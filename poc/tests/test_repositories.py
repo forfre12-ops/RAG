@@ -102,8 +102,6 @@ class TestClassifyRepo:
             confidence=0.92,
             alternatives=[{"level_code": "TS", "confidence": 0.05}],
             chunk_count=3,
-            rag_used=True,
-            rag_top_k=5,
         )
         assert cls.classification_id is not None
         assert cls.status == "staging"

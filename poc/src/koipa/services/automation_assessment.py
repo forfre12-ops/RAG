@@ -76,7 +76,6 @@ def build_automation_assessment(
         rule_agrees=(rule_grade == selected_label) if rule_grade else None,
         rule_has_evidence=getattr(prediction, "rule_has_evidence", None),
         evidence_count=len(getattr(prediction, "evidence", None) or []),
-        rag_context_count=len(getattr(prediction, "rag_context", None) or []),
         current_policy_status=status,
         current_policy_eligible=(status == "staging"),
         causal_review_reason=causal_review_reason(warnings, status),

@@ -14,7 +14,6 @@ def _prediction(**overrides):
         "model_grade": "S2",
         "rule_has_evidence": True,
         "evidence": [object()],
-        "rag_context": [],
     }
     base.update(overrides)
     return SimpleNamespace(**base)

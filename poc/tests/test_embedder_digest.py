@@ -55,20 +55,3 @@ def test_digest_is_json_serializable():
     import json
 
     json.dumps(embedder_digest(HashEmbedding(dim=8), requested="hash"))
-
-
-def test_eval_scripts_record_the_digest():
-    """배선 고정 — digest 함수만 있고 결과물에 안 실리면 아무것도 달라지지 않는다.
-
-    p2_eval_query_expansion 은 리포트 머리말에 'KURE-v1' 을 하드코딩하고 있었다.
-    임베더가 hash 로 폴백해도 리포트에는 KURE-v1 로 적혔다는 뜻이다.
-    """
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[1] / "scripts"
-    compare = (root / "p2_compare_embeddings.py").read_text(encoding="utf-8")
-    assert '"embedder_digest": digest' in compare
-
-    qe = (root / "p2_eval_query_expansion.py").read_text(encoding="utf-8")
-    assert "embedder_digest" in qe
-    assert "KURE-v1 + ES hybrid" not in qe, "리포트 머리말에 임베더가 하드코딩돼 있다"

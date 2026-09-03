@@ -13,8 +13,6 @@ class DocumentInput(BaseModel):
 
 
 class ClassifyRequest(DocumentInput):
-    use_rag: bool = False
-    rag_namespace: Optional[str] = None
     return_evidence: bool = True
 
 
@@ -75,13 +73,6 @@ class EvaluationFactors(BaseModel):
         return self
 
 
-class RagContextHit(BaseModel):
-    source_doc: str
-    chunk_id: str
-    score: float
-    text: str = ""  # 검색된 청크 본문 — 답변 합성 프롬프트에 실제 근거로 투입
-
-
 class AutomationAssessment(BaseModel):
     """자동확정 정책을 검증하기 위해 동결하는 비민감 판단 근거.
 
@@ -104,7 +95,6 @@ class AutomationAssessment(BaseModel):
     rule_agrees: Optional[bool] = None
     rule_has_evidence: Optional[bool] = None
     evidence_count: int = 0
-    rag_context_count: int = 0
     current_policy_status: str
     current_policy_eligible: bool
     causal_review_reason: Optional[str] = None
@@ -131,7 +121,6 @@ class ClassifyResponse(BaseModel):
     #   역산이 없었으면 None — 그때는 evaluation_factors 가 곧 룰 관측값이다.
     rule_evaluation_factors: Optional[EvaluationFactors] = None
     evidence: list[EvidenceSpan] = []
-    rag_context_used: list[RagContextHit] = []
     model_version: str
     elapsed_ms: int
     status: str = "staging"

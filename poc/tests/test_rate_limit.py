@@ -44,7 +44,6 @@ def _classify_payload(doc_id: str = "rl-test") -> dict:
     return {
         "doc_id": doc_id,
         "content": "특급기밀 차세대 제품 설계도",
-        "use_rag": False,
     }
 
 

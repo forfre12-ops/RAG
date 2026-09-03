@@ -64,9 +64,14 @@ def test_compose_default_matches_code_default():
     )
 
 
-@pytest.mark.parametrize("name", ["embedding_model", "rag_operational_embedding_model"])
+@pytest.mark.parametrize("name", ["embedding_model"])
 def test_embedding_settings_point_at_the_same_model(name):
-    """설정 키가 둘인데 서로 다르면 어느 쪽이 실제인지 코드마다 갈린다."""
+    """설정 키가 둘인데 서로 다르면 어느 쪽이 실제인지 코드마다 갈린다.
+
+    [2026-09] 짝이던 rag_operational_embedding_model 은 유사문서 검색 폐기로 없앴다.
+    남은 키는 하나뿐이라 지금은 자기 자신과의 대조다 — 임베딩 설정 키가 다시 늘어나면
+    여기 이름을 보태 어긋남을 잡는다.
+    """
     from koipa.config import Settings
 
     assert Settings.model_fields[name].default == \

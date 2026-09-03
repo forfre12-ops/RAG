@@ -30,7 +30,6 @@ def _make_req() -> dict:
     return ClassifyRequest(
         doc_id="not-a-uuid",
         content="이 문서는 영업비밀 등급 분류 대상입니다.",
-        use_rag=False,
         return_evidence=False,
     ).model_dump()
 
@@ -42,7 +41,6 @@ def test_classify_unit_invokes_on_stage_callback():
     req = ClassifyRequest(
         doc_id="not-a-uuid",
         content="테스트 문서",
-        use_rag=False,
         return_evidence=False,
     )
     svc.classify(req, on_stage=seen.append)

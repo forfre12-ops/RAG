@@ -1,10 +1,10 @@
-"""P1-A7: /classify/explain — 분류 근거(증거 토큰 재집계 + S/V/M 요인 분해 + RAG context) 반환.
+"""P1-A7: /classify/explain — 분류 근거(증거 토큰 재집계 + S/V/M 요인 분해) 반환.
 
 동작:
-1) `/classify`를 거쳐 결과 획득 (evidence·factors·rag_context·warnings 포함)
+1) `/classify`를 거쳐 결과 획득 (evidence·factors·warnings 포함)
 2) evidence 토큰을 등급별·요인별로 재집계 (_aggregate_evidence)
 3) 정본 3요건(S·V·M) 곱셈식 점수 분해 + 등급을 제약하는 최저 요소 노출 (_factor_decomposition)
-4) RAG context 건수·경고·판정 경로(rule vs model) 메타 첨부
+4) 경고·판정 경로(rule vs model) 메타 첨부
 
 본 라우터는 검수자 UI(FUN-024)가 "왜 이 등급?"을 사용자에게 표시하기 위해 사용.
 근거는 **룰 시드 증거 span 기반**이다. 학습 분류기의 attention/IG 등 토큰 어트리뷰션은
@@ -61,7 +61,7 @@ def _aggregate_evidence(result: ClassifyResponse) -> dict:
 
 
 def _method_label(model_version: str | None) -> str:
-    """판정 경로 표기 — 학습 분류기 사용('model+rule+rag') vs 룰 폴백('rule+rag').
+    """판정 경로 표기 — 학습 분류기 사용('model+rule') vs 룰 폴백('rule').
 
     rule-fallback(모델 미로드) 경로의 model_version 은 'rule-fallback-v0'/'rule-fallback'
     (m5_inference/pipeline.py·classify_service.py) 또는 'poc'(기본값)/'none'/빈값이다.
@@ -70,7 +70,7 @@ def _method_label(model_version: str | None) -> str:
     """
     mv = (model_version or "").strip().lower()
     is_model = bool(mv) and mv not in ("poc", "none") and not mv.startswith("rule-fallback")
-    return "model+rule+rag" if is_model else "rule+rag"
+    return "model+rule" if is_model else "rule"
 
 
 def _factor_decomposition(result: ClassifyResponse) -> dict:
@@ -109,7 +109,6 @@ def classify_explain(
     body["explain"] = {
         "evidence_aggregated": _aggregate_evidence(result),
         "factor_decomposition": _factor_decomposition(result),
-        "rag_context_count": len(result.rag_context_used or []),
         "warnings": list(result.warnings or []),
         "method": _method_label(result.model_version),
     }

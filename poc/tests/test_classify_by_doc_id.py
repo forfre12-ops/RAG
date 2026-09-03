@@ -45,7 +45,6 @@ class TestClassifyByDocId:
         payload = {
             "doc_id": str(uuid.uuid4()),
             "content": "ALD 증착 핵심 공정 레시피. 조성 비율 대외비. 반도체 공정 파라미터.",
-            "use_rag": False,
         }
         r = client.post("/api/v1/classify", headers=_hdr(), json=payload)
         assert r.status_code == 200, r.text
@@ -61,7 +60,6 @@ class TestClassifyByDocId:
         client, _, _ = client_with_storage
         payload = {
             "doc_id": str(uuid.uuid4()),
-            "use_rag": False,
         }
         r = client.post("/api/v1/classify", headers=_hdr(), json=payload)
         assert r.status_code == 200, r.text
@@ -91,9 +89,9 @@ class TestClassifyByDocId:
 
         if doc_id is None:
             # DB 미가용 — doc_id 없으니 classify by doc_id는 error
-            classify_payload = {"doc_id": str(uuid.uuid4()), "use_rag": False}
+            classify_payload = {"doc_id": str(uuid.uuid4())}
         else:
-            classify_payload = {"doc_id": doc_id, "use_rag": False}
+            classify_payload = {"doc_id": doc_id}
 
         r2 = client.post("/api/v1/classify", headers=_hdr(), json=classify_payload)
         assert r2.status_code == 200, r2.text

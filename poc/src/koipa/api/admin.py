@@ -452,15 +452,13 @@ def dashboard() -> DashboardResponse:
 # ── [DEMO] 시연 실적재 데이터 초기화 ────────────────────────────────────────────
 # 시연 콘솔(분류 콘솔 #sec-parse · admin)의 '실적재 시연'(POST /documents → /classify)으로
 # 만든 행만 물리삭제한다.
-# 스코프가 created_by='demo-console' + RAG collection='demo' 두 상수로 고정돼, 실 운영 데이터
-# (다른 created_by)는 매칭 자체가 불가하다 — 이 스코프가 1차 안전장치다. FK 순서:
+# 스코프가 created_by='demo-console' 단일 상수로 고정돼, 실 운영 데이터(다른 created_by)는
+# 매칭 자체가 불가하다 — 이 스코프가 1차 안전장치다. FK 순서:
 #   classifications 먼저(evidence·corrections 는 CASCADE 자동) → RESTRICT 참조 테이블 → chunks
-#   → documents(labels·factor_scores 는 CASCADE 자동). rag_vectors 는 별도 best-effort 트랜잭션
-#   (스토어가 pgvector 아니면 tb_rag_vectors 미존재 — 무해 skip). admin 전용.
+#   → documents(labels·factor_scores 는 CASCADE 자동). admin 전용.
 DEMO_CREATED_BY = "demo-console"   # 데모 실적재 문서 마커 (시연 구역 actor.user_id 와 일치)
 # ⚠ 이 값을 바꾸면 「데모 데이터 초기화」가 시연 화면이 만든 문서를 못 지운다.
 #   화면(index.html #sec-parse)이 보내는 actor.user_id 와 반드시 같아야 한다.
-DEMO_RAG_COLLECTION = "demo"       # 데모 업로드 RAG 색인 컬렉션 (평가 'docs' 오염 분리)
 # [SEC-4] blast-radius 안전캡 — 데모는 소수 문서다. 삭제 대상이 이 수를 크게 넘으면 실 데이터가
 # 데모 마커(created_by='demo-console')로 오태깅됐을 신호로 보고 물리삭제를 거부(fail-safe·409).
 # created_by 가 클라이언트 제어 값(업로드 actor.user_id)이라 원리상 오염 가능한 데 대한 2차 방어 —
@@ -473,7 +471,6 @@ class DemoPurgeResponse(BaseModel):
     documents: int
     classifications: int
     chunks: int
-    rag_vectors: int
     warnings: list[str] = []
 
 
@@ -483,8 +480,8 @@ class DemoPurgeResponse(BaseModel):
     dependencies=_ADMIN_ONLY,
     summary="[시연] 데모 실적재 데이터 초기화 (created_by='demo-console' 스코프 물리삭제)",
     description=(
-        "시연 콘솔(분류 콘솔 #sec-parse · admin)의 '실적재 시연'으로 만든 문서·분류·청크·RAG벡터만 삭제한다. "
-        "스코프가 created_by='demo-console' + RAG collection='demo' 로 고정돼 실 운영 데이터는 "
+        "시연 콘솔(분류 콘솔 #sec-parse · admin)의 '실적재 시연'으로 만든 문서·분류·청크만 삭제한다. "
+        "스코프가 created_by='demo-console' 로 고정돼 실 운영 데이터는 "
         "건드리지 않는다(다른 created_by 는 매칭 불가). admin 전용·물리삭제."
     ),
 )
@@ -499,7 +496,7 @@ def purge_demo_data() -> DemoPurgeResponse:
         raise HTTPException(status_code=404, detail="demo console disabled")
 
     warnings: list[str] = []
-    counts = {"documents": 0, "classifications": 0, "chunks": 0, "rag_vectors": 0}
+    counts = {"documents": 0, "classifications": 0, "chunks": 0}
     _sub = "SELECT doc_id FROM tb_documents WHERE created_by = :marker"
     _m = {"marker": DEMO_CREATED_BY}
 
@@ -540,18 +537,6 @@ def purge_demo_data() -> DemoPurgeResponse:
             res = db.execute(_sql(stmt), _m)
             if key:
                 counts[key] = int(res.rowcount or 0)
-
-    # RAG 벡터 — 별도 best-effort(테이블 미존재/스토어 상이 시 무해 skip, 문서 purge 는 이미 확정).
-    try:
-        with session_scope() as db2:
-            res = db2.execute(
-                _sql("DELETE FROM tb_rag_vectors WHERE collection = :c"),
-                {"c": DEMO_RAG_COLLECTION},
-            )
-            counts["rag_vectors"] = int(res.rowcount or 0)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("demo purge: rag vectors skipped: %s", exc)
-        warnings.append(f"rag vectors purge skipped: {type(exc).__name__}")
 
     logger.info("demo purge done: %s", counts)
     return DemoPurgeResponse(purged=True, warnings=warnings, **counts)

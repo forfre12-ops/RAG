@@ -94,7 +94,7 @@ a{color:#0a0a0a}
     <tbody>
       <tr><th>목적</th><td>등급분류가 <b>어떤 순서로, 왜 그렇게</b> 동작하는지를 배경지식 없이 이해할 수 있게 기술한다</td></tr>
       <tr><th>대상 독자</th><td>인공지능·기계학습 배경지식이 없는 독자. 검수 담당자 · 발주처 담당자 · 신규 합류자</td></tr>
-      <tr><th>짝 문서</th><td><code>등급분류_알고리즘_명세서</code> (연산 명세) ↔ 본 문서 (같은 내용의 해설)<br />서로 <b>같은 코드</b>를 설명한다. 두 문서가 어긋나면 명세서가 정본이다</td></tr>
+      <tr><th>짝 문서</th><td>「등급분류 알고리즘 명세서」 (연산 명세) ↔ 본 문서 (같은 내용의 해설)<br />서로 <b>같은 코드</b>를 설명한다. 두 문서가 어긋나면 명세서가 정본이다</td></tr>
       <tr><th>대상 코드</th><td><code>m5_inference/pipeline.py</code> · <code>m3_labeling/rule_engine.py</code> · <code>services/classify_service.py</code> · <code>services/review_reasons.py</code> · <code>config.py</code></td></tr>
       <tr><th>본 문서가 아닌 것</th><td>법적 판단 기준이 아니다. 어떤 문서가 왜 영업비밀인지(부정경쟁방지법 제2조제2호 3요건 · 발주처 정본 가이드)는 다루지 않는다</td></tr>
       <tr><th>작성일</th><td>2026-08-29</td></tr>
@@ -103,7 +103,7 @@ a{color:#0a0a0a}
   </table>
 
   <div class="note">
-    본 문서는 <code>등급분류_알고리즘_명세서</code> 와 <b>같은 코드를 근거로</b> 하되, 용어와 전제를
+    본 문서는 「등급분류 알고리즘 명세서」 와 <b>같은 코드를 근거로</b> 하되, 용어와 전제를
     풀어 쓴 해설본이다. 수치·임계값·판정 순서는 명세서와 동일하며 새로 만든 값은 없다.
   </div>
 
@@ -194,7 +194,6 @@ a{color:#0a0a0a}
     관리를 안 한다”가 <b>입증된</b> 경우에만 준다. 본문에 언급이 없을 뿐이면 0 이 아니라 1 로 둔다.
     이 구분이 없으면 곱이 0 으로 무너져 S2 문서가 줄줄이 S3 로 떨어진다(과소분류).
   </div>
-  <p class="src">grade_from_svm() · grade_from_svm_floored() — m3_labeling/rule_engine.py:60, :79</p>
 
   <h2>3. 문서 한 건이 지나가는 길</h2>
 
@@ -211,7 +210,7 @@ a{color:#0a0a0a}
   │
   ├─ 4  <b>보정</b>              룰 점수 · 출처 · 보안표시로 등급을 올리거나 내린다  [등급 변경]
   │
-  ├─ 5  검수 게이트            15개를 순서대로 본다. 하나라도 걸리면 사람에게
+  ├─ 5  검수 게이트            14개를 순서대로 본다. 하나라도 걸리면 사람에게
   │
   └─ 결과                    등급 · 신뢰도 · 근거 · 상태
                              staging = 자동확정 · needs_review = 사람 검수 대기</div>
@@ -242,7 +241,7 @@ a{color:#0a0a0a}
   <div class="note">
     <b>세 손질의 공통점.</b> 모두 “확신을 낮추고 심각한 쪽으로 기울인다”는 같은 방향이다.
     τ=0.30은 임의로 고른 값이 아니라 홀드아웃 평가셋을 훑어 정한 운영점이다
-    (미탐률 0.174 → 0.087 · 검수 부담 +5%p). 값의 근거는 <code>config.py</code> 프로파일 주석에 있다.
+    (미탐률 0.174 → 0.087 · 검수 부담 +5%p).
   </div>
 
   <h3>3단계 · 룰 엔진 — 낱말을 센다</h3>
@@ -267,9 +266,8 @@ a{color:#0a0a0a}
     같은 이유로 본문에서 찾은 <b>공개 신호는 등급을 내리지 않는다</b>. 올라가는 것을 막을 뿐이다.
     내리는 판단은 본문이 아니라 <b>출처</b>(§4)가 한다.
   </div>
-  <p class="src">rule_engine.label() — m3_labeling/rule_engine.py:521 · 전수 열거는 poc/scripts/audit_rule_formula.py</p>
 
-  <div class="tw"><!-- FIG:flow --><svg viewBox="0 0 940 578" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="서빙 경로 다섯 단계를 세로로 그린 도식. 등급을 산출하거나 바꾸는 단계는 둘뿐이다"><style>.t{font:12px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 13px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.d{font:11px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.n{font:700 12px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.bg{font:700 10.5px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.bgo{font:700 10.5px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}</style><text class="th" x="8" y="26">문서 한 건이 등급을 받기까지 &#8212; 서빙 경로 다섯 단계</text><text class="d" x="8" y="46">등급을 <tspan class="th">산출하거나 바꾸는 단계는 2·4 둘뿐</tspan>이다. 3 은 등급을 정하지 않고, 5 는 자동확정 여부만 정한다.</text><rect x="150" y="66" width="470" height="24" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="t" x="162" y="83">입력 &#8212; 문서 또는 텍스트 + ICD 메타데이터</text><line x1="174" y1="90" x2="174" y2="102" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="104" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="104" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="120" text-anchor="middle">1</text><text class="th" x="184" y="120">전처리</text><text class="d" x="162" y="138">텍스트 추출 → 정규화 → PII 마스킹 → 청크 분할</text><line x1="174" y1="160" x2="174" y2="172" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="174" width="470" height="62" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="174" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="190" text-anchor="middle">2</text><text class="th" x="184" y="190">분류기 추론</text><text class="d" x="162" y="208">KF-DeBERTa 청크별 softmax · 온도 보정 2.03 · TS·S1 은</text><text class="d" x="162" y="223">최댓값, 그 외 길이 가중 평균 · 위험도 순 선택 τ=0.30</text><rect x="646" y="174" width="86" height="20" fill="#0a0a0a" stroke="#0a0a0a"/><text class="bg" x="689" y="188" text-anchor="middle">등급 결정</text><line x1="174" y1="248" x2="174" y2="260" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="262" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="262" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="278" text-anchor="middle">3</text><text class="th" x="184" y="278">룰 등급 산출</text><text class="d" x="162" y="296">키워드 argmax → 요소 정합 → 상위 등급 채택</text><rect x="646" y="262" width="86" height="20" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="bgo" x="689" y="276" text-anchor="middle">등급 결정 아님</text><line x1="174" y1="318" x2="174" y2="330" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="332" width="470" height="62" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="332" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="348" text-anchor="middle">4</text><text class="th" x="184" y="348">등급 보정</text><text class="d" x="162" y="366">미탐 방지 상향(올림); 출처 상한(내림); 보안표시 하한(올림) · 룰 상향 임계</text><text class="d" x="162" y="381">TS 3.0 · S1 2.2 · S2 1.6</text><rect x="646" y="332" width="86" height="20" fill="#0a0a0a" stroke="#0a0a0a"/><text class="bg" x="689" y="346" text-anchor="middle">등급 변경</text><line x1="174" y1="406" x2="174" y2="418" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="420" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="420" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="436" text-anchor="middle">5</text><text class="th" x="184" y="436">검수 라우팅</text><text class="d" x="162" y="454">게이트 15개를 순서대로 · 신뢰도 임계 0.50</text><rect x="646" y="420" width="86" height="20" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="bgo" x="689" y="434" text-anchor="middle">라우팅</text><line x1="174" y1="476" x2="174" y2="488" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="490" width="470" height="26" fill="#0a0a0a"/><text class="n" x="162" y="508">출력 &#8212; 등급 · 신뢰도 · 근거 · 상태(staging / needs_review)</text><defs><marker id="fah" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#0a0a0a"/></marker></defs><text class="d" x="8" y="542">값은 배포 프로파일(full-train)에서 읽어 그린다 &#8212; 설정이 바뀌면 이 그림도 함께 바뀐다.</text></svg><!-- /FIG:flow --></div>
+  <div class="tw"><!-- FIG:flow --><svg viewBox="0 0 940 578" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="서빙 경로 다섯 단계를 세로로 그린 도식. 등급을 산출하거나 바꾸는 단계는 둘뿐이다"><style>.t{font:12px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 13px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.d{font:11px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.n{font:700 12px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.bg{font:700 10.5px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.bgo{font:700 10.5px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}</style><text class="th" x="8" y="26">문서 한 건이 등급을 받기까지 &#8212; 서빙 경로 다섯 단계</text><text class="d" x="8" y="46">등급을 <tspan class="th">산출하거나 바꾸는 단계는 2·4 둘뿐</tspan>이다. 3 은 등급을 정하지 않고, 5 는 자동확정 여부만 정한다.</text><rect x="150" y="66" width="470" height="24" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="t" x="162" y="83">입력 &#8212; 문서 또는 텍스트 + ICD 메타데이터</text><line x1="174" y1="90" x2="174" y2="102" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="104" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="104" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="120" text-anchor="middle">1</text><text class="th" x="184" y="120">전처리</text><text class="d" x="162" y="138">텍스트 추출 → 정규화 → PII 마스킹 → 청크 분할</text><line x1="174" y1="160" x2="174" y2="172" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="174" width="470" height="62" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="174" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="190" text-anchor="middle">2</text><text class="th" x="184" y="190">분류기 추론</text><text class="d" x="162" y="208">KF-DeBERTa 청크별 softmax · 온도 보정 2.03 · TS·S1 은</text><text class="d" x="162" y="223">최댓값, 그 외 길이 가중 평균 · 위험도 순 선택 τ=0.30</text><rect x="646" y="174" width="86" height="20" fill="#0a0a0a" stroke="#0a0a0a"/><text class="bg" x="689" y="188" text-anchor="middle">등급 결정</text><line x1="174" y1="248" x2="174" y2="260" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="262" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="262" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="278" text-anchor="middle">3</text><text class="th" x="184" y="278">룰 등급 산출</text><text class="d" x="162" y="296">키워드 argmax → 요소 정합 → 상위 등급 채택</text><rect x="646" y="262" width="86" height="20" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="bgo" x="689" y="276" text-anchor="middle">등급 결정 아님</text><line x1="174" y1="318" x2="174" y2="330" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="332" width="470" height="62" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="332" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="348" text-anchor="middle">4</text><text class="th" x="184" y="348">등급 보정</text><text class="d" x="162" y="366">미탐 방지 상향(올림); 출처 상한(내림); 보안표시 하한(올림) · 룰 상향 임계</text><text class="d" x="162" y="381">TS 3.0 · S1 2.2 · S2 1.6</text><rect x="646" y="332" width="86" height="20" fill="#0a0a0a" stroke="#0a0a0a"/><text class="bg" x="689" y="346" text-anchor="middle">등급 변경</text><line x1="174" y1="406" x2="174" y2="418" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="420" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="420" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="436" text-anchor="middle">5</text><text class="th" x="184" y="436">검수 라우팅</text><text class="d" x="162" y="454">게이트 14개를 순서대로 · 신뢰도 임계 0.50</text><rect x="646" y="420" width="86" height="20" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="bgo" x="689" y="434" text-anchor="middle">라우팅</text><line x1="174" y1="476" x2="174" y2="488" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="490" width="470" height="26" fill="#0a0a0a"/><text class="n" x="162" y="508">출력 &#8212; 등급 · 신뢰도 · 근거 · 상태(staging / needs_review)</text><defs><marker id="fah" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#0a0a0a"/></marker></defs><text class="d" x="8" y="542">값은 배포 프로파일(full-train)에서 읽어 그린다 &#8212; 설정이 바뀌면 이 그림도 함께 바뀐다.</text></svg><!-- /FIG:flow --></div>
 
   <h2>4. 등급을 바꾸는 보정 — 세 가지</h2>
 
@@ -334,9 +332,8 @@ a{color:#0a0a0a}
     S3로 내려갔다가 다시 올라온다. 둘이 충돌하면 <b>문서에 찍힌 표시가 이긴다</b>. 그리고 이 문서는 이미
     <code>cap-conflict</code> 로 검수 대기가 되어 있다.
   </div>
-  <p class="src">pipeline.run() — m5_inference/pipeline.py:660 이후 · ICD 매핑은 m3_labeling/rule_engine.py:143</p>
 
-  <h2>5. 검수로 넘기는 15개 게이트</h2>
+  <h2>5. 검수로 넘기는 14개 게이트</h2>
 
   <p>보정까지 끝나면 등급은 확정이다. 마지막 단계는 <b>이 판정을 자동으로 확정해도 되는가</b>만 정한다.
   여기서 말하는 <b>검수 게이트</b>는 <b>등급을 바꾸지 않는다</b>. 상태만 둘 중 하나로 정한다.
@@ -368,7 +365,6 @@ a{color:#0a0a0a}
       <tr><td class="c">12</td><td>룰·모델 불일치</td><td>AI와 룰의 등급이 다르다 (단, 룰이 실제 근거를 냈을 때만)</td><td class="c ok">ON</td></tr>
       <tr><td class="c">13</td><td>LLM 2차 의견</td><td>대형언어모델이 더 높은 등급을 제시했다</td><td class="c off">OFF</td></tr>
       <tr><td class="c">14</td><td>kill-gate 안전브레이크</td><td>모델 이상 신호가 켜진 동안 고등급 자동확정을 멈춘다</td><td class="c off">OFF</td></tr>
-      <tr><td class="c">15</td><td>유사도 escalation</td><td>사람이 더 높은 등급으로 확정한 문서와 많이 닮았다</td><td class="c off">OFF</td></tr>
     </tbody>
   </table>
   </div>
@@ -378,9 +374,9 @@ a{color:#0a0a0a}
     분류 전체를 실패시키거나, 그냥 통과시키거나. 여기서는 <b>분류는 계속하되 그 사실을 기록하고 사람에게
     넘긴다</b>. 검사를 못 한 문서가 검사를 통과한 문서인 척하지 않게 하려는 것이다.
     <br><br>
-    실제로 이 장치가 일한 적이 있다. 관리 화면에서 등록한 태깅 규칙 하나의 정규식이 깨져 있었고, 그 오류가
-    룰 라벨링을 문서마다 중단시켜 <b>미탐 방지 상향과 12번 합의 게이트가 함께 멈춰</b> 있었다. 지금은 규칙
-    등록 시점에 정규식을 검사해 거부하고, 이미 저장된 규칙이 깨져 있으면 그 규칙만 무시한다.
+    같은 이유로, 관리 화면에서 등록하는 태깅 규칙은 <b>등록 시점에 정규식을 검사해 거부</b>하고,
+    이미 저장된 규칙이 깨져 있으면 <b>그 규칙만 무시</b>한다. 규칙 하나의 오류가 룰 라벨링 전체를
+    멈추지 않도록 경계를 나눈 것이다.
   </div>
 
   <div class="note">
@@ -388,16 +384,13 @@ a{color:#0a0a0a}
     이건 “공개 문서라고 판단했다”가 아니라 <b>“할 말이 없다”</b> 이다. 이 둘을 구분하지 않고 AI 등급과
     비교하면 룰 사전에 없는 어휘로 쓰인 문서가 전부 불일치로 몰려 검수 대기가 된다. 그래서 룰이 실제
     키워드를 잡았을 때만 불일치로 친다.
-    <br>다만 <b>본문에 “대외비” 같은 관리표시가 있으면</b> 키워드가 0건이어도 “할 말 없음”으로 치지 않는다 —
-    실제로 “관계자 외 열람을 제한합니다”가 적힌 비공개 메모가 키워드 0건으로 통과해 신뢰도 0.959로
-    자동확정된 적이 있다.
+    <br>다만 <b>본문에 “대외비” 같은 관리표시가 있으면</b> 키워드가 0건이어도 “할 말 없음”으로 치지 않는다.
+    사전에 없는 어휘로 쓰였더라도 관리표시가 있으면 룰이 의견을 낸 것으로 보고 대조 대상에 넣는다.
   </div>
   <p class="src">게이트 순서 정본 — services/review_reasons.py:34 · 판정 코드는 services/classify_service.py
-  <br>같은 파일에 16번째 항목 <code>extraction-gate</code> 가 보이는데, 그것은 시연·진단 화면
-  (<code>POST /documents/analyze</code>) 전용이라 위 표에 넣지 않았다. 실제 연동 경로에서 같은 상황
-  (표 누락·OCR 필요·저품질 추출)은 위 표 <b>2번 열화추출 격리</b> 가 잡는다.</p>
+  <br>연동 경로에서 표 누락·OCR 필요·저품질 추출은 위 표 <b>2번 열화추출 격리</b> 가 잡는다.</p>
 
-  <div class="tw"><!-- FIG:funnel --><svg viewBox="0 0 940 593" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="검수 라우팅 게이트를 순서대로 통과하는 퍼널 도식. 앞 게이트에 걸리면 뒤 게이트는 평가되지 않는다"><style>.t{font:12px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 12.5px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.m{font:10.5px ui-monospace,monospace;fill:#71717a}.d{font:11px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.n{font:700 11px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.hit{font:700 11px "Pretendard","Noto Sans KR",sans-serif;fill:#7f1d1d}</style><text class="th" x="8" y="26">문서 한 건이 등급을 받은 뒤 &#8212; 게이트 15개를 순서대로 지난다</text><text class="d" x="8" y="46">앞 게이트가 걸리면 <tspan class="th">뒤 게이트는 평가되지 않는다</tspan>. 그래서 한 문서의 검수 사유는 처음 걸린 게이트 하나다.</text><text class="d" x="8" y="66">아래 숫자는 경화 홀드아웃 42건 실측(2026-08-29) &#8212; 실제로 발동한 게이트는 <tspan class="hit">둘뿐</tspan>이다.</text><rect x="150" y="66" width="490" height="20" fill="#f4f4f5"/><text class="d" x="158" y="80">입력 42건</text><text class="d" x="652" y="80">걸리면 &#8594; 검수</text><rect x="150" y="92" width="490" height="22" fill="#fff5f5" stroke="#7f1d1d"/><rect x="8" y="92" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="107" text-anchor="middle">1</text><text class="t" x="36" y="107">저신뢰</text><text class="m" x="160" y="107">low-confidence</text><text class="hit" x="652" y="107">&#8594; 검수 6건</text><rect x="152" y="119" width="485" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="119" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="134" text-anchor="middle">2</text><text class="t" x="36" y="134">열화추출 격리</text><text class="m" x="162" y="134">ingestion-degraded</text><rect x="155" y="146" width="479" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="146" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="161" text-anchor="middle">3</text><text class="t" x="36" y="161">출처 상한이 상향 신호를 덮음</text><text class="m" x="165" y="161">cap-conflict</text><rect x="158" y="173" width="473" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="173" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="188" text-anchor="middle">4</text><text class="t" x="36" y="188">근거 희소</text><text class="m" x="168" y="188">sparse-evidence</text><rect x="161" y="200" width="467" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="200" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="215" text-anchor="middle">5</text><text class="t" x="36" y="215">영문 약어만으로 승격</text><text class="m" x="171" y="215">abbrev-only-escalation</text><rect x="164" y="227" width="461" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="227" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="242" text-anchor="middle">6</text><text class="t" x="36" y="242">무음 빈본문</text><text class="m" x="174" y="242">body-below-threshold</text><rect x="167" y="254" width="455" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="254" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="269" text-anchor="middle">7</text><text class="t" x="36" y="269">접근범위와 예측 충돌</text><text class="m" x="177" y="269">metadata-access-conflict</text><rect x="170" y="281" width="449" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="281" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="296" text-anchor="middle">8</text><text class="t" x="36" y="296">관리성 부재와 예측 충돌</text><text class="m" x="180" y="296">metadata-management-conflict</text><rect x="173" y="308" width="443" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="308" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="323" text-anchor="middle">9</text><text class="t" x="36" y="323">ICD 규약값 부적합</text><text class="m" x="183" y="323">icd-metadata-fnr-risk</text><rect x="176" y="335" width="438" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="335" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="350" text-anchor="middle">10</text><text class="t" x="36" y="350">내부 신호가 있는데 S3 예측</text><text class="m" x="186" y="350">s2-underclass-risk</text><rect x="179" y="362" width="432" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="362" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="377" text-anchor="middle">11</text><text class="t" x="36" y="377">게이트가 예외로 미적용</text><text class="m" x="189" y="377">gate-fail-open</text><rect x="182" y="389" width="426" height="22" fill="#fff5f5" stroke="#7f1d1d"/><rect x="8" y="389" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="404" text-anchor="middle">12</text><text class="t" x="36" y="404">룰·모델 불일치</text><text class="m" x="192" y="404">agreement-gate</text><text class="hit" x="652" y="404">&#8594; 검수 2건</text><rect x="185" y="416" width="420" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="416" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="431" text-anchor="middle">13</text><text class="t" x="36" y="431">LLM 2차 의견이 더 높음</text><text class="m" x="195" y="431">llm-secondopinion</text><rect x="188" y="443" width="414" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="443" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="458" text-anchor="middle">14</text><text class="t" x="36" y="458">배포 차단 신호 발동 중</text><text class="m" x="198" y="458">kill-gate-brake</text><rect x="191" y="470" width="408" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="470" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="485" text-anchor="middle">15</text><text class="t" x="36" y="485">사람 확정 문서와 유사</text><text class="m" x="201" y="485">similarity-escalation</text><rect x="150" y="503" width="490" height="26" fill="#0a0a0a"/><text class="n" x="160" y="521">모든 게이트를 통과 &#8594; 자동확정(staging) 34건 · 81.0%</text><text class="hit" x="652" y="521">검수 8건</text><text class="d" x="8" y="553">게이트는 <tspan class="th">등급을 바꾸지 않는다</tspan> &#8212; 자동확정할지 사람에게 보낼지만 정한다. 등급을 바꾸는 것은 그 앞의 보정이다.</text><text class="d" x="8" y="573">같은 목록에 16번째 <tspan class="m">extraction-gate</tspan> 가 있으나 진단·시연 엔드포인트 전용이라 이 그림에서 뺐다.</text></svg><!-- /FIG:funnel --></div>
+  <div class="tw"><!-- FIG:funnel --><svg viewBox="0 0 940 566" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="검수 라우팅 게이트를 순서대로 통과하는 퍼널 도식. 앞 게이트에 걸리면 뒤 게이트는 평가되지 않는다"><style>.t{font:12px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 12.5px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.m{font:10.5px ui-monospace,monospace;fill:#71717a}.d{font:11px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.n{font:700 11px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.hit{font:700 11px "Pretendard","Noto Sans KR",sans-serif;fill:#7f1d1d}</style><text class="th" x="8" y="26">문서 한 건이 등급을 받은 뒤 &#8212; 게이트 14개를 순서대로 지난다</text><text class="d" x="8" y="46">앞 게이트가 걸리면 <tspan class="th">뒤 게이트는 평가되지 않는다</tspan>. 그래서 한 문서의 검수 사유는 처음 걸린 게이트 하나다.</text><text class="d" x="8" y="66">아래 숫자는 경화 홀드아웃 42건 실측(2026-08-29) &#8212; 실제로 발동한 게이트는 <tspan class="hit">둘뿐</tspan>이다.</text><rect x="150" y="66" width="490" height="20" fill="#f4f4f5"/><text class="d" x="158" y="80">입력 42건</text><text class="d" x="652" y="80">걸리면 &#8594; 검수</text><rect x="150" y="92" width="490" height="22" fill="#fff5f5" stroke="#7f1d1d"/><rect x="8" y="92" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="107" text-anchor="middle">1</text><text class="t" x="36" y="107">저신뢰</text><text class="m" x="160" y="107">low-confidence</text><text class="hit" x="652" y="107">&#8594; 검수 6건</text><rect x="152" y="119" width="485" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="119" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="134" text-anchor="middle">2</text><text class="t" x="36" y="134">열화추출 격리</text><text class="m" x="162" y="134">ingestion-degraded</text><rect x="155" y="146" width="479" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="146" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="161" text-anchor="middle">3</text><text class="t" x="36" y="161">출처 상한이 상향 신호를 덮음</text><text class="m" x="165" y="161">cap-conflict</text><rect x="158" y="173" width="473" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="173" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="188" text-anchor="middle">4</text><text class="t" x="36" y="188">근거 희소</text><text class="m" x="168" y="188">sparse-evidence</text><rect x="161" y="200" width="467" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="200" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="215" text-anchor="middle">5</text><text class="t" x="36" y="215">영문 약어만으로 승격</text><text class="m" x="171" y="215">abbrev-only-escalation</text><rect x="164" y="227" width="461" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="227" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="242" text-anchor="middle">6</text><text class="t" x="36" y="242">무음 빈본문</text><text class="m" x="174" y="242">body-below-threshold</text><rect x="167" y="254" width="455" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="254" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="269" text-anchor="middle">7</text><text class="t" x="36" y="269">접근범위와 예측 충돌</text><text class="m" x="177" y="269">metadata-access-conflict</text><rect x="170" y="281" width="449" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="281" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="296" text-anchor="middle">8</text><text class="t" x="36" y="296">관리성 부재와 예측 충돌</text><text class="m" x="180" y="296">metadata-management-conflict</text><rect x="173" y="308" width="443" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="308" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="323" text-anchor="middle">9</text><text class="t" x="36" y="323">ICD 규약값 부적합</text><text class="m" x="183" y="323">icd-metadata-fnr-risk</text><rect x="176" y="335" width="438" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="335" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="350" text-anchor="middle">10</text><text class="t" x="36" y="350">내부 신호가 있는데 S3 예측</text><text class="m" x="186" y="350">s2-underclass-risk</text><rect x="179" y="362" width="432" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="362" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="377" text-anchor="middle">11</text><text class="t" x="36" y="377">게이트가 예외로 미적용</text><text class="m" x="189" y="377">gate-fail-open</text><rect x="182" y="389" width="426" height="22" fill="#fff5f5" stroke="#7f1d1d"/><rect x="8" y="389" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="404" text-anchor="middle">12</text><text class="t" x="36" y="404">룰·모델 불일치</text><text class="m" x="192" y="404">agreement-gate</text><text class="hit" x="652" y="404">&#8594; 검수 2건</text><rect x="185" y="416" width="420" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="416" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="431" text-anchor="middle">13</text><text class="t" x="36" y="431">LLM 2차 의견이 더 높음</text><text class="m" x="195" y="431">llm-secondopinion</text><rect x="188" y="443" width="414" height="22" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="443" width="22" height="22" fill="#0a0a0a"/><text class="n" x="19" y="458" text-anchor="middle">14</text><text class="t" x="36" y="458">배포 차단 신호 발동 중</text><text class="m" x="198" y="458">kill-gate-brake</text><rect x="150" y="476" width="490" height="26" fill="#0a0a0a"/><text class="n" x="160" y="494">모든 게이트를 통과 &#8594; 자동확정(staging) 34건 · 81.0%</text><text class="hit" x="652" y="494">검수 8건</text><text class="d" x="8" y="526">게이트는 <tspan class="th">등급을 바꾸지 않는다</tspan> &#8212; 자동확정할지 사람에게 보낼지만 정한다. 등급을 바꾸는 것은 그 앞의 보정이다.</text><text class="d" x="8" y="546">게이트는 운영 적재 경로 기준 14개다 &#8212; 진단·시연 전용 항목은 이 그림에서 뺐다.</text></svg><!-- /FIG:funnel --></div>
 
   <h2>6. 자주 묻는 질문</h2>
 
@@ -410,15 +403,15 @@ a{color:#0a0a0a}
   <p>AI가 그 등급에 준 확률이다. <b>정답률이 아니다.</b> 온도 보정(2.03)을 거친 뒤의 값이라 보정 전보다
   전반적으로 낮게 나온다. 0.50 미만이면 검수로 보낸다.</p>
   <p>이 숫자는 API 응답·데이터베이스·감사로그에 그대로 남지만 <b>검수 화면에는 띄우지 않는다</b>. 숫자로
-  세워 두면 정답 확률처럼 읽히는데 실제 판별력은 그렇지 못하다(골든500 기준 AUROC 0.58 · ECE 0.18 —
-  0.5가 동전 던지기다). 자동확정을 가르는 것도 이 값 단독이 아니다. 그래서 화면은 숫자 대신
+  세워 두면 정답 확률처럼 읽히는데, 이 값 단독으로는 정답·오답을 가르는 판별력이 충분하지 않다.
+  자동확정을 가르는 것도 이 값 하나가 아니다. 그래서 화면은 숫자 대신
   <b>자동확정인가 검수인가, 그리고 왜 검수인가</b>를 보여 준다.</p>
 
   <div class="q">Q3. 임계 0.50은 어떻게 정했나? 올리면 더 안전해지나?</div>
-  <p>홀드아웃 평가셋 두 종으로 0.45~0.70 구간을 훑어서 정했다. 결과는 이랬다 — 임계를 0.70에서 0.50으로
-  내려도 <b>고등급 미탐(놓친 비밀)은 전 구간에서 변하지 않았고</b>, 자동확정 비율만 64.3% → 81.0%
-  (hardened42), 58.7% → 75.2%(holdout109)로 올랐다. 즉 이 임계는 안전이 아니라 <b>검수 부담</b>을 가르는
-  손잡이다. 올리면 사람 일이 늘 뿐 더 안전해지지 않는다.</p>
+  <p>홀드아웃 평가셋 두 종으로 0.45~0.70 구간을 훑어서 정했다. 임계를 0.70에서 0.50으로 내려도
+  <b>고등급 미탐(놓친 비밀)은 전 구간에서 변하지 않았고</b>, 자동확정 비율만 올랐다.
+  즉 이 임계는 안전이 아니라 <b>검수 부담</b>을 가르는 손잡이다.
+  올리면 사람 일이 늘 뿐 더 안전해지지 않는다.</p>
 
   <div class="q">Q4. AI는 S3라고 했는데 화면에는 S1이 떠 있다. 고장인가?</div>
   <p>정상이다. §4의 보정이 올린 것이다. 판정 결과에 <b>왜 그렇게 됐는지 한 줄</b>이 함께 실린다.
@@ -448,9 +441,8 @@ agreement (룰·모델 모두 S2 일치 → 자동 확정)</pre>
 
   <h2>7. 지금 돌아가는 값</h2>
 
-  <p>아래는 <b>223 배포 프로파일(full-train)이 적용하는 값</b>이다. 컨테이너 환경변수로 따로 지정한 값이 없으면
-  이 프로파일 기본값이 그대로 쓰인다. <b>어느 행이 서버에서 직접 읽은 값이고 어느 행이 프로파일 기본값인지는
-  명세서 §6 이 행마다 구분해 적었다</b> — 그쪽이 정본이다.</p>
+  <p>아래는 <b>시험 서버 배포 프로파일(full-train)이 적용하는 값</b>이다.
+  <b>행마다 출처를 구분해 적은 것은 명세서 §6 이며</b> — 그쪽이 정본이다.</p>
 
   <div class="tw">
   <table>
@@ -469,7 +461,6 @@ agreement (룰·모델 모두 S2 일치 → 자동 확정)</pre>
     </tbody>
   </table>
   </div>
-  <p class="src">근거 — 값은 poc/src/koipa/config.py (onprem-local · full-train 두 프로파일의 해당 값은 동일하다) · 223 서버 실측(docker inspect koipa-jjw-api-1)은 등급분류_알고리즘_명세서 §6</p>
 
   <h2>8. 용어</h2>
 
@@ -495,11 +486,11 @@ agreement (룰·모델 모두 S2 일치 → 자동 확정)</pre>
 
   <h2>9. 더 자세히 보려면</h2>
 
-  <p>정확한 연산 순서와 조건식은 함께 동봉한 <code>등급분류_알고리즘_명세서</code> 에 있다.
+  <p>정확한 연산 순서와 조건식은 함께 동봉한 「등급분류 알고리즘 명세서」 에 있다.
   본 문서와 어긋나면 <b>명세서가 정본이다.</b> 룰 판정식의 전수 검증(16조합 전수 열거와
   평가셋 4종 993건 실측)은 그 문서 &sect;4-2~4-3 이다.</p>
 
-  <div class="foot">근거 파일 &mdash; <code>poc/src/koipa/modules/m5_inference/pipeline.py</code> · <code>poc/src/koipa/modules/m3_labeling/rule_engine.py</code> · <code>poc/src/koipa/services/classify_service.py</code> · <code>poc/src/koipa/services/review_reasons.py</code> · <code>poc/src/koipa/config.py</code> · <code>poc/src/koipa/api/static/admin.html</code> · 본 묶음 첨부 「등급분류 알고리즘 명세서」</div>
+  <div class="foot">등급분류 알고리즘 쉬운 설명서 — 한국지식재산보호원 AI 영업비밀 등급분류 시스템</div>
 
 </div>
 </body>

@@ -82,10 +82,11 @@ class TestKPIRegistry:
         assert "trained_model" in s1_3.requires
         assert "trained_model" in s1_4.requires
 
-    def test_s5_4_requires_pg_and_trained_model(self):
-        s5_4 = kpi_by_id("S5.4")
-        assert "pg" in s5_4.requires            # 벡터 검색이 PG로 이전(ES 제거)
-        assert "trained_model" in s5_4.requires
+    def test_pg_backed_kpi_declares_pg_requirement(self):
+        # [2026-09] 종전 대상이던 S5.4(Recall@5)는 유사문서 검색 폐기로 없어졌다.
+        # 확인하려는 것은 "DB 가 있어야 재는 KPI 에 requires 가 실제로 붙어 있나" 다.
+        s3_3 = kpi_by_id("S3.3")
+        assert "pg" in s3_3.requires
 
 
 class TestAvailableResources:
@@ -165,6 +166,6 @@ class TestRequiresSkipsKPI:
 
     def test_satisfied_requires_empty_missing(self):
         r = AvailableResources(pg=True, es=True, trained_model=True)
-        kpi = kpi_by_id("S5.4")  # requires=["pg", "trained_model"]
+        kpi = kpi_by_id("S3.3")  # requires=["pg"]
         missing = [name for name in kpi.requires if not r.has(name)]
         assert missing == []

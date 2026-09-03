@@ -296,7 +296,6 @@ def test_evidence_failure_does_not_discard_classification(monkeypatch):
         scores = {"TS": 1.0}
         confidence = 0.9
         model_version = "test"
-        rag_context = []
         evidence = [EvidenceSpan(text="비밀 근거", start=0, end=4, weight=1.0, tag="keyword_match")]
 
     class _Req:
@@ -338,7 +337,6 @@ def test_classification_returned_when_no_evidence(monkeypatch):
         scores = {"TS": 1.0}
         confidence = 0.9
         model_version = "test"
-        rag_context = []
         evidence = []
 
     class _Req:

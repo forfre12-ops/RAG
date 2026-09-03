@@ -10,8 +10,6 @@ from pydantic import BaseModel
 class GuideUploadResponse(BaseModel):
     guide_id: str
     version: str
-    indexed: bool
-    embedding_vector_count: int
     triggers_retraining: bool
 
 

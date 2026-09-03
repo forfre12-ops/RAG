@@ -158,7 +158,7 @@ def test_mrenorm_override_path_keeps_label_scores_confidence_consistent(monkeypa
 
     monkeypatch.setattr(pipe.labeling.engine, "label", lambda _t: _RuleRes())
     # source-prior가 cap으로 끼어들지 않도록 metadata 미지정.
-    res = pipe.run(text="원천기술 수식 한 문단", use_rag=False)
+    res = pipe.run(text="원천기술 수식 한 문단")
 
     assert res.label == Grade.TS, "룰 TS override가 적용되어야 함 (fail-SECURE)"
     # label == scores argmax
@@ -190,7 +190,7 @@ def test_mrenorm_source_prior_cap_keeps_consistency(monkeypatch):
 
     monkeypatch.setattr(pipe.labeling.engine, "label", lambda _t: _RuleRes())
 
-    res = pipe.run(text="공개 판례 본문", use_rag=False,
+    res = pipe.run(text="공개 판례 본문",
                    metadata={"source": "court_decision"})
 
     assert res.label == Grade.S3, "공개 출처는 S3로 cap (비공지성 게이트)"

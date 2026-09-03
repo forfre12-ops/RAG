@@ -18,7 +18,7 @@ def test_rule_fallback_predicts_all_grades():
         ("S3", "보도자료 공시 채용 공고 회사 소개 이용약관"),
     ]
     for truth, text in cases:
-        res = pipe.run(text=text, use_rag=False, metadata={}, return_evidence=True)
+        res = pipe.run(text=text, metadata={}, return_evidence=True)
         pred = res.label.value if hasattr(res.label, "value") else str(res.label)
         assert pred == truth, f"target={truth}, predicted={pred}"
         assert res.model_version == "rule-fallback-v0"
@@ -54,7 +54,7 @@ def _abbrev_only_doc() -> str:
 
 def test_fix_e_abbrev_only_promotion_tagged_grade_unchanged():
     pipe = InferencePipeline()
-    res = pipe.run(text=_abbrev_only_doc(), use_rag=False, return_evidence=False)
+    res = pipe.run(text=_abbrev_only_doc(), return_evidence=False)
     joined = " ".join(res.warnings or [])
     # 승격이 일어났고(청크 severe-agg), 그 근거가 약어-only → 전용 태그가 붙는다.
     if "chunk severe-agg" in joined:
@@ -73,7 +73,7 @@ def test_fix_e_preserves_autoconfirm_for_korean_seed_secret():
         "본 자료는 특급기밀이며 반도체 공정 레시피와 EUV 공정 파라미터, 특수 합금 조성비를 "
         "CVD·N2O 공정으로 정리한다. 1급 비밀. "
     ) * 8
-    res = pipe.run(text=text, use_rag=False, return_evidence=False)
+    res = pipe.run(text=text, return_evidence=False)
     joined = " ".join(res.warnings or [])
     assert "abbrev-only-escalation" not in joined, (
         "한국어 시드 기반 고등급인데 약어-only로 오판: " + joined

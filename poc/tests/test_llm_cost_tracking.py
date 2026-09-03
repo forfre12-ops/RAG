@@ -84,23 +84,6 @@ def test_usage_jsonl_records_concrete_build_sha(tmp_path, monkeypatch):
     assert row["build_sha"] == "4d4c012898ba"
 
 
-def test_expand_llm_records_query_expansion_usage(tmp_path, monkeypatch):
-    import koipa.services.llm_usage_service as us
-    from koipa.rag import query_expansion as qe
-    monkeypatch.setattr(us, "_default_service", us.LLMUsageService(jsonl_path=str(tmp_path / "u.jsonl")))
-
-    class _Stub:
-        name = "anthropic"
-
-        def generate(self, prompt, **k):
-            return LLMResponse(text='["쿼리1","쿼리2"]', usage=_usage(provider="anthropic", model="claude-opus-4-8", cost=0.005))
-
-    c0 = _calls("anthropic", "claude-opus-4-8", "query_expansion")
-    out = qe.expand_llm("테스트 쿼리", provider=_Stub())
-    assert out.method == "llm"
-    assert _calls("anthropic", "claude-opus-4-8", "query_expansion") == c0 + 1
-
-
 def _labeler_stub(cost=0.003):
     class _Stub:
         name = "anthropic"

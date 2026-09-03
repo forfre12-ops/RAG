@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import tempfile
 import time
 from typing import Optional
@@ -28,32 +27,6 @@ from koipa.services.document_ingestion_service import (
 )
 
 router = APIRouter(tags=["documents"], dependencies=[Depends(require_auth)])
-
-# [#14] 업로드 RAG 적재 대상(collection)은 caller 지정이라, 검증 없이 두면 인증 사용자가 시스템/
-# 평가/가이드 코퍼스(docs·legal·secrets-guides·gold 등)에 임의 문서를 심어 검색·평가 결과를
-# 오염(corpus poisoning)시킬 수 있다. pgvector 파라미터 바인딩이라 SQLi 는 아니나, 네임스페이스를
-# 안전 charset(소문자 강제)으로 제한하고 보호 컬렉션을 거부한다. 미지정 시 기본 업로드 컬렉션 사용.
-_RAG_NS_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
-_RAG_NS_PROTECTED = frozenset({
-    "docs", "legal", "secrets-guides", "gold", "gold_real", "golden",
-    "eval", "locked_gold_eval", "retrieval_gold",
-})
-
-
-def _validate_rag_namespace(ns: Optional[str]) -> None:
-    """caller 지정 rag_namespace 를 안전 charset + 보호 컬렉션 거부로 검증(빈값=기본 사용, 통과)."""
-    if ns is None:
-        return
-    v = ns.strip()
-    if not v:
-        return
-    if not _RAG_NS_RE.match(v) or v in _RAG_NS_PROTECTED:
-        raise HTTPException(
-            status_code=422,
-            detail=f"invalid rag_namespace: {ns!r} (허용: ^[a-z0-9][a-z0-9_-]{{0,63}}$, "
-                   "시스템/평가 컬렉션 불가)",
-        )
-
 
 def _get_ingestion_service() -> DocumentIngestionService:
     """Dependency — 테스트에서 app.dependency_overrides로 LocalStorage 주입."""
@@ -83,10 +56,6 @@ class DocumentUploadResponse(BaseModel):
     # 격리돼 자동분류를 그대로 통과하지 않는다(호출측이 검수 유도).
     requires_review: bool = False
     review_reasons: list[str] = []
-    # index_for_rag=true 일 때만 채워짐 — 업로드 문서를 RAG 검색 대상으로 적재한 결과
-    rag_indexed: bool = False
-    rag_collection: Optional[str] = None
-    rag_vector_count: int = 0
 
 
 @router.post("/documents", response_model=DocumentUploadResponse, status_code=201)
@@ -121,8 +90,6 @@ async def upload_document(
         description="ICD §3.3 접근범위: approved_only | designated | department | "
                     "all_employees. 보안표시가 none 일 때 관리수준(M)을 정하는 주 입력.",
     ),
-    index_for_rag: bool = Form(default=False, description="True면 업로드 문서를 RAG 검색 컬렉션에도 적재"),
-    rag_namespace: Optional[str] = Form(default=None, description="RAG 적재 컬렉션(미지정 시 settings.rag_upload_collection)"),
     enqueue_classification: bool = Form(default=False),
     file: UploadFile = File(...),
     svc: DocumentIngestionService = Depends(_get_ingestion_service),
@@ -142,9 +109,6 @@ async def upload_document(
         raise HTTPException(status_code=422, detail=f"invalid actor json: {exc}") from exc
     # [#13] created_by 감사 신원을 인증 principal 로 확정(body 자칭 위조 차단; JWT sub 우선).
     bind_authenticated_actor(actor_obj, auth)
-    # [#14] RAG 적재 네임스페이스 검증 — 시스템/평가 컬렉션 오염 차단(파일 읽기 전 fail-fast).
-    _validate_rag_namespace(rag_namespace)
-
     max_bytes = settings.max_upload_mb * 1024 * 1024
     declared_size = getattr(file, "size", None)
     if declared_size is not None and declared_size > max_bytes:
@@ -199,17 +163,6 @@ async def upload_document(
                     f"classification was not queued: {type(exc).__name__}"
                 )
 
-    rag_indexed = False
-    rag_collection: Optional[str] = None
-    rag_vector_count = 0
-    if index_for_rag and result.persisted and result.doc_id is not None:
-        rag_collection = (rag_namespace or "").strip() or getattr(
-            settings, "rag_upload_collection", "uploads"
-        )
-        rag_indexed, rag_vector_count = _index_uploaded_doc(
-            result.doc_id, rag_collection, result.warnings
-        )
-
     return DocumentUploadResponse(
         doc_id=(str(result.doc_id) if result.doc_id is not None else None),
         filename=result.filename,
@@ -231,39 +184,7 @@ async def upload_document(
         warnings=result.warnings,
         requires_review=result.requires_review,
         review_reasons=result.review_reasons,
-        rag_indexed=rag_indexed,
-        rag_collection=rag_collection if rag_indexed else None,
-        rag_vector_count=rag_vector_count,
     )
-
-
-def _index_uploaded_doc(
-    doc_id, collection: str, warnings: list[str]
-) -> tuple[bool, int]:
-    """업로드된 문서의 DB chunks를 RAG 검색 컬렉션에 적재. 실패는 warnings에 누적.
-
-    tenant 제거: 격리는 KL 포털 전담 → 무스코프 조회·적재.
-    """
-    try:
-        from koipa.db import SessionLocal  # noqa: PLC0415
-        from koipa.rag.document_indexer import index_document_for_rag  # noqa: PLC0415
-        from koipa.repositories.chunk_repo import ChunkRepo  # noqa: PLC0415
-
-        db = SessionLocal()
-        try:
-            rows = ChunkRepo(db).get_by_doc_id(doc_id)
-            chunks = [(c.chunk_index, c.content) for c in rows]
-        finally:
-            db.close()
-
-        res = index_document_for_rag(
-            doc_id=str(doc_id), collection=collection, chunks=chunks
-        )
-        warnings.extend(f"rag-index: {w}" for w in res.warnings)
-        return res.indexed, res.vector_count
-    except Exception as exc:  # noqa: BLE001
-        warnings.append(f"rag-index failed: {type(exc).__name__}: {exc}")
-        return False, 0
 
 
 # ---------------------------------------------------------------------------

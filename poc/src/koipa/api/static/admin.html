@@ -742,8 +742,6 @@ details.adv[open]{padding-bottom:12px;}
             <label class="fld">기본 모델 <span class="techbar" data-tech>base_model</span></label>
             <input id="tr-base" type="text" value="kf-deberta-base" />
           </div>
-          <!-- 학습 폼의 「검색 보강(use_rag)」을 뺐다 — 학습 경로에 소비처가 없다(선언만 있고 grep 0건).
-               ⚠ /classify 의 use_rag 는 실동작이라 그대로 둔다. -->
         </div>
         <div class="btn-row">
           <button class="btn" onclick="submitTrain()">재학습 제출</button>
@@ -1425,15 +1423,12 @@ const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let PENDING_FILE=null;   // 방금 추출한 원본 파일 — 적재할 때 이 파일 그대로 올린다
 
 /* POST /documents — 문서를 실제로 적재하고 doc_id(UUID)를 받는다.
- * index_for_rag=false 고정: 색인은 청크마다 임베딩을 돌리는데 그걸 요청 안에서 하면 워커가
- * 타임아웃으로 죽는다(대용량 폴백 주석 참조). 분류에는 색인이 필요 없다.
  * ICD 세 필드는 화면 값 그대로 싣는다 — 분석과 적재가 다른 값을 쓰면 같은 파일인데 등급이 갈린다. */
 async function postDocument(f){
   const c=cfg();
   const fd=new FormData();
   fd.append('file', f);
   fd.append('actor', JSON.stringify(actor()));
-  fd.append('index_for_rag','false');
   [['source_type','cl-icd-source'],['security_marking','cl-icd-marking'],['access_scope','cl-icd-scope']]
     .forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) fd.append(field,v); });
   log('POST /documents','req');
@@ -1513,19 +1508,14 @@ function onPickFile(){
 /* 대용량 폴백 — /documents/analyze 는 요청 안에서 분류까지 끝내는 동기 진단 경로라
  * analyze_sync_max_chunks(기본 34 ≈ 9페이지)를 넘으면 413 으로 거절한다. 그때 서버가
  * 안내하는 경로 그대로 POST /documents(적재) → POST /classify/async → 잡 폴링으로 넘긴다.
- * 이 경로는 문서를 실제로 적재하므로 데모 마커(created_by · rag_namespace)를 화면 경로와
- * 동일하게 달아 정리 절차(OPERATION.md §8)가 걷어갈 수 있게 한다. */
+ * 이 경로는 문서를 실제로 적재하므로 데모 마커(created_by)를 화면 경로와 동일하게 달아
+ * 정리 절차(OPERATION.md §8)가 걷어갈 수 있게 한다. */
 async function ingestLargeDocument(f, info){
   const c=cfg();
   if(info) info.innerHTML='<span class="pill warn">대용량</span> 동기 경로 상한 초과 — 적재 후 비동기 분류로 전환합니다…';
   const fd=new FormData();
   fd.append('file', f);
   fd.append('actor', JSON.stringify({user_id:'demo-console', role:c.role||'admin'}));
-  // index_for_rag 는 반드시 false. 색인은 청크마다 임베딩을 돌리는데 그걸 요청 안에서 하면
-  // 대용량에서 gunicorn 워커가 타임아웃으로 SIGKILL 된다(실측 2026-08-08: 75K자·401청크에서
-  // 워커 2회 사망). --workers 1 이면 동시에 처리 중이던 다른 요청까지 함께 끊긴다.
-  // 같은 문서를 index_for_rag=false 로 보내면 0.6초에 201 로 끝난다 — 분류에는 색인이 필요 없다.
-  fd.append('index_for_rag','false');
   // [2026-08-23] ICD 메타데이터 — 소용량 경로(classifyFromFile)와 동일 규칙, 대용량 폴백에서만 빠지면
   // 문서 크기에 따라 등급 판정 근거가 달라지는 비일관성이 생긴다.
   [['source_type','cl-icd-source'],['security_marking','cl-icd-marking'],['access_scope','cl-icd-scope']]

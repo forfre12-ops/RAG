@@ -5,7 +5,6 @@
        보수적으로 최고등급 격리 + status=needs_review (절대 공개로 안 떨어뜨림).
   [H6] modules/m5_inference/pipeline.py — softmax id→등급 매핑을 모델 config.id2label에서
        구성. 길이·코드집합 불일치면 load 거부(fail-closed). GradeRegistry는 rule-fallback 전용.
-  [H8] modules/m5_inference/pipeline.py _build_rag_context — 무스코핑 검색(단일 고객사 엔진).
   [H4] modules/m4_training/trainer.py — 전부-TS degenerate 예측기가 fnr_high=0으로
        best 모델 선정을 게이밍하지 못하도록 합성 지표 + degenerate 가드.
 
@@ -189,32 +188,6 @@ def test_h6_load_model_refuses_on_mismatch(monkeypatch, tmp_path):
     # fail-closed: 모델/토크나이저는 폐기되어 rule-fallback 경로로 가야 함
     assert pipe._model is None
     assert pipe._tokenizer is None
-
-
-# ===========================================================================
-# [H8] _build_rag_context: 무스코핑 검색 (tenant 제거: 격리는 KL 포털 전담)
-# ===========================================================================
-
-
-def test_h8_none_metadata_preserves_search(monkeypatch):
-    """metadata is None → 검색은 진행(필터 None). 단일 고객사 엔진, tenant 격리 없음."""
-    pipe = _fresh_pipeline()
-
-    captured = {}
-
-    def _spy(*, filter=None, **kwargs):
-        captured["filter"] = filter
-        return []  # hit 없음이어도 검색은 호출됐다는 사실이 핵심
-
-    monkeypatch.setattr("koipa.services.retrieval.expand_then_search", _spy)
-    # build_store/build_embedder도 안전 fake
-    monkeypatch.setattr("koipa.adapters.vectorstore.build_store", lambda *a, **k: object())
-    monkeypatch.setattr("koipa.adapters.embedding.build_embedder",
-                        lambda *a, **k: type("E", (), {"embed": lambda self, t: [[0.0]]})())
-
-    pipe._build_rag_context(query="q", namespace="docs", metadata=None)
-    assert "filter" in captured, "metadata None인데 검색이 호출되지 않음 — 검색 경로 손상"
-    assert captured["filter"] is None
 
 
 # ===========================================================================

@@ -115,8 +115,6 @@ class TestCaptureEnv:
             probe_services=False,
             llm_provider="anthropic",
             embedding_provider="kure-v1",
-            vector_backend="es",
         )
         assert env.llm_provider == "anthropic"
         assert env.embedding_provider == "kure-v1"
-        assert env.vector_backend == "es"

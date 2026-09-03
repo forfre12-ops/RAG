@@ -112,12 +112,9 @@ KPIS: list[KPI] = [
     KPI("S4.4", "S4", "PUT p95 latency", "ms", "le", 500, "p95", requires=["pg"]),
 
     # S5
-    KPI("S5.1", "S5", "업로드+인덱싱 p95 latency", "ms", "le", 30000, "p95"),
-    KPI("S5.2", "S5", "embedding_vector_count > 0", "count", "gt", 0, "min"),
+    KPI("S5.1", "S5", "가이드 업로드 p95 latency", "ms", "le", 30000, "p95"),
     # dryrun: hash 임베딩 + InMemory 백엔드. full: KURE-v1 + ES. 합격선은 보수적 0.3 (도달 검증 + full 시 회귀 추적)
-    KPI("S5.3", "S5", "인덱싱 throughput", "chunks/s", "ge", 0.3, "last"),
     # Recall@5는 실 PG 벡터스토어(pgvector) + 학습된 모델(또는 풀 임베딩) 전제. dryrun(hash 임베딩)에선 SKIP.
-    KPI("S5.4", "S5", "Recall@5", "ratio", "ge", 0.80, "last", requires=["pg", "trained_model"], core=True),
     KPI("S5.5", "S5", "후속 GET 200", "bool", "ge", True, "bool_all"),
 
     # S6
@@ -208,8 +205,7 @@ KPIS: list[KPI] = [
     KPI("S12.5", "S12", "N=1000 p95 latency", "ms", "le", 60000, "p95"),
 
     # S14 데이터 저장소 정전 후 자동 복구 (W12 확장)
-    # 2026-08-17: 대상을 ES → PostgreSQL 로 바꾼다. 벡터스토어는 pgvector(설정 기본값
-    # vector_backend=pg, 배포 프로파일 전부 pg)이고 ES 어댑터는 레거시라 배포에 없다.
+    # 2026-08-17: 대상을 ES → PostgreSQL 로 바꾼다(벡터 검색 자체는 2026-09 에 폐기).
     # ES 를 전제한 KPI 는 실측할 수 없는 게 아니라 **측정 대상 자체가 아니었다** —
     # 없는 구성을 띄워 재면 그 숫자는 배포본 근거가 못 된다.
     # dryrun: 가용성 식별만. full: docker 시뮬레이션 (require=pg + 명시 옵트인)
@@ -244,16 +240,16 @@ _SCENARIO_MODULES: dict[str, tuple[str, ...]] = {
             "src/koipa/workers"),
     "S3":  ("src/koipa/services/confirm_service.py", "src/koipa/api/confirm.py"),
     "S4":  ("src/koipa/services/schema_admin_service.py", "src/koipa/api/schema_admin.py"),
-    "S5":  ("src/koipa/services/document_ingestion_service.py", "src/koipa/rag",
+    "S5":  ("src/koipa/services/guide_service.py",
             "src/koipa/api/documents.py"),
     "S6":  ("src/koipa/services/synthesis_service.py", "src/koipa/modules/m1_synthesis"),
     "S7":  ("src/koipa/modules/m4_training", "src/koipa/workers"),
     "S8":  ("src/koipa/modules/m6_evaluation",),
     "S9":  ("src/koipa/modules/m5_inference", "src/koipa/modules/m3_labeling"),
-    "S10": ("src/koipa/rag", "src/koipa/perf/scenarios.py"),
+    "S10": ("src/koipa/services/classify_service.py", "src/koipa/perf/scenarios.py"),
     "S11": ("src/koipa/perf",),
     "S12": ("src/koipa/services/async_classify_service.py", "src/koipa/api/async_classify.py"),
-    "S14": ("src/koipa/db", "src/koipa/adapters/vectorstore", "src/koipa/adapters/storage"),
+    "S14": ("src/koipa/db", "src/koipa/adapters/storage"),
     "S15": ("scripts/dr_restore_check.py", "scripts/backup_postgres.py"),
     "S16": ("src/koipa/api/_jwt_auth.py", "src/koipa/api/_rbac.py"),
     "S17": ("src/koipa/api/middleware.py", "src/koipa/repositories/audit_repo.py",

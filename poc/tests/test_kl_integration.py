@@ -66,7 +66,6 @@ class TestS1SyncClassify:
                 json={
                     "doc_id": str(uuid.uuid4()),
                     "content": "특급기밀 차세대 제품 설계도 핵심 원천기술 — KL 통합 시나리오 S1",
-                    "use_rag": False,
                     "return_evidence": True,
                 },
             )
@@ -209,8 +208,7 @@ class TestS5GuideUpload:
         assert r.status_code == 201
         body = r.json()
         assert body["guide_id"] == gid
-        assert isinstance(body["indexed"], bool)
-        assert body["embedding_vector_count"] >= 0  # ES 미가용 시 0도 허용
+        assert body["triggers_retraining"] is False
 
     def test_list_versions_after_upload(self):
         gid = f"kl-list-{uuid.uuid4().hex[:6]}"

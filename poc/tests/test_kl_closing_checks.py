@@ -93,24 +93,6 @@ class TestOpenAPIResponseCodes:
 
 
 # ============================================================
-# 2. /guide/documents 업로드 시 ES alias 스왑 계약
-# ============================================================
-
-
-class TestGuideAliasSwap:
-    """rag_indexer가 새 인덱스 생성 + alias 스왑 계약을 보유했는지."""
-
-    def test_rag_indexer_alias_swap_contract(self):
-        from koipa.modules.m4_training import rag_indexer
-
-        # 핵심 계약 — 스왑 함수가 존재하고 새 인덱스 → 인덱싱 → alias 스왑 순서
-        attrs = [a for a in dir(rag_indexer) if not a.startswith("_")]
-        # alias 또는 swap 키워드를 포함한 공개 인터페이스 1개 이상 존재
-        candidates = [a for a in attrs if "alias" in a.lower() or "swap" in a.lower() or "index" in a.lower()]
-        assert candidates, f"rag_indexer alias/swap 인터페이스 없음. 공개 attrs={attrs}"
-
-
-# ============================================================
 # 3. /schema/grades PUT 시 빠진 등급 is_active=false cascade
 # ============================================================
 

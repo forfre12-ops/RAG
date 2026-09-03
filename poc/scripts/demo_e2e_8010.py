@@ -142,11 +142,7 @@ def main() -> int:
                 headers=HEADERS,
                 files={"file": (pdf.name, f,
                                 _MIME.get(pdf.suffix.lower(), "application/octet-stream"))},
-                # rag_namespace='demo' 는 화면 경로(/demo/index.html#sec-parse)와 반드시 같아야 한다.
-                # 생략하면 설정 기본값('uploads')으로 색인되는데, 데모 초기화
-                # (POST /admin/demo/purge)의 스코프는 created_by='demo-console' + collection='demo'
-                # 두 상수라 uploads 로 간 벡터는 지워지지 않는다 — 리허설을 반복할수록 잔류가 쌓인다.
-                data={"actor": ACTOR, "index_for_rag": "true", "rag_namespace": "demo"},
+                data={"actor": ACTOR},
             )
         if r.status_code >= 400:
             print("  [실패]", r.status_code, r.text[:300])
@@ -157,7 +153,6 @@ def main() -> int:
         print(f"  • 추출방식/품질     : {up['extraction_method']} / {up['extraction_quality']}  (OCR={up['ocr_used']})")
         print(f"  • 추출 글자수       : {up['char_count']}자")
         print(f"  • 청크 개수         : {up['chunk_count']}")
-        print(f"  • RAG 색인          : {up['rag_indexed']} (collection={up['rag_collection']}, vec={up['rag_vector_count']})")
         # 폐쇄망 스토리지는 로컬 파일시스템(LocalStorage + AES-256-GCM 암호화)이다.
         print("  • 원문 저장         : STORAGE_BACKEND 설정 경로(폐쇄망 기본 = 로컬 FS · 암호화 저장)")
 
@@ -166,7 +161,7 @@ def main() -> int:
         r = cli.post(
             f"{BASE}/api/v1/classify",
             headers=HEADERS,
-            json={"doc_id": doc_id, "use_rag": False},
+            json={"doc_id": doc_id},
         )
         if r.status_code >= 400:
             print("  [실패]", r.status_code, r.text[:300])

@@ -48,7 +48,6 @@ def predict_via_serving(
     *,
     pipeline: Optional[Any] = None,
     model_dir: Optional[str] = None,
-    use_rag: bool = False,
     metadata: Optional[dict] = None,
     labels: Optional[Sequence[str]] = None,
 ) -> list[dict]:
@@ -78,7 +77,7 @@ def predict_via_serving(
             continue
         failed = False
         try:
-            result = pipeline.run(text, use_rag=use_rag, metadata=metadata)
+            result = pipeline.run(text, metadata=metadata)
             pred = _label_code(result.label)
         except Exception as exc:  # noqa: BLE001
             # 서빙 실패 = 운영에서도 그 문서를 분류 못 함. 이전엔 pred='TS'(최고등급)를 줘
@@ -111,7 +110,6 @@ def evaluate_via_serving(
     *,
     pipeline: Optional[Any] = None,
     model_dir: Optional[str] = None,
-    use_rag: bool = False,
     metadata: Optional[dict] = None,
     labels: Optional[Sequence[str]] = None,
     model_version: str = "serving",
@@ -125,11 +123,11 @@ def evaluate_via_serving(
     Args:
         rows: [{"text":.., "label":..}, ..] (label은 expected_grade도 허용).
         pipeline: 주입 시 그대로 사용(테스트/재사용). 미주입 시 InferencePipeline(model_dir) 생성.
-        use_rag/metadata: run()에 전달(소스-프라이어 게이트 등 메타 의존 동작 평가).
+        metadata: run()에 전달(소스-프라이어 게이트 등 메타 의존 동작 평가).
     """
     preds = predict_via_serving(
         rows, pipeline=pipeline, model_dir=model_dir,
-        use_rag=use_rag, metadata=metadata, labels=labels,
+        metadata=metadata, labels=labels,
     )
     y_true = [r["label"] for r in preds]
     y_pred = [r["pred"] for r in preds]

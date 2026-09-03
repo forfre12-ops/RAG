@@ -159,7 +159,6 @@ def test_healthz_exposes_demo_console_fields(client):
         "deploy_profile",
         "embedding_provider",
         "llm_provider",
-        "vector_backend",
         "warmup_done",
     ):
         assert k in body, f"healthz 응답에 {k} 누락"
@@ -255,7 +254,7 @@ def test_borderline_sample_toggle_lowers_rule_grade():
         res = ClassifyService.get_instance().classify(
             ClassifyRequest(
                 doc_id=b["id"], content=text, title=b["title"],
-                use_rag=False, return_evidence=False,
+                return_evidence=False,
             )
         )
         rg = getattr(res, "rule_grade", None)
@@ -302,7 +301,6 @@ def test_built_samples_classify_to_intended_grade():
             doc_id=s["id"],
             content=s["body"],
             title=s["title"],
-            use_rag=False,
             return_evidence=True,
         )
         res = svc.classify(req)

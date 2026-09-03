@@ -25,7 +25,7 @@ class _FakePipe:
         self.mapping = mapping
         self.default = default
 
-    def run(self, text, use_rag=False, metadata=None):
+    def run(self, text, metadata=None):
         for key, g in self.mapping.items():
             if key in text:
                 return _Res(label=g)

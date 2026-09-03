@@ -66,8 +66,6 @@ tags:
     description: 성능 지표·리포트 (FUN-024)
   - name: documents
     description: 등급 판정 대상 문서 업로드·ingestion (FUN-005 연계)
-  - name: answer
-    description: "[요건 외] RAG 기반 질의응답 합성 — RFP 요건이 아닌 부가 기능. /rag/search(검색)는 요건 범위이고 /answer(LLM 답변 생성)는 요건 외다"
   - name: health
     description: 상태 확인
   - name: admin
@@ -252,7 +250,6 @@ paths:
               type: object
               required: [documents]
               properties:
-                use_rag: { type: boolean, default: false }
                 documents:
                   type: array
                   maxItems: 1000
@@ -469,7 +466,6 @@ paths:
                 hyperparams:
                   type: object
                   additionalProperties: true
-                use_rag: { type: boolean, default: false }
                 actor: { $ref: '#/components/schemas/Actor' }
       responses:
         '202':
@@ -1315,41 +1311,6 @@ paths:
         '404': { description: "keyword_id not found" }
         '503': { description: "db unavailable" }
 
-  /answer:
-    post:
-      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
-      tags: [answer]
-      summary: "[요건 외] RAG 답안 합성 — query + RAG hits → LLM 답안 + 인용"
-      x-scope: out-of-requirement   # RFP 요건 아님. 산출물 문서에서 제외했고 코드는 존치(휴면)
-      description: |
-        분류와 별개 단계. 질의를 받아 RAG 검색(facade)으로 컨텍스트 hits를 모은 뒤
-        LLM(원격/로컬/noop)으로 답안을 합성한다. 인용 출처(citations)는 hits 순서대로
-        rank를 부여해 반환. noop·LLM 부재·생성 실패는 `deterministic_fallback=true`로
-        결정론적 안내를 반환하며 5xx가 아닌 200으로 끝남(warnings에 사유).
-      security:
-        - ApiKeyAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RagAnswerRequest'
-      responses:
-        '200':
-          description: 답안 합성 완료 (deterministic_fallback 여부는 응답 필드 참조)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RagAnswerResult'
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '422':
-          description: "요청 검증 실패 (예: query 길이 위반)"
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-        '500': { $ref: '#/components/responses/InternalError' }
-
-  # ── 관리자 콘솔·골든셋 검수 (2026-08-08~09 신설, 2026-08-11 명세 반영) ─────────
-  # 라우터에는 있었으나 본 명세에 없던 15경로. KL 연동 대상은 아니고 지재원 관리자 콘솔이
-  # 쓰는 내부 경로이지만, 명세에 없으면 감리에서 "구현 미기술"로 읽힌다.
   /admin/audit-log:
     get:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
@@ -1663,29 +1624,6 @@ paths:
               schema: { type: string }
         '401': { description: "포털 JWT 쿠키 필요 — login.html 경유" }
 
-  /rag/search:
-    post:
-      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
-      tags: [answer]
-      summary: 유사 문서·청크 Top-K 검색 (LLM 미호출)
-      description: >-
-        /answer 와 달리 LLM 을 호출하지 않는다 — 요건상 RAG 는 검색이고 답변 생성은
-        요건 외이므로 LLM-free 고객사에서도 이 경로는 동작한다. 인증(require_auth)만
-        요구하고 등급별 접근제어는 두지 않는다(단일 고객사 폐쇄망·상류 KL 포털 격리 전제).
-        한도 60/분.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/RagAnswerRequest' }
-      responses:
-        '200':
-          description: "{query, count, elapsed_ms, hits:[{source_doc, chunk_id, score, text}]}"
-          content:
-            application/json:
-              schema: { type: object, additionalProperties: true }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-
   /dashboard/summary:
     get:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
@@ -1730,7 +1668,7 @@ paths:
         기본)면 404 로 거부한다 — 납품 운영본에는 이 엔드포인트가 존재하지 않는다.
       responses:
         '200':
-          description: "{documents, classifications, chunks, rag_vectors, warnings[]}"
+          description: "{documents, classifications, chunks, warnings[]}"
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
@@ -1844,16 +1782,6 @@ components:
         - $ref: '#/components/schemas/DocumentInput'
         - type: object
           properties:
-            use_rag:
-              type: boolean
-              default: false
-              description: 사내규정 RAG 컨텍스트 결합 여부 (PostgreSQL pgvector dense + bigram ts_rank 하이브리드)
-            rag_namespace:
-              type: string
-              description: |
-                선택. RAG 검색 대상 네임스페이스 명시(실제 요청 필드명 = rag_namespace).
-                미지정 시 기본 네임스페이스 사용.
-              example: secrets-guides
             return_evidence:
               type: boolean
               default: true
@@ -1910,14 +1838,6 @@ components:
               text: { type: string }
               weight: { type: number }
               tag: { type: string }
-        rag_context_used:
-          type: array
-          items:
-            type: object
-            properties:
-              source_doc: { type: string }
-              chunk_id: { type: string }
-              score: { type: number }
         model_version: { type: string }
         elapsed_ms: { type: integer }
         factors_source:
@@ -2000,75 +1920,6 @@ components:
           items: { type: string }
           description: Non-empty when queue lookup degraded, for example because DB is unavailable.
 
-    RagAnswerRequest:
-      type: object
-      required: [query]
-      properties:
-        query:
-          type: string
-          minLength: 1
-          maxLength: 4000
-          description: 사용자 질의
-        namespace:
-          type: string
-          description: RAG collection 명. 미지정 시 settings.rag_default_collection.
-        top_k:
-          type: integer
-          minimum: 1
-          maximum: 20
-          default: 5
-        grade:
-          $ref: '#/components/schemas/Grade'
-        use_reranker:
-          type: boolean
-          default: true
-        metadata:
-          type: object
-          description: "추가 filter (예: dept_id)."
-          additionalProperties: true
-
-    RagCitation:
-      type: object
-      required: [source_doc, chunk_id, score, rank]
-      properties:
-        source_doc: { type: string }
-        chunk_id: { type: string }
-        score: { type: number }
-        rank: { type: integer, description: 1부터 시작 }
-
-    RagAnswerUsage:
-      type: object
-      required: [provider, model, input_tokens, output_tokens, cost_usd]
-      properties:
-        provider: { type: string }
-        model: { type: string }
-        input_tokens: { type: integer }
-        output_tokens: { type: integer }
-        cost_usd: { type: number }
-        latency_ms: { type: integer, default: 0 }
-        success: { type: boolean, default: true }
-
-    RagAnswerResult:
-      type: object
-      required: [answer, deterministic_fallback]
-      properties:
-        answer: { type: string }
-        citations:
-          type: array
-          items: { $ref: '#/components/schemas/RagCitation' }
-        grade:
-          $ref: '#/components/schemas/Grade'
-          nullable: true
-        usage:
-          allOf:
-            - $ref: '#/components/schemas/RagAnswerUsage'
-          nullable: true
-        warnings:
-          type: array
-          items: { type: string }
-        deterministic_fallback:
-          type: boolean
-          description: LLM 미사용·실패 시 true (결정론적 안내 응답)
 
     JobStatus:
       type: object

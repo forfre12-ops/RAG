@@ -37,8 +37,6 @@ _VALID_LLM_PROVIDER = {
 }
 # embedding: hash(드라이런)·hf(KURE/BGE). 하위호환 alias 일부 포함(huggingface/kure/bge).
 _VALID_EMBEDDING_PROVIDER = {"hash", "hf", "huggingface", "kure", "kure-v1", "bge", "bgem3"}
-_VALID_RERANKER_PROVIDER = {"noop", "bge"}
-_VALID_VECTOR_BACKEND = {"es", "pg", "pgvector", "postgres", "inmemory"}
 _VALID_STORAGE_BACKEND = {"minio", "seaweedfs", "s3", "local"}
 _VALID_POC_MODE = {"dryrun", "full"}
 _VALID_SOURCE_PRIOR_CAP_GRADE = {"S2", "S3"}
@@ -51,8 +49,6 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
     "lite-noapi": {
         "llm_provider": "noop",
         "embedding_provider": "hash",
-        "reranker_provider": "noop",
-        "vector_backend": "inmemory",
         "storage_backend": "local",
         "enable_training": False,
         "poc_mode": "dryrun",
@@ -60,8 +56,6 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
     "lite-cloud": {
         "llm_provider": "anthropic",
         "embedding_provider": "hf",
-        "reranker_provider": "noop",
-        "vector_backend": "pg",
         # [CFG-5] 로컬FS로 통일(2026-07-22 사용자 확정) — 'MinIO 미사용(전체)' 결정·onprem 정합.
         # 종전 'minio' 기본은 번들서 minio 제거와 모순(poc_mode=full 시 미가용→startup 크래시)
         # 드리프트였다. lite-cloud 는 경량 tier(require_safety_gates=False)라 암호화를 강제하지
@@ -73,9 +67,6 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
     "onprem-local": {
         "llm_provider": "ollama",
         "embedding_provider": "hf",
-        # reranker: 실측 recall 무개선·CPU 지연 5배 → 폐쇄망 기본 noop (필요시 프로파일서 명시적 bge)
-        "reranker_provider": "noop",
-        "vector_backend": "pg",
         # 폐쇄망=로컬FS(file://) — 2026-06-24 결정(MinIO 미사용, 원본만 EncryptingStorage 래핑).
         # 이전 'minio' 기본은 결정과 모순되는 드리프트였다.
         "storage_backend": "local",
@@ -143,9 +134,6 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
     "full-train": {
         "llm_provider": "anthropic",
         "embedding_provider": "hf",
-        # reranker: 실측 recall 무개선·CPU 지연 5배 → 폐쇄망 기본 noop (필요시 프로파일서 명시적 bge)
-        "reranker_provider": "noop",
-        "vector_backend": "pg",
         # MinIO 미사용 결정 정합(번들도 minio 제거). 학습 산출물·문서는 로컬FS.
         "storage_backend": "local",
         "enable_training": True,
@@ -225,25 +213,6 @@ class Settings(BaseSettings):
     # 디폴트는 localhost dev DB. 운영은 DATABASE_URL env 필수.
     database_url: str = "postgresql+psycopg://koipa:koipa_dev@localhost:5432/koipa"
     redis_url: str = "redis://localhost:6379/0"
-
-    # 벡터 DB
-    vector_backend: str = "pg"  # pg(기본, pgvector dense+ts_rank 하이브리드) | es(레거시) | inmemory
-    # hybrid 검색의 어휘 후보는 tb_rag_vectors 를 순차 스캔한다 - bigram 을 OR 로 묶은
-    # 질의라 코퍼스의 99.6%(14,703/14,755)가 매칭돼 GIN 인덱스가 순차 스캔보다 비싸다.
-    # 그 스캔의 병렬 워커 수가 지연을 지배한다(2026-08-16 KL 서버 실측).
-    #   기본 2워커   p50 191.8ms · p95 237.9ms
-    #   4워커        p50 124.3ms · p95 151.6ms   반환 결과 40/40 동일
-    # PostgreSQL 은 min_parallel_table_scan_size(기본 8MB)를 눈금 삼아 테이블 크기에서
-    # 워커 수를 정한다(3배마다 +1). 이 테이블 힙이 26MB 라 2개에서 멈추므로, 그 눈금을
-    # 0 으로 두어야 아래 값이 실제로 듣는다. 둘 다 검색 트랜잭션 안에서만 건다(SET LOCAL).
-    # 0 이면 아무것도 안 건다(서버 기본값 사용).
-    # ⚠ 동시 요청이 많으면 이득이 사라진다(CPU 8 · 동시 4 이상에서 처리량 포화).
-    #   실측: 동시1 189->125ms · 동시2 214->149ms · 동시4 p50 이득이나 p95 손해.
-    #   운영 사양·동시 사용자 수가 다르면 scripts/bench_pg_concurrency.py 로 다시 잰다.
-    pg_search_parallel_workers: int = 4
-    es_url: str = "http://localhost:9200"
-    es_username: str = ""
-    es_password: str = ""
 
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = ""
@@ -584,19 +553,6 @@ class Settings(BaseSettings):
     # tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진) — 전역 file_hash 스코프.
     verified_label_content_reuse: bool = True
 
-    # [Phase 2] 유사도 escalation 게이트 (등급 무변경·검수 라우팅만). 기본 False = 동작 보존(opt-in).
-    # 들어온 문서가 *사람이 더 높은(더 비밀) 등급으로 검증한 문서와 매우 유사*(dense 코사인 ≥ τ)하면
-    # needs_review로 라우팅한다 — exact-match override(_verified_label_by_content)의 '유사' 아날로그를
-    # 등급 *override가 아니라 신호*로만 쓴다. 전파 0·poisoning 0·FNR-safe(이웃이 모델 예측보다 엄격히
-    # 더 비밀일 때만 발동). corpus 의존: 사람검증 고등급 문서가 벡터스토어에 없으면 no-op(무실데이터
-    # 단계엔 발동 0 → SIMILARITY_ESCALATION_TOTAL 카운터로 가시화). 임베딩/검색/DB 오류는 전부 silent
-    # fail-open(분류 진행). _SAFETY_GATES·_PROFILE_DEFAULTS에 넣지 않음 — 강제 ON은 corpus 없으면
-    # 무음 no-op이거나 startup 차단(require_safety_gates)이 되어 비파괴 원칙에 어긋남(검증 corpus 생긴 뒤 승격).
-    similarity_escalation_enabled: bool = False
-    # 유사도 escalation 임계 (dense 코사인 유사도 = 1-cosine_distance). 기본 0.92 = 고정밀(검수 폭증 방지).
-    # 0<τ<1. 기존 classifier_escalation_tau(등급별 softmax argmax 보정)와 무관한 별개 노브(이름 구분).
-    similarity_escalation_tau: float = 0.92
-
     # Source-type prior = 비공지성 게이트 (Gate 1). doc/22 §4.0 · doc/32 §2.
     # 이미 공개된 출처(판례·공시·보도자료 등)의 문서는 내용과 무관하게 S3 — 부정경쟁방지법
     # §2.2 비공지성 미충족 → 영업비밀 불성립. 가중합(내용) 결과를 게이트가 덮어쓴다.
@@ -755,11 +711,6 @@ class Settings(BaseSettings):
     #   hf   : hf_embedding (sentence-transformers, KURE/BGE 로컬 캐시, full/onprem 기본)
     embedding_provider: str = "hash"
 
-    # --- Reranker (A1) ---
-    # noop  : 입력 순서 유지 (기본, 운영 외)
-    # bge   : BAAI/bge-reranker-v2-m3 (FlagEmbedding 또는 sentence_transformers)
-    reranker_provider: str = "noop"
-
     # --- 청크/처리 ---
     max_seq_len: int = 512
     chunk_size: int = 512
@@ -791,25 +742,6 @@ class Settings(BaseSettings):
     # 으로만 남기던 것을, 검수 게이트가 소비해 needs_review로 라우팅(등급 불변·FNR-safe). 표(HWP)
     # 커버리지와 동일 취지를 OOXML 손실 신호로 확장. 기본 ON. 미디어 다수 문서에서 과라우팅 시 0.
     extraction_content_loss_review: bool = True
-
-    # 표적 1 (2026-05-29): InferencePipeline use_rag 활성 시 retrieval facade 호출 기본값.
-    rag_default_collection: str = "docs"
-    rag_default_top_k: int = 5
-    rag_query_expansion_method: str = "rule"  # rule | llm | hybrid
-    rag_index_chunk_size: int = 1200
-    rag_index_chunk_overlap: int = 100
-    rag_operational_embedding_model: str = "nlpai-lab/KURE-v1"
-    rag_operational_search_mode: str = "hybrid"
-
-    # RAG /answer 인용 강제(citation enforcement). 기본 False = 동작 보존(경고만).
-    # synthesize_answer는 LLM 답변의 [n] 인용을 hits 범위와 대조해 환각 인용
-    # (존재하지 않는 근거 번호 인용 = out-of-range)을 warnings의 'hallucination_risk:<n>'
-    # 마커로 관측만 한다. True면 그 경고를 집행(enforce)으로 승격한다: out-of-range 인용이
-    # 1건이라도 있으면 해당 LLM 답변을 폐기하고 결정론적(deterministic) 답변으로 강등해
-    # 환각 인용이 사용자에게 노출되는 것을 차단한다(citations·grade는 보존). 기본 False라
-    # 현 동작 불변 — 인용 품질을 강하게 보장해야 하는 배포에서만 .env로 opt-in한다.
-    # 이전엔 settings에 미정의라 미문서화 env(getattr 폴백)로만 동작했다(정식화).
-    answer_enforce_citations: bool = False
 
     # --- 업로드 한도 (DoS 차단) ---
     # R3: guide upload·classify content 본문 크기 한도. 환경변수 MAX_UPLOAD_MB 로 조정(접두사 없음 — config.py:185).
@@ -903,14 +835,6 @@ class Settings(BaseSettings):
             raise ValueError(f"classifier_escalation_tau는 None이거나 0<τ<1 이어야 합니다 (got {v}).")
         return v
 
-    # 유사도 escalation τ: 0<τ<1 (양 끝 배제 — 1.0=exact·0.0=무의미은 degenerate).
-    @field_validator("similarity_escalation_tau")
-    @classmethod
-    def _check_similarity_escalation_tau(cls, v: float) -> float:
-        if not (0.0 < v < 1.0):
-            raise ValueError(f"similarity_escalation_tau는 0<τ<1 이어야 합니다 (got {v}).")
-        return v
-
     # 2) 양수/음수 제약 — 풀·업로드·청크·시퀀스·타임리밋 등.
     @field_validator("db_pool_size", "max_upload_mb", "max_request_body_mb", "chunk_size", "max_seq_len")
     @classmethod
@@ -941,21 +865,8 @@ class Settings(BaseSettings):
             raise ValueError(f"{info.field_name}는 양수여야 합니다 (got {v}).")
         return v
 
-    @field_validator("rag_default_top_k")
     @classmethod
-    def _check_top_k(cls, v: int, info) -> int:  # noqa: ANN001
-        if v < 1:
-            raise ValueError(f"{info.field_name}는 1 이상이어야 합니다 (got {v}).")
-        return v
-
-    @field_validator("rag_index_chunk_size")
-    @classmethod
-    def _check_rag_chunk_size(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError(f"rag_index_chunk_size는 1 이상이어야 합니다 (got {v}).")
-        return v
-
-    @field_validator("rag_index_chunk_overlap", "chunk_overlap", "rollback_min_samples")
+    @field_validator("chunk_overlap", "rollback_min_samples")
     @classmethod
     def _check_nonneg_int(cls, v: int, info) -> int:  # noqa: ANN001
         if v < 0:
@@ -987,22 +898,6 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"embedding_provider는 {sorted(_VALID_EMBEDDING_PROVIDER)} 중 하나여야 합니다 (got {v!r})."
             )
-        return v
-
-    @field_validator("reranker_provider")
-    @classmethod
-    def _check_reranker_provider(cls, v: str) -> str:
-        if v.lower() not in _VALID_RERANKER_PROVIDER:
-            raise ValueError(
-                f"reranker_provider는 {sorted(_VALID_RERANKER_PROVIDER)} 중 하나여야 합니다 (got {v!r})."
-            )
-        return v
-
-    @field_validator("vector_backend")
-    @classmethod
-    def _check_vector_backend(cls, v: str) -> str:
-        if v.lower() not in _VALID_VECTOR_BACKEND:
-            raise ValueError(f"vector_backend는 {sorted(_VALID_VECTOR_BACKEND)} 중 하나여야 합니다 (got {v!r}).")
         return v
 
     @field_validator("storage_backend")
@@ -1042,11 +937,6 @@ class Settings(BaseSettings):
         if self.chunk_overlap >= self.chunk_size:
             raise ValueError(
                 f"chunk_overlap < chunk_size 이어야 합니다 (overlap={self.chunk_overlap}, size={self.chunk_size})."
-            )
-        if self.rag_index_chunk_overlap >= self.rag_index_chunk_size:
-            raise ValueError(
-                "rag_index_chunk_overlap < rag_index_chunk_size 이어야 합니다 "
-                f"(overlap={self.rag_index_chunk_overlap}, size={self.rag_index_chunk_size})."
             )
         return self
 
@@ -1098,7 +988,7 @@ apply_profile_defaults(settings)
 # 하드닝 운영(폐쇄망)에서 필수. .env override(=0)로 조용히 꺼진 채 startup 성공하는 것을 막는다.
 # source_prior: 공개출처(판례·공시 등) 문서를 S3로 cap하는 비공지성 게이트. corpus 비의존이라
 # 강제해도 무음 no-op 위험이 없고(기본 True), 하드닝 배포가 이 게이트를 조용히 끄면 공개출처가
-# 비밀로 과분류(실측 85% FPR)되므로 강제집합에 포함. (similarity_escalation은 corpus 의존이라 제외.)
+# 비밀로 과분류(실측 85% FPR)되므로 강제집합에 포함.
 # require_real_embedder: HF 임베더 로드 실패 시 HashEmbedding 무음 폴백(검색품질 급락) 거부.
 # require_real_classifier: 분류기 모델 dir 로드 실패 시 rule-fallback-v0 무음 열화 거부(형제 게이트).
 # deploy_gate_require_locked_eval: 자동활성 시 실(locked_gold_eval) 평가 readiness 요구(죽음의 나선 #4).

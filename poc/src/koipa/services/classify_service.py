@@ -194,14 +194,13 @@ class ClassifyService:
         on_stage: 단계 진입 시 호출되는 콜백. 단계 이름 = stages_emitted 참조.
                   SSE 스트리밍(/classify/stream) 등에서 진척 송신용. 없으면 no-op.
         """
-        # #29: classify 진입 span — 비민감 식별값만(문서 유무·모델버전·use_rag).
+        # #29: classify 진입 span — 비민감 식별값만(문서 유무·모델버전).
         #      문서 본문 등 민감정보는 절대 부착하지 않는다. OTel 미활성 시 no-op.
         with span(
             "classify",
             **{
                 "koipa.has_doc_id": bool(req.doc_id),
                 "koipa.has_content": bool(req.content),
-                "koipa.use_rag": bool(req.use_rag),
                 # model_version은 model_dir 폴더명에서 안전 도출(없으면 rule-fallback).
                 # InferencePipeline 자체엔 model_version 속성이 없으므로 직접 참조 금지.
                 "koipa.model_dir": (
@@ -213,8 +212,8 @@ class ClassifyService:
             notify = on_stage or (lambda _stage: None)
 
             logger.debug(
-                "classify enter: doc_id=%s use_rag=%s content_len=%d",
-                req.doc_id, req.use_rag, len(req.content or ""),
+                "classify enter: doc_id=%s content_len=%d",
+                req.doc_id, len(req.content or ""),
             )
             notify("extract")
             # content가 없으면 normalized_text_uri에서 읽어오기 (doc_id 전용 분류 경로)
@@ -310,22 +309,10 @@ class ClassifyService:
                     ],
                 )
 
-            # InferencePipeline 내부에서 embed → retrieve → llm을 거치므로,
-            # 진입/종료 양쪽에 신호를 보내 클라이언트가 long-stage 감지 가능.
-            #
-            # [2026-08-24] `embed` 를 use_rag 안으로 옮겼다. 종전에는 무조건 보냈는데,
-            # **RAG 임베딩은 use_rag=True 일 때만 돈다**(pipeline.py:887 `if use_rag:` 안의
-            # _build_rag_context). use_rag=False 인 기본 경로에서는 임베더를 부르지 않는다 —
-            # 분류기가 하는 토큰 인코딩(_encode_windows)은 추론의 일부이지 별도 단계가 아니다.
-            # 그런데 화면은 「임베딩」 칸을 점등해 하지 않은 일을 한다고 말하고 있었다.
-            if req.use_rag:
-                notify("embed")
-            notify("retrieve" if req.use_rag else "llm")
+            notify("llm")
             eff_meta = self._effective_metadata(req, content=cleaned)
             pred = self.inference.run(
                 text=cleaned,
-                use_rag=req.use_rag,
-                rag_namespace=req.rag_namespace,
                 metadata=eff_meta,
                 return_evidence=req.return_evidence,
             )
@@ -570,14 +557,6 @@ class ClassifyService:
                     status = "needs_review"
                     warnings_acc.append(brake)
 
-            # [Phase 2] 유사도 escalation — 사람이 더 높은 등급으로 검증한 문서와 매우 유사하면
-            # needs_review 라우팅(등급 무변경·opt-in 기본 off·전 경로 fail-open). 가장 비싼 게이트
-            # (임베딩+벡터검색+DB)라 체인 마지막에 두고, 앞 게이트가 이미 올렸으면 스킵된다.
-            if status != "needs_review":
-                sim = self._similarity_escalation_gate(req.doc_id, cleaned, pred.label)
-                if sim is not None:
-                    status = "needs_review"
-                    warnings_acc.append(sim)
 
             # 게이트가 확정한 최종 status로 영속화(원자적). needs_review 는 여기서 DB 행에
             # 실제 기록되어 GET /review-queue 검수 큐에 노출된다(예전엔 항상 staging 이었음).
@@ -608,7 +587,6 @@ class ClassifyService:
                 factors_source=self._factors_source(warnings_acc),
                 rule_evaluation_factors=getattr(pred, "rule_factors", None),
                 evidence=pred.evidence,
-                rag_context_used=pred.rag_context,
                 model_version=pred.model_version,
                 elapsed_ms=0,
                 status=status,
@@ -1101,8 +1079,6 @@ class ClassifyService:
                     alternatives=alternatives,
                     automation_assessment=automation_assessment,
                     chunk_count=chunk_count,
-                    rag_used=bool(pred.rag_context),
-                    rag_top_k=len(pred.rag_context) or None,
                     status=status,
                 )
                 classification_id = cls.classification_id
@@ -1133,33 +1109,21 @@ class ClassifyService:
             warns.append(f"persistence skipped: unexpected error ({type(exc).__name__})")
             return uuid.uuid4(), warns
 
-        # ── Step 2: evidence / RAG-evidence 영속화 (best-effort, 별도 트랜잭션) ──
+        # ── Step 2: evidence 영속화 (best-effort, 별도 트랜잭션) ──
         # M-classify-tx: 여기서 실패하더라도 Step 1 에서 이미 commit 된
         # classification 은 보존된다. evidence 는 보강 메타라 손실돼도 분류
         # 결과(등급)는 유지 — 미탐(분류 자체 유실) 위험을 evidence 손실로
         # 격하한다. 실패는 warning 으로만 보고하고 classification_id 는 그대로 반환.
-        if pred.evidence or pred.rag_context:
+        if pred.evidence:
             try:
                 from koipa.db import session_scope  # noqa: PLC0415
 
                 with session_scope() as db2:
-                    repo2 = ClassifyRepo(db2)
-                    if pred.evidence:
-                        repo2.add_evidence_from_spans(
-                            classification_id,
-                            spans=pred.evidence,
-                            default_chunk_id=evidence_default_chunk,
-                        )
-                    if pred.rag_context:
-                        n_rag = repo2.add_rag_evidence_from_hits(
-                            classification_id,
-                            hits=pred.rag_context,
-                            default_chunk_id=evidence_default_chunk,
-                        )
-                        if n_rag != len(pred.rag_context):
-                            warns.append(
-                                f"rag evidence partial persist: {n_rag}/{len(pred.rag_context)}"
-                            )
+                    ClassifyRepo(db2).add_evidence_from_spans(
+                        classification_id,
+                        spans=pred.evidence,
+                        default_chunk_id=evidence_default_chunk,
+                    )
             except Exception as exc:  # noqa: BLE001
                 # evidence 실패는 classification 을 폐기하지 않는다 — warning 만.
                 self._inc_persist_failure("evidence_error")
@@ -1403,166 +1367,11 @@ class ClassifyService:
                 "— routed to human review"
             )
         except Exception as exc:  # noqa: BLE001 — kill-gate 미가용·오류는 자동확정 유지(fail-open)
-            # 다른 서빙 게이트(agreement/llm_second_opinion/similarity_escalation)와 동일하게
+            # 다른 서빙 게이트(agreement/llm_second_opinion)와 동일하게
             # 게이트 계통장애가 무음 no-op으로 숨지 않게 가시화(게이트=가시성 계약).
             logger.debug("kill-gate brake fail-open (kill-gate unavailable): %s", exc)
             ClassifyService._record_gate_fail_open("kill_gate")
             return None
-
-    # ------------------------------------------------------------
-    # [Phase 2] 유사도 escalation 게이트 (등급 무변경 — 검수 라우팅만)
-    # ------------------------------------------------------------
-
-    # 권위(사람/법적) 검증 출처 — get_verified_document_label 우선순위 1~2(human_review·
-    # nkt_designated)만 escalation 참조로 인정. koipa_case_based는 2026-07-03 감사에서 판례 인용
-    # 조작(손작성 시나리오)이 확인돼 강등(golden_tiers.SYNTHETIC_PROXY_SOURCES) — codex_review/
-    # public_definitive/rule_llm_agreement/llm_judge_* 와 함께 제외(‘사람·정부지정이 검증한 더
-    # 높은 등급’ 신호만 채택). S1/S2 escalation 커버리지는 고객사 human_review 누적이 정당한 경로.
-    _AUTHORITATIVE_LABEL_SOURCES = frozenset(
-        {"human_review", "nkt_designated"}
-    )
-
-    def _similarity_escalation_gate(self, doc_id, text, model_label) -> "str | None":
-        """유사도 escalation — 자동확정 부적격이면 검수 사유 문자열, 적격/비활성이면 None.
-
-        들어온 문서가 *권위(사람 검수·법적 지정) 출처가 더 높은(더 비밀) 등급으로 검증한 다른
-        문서와 매우 유사*하면 (dense 코사인 ≥ τ) needs_review로 라우팅한다. 등급(pred.label/
-        scores)은 **절대 바꾸지 않는다** — exact-match override의 '유사' 아날로그를 *신호*로만
-        쓴다(전파 0·poisoning 0). FNR-safe: 이웃이 모델 예측보다 **엄격히 더 비밀**일 때만
-        올린다(동급/하급은 절대 발동 안 함).
-
-        반환 None = 라우팅 변경 없음(게이트 비활성·이미 최고등급·본문 없음·이웃 없음·임계 미만·
-        이웃이 동급/하급·사람검증 이웃 없음·임베딩/검색/DB 오류). 모든 예외는 fail-open(분류 진행)
-        하고 SERVING_GATE_FAIL_OPEN_TOTAL{gate='similarity_escalation'}로 가시화한다.
-
-        ⚠️ 반드시 store.search(dense 코사인 = 1-cosine_distance)만 쓴다 — expand_then_search/
-        search_hybrid 점수는 RRF/리랭커라 τ(코사인)와 비교 불가(잘못 쓰면 상시/전무 발동).
-        """
-        try:
-            from koipa.config import settings  # noqa: PLC0415
-
-            if not getattr(settings, "similarity_escalation_enabled", False):
-                return None  # 기본 OFF — 임베딩/검색 비용 전에 즉시 종료
-            # 점수 의미 일치: store.search가 *raw 코사인*을 주는 백엔드에서만 동작(τ=코사인 기준).
-            # es는 _score=(1+cos)/2라 같은 τ가 더 낮은 실코사인에서 발동(의미 어긋남) → no-op
-            # (es는 레거시·기본 아님, opt-in 게이트라 안전). pg(1-거리)·inmemory(코사인)만 raw 코사인.
-            backend = str(getattr(settings, "vector_backend", "pg") or "pg").lower()
-            if backend not in ("pg", "inmemory"):
-                return None
-            from koipa.schemas.common import GradeRegistry  # noqa: PLC0415
-
-            order = GradeRegistry.get_order()  # 낮을수록 더 비밀(TS=1)
-            model_code = model_label.value if hasattr(model_label, "value") else str(model_label)
-            top_code = next(iter(order), "TS")
-            if model_code == top_code:
-                return None  # 이미 최고등급 — 과소분류 불가, 검색 불요
-            if not text:
-                return None
-
-            # dense 임베딩 + dense 검색(코사인). hybrid/reranker 금지(점수 의미 불일치).
-            from koipa.adapters.embedding import build_embedder  # noqa: PLC0415
-            from koipa.adapters.vectorstore import build_store  # noqa: PLC0415
-
-            result = build_embedder().embed([text])
-            vectors = getattr(result, "vectors", None) or result
-            vec = vectors[0] if vectors else None
-            if not vec:
-                return None
-            collection = getattr(settings, "rag_default_collection", "docs")
-            top_k = int(getattr(settings, "rag_default_top_k", 5) or 5)
-            tau = float(getattr(settings, "similarity_escalation_tau", 0.92))
-            hits = build_store().search(collection, vec, top_k=top_k, filter=None)
-            # [obs] 게이트가 실제 검색을 수행함(routed와 분리) — enabled인데 참조 없어 inert인
-            # 상태를 'ran'>0·'routed'=0으로 구분(무실데이터 단계 가시화).
-            self._inc_similarity_escalation("ran")
-
-            self_id = str(doc_id or "")
-            seen: set[str] = set()
-            for hit in hits or []:
-                score = float(getattr(hit, "score", 0.0) or 0.0)
-                if score < tau:
-                    continue  # 고정밀 임계 미만 — 참조로 안 씀
-                payload = getattr(hit, "payload", None) or {}
-                nid = str(
-                    payload.get("doc_id")
-                    or payload.get("source_doc")
-                    or getattr(hit, "id", "")
-                    or ""
-                )
-                if not nid or nid == self_id or nid in seen:
-                    continue  # 자기 자신(또는 동일 doc의 다른 청크)·중복 제외
-                seen.add(nid)
-                neighbor_code = self._verified_human_grade(nid)
-                if neighbor_code is None:
-                    continue  # 사람검증 등급 없음(머신라벨/미검증) → 참조 불가
-                if order.get(neighbor_code, 99) < order.get(model_code, 99):
-                    # 이웃이 모델 예측보다 엄격히 더 비밀 → 사람 확인(등급은 무변경).
-                    self._inc_similarity_escalation("routed")
-                    return (
-                        f"similarity-escalation: model auto-confirmed {model_code} but an authoritatively-"
-                        f"verified (human/legal) similar doc {nid} is graded higher {neighbor_code} "
-                        f"(cos={score:.2f} >= {tau:.2f}) — routed to human review (FNR-safe, grade unchanged)"
-                    )
-            return None
-        except Exception as exc:  # noqa: BLE001 — 임베딩/검색/DB 오류는 fail-open(분류 진행)
-            logger.debug("similarity-escalation fail-open: %s", exc)
-            self._record_gate_fail_open("similarity_escalation")
-            return None
-
-    @staticmethod
-    def _verified_human_grade(neighbor_doc_id: str) -> "str | None":
-        """이웃 doc의 *사람/권위* 검증 등급 코드 — 없거나 머신라벨이면 None.
-
-        exact-match override가 쓰는 동일 primitive(get_verified_document_label)로 검증라벨을
-        가져와, labeled_by가 권위 출처(_AUTHORITATIVE_LABEL_SOURCES)일 때만 등급코드를 반환한다.
-        file_hash 폴백(_verified_label_by_content)은 쓰지 않는다(그건 exact-match의 몫).
-        예외는 None(이웃 1건 스킵 — 게이트 전체를 죽이지 않음) + fail-open 카운터로 가시화한다
-        (systemic 라벨-DB 장애를 무음 no-op으로 숨기지 않음 — 게이트 contract 준수).
-        """
-        try:
-            from sqlalchemy import select  # noqa: PLC0415
-
-            from koipa.db import SessionLocal  # noqa: PLC0415
-            from koipa.db.models import ClassificationLevel  # noqa: PLC0415
-            from koipa.repositories.classify_repo import ClassifyRepo  # noqa: PLC0415
-
-            nid = _try_uuid_str(neighbor_doc_id)
-            if nid is None:
-                return None
-            db = SessionLocal()
-            try:
-                dl = ClassifyRepo(db).get_verified_document_label(nid)
-                if dl is None or dl.labeled_by not in ClassifyService._AUTHORITATIVE_LABEL_SOURCES:
-                    return None
-                level = db.execute(
-                    select(ClassificationLevel).where(
-                        ClassificationLevel.level_id == dl.level_id
-                    )
-                ).scalar_one_or_none()
-                return level.level_code if level is not None else None
-            finally:
-                db.close()
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("_verified_human_grade skipped: %s", exc)
-            # systemic 라벨-DB 장애가 무음 no-op으로 숨지 않게 가시화(게이트 fail-open contract).
-            ClassifyService._record_gate_fail_open("similarity_escalation")
-            return None
-
-    @staticmethod
-    def _inc_similarity_escalation(action: str = "routed") -> None:
-        """[obs] 유사도 escalation 가시화 — best-effort(메트릭 실패가 게이트를 막지 않음).
-
-        action='ran'(게이트가 실제 검색 수행)·'routed'(검수 라우팅 발동). ran>0·routed=0이면
-        '활성인데 참조(권위 고등급 유사문서)가 없어 inert'를 의미 — disabled/empty와 구분된다.
-        """
-        try:
-            from koipa.api.prom_metrics import (  # noqa: PLC0415
-                SIMILARITY_ESCALATION_TOTAL,
-            )
-
-            SIMILARITY_ESCALATION_TOTAL.labels(action=action).inc()
-        except Exception:  # noqa: BLE001
-            pass
 
     def _effective_metadata(self, req: ClassifyRequest, content: str | None = None) -> dict:
         """분류 metadata 구성 — 요청 metadata에 저장된 문서 출처(provenance)를 보강.

@@ -100,9 +100,8 @@ a{color:#0a0a0a}
   </table>
 
   <div class="note">
-    본 회신은 접수 초안을 <b>대체하지 않습니다.</b> 초안의 구조(비동기 요청 + 완료 콜백)는 그대로
-    유효하며, <b>이미 구현되어 있는 부분</b>과 <b>규격을 맞춰야 하는 부분</b>을 갈라 적습니다.
-    협의사항 15건에 대한 의견은 &sect;6 에 표로 정리했습니다.
+    초안의 구조(비동기 요청 + 완료 콜백)를 그대로 두고, <b>이미 구현되어 있는 부분</b>과
+    <b>규격을 맞춰야 하는 부분</b>을 갈라 적었습니다.
   </div>
 
   <h2>0. 결론 세 줄</h2>
@@ -112,8 +111,9 @@ a{color:#0a0a0a}
     <tbody>
       <tr>
         <td class="c">1</td><td>연계 방식</td>
-        <td><b>1안(REST 직접 연동) 채택 권고.</b> 2안(Redis Stream)은 소비자 구현이 없어
-        신규 개발이 필요하고, 1안이 제공하는 신뢰 전달(재시도·DLQ)을 이미 갖추고 있습니다</td>
+        <td><b>구현 범위와 운영 복잡도를 고려하면 현 시점에서는 1안(REST 직접 연동)을 우선
+        검토하는 것이 효율적입니다.</b> 1안이 제공하는 것은 이미 갖추고 있으며(&sect;4),
+        2안 채택 시에는 요청 소비 루프 신규 개발이 필요하여 범위·일정 협의가 선행되어야 합니다</td>
       </tr>
       <tr>
         <td class="c">2</td><td>결과 반환 항목</td>
@@ -122,33 +122,33 @@ a{color:#0a0a0a}
       </tr>
       <tr>
         <td class="c">3</td><td>요청 절차</td>
-        <td><b>등록 &rarr; 분류 2단계</b>입니다. 등록을 건너뛰면 200 응답을 받고도 결과가 저장되지 않습니다</td>
+        <td><b>등록 &rarr; 분류 2단계</b>입니다. 등록 절차를 포함하는 방안을 권고드립니다(&sect;2)</td>
       </tr>
     </tbody>
   </table>
   </div>
 
-  <h2>1. 초안의 표기 오류 &mdash; 확인 요청</h2>
+  <h2>1. 연계 규약 정합화를 위해 확인이 필요한 사항</h2>
 
-  <p>규약 문서라 먼저 짚습니다. 인터페이스 목록과 상세의 메서드가 어긋나 있습니다.</p>
+  <p>규약 확정 전에 인터페이스 목록과 상세의 메서드를 맞춰 두고자 합니다.</p>
 
   <div class="tw">
   <table>
     <thead><tr><th style="width:12%">항목</th><th style="width:28%">목록(2쪽)</th><th style="width:28%">상세(3~4쪽)</th><th>비고</th></tr></thead>
     <tbody>
-      <tr><td>IF-02</td><td><code>POST /classify</code></td><td><code>GET /api/v1/classify</code></td><td>파일 전송이므로 <b>POST</b> 가 맞습니다</td></tr>
-      <tr><td>IF-03</td><td><code>POST /classify/callback</code></td><td><code>GET /api/v1/classify/callback</code></td><td>본문 전송이므로 <b>POST</b> 가 맞습니다</td></tr>
+      <tr><td>IF-02</td><td><code>POST /classify</code></td><td><code>GET /api/v1/classify</code></td><td>파일 전송이므로 <b>POST</b> 로 맞추어 주시기 바랍니다</td></tr>
+      <tr><td>IF-03</td><td><code>POST /classify/callback</code></td><td><code>GET /api/v1/classify/callback</code></td><td>본문 전송이므로 <b>POST</b> 로 맞추어 주시기 바랍니다</td></tr>
     </tbody>
   </table>
   </div>
 
-  <p>또한 IF-01 의 경로는 실제 구현과 다릅니다.</p>
+  <p>IF-01 의 경로는 현행 엔진에서 다음과 같습니다. 규약서에 이 값으로 반영해 주시기 바랍니다.</p>
 
   <div class="tw">
   <table>
     <thead><tr><th style="width:26%">초안</th><th style="width:26%">실제</th><th>비고</th></tr></thead>
     <tbody>
-      <tr><td><code>GET /health</code></td><td><code>GET /api/v1/healthz</code></td><td>루트 <code>/healthz</code> 는 404 다(실측)</td></tr>
+      <tr><td><code>GET /health</code></td><td><code>GET /api/v1/healthz</code></td><td>루트 <code>/healthz</code> 는 404 입니다(실측)</td></tr>
     </tbody>
   </table>
   </div>
@@ -161,8 +161,7 @@ a{color:#0a0a0a}
   <div class="note warn">
     <b>가장 중요한 조정 사항.</b> 초안은 <code>POST /classify</code> 하나에 파일을 실어 보내는
     1단계 구조입니다. 본 엔진은 <b>문서 등록과 분류가 분리</b>되어 있고, 등록 없이 분류를 호출하면
-    <b>HTTP 200 을 반환하면서도 분류 결과가 저장되지 않습니다.</b> 응답만 보면 정상으로 보이므로
-    현장에서 발견하기 어렵습니다.
+    <b>HTTP 200 을 반환하면서도 분류 결과가 저장되지 않습니다.</b>
   </div>
 
   <h3>2-1. 실제 절차</h3>
@@ -170,7 +169,7 @@ a{color:#0a0a0a}
   <pre>① 문서 등록
    POST /api/v1/documents
    Content-Type: multipart/form-data
-   Authorization: Bearer &lt;토큰&gt;          (또는 동일 오리진 세션 쿠키)
+   &lt;인증 헤더&gt;                          (배포 확정 방식 · 또는 동일 오리진 세션 쿠키)
 
    form-data
      file          (필수) 원본 파일
@@ -183,7 +182,7 @@ a{color:#0a0a0a}
 ② 분류 요청
    POST /api/v1/classify/async
    Content-Type: application/json
-   Authorization: Bearer &lt;토큰&gt;
+   &lt;인증 헤더&gt;                          (배포 확정 방식)
 
    { "doc_id": "3f2a9c14-...",              ← ①이 발급한 UUID
      "callback_url": "https://portal/…/callback" }
@@ -192,32 +191,31 @@ a{color:#0a0a0a}
 
 ③ 완료 통보 (엔진 → 관리시스템)
    POST {callback_url}
-   { "job_id": "...", "status": "done", "results": [ { ... 21필드 ... } ] }</pre>
+   { "job_id": "...", "status": "done", "results": [ { ... 20필드 ... } ] }</pre>
 
   <div class="tw">
-<!-- FIG:seq --><svg viewBox="0 0 940 470" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="등록 후 분류를 요청하는 2단계 절차와, 등록을 건너뛴 경우의 경로를 함께 그린 시퀀스 도식"><style>.t{font:12.5px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 13px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.m{font:11.5px ui-monospace,monospace;fill:#0a0a0a}.d{font:11.5px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.bad{font:700 11.5px "Pretendard","Noto Sans KR",sans-serif;fill:#7f1d1d}</style><defs><marker id="ah" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#0a0a0a"/></marker><marker id="ahb" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#7f1d1d"/></marker></defs><rect x="10" y="14" width="220" height="34" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="th" x="120" y="36" text-anchor="middle">관리시스템 (KL 포털)</text><line x1="120" y1="48" x2="120" y2="410" stroke="rgba(0,0,0,.18)" stroke-dasharray="3 4"/><rect x="360" y="14" width="220" height="34" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="th" x="470" y="36" text-anchor="middle">분류 엔진 (Koipa)</text><line x1="470" y1="48" x2="470" y2="410" stroke="rgba(0,0,0,.18)" stroke-dasharray="3 4"/><rect x="710" y="14" width="220" height="34" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="th" x="820" y="36" text-anchor="middle">암호화 저장소</text><line x1="820" y1="48" x2="820" y2="410" stroke="rgba(0,0,0,.18)" stroke-dasharray="3 4"/><rect x="8" y="75" width="22" height="20" fill="#0a0a0a"/><text class="th" x="19" y="89" text-anchor="middle" fill="#fff">1</text><text class="d" x="36" y="89">문서 등록</text><line x1="120" y1="90" x2="470" y2="90" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="82" text-anchor="middle">POST /api/v1/documents</text><text class="d" x="295" y="105" text-anchor="middle">multipart · file + actor(필수)</text><line x1="470" y1="122" x2="820" y2="122" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="645" y="114" text-anchor="middle">원본 저장</text><text class="d" x="645" y="137" text-anchor="middle">AES-256-GCM 암호화</text><line x1="470" y1="154" x2="120" y2="154" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="146" text-anchor="middle">doc_id (UUID) 발급</text><rect x="8" y="191" width="22" height="20" fill="#0a0a0a"/><text class="th" x="19" y="205" text-anchor="middle" fill="#fff">2</text><text class="d" x="36" y="205">분류 요청</text><line x1="120" y1="206" x2="470" y2="206" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="198" text-anchor="middle">POST /api/v1/classify/async</text><text class="d" x="295" y="221" text-anchor="middle">{ doc_id, callback_url } · content 없이</text><line x1="470" y1="238" x2="120" y2="238" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="230" text-anchor="middle">job_id 즉시 반환</text><rect x="8" y="275" width="22" height="20" fill="#0a0a0a"/><text class="th" x="19" y="289" text-anchor="middle" fill="#fff">3</text><text class="d" x="36" y="289">완료 통보</text><line x1="470" y1="290" x2="120" y2="290" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="282" text-anchor="middle">POST {callback_url}</text><text class="d" x="295" y="305" text-anchor="middle">결과 21필드 · 재시도·DLQ 포함</text><line x1="8" y1="330" x2="932" y2="330" stroke="rgba(0,0,0,.18)"/><text class="bad" x="8" y="352">등록을 건너뛰면 &#8212; 응답은 200 인데 결과가 남지 않는다</text><line x1="120" y1="388" x2="470" y2="388" stroke="#7f1d1d" stroke-dasharray="6 4" marker-end="url(#ahb)"/><text class="bad" x="295" y="380" text-anchor="middle">POST /api/v1/classify (doc_id 미등록)</text><text class="d" x="295" y="403" text-anchor="middle">HTTP 200 · 등급도 나온다</text><line x1="470" y1="388" x2="820" y2="388" stroke="#7f1d1d" stroke-dasharray="6 4"/><text class="bad" x="645" y="380" text-anchor="middle">저장 안 됨</text><text class="d" x="645" y="403" text-anchor="middle">document_exists 검사에서 영속화를 건너뛴다</text><text class="d" x="36" y="432">&#8226; 검수 대기 목록 · 판정 이력 · 감사 로그 어디에도 남지 않는다. 경고 문자열 한 줄만 응답에 붙어 현장에서 발견하기 어렵다.</text><text class="d" x="36" y="452">&#8226; <tspan class="m">POST /api/v1/documents/analyze</tspan> (파일 하나로 끝나는 1단계 경로)도 같은 이유로 결과가 남지 않는다 &#8212; 시연·진단 전용이다.</text></svg><!-- /FIG:seq -->
+<!-- FIG:seq --><svg viewBox="0 0 940 470" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="등록 후 분류를 요청하는 2단계 절차와, 등록을 건너뛴 경우의 경로를 함께 그린 시퀀스 도식"><style>.t{font:12.5px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 13px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.m{font:11.5px ui-monospace,monospace;fill:#0a0a0a}.d{font:11.5px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.bad{font:700 11.5px "Pretendard","Noto Sans KR",sans-serif;fill:#7f1d1d}</style><defs><marker id="ah" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#0a0a0a"/></marker><marker id="ahb" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#7f1d1d"/></marker></defs><rect x="10" y="14" width="220" height="34" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="th" x="120" y="36" text-anchor="middle">관리시스템 (KL 포털)</text><line x1="120" y1="48" x2="120" y2="410" stroke="rgba(0,0,0,.18)" stroke-dasharray="3 4"/><rect x="360" y="14" width="220" height="34" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="th" x="470" y="36" text-anchor="middle">분류 엔진 (Koipa)</text><line x1="470" y1="48" x2="470" y2="410" stroke="rgba(0,0,0,.18)" stroke-dasharray="3 4"/><rect x="710" y="14" width="220" height="34" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="th" x="820" y="36" text-anchor="middle">암호화 저장소</text><line x1="820" y1="48" x2="820" y2="410" stroke="rgba(0,0,0,.18)" stroke-dasharray="3 4"/><rect x="8" y="75" width="22" height="20" fill="#0a0a0a"/><text class="th" x="19" y="89" text-anchor="middle" fill="#fff">1</text><text class="d" x="36" y="89">문서 등록</text><line x1="120" y1="90" x2="470" y2="90" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="82" text-anchor="middle">POST /api/v1/documents</text><text class="d" x="295" y="105" text-anchor="middle">multipart · file + actor(필수)</text><line x1="470" y1="122" x2="820" y2="122" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="645" y="114" text-anchor="middle">원본 저장</text><text class="d" x="645" y="137" text-anchor="middle">AES-256-GCM 암호화</text><line x1="470" y1="154" x2="120" y2="154" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="146" text-anchor="middle">doc_id (UUID) 발급</text><rect x="8" y="191" width="22" height="20" fill="#0a0a0a"/><text class="th" x="19" y="205" text-anchor="middle" fill="#fff">2</text><text class="d" x="36" y="205">분류 요청</text><line x1="120" y1="206" x2="470" y2="206" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="198" text-anchor="middle">POST /api/v1/classify/async</text><text class="d" x="295" y="221" text-anchor="middle">{ doc_id, callback_url } · content 없이</text><line x1="470" y1="238" x2="120" y2="238" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="230" text-anchor="middle">job_id 즉시 반환</text><rect x="8" y="275" width="22" height="20" fill="#0a0a0a"/><text class="th" x="19" y="289" text-anchor="middle" fill="#fff">3</text><text class="d" x="36" y="289">완료 통보</text><line x1="470" y1="290" x2="120" y2="290" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="282" text-anchor="middle">POST {callback_url}</text><text class="d" x="295" y="305" text-anchor="middle">결과 21필드 · 재시도·DLQ 포함</text><line x1="8" y1="330" x2="932" y2="330" stroke="rgba(0,0,0,.18)"/><text class="bad" x="8" y="352">등록을 건너뛴 경우 &#8212; 응답은 200 이나 분류 결과가 저장되지 않는다</text><line x1="120" y1="388" x2="470" y2="388" stroke="#7f1d1d" stroke-dasharray="6 4" marker-end="url(#ahb)"/><text class="bad" x="295" y="380" text-anchor="middle">POST /api/v1/classify (doc_id 미등록)</text><text class="d" x="295" y="403" text-anchor="middle">HTTP 200 · 등급도 나온다</text><line x1="470" y1="388" x2="820" y2="388" stroke="#7f1d1d" stroke-dasharray="6 4"/><text class="bad" x="645" y="380" text-anchor="middle">결과 미저장</text><text class="d" x="645" y="403" text-anchor="middle">document_exists 검사에서 영속화를 건너뛴다</text><text class="d" x="36" y="432">&#8226; 분류 결과가 검수 대기 목록 · 판정 이력에 저장되지 않는다 (호출 자체는 감사 로그에 기록된다).</text><text class="d" x="36" y="452">&#8226; <tspan class="m">POST /api/v1/documents/analyze</tspan> (파일 하나로 끝나는 1단계 경로)도 같은 이유로 결과가 저장되지 않는다 &#8212; 시연·진단 전용 경로다.</text></svg><!-- /FIG:seq -->
   </div>
-  <p class="src">정상 경로(①~③)와 등록을 건너뛴 경로(붉은 점선)를 한 그림에 두었습니다.
-  아래 2-2 가 그 생략이 어디서 걸리는지를 코드로 보여 줍니다.</p>
+  <p class="src">정상 경로(①~③)와 등록을 건너뛴 경로(붉은 점선)를 한 그림에 두었습니다.</p>
 
   <div class="note">
-    <b>인증.</b> 화면이나 요청 본문으로 자격증명을 받지 않습니다. 서버가 같은 오리진
-    세션 쿠키 또는 <code>Authorization</code> 헤더로 신원을 확인하며, 미인증이면 401 을
-    반환합니다. 실제 자격증명은 본 문서를 포함한 어떤 문서에도 기재하지 않고 별도 안전
-    경로로 전달합니다.
+    <b>인증.</b> 코드 기본값은 API Key 헤더 방식이며 JWT 모드도 지원합니다 &mdash;
+    <b>연동에 적용할 방식은 인증 협의에서 확정해 회신드리겠습니다.</b> 어느 방식이든 서버가
+    헤더 또는 같은 오리진 세션 쿠키로 신원을 확인하며, 미인증이면 401 을 반환합니다.
+    화면이나 요청 본문으로 자격증명을 받지 않으며, 실제 자격증명은 본 문서를 포함한 어떤
+    문서에도 기재하지 않고 별도 안전 경로로 전달합니다.
   </div>
 
   <h3>2-2. 저장이 건너뛰어지는 지점</h3>
 
-  <pre>if not repo.document_exists(doc_uuid):
-    self._inc_persist_failure("no_doc")
-    warns.append(f"persistence skipped: doc_id={doc_uuid} not found")
-    return uuid.uuid4(), warns</pre>
+  <p>분류 요청을 받으면 <code>doc_id</code> 가 문서 테이블에 등록되어 있는지 먼저 확인하고,
+  없으면 영속화 단계를 건너뛴 뒤 경고만 응답에 붙입니다.</p>
 
-  <p class="src"><code>poc/src/koipa/services/classify_service.py</code></p>
+  <p class="src">근거 &mdash; <code>poc/src/koipa/services/classify_service.py</code></p>
 
   <p><code>doc_id</code> 가 문서 테이블에 없으면 분류는 수행되지만 <b>이력·조회·검수 대상 목록에
-  남지 않습니다.</b> 경고 문자열 하나만 응답에 붙습니다. 따라서 ①을 생략할 수 없습니다.</p>
+  남지 않습니다.</b> 이력·검수 연계를 위해 <b>등록 절차를 포함하는 방안을 권고드립니다</b> &mdash;
+  등록을 거치지 않은 요청은 사람 검수로 등급을 확정하는 절차(FUN-024)가 성립하지 않습니다.</p>
 
   <h3>2-3. 1단계 경로도 있습니다 &mdash; 다만 결과가 남지 않습니다</h3>
 
@@ -225,22 +223,19 @@ a{color:#0a0a0a}
   <code>POST /api/v1/documents/analyze</code> 가 업로드&middot;파싱&middot;검수 게이트&middot;분류를
   한 요청 안에서 끝내고 등급을 돌려줍니다. 그럼에도 연동 경로로 권하지 않는 이유는 하나입니다.</p>
 
-  <p><b>이 경로는 결과를 저장하지 않습니다.</b> 문서가 등록되지 않은 상태이므로 2-2 의
+  <p><b>이 경로는 분류 결과를 저장하지 않습니다.</b> 문서가 등록되지 않은 상태이므로 2-2 의
   <code>document_exists</code> 검사에서 영속화가 건너뛰어집니다. 따라서 분류 결과가
-  <b>검수 대기 목록&middot;판정 이력&middot;감사 로그 어디에도 남지 않습니다.</b> 사람 검수를 거쳐
-  등급을 확정하는 절차(FUN-024)가 성립하지 않으므로, 연동에는 쓸 수 없습니다.
-  이 경로는 시연&middot;진단 화면 전용입니다.</p>
-
-  <p>즉 2단계를 요청드리는 것은 구현 편의가 아니라
-  <b>검수&middot;이력&middot;감사를 남기기 위한 요건</b> 때문입니다.</p>
+  <b>검수 대기 목록&middot;판정 이력에 남지 않습니다</b>(호출 자체는 감사 로그에 기록되며, 남지 않는
+  것은 분류 결과입니다). 사람 검수로 등급을 확정하는 절차(FUN-024)가 성립하지 않으므로,
+  <b>시연&middot;진단 목적에 적합하며 운영 연계에는 등록형 절차가 더 적합합니다.</b></p>
 
   <h3>2-4. 파일 크기 상한 &mdash; 확정 회신</h3>
 
   <div class="note">
     <b>초안 2쪽 「본문 상한」 칸의 비고에 &ldquo;멀티파트 업로드 용량 제한 협의 필요&rdquo;로
-    적어 주신 사항에 대한 회신입니다.</b> 초안 기재값은 <b>500MB</b> 이고 현행 배포본의
-    상한은 <b>20MB</b> 입니다. 20MB 를 넘는 문서는 <b>413</b> 을 받으므로, 실제 필요하신
-    최대 파일 크기를 회신하여 주시면 그 값에 맞추어 조정하겠습니다.
+    적어 주신 사항에 대한 회신입니다.</b> <b>현재 운영 상한은 20MB</b> 이며(초안 기재값 500MB),
+    20MB 를 넘는 문서는 <b>413</b> 을 받습니다. 필요 용량을 협의해 조정 여부를 결정하면 좋겠습니다 &mdash;
+    실제 다루시는 최대 파일 크기를 회신하여 주시면, 설정으로 되는 값인지 코드 수정이 필요한 값인지를 회신 후 5영업일 안에 회신드리겠습니다.
   </div>
 
   <p><b>현행 상한</b></p>
@@ -250,7 +245,7 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:30%">구분</th><th style="width:14%">상한</th><th>동작</th></tr></thead>
     <tbody>
       <tr><td>멀티파트 업로드(<code>POST /documents</code> 등)</td><td class="c"><b>20MB</b></td><td>초과 시 <b>413</b> <code>file too large</code></td></tr>
-      <tr><td>요청 본문 전체(멀티파트 포함)</td><td class="c"><b>25MB</b></td><td>본문을 읽기 전에 <b>413</b> 반환(<code>KOIPA_BODY_TOO_LARGE</code>)</td></tr>
+      <tr><td>요청 본문 전체(멀티파트 포함)</td><td class="c"><b>25MB</b></td><td>본문을 읽기 전에 <b>413</b> 반환</td></tr>
       <tr><td>역프록시 본문 상한(납품 구성)</td><td class="c"><b>25M</b></td><td><code>infra/mtls/nginx.mtls.conf</code> &mdash; 시험 서버에는 앞단 프록시가 없습니다</td></tr>
       <tr><td>JSON <code>content</code> 문자열</td><td class="c">1,048,576자</td><td>초안 기재값과 동일</td></tr>
     </tbody>
@@ -269,8 +264,8 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:22%">보낸 파일</th><th style="width:10%">응답</th><th>본문</th></tr></thead>
     <tbody>
       <tr><td>91 bytes (txt)</td><td class="c"><b>200</b></td><td>추출&middot;청킹까지 정상 &mdash; 멀티파트 경로 자체는 문제없이 동작합니다</td></tr>
-      <tr><td>22,000,000 bytes</td><td class="c"><b>413</b></td><td><code>file too large: 22000000 &gt; 20971520 bytes (20MB)</code></td></tr>
-      <tr><td>30,000,000 bytes</td><td class="c"><b>413</b></td><td><code>{"detail":"request body too large","code":"KOIPA_BODY_TOO_LARGE"}</code></td></tr>
+      <tr><td>22,000,000 bytes</td><td class="c"><b>413</b></td><td>멀티파트 업로드 상한 20MB 초과로 거절</td></tr>
+      <tr><td>30,000,000 bytes</td><td class="c"><b>413</b></td><td>요청 본문 상한 25MB 초과로 거절 &mdash; 인증 검사 이전 단계</td></tr>
     </tbody>
   </table>
   </div>
@@ -294,12 +289,9 @@ a{color:#0a0a0a}
   </table>
   </div>
 
-  <p><b>앞의 다섯은 설정 조정이고, 마지막 하나가 500MB 를 그대로 열어 드리지 못하는
-  이유입니다.</b> 현재 구현은 업로드된 파일을 <b>통째로 메모리에 올린 뒤</b> 추출로
-  넘깁니다(스트리밍 처리가 아닙니다). 시험 서버의 API 컨테이너는 메모리 10GiB &middot;
-  워커 3개 구성이므로, 500MB 문서가 동시 3건이면 원본만 1.5GB 이고 추출 본문&middot;청크
-  사본이 그 위에 더 얹힙니다. 정확한 배수는 아직 측정하지 않았습니다 &mdash; 목표 상한을
-  주시면 그 값으로 부하 실측을 돌려 확정 회신하겠습니다.</p>
+  <p><b>앞의 다섯은 설정 조정으로 반영할 수 있고, 마지막 하나는 코드 수정이 필요합니다.</b>
+  500MB 를 그대로 여는 것은 설정 변경만으로는 되지 않고 <b>스트리밍 처리 구현</b>이 함께
+  필요합니다. 목표 상한을 주시면 필요한 작업과 일정을 함께 회신드리겠습니다.</p>
 
   <div class="note">
     <b>요청.</b> 실제 다루시는 문서의 최대 크기를 회신하여 주십시오. 설정 조정만으로 되는
@@ -312,19 +304,19 @@ a{color:#0a0a0a}
   <h2>3. 결과 반환 항목 &mdash; 확대 요청</h2>
 
   <p>초안의 콜백 항목은 5개(<code>doc_id</code> · <code>success</code> · <code>etc</code> ·
-  <code>file_name</code> · <code>label</code>)다. 응답은 <b>21필드</b>이며, 그중
-  <b>검수 라우팅에 반드시 필요한 것</b>이 빠져 있습니다.</p>
+  <code>file_name</code> · <code>label</code>)다. 응답은 <b>20필드</b>이며, 그중
+  <b>검수 라우팅에 필요한 항목</b>이 빠져 있습니다.</p>
 
   <div class="tw">
   <table>
     <thead><tr><th style="width:8%">우선</th><th style="width:24%">필드</th><th>없으면 무엇이 안 되는가</th></tr></thead>
     <tbody>
-      <tr><td class="c"><b>필수</b></td><td><code>status</code></td><td><b>이 건을 사람이 봐야 하는지</b>를 알 수 없다(<code>needs_review</code>)</td></tr>
-      <tr><td class="c"><b>필수</b></td><td><code>confidence</code></td><td>검수 우선순위를 매길 수 없다(저신뢰 우선 정렬)</td></tr>
+      <tr><td class="c"><b>필수</b></td><td><code>status</code></td><td><b>이 건을 사람이 봐야 하는지</b>를 알 수 없습니다(<code>needs_review</code>)</td></tr>
+      <tr><td class="c"><b>필수</b></td><td><code>confidence</code></td><td>검수 우선순위를 매길 수 없습니다(저신뢰 우선 정렬)</td></tr>
       <tr><td class="c"><b>필수</b></td><td><code>warnings</code></td><td><b>왜</b> 검수로 보냈는지 설명할 수 없습니다</td></tr>
       <tr><td class="c">권장</td><td><code>evidence</code></td><td>검수자가 근거 없이 본문 전체를 다시 읽어야 합니다</td></tr>
       <tr><td class="c">권장</td><td><code>rule_grade</code> · <code>model_grade</code></td><td>룰·모델 불일치를 화면에 표시할 수 없습니다</td></tr>
-      <tr><td class="c">권장</td><td><code>model_version</code></td><td>어느 모델이 판정했는지 추적할 수 없다(감사 대응)</td></tr>
+      <tr><td class="c">권장</td><td><code>model_version</code></td><td>어느 모델이 판정했는지 추적할 수 없습니다(감사 대응)</td></tr>
       <tr><td class="c">참고</td><td><code>scores</code> · <code>decision_path</code> · <code>automation_assessment</code></td><td>판정 근거 심층 확인용</td></tr>
     </tbody>
   </table>
@@ -349,25 +341,25 @@ a{color:#0a0a0a}
       <tr><td>신뢰 전달</td><td>Outbox 패턴 &mdash; 결과를 먼저 적재하고 별도 배송기가 발송합니다</td></tr>
       <tr><td>재시도</td><td>지수 백오프. 발송 주기 60초</td></tr>
       <tr><td>영구 실패 처리</td><td>최대 시도 소진 시 <b>DLQ</b> 이동 + 지표 노출(<code>koipa_outbox_dlq_total</code>)</td></tr>
-      <tr><td>SSRF 차단</td><td>루프백·클라우드 메타데이터·사설 대역 주소를 콜백 대상에서 거부</td></tr>
+      <tr><td>SSRF 차단</td><td>루프백·클라우드 메타데이터·link-local·reserved·multicast 주소를 콜백 대상에서 거부. 사설 대역(RFC1918)은 폐쇄망 정상 콜백이라 <b>기본 허용</b>이며, 외부망 배포에서는 설정으로 차단합니다</td></tr>
     </tbody>
   </table>
   </div>
 
-  <p>따라서 <b>콜백 수신 엔드포인트만</b> 준비하시면 됩니다.</p>
+  <p>따라서 재시도·실패 처리는 엔진이 담당합니다. <b>콜백 수신 경로와 상호 인증 방식을 함께 확정하면</b> 연계 준비가 가능합니다 &mdash; 수신측 인증 방식은 협의 항목으로 남아 있습니다.</p>
 
   <h2>5. Redis Stream 방식(2안)에 대한 의견</h2>
 
   <div class="note">
     <b>용어 구분.</b> 여기서 말하는 <b>Stream 은 Redis 의 메시지 큐 자료구조</b>이며,
     HTTP 실시간 전송(스트리밍)이 아닙니다. 이름이 같아 혼동되기 쉬워 먼저 밝힙니다.
-    <b>실시간 진행 표시가 필요하신 것이라면 그것은 &sect;5-2 의 SSE 로 제공됩니다</b> &mdash;
+    <b>실시간 진행 표시가 필요하신 것이라면 별도 수단으로 제공 가능하며</b>,
     2안 채택 여부와 무관합니다.
   </div>
 
   <div class="note warn">
-    <b>권고하지 않습니다.</b> 기술적으로 불가능해서가 아니라, <b>1안이 이미 제공하는 것을
-    새로 만들어야 하기 때문</b>입니다.
+    <b>현 시점에서는 1안을 우선 검토하시기를 권해 드립니다.</b> 기술적으로 불가능해서가 아니라,
+    <b>1안이 이미 제공하는 것을 새로 만들어야 하기 때문</b>입니다.
   </div>
 
   <div class="tw">
@@ -390,12 +382,12 @@ a{color:#0a0a0a}
       </tr>
       <tr>
         <td>스트림 키 이름</td>
-        <td>초안은 <code>kopia:</code> 접두사를 쓰는데, 시스템 식별자는 전부
-        <b><code>koipa</code></b> 다(패키지·DB·컨테이너·도메인). 채택 시 <code>koipa:</code> 로 통일 요청</td>
+        <td>초안은 <code>kopia:</code> 접두사를 쓰고, 패키지·DB·컨테이너·도메인 식별자는
+        <b><code>koipa</code></b> 입니다. 채택 시 <code>koipa:</code> 로 통일해 주시기를 요청드립니다</td>
       </tr>
       <tr>
         <td>접속 비밀번호</td>
-        <td>초안 5쪽에 실값이 기재되어 있습니다. <b>문서에서 제거</b>하고 별도 안전 경로로 전달하실 것을 요청드립니다</td>
+        <td>초안 6쪽 비밀번호 칸에 값이 적혀 있습니다(비고 &ldquo;협의 필요&rdquo;). <b>확정 값이라면</b> 문서에서 빼고 별도 안전 경로로 전달하실 것을 권해 드립니다</td>
       </tr>
     </tbody>
   </table>
@@ -408,27 +400,6 @@ a{color:#0a0a0a}
   원본 경로를 넘기고 엔진이 그 경로를 직접 읽으면 <b>이 암호화 저장 경로를 지나치게 됩니다.</b>
   등록 API(<code>POST /api/v1/documents</code>)를 통해 반입하시면 암호화 저장이 보장됩니다.</p>
 
-  <h3>5-2. 실시간 진행 상황이 필요하시면 &mdash; SSE 로 이미 제공됩니다</h3>
-
-  <p>분류가 어디까지 진행됐는지를 화면에 실시간으로 보여주실 계획이라면,
-  <b>이미 구현되어 배포본에 올라가 있습니다.</b></p>
-
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:26%">항목</th><th>내용</th></tr></thead>
-    <tbody>
-      <tr><td>경로</td><td><code>POST /api/v1/classify/stream</code> (Server-Sent Events)</td></tr>
-      <tr><td>이벤트</td><td><code>progress</code>(추출&middot;정규화&middot;임베딩&middot;검색&middot;판정&middot;저장 단계 진입) ·
-      <code>partial</code>(중간 등급&middot;신뢰도) · <code>result</code>(최종 21필드) ·
-      <code>error</code> · <code>done</code></td></tr>
-      <tr><td>상태</td><td><b>구현 완료 · 시험 서버 배포됨</b></td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <p>즉 &ldquo;진행 상황을 실시간으로&rdquo;는 Redis Stream 으로 풀 문제가 아니라 이 경로로 푸는
-  문제입니다. 필요하시면 규약서에 정식 인터페이스로 포함해 드리겠습니다.</p>
-
   <h2>6. 협의사항 15건 &mdash; 회신 의견</h2>
 
   <div class="tw">
@@ -436,19 +407,20 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:8%">구분</th><th style="width:22%">협의 항목</th><th>회신 의견</th></tr></thead>
     <tbody>
       <tr><td class="c">공통</td><td>연계 방식</td><td><b>REST 직접 연동(1안)</b> 권고 (&sect;5)</td></tr>
-      <tr><td class="c">공통</td><td>인증 방식</td><td>현행 인증 체계를 그대로 사용합니다. 자격증명은 본 문서를 포함한 <b>어떤 문서에도 기재하지 않고</b> 별도 안전 경로로 전달합니다</td></tr>
+      <tr><td class="c">공통</td><td>인증 방식</td><td>적용 방식은 협의로 확정합니다(&sect;2-1). 자격증명은 별도 안전 경로로 전달합니다</td></tr>
       <tr><td class="c">공통</td><td>중복 요청 처리</td><td>동일 파일 재업로드는 파일 해시로 판별해 <b>기존 문서로 연결</b>합니다. 다만 이때 <b>메타·외부 참조는 갱신되지 않습니다</b> &mdash; 메타 변경이 필요하면 별도 갱신 호출이 필요합니다</td></tr>
-      <tr><td class="c">공통</td><td>장애·예외 처리</td><td>본 API 는 <b>HTTP 상태코드로 분기</b>합니다. 심볼릭 오류코드 체계는 없으므로 상태코드 기준으로 처리 로직을 세워 주시기 바랍니다</td></tr>
+      <tr><td class="c">공통</td><td>장애·예외 처리</td><td>본 API 는 <b>HTTP 상태코드로 분기</b>합니다. 상태코드 기준으로 처리 로직을 세워 주시기 바랍니다</td></tr>
       <tr><td class="c">REST</td><td>파일 업로드 용량</td><td><b>멀티파트 20MB · 요청 본문 25MB</b>(초과 시 413 · 실측 확인). 초안 2쪽에 &ldquo;협의 필요&rdquo;로 적어 주신 칸에 대한 회신입니다 &mdash; 기재값 500MB 와의 차이와 조정에 필요한 것은 <b>&sect;2-4 참조</b>. JSON <code>content</code> 상한 1,048,576자는 초안과 동일</td></tr>
       <tr><td class="c">REST</td><td>요청 Timeout</td><td>비동기 경로이므로 결과 대기 Timeout 이 불필요합니다. 접수 응답은 즉시 반환됩니다</td></tr>
       <tr><td class="c">REST</td><td>Callback 실패 처리</td><td><b>이미 구현</b> &mdash; 재시도·DLQ·SSRF 차단 (&sect;4)</td></tr>
       <tr><td class="c">REST</td><td>추가 전달 항목</td><td><b>&sect;3 의 필수 3필드 수신 요청</b></td></tr>
-      <tr><td class="c">Redis</td><td>접속 정보</td><td rowspan="6" style="vertical-align:top">2안 미채택 권고에 따라 <b>보류</b>. 채택 결정 시 별도 회신하겠습니다. 단 <b>비밀번호 문서 기재 제거</b>와 <b>키 접두사 <code>koipa:</code> 통일</b>은 채택 여부와 무관하게 요청드립니다</td></tr>
+      <tr><td class="c">Redis</td><td>접속 정보</td><td rowspan="7" style="vertical-align:top">1안 우선 검토 권고에 따라 <b>보류</b>. 채택 결정 시 별도 회신드리겠습니다. 단 <b>비밀번호 문서 기재 정리</b>와 <b>키 접두사 <code>koipa:</code> 통일</b>은 채택 여부와 무관하게 요청드립니다</td></tr>
       <tr><td class="c">Redis</td><td>인증</td></tr>
       <tr><td class="c">Redis</td><td>파일 전달 방식</td></tr>
       <tr><td class="c">Redis</td><td>파일 공유 환경</td></tr>
       <tr><td class="c">Redis</td><td>미소비 Timeout</td></tr>
-      <tr><td class="c">Redis</td><td>Scheduler 주기 · Timeout 처리</td></tr>
+      <tr><td class="c">Redis</td><td>Scheduler 주기</td></tr>
+      <tr><td class="c">Redis</td><td>Timeout 처리</td></tr>
     </tbody>
   </table>
   </div>
@@ -465,7 +437,7 @@ a{color:#0a0a0a}
       <tr><td>IF-01</td><td class="c">보조</td><td><code>GET /api/v1/healthz</code></td><td>관리 &rarr; 엔진</td><td>준비 상태 확인</td></tr>
       <tr><td>IF-05</td><td class="c">보조</td><td><code>GET /api/v1/classify/jobs/{job_id}</code></td><td>관리 &rarr; 엔진</td><td>상태 조회(콜백 유실 대비)</td></tr>
       <tr><td>IF-06</td><td class="c">보조</td><td><code>GET /api/v1/classify/{doc_id}</code></td><td>관리 &rarr; 엔진</td><td>문서 단위 결과 조회 &mdash; <b>사람이 확정한 등급 포함</b></td></tr>
-      <tr><td colspan="5" style="font-size:12px">&nbsp;&nbsp;<b>반드시 구현하셔야 하는 것은 필수 3개</b>입니다. 보조 3개는 없어도 연동이 성립하며, 운영 편의를 위한 것입니다</td></tr>
+      <tr><td colspan="5" style="font-size:12px">&nbsp;&nbsp;<b>연동에 필요한 인터페이스는 필수 3개</b>입니다. 보조 3개는 없어도 연동이 성립하며, 운영 편의를 위한 것입니다</td></tr>
     </tbody>
   </table>
   </div>
@@ -491,7 +463,7 @@ a{color:#0a0a0a}
   </table>
   </div>
 
-  <div class="foot">근거 &mdash; 배포 API OpenAPI 조회 · <code>poc/src/koipa/services/classify_service.py</code> · <code>poc/src/koipa/services/outbox.py</code> · <code>poc/src/koipa/services/async_classify_service.py</code> · <code>poc/src/koipa/schemas/classify.py</code> · <code>poc/src/koipa/api/documents.py</code> · 「KL 연동 인터페이스 규약서(ICD)」 v0.9 협의안(2026-06-20)</div>
+  <div class="foot">API 통신 방안 검토 회신 — 한국지식재산보호원 AI 영업비밀 등급분류 시스템 · 2026-08-28 접수분</div>
 </div>
 </body>
 </html>

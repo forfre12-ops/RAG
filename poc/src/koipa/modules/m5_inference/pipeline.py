@@ -8,7 +8,7 @@ from typing import Optional
 
 from koipa.config import settings
 from koipa.schemas.common import Grade, GradeRegistry
-from koipa.schemas.classify import EvidenceSpan, EvaluationFactors, RagContextHit
+from koipa.schemas.classify import EvidenceSpan, EvaluationFactors
 from koipa.modules.m2_preprocess import split as _chunk_split
 from koipa.modules.m3_labeling.pipeline import LabelingPipeline
 from koipa.obs.otel import span  # 수동 span — OTel 미설치/미활성 시 완전 no-op
@@ -205,7 +205,6 @@ class InferenceResult:
     scores: dict[str, float]
     factors: Optional[EvaluationFactors] = None
     evidence: list[EvidenceSpan] = field(default_factory=list)
-    rag_context: list[RagContextHit] = field(default_factory=list)
     model_version: str = "poc"
     warnings: list[str] = field(default_factory=list)
     # [agreement-gate 재사용] run()이 이미 산출한 **원시 룰등급**(rule_result.grade) — 합의
@@ -660,14 +659,12 @@ class InferencePipeline:
     def run(
         self,
         text: str,
-        use_rag: bool = False,
-        rag_namespace: Optional[str] = None,
         metadata: Optional[dict] = None,
         return_evidence: bool = True,
     ) -> InferenceResult:
         _model_raw_grade: Optional[str] = None
         if self._model is not None:
-            result = self._run_model(text, use_rag, return_evidence)
+            result = self._run_model(text, return_evidence)
             _model_raw_grade = result.label.value if hasattr(result.label, "value") else str(result.label)
             # FNR-safe: rule engine이 TS를 강하게 잡는데 모델이 낮은 등급을 줬으면 TS로 올림.
             if result.label != Grade.TS:
@@ -710,7 +707,6 @@ class InferencePipeline:
                                 scores=new_scores,
                                 factors=result.factors,
                                 evidence=result.evidence,
-                                rag_context=result.rag_context,
                                 model_version=result.model_version,
                                 warnings=result.warnings + [
                                     # 소수 2자리 — 임계와의 차가 0.05 단위로 갈리는데
@@ -827,7 +823,6 @@ class InferencePipeline:
                             scores=new_scores,
                             factors=cap_factors,
                             evidence=result.evidence,
-                            rag_context=result.rag_context,
                             model_version=result.model_version,
                             warnings=result.warnings,
                             rule_grade=result.rule_grade,
@@ -869,7 +864,7 @@ class InferencePipeline:
                     result = InferenceResult(
                         label=Grade[floor_code], confidence=new_conf, scores=new_scores,
                         factors=result.factors, evidence=result.evidence,
-                        rag_context=result.rag_context, model_version=result.model_version,
+                        model_version=result.model_version,
                         warnings=result.warnings + [
                             f"metadata-floor: security_marking={mark} → grade raised {cur}→{floor_code} (ICD §4.2 명시표기 우선)"
                         ],
@@ -929,25 +924,6 @@ class InferencePipeline:
         except Exception:  # noqa: BLE001
             _record_gate_fail_open("s2_underclass_risk", result)
 
-        # 표적 1 (2026-05-29): use_rag=True면 retrieval facade 호출하여 rag_context 채움.
-        # rule-fallback / _run_model 어느 경로든 동일하게 RAG context 보강 — 분류 본문은 안 건드림.
-        # 모든 외부 의존(벡터스토어/임베더/reranker) 실패는 silent + 빈 컨텍스트 폴백.
-        if use_rag:
-            try:
-                hits = self._build_rag_context(
-                    query=text,
-                    namespace=rag_namespace,
-                    metadata=metadata,
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("rag_context build failed: %s", exc)
-                hits = []
-            if hits:
-                result.rag_context = hits
-            else:
-                # 빈 결과는 운영 신호 — warning에 한 줄 남기되 분류는 그대로 진행.
-                result.warnings = list(result.warnings) + ["rag_context empty (store/encoder unavailable or no hits)"]
-
         # [transparency] 원시 모델 판정(override/cap/floor 이전)을 최종 결과에 부착 — 룰·모델·최종 대조용.
         result.model_grade = _model_raw_grade
         return result
@@ -994,7 +970,6 @@ class InferencePipeline:
             scores=new_scores,
             factors=result.factors,
             evidence=result.evidence,
-            rag_context=result.rag_context,
             model_version=result.model_version,
             warnings=list(result.warnings)
             + [
@@ -1321,7 +1296,7 @@ class InferencePipeline:
         )
         return enc, list(range(len(batch)))
 
-    def _run_model(self, text: str, use_rag: bool, return_evidence: bool) -> InferenceResult:
+    def _run_model(self, text: str, return_evidence: bool) -> InferenceResult:
         import torch
         import torch.nn.functional as F
 
@@ -1368,8 +1343,6 @@ class InferencePipeline:
         conf = min(max(float(norm[pred_idx]), 0.0), 1.0)
 
         lab = self.labeling.label(text)  # 보조 evidence/factors
-        # use_rag은 run() 레벨에서 통합 처리 — 본 함수 시그니처는 호환 위해 유지.
-        del use_rag
         # [A3] 모델 등급 ↔ 룰 factors 정합. 룰이 미탐(곱=0/낮음)인데 모델이 고등급이면
         # 표시 S/V/M을 모델 등급에 정합화(+경고) — 'S0·V0·M0인데 TS' 모순 표기 방지.
         factors = lab.factors
@@ -1411,103 +1384,3 @@ class InferencePipeline:
             rule_factors=rule_factors,
         )
 
-    # ------------------------------------------------------------
-    # 표적 1 — RAG context builder
-    # ------------------------------------------------------------
-
-    def _build_rag_context(
-        self,
-        *,
-        query: str,
-        namespace: Optional[str] = None,
-        metadata: Optional[dict] = None,
-    ) -> list[RagContextHit]:
-        """retrieval facade를 안전하게 호출해 RagContextHit 리스트 반환.
-
-        모든 외부 의존(벡터스토어/임베더/reranker)이 실패하거나 부재하면 빈 리스트.
-        - store: build_store() — ES 미가용 시 InMemoryStore 자동 폴백 (이미 어댑터가 처리)
-        - encode: build_embedder() — HF 모델 로드 실패 시 HashEmbedding 폴백 (이미 어댑터가 처리)
-        - collection: namespace 우선, 없으면 settings.rag_default_collection
-        - top_k: settings.rag_default_top_k 또는 5
-        """
-        if not query or not query.strip():
-            return []
-
-        # collection 결정
-        collection = (namespace or "").strip() or getattr(settings, "rag_default_collection", "docs")
-        top_k = int(getattr(settings, "rag_default_top_k", 5))
-        method = getattr(settings, "rag_query_expansion_method", "rule")
-
-        # 어댑터 lazy import — m5_inference 모듈 로드 시점 의존 차단
-        try:
-            from koipa.adapters.embedding import build_embedder  # noqa: PLC0415
-            from koipa.adapters.vectorstore import build_store  # noqa: PLC0415
-            from koipa.services.retrieval import expand_then_search  # noqa: PLC0415
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("rag adapters unavailable: %s", exc)
-            return []
-
-        try:
-            store = build_store()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("vectorstore build failed: %s", exc)
-            return []
-
-        try:
-            embedder = build_embedder()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("embedder build failed: %s", exc)
-            return []
-
-        def _encode(t: str):
-            try:
-                result = embedder.embed([t])
-                # EmbeddingResult.vectors 또는 list[list[float]]
-                vectors = getattr(result, "vectors", None) or result
-                return vectors[0] if vectors else []
-            except Exception as exc:  # noqa: BLE001
-                logger.debug("encode failed: %s", exc)
-                return []
-
-        def _encode_batch(texts: list[str]):
-            """§1: 확장 쿼리 N개 1회 forward — KURE p50 629ms × 4쿼리 단축."""
-            if not texts:
-                return []
-            try:
-                result = embedder.embed(texts)
-                vectors = getattr(result, "vectors", None) or result
-                return list(vectors)
-            except Exception as exc:  # noqa: BLE001
-                logger.debug("encode_batch failed: %s", exc)
-                return []
-
-        # tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진이라 per-customer 경계 없음).
-        # 무스코핑 전역 검색 — filter 없음.
-        filter_ = None
-
-        try:
-            hits = expand_then_search(
-                store=store,
-                collection=collection,
-                query_text=query,
-                encode_batch=_encode_batch,
-                encode=_encode,
-                method=method,
-                top_k=top_k,
-                filter=filter_,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("expand_then_search failed: %s", exc)
-            return []
-
-        # SearchHit → RagContextHit 변환
-        out: list[RagContextHit] = []
-        for h in hits:
-            payload = h.payload or {}
-            source_doc = str(payload.get("doc_id") or payload.get("source_doc") or h.id)
-            out.append(RagContextHit(
-                source_doc=source_doc,
-                chunk_id=str(h.id),
-                score=float(h.score),
-            ))
-        return out

@@ -78,7 +78,7 @@ def test_floor_fnr_card_semantics(tmp_path):
         def __init__(self):
             self.n = 0
 
-        def run(self, text, use_rag=False, metadata=None):  # noqa: ARG002
+        def run(self, text, metadata=None):  # noqa: ARG002
             import types
             grade = "S3" if self.n < 2 else "TS"
             self.n += 1

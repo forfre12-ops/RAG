@@ -462,32 +462,25 @@ def load_train_centroid(path: str | None = None) -> dict | None:
 
 
 def fetch_recent_prod_embeddings(*, limit: int = 200) -> list[list[float]]:
-    """최근 운영 임베딩 표본을 vectorstore에서 가져온다.
+    """최근 운영 임베딩 표본 — 현재 공급원이 없어 항상 빈 리스트다.
 
-    구현 노트: 현 PoC의 InMemoryVectorStore에는 시간 인덱스가 없어
-    전체 청크 중 마지막 N개를 그대로 표본으로 사용. ES 백엔드 도입 후
-    timestamp range로 교체할 것 (P2).
+    ⚠ 2026-09: 유사문서 검색(RAG) 폐기로 벡터스토어(adapters/vectorstore)를 걷어냈다.
+    이 함수는 그 스토어의 sample_vectors 가 유일한 공급원이었다. 벡터스토어를 채우던
+    경로(업로드 문서 RAG 색인·가이드 색인)도 같은 판에서 없앴으므로, 어댑터만 남겼더라도
+    빈 스토어를 읽었을 자리다.
+
+    호출부(run_drift_check)는 빈 표본을 이미 "drift check skipped" 로 처리한다 — 경보를
+    거짓으로 내지 않는다. 드리프트 감지는 요건이 아니고(RTM 에 행 없음) 기본값도
+    OFF(settings.drift_detection_enabled=False)라 배포 동작에는 변화가 없다.
+
+    되살리려면 여기에 공급원을 새로 잇는다. tb_chunks 의 최근 본문을 adapters.embedding
+    으로 임베딩하는 것이 가장 가까운 대체다(위 스토어도 '마지막 N개 청크'를 표본으로 썼다).
+    임베딩 비용은 config.drift_detection_enabled 주석의 실측(200건 30분)을 참고할 것.
     """
-    try:
-        from koipa.adapters.vectorstore import build_store  # noqa: PLC0415
-    except Exception as exc:  # noqa: BLE001
-        _logger.debug("fetch_recent_prod_embeddings skipped (vectorstore unavailable): %s", exc)
-        return []
-    try:
-        # force_memory=False면 env VECTOR_BACKEND 따름. ES 미가용 시 InMemory 폴백.
-        store = build_store()
-    except Exception as exc:  # noqa: BLE001
-        _logger.debug("vectorstore init failed: %s", exc)
-        return []
-
-    # 어댑터별 표본 메서드 (모든 백엔드가 구현하진 않음 — 폴백 빈 리스트)
-    sample_fn = getattr(store, "sample_vectors", None)
-    if callable(sample_fn):
-        try:
-            return list(sample_fn(limit=limit))
-        except Exception as exc:  # noqa: BLE001
-            _logger.debug("sample_vectors failed: %s", exc)
-            return []
+    _logger.debug(
+        "fetch_recent_prod_embeddings: 공급원 없음(벡터스토어 폐기) — 빈 표본 반환 "
+        "(limit=%d 무시). drift check 는 skip 된다.", limit,
+    )
     return []
 
 

@@ -197,45 +197,20 @@ def test_registry_ttl_env_parsing(monkeypatch):
 # Guide 이력 — 전역(global) 네임스페이스 (DB 미가용 in-memory 경로)
 # tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진). guide_id 단독으로 키.
 # ===========================================================================
-class _StubIndexResult:
-    def __init__(self):
-        self.indexed = True
-        self.index_name = "guides_v1"
-        self.alias = "guides"
-        self.chunk_count = 1
-        self.vector_count = 3
-        self.model = "stub"
-        self.warnings: list[str] = []
-
-
-class _StubIndexer:
-    """index_guide 호출을 캡처하는 스텁 — ES 미사용."""
-
-    def __init__(self):
-        self.seen_guides: list[str] = []
-
-    def index_guide(self, *, guide_id, version, text,
-                    doc_type=None, effective_date=None, **kw):
-        self.seen_guides.append(guide_id)
-        return _StubIndexResult()
-
-
 def _svc_with_stub():
     from koipa.services.guide_service import GuideService
 
-    return GuideService(indexer=_StubIndexer())
+    return GuideService()
 
 
 def test_persist_records_guide_in_memory():
-    """업로드가 인덱서·in-memory 레코드까지 guide_id로 전달된다(전역 네임스페이스)."""
+    """업로드가 in-memory 레코드까지 guide_id로 전달된다(전역 네임스페이스)."""
     svc = _svc_with_stub()
     svc.upload(
         guide_id="g1", version="v1", effective_date=None, change_summary=None,
         content_bytes=b"hello guide", actor_user_id="u1",
         filename="g1.txt",
     )
-    # 인덱서에 guide_id 전달
-    assert svc._indexer.seen_guides == ["g1"]
     # in-memory 레코드가 guide_id로 키됨
     assert "g1" in svc._guides
     rec = svc._guides["g1"][0]
@@ -271,7 +246,7 @@ def test_guide_record_fields():
 
     rec = _GuideRecord(
         guide_id="g", version="v", effective_date=None, change_summary=None,
-        registered_at="now", indexed=False, embedding_vector_count=0,
+        registered_at="now",
     )
     assert rec.guide_id == "g"
     assert not hasattr(rec, "tenant_id")

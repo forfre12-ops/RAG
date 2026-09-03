@@ -515,7 +515,6 @@ def load_review_evidence(classification_id) -> dict:
                 "classified_at": cls.classified_at.isoformat() if cls.classified_at else None,
                 "alternatives": list(cls.alternatives or []),
                 "automation_assessment": cls.automation_assessment,
-                "rag_used": bool(cls.rag_used),
             }
             evs = db.execute(
                 select(ClassificationEvidence)
@@ -529,8 +528,6 @@ def load_review_evidence(classification_id) -> dict:
                     "contribution": float(e.contribution) if e.contribution is not None else None,
                     "start": e.excerpt_start,
                     "end": e.excerpt_end,
-                    "rag_similarity": (float(e.rag_similarity)
-                                       if e.rag_similarity is not None else None),
                 })
     except SQLAlchemyError as exc:
         logger.warning("load_review_evidence failed: id=%s err=%s", classification_id, exc)
@@ -547,7 +544,7 @@ def load_review_evidence(classification_id) -> dict:
 
     if not out["evidence"]:
         # 근거 0 은 결함이 아니라 신호다. 적재 조건이 "룰 증거 span 이 잡혔을 때"
-        # (classify_service: `if pred.evidence or pred.rag_context`)이므로, 키워드 앵커 없이
+        # (classify_service: `if pred.evidence`)이므로, 키워드 앵커 없이
         # 모델 확률만으로 판정된 건은 남길 근거가 없다. 그리고 그런 건이 바로 신뢰도가 낮아
         # 검수로 라우팅되는 건이다 — 실서버 실측(2026-08-08)에서 needs_review 8건은 전부 근거 0,
         # 근거가 있는 건은 confirmed/staging 쪽이었다.

@@ -37,7 +37,7 @@ def _classify_with_status(monkeypatch, status):
     svc = ClassifyService.get_instance()
     # doc_id 경로: content 없이 → _fetch_content_by_doc_id 가 (본문, status) 반환하도록 스텁.
     monkeypatch.setattr(svc, "_fetch_content_by_doc_id", lambda doc_id: (_BODY, status))
-    req = ClassifyRequest(doc_id=str(uuid.uuid4()), use_rag=False)
+    req = ClassifyRequest(doc_id=str(uuid.uuid4()))
     return svc.classify(req)
 
 
@@ -131,7 +131,7 @@ def test_content_path_respects_ingestion_isolation(monkeypatch):
     """본문 직접 제공(content) + UUID 적재문서가 needs_review 격리면 서빙도 격리 존중."""
     svc = ClassifyService.get_instance()
     monkeypatch.setattr(svc, "_ingestion_flagged_for_doc", lambda doc_id: True)
-    req = ClassifyRequest(doc_id=str(uuid.uuid4()), content=_BODY, use_rag=False)
+    req = ClassifyRequest(doc_id=str(uuid.uuid4()), content=_BODY)
     res = svc.classify(req)
     assert res.status == "needs_review"
     assert any(_FLAG_WARN in w for w in res.warnings)

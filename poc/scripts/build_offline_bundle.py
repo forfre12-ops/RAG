@@ -78,7 +78,6 @@ class PluginEntry:
 
 @dataclass
 class BundlePolicies:
-    vector_backend_default: str = "pg"   # §03 ES→Postgres 단일화(2026-06-24). ES 폐기.
     llm_provider_default: str = "vllm"
     qwen3_thinking_mode: bool = False
 

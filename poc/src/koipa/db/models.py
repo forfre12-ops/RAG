@@ -273,8 +273,6 @@ class Classification(Base):
     automation_assessment: Mapped[dict | None] = mapped_column(_JSON_PORTABLE)
     aggregation_method: Mapped[str | None] = mapped_column(String(20), default="hybrid", server_default=text("'hybrid'"))
     chunk_count: Mapped[int | None] = mapped_column(SmallInteger)
-    rag_used: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
-    rag_top_k: Mapped[int | None] = mapped_column(SmallInteger)
     status: Mapped[str] = mapped_column(String(20), default="staging", server_default=text("'staging'"))
     # 게이트 최종 결정을 생성 시점에 동결(status와 달리 이후 confirm/correction이 건드리지 않음).
     # nullable: 이 컬럼 도입 이전 행은 최초값을 복원할 수 없어 NULL로 남는다.
@@ -311,8 +309,6 @@ class ClassificationEvidence(Base):
     excerpt_start: Mapped[int | None] = mapped_column(Integer)
     excerpt_end: Mapped[int | None] = mapped_column(Integer)
     contribution: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
-    rag_ref_doc_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True))
-    rag_similarity: Mapped[float | None] = mapped_column(Numeric(4, 3))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
@@ -601,11 +597,6 @@ class Guide(Base):
     change_summary: Mapped[str | None] = mapped_column(Text)
     doc_type: Mapped[str | None] = mapped_column(String(50))
     filename: Mapped[str | None] = mapped_column(String(500))
-    indexed: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
-    embedding_vector_count: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
-    index_name: Mapped[str | None] = mapped_column(String(300))
-    alias: Mapped[str | None] = mapped_column(String(300))
-    model: Mapped[str | None] = mapped_column(String(100))
     registered_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (

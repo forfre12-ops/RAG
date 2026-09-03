@@ -88,15 +88,15 @@ def seq_svg() -> str:
     arrow(290, 470, 120, "POST {callback_url}", "결과 21필드 · 재시도·DLQ 포함")
 
     a('<line x1="8" y1="330" x2="%d" y2="330" stroke="%s"/>' % (W - 8, LINE))
-    a('<text class="bad" x="8" y="352">등록을 건너뛰면 &#8212; 응답은 200 인데 결과가 남지 않는다</text>')
+    a('<text class="bad" x="8" y="352">등록을 건너뛴 경우 &#8212; 응답은 200 이나 분류 결과가 저장되지 않는다</text>')
     arrow(388, 120, 470, "POST /api/v1/classify (doc_id 미등록)", "HTTP 200 · 등급도 나온다", bad=True)
     a('<line x1="470" y1="388" x2="820" y2="388" stroke="%s" stroke-dasharray="6 4"/>' % BAD)
-    a('<text class="bad" x="645" y="380" text-anchor="middle">저장 안 됨</text>')
+    a('<text class="bad" x="645" y="380" text-anchor="middle">결과 미저장</text>')
     a('<text class="d" x="645" y="403" text-anchor="middle">document_exists 검사에서 영속화를 건너뛴다</text>')
-    a('<text class="d" x="36" y="432">&#8226; 검수 대기 목록 · 판정 이력 · 감사 로그 어디에도 남지 않는다. '
-      '경고 문자열 한 줄만 응답에 붙어 현장에서 발견하기 어렵다.</text>')
+    a('<text class="d" x="36" y="432">&#8226; 분류 결과가 검수 대기 목록 · 판정 이력에 저장되지 않는다 '
+      '(호출 자체는 감사 로그에 기록된다).</text>')
     a('<text class="d" x="36" y="452">&#8226; <tspan class="m">POST /api/v1/documents/analyze</tspan> '
-      '(파일 하나로 끝나는 1단계 경로)도 같은 이유로 결과가 남지 않는다 &#8212; 시연·진단 전용이다.</text>')
+      '(파일 하나로 끝나는 1단계 경로)도 같은 이유로 결과가 저장되지 않는다 &#8212; 시연·진단 전용 경로다.</text>')
     a('</svg>')
     return "".join(p)
 
@@ -186,7 +186,6 @@ GATE_LABELS = {
     "agreement-gate": "룰·모델 불일치",
     "llm-secondopinion": "LLM 2차 의견이 더 높음",
     "kill-gate-brake": "배포 차단 신호 발동 중",
-    "similarity-escalation": "사람 확정 문서와 유사",
 }
 
 # 실측(2026-08-29 · 경화 홀드아웃 42건 · 배포 프로파일 그대로).
@@ -217,7 +216,8 @@ def funnel_svg() -> str:
       '.m{font:10.5px ui-monospace,monospace;fill:%s}.d{font:11px %s;fill:%s}'
       '.n{font:700 11px %s;fill:#fff}.hit{font:700 11px %s;fill:%s}</style>'
       % (FONT, INK, FONT, INK, DIM, FONT, DIM, FONT, FONT, BAD))
-    a('<text class="th" x="8" y="26">문서 한 건이 등급을 받은 뒤 &#8212; 게이트 15개를 순서대로 지난다</text>')
+    a('<text class="th" x="8" y="26">문서 한 건이 등급을 받은 뒤 &#8212; '
+      '게이트 %d개를 순서대로 지난다</text>' % len(tags))
     a('<text class="d" x="8" y="46">앞 게이트가 걸리면 <tspan class="th">뒤 게이트는 평가되지 않는다</tspan>. '
       '그래서 한 문서의 검수 사유는 처음 걸린 게이트 하나다.</text>')
     a('<text class="d" x="8" y="66">아래 숫자는 경화 홀드아웃 %d건 실측(2026-08-29) &#8212; '
@@ -248,8 +248,8 @@ def funnel_svg() -> str:
     a('<text class="hit" x="%d" y="%d">검수 %d건</text>' % (W - right + 12, yb + 18, MEASURED["review"]))
     a('<text class="d" x="8" y="%d">게이트는 <tspan class="th">등급을 바꾸지 않는다</tspan> &#8212; '
       '자동확정할지 사람에게 보낼지만 정한다. 등급을 바꾸는 것은 그 앞의 보정이다.</text>' % (yb + 50))
-    a('<text class="d" x="8" y="%d">같은 목록에 16번째 <tspan class="m">extraction-gate</tspan> 가 있으나 '
-      '진단·시연 엔드포인트 전용이라 이 그림에서 뺐다.</text>' % (yb + 70))
+    a('<text class="d" x="8" y="%d">게이트는 운영 적재 경로 기준 %d개다 &#8212; '
+      '진단·시연 전용 항목은 이 그림에서 뺐다.</text>' % (yb + 70, len(tags)))
     a('</svg>')
     return "".join(p)
 

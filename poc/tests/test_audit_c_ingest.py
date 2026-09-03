@@ -181,13 +181,12 @@ class TestPiiNoHyphenBypass:
 # [H5] healthz_ready — 비정상 시 실제 503
 # ===========================================================================
 class TestHealthReady503:
-    def _patch_checks(self, model_ok, db_ok=True, es_ok=True, st_ok=True):
+    def _patch_checks(self, model_ok, db_ok=True, st_ok=True):
         import koipa.api.health as h
 
         return [
             mock.patch.object(h, "_check_model", return_value={"status": "m", "ok": model_ok}),
             mock.patch.object(h, "_check_db", return_value={"status": "d", "ok": db_ok}),
-            mock.patch.object(h, "_check_es", return_value={"status": "e", "ok": es_ok}),
             mock.patch.object(h, "_check_storage", return_value={"status": "s", "ok": st_ok}),
         ]
 
@@ -198,7 +197,7 @@ class TestHealthReady503:
         from fastapi.responses import JSONResponse
 
         patches = self._patch_checks(model_ok=False)
-        with patches[0], patches[1], patches[2], patches[3]:
+        with patches[0], patches[1], patches[2]:
             h.STARTUP_COMPLETE = True
             resp = h.healthz_ready()
         assert isinstance(resp, JSONResponse)
@@ -212,7 +211,7 @@ class TestHealthReady503:
         from fastapi.responses import JSONResponse
 
         patches = self._patch_checks(model_ok=True)
-        with patches[0], patches[1], patches[2], patches[3]:
+        with patches[0], patches[1], patches[2]:
             h.STARTUP_COMPLETE = True
             resp = h.healthz_ready()
         assert isinstance(resp, JSONResponse)
@@ -223,7 +222,7 @@ class TestHealthReady503:
         import koipa.api.health as h
 
         patches = self._patch_checks(model_ok=True)
-        with patches[0], patches[1], patches[2], patches[3]:
+        with patches[0], patches[1], patches[2]:
             h.STARTUP_COMPLETE = False
             resp = h.healthz_ready()
         assert resp.status_code == 503

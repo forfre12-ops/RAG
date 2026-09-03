@@ -23,11 +23,6 @@ class GuideRepo:
         change_summary: Optional[str] = None,
         doc_type: Optional[str] = None,
         filename: Optional[str] = None,
-        indexed: bool = False,
-        embedding_vector_count: int = 0,
-        index_name: Optional[str] = None,
-        alias: Optional[str] = None,
-        model: Optional[str] = None,
     ) -> Guide:
         """guide_id+version 조합이 이미 있으면 UPDATE, 없으면 INSERT.
 
@@ -45,11 +40,6 @@ class GuideRepo:
             existing.change_summary = change_summary
             existing.doc_type = doc_type
             existing.filename = filename
-            existing.indexed = indexed
-            existing.embedding_vector_count = embedding_vector_count
-            existing.index_name = index_name
-            existing.alias = alias
-            existing.model = model
             self.db.flush()
             return existing
 
@@ -60,11 +50,6 @@ class GuideRepo:
             change_summary=change_summary,
             doc_type=doc_type,
             filename=filename,
-            indexed=indexed,
-            embedding_vector_count=embedding_vector_count,
-            index_name=index_name,
-            alias=alias,
-            model=model,
         )
         self.db.add(row)
         self.db.flush()
@@ -82,10 +67,10 @@ class GuideRepo:
         return list(self.db.execute(stmt).scalars())
 
     def latest_training_version(self, guide_id: str) -> Optional[str]:
-        """현재 학습에 쓰인 버전 — 마지막 indexed=True 버전."""
+        """가장 최근에 등록된 버전 — RAG 인덱싱 폐기(2026-09)로 '학습에 쓰인' 구분은 없다."""
         stmt = (
             select(Guide.version)
-            .where(Guide.guide_id == guide_id, Guide.indexed.is_(True))
+            .where(Guide.guide_id == guide_id)
             .order_by(Guide.registered_at.desc())
             .limit(1)
         )

@@ -100,15 +100,6 @@ EMBEDDING_FALLBACK_TOTAL = Counter(
     registry=registry,
 )
 
-# RAG context / fetch 실패 — 벡터스토어·임베더·검색 중 오류 발생 시 증가.
-# logger.warning과 함께 운영 대시보드에서 retrieval 장애를 가시화.
-RAG_CONTEXT_FAILURE_TOTAL = Counter(
-    "koipa_rag_context_failure_total",
-    "RAG context build failures (vectorstore/embedder/search error)",
-    ["stage"],  # build_rag_context | fetch_hits
-    registry=registry,
-)
-
 # §7 (2026-05-29): /answer 단계별 latency — retrieve(쿼리 확장 + ES 검색 + reranker)
 # vs synthesize(LLM 답안 합성). 운영 SLO 정의 + §1 batch encode 효과 정량 입증.
 ANSWER_PHASE_DURATION = Histogram(
@@ -439,18 +430,6 @@ KILL_GATE_AUTOCONFIRM_SUPPRESSED_TOTAL = Counter(
     registry=registry,
 )
 
-# [Phase 2] 유사도 escalation — 권위(사람/법적) 출처가 더 높은 등급으로 검증한 *유사* 문서(dense
-# 코사인 ≥ τ)에 대한 게이트 동작. 등급은 바뀌지 않는다(검수 라우팅만). label action:
-#   · action='ran'    : 게이트가 실제 검색을 수행한 횟수(활성 상태에서 1분류당 1회).
-#   · action='routed' : 그중 실제로 needs_review로 라우팅한 횟수.
-# ran>0·routed=0 = 활성인데 참조(권위 고등급 유사문서)가 없어 inert(disabled/empty와 구분, 무실데이터 가시화).
-SIMILARITY_ESCALATION_TOTAL = Counter(
-    "koipa_similarity_escalation_total",
-    "Auto-confirms routed to needs_review because a highly-similar (dense cosine >= tau) doc was human-verified to a higher/more-secret grade than predicted",
-    ["action"],
-    registry=registry,
-)
-
 # [QW] verified_label(사람검수 완료) 감사 기록 실패 — 결정론 경로의 컴플라이언스 감사가 best-effort라
 # DB 실패 시 무음 누락된다. 이 값이 0보다 크면 감사 누락 발생 신호(NFR-SEC-01 추적).
 CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL = Counter(
@@ -482,7 +461,6 @@ SERVING_FAIL_OPEN_GATES: frozenset[str] = frozenset({
     # 검수 라우팅 — 자동확정을 막지 못하고 통과시킨다(services/classify_service.py)
     "agreement",              # 룰·모델 합의 게이트: 룰엔진 미가용
     "llm_second_opinion",     # LLM 2차 의견: 제공자 오류
-    "similarity_escalation",  # 유사도 에스컬레이션
     "kill_gate",              # kill-gate 발동 중 고등급 자동확정 억제
     # 등급 판정 — 상향/하향 보정이 미적용된다(modules/m5_inference/pipeline.py)
     "fnr_safe_override",      # 룰이 TS를 강하게 잡을 때의 상향

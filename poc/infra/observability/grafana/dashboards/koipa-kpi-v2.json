@@ -128,12 +128,11 @@
     {
       "id": 12,
       "type": "timeseries",
-      "title": "서빙 게이트 발동 (metadata-floor / source-prior / similarity, action별)",
+      "title": "서빙 게이트 발동 (metadata-floor / source-prior, action별)",
       "gridPos": {"x": 12, "y": 24, "w": 12, "h": 6},
       "targets": [
         {"expr": "sum by (action) (rate(koipa_metadata_floor_applied_total[5m]))", "refId": "A"},
-        {"expr": "sum by (action) (rate(koipa_source_prior_applied_total[5m]))", "refId": "B"},
-        {"expr": "sum by (action) (rate(koipa_similarity_escalation_total[5m]))", "refId": "C"}
+        {"expr": "sum by (action) (rate(koipa_source_prior_applied_total[5m]))", "refId": "B"}
       ]
     },
     {

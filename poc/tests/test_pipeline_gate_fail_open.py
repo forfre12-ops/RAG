@@ -56,7 +56,6 @@ def test_metadata_floor_fail_open_records_and_stays_fail_safe(monkeypatch):
     # 평범한 본문 → rule-fallback 저등급 예측. security_marking=top_secret 이 그보다 높아 floor 진입.
     res = pipe.run(
         text="평범한 사내 안내 문서입니다. 특별한 내용 없음.",
-        use_rag=False,
         metadata={"security_marking": "top_secret"},
         return_evidence=False,
     )
@@ -122,7 +121,6 @@ def test_metadata_floor_fail_open_routes_real_pipeline_result(monkeypatch):
     pipe = InferencePipeline()
     res = pipe.run(
         text="평범한 사내 안내 문서입니다. 특별한 내용 없음.",
-        use_rag=False,
         metadata={"security_marking": "top_secret"},
         return_evidence=False,
     )

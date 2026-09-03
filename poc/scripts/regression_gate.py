@@ -53,7 +53,7 @@ WATCHED_SETTINGS = [
     "source_prior_enabled", "source_prior_cap_grade", "storage_encryption_enabled",
     "require_safety_gates", "rule_semantic_threshold", "rule_high_risk_weight_multiplier",
     "rule_fallback_min_evidence", "severe_agg_codes", "model_secondopinion_llm_enabled",
-    "similarity_escalation_enabled", "ts_tie_break_enabled", "auto_rollback_enabled",
+    "ts_tie_break_enabled", "auto_rollback_enabled",
     "drift_detection_enabled", "enable_training", "enable_incremental_retrain",
 ]
 

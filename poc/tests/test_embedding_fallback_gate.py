@@ -101,7 +101,7 @@ def _warmup_settings(**over):
     from types import SimpleNamespace
 
     base = dict(poc_mode="full", require_real_embedder=False,
-                embedding_provider="hf", reranker_provider="noop")
+                embedding_provider="hf")
     base.update(over)
     return SimpleNamespace(**base)
 

@@ -94,28 +94,6 @@ infra-down:
 infra-verify:
 	$(PY) scripts/verify_infra.py
 
-# ── ES→PG 단일화 재검증 (의사결정_대장 §03 게이트; infra/postgres/README.md) ──
-# 기본 dev 스택과 격리된 pgvector+pg_bigm PG(:5433). ES 스택 비건드림.
-REVALID_DB ?= postgresql+psycopg://koipa:koipa_dev@localhost:5433/koipa
-
-revalidate-pg-up:
-	docker compose -f docker-compose.pgvector.yml up -d --build
-
-revalidate-pg-migrate:
-	DATABASE_URL=$(REVALID_DB) $(PY) -m alembic upgrade head
-
-revalidate-pg-bench:
-	VECTOR_BACKEND=pg DATABASE_URL=$(REVALID_DB) $(PY) scripts/revalidate_pg_lexical.py
-
-revalidate-pg-down:
-	docker compose -f docker-compose.pgvector.yml down
-
-# 크럭스: stock dev postgres(:5432)만으로 실 ts_rank 검증 — 커스텀 이미지(pgvector/pg_bigm) 불요.
-# 게이트의 단일 핵심 불확실성(실 ts_rank ≈ 프록시 87%?)을 최소 비용으로 푼다.
-revalidate-tsrank-crux:
-	docker compose up -d postgres
-	$(PY) scripts/revalidate_pg_tsrank_crux.py
-
 api:
 	uvicorn koipa.api.app:app --reload --host 0.0.0.0 --port 8000
 
@@ -137,12 +115,6 @@ p3-800:
 	rm -rf datasets/synthetic_800
 	$(PY) scripts/p3_generate_synthetic.py --total 800 --provider noop \
 	    --out datasets/synthetic_800
-
-p2:
-	$(PY) scripts/p2_compare_embeddings.py --mode dryrun --backends inmemory
-
-p2-full:
-	$(PY) scripts/p2_compare_embeddings.py --mode full --backends es --hybrid
 
 bundle-dry:
 	$(PY) scripts/build_offline_bundle.py --version 1.0.0-rc1 --dry-run \
@@ -188,9 +160,6 @@ verify-all: ## 회신 무관 가능한 전체 검증 (pytest + dryrun PoC + 번�
 
 gold-set: ## gold set 생성 (test_set_v2 → datasets/gold/classification_gold.jsonl)
 	$(PY) scripts/make_gold_set.py
-
-retrieval-gold: ## doc_id retrieval gold set 생성
-	$(PY) scripts/make_retrieval_gold.py --source datasets/oss_eval_queries.json --out datasets/gold_real/retrieval_gold.jsonl --n 80
 
 p1-retrain-dataset: ## P1 retraining JSONL build only
 	$(PY) scripts/build_p1_retrain_dataset.py
@@ -397,23 +366,6 @@ import-review-dry: ## 검수 import dry-run (파일/DB 수정 없음)
 	@[ -n "$(INPUT)" ] || (echo "usage: make import-review-dry INPUT=corrections.csv"; exit 1)
 	$(PY) scripts/import_review_corrections.py $(INPUT) \
 	    --merge-gold --write-db --dry-run
-
-eval-p2-gold: ## P2 doc_id 기준 Recall@5 (oss_eval_queries.json 또는 retrieval_gold.jsonl)
-	$(PY) scripts/p2_compare_embeddings.py \
-	    --mode dryrun --backends inmemory \
-	    --synth-dir datasets/oss_corpus \
-	    --queries-file datasets/gold_real/retrieval_gold.jsonl \
-	    --report-only \
-	    --report reports/p2_gold_eval_report.md
-
-p2-full-gold: ## KURE-v1 + ES dense/hybrid full eval on retrieval_gold
-	$(PY) scripts/p2_compare_embeddings.py \
-	    --mode full --models nlpai-lab/KURE-v1 \
-	    --backends es --hybrid \
-	    --synth-dir datasets/oss_corpus \
-	    --queries-file datasets/gold_real/retrieval_gold.jsonl \
-	    --chunk-size 1200 --chunk-overlap 100 \
-	    --report reports/p2_gold_kure_es_hybrid_v3.md
 
 operational-readiness: ## Build combined P1/P2/data readiness report (reads existing eval JSONs)
 	$(PY) scripts/build_operational_readiness.py \

@@ -4,8 +4,8 @@ Operational readiness can be CONDITIONALLY_READY while external human review is
 still pending. This release gate is stricter: by default every gate must be PASS.
 
 Two failure classes are distinguished (mirroring build_operational_readiness):
-  - FAIL    = a genuine regression / defect (P1 F1/FNR, P2 recall/latency, gold
-              quality). These ALWAYS block a release.
+  - FAIL    = a genuine regression / defect (P1 F1/FNR, gold quality).
+              These ALWAYS block a release.
   - BLOCKED = a data-ceiling / self-resolving item — human_review below the
               minimum, or model parity pending a deploy-time CLASSIFIER_MODEL_DIR
               promotion. These block by default.

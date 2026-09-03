@@ -2,7 +2,7 @@
 
   GET /healthz       : 하위호환 단일 엔드포인트 (기존 동작 유지)
   GET /healthz/live  : 프로세스 생존 여부 (k8s liveness probe)
-  GET /healthz/ready : 서비스 가능 여부 — DB/ES/MinIO/model 준비 상태 (readiness probe)
+  GET /healthz/ready : 서비스 가능 여부 — DB/MinIO/model 준비 상태 (readiness probe)
   GET /healthz/deep  : 전체 구성요소 상세 진단 (운영 대시보드용)
 
 status 값:
@@ -67,32 +67,6 @@ def _check_db() -> dict:
         return {"status": "error", "ok": False, "detail": type(exc).__name__}
 
 
-def _check_es() -> dict:
-    """벡터스토어 헬스 — 백엔드 무관. ES는 _client.ping, PG(pgvector)는 engine SELECT 1.
-
-    이전엔 ES `_client` 만 봐서 PG 백엔드는 _client 부재로 점검 없이 ok(false-ok)였다.
-    PgVectorStore 는 _engine(SQLAlchemy)으로 실연결을 확인한다.
-    """
-    if getattr(settings, "vector_backend", "inmemory") == "inmemory":
-        return {"status": "skipped", "ok": True}
-    try:
-        from koipa.adapters.vectorstore import build_store  # noqa: PLC0415
-        store = build_store()
-        client = getattr(store, "_client", None)
-        if client is not None:          # ES
-            client.ping()
-            return {"status": "ok", "ok": True}
-        engine = getattr(store, "_engine", None)
-        if engine is not None:          # PG (pgvector)
-            from sqlalchemy import text  # noqa: PLC0415
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            return {"status": "ok", "ok": True}
-        return {"status": "ok", "ok": True}  # inmemory 폴백 등 — 점검 대상 없음
-    except Exception as exc:  # noqa: BLE001
-        return {"status": "error", "ok": False, "detail": type(exc).__name__}
-
-
 def _check_storage() -> dict:
     """M-health-storage: ingestion이 실제로 쓰는 build_storage() 결과를 기준으로 점검.
 
@@ -139,35 +113,6 @@ def _check_embedder() -> dict:
         return {"status": "ok", "ok": True}
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "ok": False, "detail": type(exc).__name__}
-
-
-def _check_reranker() -> dict:
-    """[C20] reranker effective 백엔드 가시화 — bge→noop graceful 폴백 노출.
-
-    종전 /healthz는 settings.reranker_provider(설정값)만 보고해, bge 초기화 실패로 noop으로
-    조용히 내려간 상태를 가렸다. 본 probe는 *이미 초기화된 캐시*만 읽어 effective 타입을
-    노출한다(강제 get_reranker() 호출로 모델 로드를 유발하지 않는다 — health가 느려지지 않게).
-    reranker는 품질 보강(+소폭)이라 폴백이 서비스-다운은 아니므로 ok=True 고정·가시화 전용.
-    """
-    configured = getattr(settings, "reranker_provider", "noop")
-    try:
-        from koipa.adapters.reranker import _RERANKER_CACHE  # noqa: PLC0415
-        inst = _RERANKER_CACHE.get(str(configured).lower())
-        if inst is None:
-            return {"status": "not_initialized", "ok": True,
-                    "configured": configured, "effective": None}
-        effective = type(inst).__name__
-        fell_back = str(configured).lower() == "bge" and effective == "NoopReranker"
-        return {
-            "status": "fallback" if fell_back else "ok",
-            "ok": True,
-            "configured": configured,
-            "effective": effective,
-            "fell_back_to_noop": fell_back,
-        }
-    except Exception as exc:  # noqa: BLE001
-        return {"status": "error", "ok": True, "configured": configured,
-                "detail": type(exc).__name__}
 
 
 def _check_extractors() -> dict:
@@ -315,13 +260,6 @@ def _operational_config() -> dict:
         # 시연 전용 표면이 켜져 있는가. 시연 화면이 상태를 바꾸는 버튼(실시간 반영 시연)을
         # 이 값으로 감춘다 — 프로덕션(onprem-local·full-train)은 False 다.
         "demo_console_enabled": bool(getattr(settings, "demo_console_enabled", False)),
-        "rag": {
-            "collection": getattr(settings, "rag_default_collection", "docs"),
-            "embedding_model": getattr(settings, "rag_operational_embedding_model", ""),
-            "search_mode": getattr(settings, "rag_operational_search_mode", ""),
-            "chunk_size": getattr(settings, "rag_index_chunk_size", None),
-            "chunk_overlap": getattr(settings, "rag_index_chunk_overlap", None),
-        },
     }
 
 
@@ -356,13 +294,12 @@ def healthz_live():
 def healthz_ready():
     """k8s readiness probe — 서비스 가능 여부.
 
-    DB / vectorstore / storage / model 모두 준비돼야 ready.
+    DB / storage / model 모두 준비돼야 ready.
     하나라도 실패하면 503 반환 — 로드밸런서가 트래픽 차단하도록.
     """
     checks = {
         "model": _check_model(),
         "db": _check_db(),
-        "vectorstore": _check_es(),
         "storage": _check_storage(),
         "warmup": {"status": "complete" if STARTUP_COMPLETE else "pending",
                    "ok": STARTUP_COMPLETE},
@@ -383,10 +320,8 @@ def healthz_deep():
     checks = {
         "model": _check_model(),
         "db": _check_db(),
-        "vectorstore": _check_es(),
         "storage": _check_storage(),
         "embedder": _check_embedder(),
-        "reranker": _check_reranker(),
         "extractors": _check_extractors(),
         "compute": _check_compute(),
         "warmup": {"status": "complete" if STARTUP_COMPLETE else "pending",
@@ -432,10 +367,7 @@ def healthz():
         "deploy_profile": getattr(settings, "deploy_profile", "unknown"),
         "embedding_provider": getattr(settings, "embedding_provider", "unknown"),
         "llm_provider": getattr(settings, "llm_provider", "unknown"),
-        "vector_backend": getattr(settings, "vector_backend", "unknown"),
-        "reranker_provider": getattr(settings, "reranker_provider", "noop"),
         "classifier_model_dir": operational_config["classifier_model_dir"],
-        "rag": operational_config["rag"],
         "operational_config": operational_config,
         "readiness": _readiness_snapshot(),
         "warmup_done": STARTUP_COMPLETE,

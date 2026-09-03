@@ -2511,10 +2511,6 @@ pdf-tables = [
 psh = [
     { name = "prometheus-client" },
 ]
-reranker = [
-    { name = "flagembedding" },
-    { name = "sentence-transformers" },
-]
 tuning = [
     { name = "optuna" },
 ]
@@ -2538,7 +2534,6 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "flagembedding", marker = "extra == 'embedding'", specifier = ">=1.2" },
     { name = "flagembedding", marker = "extra == 'full'", specifier = ">=1.2" },
-    { name = "flagembedding", marker = "extra == 'reranker'", specifier = ">=1.2" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.29" },
     { name = "konlpy", marker = "extra == 'full'", specifier = ">=0.6" },
@@ -2603,7 +2598,6 @@ requires-dist = [
     { name = "sentence-transformers", specifier = ">=3.0" },
     { name = "sentence-transformers", marker = "extra == 'embedding'", specifier = ">=3.0" },
     { name = "sentence-transformers", marker = "extra == 'full'", specifier = ">=3.0" },
-    { name = "sentence-transformers", marker = "extra == 'reranker'", specifier = ">=3.0" },
     { name = "slowapi", specifier = ">=0.1.9" },
     { name = "soynlp", marker = "extra == 'full'", specifier = ">=0.0.493" },
     { name = "soynlp", marker = "extra == 'nlp'", specifier = ">=0.0.493" },
@@ -2615,7 +2609,7 @@ requires-dist = [
     { name = "xlrd", marker = "extra == 'full'", specifier = ">=2.0" },
     { name = "xlrd", marker = "extra == 'xls'", specifier = ">=2.0" },
 ]
-provides-extras = ["hwp", "xls", "hwp-tables", "ocr", "pdf-agpl", "pdf-tables", "nlp", "embedding", "reranker", "minio", "llm", "orchestration", "lint", "full", "psh", "otel", "jwt", "evaluation", "tuning", "dev"]
+provides-extras = ["hwp", "xls", "hwp-tables", "ocr", "pdf-agpl", "pdf-tables", "nlp", "embedding", "minio", "llm", "orchestration", "lint", "full", "psh", "otel", "jwt", "evaluation", "tuning", "dev"]
 
 [[package]]
 name = "kombu"

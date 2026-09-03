@@ -312,9 +312,9 @@ function renderBodyPreview(text) {
 // 분류 호출 (와우 2 — SSE 7단계 점등)
 // ──────────────────────────────────────────────────────────────────────
 // 서버 ClassifyService 가 실제 emit 하는 stage 이름과 1:1 매칭.
-// [2026-08-24] 「임베딩」을 뺐다(6단계 → 5단계). RAG 임베딩은 use_rag=True 일 때만 돌고
-// (pipeline.py:887), 이 화면은 use_rag=false 로 보낸다 — 즉 그 칸은 **하지 않은 일**을
-// 점등하고 있었다. 서버도 이제 그 신호를 use_rag 안에서만 보낸다(classify_service.py:314).
+// [2026-08-24] 「임베딩」을 뺐다(6단계 → 5단계). 분류 경로는 임베더를 부르지 않는다 —
+// 분류기가 하는 토큰 인코딩은 추론의 일부이지 별도 단계가 아니다. 그 칸은 **하지 않은 일**을
+// 점등하고 있었다. (2026-09: 그 신호를 켜던 유사문서 검색 자체를 폐기했다.)
 // 분류기의 토큰 인코딩은 추론의 일부이지 별도 단계가 아니라 「분류 추론」에 포함된다.
 const STAGES = [
   { key: "extract", label: "본문 추출" },
@@ -400,7 +400,6 @@ async function runClassify() {
         title: title || "demo",
         content: body,
         metadata: Object.keys(icdMeta).length ? icdMeta : null,
-        use_rag: false,
         return_evidence: true,
       },
       onEvent: ({ event, data }) => {
@@ -444,7 +443,6 @@ async function runClassify() {
       doc_id: state.currentSampleId || "demo-input",
       title: title || "demo",
       content: body,
-      use_rag: false,
       return_evidence: true,
     });
     if (r.ok) {
@@ -948,8 +946,6 @@ async function persistToQueue(analysis, file) {
     // 1) 실제 적재 — documents/chunks 저장 + RAG demo 색인, created_by=demo-console 마커
     const fd = new FormData();
     fd.append("actor", JSON.stringify({ user_id: "demo-console", role: "admin" }));
-    fd.append("index_for_rag", "true");
-    fd.append("rag_namespace", "demo");
     fd.append("file", file);
     /* [2026-08-21] 분석과 **같은 ICD 값**을 실적재에도 싣는다.
        종전에는 이 경로가 세 필드를 안 보내서, 화면에는 S1 로 분석돼 있는데 검수 큐에 들어간

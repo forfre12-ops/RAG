@@ -21,7 +21,6 @@ def _warmup_settings(**over):
         require_real_embedder=False,
         require_real_classifier=False,
         embedding_provider="hash",
-        reranker_provider="noop",
     )
     base.update(over)
     return SimpleNamespace(**base)

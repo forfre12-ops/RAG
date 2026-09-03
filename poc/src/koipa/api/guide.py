@@ -1,4 +1,8 @@
-"""POST /guide/documents + GET /guide/documents/{guide_id} — 가이드 문서 (FUN-002)."""
+"""POST /guide/documents + GET /guide/documents/{guide_id} — 가이드 문서 버전 이력.
+
+⚠ 종전 "FUN-002" 표기는 정본 요구사항 추적표에 없는 번호였다(2026-09 정정) — 계약
+요건이 아니라 부가 기능이다. 자세한 것은 services/guide_service.py 모듈 docstring.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +22,7 @@ from koipa.services.guide_service import GuideService
 router = APIRouter(tags=["guide"], dependencies=[Depends(require_auth)])
 
 
-# 가이드 문서 업로드(FUN-002)는 전역 기준 문서를 바꾸는 변경성 작업 →
+# 가이드 문서 업로드는 전역 기준 문서를 바꾸는 변경성 작업 →
 # admin/kl_backend로 제한. 버전 조회(GET)는 인증된 사용자면 허용(전역 네임스페이스).
 @router.post(
     "/guide/documents",

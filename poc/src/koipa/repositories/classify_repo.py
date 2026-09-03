@@ -20,7 +20,7 @@ from koipa.db.models import (
     Document,
     DocumentLabel,
 )
-from koipa.schemas.classify import EvidenceSpan, RagContextHit
+from koipa.schemas.classify import EvidenceSpan
 from koipa.schemas.common import Grade
 
 
@@ -73,8 +73,6 @@ class ClassifyRepo:
         alternatives: list[dict],
         automation_assessment: dict | None = None,
         chunk_count: int | None = None,
-        rag_used: bool = False,
-        rag_top_k: int | None = None,
         aggregation_method: str = "hybrid",
         status: str = "staging",
         inference_ms: int | None = None,
@@ -87,8 +85,6 @@ class ClassifyRepo:
             alternatives=alternatives,
             automation_assessment=automation_assessment,
             chunk_count=chunk_count,
-            rag_used=rag_used,
-            rag_top_k=rag_top_k,
             aggregation_method=aggregation_method,
             status=status,
             # 생성 시점 status = 게이트의 최종 판정 그 자체. 이후 confirm/correction이
@@ -111,10 +107,7 @@ class ClassifyRepo:
         excerpt_start: int | None = None,
         excerpt_end: int | None = None,
         factor_id: int | None = None,
-        rag_ref_doc_id: uuid.UUID | None = None,
-        rag_similarity: float | None = None,
     ) -> ClassificationEvidence:
-        """rag_ref_doc_id/rag_similarity는 evidence_type='rag_context'에서 사용."""
         ev = ClassificationEvidence(
             classification_id=classification_id,
             chunk_id=chunk_id,
@@ -124,8 +117,6 @@ class ClassifyRepo:
             excerpt_start=excerpt_start,
             excerpt_end=excerpt_end,
             factor_id=factor_id,
-            rag_ref_doc_id=rag_ref_doc_id,
-            rag_similarity=rag_similarity,
         )
         self.db.add(ev)
         return ev
@@ -161,42 +152,6 @@ class ClassifyRepo:
         self._bulk_or_add(objs)
         return len(objs)
 
-    def add_rag_evidence_from_hits(
-        self,
-        classification_id: uuid.UUID,
-        *,
-        hits: Iterable[RagContextHit],
-        default_chunk_id: uuid.UUID,
-        excerpt_max_len: int = 500,
-    ) -> int:
-        """RagContextHit(스키마) → ClassificationEvidence(DB)로 RAG 검색 결과를 영속화.
-
-        - evidence_type='rag_context' 고정. RAG 출처 식별 + 검수자가 인용 정확도 검증 가능.
-        - source_doc·chunk_id 문자열을 UUID로 파싱(실패 시 None — DB는 nullable이라 OK).
-        - excerpt는 RagContextHit가 본문을 별도로 안 들고 있어 source_doc 식별자를 보존만 함.
-          본문이 필요하면 호출자가 별도 lookup하여 excerpt 갱신.
-        - contribution은 hit.score를 [0,1]로 clamp.
-
-        §5: 동일하게 add_all로 묶음 insert. add_all 미구현 stub session에서는
-        단건 폴백.
-        """
-        objs: list[ClassificationEvidence] = []
-        for hit in hits:
-            ref_doc = _try_uuid(hit.source_doc)
-            chunk = _try_uuid(hit.chunk_id) or default_chunk_id
-            score = max(0.0, min(1.0, float(hit.score)))
-            excerpt = f"[rag] doc={hit.source_doc} chunk={hit.chunk_id}"[:excerpt_max_len]
-            objs.append(ClassificationEvidence(
-                classification_id=classification_id,
-                chunk_id=chunk,
-                evidence_type="rag_context",
-                excerpt=excerpt,
-                contribution=score,
-                rag_ref_doc_id=ref_doc,
-                rag_similarity=score,
-            ))
-        self._bulk_or_add(objs)
-        return len(objs)
 
     def _bulk_or_add(self, objs: list) -> None:
         """§5 helper: add_all 우선, 미구현 시 단건 add 루프 폴백."""

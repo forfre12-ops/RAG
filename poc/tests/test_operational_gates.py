@@ -24,16 +24,6 @@ def test_operational_readiness_blocks_when_human_review_below_minimum(tmp_path, 
         tmp_path / "p1_llm.json",
         {"metrics": {"f1_macro": 0.55, "high_risk_to_s3": 17}},
     )
-    _write_json(
-        tmp_path / "p2.json",
-        {
-            "best_config": {
-                "label": "KURE / es / hybrid",
-                "latency_ms_p50": 174,
-                "retrieval_metrics": {"recall_at_k": 0.925, "mrr": 0.842, "ndcg_at_k": 0.862},
-            }
-        },
-    )
     gold = tmp_path / "classification_gold.jsonl"
     gold.write_text(
         "\n".join(
@@ -41,11 +31,6 @@ def test_operational_readiness_blocks_when_human_review_below_minimum(tmp_path, 
             for _ in range(700)
         )
         + "\n",
-        encoding="utf-8",
-    )
-    retrieval = tmp_path / "retrieval_gold.jsonl"
-    retrieval.write_text(
-        "\n".join(json.dumps({"source": "oss_eval_doc_id"}) for _ in range(80)) + "\n",
         encoding="utf-8",
     )
 
@@ -58,12 +43,8 @@ def test_operational_readiness_blocks_when_human_review_below_minimum(tmp_path, 
             str(tmp_path / "p1_public.json"),
             "--p1-llm",
             str(tmp_path / "p1_llm.json"),
-            "--p2",
-            str(tmp_path / "p2.json"),
             "--gold",
             str(gold),
-            "--retrieval-gold",
-            str(retrieval),
             "--out",
             str(out),
             "--min-human-review",
@@ -83,29 +64,12 @@ def _readiness_argv(tmp_path, gold, **extra):
         {"metrics": {"f1_macro": 0.83, "fnr_underclass": 0.0, "high_risk_to_s3": 0}},
     )
     _write_json(tmp_path / "p1_llm.json", {"metrics": {"f1_macro": 0.55, "high_risk_to_s3": 17}})
-    _write_json(
-        tmp_path / "p2.json",
-        {
-            "best_config": {
-                "label": "KURE / es / hybrid",
-                "latency_ms_p50": 174,
-                "retrieval_metrics": {"recall_at_k": 0.925, "mrr": 0.842, "ndcg_at_k": 0.862},
-            }
-        },
-    )
-    retrieval = tmp_path / "retrieval_gold.jsonl"
-    retrieval.write_text(
-        "\n".join(json.dumps({"source": "oss_eval_doc_id"}) for _ in range(80)) + "\n",
-        encoding="utf-8",
-    )
     out = tmp_path / "readiness.md"
     argv = [
         "build_operational_readiness.py",
         "--p1-public", str(tmp_path / "p1_public.json"),
         "--p1-llm", str(tmp_path / "p1_llm.json"),
-        "--p2", str(tmp_path / "p2.json"),
         "--gold", str(gold),
-        "--retrieval-gold", str(retrieval),
         "--out", str(out),
         "--min-human-review", "40",
         # parity gate: default evaluated == deployed so it PASSes unless a test overrides
@@ -409,7 +373,6 @@ def test_release_manifest_marks_missing_files(tmp_path, monkeypatch):
 # 왜 이 테스트들이 있나: readiness 리포트 자신은 generated_at·git_sha 를 남기고
 # --require-fresh 가 그것을 봤다. 그런데 **그 리포트가 무엇을 읽었는지는 아무도 안 봤다.**
 #
-#     배포본      vector_backend = pg
 #     게이트 입력  reports/p2_gold_kure_es_hybrid_v3.json  (ES · 2026-06-02 생성)
 #
 # 출하하지 않는 구성의 검색 품질이 2개월 반 동안 게이트를 통과했고, 그 사이 readiness 는
@@ -470,16 +433,16 @@ def _problems(readiness, monkeypatch):
 
 def test_input_freshness_stale_measurement_is_caught(tmp_path, monkeypatch):
     r = _readiness_with_inputs(tmp_path, [
-        _make_input(tmp_path, "p2", "measurement", days_old=76),
+        _make_input(tmp_path, "p1_public", "measurement", days_old=76),
     ])
     probs = _problems(r, monkeypatch)
-    assert any("p2" in p and "76d old" in p for p in probs), probs
+    assert any("p1_public" in p and "76d old" in p for p in probs), probs
 
 
 def test_input_freshness_frozen_dataset_is_not_aged_out(tmp_path, monkeypatch):
     """골든셋은 동결이 정상이다 - 오래됐다고 릴리스를 막으면 안 된다."""
     r = _readiness_with_inputs(tmp_path, [
-        _make_input(tmp_path, "retrieval_gold", "dataset", days_old=400),
+        _make_input(tmp_path, "classification_gold", "dataset", days_old=400),
     ])
     assert _problems(r, monkeypatch) == []
 
@@ -495,7 +458,7 @@ def test_input_freshness_missing_input_is_caught(tmp_path, monkeypatch):
 def test_input_freshness_changed_file_is_caught(tmp_path, monkeypatch):
     """파일이 그 뒤로 바뀌었으면 이 요약은 그 파일에 대한 것이 아니다."""
     r = _readiness_with_inputs(tmp_path, [
-        _make_input(tmp_path, "p2", "measurement", wrong_sha=True),
+        _make_input(tmp_path, "p1_public", "measurement", wrong_sha=True),
     ])
     probs = _problems(r, monkeypatch)
     assert any("changed since" in p for p in probs), probs

@@ -294,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
             text = str(row.get("text") or row.get("body") or "")
             # 요청 doc_id 는 비-UUID 로 준다 - DB persist 를 건너뛰어 운영 데이터를 오염시키지 않는다.
             request_doc_id = f"{id_prefix}-{name}-{i:04d}"
-            payload: dict = {"doc_id": request_doc_id, "content": text, "use_rag": False}
+            payload: dict = {"doc_id": request_doc_id, "content": text}
             if metadata is not None:
                 payload["metadata"] = metadata
             try:

@@ -113,7 +113,7 @@ a{color:#0a0a0a}
       <tr><td class="c">가-2</td><td>전체 워크플로우</td><td><b>귀사 파악 정확</b></td><td>6단계 그대로 맞습니다. 전후 보정 2건만 보강</td></tr>
       <tr><td class="c">가-2-1</td><td>GPU 환경 변경점</td><td>회신</td><td>등급 결정 경로는 GPU 유무와 무관하게 동일합니다</td></tr>
       <tr><td class="c">가-2-2</td><td>100쪽 문서 처리 시간</td><td>회신</td><td>실문서 100쪽을 만들어 <b>파싱부터 판정까지 종단 실측</b>했습니다. 6 CPU 기준 <b>약 5분</b> · 텍스트 문서는 파싱이 전체의 1~4%. <b>스캔 문서는 납품 번들에서 처리되지 않습니다</b>(OCR 미동봉)</td></tr>
-      <tr><td class="c">가-3</td><td>반환 항목</td><td>회신</td><td>현행 21필드. GPU 유무로 달라지지 않습니다</td></tr>
+      <tr><td class="c">가-3</td><td>반환 항목</td><td>회신</td><td>현행 20필드. GPU 유무로 달라지지 않습니다</td></tr>
       <tr><td class="c">가-3-1</td><td>SVM 점수 산정</td><td><b>정정</b></td><td>3요건은 독립 판독되지 않습니다. 곱셈은 교차 확인입니다</td></tr>
       <tr><td class="c">가-3-2</td><td>XAI 방법</td><td><b>정정</b></td><td>Attention·Gradient Saliency 를 쓰지 않습니다</td></tr>
       <tr><td class="c">가-4</td><td>룰 기반 방식</td><td><b>정정</b></td><td>출현 빈도가 아니라 가중합 argmax 다. 시드 404개</td></tr>
@@ -191,7 +191,7 @@ a{color:#0a0a0a}
       </tr>
       <tr>
         <td>최종 &mdash; 검수 라우팅</td>
-        <td>등급이 정해진 뒤 <b>게이트 15개</b>가 &ldquo;이 건을 사람에게 보낼지&rdquo;를 판정합니다.
+        <td>등급이 정해진 뒤 <b>게이트 14개</b>가 &ldquo;이 건을 사람에게 보낼지&rdquo;를 판정합니다.
         <b>게이트는 등급을 바꾸지 않습니다</b> &mdash; 라우팅만 합니다</td>
       </tr>
     </tbody>
@@ -326,7 +326,7 @@ a{color:#0a0a0a}
 <h2>5. 가-3 &mdash; 반환 항목</h2>
   <div class="q">현행 반환 항목이 최종 확정인가 · GPU 여부에 따른 구분</div>
 
-  <p>현행 <code>ClassifyResponse</code> 는 <b>21필드</b>다. GPU 유무로 달라지지 않습니다.</p>
+  <p>현행 <code>ClassifyResponse</code> 는 <b>20필드</b>다. GPU 유무로 달라지지 않습니다.</p>
 
   <div class="tw">
   <table>
@@ -345,7 +345,6 @@ a{color:#0a0a0a}
       <tr><td><code>automation_assessment</code></td><td class="c">&mdash;</td><td>자동확정 판단 근거(마진·순위 등)</td></tr>
       <tr><td><code>evidence</code></td><td class="c">&mdash;</td><td>근거 구간(&sect;7 참조)</td></tr>
       <tr><td><code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>factors_source</code></td><td class="c">&mdash;</td><td>3요건 표시값과 그 출처</td></tr>
-      <tr><td><code>rag_context_used</code></td><td class="c">&mdash;</td><td>RAG 근거 사용 여부</td></tr>
     </tbody>
   </table>
   </div>
@@ -360,7 +359,7 @@ a{color:#0a0a0a}
 
   <h3>5-1. 확정 여부와 추가 항목</h3>
 
-  <p>위 21필드는 <b>현재 배포본의 확정 규격</b>이며, 연동 규약서(ICD)에 그대로 반영되어 있습니다.
+  <p>위 20필드는 <b>현재 배포본의 확정 규격</b>이며, 연동 규약서(ICD)에 그대로 반영되어 있습니다.
   당사가 임의로 필드를 빼거나 이름을 바꾸지 않습니다.</p>
 
   <div class="tw">

@@ -28,7 +28,6 @@ from koipa.api import documents as documents_api
 from koipa.api import schema_admin as schema_admin_api
 from koipa.api import metrics as metrics_api
 from koipa.api import async_classify as async_classify_api
-from koipa.api import answer as answer_api
 from koipa.api import prom_metrics as prom_metrics_api
 from koipa.api import admin as admin_api
 from koipa.api import keyword_admin as keyword_admin_api
@@ -182,11 +181,11 @@ async def lifespan(app: FastAPI):
         logger.warning("structured logging setup skipped: %s", exc)
     # 배포 프로파일 + 적용된 backend 부팅 로그 — 운영 사고 사전 차단
     logger.info(
-        "koipa startup — profile=%s mode=%s llm=%s embedding=%s reranker=%s "
-        "vector=%s storage=%s training=%s",
+        "koipa startup — profile=%s mode=%s llm=%s embedding=%s "
+        "storage=%s training=%s",
         settings.deploy_profile, settings.poc_mode,
-        settings.llm_provider, settings.embedding_provider, settings.reranker_provider,
-        settings.vector_backend, settings.storage_backend, settings.enable_training,
+        settings.llm_provider, settings.embedding_provider,
+        settings.storage_backend, settings.enable_training,
     )
     # J1: 운영 모드에서 빈 자격증명 차단 (dryrun/테스트는 우회)
     assert_production_credentials()
@@ -210,7 +209,7 @@ async def lifespan(app: FastAPI):
 
 
 def _warmup_models(settings_obj) -> None:
-    """임베더·reranker 모델을 부팅 시 1회 호출하여 cold start 비용 흡수.
+    """임베더 모델을 부팅 시 1회 호출하여 cold start 비용 흡수.
 
     KURE/BGE 첫 호출에서 측정된 p95 32s가 운영 첫 요청에 노출되지 않도록.
     hash/noop provider 환경(lite-noapi·dryrun)에서는 즉시 반환되므로 사실상 no-op.
@@ -273,14 +272,6 @@ def _warmup_models(settings_obj) -> None:
                 "위험). 실 분류기 배포면 CLASSIFIER_MODEL_DIR 설정 또는 활성 ModelVersion 시드 필요."
             )
         logger.info("classifier warmup ok — model_dir=%s loaded=%s", model_dir, loaded)
-    if settings_obj.reranker_provider not in ("", "noop"):
-        try:
-            from koipa.adapters.reranker import get_reranker  # noqa: PLC0415
-            rr = get_reranker()
-            rr.rerank("warmup", ["doc1", "doc2"], top_k=1)
-            logger.info("reranker warmup ok — provider=%s", settings_obj.reranker_provider)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("reranker warmup skipped: %s", exc)
 
 
 # 버전 단일 소스 = pyproject.toml([project].version). 과거엔 app.py("0.1.0-poc")·pyproject
@@ -369,7 +360,6 @@ app.include_router(classify_api.router, prefix="/api/v1")
 app.include_router(classify_stream_api.router, prefix="/api/v1")
 app.include_router(explain_api.router, prefix="/api/v1")
 app.include_router(async_classify_api.router, prefix="/api/v1")
-app.include_router(answer_api.router, prefix="/api/v1")
 app.include_router(confirm_api.router, prefix="/api/v1")
 # 검수 액션(승급)은 재학습 무관 — enable_training과 무관하게 항상 등록(폐쇄망 운영 경로).
 app.include_router(promotion_api.router, prefix="/api/v1")

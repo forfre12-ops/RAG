@@ -183,7 +183,7 @@ def _check_paste_set(client, headers: dict, args) -> int:
     def classify(content: str, doc_id: str, title: str) -> dict:
         r = client.post("/api/v1/classify", headers={**headers, "Content-Type": "application/json"},
                         json={"doc_id": doc_id, "title": title, "content": content,
-                              "use_rag": False, "return_evidence": False})
+                              "return_evidence": False})
         if r.status_code != 200:
             return {"error": f"{r.status_code}: {r.text[:200]}"}
         return r.json()

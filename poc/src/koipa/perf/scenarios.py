@@ -45,106 +45,6 @@ def _hdr(role: str = "kl_backend") -> dict:
     }
 
 
-def _measure_recall_at_5() -> float | None:
-    """검색 정답셋으로 Recall@5 를 직접 잰다. 못 재면 사유를 남기고 None.
-
-    이전 판은 `reports/p2/recall_at_5.json` 이라는 **미리 계산된 파일**을 읽었다. 그 파일이
-    없으면 값도 사유도 없이 사라져(223 실측 2026-08-17 무측정) RAG 검색 품질은 한 번도
-    보고된 적이 없었다. 여기서는 색인된 벡터스토어에 직접 질의해 잰다 — API 를 거치지 않으므로
-    감사 로그를 남기지 않는다(운영 DB 를 대상으로 해도 읽기 전용).
-
-    ⚠ 색인 doc_id 에는 청크 접미사가 붙는다(`<uuid>-c0`). 정답셋은 접미사 없는 문서 ID 라
-    그대로 비교하면 전건 불일치로 Recall 0.000 이 나온다(실측으로 확인).
-    """
-    import json as _json  # noqa: PLC0415
-    import os as _os  # noqa: PLC0415
-    import re as _re  # noqa: PLC0415
-    from pathlib import Path as _P  # noqa: PLC0415
-
-    from koipa.config import settings as _settings  # noqa: PLC0415
-
-    poc_root = _P(__file__).resolve().parents[3]
-    candidates = [
-        _os.environ.get("PSH_RETRIEVAL_GOLD", "").strip(),
-        "datasets/gold_real/retrieval_gold_nl.jsonl",
-        "datasets/gold_real/retrieval_gold.jsonl",
-    ]
-    rows: list[dict] = []
-    src = ""
-    for cand in candidates:
-        if not cand:
-            continue
-        path = _P(cand) if _P(cand).is_absolute() else poc_root / cand
-        if not path.is_file():
-            continue
-        try:
-            rows = [_json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
-        except Exception:  # noqa: BLE001
-            continue
-        if rows:
-            src = path.name
-            break
-    if not rows:
-        print("[PSH][S5] 검색 정답셋 없음 — Recall@5 무측정 (PSH_RETRIEVAL_GOLD 로 지정)")
-        return None
-
-    limit = int(_os.environ.get("PSH_RETRIEVAL_MAX", "50") or 50)
-    collection = (
-        _os.environ.get("PSH_RETRIEVAL_COLLECTION", "").strip()
-        or getattr(_settings, "rag_default_collection", "docs")
-    )
-    try:
-        from koipa.adapters.vectorstore import build_store  # noqa: PLC0415
-        from koipa.rag.indexer import build_embedder  # noqa: PLC0415
-
-        # 검색 품질은 **색인이 있는 곳에서만** 잴 수 있다. PSH 는 데이터 오염을 피하려고
-        # 측정 전용 DB 를 쓰는데 거기엔 코퍼스가 없다 — 그대로 재면 Recall 0.000 이 나오고
-        # "검색이 못 찾았다" 로 오독된다(223 실측으로 확인). 색인이 있는 DB 를 따로 지정하면
-        # 그 DB 에는 **읽기 전용 SELECT 만** 나간다.
-        index_url = _os.environ.get("PSH_RETRIEVAL_DATABASE_URL", "").strip()
-        if index_url:
-            from sqlalchemy import create_engine  # noqa: PLC0415
-
-            from koipa.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
-
-            store = PgVectorStore(engine=create_engine(index_url, pool_pre_ping=True))
-        else:
-            store = build_store()
-        embedder = build_embedder()
-    except Exception as exc:  # noqa: BLE001
-        print(f"[PSH][S5] 검색 계층 준비 실패 — Recall@5 무측정 ({type(exc).__name__}: {exc})")
-        return None
-
-    def _strip_chunk(doc_id: object) -> str:
-        return _re.sub(r"-c[0-9]+$", "", str(doc_id or ""))
-
-    hit, n = 0, 0
-    for rec in rows[:limit]:
-        query = rec.get("text") or ""
-        expected = _strip_chunk(rec.get("expected_doc_id"))
-        if not query or not expected:
-            continue
-        try:
-            vec = embedder.embed([query]).vectors[0]
-            hits = store.search(collection, vec, top_k=5)
-        except Exception as exc:  # noqa: BLE001
-            print(f"[PSH][S5] 검색 실패 — Recall@5 무측정 (collection={collection!r}"
-                  f" {type(exc).__name__}: {exc})")
-            return None
-        ids = [_strip_chunk((h.payload or {}).get("doc_id")) for h in hits]
-        n += 1
-        hit += expected in ids
-    if not n:
-        print("[PSH][S5] 정답셋에 질의·정답ID 쌍이 없다 — Recall@5 무측정")
-        return None
-    if hit == 0:
-        # 전건 실패는 "검색이 못 찾았다" 보다 "정답셋과 색인이 다른 코퍼스" 일 때가 많다.
-        print(f"[PSH][S5] ⚠ Recall@5 0.000 (정답셋 {src} · collection={collection}) —"
-              " 정답셋과 색인 코퍼스가 같은 빌드인지 확인할 것")
-    print(f"[PSH][S5] Recall@5 = {hit / n:.3f} · 정답셋 {src} {n}건 · collection={collection}")
-    return hit / n
-
-
 def _load_eval_set() -> tuple[list[tuple[str, str]], str]:
     """(본문, 정답등급) 목록과 출처 이름. 없으면 ([], "").
 
@@ -260,7 +160,6 @@ def s1_sync_classify(ctx: ScenarioContext) -> None:
                     json={
                         "doc_id": f"psh-s1-{i}-{uuid.uuid4().hex[:6]}",
                         "content": content,
-                        "use_rag": False,
                         "return_evidence": True,
                     },
                 )
@@ -473,7 +372,7 @@ def s3_confirm_relabel(ctx: ScenarioContext) -> None:
             r = cli.post(
                 "/api/v1/classify",
                 headers=_hdr(),
-                json={"doc_id": doc_id, "content": body, "use_rag": False},
+                json={"doc_id": doc_id, "content": body},
             )
             if r.status_code == 200 and r.json().get("inference_id"):
                 records.append((doc_id, r.json()["inference_id"]))
@@ -636,16 +535,17 @@ def s4_schema_grades(ctx: ScenarioContext) -> None:
 # S5. guide upload + RAG
 # ----------------------------------------------------------------
 
-def s5_guide_rag(ctx: ScenarioContext) -> None:
+def s5_guide_upload(ctx: ScenarioContext) -> None:
+    # [2026-09] 유사문서 검색(RAG) 폐기로 가이드 업로드의 색인 단계가 없어졌다.
+    # 색인 산출을 재던 KPI 3개(벡터 수·색인 throughput·Recall@5)는 잴 대상이 사라져
+    # 함께 걷었다. 남는 것은 업로드 지연(s5_1)과 후속 버전조회 200(s5_5)이다.
     make = _client_factory()
-    # warmup 2회 + 측정 N회 (HF 모델 임베더 첫 로딩 영향 배제)
     warmup = 2
     N = 5
     actor = {"user_id": "psh-admin", "role": "admin"}
     text_body = "본 가이드는 영업비밀의 등급 분류 기준을 정의한다. " * 30
 
     latencies: list[float] = []
-    throughputs: list[float] = []
     list_ok = True
     last_gid = ""
 
@@ -673,39 +573,14 @@ def s5_guide_rag(ctx: ScenarioContext) -> None:
             if r.status_code != 201:
                 continue
             latencies.append(elapsed)
-            body = r.json()
-            vc = int(body.get("embedding_vector_count", 0))
-            # 실제로 벡터가 색인된 회차만 측정에 포함.
-            # dryrun(ES 미가용·테스트 클라이언트) 환경에서는 vc=0이 정상 — SKIP되도록 record 생략.
-            if vc > 0:
-                ctx.record("s5_2", vc)
-                if elapsed > 0:
-                    throughputs.append(vc / (elapsed / 1000.0))
 
         if last_gid:
             rg = cli.get(f"/api/v1/guide/documents/{last_gid}", headers=_hdr(role="admin"))
             list_ok = rg.status_code == 200
 
-    # throughput: 측정 중 최댓값 (각 호출의 즉시 throughput 중 가장 빠른 값 — warmup 후 정상 상태)
-    if throughputs:
-        ctx.record("s5_3", max(throughputs))
-
     for lat in latencies:
         ctx.record("s5_1", lat)
     ctx.record("s5_5", list_ok)
-
-    if ctx.mode == "full":
-        # Recall@5 — 색인된 벡터스토어에 직접 질의해 잰다.
-        # 이전 판은 `ctx.resources.es` 를 조건으로 걸고 있었다. 이 배포의 벡터스토어는
-        # pgvector 라 ES 는 영원히 False 고, 그래서 이 KPI 는 한 번도 측정된 적이 없었다.
-        # 벡터스토어 종류가 아니라 "정답셋과 색인이 있는가" 가 조건이다 —
-        # 못 재는 경우는 _measure_recall_at_5 가 사유를 남긴다.
-        try:
-            rec = _measure_recall_at_5()
-            if rec is not None:
-                ctx.record("s5_4", rec)
-        except Exception as exc:  # noqa: BLE001
-            print(f"[PSH][S5] Recall@5 측정 중 오류 — 무측정 ({type(exc).__name__}: {exc})")
 
 
 # ----------------------------------------------------------------
@@ -1213,7 +1088,7 @@ def _build_s10_eval_set(n_per_grade: int = 25) -> list[tuple[str, str]]:
     return out
 
 
-def s10_rag_evidence(ctx: ScenarioContext) -> None:
+def s10_evidence_fidelity(ctx: ScenarioContext) -> None:
     make = _client_factory()
     cases = _build_s10_eval_set(n_per_grade=25)  # 4 grades × 25 = 100 cases
     if not cases:
@@ -1236,7 +1111,6 @@ def s10_rag_evidence(ctx: ScenarioContext) -> None:
                 json={
                     "doc_id": f"psh-s10-{uuid.uuid4().hex[:6]}",
                     "content": content,
-                    "use_rag": True,   # RAG 활성화 — label-evidence 관계 실측
                     "return_evidence": True,
                 },
             )
@@ -1277,7 +1151,7 @@ def s10_rag_evidence(ctx: ScenarioContext) -> None:
               " — 분류 레이트리밋(60/min) 확인 필요")
     if mismatch_label or mismatch_cite:
         print(f"[PSH][S10] label-evidence 불일치 내역 — 판정 차이 {mismatch_label}건 ·"
-              f" 인용 결함 {mismatch_cite}건 (인용 결함만이 RAG 품질 문제다)")
+              f" 인용 결함 {mismatch_cite}건 (인용 결함만이 근거 품질 문제다)")
 
 
 # ----------------------------------------------------------------
@@ -1541,7 +1415,7 @@ def s14_store_dr(ctx: ScenarioContext) -> None:
     """dryrun: 저장소 가용성 확인만. full: docker 정전 시뮬레이션 (PSH_S14_SIMULATE_OUTAGE=1 옵트인).
 
     2026-08-17: 대상을 ES → PostgreSQL 로 바꿨다. 이 배포의 벡터스토어는 pgvector 이고
-    (vector_backend 기본값 pg · 배포 프로파일 전부 pg), ES 어댑터는 레거시라 서버에 없다.
+    벡터 검색 자체를 2026-09 에 걷어냈다.
     ES 를 세워 재는 건 쓰지 않는 구성을 만들어 재는 것이라 배포본 근거가 되지 못한다.
     권한·환경 의존이 강해 dryrun 기본은 비활성, 운영 단계에서 nightly 1회 실행 권장.
     """
@@ -1678,13 +1552,13 @@ SPECS: list[ScenarioSpec] = [
     ScenarioSpec("S2", "대용량 비동기 분류", s2_async_batch),
     ScenarioSpec("S3", "관리자 확정·재라벨", s3_confirm_relabel),
     ScenarioSpec("S4", "등급체계 변경", s4_schema_grades),
-    ScenarioSpec("S5", "가이드 RAG 인덱싱", s5_guide_rag),
+    ScenarioSpec("S5", "가이드 업로드·버전조회", s5_guide_upload),
     ScenarioSpec("S6", "합성 생성→검수", s6_synth),
     ScenarioSpec("S7", "URGENT_RETRAIN", s7_urgent_retrain, requires=["pg"]),
     ScenarioSpec("S8", "운영 지표·CM", s8_metrics),
     ScenarioSpec("S9", "적대적 문서 FNR 스트레스", s9_adversarial),
     ScenarioSpec("S11", "부하 (Concurrent Stress)", s11_concurrent_stress),
-    ScenarioSpec("S10", "RAG 인용 충실도", s10_rag_evidence),
+    ScenarioSpec("S10", "인용 충실도", s10_evidence_fidelity),
     ScenarioSpec("S16", "권한·인증 거부", s16_auth_rejection),
     ScenarioSpec("S17", "감사 로그 무결성", s17_audit_log, requires=["pg"]),
     ScenarioSpec("S18", "폐쇄망 번들 무결성", s18_offline_bundle),

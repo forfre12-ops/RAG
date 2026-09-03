@@ -15,7 +15,6 @@ class TrainRequest(BaseModel):
     base_model: str = "kf-deberta-base"
     dataset_version: Optional[str] = None
     hyperparams: dict[str, Any] = Field(default_factory=dict)
-    use_rag: bool = False
     actor: Actor
 
 

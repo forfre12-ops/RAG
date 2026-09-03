@@ -34,7 +34,6 @@ class EnvSnapshot:
     services: ServiceStatus = field(default_factory=ServiceStatus)
     llm_provider: str = "noop"
     embedding_provider: str = "hash"
-    vector_backend: str = "inmemory"
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -173,7 +172,6 @@ def capture_env(
     probe_pytest: bool = False,
     llm_provider: str = "noop",
     embedding_provider: str = "hash",
-    vector_backend: str = "inmemory",
 ) -> EnvSnapshot:
     """현재 환경을 캡처. probe_services=False면 서비스 핑 생략 (빠른 dryrun용)."""
 
@@ -198,5 +196,4 @@ def capture_env(
         services=svc,
         llm_provider=llm_provider,
         embedding_provider=embedding_provider,
-        vector_backend=vector_backend,
     )

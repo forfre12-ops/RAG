@@ -55,8 +55,8 @@ def _evidence_identity(paths: dict[str, tuple[str, str]]) -> list[dict[str, Any]
     `kind` 가 둘을 가른다. **나이의 의미가 다르기 때문**이다.
 
         measurement  코드 동작을 잰 것(p1·p2 리포트). 코드가 바뀌면 낡는다 - 나이가 결함이다.
-        dataset      골든셋. **동결이 정상**이라 오래된 것이 결함이 아니다(retrieval_gold 는
-                     2026-06-01 이고 그게 맞다). 나이는 안 보고 sha 만 본다.
+        dataset      골든셋. **동결이 정상**이라 오래된 것이 결함이 아니다.
+                     나이는 안 보고 sha 만 본다.
 
     둘을 뭉뚱그려 나이로 막으면 정상인 동결 골든셋이 릴리스를 막는다.
     """
@@ -187,98 +187,6 @@ def _p1_gate(
     }
 
 
-# 배포본이 실제로 쓰는 벡터 백엔드. 이것과 다른 구성으로 잰 수치는 릴리스 근거가 못 된다.
-_SHIPPED_BACKENDS = ("pg", "pgvector", "postgres")
-
-
-def _retrieval_config_text(p2_report: dict) -> str:
-    """readiness 문서에 적을 검색 구성 문자열을 **리포트에서** 만든다.
-
-    하드코딩하면 리포트를 바꿔도 설명이 안 따라온다(2026-08-16 실측: 게이트는 pg 수치인데
-    문서는 Elasticsearch 라고 적고 있었다).
-    """
-    best = p2_report.get("best_config") or {}
-    emb = best.get("embedder") or "?"
-    backend = str(best.get("backend") or "?")
-    mode = best.get("search_mode") or "?"
-    name = {"pg": "PostgreSQL+pgvector", "es": "Elasticsearch",
-            "inmemory": "InMemory"}.get(backend, backend)
-    cs = best.get("chunk_size", 1200)
-    co = best.get("chunk_overlap", 100)
-    return f"{emb} + {name} {mode} + chunk={cs}/overlap={co}"
-
-
-def _settings_for_gate():
-    """게이트가 출하 설정을 읽는다. 실패해도 게이트가 죽으면 안 되므로 빈 껍데기를 준다."""
-    try:
-        from koipa.config import settings  # noqa: PLC0415
-        return settings
-    except Exception:  # noqa: BLE001
-        class _Empty:
-            pass
-        return _Empty()
-
-
-def _p2_gate(p2_report: dict) -> tuple[Gate, dict]:
-    """검색 품질 게이트. **출하 구성으로 잰 것인지 먼저 본다.**
-
-    ⚠ 2026-08-16 발견. 배포본은 `vector_backend=pg`(pgvector)인데 이 게이트가 읽던 리포트는
-      `backend=es`(Elasticsearch)로 2026-06-02 에 생성된 것이었다. **우리가 출하하지 않는
-      구성의 검색 품질이 릴리스 게이트를 통과시키고 있었다.**
-
-      P1 에서 '원시 모델을 재고 있었다' 와 같은 종류의 결함이다 - 게이트가 출하물을 안 잰다.
-      그때는 판정 단위를 서빙 경로로 바꿨고, 여기서는 백엔드 불일치를 BLOCKED 로 표면화한다.
-
-      ⚠ FAIL 이 아니라 BLOCKED 로 둔다. 성능이 나쁜 것이 아니라 **잰 적이 없는 것**이고,
-        둘을 같은 말로 보고하면 원인을 못 찾는다.
-
-      pg 로 재려면: `scripts/p2_compare_embeddings.py --backends pg --hybrid`
-      (2026-08-16 에 pg hybrid 조합을 열었다. pg_store 는 dense+어휘 RRF 를 SQL 에서 융합하며
-       vec-only 폴리필이 아니다.)
-    """
-    best = p2_report.get("best_config", {})
-    metrics = best.get("retrieval_metrics", {})
-    recall = metrics.get("recall_at_k", best.get("recall_at_k", 0))
-    latency = best.get("latency_ms_p50", 999999)
-    backend = str(best.get("backend", "")).lower()
-
-    detail = (
-        f"{best.get('label', 'N/A')}: Recall@5={recall:.3f}, "
-        f"MRR={metrics.get('mrr', 0):.3f}, nDCG@5={metrics.get('ndcg_at_k', 0):.3f}, "
-        f"p50={latency:.0f}ms"
-    )
-    if backend and backend not in _SHIPPED_BACKENDS:
-        return Gate(
-            "P2 retrieval", "BLOCKED",
-            f"측정 백엔드({backend}) != 출하 백엔드(pg) - 출하하지 않는 구성의 수치다. "
-            f"pg 로 재측정 필요. 참고값: {detail}",
-        ), {"best_config": best, "backend_mismatch": True}
-
-    # [임베더 정합] 백엔드만 맞으면 되는 게 아니다 - **어느 모델로 임베딩했는지**도
-    # 같아야 이 수치가 출하물을 설명한다.
-    #
-    # 실측 2026-08-17(KL 223): 배포본 api 는 BAAI/bge-m3, worker 는 nlpai-lab/KURE-v1 로
-    # 떠 있었다(compose 기본값이 파일마다 달랐다). 두 모델 다 1024 차원이라 차원 검사에
-    # 안 걸리고 예외도 안 난다 - 색인과 질의가 다른 공간이라 **조용히 오검색**이 난다.
-    # 그때 게이트는 KURE-v1 로 잰 Recall 0.887 을 통과시키고 있었다.
-    #
-    # ⚠ BLOCKED 이지 FAIL 이 아니다. 성능이 나쁜 게 아니라 **그 구성을 잰 적이 없는 것**이고,
-    #   둘을 같은 말로 보고하면 원인을 못 찾는다(백엔드 불일치와 같은 취급).
-    shipped_emb = str(getattr(_settings_for_gate(), "embedding_model", "") or "").strip()
-    measured_emb = str(best.get("embedder", "") or "").strip()
-    if shipped_emb and measured_emb and measured_emb != shipped_emb:
-        return Gate(
-            "P2 retrieval", "BLOCKED",
-            f"측정 임베더({measured_emb}) != 출하 임베더({shipped_emb}) - 색인과 질의가 "
-            f"다른 모델이면 차원이 같아 오류 없이 오검색이 난다. 같은 모델로 재측정 필요. "
-            f"참고값: {detail}",
-        ), {"best_config": best, "embedder_mismatch": True,
-            "shipped_embedder": shipped_emb, "measured_embedder": measured_emb}
-
-    status = "PASS" if recall >= 0.80 and latency <= 200 else "FAIL"
-    return Gate("P2 retrieval", status, detail), {"best_config": best}
-
-
 HIGH_RISK = {"TS", "S1", "S2"}
 
 _STRICT_VALIDATOR_CACHE: list = []
@@ -356,12 +264,10 @@ def _human_review_agreement(path: Path) -> dict:
 
 def _data_gates(
     gold_path: Path,
-    retrieval_gold_path: Path,
     min_human_review: int,
     max_high_risk_underclass: float,
 ) -> tuple[list[Gate], dict]:
     gold_n, grade_counts, source_counts = _count_jsonl(gold_path)
-    retrieval_n, _, retrieval_sources = _count_jsonl(retrieval_gold_path)
     hr = _human_review_agreement(gold_path)
     # [#8] 게이트 임계는 raw 가 아니라 strict(서명 envelope + 실문서 출처)만 센다.
     human_review = hr["count_strict"]
@@ -405,11 +311,6 @@ def _data_gates(
             f"{gold_n} records, grades={dict(sorted(grade_counts.items()))}",
         ),
         Gate("human review gold", hr_status, hr_detail),
-        Gate(
-            "retrieval gold size",
-            "PASS" if retrieval_n >= 80 else "FAIL",
-            f"{retrieval_n} doc-id queries, sources={dict(sorted(retrieval_sources.items()))}",
-        ),
     ]
     return gates, {
         "human_review_agreement": hr,
@@ -418,11 +319,6 @@ def _data_gates(
             "records": gold_n,
             "grade_distribution": dict(sorted(grade_counts.items())),
             "source_distribution": dict(sorted(source_counts.items())),
-        },
-        "retrieval_gold": {
-            "path": str(retrieval_gold_path),
-            "records": retrieval_n,
-            "source_distribution": dict(sorted(retrieval_sources.items())),
         },
     }
 
@@ -514,7 +410,6 @@ def _write_md(payload: dict, out: Path) -> None:
         f"- Deploy profile: `{payload.get('deploy_profile') or 'unset'}`",
         f"- Evaluated model: `{payload['evaluated_model']}`",
         f"- Deployed model: `{payload['deployed_model']}`",
-        f"- Retrieval config: `{payload['retrieval_config']}`",
         "",
         "## Gates",
         "",
@@ -559,14 +454,7 @@ def main() -> int:
     ap.add_argument("--p1-serving", default="reports/SERVING_VS_RAW.json",
                     help="서빙 경로 평가(scripts/eval_serving_vs_raw.py 산출). P1 판정 단위.")
     ap.add_argument("--p1-llm", default="reports/p1_release_holdout_direct.json")
-    # ⚠ 기본값이 출하 백엔드(pg)의 리포트를 가리켜야 한다. 2026-08-16 까지 여기가
-    #   `p2_gold_kure_es_hybrid_v3.json`(ES · 2026-06-02 생성)이었고, 그래서 **우리가
-    #   출하하지 않는 구성의 검색 품질이 릴리스 게이트를 통과시키고 있었다.**
-    #   _p2_gate 가 백엔드 불일치를 BLOCKED 로 잡게 고쳤지만, 기본값 자체가 틀려 있으면
-    #   매번 BLOCKED 를 보고 사람이 경로를 넘겨야 한다 - 기본값을 옳게 둔다.
-    ap.add_argument("--p2", default="reports/p2_gold_kure_pg_hybrid.json")
     ap.add_argument("--gold", default="datasets/gold_real/classification_gold.jsonl")
-    ap.add_argument("--retrieval-gold", default="datasets/gold_real/retrieval_gold.jsonl")
     ap.add_argument("--model-dir", default="artifacts/classifier_p1_v5_clean/v-fe4b386b",
                     help="evaluated model - the one the F1/FNR reports describe")
     ap.add_argument("--deployed-model", default=_deployed_model_default(),
@@ -586,19 +474,14 @@ def main() -> int:
     # evaluated 모델 = 리포트가 *실제로* 기술하는 모델(report.model_dir)을 진실원으로.
     # parity 게이트가 "F1 리포트가 라이브 배포 모델을 기술하나?"를 정확히 묻게 한다.
     evaluated_model = p1_public_report.get("model_dir") or args.model_dir
-    # ⚠ 리포트를 변수로 잡아 둔다. 종전에는 _p2_gate 에 바로 넘겨 payload 쪽에서
-    #   같은 리포트를 다시 참조할 방법이 없었다.
-    p2_report = _load_json(Path(args.p2))
-    p2_gate, p2_payload = _p2_gate(p2_report)
     data_gates, data_payload = _data_gates(
         Path(args.gold),
-        Path(args.retrieval_gold),
         args.min_human_review,
         args.max_high_risk_underclass,
     )
 
     parity_gate = _model_parity_gate(evaluated_model, args.deployed_model)
-    gate_objects = [p1_gate, p2_gate, *data_gates, parity_gate]
+    gate_objects = [p1_gate, *data_gates, parity_gate]
     public_f1 = p1_payload.get("public", {}).get("f1_macro", 0)
     pseudo_f1 = p1_payload.get("llm_pseudo", {}).get("f1_macro", 0)
 
@@ -686,24 +569,17 @@ def main() -> int:
             "p1_public": (args.p1_public, "measurement"),
             "p1_serving": (args.p1_serving, "measurement"),
             "p1_llm": (args.p1_llm, "measurement"),
-            "p2": (args.p2, "measurement"),
             "classification_gold": (args.gold, "dataset"),
-            "retrieval_gold": (args.retrieval_gold, "dataset"),
         }),
         "verdict": _overall(gate_objects),
         "evaluated_model": _norm_model(evaluated_model),
         "deployed_model": _norm_model(args.deployed_model) or "unknown",
-        # ⚠ 2026-08-16. 종전에는 이 문자열이 "Elasticsearch" 로 **하드코딩**돼 있었다.
-        #   P2 리포트를 pg 로 바꿔도 이 줄이 안 바뀌어 readiness 문서가 계속 ES 라고
-        #   말한다. 게이트 수치는 pg 인데 설명은 ES 인 상태가 된다 - 리포트에서 읽는다.
-        "retrieval_config": _retrieval_config_text(p2_report),
         "release_gate_policy": {
             "min_human_review": args.min_human_review,
             "max_high_risk_underclass": args.max_high_risk_underclass,
         },
         "gates": [g.__dict__ for g in gate_objects],
         "p1": p1_payload,
-        "p2": p2_payload,
         "data": data_payload,
         "next_actions": next_actions,
         "known_limitations": known_limitations,

@@ -76,7 +76,6 @@ def test_classify_response_schema_roundtrip():
             management=0.5,
         ),
         "evidence": [],
-        "rag_context_used": [],
         "model_version": "test",
         "elapsed_ms": 12,
         "warnings": [],

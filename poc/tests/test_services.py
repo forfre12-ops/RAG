@@ -24,7 +24,6 @@ def test_classify_service_end_to_end():
     req = ClassifyRequest(
         doc_id="t-1",
         content="특급기밀 핵심 원천기술 M&A 계획 차세대 제품 설계도",
-        use_rag=False,
         return_evidence=True,
     )
     res = svc.classify(req)
@@ -66,7 +65,7 @@ def test_fix_d_patent_gazette_capped_to_s3_and_reviewed():
         "공개특허 10-2017-0094559\n(19) 대한민국특허청(KR)\n(12) 공개특허공보(A)\n"
         "(11) 공개번호 10-2017-0094559\n(43) 공개일자\n발명의 명칭 반도체 장치.\n"
     ) + ("산화물 반도체 박막을 CVD 방식으로 증착하고 N2O 분위기에서 처리한다. " * 40)
-    res = svc.classify(ClassifyRequest(doc_id="patent-x", content=body, use_rag=False))
+    res = svc.classify(ClassifyRequest(doc_id="patent-x", content=body))
     assert res.label.value == "S3", f"공개특허가 S3로 캡되지 않음: {res.label.value}"
     assert res.status == "needs_review"
     assert any("source-prior" in w for w in (res.warnings or []))
@@ -79,7 +78,7 @@ def test_fix_d_does_not_touch_genuine_secret():
         "본 자료는 특급기밀이며 반도체 공정 레시피와 EUV 공정 파라미터, "
         "특수 합금 조성비를 CVD·N2O 공정으로 정리한다. 1급 비밀. "
     ) * 8
-    res = svc.classify(ClassifyRequest(doc_id="sec-x", content=body, use_rag=False))
+    res = svc.classify(ClassifyRequest(doc_id="sec-x", content=body))
     assert res.label.value == "TS"
     assert not any("source-prior" in w for w in (res.warnings or []))
 

@@ -27,7 +27,7 @@
 사용:
     python scripts/build_erd.py            # SVG 를 표준출력으로
     python scripts/build_erd.py --apply    # ERD 문서의 <svg> 를 교체
-    python scripts/build_erd.py --apply --with-rag   # 검색용 표 2종 포함(21표)
+    python scripts/build_erd.py --apply --spec       # 테이블정의서_ERD.html 에 쓴다
 """
 from __future__ import annotations
 
@@ -37,6 +37,13 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
+
+# [2026-09-03] Windows 기본 콘솔(cp949)에서 SVG·진단 문구를 못 찍고 죽는 것을 막는다.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 
 _ROOT = Path(__file__).resolve().parent.parent
 _MODELS = _ROOT / "src" / "koipa" / "db" / "models.py"
@@ -62,20 +69,25 @@ LOGICAL = {
     "tb_audit_log": "감사 로그",
     "tb_guides": "가이드 문서",
     "tb_llm_usage": "LLM 사용량",
-    "tb_rag_vectors": "벡터 저장소",
-    "tb_rag_aliases": "컬렉션 별칭",
 }
 
-# 외래키 제약은 없으나 논리적으로 참조하는 관계. 월별 파티션 테이블에는 제약을 걸지
-# 않는다(파티션 추가·분리 비용) — 그래서 FK 목록에는 안 잡히지만 관계는 실재한다.
-LOGICAL_FK = [("tb_chunks", "doc_id", "tb_documents")]
+# 외래키 제약은 없으나 논리적으로 참조하는 관계. FK 목록에는 안 잡히지만 관계는 실재한다.
+#
+# [2026-09-03] 정본을 scripts/table_spec_meta.py 로 옮겼다. 종전에는 여기와 build_table_spec.py
+# 가 각각 목록을 들고 있어 도식은 점선 1개, 캡션·본문은 2건으로 갈렸다.
+def _logical_fk() -> list[tuple[str, str, str]]:
+    try:
+        sys.path.insert(0, str(_ROOT.parent / "scripts"))
+        import table_spec_meta as _meta        # noqa: PLC0415
+        refs = getattr(_meta, "SOFT_REFS", None)
+        if refs:
+            return [tuple(r) for r in refs]
+    except Exception as exc:                   # noqa: BLE001
+        print("[!] 제약 없는 참조 정본을 못 읽었다: %s" % exc, file=sys.stderr)
+    return []
 
-# 마이그레이션으로만 만들어지는 검색용 표(ORM 매핑 없음). --with-rag 로 포함한다.
-RAG_TABLES = {"tb_rag_vectors": 10, "tb_rag_aliases": 3}
-RAG_LOGICAL_FK = [
-    ("tb_rag_vectors", "doc_id", "tb_documents"),
-    ("tb_rag_aliases", "collection", "tb_rag_vectors"),
-]
+
+LOGICAL_FK = _logical_fk()
 
 BW, BH = 208, 46           # 상자 크기
 GAP_X, GAP_Y = 132, 30     # 열 통로 폭 · 행 간격
@@ -103,6 +115,26 @@ def parse_models() -> tuple[dict[str, int], list[tuple[str, str, str]]]:
         m2 = re.match(r'\s*([a-z_]+)\s*:.*ForeignKey\("([^"]+)"', ln)
         if m2:
             fks.append((cur, m2.group(1), m2.group(2).split(".")[0]))
+    # [2026-09-03] 정의서에서 뺀 표는 도식에서도 뺀다 — 안 그러면 상자 수가 본문과 갈린다.
+    # 제외 목록의 정본은 scripts/table_spec_meta.py 한 곳이다.
+    # [2026-09-03] 정의서에서 뺀 표·칼럼은 도식에서도 뺀다. 정본은 scripts/table_spec_meta.py
+    # 한 곳이다 — 여기서 따로 세면 표지의 "N테이블 M칼럼" 과 도식이 갈린다(실측 223 대 214).
+    excluded: set[str] = set()
+    ex_cols: dict[str, dict] = {}
+    try:
+        sys.path.insert(0, str(_ROOT.parent / "scripts"))
+        import table_spec_meta as _meta        # noqa: PLC0415
+        excluded = set(getattr(_meta, "EXCLUDED_TABLES", {}))
+        ex_cols = getattr(_meta, "EXCLUDED_COLUMNS", {}) or {}
+    except Exception as exc:                   # noqa: BLE001
+        # 조용히 넘어가면 상자 수가 어긋난 채로 그려진다 — 말은 한다.
+        print("[!] 제외 목록을 못 읽었다(전체를 그린다): %s" % exc, file=sys.stderr)
+    if excluded:
+        cols = {k: v for k, v in cols.items() if k not in excluded}
+        fks = [f for f in fks if f[0] not in excluded and f[2] not in excluded]
+    for tname, drop in ex_cols.items():
+        if tname in cols:
+            cols[tname] = max(0, cols[tname] - len(drop))
     return dict(cols), fks
 
 
@@ -151,13 +183,10 @@ def order_rows(by_layer: dict[int, list[str]], edges: list[tuple[str, str]]) -> 
                 rank[t] = i
 
 
-def build_svg(with_rag: bool = False) -> str:
+def build_svg() -> str:
     cols, fks = parse_models()
     fks = fks + LOGICAL_FK
-    if with_rag:
-        cols = {**cols, **RAG_TABLES}
-        fks = fks + RAG_LOGICAL_FK
-    logical_set = set(LOGICAL_FK + RAG_LOGICAL_FK)
+    logical_set = set(LOGICAL_FK)
     tables = sorted(cols)
     edges = [(c, p) for c, _f, p in fks]
     depth = layer_of(tables, edges)
@@ -330,16 +359,16 @@ def build_svg(with_rag: bool = False) -> str:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="ERD 문서의 <svg> 를 교체한다")
-    ap.add_argument("--with-rag", action="store_true",
-                    help="검색용 표 2종(tb_rag_*)까지 포함해 21표로 그린다")
+    ap.add_argument("--spec", action="store_true",
+                    help="테이블정의서_ERD.html 에 쓴다(기본은 ERD_개체관계도.html)")
     args = ap.parse_args(argv)
 
-    svg = build_svg(with_rag=args.with_rag)
+    svg = build_svg()
     if not args.apply:
         sys.stdout.write(svg + "\n")
         return 0
 
-    name = "테이블정의서_ERD.html" if args.with_rag else "ERD_개체관계도.html"
+    name = "테이블정의서_ERD.html" if args.spec else "ERD_개체관계도.html"
     targets = [
         _ROOT.parent / "doc" / "감리문서" / name,
         _ROOT.parent / "doc" / "result" / "KL_회신_2026-08-28" / "첨부" / name,

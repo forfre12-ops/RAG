@@ -191,7 +191,7 @@ a{color:#0a0a0a}
 
 ③ 완료 통보 (엔진 → 관리시스템)
    POST {callback_url}
-   { "job_id": "...", "status": "done", "results": [ { ... 21필드 ... } ] }</pre>
+   { "job_id": "...", "status": "done", "results": [ { ... 20필드 ... } ] }</pre>
 
   <div class="note">
     <b>인증.</b> 화면이나 요청 본문으로 자격증명을 받지 않습니다. 서버가 같은 오리진
@@ -215,7 +215,7 @@ a{color:#0a0a0a}
   <h2>3. 결과 반환 항목 &mdash; 확대 요청</h2>
 
   <p>초안의 콜백 항목은 5개(<code>doc_id</code> · <code>success</code> · <code>etc</code> ·
-  <code>file_name</code> · <code>label</code>)다. 당사 응답은 <b>21필드</b>이며, 그중
+  <code>file_name</code> · <code>label</code>)다. 당사 응답은 <b>20필드</b>이며, 그중
   <b>검수 라우팅에 반드시 필요한 것</b>이 빠져 있습니다.</p>
 
   <div class="tw">

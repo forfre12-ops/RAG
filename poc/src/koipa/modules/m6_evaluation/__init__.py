@@ -38,11 +38,6 @@ from koipa.modules.m6_evaluation.report import (
     render_html_report,
     render_confusion_matrix_png,
 )
-from koipa.modules.m6_evaluation.retrieval_metrics import (
-    RetrievalMetricsResult,
-    compute_retrieval_metrics_from_arrays,
-    compute_retrieval_metrics_from_db,
-)
 
 __all__ = [
     "MetricsResult",
@@ -61,7 +56,4 @@ __all__ = [
     "reviewer_reliability",
     "render_html_report",
     "render_confusion_matrix_png",
-    "RetrievalMetricsResult",
-    "compute_retrieval_metrics_from_arrays",
-    "compute_retrieval_metrics_from_db",
 ]

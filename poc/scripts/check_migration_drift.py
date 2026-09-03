@@ -11,6 +11,11 @@ verify_infra.check_postgres는 baseline 4개 테이블 존재만 확인하므로
 
 in-process 비교(외부 alembic CLI 파싱 회피): 프로젝트 alembic/env.py가 settings.database_url과
 Base.metadata를 쓰는 패턴을 그대로 재사용한다.
+
+[2026-09] 계열이 둘이 됐다. MariaDB 전용 베이스라인(f2a3b4c5d6e7, branch_labels=mariadb)이
+PostgreSQL 계열(000000000001~, branch_labels=postgres)과 독립으로 선다. 한 DB 는 자기
+dialect 의 계열 하나만 적용하므로, **접속한 DB 의 dialect 에 해당하는 head 만** 기대값으로
+잡는다. 둘 다 기대하면 PostgreSQL DB 가 MariaDB 판을 안 올렸다고 상시 DRIFT 를 낸다.
 """
 
 from __future__ import annotations
@@ -73,12 +78,31 @@ def _db_heads(database_url: str, *, connect_timeout: int) -> list[str]:
         engine.dispose()
 
 
-def _script_heads(ini_path: str) -> list[str]:
+# dialect → 그 DB 가 적용해야 하는 alembic branch label.
+_DIALECT_BRANCH = {"postgresql": "postgres", "mariadb": "mariadb", "mysql": "mariadb"}
+
+
+def _branch_for_url(database_url: str) -> str | None:
+    """접속 URL 의 dialect 에 해당하는 branch label. 모르는 dialect 면 None(전체 head)."""
+    from sqlalchemy.engine import make_url
+
+    try:
+        backend = make_url(database_url).get_backend_name()
+    except Exception:  # noqa: BLE001
+        return None
+    return _DIALECT_BRANCH.get(backend)
+
+
+def _script_heads(ini_path: str, *, branch: str | None = None) -> list[str]:
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
     cfg = Config(ini_path)
-    return list(ScriptDirectory.from_config(cfg).get_heads())
+    script = ScriptDirectory.from_config(cfg)
+    if branch is None:
+        return list(script.get_heads())
+    # `<label>@head` 를 실제 리비전으로 풀어 그 계열의 head 만 돌려준다.
+    return [r.revision for r in script.get_revisions(f"{branch}@head")]
 
 
 def main() -> int:
@@ -116,11 +140,13 @@ def main() -> int:
             getattr(settings, "db_connect_timeout", 5),
         )
 
-        expected = _script_heads(args.alembic_ini)
+        branch = _branch_for_url(settings.database_url)
+        expected = _script_heads(args.alembic_ini, branch=branch)
         applied = _db_heads(settings.database_url, connect_timeout=connect_timeout)
         result = compare_heads(applied, expected)
         result["ok"] = not result["drift"]
         result["error"] = None
+        result["branch"] = branch
         result["connect_timeout_seconds"] = connect_timeout
     except Exception as exc:  # noqa: BLE001
         # DB 미가용 등 — 점검 자체 실패. 드리프트 여부 미확정이므로 비-OK.
@@ -132,6 +158,7 @@ def main() -> int:
             "drift": None,
             "ok": False,
             "error": f"{type(exc).__name__}: {exc}",
+            "branch": None,
             "connect_timeout_seconds": connect_timeout,
         }
 
@@ -144,7 +171,8 @@ def main() -> int:
     elif result["drift"]:
         print(
             f"[migration-drift] DRIFT: db={result['db_current']} expected={result['expected_heads']} "
-            f"missing={result['missing']} unknown={result['unknown']} — run `alembic upgrade head`"
+            f"missing={result['missing']} unknown={result['unknown']} — "
+            f"run `alembic upgrade {result.get('branch') or 'head'}@head`"
         )
     else:
         print(f"[migration-drift] OK: db at head {result['db_current']}")
