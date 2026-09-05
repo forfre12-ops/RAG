@@ -211,3 +211,64 @@ def test_incidental_boilerplate_overlap_does_not_trip_the_axis():
     report = assess(train, holdout)
     assert 0 < report["overlap"]["shared_sentences"]["coverage"] <= 0.02
     assert report["lineage_independent"] is True
+
+
+# ── 문장 공유의 갈래 보고 (2026-09-05) ──────────────────────────────────────
+#
+# 커버리지 하나로는 "왜 걸렸는지"를 못 판다. 길이를 균형 잡아 Theil's U 0.074 ·
+# 길이-only 0.242(무작위 0.25 보다 낮다)까지 내린 홀드아웃에서도 커버리지가 0.124 였고,
+# 공유 20종을 전부 읽어 보니 **같은 원본은 하나도 없었다** — 판결문 서식 6 · 생성기
+# 템플릿 9 · 보고서 서식 1. 그래서 상투어를 뺀 값을 함께 낸다.
+#
+# ⚠ 이 갈래는 선별 보조이지 판정이 아니다. 판정은 바뀌지 않는다는 것도 함께 고정한다.
+
+_BOILER = "그러므로 상고를 기각하고 상고비용은 패소자의 부담으로 하기로 하여 주문과 같이 판결한다."
+_UNIQUE = "이 사건 고안은 말굽형 영구자석의 양단에 막대자석의 반대극을 배치한 자화수 제조장치이다."
+
+
+def _row(text, label="S3"):
+    return {"text": text, "label": label}
+
+
+def _filler(i):
+    return "검토 결과와 산정 근거를 정리한 %s 항목의 내용이다." % chr(ord("가") + i)
+
+
+def test_boilerplate_and_distinctive_are_reported_separately():
+    """여러 학습 문서에 나오는 문장은 상투어로 따로 센다."""
+    train = [_row(" ".join([_BOILER, _filler(i), _filler(i + 20)])) for i in range(5)]
+    holdout = [_row(" ".join([_BOILER, _filler(50 + i), _filler(60 + i)])) for i in range(4)]
+    rep = assess(train, holdout)
+    ss = rep["overlap"]["shared_sentences"]
+    assert ss["coverage"] == 1.0, ss              # 전 문서가 상투어를 공유한다
+    assert ss["boilerplate_types"] >= 1
+    assert ss["distinctive_coverage"] == 0.0, ss  # 상투어를 빼면 0
+
+
+def test_distinctive_sharing_is_still_counted():
+    """한 문서에만 있는 문장을 공유하면 상투어를 빼도 남는다 — 놓치지 않는다."""
+    train = [_row(" ".join([_UNIQUE, _filler(0), _filler(1)]))]
+    holdout = [_row(" ".join([_UNIQUE, _filler(70), _filler(71)]))]
+    ss = assess(train, holdout)["overlap"]["shared_sentences"]
+    assert ss["distinctive_coverage"] == 1.0, ss
+    assert ss["distinctive_types"] >= 1
+
+
+def test_verdict_is_unchanged_by_the_breakdown():
+    """갈래를 더해도 판정은 그대로 — 도구가 스스로 느슨해지면 안 된다."""
+    train = [_row(" ".join([_BOILER, _filler(i)])) for i in range(5)]
+    holdout = [_row(" ".join([_BOILER, _filler(80 + i)])) for i in range(4)]
+    rep = assess(train, holdout)
+    ss = rep["overlap"]["shared_sentences"]
+    assert ss["distinctive_coverage"] == 0.0
+    # 상투어만 겹쳐도 커버리지가 문턱을 넘으면 여전히 '독립 아님'이다.
+    assert rep["lineage_independent"] is False
+    assert any("같은 문장을 품고" in c for c in rep["concerns"])
+
+
+def test_concern_text_carries_the_breakdown():
+    """지표만 인용되고 한정이 떨어져 나가지 않도록 문구에 갈래를 넣는다."""
+    train = [_row(" ".join([_BOILER, _filler(i)])) for i in range(5)]
+    holdout = [_row(" ".join([_BOILER, _filler(90 + i)])) for i in range(4)]
+    msg = [c for c in assess(train, holdout)["concerns"] if "같은 문장" in c][0]
+    assert "상투어" in msg and "빼면" in msg, msg

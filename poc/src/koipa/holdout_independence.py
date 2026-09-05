@@ -87,6 +87,12 @@ def _overlap(left: set[str], right: set[str]) -> dict[str, Any]:
     }
 
 
+# [2026-09-05] 상투어로 보는 문턱. 학습셋에서 이 수 이상의 **문서**에 나오는 문장은 그
+# 코퍼스의 서식이지 특정 원본의 내용이 아니다. 한국어 판결문은 맺음말이 정형이라
+# ("그러므로 상고를 기각하고 … 주문과 같이 판결한다") 독립 수집한 두 코퍼스도 반드시 겹친다.
+_BOILERPLATE_MIN_TRAIN_DOCS = 3
+
+
 def _shared_sentences(
     train_rows: Sequence[Mapping[str, Any]],
     holdout_rows: Sequence[Mapping[str, Any]],
@@ -95,23 +101,66 @@ def _shared_sentences(
 
     중요한 것은 종 수가 아니라 **커버리지**다. 상투어 두어 종이 겹치는 것과, 홀드아웃
     전 문서가 학습셋 문장을 품고 있는 것은 완전히 다른 상황인데 종 수만 보면 구분이 안 된다.
+
+    [2026-09-05] 커버리지 하나로는 **왜 걸렸는지**를 못 판다. 실측: 길이를 균형 잡은
+    홀드아웃(Theil's U 0.074 · 길이-only 0.242 로 무작위 0.25 보다도 낮다)에서도 커버리지가
+    0.124 로 나왔다. 공유 20종을 **전부 눈으로 읽었더니 같은 원본은 하나도 없었다** —
+    전부 정형 문구다:
+
+        판결문 서식 6종   그러므로 상고를 기각하고 … 주문과 같이 판결한다
+                          선고 #구# 판결 【주 문】 상고를 기각한다
+        생성기 템플릿 9종  본 문서는 [가상기업A]의 #급 비밀로 분류된 자료로 …
+                          This document is material for [Company A] classified as Level # Secret.
+        보고서 서식 1종    다음 주에 대한 투자 전략과 주요 이슈를 점검합니다
+
+    한국어 판례가 든 홀드아웃은 어떻게 만들어도 판결문 서식을 공유한다. 생성기 템플릿은
+    합성 코퍼스가 같은 머리 문장을 재사용해서 생긴다(그 문장이 등급까지 말한다 —
+    rag_corpus_v2 720건 중 50%가 본문에 자기 등급을 노출한다).
+
+    그래서 **학습셋에서 여러 문서에 나오는 문장(상투어)을 뺀 커버리지**를 함께 낸다.
+
+    ⚠ 이 갈래는 **선별 보조이지 판정이 아니다.** 문턱을 3개 문서로 두었는데, 학습셋에
+      판례가 적으면 판결문 서식도 1~2개 문서에만 나와 "상투어 아님"으로 남는다 —
+      위 실측에서도 20종 중 4종만 상투어로 걸러졌고 나머지 16종은 사람이 읽어야 정형인
+      것이 드러났다. 빈도는 정형성을 재지 못하고 그 코퍼스에 판례가 몇 건인지를 잰다.
+
+    ⚠ 판정(lineage_independent · usable_for_comparison)은 **바꾸지 않는다.** 이 축은 초판이
+      너무 관대해서 나중에 더한 것이라(2026-08-12), 도구가 스스로 느슨해지면 처음 문제로
+      되돌아간다. 문턱을 풀지 말지는 사람이 수치와 실제 문장을 보고 정한다.
     """
-    train_sentences: set[str] = set()
+    train_doc_freq: dict[str, int] = {}
     for row in train_rows:
-        train_sentences |= _normalize_sentences(_text(row))
+        for sentence in _normalize_sentences(_text(row)):
+            train_doc_freq[sentence] = train_doc_freq.get(sentence, 0) + 1
+    train_sentences = set(train_doc_freq)
+    boilerplate = {s for s, n in train_doc_freq.items() if n >= _BOILERPLATE_MIN_TRAIN_DOCS}
+
     shared_types: set[str] = set()
+    distinctive_types: set[str] = set()
     touched = 0
+    touched_distinctive = 0
     for row in holdout_rows:
         overlap = _normalize_sentences(_text(row)) & train_sentences
-        if overlap:
-            touched += 1
-            shared_types |= overlap
+        if not overlap:
+            continue
+        touched += 1
+        shared_types |= overlap
+        rare = overlap - boilerplate
+        if rare:
+            touched_distinctive += 1
+            distinctive_types |= rare
+    n_holdout = len(holdout_rows) or 1
     return {
         "train_sentence_types": len(train_sentences),
         "shared_types": len(shared_types),
         "holdout_documents_touched": touched,
-        "coverage": round(touched / (len(holdout_rows) or 1), 4),
+        "coverage": round(touched / n_holdout, 4),
+        # 상투어를 뺀 값 — 판정에는 쓰지 않고 "왜 걸렸나"를 가릴 수 있게 함께 낸다.
+        "boilerplate_types": len(shared_types & boilerplate),
+        "distinctive_types": len(distinctive_types),
+        "distinctive_coverage": round(touched_distinctive / n_holdout, 4),
         "examples": sorted(shared_types)[:3],
+        "distinctive_examples": sorted(distinctive_types)[:3],
     }
 
 
@@ -153,7 +202,9 @@ def assess(
     if sentences["coverage"] > RECOMMENDED_MAX_SHARED_SENTENCE_COVERAGE:
         concerns.append(
             f"홀드아웃 {sentences['coverage']:.1%} 가 학습셋과 같은 문장을 품고 있다"
-            f"({sentences['shared_types']}종) — 메타데이터가 달라도 문장 풀을 공유하면"
+            f"({sentences['shared_types']}종 · 그중 상투어 {sentences['boilerplate_types']}종)"
+            f" — 상투어를 빼면 {sentences['distinctive_coverage']:.1%}"
+            f"({sentences['distinctive_types']}종). 메타데이터가 달라도 문장 풀을 공유하면"
             " 모델은 요인이 아니라 그 문장을 외운다"
         )
     for key, value in family.items():
