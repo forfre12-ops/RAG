@@ -256,7 +256,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     </div>
     <h1 class="title">API 명세</h1>
   <div style="margin:10px 0 16px;padding:8px 13px;border-left:3px solid #0a0a0a;background:#fafafa;font-size:12.5px;color:#3f3f46;"><b>2026-08-26 소스 대조 개정</b> — 본 문서의 모든 경로·필드·상태코드·기본값을 <code>poc/src/koipa/api</code> 소스와 1:1 대조해 갱신했다. 직전 판(2026-07-04 작성 / 2026-08-02 재확인) 이후 API 소스에 116건의 커밋이 있었고, 그 사이 늘어난 엔드포인트 16종과 응답 필드 29개를 이번 판에서 반영했다. 기준 데이터: 배포본 <code>v5_clean(v-fe4b386b)</code> · 골든 정본 <code>gold_real</code> 777건.</div>
-    <p class="lede"><strong>Koipa(수행사) AI 코어 API</strong> — 분류·설명·RAG·검수·학습·합성·등급체계·문서 수집(M2)·운영. KL ↔ Koipa 서버 간 통신 기준이며 Koipa는 KL 단일 신뢰 클라이언트를 전제로 한다. 등급 산정은 <strong>비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</strong> 곱셈식(각 0·1·2점)이며 — 분류 응답의 <code>evaluation_factors</code>는 3요건(secrecy·value·management)을 노출한다.</p>
+    <p class="lede"><strong>Koipa(수행사) AI 코어 API</strong> — 분류·설명·검수·학습·합성·등급체계·문서 수집(M2)·운영. KL ↔ Koipa 서버 간 통신 기준이며 Koipa는 KL 단일 신뢰 클라이언트를 전제로 한다. 등급 산정은 <strong>비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</strong> 곱셈식(각 0·1·2점)이며 — 분류 응답의 <code>evaluation_factors</code>는 3요건(secrecy·value·management)을 노출한다.</p>
     <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;max-width:700px;">본 부록은 <b>Koipa(AI 에이전트)가 제공하는 API만</b> 다룬다. <b>가이드 관리·문서 메타데이터·LLM 비용 등 KL 소유 대상 API는 KL이 직접 제공</b>하므로 제외한다. <b>회원사 자가진단(<code>tb_self_assessments</code> 등 자가진단 요소)·고객사 연동 API는 신설 대상</b>으로 소유·인터페이스를 KL과 <span class="nego-chip">협의 필요</span>. <span class="nego-chip">협의 필요</span>(주황색)는 KL과 인터페이스 합의가 남은 항목이다.</p>
     <hr class="hero-sep">
 
@@ -278,7 +278,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <h3 style="margin-top:16px;">인증 모드</h3>
         <p style="font-size:13px;"><code>AUTH_MODE</code> 설정: <code>jwt</code>(JWT 전용) · <code>api_key</code>(API 키 전용) · <code>both</code>(둘 다 허용). 설정한 모드가 모든 라우터에 일괄 적용된다. API 키 검증은 타이밍 사이드채널을 차단하도록 수행된다.</p>
         <h3 style="margin-top:16px;">신뢰 경계 — KL 단일 연동 (고객사 격리는 KL 포털)</h3>
-        <p style="font-size:13px;"><strong>KL이 고객사(회원사) 페이지를 일원 구축</strong>하므로, 고객사 간 데이터 격리(어느 회원사가 어느 문서를 보는지)는 <strong>KL 포털 계층</strong>에서 처리한다. Koipa는 KL 백엔드를 단일 신뢰 클라이언트로 받는 분류·RAG 엔진이다. 인증 신원(actor_id·role)은 <code>request.state</code>에 저장되어 <strong>역할 기반 권한(RBAC)</strong>과 감사 로그 actor 식별에만 쓰인다. 감사 로그의 actor_id는 위조 가능 헤더 대신 인증 컨텍스트에서 도출된다. <span class="nego-chip">협의 필요</span> 고객사 식별자(예: <code>external_ref</code> 규약)를 Koipa 응답·감사에 어느 수준까지 남길지는 KL과 합의.</p>
+        <p style="font-size:13px;"><strong>KL이 고객사(회원사) 페이지를 일원 구축</strong>하므로, 고객사 간 데이터 격리(어느 회원사가 어느 문서를 보는지)는 <strong>KL 포털 계층</strong>에서 처리한다. Koipa는 KL 백엔드를 단일 신뢰 클라이언트로 받는 분류 엔진이다. 인증 신원(actor_id·role)은 <code>request.state</code>에 저장되어 <strong>역할 기반 권한(RBAC)</strong>과 감사 로그 actor 식별에만 쓰인다. 감사 로그의 actor_id는 위조 가능 헤더 대신 인증 컨텍스트에서 도출된다. <span class="nego-chip">협의 필요</span> 고객사 식별자(예: <code>external_ref</code> 규약)를 Koipa 응답·감사에 어느 수준까지 남길지는 KL과 합의.</p>
         <h3 style="margin-top:16px;">Rate Limit</h3>
         <p style="font-size:13px;"><strong>전역 기본 한도는 없다.</strong> 한도는 아래 <strong>9개 라우트에만</strong> 개별로 걸려 있고, 표에 없는 엔드포인트(<code>/documents</code> · <code>/golden/*</code> · <code>/confirm</code> · <code>/relabel</code> · <code>/promotions/*</code> · <code>/admin/*</code> · <code>/metrics/*</code> 등)에는 <strong>서버측 호출 한도가 적용되지 않는다</strong>. 한도 키는 <strong>인증된 신원</strong>(actor) 우선, 미인증 시 IP 폴백이다. 초과 시 <code>429</code> + <code>Retry-After</code> 헤더로 응답한다.</p>
         <table class="full" style="margin-top:8px;">
@@ -286,7 +286,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tbody>
             <tr><td class="f-name"><code>POST /classify</code> · <code>/classify/async</code> · <code>/classify/batch</code></td><td>60 / 분</td></tr>
             <tr><td class="f-name"><code>POST /classify/stream</code> · <code>/classify/explain</code></td><td>30 / 분</td></tr>
-            <tr><td class="f-name"><code>POST /answer</code></td><td>30 / 분</td></tr>
             <tr><td class="f-name"><code>POST /synth/generate</code></td><td>10 / 분</td></tr>
             <tr><td class="f-name"><code>POST /train</code></td><td><strong>10 / 시간</strong></td></tr>
           </tbody>
@@ -367,7 +366,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">긴 문서·RAG ON 등 즉시 응답 시간이 길 수 있는 단일 문서를 큐에 등록한다. 브로커 가용 시 Celery로 발사하고, 테스트·브로커 미가용 환경에서는 in-process 폴백으로 기존 동작을 보존한다.</p>
+        <p class="ep-desc">긴 문서 등 즉시 응답 시간이 길 수 있는 단일 문서를 큐에 등록한다. 브로커 가용 시 Celery로 발사하고, 테스트·브로커 미가용 환경에서는 in-process 폴백으로 기존 동작을 보존한다.</p>
         <table class="ftbl">
           <thead><tr><th>방향</th><th>필드</th><th>타입</th><th>설명</th></tr></thead>
           <tbody>
@@ -454,14 +453,14 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       </div>
     </div>
 
-    <!-- ===== RAG ===== -->
+    <!-- ===== 설명 ===== -->
     <div class="cat-divider"><div class="cat-line"></div><span class="cat-label">분류 설명</span><div class="cat-line"></div></div>
 
     <div class="ep" id="ep-explain">
       <div class="ep-header">
         <span class="method post">POST</span>
         <span class="ep-path">/api/v1/classify/explain</span>
-        <span class="ep-summary">분류 결정 설명 (토큰 기여도 + S·V·M 요건 + RAG context)</span>
+        <span class="ep-summary">분류 결정 설명 (토큰 기여도 + S·V·M 요건)</span>
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
@@ -856,7 +855,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">JWT (POST admin · kl_backend / GET 인증)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">가이드 문서를 등록하고 RAG 인덱싱 결과를 반환한다. 버전 조회는 특정 <code>guide_id</code>의 현재 학습 버전과 등록 버전 목록을 반환한다.</p>
+        <p class="ep-desc">가이드 문서를 등록하고 등록 결과를 반환한다. 버전 조회는 특정 <code>guide_id</code>의 현재 학습 버전과 등록 버전 목록을 반환한다.</p>
         <p style="font-size:13px;"><code>GuideUploadResponse = {guide_id, version, triggers_retraining}</code></p>
         <p style="font-size:13px;"><code>GuideVersionList = {guide_id, current_training_version, versions:[{version, effective_date, change_summary, registered_at}]}</code></p>
       </div>
@@ -1174,8 +1173,8 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">JWT (admin role)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">시연 콘솔(<code>parse_demo</code>/admin)의 '실적재 시연'으로 생성된 문서·분류·청크·RAG벡터만 <strong>물리삭제</strong>한다. 시연 반복 시 데모 데이터가 운영 집계를 오염시키는 것을 막는 용도다.</p>
-        <div class="callout"><div class="callout-label">파괴적 엔드포인트 — 2중 안전장치</div><p style="font-size:13px;"><b>① 스코프 고정</b> — 삭제 대상이 <code>created_by='demo-console'</code> + RAG <code>collection='demo'</code>로 하드코딩돼 있어 다른 <code>created_by</code>는 매칭 자체가 불가하다. 실 운영 데이터는 구조적으로 지워지지 않는다.<br><b>② 프로파일 차단</b> — <code>demo_console_enabled=false</code>(운영 프로파일 기본)면 <code>404</code>로 거부한다. 즉 <b>납품 운영본에서는 이 엔드포인트가 존재하지 않는다.</b></p></div>
+        <p class="ep-desc">시연 콘솔(<code>parse_demo</code>/admin)의 '실적재 시연'으로 생성된 문서·분류·청크만 <strong>물리삭제</strong>한다. 시연 반복 시 데모 데이터가 운영 집계를 오염시키는 것을 막는 용도다.</p>
+        <div class="callout"><div class="callout-label">파괴적 엔드포인트 — 2중 안전장치</div><p style="font-size:13px;"><b>① 스코프 고정</b> — 삭제 대상이 <code>created_by='demo-console'</code>로 하드코딩돼 있어 다른 <code>created_by</code>는 매칭 자체가 불가하다. 실 운영 데이터는 구조적으로 지워지지 않는다.<br><b>② 프로파일 차단</b> — <code>demo_console_enabled=false</code>(운영 프로파일 기본)면 <code>404</code>로 거부한다. 즉 <b>납품 운영본에서는 이 엔드포인트가 존재하지 않는다.</b></p></div>
         <h4>Response 200 — DemoPurgeResponse</h4>
         <p style="font-size:13px;"><code>{documents, classifications, chunks, rag_vectors, warnings[]}</code> — 각 항목의 실삭제 건수.</p>
         <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 admin 권한 필요</span><span class="sc s4xx">404 데모 콘솔 비활성(운영 기본)</span></div>
@@ -1300,7 +1299,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
             <tr><td class="f-name">eval_source</td><td class="f-type">string | null</td><td><b>이 수치가 나온 평가셋의 이름.</b> 수치를 인용할 때 반드시 함께 표기할 것 — 셋이 다르면 값이 달라지므로, 제출본 대표값과 이 응답값을 섞어 말하면 안 된다</td></tr>
           </tbody>
         </table>
-        <p style="font-size:12.5px;color:var(--text-dim);">※ 지표는 서빙경로 전체(보정·게이트·집계 포함)를 통과해 측정된다. <strong>P95 레이턴시는 이 응답이 아니라 <code>/metrics-prom</code></strong>의 <code>koipa_request_duration_seconds</code> 히스토그램에서 계산한다. <strong>RAG 검색 Recall@5는 어느 API로도 노출되지 않으며</strong>(Prometheus 메트릭 없음) 평가 리포트로만 확인한다.</p>
+        <p style="font-size:12.5px;color:var(--text-dim);">※ 지표는 서빙경로 전체(보정·게이트·집계 포함)를 통과해 측정된다. <strong>P95 레이턴시는 이 응답이 아니라 <code>/metrics-prom</code></strong>의 <code>koipa_request_duration_seconds</code> 히스토그램에서 계산한다. </p>
         <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">404 활성 모델 없음</span></div>
       </div>
     </div>
@@ -1364,7 +1363,6 @@ koipa_locked_eval_ready                 # locked 평가셋 준비 여부
 # 운영 경보 카운터
 koipa_rule_fallback_total               # 모델 미로드 → rule-fallback 처리 횟수
 koipa_classify_persist_failure_total{reason}  # DB 영속화 실패 (db_error 등)
-koipa_rag_context_failure_total{stage}  # RAG context 빌드 실패 (build_rag_context|fetch_hits)
 koipa_embedding_fallback_total{original_provider}  # 임베딩 provider 폴백 발생 횟수
 koipa_audit_write_failure_total         # 감사 로그 기록 실패
 

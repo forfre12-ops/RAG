@@ -151,7 +151,7 @@ footer strong{color:var(--text-dim);}
       <tr><td class="center"><strong>M1</strong></td><td>합성 생성</td><td>학습 부트스트랩용 합성 문서 생성(실데이터 0 제약). 근거(witness) 분류체계 부여</td><td><code>generator.py</code> · <code>witness_taxonomy.py</code></td><td class="center"><strong>FUN-003</strong></td></tr>
       <tr><td class="center"><strong>M2</strong></td><td>전처리</td><td>전자문서 텍스트 추출(HWP·HWPX·PDF·DOCX·XLSX·XLS·PPTX·TXT) → 정규화·품질점수 → PII 마스킹 → 청킹 〔OCR은 요건 외이며 배포본 미포함 — 스캔본은 추출 0자로 failed 격리〕</td><td><code>extractor.py</code> · <code>normalizer.py</code> · <code>pii_masker.py</code> · <code>chunker.py</code> · <code>pipeline.py</code></td><td class="center"><strong>FUN-022</strong></td></tr>
       <tr><td class="center"><strong>M3</strong></td><td>라벨링</td><td>룰(키워드 사전)·LLM 판정·합의 게이트로 합성 문서에 등급 라벨 부여(학습 시드)</td><td><code>rule_engine.py</code> · <code>seeds.py</code> · <code>llm_labeler.py</code> · <code>judge.py</code> · <code>consensus.py</code> · <code>pipeline.py</code></td><td class="center">FUN-023</td></tr>
-      <tr><td class="center"><strong>M4</strong></td><td>학습</td><td>인코더 PLM(KF-DeBERTa) 분류기 학습 · 청크 증강 · RAG 벡터 색인</td><td><code>trainer.py</code> · <code>chunk_expand.py</code> · <code>rag_indexer.py</code></td><td class="center"><strong>FUN-004</strong></td></tr>
+      <tr><td class="center"><strong>M4</strong></td><td>학습</td><td>인코더 PLM(KF-DeBERTa) 분류기 학습 · 청크 증강</td><td><code>trainer.py</code> · <code>chunk_expand.py</code></td><td class="center"><strong>FUN-004</strong></td></tr>
       <tr><td class="center"><strong>M5</strong></td><td>추론</td><td>임베딩→모델 추론→청크 집계(most-severe)→SSE 단계 스트리밍. 서빙 진입 파이프라인</td><td><code>pipeline.py</code></td><td class="center"><strong>FUN-005</strong></td></tr>
       <tr><td class="center"><strong>M6</strong></td><td>평가·운영</td><td>지표·리포트 산출 · 온도 보정 · 배포/안전 게이트 · 운영학습(교정 환류) · 평가 앵커 · 검수자/심판 신뢰도</td><td>24개 파일 — 아래 세부표</td><td class="center"><strong>FUN-024</strong></td></tr>
     </tbody>
@@ -190,7 +190,7 @@ footer strong{color:var(--text-dim);}
       <tr><td class="nowrap"><code>metrics.py</code> · <code>explain.py</code></td><td>모델 지표·혼동행렬 조회 · 분류 설명가능성(근거)</td><td class="center">FUN-024</td></tr>
       <tr><td class="nowrap"><code>keyword_admin.py</code> · <code>schema_admin.py</code></td><td>키워드 사전 관리 · 등급체계(레벨) 관리</td><td class="center"><strong>FUN-023·005a</strong></td></tr>
       <tr><td class="nowrap"><code>synthesis.py</code> · <code>training.py</code> · <code>promotion.py</code></td><td>합성 생성 잡 · 재학습 트리거 · 검증라벨 승급</td><td class="center">FUN-003·004</td></tr>
-      <tr><td class="nowrap"><code>guide.py</code> · <code>answer.py</code></td><td>규정 가이드 RAG · RAG 질의응답 <span class="tag opt">부가</span></td><td class="center">—</td></tr>
+      <tr><td class="nowrap"><code>guide.py</code></td><td>규정 가이드 등록·버전 조회</td><td class="center">—</td></tr>
       <tr><td class="nowrap"><code>health.py</code></td><td>헬스체크(live/ready/deep) — 운영 probe</td><td class="center">NFR</td></tr>
       <tr><td class="nowrap"><code>app.py</code> · <code>middleware.py</code> · <code>rate_limit.py</code> · <code>prom_metrics.py</code></td><td>앱 부트·라우터 마운트 · 감사/요청ID 미들웨어 · 레이트리밋 · Prometheus 노출</td><td class="center">NFR</td></tr>
     </tbody>
@@ -208,7 +208,7 @@ footer strong{color:var(--text-dim);}
       <tr><td class="nowrap"><code>confirm_service.py</code></td><td>검수 확정/재라벨 · 검수 큐 질의 · 2인검토 게이트 · 교정 기록</td></tr>
       <tr><td class="nowrap"><code>golden_build_service.py</code> · <code>promotion_service.py</code></td><td>골든셋 후보 빌드/검수/서명 · 검증라벨(문서별) 승급</td></tr>
       <tr><td class="nowrap"><code>training_service.py</code> · <code>synthesis_service.py</code></td><td>모델 등록·배포 게이트·활성화 · 합성 생성 오케스트레이션</td></tr>
-      <tr><td class="nowrap"><code>retrieval.py</code> · <code>rag_answer_service.py</code> · <code>guide_service.py</code></td><td>하이브리드 검색(dense+ts_rank) · RAG 답변 · 가이드 색인 <span class="tag opt">부가</span></td></tr>
+      <tr><td class="nowrap"><code>guide_service.py</code></td><td>가이드 문서 등록·버전 관리</td></tr>
       <tr><td class="nowrap"><code>audit_chain.py</code></td><td>감사 로그 hash-chain 무결성(NFR-SEC-01)</td></tr>
       <tr><td class="nowrap"><code>outbox.py</code> · <code>idempotency.py</code> · <code>_retry.py</code></td><td>웹훅 신뢰전달(outbox·재시도·DLQ) · 멱등성 · 재시도 유틸</td></tr>
       <tr><td class="nowrap"><code>drift_monitor.py</code> · <code>metrics_service.py</code> · <code>worker_metrics_bridge.py</code></td><td>임베딩 드리프트 · 지표 서비스 · 워커→API 메트릭 브리지</td></tr>
@@ -243,8 +243,7 @@ footer strong{color:var(--text-dim);}
       <tr><td class="nowrap"><strong>embedding</strong></td><td><code>hf_embedding</code>(KURE-v1) · <code>hash_embedding</code> · <code>cache_layer</code></td><td>hash는 폴백(운영 거부)</td></tr>
       <tr><td class="nowrap"><strong>llm</strong></td><td><code>vllm</code> · <code>local_openai</code> · <code>anthropic</code> · <code>openai</code> · <code>noop</code></td><td>폐쇄망=로컬(vLLM/Ollama)</td></tr>
       <tr><td class="nowrap"><strong>storage</strong></td><td><code>local_store</code> · <code>encrypted_store</code>(AES-256-GCM) · <code>minio_store</code> · <code>seaweedfs_store</code></td><td>폐쇄망=로컬FS+원본암호화</td></tr>
-      <tr><td class="nowrap"><strong>vectorstore</strong></td><td><code>pg_store</code>(pgvector) · <code>inmemory_store</code> · <code>es_store</code></td><td>정본=pgvector(ES 폐기)</td></tr>
-    </tbody>
+      </tbody>
   </table>
   </div>
 
@@ -254,7 +253,7 @@ footer strong{color:var(--text-dim);}
   <table>
     <thead><tr><th style="width:150px">패키지</th><th>구성</th></tr></thead>
     <tbody>
-      <tr><td class="nowrap"><code>db/</code></td><td>ORM 모델(<code>models.py</code>, 19테이블) · 세션(<code>session.py</code>) · 마이그레이션(<code>poc/alembic/</code>, RAG 벡터 2테이블 포함)</td></tr>
+      <tr><td class="nowrap"><code>db/</code></td><td>ORM 모델(<code>models.py</code>, 20테이블) · 세션(<code>session.py</code>) · 마이그레이션(<code>poc/alembic/</code> — MariaDB·PostgreSQL 두 계열)</td></tr>
       <tr><td class="nowrap"><code>schemas/</code></td><td>요청/응답·도메인 DTO(Pydantic) — classify·confirm·golden·common 등</td></tr>
       <tr><td class="nowrap"><code>workers/</code></td><td>Celery 앱(<code>celery_app.py</code>) · 태스크·주기 tick(<code>tasks.py</code> — 재학습·드리프트·감사검증·outbox·파티션·heartbeat)</td></tr>
       <tr><td class="nowrap"><code>obs/ · perf/</code></td><td>관측성 보조 · 성능 시나리오(<code>scenarios.py</code>)·KPI 산정(<code>kpis.py</code>, PER-002)</td></tr>
@@ -279,7 +278,7 @@ footer strong{color:var(--text-dim);}
   </div>
 
   <div class="footnote">
-    본 문서는 감리 대응 프로그램 목록 산출물로, <code>poc/src/koipa</code> 소스 트리를 기준으로 작성됨(2026-07-17). 파일·모듈은 소스 형상과 일치하며, 상세는 RTM(요건추적)·부록A(DB)·부록B(API)를 정본으로 참조한다. 요건 외 부가 기능(RAG 질의응답·가이드)은 존치하되 산출물 판정 범위에서 제외한다.
+    본 문서는 감리 대응 프로그램 목록 산출물로, <code>poc/src/koipa</code> 소스 트리를 기준으로 작성됨(2026-07-17). 파일·모듈은 소스 형상과 일치하며, 상세는 RTM(요건추적)·부록A(DB)·부록B(API)를 정본으로 참조한다. 유사문서 조회(RAG 질의응답·벡터 검색)는 2026-09-05 미채택으로 소스·DB 에서 제거했다 — 이 목록에도 없다.
   </div>
 
 </article>

@@ -100,15 +100,9 @@ EMBEDDING_FALLBACK_TOTAL = Counter(
     registry=registry,
 )
 
-# §7 (2026-05-29): /answer 단계별 latency — retrieve(쿼리 확장 + ES 검색 + reranker)
-# vs synthesize(LLM 답안 합성). 운영 SLO 정의 + §1 batch encode 효과 정량 입증.
-ANSWER_PHASE_DURATION = Histogram(
-    "koipa_answer_phase_duration_seconds",
-    "POST /answer per-phase latency",
-    ["phase"],  # retrieve | synthesize
-    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0),
-    registry=registry,
-)
+# [2026-09-05] ANSWER_PHASE_DURATION(koipa_answer_phase_duration_seconds) 을 지웠다.
+# POST /answer 의 단계별 지연을 재던 지표인데 그 라우트가 없어졌고 올리는 코드도 없다.
+# 정의만 남으면 /metrics-prom 에 영원히 비는 히스토그램이 노출된다.
 
 # §4 (2026-05-29): CachedEmbedding 적중률 측정 — Redis 캐시 ROI 추적.
 # 운영 진입 시 캐시 적중률 = 임베딩 API 비용 절감 근거.
