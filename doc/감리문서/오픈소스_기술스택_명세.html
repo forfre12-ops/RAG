@@ -113,7 +113,7 @@ a{color:#0a0a0a}
       <tr><td>핵심 의존성</td><td class="n">31</td><td><code>pyproject.toml</code> 의 <code>[project].dependencies</code>. 모든 배포본에 포함된다</td></tr>
       <tr><td>선택 묶음(extras)</td><td class="n">20</td><td>기능별 선택 설치 묶음이다. 배포 이미지는 이 가운데 일부만 설치한다</td></tr>
       <tr><td>설치 패키지(전이 포함)</td><td class="n">178</td><td>라이선스 목록 <code>poc/licenses/third-party-licenses.json</code> 의 항목 수</td></tr>
-      <tr><td>DBMS</td><td>PostgreSQL</td><td>벡터 검색용 확장 <code>pgvector</code> 필수</td></tr>
+      <tr><td>DBMS</td><td>MariaDB 10.11</td><td>납품 정본. KL 포털이 쓰는 DB 에 전용 데이터베이스를 만들어 쓴다</td></tr><tr><td>DBMS(폐쇄망 번들)</td><td>PostgreSQL 16</td><td>번들이 담는 DB 는 이쪽이다. 같은 ORM·같은 시험이 두 DB 에서 함께 통과한다 &mdash; 갈리는 것은 마이그레이션 계열뿐이다(<code>alembic upgrade mariadb@head</code> / <code>postgres@head</code>)</td></tr>
       <tr><td>런타임</td><td>Python 3.11</td><td>요구 버전 3.11 이상, 컨테이너 기반 이미지 <code>python:3.11-slim</code></td></tr>
     </tbody>
   </table>
@@ -125,7 +125,7 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:16%">계층</th><th style="width:36%">주요 패키지</th><th>역할</th></tr></thead>
     <tbody>
       <tr><td>API</td><td>fastapi · uvicorn · pydantic · pydantic-settings · slowapi · python-multipart<br><span class="src">운영 이미지의 WSGI 실행기 gunicorn 은 <code>uv.lock</code> 에 고정되어 함께 설치된다</span></td><td>HTTP 서비스, 스키마 검증, 속도 제한</td></tr>
-      <tr><td>데이터</td><td>sqlalchemy · psycopg[binary] · alembic</td><td>ORM, PostgreSQL 드라이버, 스키마 마이그레이션</td></tr>
+      <tr><td>데이터</td><td>sqlalchemy · pymysql · psycopg[binary] · alembic</td><td>ORM, MariaDB 드라이버(<code>pymysql</code>), PostgreSQL 드라이버(<code>psycopg</code>), 스키마 마이그레이션</td></tr>
       <tr><td>비동기</td><td>celery[redis] · redis</td><td>배치 분류, 골든셋 생성, 야간 재학습</td></tr>
       <tr><td>모델</td><td>torch · transformers · accelerate · sentence-transformers · datasets · evaluate · scikit-learn · scipy</td><td>KF-DeBERTa 분류기 학습·추론, 임베딩</td></tr>
       <tr><td>실험 관리</td><td>mlflow · matplotlib</td><td>학습 실행 추적, 지표 시각화</td></tr>

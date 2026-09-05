@@ -262,8 +262,8 @@ def validate_generator_prompt_contract() -> None:
 _PII_PATTERNS = [
     re.compile(r"(?<!\d)\d{6}[- ]?[1-4]\d{6}(?!\d)"),   # 주민등록번호
     re.compile(r"(?<!\d)\d{6}[- ]?[5-8]\d{6}(?!\d)"),   # 외국인등록번호
-    re.compile(r"01[016789]-?\d{3,4}-?\d{4}"),     # 휴대전화
-    re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"),  # 이메일
+    re.compile(r"\b01[016789]-?\d{3,4}-?\d{4}\b"),     # 휴대전화
+    re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),  # 이메일
 ]
 
 

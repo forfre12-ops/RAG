@@ -32,6 +32,18 @@ from pathlib import Path
 _HERE = Path(__file__).resolve().parent
 _REPO = _HERE.parent.parent
 
+def _response_field_count() -> int:
+    """분류 응답 필드 수 — 스키마에서 센다.
+
+    [2026-09-05] 종전에는 도식에 "21필드"라고 손으로 적혀 있었다. 같은 문서 본문은
+    "20필드"라고 적고 코드도 20 이었다 — 그림만 하나 더 세고 있었다. 그림 속 글자는
+    audit_doc_runtime.py 가 못 읽으므로 아무도 잡지 못한다. 그래서 여기서 센다.
+    """
+    sys.path.insert(0, str(_REPO / "poc" / "src"))
+    from koipa.schemas.classify import ClassifyResponse  # noqa: PLC0415
+
+    return len(ClassifyResponse.model_fields)
+
 INK, DIM, LINE, MID = "#0a0a0a", "#71717a", "rgba(0,0,0,.18)", "#f4f4f5"
 BAR_LIGHT = "#d4d4d8"
 BAD = "#7f1d1d"
@@ -85,7 +97,8 @@ def seq_svg() -> str:
     arrow(206, 120, 470, "POST /api/v1/classify/async", "{ doc_id, callback_url } · content 없이")
     arrow(238, 470, 120, "job_id 즉시 반환")
     step(290, "3", "완료 통보")
-    arrow(290, 470, 120, "POST {callback_url}", "결과 21필드 · 재시도·DLQ 포함")
+    arrow(290, 470, 120, "POST {callback_url}",
+          "결과 %d필드 · 재시도·DLQ 포함" % _response_field_count())
 
     a('<line x1="8" y1="330" x2="%d" y2="330" stroke="%s"/>' % (W - 8, LINE))
     a('<text class="bad" x="8" y="352">등록을 건너뛴 경우 &#8212; 응답은 200 이나 분류 결과가 저장되지 않는다</text>')

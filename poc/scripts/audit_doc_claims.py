@@ -75,7 +75,7 @@ def strip_html(raw: str) -> str:
     (「DB 대리키 표준화 전환계획」 실측). 경계에 | 를 세워 정규식이 못 넘게 한다.
     검사기가 거짓 경보를 내면 다음 사람이 진짜 불일치를 흘려 넘긴다.
     """
-    raw = re.sub(r"(?is)<(style|script)[^>]*>.*?</>", " ", raw)
+    raw = re.sub(r"(?is)<(style|script)[^>]*>.*?</\1>", " ", raw)
     inline = "|".join(_INLINE)
     raw = re.sub(rf"(?i)</?(?:{inline})(?:\s[^>]*)?/?>", " ", raw)   # 문장 안 태그 = 공백
     text = re.sub(r"<[^>]+>", " | ", raw)                            # 그 밖 = 칸 경계

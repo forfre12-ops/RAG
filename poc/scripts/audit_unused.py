@@ -79,9 +79,9 @@ def audit_tables(detail: bool) -> tuple[int, int, int]:
             # 쓰기: 원시 SQL. [2026-09-05] 종전에는 원시 SQL 을 **읽기로만** 셌다.
             # 그래서 raw SQL 로만 쓰는 표(예: tb_advisory_locks — 잠금 행 INSERT)가
             # "쓰기 0 · 영원히 빈다"로 잡혔다. 사실이 아닌 경고는 도구를 못 믿게 만든다.
-            write[cls] += len(re.findall(rf"INSERT\s+(?:IGNORE\s+)?INTO\s+{tname}", s, re.I))
-            write[cls] += len(re.findall(rf"UPDATE\s+{tname}", s, re.I))
-            write[cls] += len(re.findall(rf"DELETE\s+FROM\s+{tname}", s, re.I))
+            write[cls] += len(re.findall(rf"INSERT\s+(?:IGNORE\s+)?INTO\s+{tname}\b", s, re.I))
+            write[cls] += len(re.findall(rf"UPDATE\s+{tname}\b", s, re.I))
+            write[cls] += len(re.findall(rf"DELETE\s+FROM\s+{tname}\b", s, re.I))
             # 읽기: select/query 인자 또는 속성 접근
             read[cls] += len(re.findall(rf"select\(\s*{cls}\b", s))
             read[cls] += len(re.findall(rf"query\(\s*{cls}\b", s))
@@ -194,7 +194,19 @@ def audit_settings(detail: bool) -> tuple[int, int]:
             for st in n.body:
                 if isinstance(st, ast.AnnAssign) and isinstance(st.target, ast.Name):
                     fields.append(st.target.id)
-    blob = "\n".join(_read(p) for p in _py(_SRC) if p != cfg)
+    # [2026-09-05] config.py 를 통째로 빼면 **같은 파일 안의 가드**가 읽는 값을 못 본다.
+    # 실측: console_login_prefill_allow_unsafe 는 config.py 의
+    # assert_production_credentials() 가 읽는데(하드닝 배포에서 무인증 login.html 을 막는
+    # 검사) "참조 0" 으로 잡혔다. Settings 클래스 **본문만** 빼고 나머지는 본다.
+    cfg_src = _read(cfg)
+    cfg_lines = cfg_src.split("\n")
+    for n in ast.walk(ast.parse(cfg_src)):
+        if isinstance(n, ast.ClassDef) and n.name == "Settings":
+            end = getattr(n, "end_lineno", None) or len(cfg_lines)
+            for i in range(n.lineno - 1, min(end, len(cfg_lines))):
+                cfg_lines[i] = ""
+    blob = "\n".join(cfg_lines)
+    blob += "\n".join(_read(p) for p in _py(_SRC) if p != cfg)
     blob += "\n".join(_read(p) for p in _py(_SCRIPTS))
     blob += "\n".join(_read(p) for p in _py(_TESTS))
     for y in _ROOT.rglob("docker-compose*.yml"):

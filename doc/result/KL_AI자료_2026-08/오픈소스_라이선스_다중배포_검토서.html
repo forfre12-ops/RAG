@@ -62,11 +62,13 @@ a{color:#0a0a0a}
   <div class="note"><b>결론 — 다중배포 라이선스 리스크 없음.</b> 배포 스택은 <b>permissive 중심</b>이며(배포 이미지 실측 199개 중 <b>189개 permissive</b>), 약한 copyleft는 <b>LGPL 2건</b>(DB 드라이버 <code>psycopg</code>·문자셋 판별 <code>chardet</code>)과 <b>MPL-2.0 소수</b>(certifi·tqdm·fqdn)뿐입니다. 모두 <b>미수정·동적 링크 사용</b>이라 <b>재배포는 자유</b>이고 라이선스 고지만 하면 됩니다. 강한 copyleft(AGPL·GPL·SSPL) 구성요소는 <b>배포 이미지에 설치되지 않습니다</b>(§2 · 이미지 내 <code>poppler</code>·<code>tesseract</code> 바이너리 부재 실측 확인).</div>
   <div class="note" style="border-left-color:#3f3f46"><b>산출 근거.</b> 위 수치는 <b>실제 배포 이미지(<code>koipa-api</code>) 안에서 <code>scripts/dump_licenses.py</code>를 돌려</b> 얻은 것이며, 그 결과물(<code>third-party-licenses.txt</code> · <code>sbom.cyclonedx.json</code>, CycloneDX)이 <b>폐쇄망 번들 <code>licenses/</code>에 동봉</b>됩니다. 문서와 번들이 같은 산출물을 가리킵니다.</div>
 
+  <div class="callout"><b>MariaDB 서버(GPL-2.0)는 이 표에 없습니다.</b> 2026-09-05 부로 납품 정본 DB 를 MariaDB 10.11 로 맞췄으나, 서버는 발주처가 운영하는 것을 쓰고 <b>우리 번들이 담지 않습니다</b> &mdash; 폐쇄망 번들이 담는 DB 는 PostgreSQL 하나입니다(<code>build_offline_bundle._REQUIRED_CORE_SERVICES</code>). 재배포가 없으므로 GPL-2.0 의 배포 의무가 걸리지 않습니다. 우리가 담는 MariaDB 관련 산출물은 순수 파이썬 클라이언트 <code>PyMySQL</code>(MIT) 하나입니다.</div>
+
   <h2>1. 배포 구성요소 라이선스 (permissive 중심 · LGPL 2건)</h2>
   <table>
     <thead><tr><th>구성요소</th><th style="width:130px">라이선스</th><th style="width:70px">유형</th></tr></thead>
     <tbody>
-      <tr><td>PostgreSQL + pgvector</td><td>PostgreSQL License</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>PostgreSQL + pgvector (폐쇄망 번들이 담는 DB)</td><td>PostgreSQL License</td><td><span class="tag perm">permissive</span></td></tr><tr><td>PyMySQL (MariaDB 드라이버) &mdash; 순수 파이썬 클라이언트</td><td>MIT</td><td><span class="tag perm">permissive</span></td></tr>
       <tr><td>psycopg 3 · psycopg-binary (PostgreSQL 드라이버) — 재배포 자유·고지만 필요</td><td>LGPL-3.0</td><td><span class="tag copyleft">LGPL</span></td></tr>
       <tr><td>chardet (문자셋 판별 — 문서 인코딩 추정) — 미수정·동적 링크, 재배포 자유·고지만 필요</td><td>LGPL-2.1+</td><td><span class="tag copyleft">LGPL</span></td></tr>
       <tr><td>Redis 7.2 · nginx</td><td>BSD-3 · BSD-2</td><td><span class="tag perm">permissive</span></td></tr>
