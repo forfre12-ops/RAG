@@ -56,6 +56,7 @@ from koipa.golden_tiers import (  # noqa: E402
     TIER_SILVER,
     TRAIN_TIERS,
     document_origin,
+    ORIGIN_SYNTHETIC,
     is_external_authority,
     tier_of,
 )
@@ -185,7 +186,12 @@ def load_rag(corpus_dir: Path) -> tuple[list[dict], int]:
             skipped += 1
             continue
         rec = {"text": body, "label": label, "domain": d.get("domain", ""),
-               "source": "rag_corpus_v2", "label_source": "rag_corpus_v2"}
+               "source": "rag_corpus_v2", "label_source": "rag_corpus_v2",
+               # [2026-09-05] doc_id·출처를 찍는다. 종전에는 둘 다 비어 배포본 학습셋
+               # 840행이 "어디서 왔는지 물을 수 없는" 상태였다. 파일명이 곧 신원이다.
+               "doc_id": "rag_corpus_v2/%s" % f.stem,
+               # 본문이 [가상기업A] 를 쓰는 생성물이다(720건 전수 확인). 실문서가 아니다.
+               "document_origin": ORIGIN_SYNTHETIC}
         rows.append(_base_record(rec, origin_dataset="rag_corpus_v2", label=label))
     return rows, skipped
 
@@ -218,7 +224,15 @@ def load_english(path: Path, per_grade: int) -> list[dict]:
         cand = sorted(by_grade.get(g, {}).values(), key=lambda r: _stable_int(norm_text(r.get("text"))))
         for r in cand[:per_grade]:
             rec = {"text": r["text"], "label": g, "source": "bilingual_en",
-                   "label_source": "bilingual_en", "domain": "en"}
+                   "label_source": "bilingual_en", "domain": "en",
+                   # 원본 jsonl 은 {label,text} 뿐이라 신원이 없다. 본문 해시로 만든다 —
+                   # 같은 문서는 늘 같은 id 가 나오고, 시각이 섞이지 않는다.
+                   "doc_id": "bilingual_en/%012x" % _stable_int(norm_text(r["text"])),
+                   # ⚠ 원본 6,711행에는 실제 판례가 3,554행 섞여 있다. 여기서 뽑히는 것은
+                   #   영문 비중 30% 초과분뿐이고 판례 검출 0건 — 가상기업 문서의 영어판이다
+                   #   ("[Company A]" · "Level 1 Secret"). 그래서 synthetic 으로 찍는다.
+                   #   원본 전체를 이 값으로 찍으면 실문서를 합성으로 오기재하게 된다.
+                   "document_origin": ORIGIN_SYNTHETIC}
             picked.append(_base_record(rec, origin_dataset="bilingual_en", label=g))
     return picked
 
@@ -412,8 +426,19 @@ def main() -> int:
     for r in pool:
         _lbl_by_text[norm_text(r["text"])].add(r["label"])
     unresolved_collisions = sum(1 for v in _lbl_by_text.values() if len(v) > 1)
+    # [2026-09-05] **출처가 본문과 어긋나는 행**을 센다. 조용히 고치지 않는다 — 등급은
+    # apply_public_ruling_rule 이 이미 S3 로 바로잡지만, document_origin 은 상류
+    # (labeled_oss_v1)가 준 값이라 여기서 덮어쓰면 어느 쪽이 진실인지를 잃는다.
+    # 실측 2026-09-05: 351행이 document_origin=synthetic 인데 본문은 공개 판결문이다
+    # (한국방송공사·법무법인 삼흥 등 실명이 그대로 들어 있다). 등급은 전부 S3 로 맞다.
+    # 이 값이 0 이 아니면 상류 출처 기재를 손봐야 한다는 뜻이고, PASS 를 막지는 않는다.
+    origin_text_mismatch = sum(
+        1 for r in pool
+        if r.get("is_court") and document_origin(r) == ORIGIN_SYNTHETIC
+    )
     gates = {
         "cross_split_exact_overlap": {"train_val": leak_val, "train_test": leak_test, "val_test": leak_vt},
+        "origin_text_mismatch": origin_text_mismatch,
         "unresolved_label_collisions": unresolved_collisions,  # 0이어야 통과(동일텍스트=단일라벨)
         "rows_with_collision_audit_stamp": sum(1 for r in pool if r.get("label_collision")),  # 정보용(해소완료 감사추적)
         "court_fraction": round(court_frac, 4),
