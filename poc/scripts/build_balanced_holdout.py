@@ -39,8 +39,11 @@ usable_for_comparison=false 다. 오염을 걷어내도(clean_holdout_leakage) �
   통과해도 나올 수 있는 주장은 "합성 내부 일관성 + 안전 무회귀"까지다.
 
 usage:
+  # 모델 둘을 견줄 때는 **양쪽 학습셋을 모두** 준다 — 한쪽만 보면 다른 모델이 외운
+  # 문서가 남아 그 모델에 유리해진다.
   python scripts/build_balanced_holdout.py \
       --train datasets/labeled_p1_v6_court/train.jsonl \
+      --train datasets/labeled_p1_v5_clean/train.jsonl \
       --pool  datasets/labeled_p1_v6_court/val.jsonl,datasets/labeled_p1_v6_court/test.jsonl \
       --out   datasets/labeled_p1_v6_court/holdout_balanced.jsonl
   python scripts/build_balanced_holdout.py ... --dry-run     # 수치만 본다
@@ -132,7 +135,12 @@ def pick(
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="길이 균형 홀드아웃 추출")
-    ap.add_argument("--train", required=True, help="학습셋 jsonl — 같은 원본 제거에 쓴다")
+    ap.add_argument(
+        "--train", required=True, action="append",
+        help="학습셋 jsonl — 같은 원본 제거에 쓴다. **여러 번 줄 수 있다.** 모델 둘을 "
+             "견주려면 양쪽 학습셋을 모두 줘야 한다 — 한쪽만 보면 다른 모델이 외운 문서가 "
+             "홀드아웃에 남아 그 모델에 유리해진다(실측: v6 풀 498건 중 4건이 v5 train 에 있다).",
+    )
     ap.add_argument("--pool", required=True, help="추출 풀 jsonl(쉼표로 여러 개)")
     ap.add_argument("--out", default=None, help="출력 jsonl. --dry-run 이면 무시")
     ap.add_argument("--edges", default=DEFAULT_EDGES,
@@ -143,13 +151,17 @@ def main(argv=None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="수치만 보고 파일은 쓰지 않는다")
     args = ap.parse_args(argv)
 
-    train = _load(Path(args.train))
+    train: list[dict] = []
+    for tp in args.train:
+        rows = _load(Path(tp))
+        train += rows
+        print("  학습셋 %s: %d행" % (tp, len(rows)))
     pool: list[dict] = []
     for p in [x.strip() for x in args.pool.split(",") if x.strip()]:
         pool += _load(Path(p))
     edges = [int(x) for x in args.edges.split(",") if x.strip()]
-    print("학습 %d행 · 풀 %d행 · 길이대 경계 %s · 배수 <=%.1f"
-          % (len(train), len(pool), edges, args.ratio_cap))
+    print("학습 합계 %d행(%d개 셋) · 풀 %d행 · 길이대 경계 %s · 배수 <=%.1f"
+          % (len(train), len(args.train), len(pool), edges, args.ratio_cap))
 
     picked, diag = pick(pool, edges, ratio_cap=args.ratio_cap)
     print()
