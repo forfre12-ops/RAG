@@ -112,7 +112,7 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:16%">프로파일</th><th style="width:22%">용도</th><th style="width:18%">학습 기능</th><th>특징</th></tr></thead>
     <tbody>
       <tr><td><code>lite-noapi</code></td><td>로컬 개발 · 기본값</td><td class="c off">없음</td><td>외부 의존 없이 기동한다(해시 임베딩, 메모리 내 벡터 저장)</td></tr>
-      <tr><td><code>lite-cloud</code></td><td>오픈망 파일럿</td><td class="c off">없음</td><td>PostgreSQL 과 pgvector 사용, 로컬 파일시스템 저장</td></tr>
+      <tr><td><code>lite-cloud</code></td><td>오픈망 파일럿</td><td class="c off">없음</td><td>관계형 DB 와 로컬 파일시스템 저장</td></tr>
       <tr><td><code>onprem-local</code></td><td>고객사 폐쇄망 운영</td><td class="c off">없음<span class="src"> (야간 증분 재학습은 별도 설정)</span></td><td>안전 게이트 적용을 강제한다. 원본 저장 시 암호화가 필수이며, 게이트가 비활성이면 기동을 차단한다</td></tr>
       <tr><td><code>full-train</code></td><td>지재원 학습 노드 · 시험 서버</td><td class="c ok">있음</td><td>학습·합성 라우터가 추가로 노출된다. 안전 게이트 설정은 <code>onprem-local</code> 과 같다</td></tr>
     </tbody>
@@ -126,8 +126,8 @@ a{color:#0a0a0a}
     <tbody>
       <tr><td><code>api</code></td><td><code>koipa-api</code> (python:3.11-slim)</td><td>HTTP API 제공 및 콘솔 정적 파일 서비스</td></tr>
       <tr><td><code>worker</code></td><td><code>koipa-worker</code></td><td>Celery 워커. 배치 분류, 골든셋 생성, 학습을 수행한다</td></tr>
-      <tr><td><code>beat</code></td><td><code>koipa-worker</code></td><td>주기 작업 스케줄러. 야간 재학습과 파티션 생성을 담당한다</td></tr>
-      <tr><td><code>postgres</code></td><td><code>pgvector/pgvector:pg16</code></td><td>관계형 저장소 및 벡터 검색</td></tr>
+      <tr><td><code>beat</code></td><td><code>koipa-worker</code></td><td>주기 작업 스케줄러. 야간 재학습과 보존기간 삭제를 담당한다</td></tr>
+      <tr><td><code>mariadb</code> / <code>postgres</code></td><td><code>mariadb:10.11</code> / <code>pgvector/pgvector:pg16</code></td><td>관계형 저장소. 납품 정본은 MariaDB, 폐쇄망 번들과 현행 시험서버는 PostgreSQL</td></tr>
       <tr><td><code>redis</code></td><td><code>redis:7.2-alpine</code></td><td>작업 큐 및 메시지 브로커</td></tr>
       <tr><td><code>mlflow</code></td><td>MLflow</td><td>학습 실행 추적. 학습 노드에만 배치한다</td></tr>
       <tr><td><code>nginx-mtls</code></td><td><code>nginx:1.27-alpine</code></td><td>폐쇄망 구성 전용. 상호 TLS 를 종단한다</td></tr>
@@ -165,7 +165,7 @@ a{color:#0a0a0a}
     <tbody>
       <tr><td>이미지 공급</td><td>빌드 컨텍스트 없이 <code>docker load</code> 로 복원한 이미지 태그를 직접 참조한다. 소스와 인터넷 연결이 필요 없다</td></tr>
       <tr><td>객체 저장소</td><td>객체 저장소를 사용하지 않는다. 로컬 파일시스템에 저장하며 원본은 AES-256-GCM 으로 암호화한다</td></tr>
-      <tr><td>벡터 검색</td><td>PostgreSQL 의 <code>pgvector</code> 확장을 사용한다. 별도 검색 엔진을 두지 않는다</td></tr>
+      <tr><td>검색 엔진</td><td>두지 않는다. 유사문서 조회를 2026-09-05 미채택으로 걷어 벡터 검색 자체가 없다</td></tr>
       <tr><td>전송 보안</td><td><code>nginx-mtls</code> 상호 TLS</td></tr>
       <tr><td>LLM</td><td>기본 미사용. 등급 결정 경로는 LLM 없이 동작한다</td></tr>
       <tr><td>안전 게이트</td><td>적용을 강제하며, 게이트가 비활성이면 기동하지 않는다</td></tr>
@@ -178,8 +178,8 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:22%">대상</th><th style="width:26%">저장소</th><th>비고</th></tr></thead>
     <tbody>
-      <tr><td>구조화 데이터</td><td>PostgreSQL</td><td>테이블 19 개이며 상세는 <code>테이블_정의서</code> 에 있다. 감사 로그·청크·LLM 사용량은 월별 파티션으로 운영한다</td></tr>
-      <tr><td>임베딩 벡터</td><td>PostgreSQL <code>pgvector</code></td><td>필수 확장</td></tr>
+      <tr><td>구조화 데이터</td><td>PostgreSQL</td><td>테이블 19 개이며 상세는 <code>테이블_정의서</code> 에 있다. 납품 정본(MariaDB)은 파티션을 두지 않는다 — 시간축 인덱스와 보존기간 삭제로 대신한다. 현행 시험서버(PostgreSQL)에는 옛 마이그레이션이 만든 월별 파티션이 남아 있다(실측: tb_audit_log·tb_chunks·tb_llm_usage 각 15개)</td></tr>
+      <tr><td>임베딩</td><td>KURE-v1 (CPU)</td><td>룰 시드 유사도·학습 분포 감시에 쓴다. 저장하지 않는다</td></tr>
       <tr><td>문서 원본 · 정규화 텍스트</td><td>로컬 파일시스템</td><td>DB 에는 접근 경로만 저장한다. 운영 프로파일에서는 저장 시 암호화가 필수다</td></tr>
       <tr><td>작업 큐</td><td>Redis</td><td>배치 분류·학습 작업의 큐와 멱등 키 저장에 사용한다</td></tr>
       <tr><td>모델 아티팩트</td><td>파일시스템 볼륨</td><td>학습 노드는 MLflow 로 실행을 추적한다</td></tr>

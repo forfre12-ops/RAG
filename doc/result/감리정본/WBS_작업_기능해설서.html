@@ -150,7 +150,7 @@ footer strong{color:var(--text-dim);}
     <div class="ov-card"><b>① FNR 우선 (미탐 최소화)</b><p>정확도보다 <strong>고등급(TS·S1) 놓치지 않기</strong>가 먼저다. 애매하면 등급을 상향하거나 사람 검수로 보낸다.</p></div>
     <div class="ov-card"><b>② 무음실패 방지</b><p>안전 게이트가 조용히 열리면 비밀이 샌다. <strong>게이트ON = 가시성ON</strong>으로 게이트 발동을 전부 계측·경보한다.</p></div>
     <div class="ov-card"><b>③ 무실데이터 → 합성 + 운영학습</b><p>실데이터·검수·반출 0이라 <strong>합성으로 부팅</strong>하고, 실분포 성능은 고객사 사람검수(비모수 운영학습)로만 올린다.</p></div>
-    <div class="ov-card"><b>④ 폐쇄망 · GPU-free · 반출0</b><p>Postgres 한 대(+pgvector)로 통합, 등급 핫패스는 <strong>CPU·LLM-free</strong>, 문서·신원은 밖으로 내보내지 않는다.</p></div>
+    <div class="ov-card"><b>④ 폐쇄망 · GPU-free · 반출0</b><p>관계형 DB 한 대로 통합, 등급 핫패스는 <strong>CPU·LLM-free</strong>, 문서·신원은 밖으로 내보내지 않는다.</p></div>
   </div>
   <div class="callout inset"><div class="callout-label">읽는 법</div><p>각 항목은 <strong>담당 기능 · 처리 방식 · 장점·근거 · 참고사항</strong> 4블록으로 되어 있습니다. <strong>참고사항</strong>에는 전제·한계(예: 합성 데이터 천장, 파일럿 이후 확정, 운영 프로파일에서만 ON)를 정직하게 표기해, 강점과 함께 한계까지 납득되게 했습니다.</p></div>
 
@@ -160,19 +160,19 @@ footer strong{color:var(--text-dim);}
     <div class="item-detail"><b>기능상세</b> · PoC 파이프라인(M1~M6)·모델·데이터·문서 자산 실사 및 반입</div>
     <div class="item-body">
       <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">PoC에서 만든 6단계 파이프라인(M1 합성데이터 생성 → M2 문서파싱/전처리 → … → M5 추론·등급판정)과 학습모델·데이터셋·설계문서 자산을 전수 조사(실사)해 개발환경으로 옮겨오는 단계다. '실제로 무엇이 살아 돌아가고(LIVE) 무엇이 배치·휴면인지'를 지도로 만드는 작업이다.</div></div>
-      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">코드를 모듈 경계(m1_synthesis·m2_preprocess·m5_inference 등)로 실사하고, 실제 실행 프로세스 3종(API 서버·Celery 워커·beat 스케줄러)과 모델 버전 대장(ModelVersion)을 대조했다. 주요 설치 컴포넌트(pgvector·redis·KURE 임베더·bge 리랭커·kf-deberta 분류기·Qwen3-14B·로컬FS 등)와 데이터셋 경로를 인벤토리로 정리해 반입 범위를 확정했다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">코드를 모듈 경계(m1_synthesis·m2_preprocess·m5_inference 등)로 실사하고, 실제 실행 프로세스 3종(API 서버·Celery 워커·beat 스케줄러)과 모델 버전 대장(ModelVersion)을 대조했다. 주요 설치 컴포넌트(DB·redis·KURE 임베더·kf-deberta 분류기·Qwen3-14B·로컬FS 등)와 데이터셋 경로를 인벤토리로 정리해 반입 범위를 확정했다.</div></div>
       <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">무엇이 진짜 쓰이는지 먼저 확정해야 반입·재현 범위가 명확해지고, 죽은 코드나 미배선 자산을 폐쇄망 배포에 실어 나르는 낭비·위험을 막는다. 레이어별 LIVE/BATCH/DORMANT 지도가 '실제 뭘 쓰나' 질문에 바로 답하는 근거가 된다.</div></div>
       <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">실데이터·검수·반출 0 방침이라 반입 자산은 합성 데이터와 공개 출처 기반이다. 등급결정 핫패스는 M5 추론 중심이며, 파이프라인이 M6까지 있어도 일부 단계는 배치·휴면 상태로 구분된다.</div></div>
     </div>
   </div>
   <div class="item" id="item-6">
     <div class="item-head"><span class="item-tag">행 6</span><span class="item-jakup">PoC 자산 실사 및 개발환경 반입</span><span class="item-gubun">환경 구축</span></div>
-    <div class="item-detail"><b>기능상세</b> · 폐쇄망 인프라 구성(PostgreSQL·pgvector) 및 개발환경 재현</div>
+    <div class="item-detail"><b>기능상세</b> · 폐쇄망 인프라 구성(관계형 DB) 및 개발환경 재현</div>
     <div class="item-body">
-      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">고객사 폐쇄망(오프라인·인터넷 차단) 조건에서 돌아갈 데이터 인프라를 세우고 개발환경을 그대로 재현하는 단계다. PostgreSQL 한 대 안에 벡터검색 기능(pgvector)까지 통합한다.</div></div>
-      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">pgvector 기반 PostgreSQL 이미지를 써서 dense 임베딩은 pgvector 코사인 검색으로, 한국어 어휘검색은 애플리케이션 bigram_text와 PostgreSQL 기본 ts_rank로 처리하고 이 둘을 한 개의 SQL 안에서 RRF(순위융합, k=60)로 합친다. 운영 핵심 경로는 pgvector + bigram ts_rank이며, pg_bigm은 별도 검증·후보가속용 커스텀 이미지에 포함할 수 있는 선택 확장이다. 형태소분석기나 별도 검색엔진(Elasticsearch)이 없어도 되고, 스키마를 ai_agent(한국지식재산보호원)·admin(KL)로 분리하며 폐쇄망 운영 저장은 로컬FS를 쓴다(MinIO 미사용).</div></div>
-      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">별도 검색엔진 없이 Postgres 한 대로 하이브리드 검색과 트랜잭션(감사체인·확정/보정 잠금)을 모두 처리해 폐쇄망 반입·운영이 단순해지고 규모가 작은 프로젝트에 잘 맞는다. 오프라인 매체 반입만으로 개발환경을 그대로 재현할 수 있다.</div></div>
-      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">ES 백엔드도 어댑터로 지원하지만 폐쇄망 기본은 PG다. 고객사 운영망은 GPU 없이 CPU로 임베딩·추론이 충분하고(지재원 모델공장만 GPU), 실운영 쿼리 분포에 대한 검색 튜닝은 파일럿 이후 모니터링으로 이어진다.</div></div>
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">고객사 폐쇄망(오프라인·인터넷 차단) 조건에서 돌아갈 데이터 인프라를 세우고 개발환경을 그대로 재현하는 단계다. 관계형 DB 한 대로 끝낸다 — 별도 검색엔진을 두지 않는다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">납품 정본 DB 는 MariaDB 10.11 이고 폐쇄망 오프라인 번들은 PostgreSQL 16 을 담는다. 같은 ORM 이 두 방언 모두에서 돌고 전체 시험이 양쪽에서 같게 통과하며, 갈리는 것은 스키마 마이그레이션 계열뿐이다(<code>alembic upgrade mariadb@head</code> / <code>postgres@head</code>). 검색엔진·형태소분석기·확장(pgvector·pg_bigm) 어느 것도 필요 없다 &mdash; 2026-09-05 유사문서 조회를 미채택했다. 폐쇄망 운영 저장은 로컬FS를 쓴다(MinIO 미사용).</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">관계형 DB 한 대가 트랜잭션(감사체인·확정/보정 잠금)을 모두 처리해 폐쇄망 반입·운영이 단순해지고 규모가 작은 프로젝트에 잘 맞는다. 오프라인 매체 반입만으로 개발환경을 그대로 재현할 수 있다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">고객사 운영망은 GPU 없이 CPU로 임베딩·추론이 충분하고(지재원 모델공장만 GPU), 실운영 쿼리 분포에 대한 검색 튜닝은 파일럿 이후 모니터링으로 이어진다.</div></div>
     </div>
   </div>
   <div class="item" id="item-7">
@@ -202,9 +202,9 @@ footer strong{color:var(--text-dim);}
     <div class="item-detail"><b>기능상세</b> · 시스템·인프라 아키텍처 설계</div>
     <div class="item-body">
       <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">전체 시스템(파싱→분류→검색→검수)과 인프라(폐쇄망·GPU-free·상용LLM 제약)의 큰 그림을 잡는 아키텍처 설계다. 어디서 무엇이 돌고 무엇을 CPU/GPU/LLM으로 처리할지 결정한다.</div></div>
-      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">지재원(개발)=CSAP 클라우드 샌드박스, 고객사(운영)=폐쇄망 분리배포로 나누고, 등급결정 핫패스는 LLM 없이 분류기+룰로만 돌리며 /answer·선택적 2차판정에만 LLM을 쓴다. 추론·임베딩은 CPU, 학습만 GPU에 의존하게 하고, 검색 인덱스는 Blue/Green alias 원자 스왑으로 무중단 재색인한다. 추론 싱글톤은 단일 프로세스 기준 핫리로드가 가능하며, 멀티워커 전체 반영은 순차 재기동 절차를 따른다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">지재원(개발)=CSAP 클라우드 샌드박스, 고객사(운영)=폐쇄망 분리배포로 나누고, 등급결정 핫패스는 LLM 없이 분류기+룰로만 돌리며 선택적 2차판정에만 LLM을 쓴다. 추론·임베딩은 CPU, 학습만 GPU에 의존하게 한다. 추론 싱글톤은 단일 프로세스 기준 핫리로드가 가능하며, 멀티워커 전체 반영은 순차 재기동 절차를 따른다.</div></div>
       <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">지재원은 GPU 모델공장(학습·합성·골든·인덱싱)이고, 고객사 운영망은 대부분 GPU 없이 CPU로 핫패스를 돌려 폐쇄망·저비용 운영을 가능하게 하며, 핫패스에서 LLM을 빼 응답을 빠르고(핫패스 ~333ms) 결정론적으로 만든다. 상용LLM은 폐쇄망이라 공개출처 오프라인에 한정. 원청/하청·개발/운영 경계를 코드가 아닌 배포 토폴로지로 격리한다.</div></div>
-      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">Qwen3-14B는 고객사 호스트에 탑재·확보해야 하는 선택적 2차판정·/answer용 모델 전제이며, 등급결정 핫패스는 LLM-free로 동작한다. 온프렘 스토리지는 로컬FS이고, RFP는 특정 클라우드 사업자를 지정하지 않고 CSAP 공공클라우드·발주기관 제공 조건만 명시한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">Qwen3-14B는 고객사 호스트에 탑재·확보해야 하는 선택적 2차판정용 모델 전제이며, 등급결정 핫패스는 LLM-free로 동작한다. 온프렘 스토리지는 로컬FS이고, RFP는 특정 클라우드 사업자를 지정하지 않고 CSAP 공공클라우드·발주기관 제공 조건만 명시한다.</div></div>
     </div>
   </div>
   <div class="item" id="item-10">
@@ -471,7 +471,7 @@ footer strong{color:var(--text-dim);}
     <div class="item-body">
       <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">KL(원청 웹시스템)이 한국지식재산보호원 AI 엔진을 호출할 때 쓰는 REST 연동 계약(ICD)을 확정하는 협의 단계다. 요청/응답 데이터 모양, metadata_floor(문서에 붙은 보안표기·접근범위 같은 메타정보로 등급을 안전하게 올리는 장치), 오류코드와 재시도 규약을 KL과 맞춘다. '어떤 필드를 주고받고, 실패하면 어떻게 다시 부르나'를 문서 하나로 못박는 일이다.</div></div>
       <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">OpenAPI 3.0.3 명세(doc/03_openapi_koipa_kl.yaml)를 '진실 소스'로 삼아 협의한다. ClassifyRequest는 DocumentInput(doc_id·content·metadata)을 상속하고, metadata에 security_marking(top_secret/secret/confidential)이나 제한적 access_scope를 실으면 서빙단 metadata_floor 게이트가 예측보다 높은 표기일 때 그 등급으로 상향 floor(하향은 절대 안 함)한다. 공통 에러 envelope(code·message·request_id), 429 응답의 Retry-After 헤더(재시도 대기 초), 비동기 분류의 callback_url 콜백까지 규약으로 확정한다.</div></div>
-      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">명세가 backend-agnostic(내부 검색엔진 세부와 무관)이라 KL은 우리 RAG 내부(pgvector dense + bigram ts_rank 하이브리드)를 전혀 몰라도 그대로 호출할 수 있다. metadata_floor는 내용 분류기가 못 보는 출처(S)·비밀관리성(M) 축을 KL의 ICD 메타로 보완해, 인사·재무 비밀이 평범한 내부문서로 보이는 사각지대의 미탐(FNR, 고등급을 낮게 보는 오류)을 막는다. 재시도·에러 코드를 표준화해 KL이 무음으로 실패를 삼키지 않고 재처리 여부를 판단할 수 있다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">명세가 backend-agnostic(내부 구현 세부와 무관)이라 KL은 엔진 내부를 전혀 몰라도 그대로 호출할 수 있다. metadata_floor는 내용 분류기가 못 보는 출처(S)·비밀관리성(M) 축을 KL의 ICD 메타로 보완해, 인사·재무 비밀이 평범한 내부문서로 보이는 사각지대의 미탐(FNR, 고등급을 낮게 보는 오류)을 막는다. 재시도·에러 코드를 표준화해 KL이 무음으로 실패를 삼키지 않고 재처리 여부를 판단할 수 있다.</div></div>
       <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">KL 측 정식 명세 회신 전이라 OpenAPI가 잠정 진실소스(버전 1.0.0-draft)이며 회신 후 재정합이 필요하다. metadata_floor는 안전방향(상향)만 하며, 표기가 고등급 콘텐츠를 오히려 덮어버릴 위험이 있는 충돌 상황은 자동확정하지 않고 needs_review(사람 검수)로 라우팅한다. 명세에 tenant_id 필드가 잔존하나 실제 격리는 폐쇄망 분리배포+RBAC로 대체된 상태라 설명용 잔재다.</div></div>
     </div>
   </div>
@@ -521,8 +521,8 @@ footer strong{color:var(--text-dim);}
     <div class="item-head"><span class="item-tag">행 40</span><span class="item-jakup">통합 테스트</span><span class="item-gubun">시스템 연계</span></div>
     <div class="item-detail"><b>기능상세</b> · KL API 연계·운영 시나리오·고객 인수팩 E2E 통합 테스트</div>
     <div class="item-body">
-      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">KL(원청) 백엔드와 한국지식재산보호원 분류 시스템이 실제로 맞물려 도는지, 그리고 고객에게 넘길 배포본이 인수 기준을 통과하는지를 '문서 파싱→등급 분류→안전 게이트'까지 한 흐름으로 검증하는 통합 테스트 단계다. KL 연동 8개 운영 시나리오(단건·비동기 분류, 관리자 확정·재라벨, 등급체계 변경, 가이드 업로드→RAG 색인, 합성 생성→검수, 능동학습 트리거, 지표 조회)를 자동 재현하고, 전 포맷 샘플로 고객 인수팩 E2E를 돌린다.</div></div>
-      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">test_kl_integration.py가 KL ICD와 OpenAPI 정본의 S1~S8 시나리오를 테스트 클라이언트 in-process 호출로 1:1 매핑하고(KL 측은 X-Actor-Id/Role 헤더로 흉내), DB·검색엔진·LLM 가용성에 따라 자동 스킵한다. 고객 인수는 run_acceptance.py가 datasets/acceptance_pack의 전 포맷 대표 표본(TXT·PDF·DOCX·XLSX·XLS·PPTX·HWPX 등)을 inproc(ClassifyService 직접) 또는 http(POST /api/v1/documents/analyze 업로드)로 태워 채점한다. 판정은 severity-floor(안전선) 규율 — 파싱 성공 + 숫자 무손실 + 고등급 미탐 없음(덜 민감하게 예측한 under-분류=veto)만 합격 게이트로 걸고, 표 커버리지·정확 등급일치율·과분류 수·지연은 보고만 한다.</div></div>
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">KL(원청) 백엔드와 한국지식재산보호원 분류 시스템이 실제로 맞물려 도는지, 그리고 고객에게 넘길 배포본이 인수 기준을 통과하는지를 '문서 파싱→등급 분류→안전 게이트'까지 한 흐름으로 검증하는 통합 테스트 단계다. KL 연동 8개 운영 시나리오(단건·비동기 분류, 관리자 확정·재라벨, 등급체계 변경, 가이드 업로드, 합성 생성→검수, 능동학습 트리거, 지표 조회)를 자동 재현하고, 전 포맷 샘플로 고객 인수팩 E2E를 돌린다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">test_kl_integration.py가 KL ICD와 OpenAPI 정본의 S1~S8 시나리오를 테스트 클라이언트 in-process 호출로 1:1 매핑하고(KL 측은 X-Actor-Id/Role 헤더로 흉내), DB·LLM 가용성에 따라 자동 스킵한다. 고객 인수는 run_acceptance.py가 datasets/acceptance_pack의 전 포맷 대표 표본(TXT·PDF·DOCX·XLSX·XLS·PPTX·HWPX 등)을 inproc(ClassifyService 직접) 또는 http(POST /api/v1/documents/analyze 업로드)로 태워 채점한다. 판정은 severity-floor(안전선) 규율 — 파싱 성공 + 숫자 무손실 + 고등급 미탐 없음(덜 민감하게 예측한 under-분류=veto)만 합격 게이트로 걸고, 표 커버리지·정확 등급일치율·과분류 수·지연은 보고만 한다.</div></div>
       <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">배포 서빙 코드를 그대로 태우기 때문에 인증·감사로그·프로메테우스 카운트·검수 라우팅 같은 통합 결함이 운영과 동일한 경로에서 드러난다. 합성 데이터 천장(실문서 F1 0.26)에서 정확 등급일치로 합격을 매기면 '안전하게 과분류하는' 옳은 시스템을 부당 불합격시키므로, 미탐만 veto하는 규율이 고등급 미탐 최소화(FNR 우선) 철학과 정확히 맞는다.</div></div>
       <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">KL 측은 헤더 mock이라 실제 KL 포털과의 왕복 연동은 파일럿 현장에서 최종 확인이 필요하다. inproc 인수 모드는 hash 임베더 폴백을 허용하므로 검색 품질은 별도 검증 대상이며 운영 tier는 REQUIRE_REAL_EMBEDDER로 실모델을 강제한다. 정확 등급일치는 합성 라벨 천장 탓에 성능 지표가 아니라 참고치로만 읽어야 한다.</div></div>
     </div>

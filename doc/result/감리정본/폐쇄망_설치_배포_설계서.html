@@ -112,7 +112,7 @@ footer strong{color:var(--text-dim);}
       <tr><td>대상 환경</td><td>KOIPA AI 영업비밀관리시스템 운영망 (폐쇄망/에어갭 — 인터넷 차단, 매체 반입)</td></tr>
       <tr><td>배포 단위</td><td>폐쇄망 배포 번들 (docker 이미지 + python 의존성 + 모델 + DB 마이그레이션 + 구성)</td></tr>
       <tr><td>추정 크기</td><td>~23GB (매체 반입 1회)</td></tr>
-      <tr><td>아키텍처</td><td>단일 노드 docker compose 스택 — API·Worker·Beat·Redis + PostgreSQL(pgvector) · 로컬 파일시스템 (MinIO 미사용 · MLflow는 지재원 전용·번들 미포함)</td></tr>
+      <tr><td>아키텍처</td><td>단일 노드 docker compose 스택 — API·Worker·Beat·Redis + PostgreSQL 16 · 로컬 파일시스템 (MinIO 미사용 · MLflow는 지재원 전용·번들 미포함)</td></tr>
       <tr><td>망 등급</td><td>폐쇄망 전제 · <span class="tag dep">확인필요</span> 매체 반입 신청·승인 절차</td></tr>
     </tbody>
   </table></div>
@@ -124,7 +124,7 @@ footer strong{color:var(--text-dim);}
   <div class="table-wrap"><table>
     <thead><tr><th>컴포넌트</th><th>버전</th><th>포트</th><th>역할</th><th>라이선스·주의</th></tr></thead>
     <tbody>
-      <tr><td><strong>PostgreSQL + pgvector</strong></td><td>16 (pgvector)</td><td>5432</td><td>메타데이터·감사장부·모델버전(월 파티션) + 벡터검색(pgvector dense + bigram-tsvector ts_rank 하이브리드)</td><td>PostgreSQL License</td></tr>
+      <tr><td><strong>PostgreSQL</strong></td><td>16</td><td>5432</td><td>메타데이터·감사장부·모델버전. 파티션은 두지 않고 시간축 인덱스와 보존기간 삭제를 쓴다</td><td>PostgreSQL License</td></tr>
       <tr><td><strong>로컬 스토리지</strong></td><td>파일시스템(file://)</td><td>—</td><td>원문·산출물 보관 — 원본 AES-256-GCM 암호화 (MinIO 미사용)</td><td>해당 없음</td></tr>
       <tr><td><strong>Redis</strong></td><td>7.2</td><td>6379</td><td>캐시 · 작업 큐 브로커</td><td>BSD-3 (7.2 시점 고정)</td></tr>
       <tr><td><strong>MLflow</strong> (지재원 전용)</td><td>2.16</td><td>—</td><td>실험·모델 레지스트리 — <strong>지재원에서만</strong>, 고객사 번들 미포함</td><td>Apache-2.0</td></tr>
@@ -181,7 +181,7 @@ footer strong{color:var(--text-dim);}
     <li><strong>GPU</strong> — <code>nvidia-smi</code> 인식 + <code>--gpus all</code> 동작 확인. <span class="tag dep">확인필요</span> Driver·CUDA·Container Toolkit 버전. 미충족 시 CPU 프로파일로 폴백(추론 성능 하락).</li>
     <li><strong>디스크</strong> — 번들 ~23GB + 이미지·모델·데이터 볼륨. Data SSD 여유 확인.</li>
     <li><strong>포트</strong> — 5432·6379·8000 (+ mTLS 443) 내부 가용 (MinIO 9000/9001·MLflow 5000 불요). 방화벽 규칙은 망 정책에 맞춰 신청.</li>
-    <li><strong>커널 파라미터</strong> — 기본값으로 충분(별도 검색엔진 mmap·memlock 튜닝 불요 — pgvector 통합).</li>
+    <li><strong>커널 파라미터</strong> — 기본값으로 충분(별도 검색엔진을 두지 않는다).</li>
     <li><strong>로컬 LLM 서버</strong> — onprem-local 프로파일은 vLLM/Ollama 서버 기동 + Qwen3-14B 적재가 선행되어야 한다(별도 프로세스).</li>
     <li><strong>OCR</strong> — <b>설치 불요</b>. 요건 외 + GPL(poppler)이라 번들·이미지에서 제외했다. 스캔 PDF는 추출 0자 → <code>failed</code> 격리.</li>
     <li><strong>시간·로캘</strong> — NTP 동기, UTF-8 로캘(한국어 텍스트 처리).</li>
@@ -193,7 +193,7 @@ footer strong{color:var(--text-dim);}
 ├── docker-images/     # docker load 대상 (api·worker·infra, ~23GB)
 ├── python-deps/       # 오프라인 wheel + 설치 목록
 ├── models/            # 학습 가중치 + 보정값 (동봉 필수)
-├── infra-config/      # docker-compose.yml · .env.template (검색엔진 산출물 불요 — pgvector 통합)
+├── infra-config/      # docker-compose.yml · .env.template
 ├── db-migrations/     # 스키마 마이그레이션
 ├── install.sh · verify.sh · manifest.yaml · CHECKSUMS
 └── docs/ · licenses/</code></pre>
@@ -247,13 +247,13 @@ docker compose up -d
       <tr><td><code>full-train</code></td><td>풀스펙 + 학습 라우터 활성</td><td>GPU 학습 자원 — 온사이트 학습(B안)은 TS미탐 치명 고객 등 합의 시에만 채택; 기본은 추론 전용(A안)</td></tr>
     </tbody>
   </table></div>
-  <p>벡터 백엔드 기본 PostgreSQL(pgvector), LLM 기본 로컬(vLLM), 속도 우선 모드.</p>
+  <p>LLM 기본 로컬(vLLM), 속도 우선 모드.</p>
 
   <div class="section-sep" id="s9"><span class="section-sep-num">09</span><span class="section-sep-line"></span><span class="section-sep-title">설치 검증</span></div>
   <h2>기동 후 점검</h2>
   <ul>
     <li><strong>헬스체크</strong> — <code>/api/v1/healthz/live</code>(프로세스)·<code>/ready</code>(의존성 실측)·<code>/deep</code>(전체).</li>
-    <li><strong>컨테이너</strong> — API·Worker·Beat·PostgreSQL(pgvector)·Redis 기동(스토리지=로컬FS · MLflow=지재원 전용). Worker는 전 큐 구독, Beat는 단일 인스턴스.</li>
+    <li><strong>컨테이너</strong> — API·Worker·Beat·PostgreSQL·Redis 기동(스토리지=로컬FS · MLflow=지재원 전용). Worker는 전 큐 구독, Beat는 단일 인스턴스.</li>
     <li><strong>스모크 분류</strong> — 샘플 문서 업로드 → 분류 → 등급·신뢰도 반환 확인.</li>
     <li><strong>관측성</strong> — 모니터링 타깃 정상, KPI 대시보드·알람 로드.</li>
   </ul>

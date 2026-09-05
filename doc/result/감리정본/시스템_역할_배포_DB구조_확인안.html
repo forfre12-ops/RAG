@@ -272,7 +272,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       <thead><tr><th>층</th><th>무엇</th><th style="width:150px;">누가</th></tr></thead>
       <tbody>
         <tr><td>PostgreSQL 서버</td><td>설치·버전·백업·접근제어</td><td><span class="tag-kl">KL</span></td></tr>
-        <tr><td>확장</td><td><b>pgvector(필수)</b> · pg_bigm(선택·후보가속) 설치</td><td><span class="tag-kl">KL</span> (명세는 LK)</td></tr>
+        <tr><td>확장</td><td>별도 확장 불요 &mdash; 유사문서 조회 미채택으로 pgvector 가 필요 없다</td><td><span class="tag-kl">KL</span> (명세는 LK)</td></tr>
         <tr><td>Koipa DDL</td><td>ORM 19개 테이블 Alembic SQL</td><td><span class="tag-lk">한국지식재산보호원</span> 납품 → KL 적용</td></tr>
         <tr><td>KL 연동</td><td>원천 문서/EDMS/사용자 권한은 API·<code>external_ref</code>·메타데이터 계약으로 연결</td><td><span class="tag-kl">KL</span> + <span class="tag-lk">LK</span></td></tr>
         <tr><td>앱(api·worker·beat)</td><td>컨테이너 (전용 계정으로 KL DB 접속)</td><td><span class="tag-lk">한국지식재산보호원</span> 납품 → KL 기동</td></tr>
@@ -297,14 +297,14 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
 
 OUT (고객사 -&gt; 지재원) :  [확인 5 미정] 검수교정 반출 여부 자체가 결정 대상
                          · A안(기본) = 문서 무반출·집계 리포트만(메일·유선 수준) · B안 = 온사이트 학습(고객 망내 폐루프, TS미탐 치명 고객 기본권고) · C안 = 문서단위 반출 -&gt; 재학습</div>
-    <div class="ok-box"><span class="ok-label">확정</span>고객사는 <b>외부망과 통신하지 않는다(완전 폐쇄망)</b> — 온프렘 LLM(Qwen3-14B·GPU)·번들 모델(분류기)·로컬 스토리지·로컬 DB로 완결. <b>분류 등급결정 핫패스는 LLM-free</b>(분류기+룰+RAG검색+메타, 333ms); 온프렘 LLM은 <b>RAG /answer 답변합성·선택적 2차판정</b> 전용. 학습은 지재원에서만. <b>역방향 환류(고객사→지재원)는 미확정</b> — 반출 여부 자체가 §6 확인 5의 결정 대상이다(기본 권고: 문서 무반출·집계 진단만 환류).</div>
+    <div class="ok-box"><span class="ok-label">확정</span>고객사는 <b>외부망과 통신하지 않는다(완전 폐쇄망)</b> — 온프렘 LLM(Qwen3-14B·GPU)·번들 모델(분류기)·로컬 스토리지·로컬 DB로 완결. <b>분류 등급결정 핫패스는 LLM-free</b>(분류기+룰+메타, 333ms); 온프렘 LLM은 <b>선택적 2차판정</b> 전용. 학습은 지재원에서만. <b>역방향 환류(고객사→지재원)는 미확정</b> — 반출 여부 자체가 §6 확인 5의 결정 대상이다(기본 권고: 문서 무반출·집계 진단만 환류).</div>
 
     <h2 id="confirm"><span class="num">6</span> 확인 · 합의 필요</h2>
     <p class="h2-sub">아래 항목이 위 구조의 전제입니다. 맞는지 / KL과 합의가 됐는지 확인 바랍니다.</p>
 
     <div class="nego"><span class="nego-label">확인 1</span><b>고객사 DB 운영 주체</b> — 폐쇄망 고객사 PostgreSQL을 KL이 운영하고 Koipa 앱은 전용 계정으로 접속하는 전제가 맞나?</div>
     <div class="nego"><span class="nego-label">확인 2</span><b>schema 분리 여부</b> — 현 소스는 단일 스키마/테이블 세트다. <code>ai_agent</code>/<code>admin</code> 분리가 필요하면 ORM/Alembic/권한 설계를 별도 변경해야 한다.</div>
-    <div class="nego"><span class="nego-label">확인 3</span><b>확장 설치</b> — KL PG에 <b>pgvector(필수)</b> 설치 가능한가? (벡터검색 필수) pg_bigm은 선택 — 한국어 후보생성 가속용이고, 랭킹은 코어 <code>ts_rank</code>(별도 확장 불요)가 담당.</div>
+    <div class="nego"><span class="nego-label">확인 3</span><b>확장 설치</b> &mdash; <b>해소됨(2026-09-05).</b> 유사문서 조회를 미채택해 <code>pgvector</code>·<code>pg_bigm</code> 어느 것도 필요 없다. 표준 설치만으로 스키마가 선다.</div>
     <div class="nego"><span class="nego-label">확인 4</span><b>DDL 적용 주체</b> — Koipa 마이그레이션을 <b>KL이 적용</b>하나, 아니면 Koipa 컨테이너에 일시 DDL 권한을 주나? 현재 구현에는 cross-schema FK가 없으므로 <code>admin.tb_documents</code> 선생성/REFERENCES 권한 전제는 적용되지 않는다.</div>
     <div class="nego"><span class="nego-label">확인 5</span><b>보정 환류 — "포맷"이 아니라 "반출 여부"가 먼저다.</b> 고객사 검수교정을 지재원으로 반출해 재학습하는 그림은 세 가지로 막힌다: ① <code>tb_corrections</code>를 DB→파일로 뽑는 <b>export 도구가 아직 없다</b>(현 <code>import_review_corrections.py</code>는 import 전용·트리거 미연결), ② 반출 포맷이 라벨(<code>doc_id·model_label·human_label·reason</code>)뿐이면 <b>원문 텍스트가 없어 분류기 재학습 자체가 불가</b>(학습은 <code>Chunk.content</code> 필요·원문은 고객사에만 존재), ③ <code>reason</code> 자유텍스트가 원문 발췌를 담을 수 있어 "메타데이터-only도 무해하지 않다". → <b>폐쇄망 고객이 문서단위 검수데이터 반출에 동의하겠는가</b>를 먼저 결정해야 한다(컬럼 규약은 그 다음 문제). <b>두 채널을 구분하라</b> — ① <b>문서 채널</b>(doc_id·원문·발췌)은 어느 안이든 <b>망 밖으로 내보내지 않는다</b>; ② <b>집계 진단 리포트</b>(등급별 오분류율·혼동행렬 카운트·문서식별 불가)는 지재원이 현장 성능을 보고 <b>고등급 사각지대의 우선순위를 잡는</b> 용도다 — 단 이건 <b>조준 신호일 뿐, 갭을 메우는 데이터가 아니다</b>(보강할 실데이터는 지재원이 자기 공개·프록시 코퍼스에서 따로 확보하며, 고등급일수록 A안만으론 못 메운다 → B안). 양이 작아(혼동행렬 한 장 분량) <b>자동 반출 채널이 아니라 고정 양식의 정기 리포트를 메일·유선·정기보고로 전달</b>하면 충분하고, 양식을 못박는 목적은 전송이 아니라 <b>'문서식별 필드 없음'을 고객 보안팀이 1회 승인</b>받기 위함이다. 아래 A/B/C 중 택1(②는 공통 필수).</div>
     <div class="tbl-wrap"><table>
@@ -326,7 +326,7 @@ OUT (고객사 -&gt; 지재원) :  [확인 5 미정] 검수교정 반출 여부 
         <tr><td>Koipa ↔ KL 원천 문서</td><td><code>tb_documents.doc_id</code>는 Koipa PK, KL EDMS 키는 <code>external_ref</code>로 보존한다. 하드 FK 대신 API/메타데이터 기반 소프트 연동.</td><td>현재 구현</td></tr>
         <tr><td>벤더 경계 FK</td><td><b>소프트 참조</b>가 현 코드와 맞다. schema 분리와 cross-schema FK가 필요하면 별도 설계 변경 대상이다.</td><td>2-벤더 폐쇄망 디커플</td></tr>
         <tr><td>학습 테이블</td><td><code>training_runs·epochs·datasets</code>·<code>prompt_versions</code>·<code>sample_documents</code>는 고객사 CPU 야간 증분재학습이 활성이면 채워진다(비활성 시 비어 있음). <code>model_versions</code>는 감사·롤백용, <code>tb_corrections</code>는 고객사 검수 교정으로 채워진다.</td><td>고객사 = CPU 런타임 + 야간 증분</td></tr>
-        <tr class="nego-row"><td><code>tb_llm_usage</code></td><td>고객사 온프렘 LLM(/answer·선택 2차판정) 호출 시 Koipa DB에 기록한다. KL 비용 정산 시스템으로 넘길지는 별도 API/리포트 계약이다.</td><td>고객사 온프렘 LLM 실재</td></tr>
+        <tr class="nego-row"><td><code>tb_llm_usage</code></td><td>고객사 온프렘 LLM(선택 2차판정) 호출 시 Koipa DB에 기록한다. KL 비용 정산 시스템으로 넘길지는 별도 API/리포트 계약이다.</td><td>고객사 온프렘 LLM 실재</td></tr>
       </tbody>
     </table></div>
 

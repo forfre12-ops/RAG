@@ -60,7 +60,7 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:210px">구성요소</th><th style="width:150px">이미지 태그</th><th style="width:130px">라이선스</th><th>역할</th></tr></thead>
     <tbody>
-      <tr><td><b>PostgreSQL + pgvector</b></td><td><code>pgvector/pgvector:pg16</code></td><td>PostgreSQL License</td><td>메타데이터·감사장부·모델버전 + <b>벡터검색(내장)</b></td></tr>
+      <tr><td><b>MariaDB</b> (납품 정본)</td><td><code>mariadb:10.11</code></td><td>GPL-2.0 &mdash; <b>번들에 담지 않음</b>(발주처 운영분 사용)</td><td>메타데이터·감사장부·모델버전</td></tr><tr><td>PostgreSQL (폐쇄망 번들)</td><td><code>pgvector/pgvector:pg16</code></td><td>PostgreSQL License</td><td>메타데이터·감사장부·모델버전 &mdash; 번들이 담는 DB</td></tr>
       <tr><td>Redis</td><td><code>redis:7.2-alpine</code></td><td>BSD-3</td><td>캐시 · 작업 큐 브로커</td></tr>
       <tr><td>nginx (mTLS)</td><td><code>nginx:1.27-alpine</code></td><td>BSD-2</td><td>mTLS 종료 — 인증서는 발주처/KL PKI</td></tr>
       <tr><td>API 서버</td><td><code>koipa-api</code></td><td>자체</td><td>FastAPI 애플리케이션 (포트 8000)</td></tr>
@@ -84,20 +84,7 @@ a{color:#0a0a0a}
       <tr><td>slowapi</td><td>0.1.10</td><td>MIT</td><td>API 호출량 제한(429 · Retry-After)</td></tr>
       <tr><td>PyYAML</td><td>6.0.3</td><td>MIT</td><td>설정·시드 파일 파싱</td></tr>
     </tbody>
-  </table>
-
-  <h2>3. 벡터 · 검색</h2>
-  <table>
-    <thead><tr><th style="width:210px">구성요소</th><th style="width:110px">버전</th><th style="width:130px">라이선스</th><th>역할</th></tr></thead>
-    <tbody>
-      <tr><td><b>pgvector</b> (dense)</td><td>PG16 확장</td><td>PostgreSQL License</td><td>의미 벡터 유사도 검색 — 벡터 차원 1024</td></tr>
-      <tr><td><b>bigram tsvector + ts_rank</b></td><td>PG 내장</td><td>PostgreSQL License</td><td>한국어 어휘 검색 랭커</td></tr>
-      <tr><td>RRF 하이브리드</td><td>자체 구현</td><td>—</td><td>dense + 어휘 융합. <b>별도 검색엔진 없이 DB 통합</b></td></tr>
-    </tbody>
-  </table>
-  
-
-  <h2>4. 모델 — 가중치 실물 기준</h2>
+  </table>  <h2>4. 모델 — 가중치 실물 기준</h2>
   <table>
     <thead><tr><th style="width:130px">구분</th><th style="width:250px">모델</th><th style="width:120px">라이선스</th><th>역할 · 확인</th></tr></thead>
     <tbody>
