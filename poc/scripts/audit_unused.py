@@ -76,6 +76,12 @@ def audit_tables(detail: bool) -> tuple[int, int, int]:
         for cls, tname in tables.items():
             # 쓰기: 생성자 호출
             write[cls] += len(re.findall(rf"\b{cls}\s*\(", s))
+            # 쓰기: 원시 SQL. [2026-09-05] 종전에는 원시 SQL 을 **읽기로만** 셌다.
+            # 그래서 raw SQL 로만 쓰는 표(예: tb_advisory_locks — 잠금 행 INSERT)가
+            # "쓰기 0 · 영원히 빈다"로 잡혔다. 사실이 아닌 경고는 도구를 못 믿게 만든다.
+            write[cls] += len(re.findall(rf"INSERT\s+(?:IGNORE\s+)?INTO\s+{tname}", s, re.I))
+            write[cls] += len(re.findall(rf"UPDATE\s+{tname}", s, re.I))
+            write[cls] += len(re.findall(rf"DELETE\s+FROM\s+{tname}", s, re.I))
             # 읽기: select/query 인자 또는 속성 접근
             read[cls] += len(re.findall(rf"select\(\s*{cls}\b", s))
             read[cls] += len(re.findall(rf"query\(\s*{cls}\b", s))

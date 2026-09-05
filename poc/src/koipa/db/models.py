@@ -597,6 +597,23 @@ class AuditLog(Base):
 # [K] 가이드 문서 버전 이력
 # ============================================================
 
+class AdvisoryLock(Base):
+    """전역 직렬화 잠금 전용 표 — 행 하나가 논리 잠금 하나다(db/locks.py).
+
+    [2026-09-05] 감사 체인·모델 활성 전환은 `pg_advisory_xact_lock` 으로만 잠겨 있어
+    MariaDB 에서 조용히 꺼졌다. MariaDB 의 GET_LOCK 은 커넥션 단위라 PostgreSQL 의
+    트랜잭션 단위 수명을 흉내 낼 수 없었다(실측 근거는 db/locks.py 머리말).
+    `SELECT ... FOR UPDATE` 행 잠금은 두 dialect 모두 트랜잭션 단위라 호출부가 이미
+    전제하던 수명(commit/rollback 에 자동 해제)과 정확히 맞는다.
+
+    데이터를 담지 않는다 — 행의 존재 자체가 잠금 지점이다. 행은 처음 쓸 때 자동 생성된다.
+    """
+
+    __tablename__ = "tb_advisory_locks"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+
 class Guide(Base):
     """가이드 문서 업로드 이력 — GuideService in-memory 대체."""
     __tablename__ = "tb_guides"

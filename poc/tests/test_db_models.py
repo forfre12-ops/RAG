@@ -77,6 +77,10 @@ def test_orm_metadata_has_expected_tables():
         "tb_llm_usage",
         "tb_audit_log",
         "tb_guides",          # N5: GuideService DB 이전
+        # [2026-09-05] 전역 직렬화 잠금 전용 표(db/locks.py). 행 하나가 논리 잠금
+        # 하나이고 데이터를 담지 않는다. pg_advisory_xact_lock 이 MariaDB 에서
+        # 조용히 꺼지던 것을 두 dialect 공통 행 잠금으로 바꾸며 들어왔다.
+        "tb_advisory_locks",
     }
     actual = set(Base.metadata.tables.keys())
     missing = expected - actual

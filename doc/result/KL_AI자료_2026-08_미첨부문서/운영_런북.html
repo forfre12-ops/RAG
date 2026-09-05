@@ -214,7 +214,7 @@ footer strong{color:var(--text-dim);}
     <li><strong>모델 롤백</strong> — 성능 열화 임계 초과 시 직전 버전으로 activate. 자동 롤백은 모니터링 동반 활성.</li>
     <li><strong>백업</strong> — DB·원문 스토리지 정기 백업, 복구 시점 목표(RPO)·복구 시간 목표(RTO) 정의(본개발).</li>
     <li><strong>DR 드릴</strong> — <code>dr_drill</code>로 감사 체인 무결성·복구 절차를 주기 점검.</li>
-    <li><strong>감사 체인 동시성</strong> — 감사 로그 해시 체인은 PostgreSQL advisory lock으로 직렬화돼, 동시 기록 시에도 체인 무결성이 보장된다(트랜잭션 종료 시 자동 해제). 모델 활성 전환도 동일 방식으로 직렬화된다.</li>
+    <li><strong>감사 체인 동시성</strong> — 감사 로그 해시 체인은 전용 표(<code>tb_advisory_locks</code>)의 행 잠금(<code>SELECT ... FOR UPDATE</code>)으로 직렬화돼, 동시 기록 시에도 체인 무결성이 보장된다(트랜잭션 종료 시 자동 해제). 모델 활성 전환도 동일 방식으로 직렬화된다. <strong>PostgreSQL·MariaDB 양쪽에서 같게 동작한다</strong> — 종전 <code>pg_advisory_xact_lock</code> 은 PostgreSQL 전용이라 MariaDB 배포에서 두 임계영역이 조용히 열렸다(2026-09-05 수정). 검증: 16건 동시 삽입에서 체인 끊김 0 — <code>tests/test_db_locks.py</code>.</li>
   </ul>
 
   <div class="section-sep" id="s7"><span class="section-sep-num">07</span><span class="section-sep-line"></span><span class="section-sep-title">알람 · SLO</span></div>

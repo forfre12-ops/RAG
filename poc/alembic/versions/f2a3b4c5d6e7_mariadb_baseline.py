@@ -91,6 +91,13 @@ def upgrade() -> None:
             (code, name, weight, is_active),
         )
 
+    # 잠금 지점 — 행이 미리 있어야 첫 사용에서 잠금이 열리지 않는다(2026-09-05 실측.
+    # 자세한 것은 판 c5d6e7f8a9b0 과 db/locks.py 머리말).
+    for lock_name in ("audit_chain", "model_activation"):
+        conn.exec_driver_sql(
+            "INSERT INTO tb_advisory_locks (name) VALUES (%s)", (lock_name,)
+        )
+
 
 def downgrade() -> None:
     conn = op.get_bind()

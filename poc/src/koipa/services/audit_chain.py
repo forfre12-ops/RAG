@@ -28,15 +28,14 @@ import logging
 import os
 from dataclasses import dataclass
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 
 from koipa.db import session_scope
 from koipa.db.models import AuditLog
 
-# 전역 audit 체인 advisory lock 키 — Postgres pg_advisory_xact_lock(bigint).
-# 동일 키를 모든 audit insert가 공유해 prev-read+insert를 단일 직렬 체인으로 만든다.
-_AUDIT_LOCK_SQL = text("SELECT pg_advisory_xact_lock(hashtext('koipa_audit_chain'))")
+# 전역 audit 체인 잠금 — 모든 audit insert가 같은 잠금을 공유해 prev-read+insert를
+# 단일 직렬 체인으로 만든다. 구현은 db/locks.py(행 잠금 · 두 dialect 동일 수명).
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +190,8 @@ def verify_chain(
     """
     try:
         with session_scope() as db:
-            q = select(AuditLog).order_by(AuditLog.occurred_at, AuditLog.audit_id)
+            # 체인을 이은 순서(=audit_id)로 걷는다 — last_hash_in_session 주석 참조.
+            q = select(AuditLog).order_by(AuditLog.audit_id)
             if since:
                 q = q.where(AuditLog.occurred_at >= since)
             if until:
@@ -293,27 +293,38 @@ def verify_chain(
 
 
 def _advisory_xact_lock(db) -> None:
-    """전역 audit 체인 직렬화 — Postgres에서만 트랜잭션 단위 advisory lock 획득.
+    """전역 audit 체인 직렬화 — 트랜잭션 단위 잠금 획득(PostgreSQL·MariaDB 동일).
 
-    pg_advisory_xact_lock은 트랜잭션 종료(commit/rollback) 시 자동 해제된다. 같은 lock
-    아래에서 prev-read+insert를 수행하면 동시 요청이 같은 prev를 읽어 체인이 분기(fork)
-    하는 race를 막는다. Postgres가 아니거나(SQLite 테스트) 실패해도 best-effort로 진행.
+    같은 잠금 아래에서 prev-read+insert 를 수행하면 동시 요청이 같은 prev 를 읽어 체인이
+    분기(fork)하는 race 를 막는다. 잠금은 트랜잭션 종료(commit/rollback)에 자동 해제된다.
+
+    [2026-09-05] 종전에는 `dialect == "postgresql"` 일 때만 잠갔다 — MariaDB 에서
+    **조용히 열리는** 상태였다. db/locks.py 가 두 dialect 를 같게 만든다.
+    못 얻어도 진행한다(감사 기록 자체를 막는 것이 더 큰 사고) — 대신 경고가 남는다.
     """
-    try:
-        if db.get_bind().dialect.name == "postgresql":
-            db.execute(_AUDIT_LOCK_SQL)
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("audit advisory lock skipped: %s", exc)
+    from koipa.db.locks import AUDIT_CHAIN, advisory_xact_lock  # noqa: PLC0415
+
+    if not advisory_xact_lock(db, AUDIT_CHAIN):
+        logger.warning(
+            "audit 체인 잠금 미획득 — 직렬화 없이 진행한다. 동시 요청이 있으면 "
+            "체인이 분기할 수 있다(verify_chain 이 잡는다).",
+        )
 
 
 def last_hash_in_session(db) -> str:
     """제공된 세션(=같은 트랜잭션)에서 직전 chained full32를 읽는다 — race-free 체인용.
 
+    ⚠ 정렬 기준은 **audit_id** 다. occurred_at 이 아니다(2026-09-05 실측으로 갈렸다).
+    PostgreSQL 의 now() 는 트랜잭션의 **첫 명령이 시작된** 시각이라, 동시 요청이 한꺼번에
+    잠금을 기다리면 전부 비슷한 occurred_at 을 받는다 — 잠금 획득 순서(=실제 삽입 순서)와
+    어긋난다. 그 상태로 occurred_at 순 마지막 행을 prev 로 고르면 **잠금이 제대로 걸려도
+    체인이 분기한다**(24건 동시 삽입에서 6건 끊김). audit_id 는 INSERT 시점에 매겨지고
+    그 INSERT 는 잠금 안에서 일어나므로 삽입 순서와 정확히 같다.
+    MariaDB 의 NOW() 는 문장 시작 시각이라 원래 어긋나지 않았다 — dialect 차이였다.
+
     tenant 제거: 격리는 KL 포털 전담 — 전역 단일 체인.
     """
-    q = select(AuditLog.payload_hash).order_by(
-        AuditLog.occurred_at.desc(), AuditLog.audit_id.desc()
-    )
+    q = select(AuditLog.payload_hash).order_by(AuditLog.audit_id.desc())
     row = db.execute(q.limit(1)).first()
     if not row or not row[0]:
         return ZERO16
@@ -340,7 +351,7 @@ def get_last_hash() -> str:
     """
     try:
         with session_scope() as db:
-            q = select(AuditLog.payload_hash).order_by(AuditLog.occurred_at.desc(), AuditLog.audit_id.desc())
+            q = select(AuditLog.payload_hash).order_by(AuditLog.audit_id.desc())
             row = db.execute(q.limit(1)).first()
     except SQLAlchemyError:
         return ZERO16

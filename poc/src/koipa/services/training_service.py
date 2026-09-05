@@ -33,17 +33,22 @@ from koipa.services.job_store import get_default_store
 logger = logging.getLogger(__name__)
 
 
-# 모델 활성 전환 직렬화용 advisory lock 키(임의 고정 64-bit 상수). 같은 키 = 같은 임계영역.
-_MODEL_ACTIVATION_LOCK_KEY = 0x10AD_AC71_AC10_0001
+def _advisory_xact_lock(db, _key=None) -> None:
+    """모델 활성 전환 직렬화 — 트랜잭션 단위 잠금(PostgreSQL·MariaDB 동일).
 
+    [2026-09-05] 종전에는 pg_advisory_xact_lock 을 쏘고 예외를 흡수했다 — MariaDB 에서
+    **조용히 열려** 두 재학습이 동시에 활성을 다툴 수 있었다. db/locks.py 가 두 dialect 를
+    같게 만든다. 못 얻어도 진행한다(모델 등록 자체를 막는 것이 더 큰 사고) — 경고가 남는다.
 
-def _advisory_xact_lock(db, key: int) -> None:
-    """PostgreSQL 트랜잭션 advisory lock 획득(best-effort). PG 외/실패는 무시(degrade)."""
-    try:
-        from sqlalchemy import text  # noqa: PLC0415
-        db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": int(key)})
-    except Exception:  # noqa: BLE001
-        logger.debug("advisory lock unavailable (non-PG backend?) — proceeding without serialization")
+    _key 는 옛 호출부 호환용이며 쓰이지 않는다(잠금 이름은 db/locks.MODEL_ACTIVATION).
+    """
+    from koipa.db.locks import MODEL_ACTIVATION, advisory_xact_lock  # noqa: PLC0415
+
+    if not advisory_xact_lock(db, MODEL_ACTIVATION):
+        logger.warning(
+            "모델 활성 전환 잠금 미획득 — 직렬화 없이 진행한다. 동시 등록이 있으면 "
+            "활성 모델이 서로 덮어써질 수 있다.",
+        )
 
 
 def _report_metrics(report: Any) -> dict:
@@ -168,8 +173,8 @@ def register_and_gate_model(
         with session_scope() as db:
             # [A2 동시성 락] 모델 활성 전환을 직렬화 — 두 재학습이 동시에 register/activate하며
             # is_active 부분 UNIQUE 인덱스를 다투거나 서로의 활성을 덮어쓰는 레이스를 막는다.
-            # pg_advisory_xact_lock은 트랜잭션 종료(commit/rollback) 시 자동 해제. PG 외 백엔드는 무시.
-            _advisory_xact_lock(db, _MODEL_ACTIVATION_LOCK_KEY)
+            # 잠금은 트랜잭션 종료(commit/rollback)에 자동 해제된다(db/locks.py · 두 dialect 동일).
+            _advisory_xact_lock(db)
             repo = TrainingRepo(db)
             baseline = repo.get_active()
             baseline_metrics = dict(baseline.metrics) if baseline and baseline.metrics else None
@@ -285,7 +290,7 @@ def activate_model_manually(
 
     try:
         with session_scope() as db:
-            _advisory_xact_lock(db, _MODEL_ACTIVATION_LOCK_KEY)
+            _advisory_xact_lock(db)
             repo = TrainingRepo(db)
             target = repo.get_by_label(version_label)
             if target is None:
@@ -536,7 +541,7 @@ def rollback_active_model(reason: str) -> dict:
     """
     try:
         with session_scope() as db:
-            _advisory_xact_lock(db, _MODEL_ACTIVATION_LOCK_KEY)
+            _advisory_xact_lock(db)
             repo = TrainingRepo(db)
             before = repo.get_active()
             restored = repo.rollback_to_previous(reason=reason)
