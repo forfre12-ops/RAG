@@ -136,6 +136,36 @@ def screen_batch(
             "batch_verdict": "too_small_for_corpus_metrics",
         }
 
+    # ②-1 [2026-09-06] **등급이 하나뿐인 배치에서는 두 코퍼스 지표가 성립하지 않는다.**
+    #
+    #   길이  1-NN 은 이웃이 무조건 같은 등급이라 항상 1.000 이다. audit() 이 함께 내는
+    #         무작위 기대값(length_only_random)도 1.000 이다 — 정보가 0인 값인데 게이트는
+    #         무작위 기준선을 보지 않고 1nn > 0.55 만 봐서 **항상 켜졌다.**
+    #   tell  "등장의 95% 이상이 한 등급" 조건이 등급이 하나면 무조건 100% 다. 3건 이상
+    #         반복되는 상투구가 있으면 등급 정보가 없는데도 tell 로 잡힌다.
+    #
+    # 실측(datasets/ab_s1, S1 60건씩): qwen 60/60 · gemma 60/60 이 corpus_leak 으로
+    # 전량 보류됐다. 등급명 노출 0 · tell 문장 0 인 배치였다 — 걸릴 이유가 없었다.
+    # 그런데 **약한 칸을 메우는 증강은 본디 한 등급이다**(S1 이 약해서 S1 만 만든다).
+    # 즉 합성의 가장 정당한 용도가 게이트에 100% 막혀 있었다.
+    #
+    # 같은 결함을 holdout_independence 가 갖고 있었고 9acb882e 에서 길이 축을 뺐다.
+    # 여기서는 tell 축까지 뺀다 — 위 근거대로 그쪽도 한 등급에서는 성립하지 않는다.
+    # 등급명 노출(①)은 문서 한 건으로 판정되므로 그대로 본다.
+    grades_present = len(metrics.get("length_by_grade") or {})
+    if grades_present < 2:
+        logger.info(
+            "synth 배치: 등급이 %d종뿐이라 코퍼스 지표(길이·tell)를 판정에 쓰지 않았다 — "
+            "한 등급 배치에서는 두 지표 모두 정의상 최대값이 된다. 등급명 노출은 그대로 봤다.",
+            grades_present,
+        )
+        return {
+            "metrics": metrics,
+            "admit": [i for i, _g, _t in kept],
+            "flagged": flagged,
+            "batch_verdict": "single_grade_corpus_metrics_skipped",
+        }
+
     leak = float(metrics.get("length_only_1nn", 0.0) or 0.0)
     cover = float(metrics.get("tell_coverage", 0.0) or 0.0)
     if leak <= max_length_leak and cover <= max_tell_coverage:

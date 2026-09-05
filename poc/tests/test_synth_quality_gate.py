@@ -74,3 +74,63 @@ def test_clean_large_batch_passes():
     assert out["batch_verdict"] == "ok", out["metrics"]
     assert len(out["admit"]) == len(docs)
     assert out["metrics"]["grade_token_exposed"] == 0
+
+
+# ── 한 등급뿐인 배치 (2026-09-06) ──────────────────────────────────────────────
+#
+# 약한 칸을 메우는 증강은 본디 한 등급이다 — S1 이 약하니 S1 만 만든다. 그런데 코퍼스
+# 지표 둘 다 한 등급에서는 정의상 최대값이 되어 게이트가 전량을 막았다.
+#
+#   길이  1-NN 은 이웃이 무조건 같은 등급이라 항상 1.000. audit() 이 함께 내는 무작위
+#         기대값(length_only_random)도 1.000 이다 — 정보가 0인 값으로 막고 있었다.
+#   tell  "등장의 95% 이상이 한 등급" 이 등급 하나면 무조건 100%. 3건 이상 반복되는
+#         상투구가 있으면 등급 정보가 없는데도 tell 로 잡힌다.
+#
+# 실측(datasets/ab_s1): qwen 60/60 · gemma 60/60 이 corpus_leak 으로 전량 보류됐다.
+# 등급명 노출 0 · tell 문장 0 인 배치였다 — 걸릴 이유가 없었다.
+#
+# 같은 결함을 holdout_independence 가 갖고 있었고 9acb882e 가 길이 축을 뺐다.
+
+def _docs(grade: str, n: int, body: str) -> list[tuple[str, str]]:
+    # 문서마다 다른 꼬리를 붙인다 — 같은 문장이 반복되면 tell 축이 따로 켜진다.
+    return [(grade, f"{body} 항목 {i} 에 대한 확인 결과를 기록한다." ) for i in range(n)]
+
+
+def test_single_grade_batch_is_not_blocked_by_corpus_metrics():
+    """한 등급 배치는 코퍼스 지표로 막지 않는다 — 그 지표가 성립하지 않는 구성이다."""
+    from koipa.services.synth_quality import screen_batch
+
+    docs = _docs("S1", 40, "공정 개선 검토 자료다. " * 30)
+    result = screen_batch(docs)
+
+    assert result["batch_verdict"] == "single_grade_corpus_metrics_skipped"
+    assert len(result["admit"]) == len(docs), "한 등급이라는 이유로 문서가 막히면 안 된다"
+    assert not result["flagged"]
+    # 값은 그대로 보고한다 — 판정에 쓰지 않을 뿐이다.
+    assert result["metrics"]["length_only_1nn"] == result["metrics"]["length_only_random"]
+
+
+def test_single_grade_batch_still_blocks_grade_token():
+    """등급명 노출은 문서 한 건으로 판정된다 — 한 등급이어도 그대로 막는다."""
+    from koipa.services.synth_quality import screen_batch
+
+    docs = _docs("S1", 40, "공정 개선 검토 자료다. " * 30)
+    docs[3] = ("S1", "본 문서는 1급 비밀로 분류된 자료입니다. " + "본문 " * 200)
+    result = screen_batch(docs)
+
+    reasons = {f["reason"] for f in result["flagged"]}
+    assert reasons == {"grade_token_exposed"}
+    assert 3 not in result["admit"]
+    assert len(result["admit"]) == len(docs) - 1
+
+
+def test_two_grade_batch_split_by_length_is_still_blocked():
+    """등급이 둘 이상이면 길이 축은 그대로 본다 — 이 완화가 게이트를 무디게 하면 안 된다."""
+    from koipa.services.synth_quality import screen_batch
+
+    short = _docs("S3", 30, "공개 안내 자료다. " * 10)
+    long_ = _docs("TS", 30, "내부 검토 자료다. " * 200)
+    result = screen_batch(short + long_)
+
+    assert result["batch_verdict"] == "corpus_leak"
+    assert result["admit"] == []
