@@ -543,7 +543,6 @@ def s5_guide_upload(ctx: ScenarioContext) -> None:
     warmup = 2
     N = 5
     actor = {"user_id": "psh-admin", "role": "admin"}
-    text_body = "본 가이드는 영업비밀의 등급 분류 기준을 정의한다. " * 30
 
     latencies: list[float] = []
     list_ok = True
@@ -553,19 +552,23 @@ def s5_guide_upload(ctx: ScenarioContext) -> None:
         for i in range(warmup + N):
             gid = f"psh-s5-{uuid.uuid4().hex[:8]}"
             last_gid = gid
+            # [2026-09-06] JSON 본문으로 고쳤다. 2026-09-05 에 이 API 가 파일을 안 받게
+            # 바뀌었는데(원문이 우리 메모리를 지나는 경로를 없앴다) 여기는 multipart 를
+            # 계속 보내 **전건 422** 였다. 하니스가 그 전날부터 죽어 있어 아무도 못 봤다.
             elapsed, r = _time_call(
                 lambda: cli.post(
                     "/api/v1/guide/documents",
                     headers=_hdr(role="admin"),
-                    data={
+                    json={
                         "guide_id": gid,
                         "version": "v1.0",
                         "effective_date": "2026-06-01",
                         "change_summary": "PSH S5",
-                        "actor": json.dumps(actor),
+                        "actor": actor,
                         "doc_type": "guideline",
+                        # 파일은 안 보낸다 — 파일명은 사람이 읽는 메타로만 남는다.
+                        "filename": "guide.txt",
                     },
-                    files={"file": ("guide.txt", io.BytesIO(text_body.encode("utf-8")), "text/plain")},
                 )
             )
             if i < warmup:
@@ -653,13 +656,37 @@ def s6_synth(ctx: ScenarioContext) -> None:
         rq = cli.get("/api/v1/synth/queue?status=pending&limit=1", headers=_hdr(role="admin"))
         items = rq.json().get("items", []) if rq.status_code == 200 else []
         if items:
-            sid = items[0].get("sample_id") or items[0].get("id")
-            r_ap = cli.post(
-                f"/api/v1/synth/samples/{sid}/approve",
-                headers=_hdr(role="admin"),
-                json={"actor": {"user_id": "psh-reviewer", "role": "reviewer"}},
-            )
-            ctx.record("s6_5", r_ap.status_code in (200, 201))
+            # [2026-09-06] 식별자는 synth_id 다. 종전에는 sample_id·id 를 찾다가 둘 다 없어
+            # None 이 되고, 그 None 을 URL 에 박아 **없는 경로**(/synth/samples/None/approve)
+            # 를 불러 404 를 받았다. 그 404 가 "approve 후 dataset 연결 실패" 로 보고됐다 —
+            # 실제로는 승인을 시도조차 못 한 것이다.
+            sid = items[0].get("synth_id")
+            if not sid:
+                print("[PSH][S6] S6.5 무측정 — 큐 항목에 synth_id 가 없다: %s"
+                      % sorted(items[0]))
+            else:
+                r_ap = cli.post(
+                    f"/api/v1/synth/{sid}/review",
+                    headers=_hdr(role="admin"),
+                    json={
+                        "decision": "approve",
+                        "actor": {"user_id": "psh-reviewer", "role": "reviewer"},
+                    },
+                )
+                # KPI 이름은 "approve 후 dataset 연결" 이다. 종전에는 HTTP 상태만 봤다 —
+                # 이름이 재지 않는 것을 주장했다. 응답의 dataset_versions 로 실제 연결을
+                # 확인한다(2026-09-05 신설: tb_sample_dataset_membership).
+                linked = False
+                if r_ap.status_code in (200, 201):
+                    body = r_ap.json()
+                    linked = bool(body.get("dataset_versions"))
+                    if not linked:
+                        print("[PSH][S6] S6.5 — 승인은 됐는데 dataset_versions 가 비었다 "
+                              "(final_status=%s)" % body.get("final_status"))
+                else:
+                    print("[PSH][S6] S6.5 — 승인 실패 %s: %s"
+                          % (r_ap.status_code, str(r_ap.text)[:160]))
+                ctx.record("s6_5", linked)
         else:
             print("[PSH][S6] S6.5 미측정 — 합성 검수큐가 비어 있다(워커 부재 시 생성 0건)")
 

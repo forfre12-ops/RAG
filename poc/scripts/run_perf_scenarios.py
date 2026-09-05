@@ -96,13 +96,29 @@ def _select_specs(specs: list, only: str, skip: str) -> list:
     return picked
 
 
+def html_output_path(base: "Path", *, only: str = "", skip: str = "") -> "Path":
+    """부분 실행이면 정본 옆에 `.partial` 로 쓴다.
+
+    [2026-09-06] 실측: `--only S5` 한 번으로 doc/20_시나리오_성능_보고서.html 이 전수
+    64개짜리에서 **KPI 2개짜리 0/2 문서**로 바뀌었다. JSON 쪽은 partial_run 표식으로
+    이미 막고 있었는데("부분 실행분이 전수 실행분과 같은 파일명·추세에 섞이면 회귀 비교가
+    거짓말을 한다") HTML 만 그대로 덮어썼다.
+    """
+    if only or skip:
+        return base.with_name(base.stem + ".partial" + base.suffix)
+    return base
+
+
 def build_report(*, mode: str, probe_services: bool, only: str = "", skip: str = "") -> dict:
     env = capture_env(
         probe_services=probe_services,
         probe_pytest=False,
         llm_provider="noop" if mode == "dryrun" else os.environ.get("LLM_PROVIDER", "noop"),
         embedding_provider="hash" if mode == "dryrun" else os.environ.get("EMB_PROVIDER", "kure-v1"),
-        vector_backend="inmemory" if mode == "dryrun" else os.environ.get("VEC_BACKEND", "es"),
+        # [2026-09-06] vector_backend= 를 뺐다. 2026-09-04 커밋 319069b9 가 유사문서 조회를
+        # 걷어내며 env.py 에서 이 필드를 지웠는데 호출부가 남아 **하니스가 TypeError 로 죽었다.**
+        # 시나리오 하나도 못 돌았고, 그 사이 성능 리포트는 옛 파일이 그대로 있었다.
+        # 시험이 없어서 이틀간 아무도 몰랐다 — tests/test_perf_harness_runs.py 가 이제 막는다.
     )
     resources = AvailableResources.from_env_snapshot(env, env.llm_provider)
     if mode == "dryrun":
@@ -236,7 +252,9 @@ def main() -> int:
         sys.path.insert(0, str(HERE))
         from render_perf_report import render_html  # type: ignore
 
-        html_path = Path(args.html_out)
+        html_path = html_output_path(Path(args.html_out), only=args.only, skip=args.skip)
+        if html_path.name != Path(args.html_out).name:
+            print(f"[PSH] 부분 실행 — 정본을 덮지 않고 {html_path.name} 으로 쓴다")
         render_html(report, out_path=html_path, history_dir=Path(args.out_dir), mode=args.mode)
         print(f"[PSH] HTML → {html_path}")
 
