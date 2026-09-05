@@ -70,6 +70,14 @@ OUTS = [
 ]
 
 # 개정 이력. 손으로 붙여 두면 생성기가 다시 돌 때 지워지므로 여기에 둔다.
+# [2026-09-05] "이 문서 머리말의 커밋" 은 **아직 커밋되지 않은 최신 행** 하나만 쓴다.
+# 렌더할 때 생성 시점 HEAD 로 채우기 때문이다. 행을 더하면서 앞 행이 이 표식을 달고
+# 남으면, 재생성할 때마다 **과거 행의 커밋까지 현재 HEAD 로 덮어쓴다** — 실제로 3행
+# (2026-08-29)이 2026-09-05 커밋을 가리키고 있었다. _check_revision_marker() 가 막는다.
+#
+# 새 행을 더할 때: 앞 행의 표식을 그 행을 실제로 만든 커밋 해시로 바꾸고, 새 행에만 표식을 둔다.
+_HEAD_MARKER = "이 문서 머리말의 커밋"
+
 REVISIONS = [
     ("1", "2026-08-26", "d3fe51c3",
      "최초 작성. ORM 메타데이터와 마이그레이션 정의에서 생성해 감리 산출물로 편입"),
@@ -78,11 +86,11 @@ REVISIONS = [
      "칼럼 목록이 두 곳에 중복 수록돼 있던 것을 이 문서로 일원화. "
      "표별 인덱스·FK 개수를 §01 에 추가"),
 
-    ("3", "2026-08-29", "이 문서 머리말의 커밋",
+    ("3", "2026-08-29", "bdb10f13 · b78e46a8",
      "어떤 코드도 읽지 않고 실 데이터도 전부 비어 있던 <b>칼럼 10개를 삭제</b>"
      "(249 → 239). 대리키를 <code>SERIAL</code> 에서 표준 "
      "<code>GENERATED ALWAYS AS IDENTITY</code> 로 전환"),
-    ("4", "2026-09-03", "이 문서 머리말의 커밋",
+    ("4", "2026-09-04", "3cd3709e",
      "<b>유사문서 조회 폐기</b> — 검색용 표 2종(21 → 19표)에 이어 표 1개와 칼럼 9개를 더 "
      "뺐다(19표 226칼럼 → <b>18표 214칼럼</b>). "
      "<b>⚠ 뺀 것은 소스에 아직 남아 있다</b> — 정의서가 코드보다 앞선 상태이며 소스 정리는 "
@@ -95,7 +103,7 @@ REVISIONS = [
      "절 번호가 03 에서 겹치던 것을 바로잡고, 제약 없는 참조 목록과 제외 칼럼을 "
      "<code>table_spec_meta.py</code> 한 곳에 두어 도식·캡션·본문이 같은 값을 쓰도록 "
      "고쳤습니다"),
-    ("5", "2026-09-05", "이 문서 머리말의 커밋",
+    ("5", "2026-09-05", "319069b9 · 90c0d96a · 87a54381",
      "<b>4차에서 '소스에 아직 남아 있다'고 적었던 것을 실제로 걷었다</b> — 커밋 "
      "<code>319069b9</code> 가 소스·ORM 에서, 마이그레이션 "
      "<code>a3b4c5d6e7f8</code> 이 DB 에서 유사문서 조회 칼럼 9개와 검색용 표 2종을 "
@@ -108,14 +116,14 @@ REVISIONS = [
      "<code>tb_audit_log</code> 의 복합 기본키는 그대로 둔다.<br>"
      "<b>표 <code>tb_advisory_locks</code> 를 넣었다</b>(18 → 19표 · 216칼럼) — 감사 "
      "해시체인과 모델 활성화의 임계구역을 두 DB 에서 같은 방식으로 잠그기 위한 표다."),
-    ("6", "2026-09-05", "이 문서 머리말의 커밋",
+    ("6", "2026-09-05", "599f7c54",
      '<b>프롬프트 버전·품질 결과 칸이 실제로 채워지기 시작했다.</b> '
      '<code>tb_sample_documents</code> 의 <code>*_prompt_version</code> 세 칸은 '
      '<code>tb_prompt_versions</code> 를 가리키는 외래키라 행을 먼저 등록해야 하는데 '
      '워커가 그 등록을 하지 않아 늘 NULL 이었다(실측: IntegrityError 1452). '
      '<code>quality_score</code>·<code>quality_report</code> 도 같은 이유로 비어 있었다 '
      '&mdash; 검수자가 "이 문서가 어떤 검사를 통과해 여기 있는가"를 화면에서 알 수 없었다.'),
-    ("7", "2026-09-05", "이 문서 머리말의 커밋",
+    ("7", "2026-09-05", "a3705759 · f2df0dbb",
      '<b>표 <code>tb_sample_dataset_membership</code> 를 넣었다</b>(19 → 20표 · 217 → '
      '221칼럼 · FK 24 → 25건) &mdash; 합성 승인본이 어느 학습셋 판에 들어갔는지 기록한다.'
      '<br>같은 날 앞선 판에서는 이것을 <code>tb_sample_documents</code> 의 칼럼 하나'
@@ -124,6 +132,12 @@ REVISIONS = [
      '바꾸고 <code>UNIQUE(sample_id, dataset_version)</code> 로 중복을 막는다. '
      '<b>자동 학습 편입이 아니라 기록</b>이며, 빌드가 방출한 뒤 남긴다.'),
 ]
+
+
+
+def _check_revision_marker() -> list[str]:
+    """HEAD 표식을 단 행이 둘 이상이면 과거 이력이 다시 쓰인다는 뜻이다."""
+    return [rev for rev, _day, ref, _what in REVISIONS if ref.startswith(_HEAD_MARKER)]
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -948,7 +962,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="파일을 쓰지 않고 검증만 한다")
     ap.add_argument("--force", action="store_true",
-                    help="생성물에 없는 요소(클릭형 관계도·인쇄 규격)가 기존 문서에 있어도 덮어쓴다")
+                    help="생성물에 없는 요소(클릭형 관계도·인쇄 규격)가 기존 문서에 있어도 덮어쓴다. "
+                         "쓴 뒤에는 반드시 `python poc/scripts/build_erd.py --apply --spec` 으로 "
+                         "클릭형 관계도를 되살릴 것 — 안 하면 도식이 사라진 채 납품된다")
     args = ap.parse_args()
 
     # [2026-09-02] 유사문서 검색을 쓰지 않기로 해 RAG 2표(tb_rag_vectors·tb_rag_aliases)를
@@ -1033,6 +1049,13 @@ def main() -> int:
     if stale:
         print("  [오류] table_spec_meta.TABLES 에만 있고 코드에 없음:", ", ".join(stale))
         ok = False
+    marked = _check_revision_marker()
+    if len(marked) > 1:
+        print("  [오류] 개정 이력에서 HEAD 표식을 단 행이 %d개다(판 %s) — 재생성할 때마다"
+              " 과거 행의 커밋이 현재 HEAD 로 덮어써진다. 최신 행 하나만 남길 것."
+              % (len(marked), ", ".join(marked)))
+        ok = False
+
     if dead_cols:
         # 문서에는 실리지 않으므로 ok 를 내리지 않는다 — 보이게만 한다.
         print("  [메모] 코드에 없는데 설명만 남은 칼럼 %d개 — 문서에는 실리지 않는다."
@@ -1047,6 +1070,7 @@ def main() -> int:
     if ok:
         print("  설명 누락 0 · 코드와 정의서 테이블 집합 일치")
 
+    forced_lost: set[str] = set()
     if not args.check:
         for out in OUTS:
             if not out.exists():
@@ -1068,6 +1092,17 @@ def main() -> int:
                 continue
             out.write_text(doc, encoding="utf-8")
             print(f"  → {out.relative_to(ROOT)} ({len(doc):,} bytes)")
+            if lost:
+                forced_lost.update(lost)
+
+    if forced_lost:
+        # [2026-09-05] --force 로 덮어쓴 뒤 이 안내를 안 보면 도식이 사라진 채 남는다.
+        # 실제로 2026-08-29 에 한 번, 2026-09-05 에 또 한 번 잃었다. 가드는 "쓰지 마라"만
+        # 말하고 "그래도 썼으면 다음에 무엇을 하라"는 말하지 않았다.
+        print()
+        print("  [주의] --force 로 다음을 덮어썼다: " + " · ".join(sorted(forced_lost)))
+        print("         지금 바로 되살릴 것 →  python poc/scripts/build_erd.py --apply --spec")
+        print("         (확인: 문서에 data-t=\"tb_...\" 상자가 표 수만큼 있어야 한다)")
     return 0 if ok else 1
 
 
