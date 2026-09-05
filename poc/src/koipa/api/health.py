@@ -260,6 +260,14 @@ def _operational_config() -> dict:
         # 시연 전용 표면이 켜져 있는가. 시연 화면이 상태를 바꾸는 버튼(실시간 반영 시연)을
         # 이 값으로 감춘다 — 프로덕션(onprem-local·full-train)은 False 다.
         "demo_console_enabled": bool(getattr(settings, "demo_console_enabled", False)),
+        # [2026-09-05] 보존기간 삭제 설정. 켜져 있으면 오래된 감사로그·LLM 사용량이
+        # 지워진다 — 운영자가 "지금 얼마나 남기고 있나"를 화면에서 확인할 수 있어야 한다.
+        # 파티션을 쓰지 않는 배포에서 표가 무한히 자라는 것을 막는 유일한 장치이기도 하다.
+        "retention": {
+            "enabled": bool(getattr(settings, "retention_enabled", False)),
+            "audit_log_days": int(getattr(settings, "retention_audit_log_days", 0) or 0),
+            "llm_usage_days": int(getattr(settings, "retention_llm_usage_days", 0) or 0),
+        },
     }
 
 

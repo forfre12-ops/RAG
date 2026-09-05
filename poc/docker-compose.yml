@@ -98,7 +98,6 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
-      VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       # [2026-08-24] dev 도 로컬FS 로 통일 (종전 기본값 minio). 실배포 프로파일이 전부 local 이라
       # dev 만 다른 백엔드면 여기서 통과한 것이 배포에서 다르게 도는 경로가 생긴다.
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
@@ -130,7 +129,6 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
-      VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       # [2026-08-24] dev 도 로컬FS 로 통일 (종전 기본값 minio) — api 쪽 주석 참조.
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       MLFLOW_TRACKING_URI: http://mlflow:5000

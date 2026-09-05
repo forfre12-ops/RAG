@@ -55,6 +55,9 @@ WATCHED_SETTINGS = [
     "rule_fallback_min_evidence", "severe_agg_codes", "model_secondopinion_llm_enabled",
     "ts_tie_break_enabled", "auto_rollback_enabled",
     "drift_detection_enabled", "enable_training", "enable_incremental_retrain",
+    # [2026-09-05] 보존기간 삭제 — 켜지면 감사 증빙이 지워진다. 조용히 바뀌면
+    # 안 되는 파괴적 플래그라 감시 대상에 넣는다.
+    "retention_enabled", "retention_audit_log_days", "retention_llm_usage_days",
 ]
 
 

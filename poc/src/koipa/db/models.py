@@ -211,6 +211,8 @@ class Chunk(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("chunk_id", "created_at"),
+        # 시간축 선두 인덱스 — tb_audit_log 와 같은 사유.
+        Index("idx_chunk_created", "created_at"),
         Index("idx_chunk_doc", "doc_id", "chunk_index"),
         # init.sql의 PARTITION BY RANGE (created_at)는 ORM이 관리하지 않음.
         # SQLAlchemy의 declarative로는 표현이 부정확해 DB측에만 둠.
@@ -544,6 +546,8 @@ class LlmUsage(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("usage_id", "called_at"),
+        # 시간축 선두 인덱스 — tb_audit_log 와 같은 사유(보존기간 삭제·기간 집계).
+        Index("idx_lu_called", "called_at"),
         Index("idx_lu_phase", "billing_phase", desc("called_at")),
         Index("idx_lu_purpose", "purpose"),
         Index("idx_lu_ref", "reference_type", "reference_id"),
@@ -576,6 +580,13 @@ class AuditLog(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("audit_id", "occurred_at"),
+        # [2026-09-05] 시간축 선두 인덱스. 감사 체인 검증(verify_chain)은
+        # `WHERE occurred_at BETWEEN .. ORDER BY occurred_at, audit_id` 로 읽는데,
+        # PK 는 (audit_id, occurred_at) 이고 나머지 인덱스는 occurred_at 이 두 번째라
+        # 날짜 범위만으로는 어느 것도 못 탄다. PostgreSQL 에서는 파티션 프루닝이 그
+        # 자리를 받고 있었으나 MariaDB 는 파티션을 쓰지 않기로 했다(2026-09-05) —
+        # 프루닝이 없어진 자리를 이 인덱스가 받는다. 보존기간 삭제도 이걸 탄다.
+        Index("idx_audit_occurred", "occurred_at", "audit_id"),
         Index("idx_audit_actor", "actor_id", desc("occurred_at")),
         Index("idx_audit_target", "target_type", "target_id"),
         Index("idx_audit_action", "action", desc("occurred_at")),

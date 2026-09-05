@@ -436,6 +436,21 @@ class Settings(BaseSettings):
     # ON 으로 바꾸면 종전 동작(학습 끝 centroid 저장 + 15분 주기 drift_tick)이 그대로 복원된다.
     drift_detection_enabled: bool = False
 
+    # ── 운영 로그 보존기간 (services/retention.py) ──────────────────────────
+    # [2026-09-05] MariaDB 전환에서 파티션을 쓰지 않기로 하면서 넣었다. 종전에는
+    # PostgreSQL 이 월 파티션을 만들어 두기만 하고 **떼는 코드가 0건**이라 두 표가
+    # 무한히 자라고 있었다(223 실측 30일 71,161행·30MB → 연 87만행·360MB).
+    #
+    # ⚠ 기본 OFF. 감사로그는 컴플라이언스 기록(NFR-SEC-01)이라 잘못 켜서 증빙이
+    #   사라지는 것이 표가 커지는 것보다 나쁘다. 운영자가 보존기간을 정한 뒤 켠다.
+    # ⚠ 켜기 전에 --dry-run 으로 몇 행이 지워질지 먼저 볼 것
+    #   (scripts/purge_retention.py --dry-run).
+    retention_enabled: bool = False
+    # 0 이하 = 그 표는 보존 무제한(삭제 안 함). 감사 기본 24개월은 일반적인 감사증적
+    # 보존 관행에 맞춘 값이며, 발주처 보존정책이 정해지면 그 값으로 바꾼다.
+    retention_audit_log_days: int = 730
+    retention_llm_usage_days: int = 365
+
     # 서빙 escalation τ (pipeline._run_model, C-esc). None(기본)=순수 argmax(동작 보존).
     # 값(0<τ<1)을 주면 severity-ordered escalation: 가장 심각한 등급 g 중 prob(g) ≥ τ 인 것을
     # 채택, 없으면 argmax 폴백 — FNR을 더 낮추는 방향(고등급 적극 승격). τ를 낮출수록 미탐↓·과분류↑.

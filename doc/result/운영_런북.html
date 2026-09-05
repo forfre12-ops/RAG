@@ -187,11 +187,13 @@ footer strong{color:var(--text-dim);}
       <tr><td>active-learning</td><td>30분</td><td>검수 누적 임계 도달 시 재학습 권고/큐잉(+일별 03:00 스냅샷).</td></tr>
       <tr><td>auto-rollback 점검</td><td>60분</td><td>활성 모델 라이브 미탐 회귀 점검(기본은 판정·로깅만, opt-in 시 실제 롤백).</td></tr>
       <tr><td>outbox 배송</td><td>60초</td><td>enqueue된 콜백 실송신. 실패는 지수 백오프, max_attempts 후 DLQ.</td></tr>
-      <tr><td><strong>파티션 롤오버</strong></td><td>매일 02:10</td><td>향후 N개월 월 파티션 자동 생성(<code>_default</code> 비대화 방지). 아래 참조.</td></tr>
+      <tr><td><strong>파티션 롤오버</strong> <em>(PostgreSQL 전용)</em></td><td>매일 02:10</td><td>향후 N개월 월 파티션 자동 생성(<code>_default</code> 비대화 방지). 아래 참조. <strong>MariaDB 배포에서는 실행되지 않는다</strong> — 파티션 미사용 결정(2026-09-05)에 따라 dialect 가드가 no-op 으로 끝낸다.</td></tr>
+      <tr><td><strong>보존기간 삭제</strong></td><td>매일 02:40</td><td>보존기간이 지난 감사로그·LLM 사용량을 월 단위로 끊어 앞에서부터 연속 삭제. <strong>기본 OFF</strong> — <code>RETENTION_ENABLED=1</code> 로 켜고 <code>RETENTION_AUDIT_LOG_DAYS</code>(기본 730) · <code>RETENTION_LLM_USAGE_DAYS</code>(기본 365)로 기간을 정한다. 켜기 전 <code>python scripts/purge_retention.py --dry-run --force-enabled</code> 로 삭제 대상 건수를 먼저 확인할 것. 파티션을 쓰지 않는 배포에서 두 표가 무한히 자라는 것을 막는 유일한 장치다.</td></tr>
     </tbody>
   </table></div>
   <h2>파티션 롤오버</h2>
   <ul>
+    <li><strong>적용 범위 — PostgreSQL 전용</strong> — 아래 롤오버 DDL 은 <code>CREATE TABLE ... PARTITION OF</code> 로 PostgreSQL 문법이다. <strong>MariaDB 배포에서는 파티션을 쓰지 않는다</strong>(2026-09-05 결정) — dialect 가드가 <code>status=not_applicable</code> 로 끝내므로 매일 실패하는 작업이 남지 않는다. 그 자리는 <strong>시간축 선두 인덱스</strong>(<code>idx_audit_occurred</code>·<code>idx_lu_called</code>·<code>idx_chunk_created</code>)와 <strong>보존기간 삭제</strong>(위 표)가 대신 받는다.</li>
     <li><strong>자동 연장</strong> — beat가 매일 02:10 <code>ensure_partitions_tick</code>을 호출해 향후 N개월 월 파티션을 미리 생성한다(<code>CREATE TABLE IF NOT EXISTS</code> 멱등). 대상: <code>tb_chunks</code>·<code>tb_llm_usage</code>·<code>tb_audit_log</code>.</li>
     <li><strong>배포 시 백필</strong> — 신규 배포 시 마이그레이션 <code>e5f6a7b8c9d0</code>을 적용해 13개월치 월 파티션을 선생성한다(<code>alembic upgrade head</code>). 이후는 beat가 매일 연장.</li>
     <li><strong>미동작 시 영향</strong> — beat·롤오버가 정지하면 신규 행이 <code>*_default</code> 파티션에 누적돼 프루닝이 무력화되고, 나중에 정상 파티션 attach 시 default 검증 락이 운영을 막는다.</li>

@@ -644,6 +644,29 @@ def ensure_partitions_tick(months_ahead: int = 3) -> dict:
     return out
 
 
+@celery_app.task(name="koipa.retention_purge_tick")
+def retention_purge_tick() -> dict:
+    """운영 로그 보존기간 삭제 — beat 가 매일 호출. 기본 OFF(설정으로 켠다).
+
+    파티션을 쓰지 않기로 하면서(2026-09-05) 오래된 감사로그·LLM 사용량을 지우는 자리가
+    비었다. services/retention.purge_expired 가 월 단위로 끊어 앞에서부터 연속 삭제한다.
+
+    status='disabled' 면 아무것도 안 한다 — 그것이 기본값이다(감사 증빙 보호).
+    truncated 가 있으면 한 틱 상한(max_slices)에 걸린 것이라 다음 틱이 이어 지운다.
+    """
+    from koipa.services.retention import purge_expired  # noqa: PLC0415
+
+    out = purge_expired()
+    if out.get("status") == "ok" and out.get("deleted"):
+        logger.info("retention_purge_tick: %s", out["deleted"])
+    if out.get("truncated"):
+        logger.info(
+            "retention_purge_tick: 한 틱 상한에 걸림 — 다음 틱이 이어 지운다: %s",
+            out["truncated"],
+        )
+    return out
+
+
 @celery_app.task(name="koipa.auto_rollback_tick")
 def auto_rollback_tick() -> dict:
     """C-ver 자동 롤백 주기 점검 — 활성 모델 라이브 미탐 회귀 시 직전 활성으로 복귀.

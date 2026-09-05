@@ -105,6 +105,7 @@ celery_app.conf.task_routes = {
     "koipa.verify_audit_chain_tick": {"queue": "learning"},
     "koipa.deliver_outbox_tick": {"queue": "index"},  # I/O-bound, classify와 격리
     "koipa.ensure_partitions_tick": {"queue": "index"},  # DDL, 경량 I/O
+    "koipa.retention_purge_tick": {"queue": "index"},  # DELETE, 경량 I/O
     "koipa.beat_heartbeat_tick": {"queue": "index"},  # 경량 생존 신호
 }
 
@@ -157,6 +158,12 @@ celery_app.conf.beat_schedule = {
         "task": "koipa.ensure_partitions_tick",
         "schedule": crontab(minute=10, hour=2),
         "kwargs": {"months_ahead": 3},
+    },
+    # 보존기간 삭제 — 매일 02:40(파티션 롤오버 30분 뒤). 기본 OFF 라 켜기 전엔 no-op.
+    # 파티션을 쓰지 않는 배포에서 감사로그·LLM 사용량이 무한히 자라는 것을 막는다.
+    "retention-purge-daily": {
+        "task": "koipa.retention_purge_tick",
+        "schedule": crontab(minute=40, hour=2),
     },
     # NFR-SEC-01 감사체인 무결성 — 매일 03:30. broken>0이면 koipa_audit_chain_broken_total↑
     # → P0 AuditChainBroken 알람. 과거 row 변조·삭제·재배열 정기 검출.
