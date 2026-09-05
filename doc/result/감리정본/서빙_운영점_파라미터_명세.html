@@ -279,7 +279,6 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <a class="toc-item" href="#s05">05 신뢰도 — confidence</a>
       <a class="toc-item" href="#s06">06 게이트 임계 7종</a>
       <a class="toc-item" href="#s07">07 청크 집계 — most-severe</a>
-      <a class="toc-item" href="#s08">08 검색 융합 — RRF</a>
       <a class="toc-item" href="#s09">09 튜닝 — Optuna</a>
       <a class="toc-item" href="#s10">10 프로파일·한계</a>
     </div>
@@ -290,7 +289,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <span class="badge">운영점·파라미터 명세</span>
       <span class="badge blue">정식 산출물 · 2026-08-02 검토</span>
       <span class="meta-dot">·</span>
-      <span class="meta-soft">온도보정 · 게이트 임계 · 신뢰도 · 검색 융합 — 코드 기준 1:1 정합</span>
+      <span class="meta-soft">온도보정 · 게이트 임계 · 신뢰도 — 코드 기준 1:1 정합</span>
       <span class="meta-dot">·</span>
       <span class="meta-soft">Koipa AI Engine</span>
     </div>
@@ -306,14 +305,13 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="hero-kpi"><span class="dot"></span> 신뢰도 <b>confidence</b></div>
       <div class="hero-kpi"><span class="dot"></span> 게이트 임계 <b>7종</b></div>
       <div class="hero-kpi"><span class="dot"></span> 청크 집계 <b>most-severe</b></div>
-      <div class="hero-kpi"><span class="dot"></span> 검색 융합 <b>RRF k=60</b></div>
       <div class="hero-kpi"><span class="dot"></span> 튜닝 도구 <b>Optuna</b>(오프라인)</div>
     </div>
     <hr class="hero-sep">
 
     <div class="callout info">
       <span class="callout-icon">ℹ</span>
-      <div class="callout-body"><b>한눈에 보기.</b> 분류 AI를 학습시킨 뒤에도, "언제 사람 검수 없이 자동확정할지"를 정하는 <b>다이얼</b>이 여러 개 있다. 보일러 온도조절기처럼 <b>코드를 안 바꾸고 값만 돌려</b> 안전(미탐 차단)과 검수부담을 맞춘다 — GPU도 재학습도 필요 없다. 다이얼은 크게 셋: <b>① 보정</b>(AI의 과신을 깎는다=temperature), <b>② 게이트</b>(확신·합의가 부족하면 사람에게 보낸다), <b>③ 집계</b>(긴 문서에서 가장 위험한 한 단락을 놓치지 않는다). 신뢰도(confidence)는 다이얼이 아니라 <b>그 다이얼들이 읽는 계기판 숫자</b>인데, 이 숫자 하나만 믿으면 안 된다는 게 핵심 교훈이다(§5). <b>검색 융합(RRF)</b>은 등급분류가 아니라 RAG 검색 쪽 다이얼이라 결이 다르다(§8).</div>
+      <div class="callout-body"><b>한눈에 보기.</b> 분류 AI를 학습시킨 뒤에도, "언제 사람 검수 없이 자동확정할지"를 정하는 <b>다이얼</b>이 여러 개 있다. 보일러 온도조절기처럼 <b>코드를 안 바꾸고 값만 돌려</b> 안전(미탐 차단)과 검수부담을 맞춘다 — GPU도 재학습도 필요 없다. 다이얼은 크게 셋: <b>① 보정</b>(AI의 과신을 깎는다=temperature), <b>② 게이트</b>(확신·합의가 부족하면 사람에게 보낸다), <b>③ 집계</b>(긴 문서에서 가장 위험한 한 단락을 놓치지 않는다). 신뢰도(confidence)는 다이얼이 아니라 <b>그 다이얼들이 읽는 계기판 숫자</b>인데, 이 숫자 하나만 믿으면 안 된다는 게 핵심 교훈이다(§5).</div>
     </div>
 
     <section id="s01">
@@ -381,7 +379,6 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td>게이트</td><td>LLM 2차의견</td><td class="td-code">model_secondopinion_llm_enabled</td><td>False (기각)</td><td>—</td><td>비-TS 자동확정 시 LLM 재확인(비권장)</td></tr>
             <tr><td>집계</td><td>고등급 max-pool</td><td class="td-code">severe_agg_codes</td><td>TS · S1</td><td>—</td><td>핵심 청크 희석 미탐 차단(FNR↓)</td></tr>
             <tr><td>룰부스트</td><td>고위험 패턴 배수</td><td class="td-code">rule_high_risk_weight_multiplier</td><td>1.0</td><td>—</td><td>범용 약어 과분류 조정(재생성 필요)</td></tr>
-            <tr><td>검색융합</td><td>RRF 상수</td><td class="td-code">_RRF_K / _CAND_N (코드상수)</td><td>60 / 50</td><td>—</td><td>dense+lexical 랭크 융합(RAG 전용)</td></tr>
           </tbody>
         </table>
       </div>
@@ -487,21 +484,6 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <tr><td>동작</td><td>청크별 확률을 문서 확률로 합칠 때, <b>저등급(S2/S3)은 길이 가중 평균</b>, <b>고등급(TS/S1)은 가장 강한 청크의 확률(max-pool)</b>로 잡는다(<code>_aggregate_chunk_probs</code>). 단조 비감소라 평균보다 낮아질 수 없어 미탐 방향으로 후퇴하지 않는다.</td></tr>
         <tr><td>효과·방향</td><td>한 청크의 강한 비밀 신호가 평균에 묻히지 않게 → <b>미탐↓</b>. 모델 경로·룰 폴백 경로에 동일 적용.</td></tr>
       </tbody></table></div>
-    </section>
-
-    <section id="s08">
-      <h2><span class="num">08</span> 검색 융합 — RRF</h2>
-      <p class="h2-sub">⚠ 이건 등급분류가 아니라 RAG 검색 쪽 노브다 — "합의 보정 게이트"와는 결이 다른 축.</p>
-      <div class="tbl-wrap"><table><tbody>
-        <tr><td style="width:18%;">코드 상수</td><td><code>_RRF_K = 60</code> (Cormack 2009 표준) · <code>_CAND_N = 50</code> (후보 윈도우)</td></tr>
-        <tr><td>동작</td><td>dense(pgvector) + 어휘(ts_rank_cd) 두 검색결과를 <b>RRF(Reciprocal Rank Fusion)</b>로 결합 — <code>inc = 1.0 / (k + rank)</code>, 같은 문서가 여러 모달리티/쿼리에 뜨면 점수 누적(<code>_rrf_combine</code> · <code>pg_store.search_hybrid</code>).</td></tr>
-        <tr><td>"가중치"의 실체</td><td>모달리티별 스칼라 weight가 <b>아니라</b> RRF 상수 k=60(<b>랭크 기반 균등 융합</b>). 점수 스케일이 다른 dense/lexical을 순위로 정규화해 섞는다.</td></tr>
-        <tr><td>측정</td><td>하이브리드 85% &gt; dense 단독 76%(의사결정_대장 §03).</td></tr>
-      </tbody></table></div>
-      <div class="callout warn">
-        <span class="callout-icon">⚠</span>
-        <div class="callout-body"><b>두 가지 정직 고지.</b> ① 융합 가중치는 <b>분류 핫패스가 아니라 RAG 검색 경로</b>의 노브이며, RAG/answer는 현재 산출물에서 휴면(보조) 처리된 기능이다 — 등급결정 품질과는 별개 축. ② §9의 Optuna 튜너 docstring 제목은 "fusion 튜너"라 적혀 있으나 실제 탐색공간엔 융합 노브가 <b>없다</b>(보정·게이트·conf만 탐색). 융합 상수는 현재 자동탐색 대상이 아니다.</div>
-      </div>
     </section>
 
     <section id="s09">

@@ -551,19 +551,21 @@ footer strong{color:var(--text-dim);}
   <div class="reason-row">
     <div class="reason-q">🔍 왜 KURE-v1?</div>
     <div class="reason-a">
-      한국어 의미 검색에서 Recall@5 = 0.808로 BGE-M3(0.790)보다 높습니다.
+      한국어 의미 유사도에서 Recall@5 = 0.808로 BGE-M3(0.790)보다 높습니다(프로토타입 측정).
       <strong>한국어 특화 임베딩 모델로, 판례·기술 문서에서 의미적 유사도를 더 정확히 계산합니다.</strong>
-      영어 중심인 범용 모델보다 한국어 문서 검색에서 consistently 우수합니다.
+      지금 이 모델이 쓰이는 곳은 <strong>검색이 아니라</strong> 룰 1차 판정의 시드 키워드 유사도와
+      학습 데이터 분포 변화 감시입니다 — 유사문서 조회는 2026-09-05 미채택으로 걷었습니다.
     </div>
   </div>
   <div class="reason-row">
-    <div class="reason-q">📦 왜 PostgreSQL pgvector?</div>
+    <div class="reason-q">📦 왜 MariaDB / PostgreSQL?</div>
     <div class="reason-a">
-      AI 개발을 맡은 한국지식재산보호원가 검색·벡터 엔진으로 PostgreSQL pgvector를 채택해 시스템에 포함·납품합니다.
-      <strong>의미 검색·키워드 검색·트랜잭션을 하나의 DB에서 처리</strong>하는 것이 핵심 이유입니다.
-      pgvector(의미 dense) + bigram tsvector·ts_rank(어휘)를 PostgreSQL 안에서 RRF로 결합하고, 감사장부·확정/보정 트랜잭션도 같은 DB가 담당합니다.
-      별도 검색엔진(Elasticsearch 등)을 붙이면 서버·JVM·라이선스(RRF=platinum)·이중쓰기 정합 부담이 추가되는데, PG는 어차피 필수라 신규 컴포넌트 0으로 끝납니다.
-      실 PG 풀스택 측정(2026-06-24)으로 하이브리드(85%)가 dense 단독(76%)보다 우수함을 확인했습니다(쿼리가 합성·LLM 생성이라 실 운영쿼리 모니터는 본개발 · 의사결정_대장 §03, ES→PG 단일화).
+      납품 정본 DB 는 <strong>MariaDB 10.11</strong> 입니다 — 발주처(KL) 포털이 쓰는 DB 가 MariaDB 라
+      거기에 전용 데이터베이스를 만들어 씁니다. 폐쇄망 오프라인 번들은 <strong>PostgreSQL 16</strong> 을 담습니다.
+      <strong>같은 코드가 두 DB 에서 모두 돕니다</strong> — ORM 을 두 방언 모두에 맞춰 두었고, 전체 시험이
+      양쪽에서 같게 통과합니다. 갈리는 것은 스키마 마이그레이션 계열뿐입니다
+      (<code>alembic upgrade mariadb@head</code> / <code>postgres@head</code>).
+      감사장부와 확정·보정 트랜잭션을 같은 DB 가 담당하므로 이중쓰기 정합 문제가 없습니다.
     </div>
   </div>
   <div class="reason-row">
@@ -939,7 +941,7 @@ footer strong{color:var(--text-dim);}
 <tbody>
 <tr><td><strong>API 서버</strong></td><td>FastAPI (Python)</td><td>8000</td><td>모든 HTTP 요청을 받아서 처리하는 메인 서버</td></tr>
 <tr><td><strong>Worker</strong></td><td>Celery + Redis</td><td>—</td><td>시간이 오래 걸리는 작업을 백그라운드에서 처리</td></tr>
-<tr><td><strong>PostgreSQL + pgvector</strong></td><td>PostgreSQL 16 (pgvector)</td><td>5432</td><td>문서·분류결과·사용자정보 관계형 저장 + AI 벡터(pgvector dense)·키워드(ts_rank) 하이브리드 검색 — DB 통합</td></tr>
+<tr><td><strong>DB</strong></td><td>MariaDB 10.11 (폐쇄망 번들은 PostgreSQL 16)</td><td>3306 / 5432</td><td>문서·분류결과·사용자정보 관계형 저장 · 감사 장부</td></tr>
 <tr><td><strong>로컬 스토리지</strong></td><td>파일시스템(file://)</td><td>—</td><td>원본 문서 파일(HWP, PDF 등) 저장 — AES-256-GCM 암호화 (MinIO 미사용)</td></tr>
 <tr><td><strong>Redis</strong></td><td>Redis 7.2</td><td>6379</td><td>임베딩 결과 캐시, Celery 작업 큐</td></tr>
 <tr><td><strong>MLflow</strong> (지재원 전용)</td><td>MLflow 2.16</td><td>—</td><td>모델 학습 추적 — <strong>지재원에서만</strong>, 고객사 번들 미포함</td></tr>
@@ -1357,7 +1359,7 @@ footer strong{color:var(--text-dim);}
   <div class="oss-card"><div class="oss-name">FastAPI</div><div class="oss-role">메인 웹 프레임워크 (API 서버)</div><div class="oss-lic">MIT · Python</div></div>
   <div class="oss-card"><div class="oss-name">Celery</div><div class="oss-role">비동기 태스크 큐 (백그라운드 처리)</div><div class="oss-lic">BSD-3 · Python</div></div>
   <div class="oss-card"><div class="oss-name">PostgreSQL 16</div><div class="oss-role">관계형 데이터베이스</div><div class="oss-lic">PostgreSQL</div></div>
-  <div class="oss-card"><div class="oss-name">pgvector</div><div class="oss-role">PostgreSQL 벡터 DB + 하이브리드(dense+ts_rank)</div><div class="oss-lic">PostgreSQL License</div></div>
+  <div class="oss-card"><!--pgvector 카드 제거(2026-09-05 유사문서 조회 미채택)--><div class="oss-name" style="display:none">pgvector</div><div class="oss-role">PostgreSQL 벡터 DB + 하이브리드(dense+ts_rank)</div><div class="oss-lic">PostgreSQL License</div></div>
   <div class="oss-card"><div class="oss-name">Redis 7.2</div><div class="oss-role">인메모리 캐시 + Celery Broker</div><div class="oss-lic">BSD-3</div></div>
   <div class="oss-card"><div class="oss-name">MLflow 2.16</div><div class="oss-role">모델 학습 실험 추적 관리</div><div class="oss-lic">Apache 2.0</div></div>
   <div class="oss-card"><div class="oss-name">HuggingFace Transformers</div><div class="oss-role">ML 모델 로딩/추론</div><div class="oss-lic">Apache 2.0</div></div>
@@ -1477,8 +1479,8 @@ footer strong{color:var(--text-dim);}
   <thead><tr><th>층</th><th>범위</th><th>결과</th><th>의미</th></tr></thead>
   <tbody>
   <tr><td>① 단위 테스트</td><td>pytest 전체</td><td>약 1,200건</td><td>로직 단위 정합 · 회귀 0</td></tr>
-  <tr><td>② DB 연동</td><td>실 PostgreSQL</td><td>20/20</td><td>저장·조회 경로 검증</td></tr>
-  <tr><td>③ 풀스택</td><td>PostgreSQL + pgvector</td><td>103/103</td><td>분류·검색 통합 동작</td></tr>
+  <tr><td>② DB 연동</td><td>실 DB(MariaDB · PostgreSQL 양쪽)</td><td>20/20</td><td>저장·조회 경로 검증</td></tr>
+  <tr><td>③ 풀스택</td><td>실 DB(MariaDB · PostgreSQL 양쪽)</td><td>103/103</td><td>분류·저장 통합 동작</td></tr>
   <tr><td>④ 실 GPU E2E</td><td>능동학습 폐곡선 전 과정</td><td>7/7</td><td>정정→재학습→배포→핫리로드 실증</td></tr>
   <tr><td>⑤ 라이브 API 데모</td><td>실서버 호출</td><td>통과</td><td>PDF→S1(0.997)→confirm/relabel→재학습 큐</td></tr>
   </tbody>
@@ -1518,7 +1520,7 @@ footer strong{color:var(--text-dim);}
   <div class="case-card">
     <div class="case-title"><span class="tag mid">대용량</span> 10,000자 이상 문서</div>
     <div class="case-body">분류: 256 토큰으로 잘라서 처리. 앞부분 기준으로 분류.
-    RAG 검색: 1200자 청크로 분할해서 모든 부분 인덱싱 → 전체 내용 검색 가능.</div>
+   </div>
   </div>
   <div class="case-card">
     <div class="case-title"><span class="tag outline">배치</span> 대량 문서 처리</div>
@@ -1616,7 +1618,7 @@ footer strong{color:var(--text-dim);}
 </div>
 
 <h2 id="db">데이터는 어떻게 저장되나요?</h2>
-<p>PostgreSQL에 <strong>약 20개 테이블</strong>이 있습니다. 핵심 흐름만 설명합니다. (고객사별 폐쇄망 분리배포로 격리, 대용량 테이블은 시간 기준 RANGE 파티션.)</p>
+<p>DB 에 <strong>표 20개</strong>가 있습니다(제공 정의서에 싣는 것은 19표 216칼럼 — 코드가 읽고 쓰지 않는 표 1개를 뺐습니다). 핵심 흐름만 설명합니다. 납품 정본 DB 는 <strong>MariaDB 10.11</strong> 이고 폐쇄망 번들은 PostgreSQL 16 을 담습니다. 고객사별 폐쇄망 분리배포로 격리하며, <strong>파티션은 두지 않고</strong> 시간축 인덱스와 보존기간 삭제를 씁니다.</p>
 
 <div style="margin:18px 0;display:flex;flex-direction:column;gap:8px;">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -1805,8 +1807,6 @@ footer strong{color:var(--text-dim);}
   <tbody>
   <tr><td>LLM</td><td>anthropic / openai / local_openai / noop</td><td><code>LLM_PROVIDER</code></td></tr>
   <tr><td>임베딩</td><td>hf (KURE/BGE) / hash (테스트)</td><td><code>EMBEDDING_PROVIDER</code></td></tr>
-  <tr><td>벡터 DB</td><td>pg (pgvector, 기본) / inmemory</td><td><code>VECTOR_BACKEND</code></td></tr>
-  <tr><td>Reranker</td><td>bge / noop</td><td><code>RERANKER_PROVIDER</code></td></tr>
   <tr><td>파일 스토리지</td><td>local (file://, 폐쇄망 기본)</td><td><code>STORAGE_BACKEND</code></td></tr>
   </tbody>
 </table>
@@ -1853,7 +1853,6 @@ footer strong{color:var(--text-dim);}
   <thead><tr><th>항목</th><th>현황</th><th>해결 방법</th><th>우선순위</th></tr></thead>
   <tbody>
   <tr><td><strong>운영 확정 라벨</strong></td><td>locked F1=N/A (관리자 확정 전)</td><td>운영 관리자 확정은 고객 망 내 <code>tb_corrections</code>에 남기고 admission gate를 거친다. 기본 반영은 exact-match 선례·검수 라우팅·집계 진단이며, 재학습은 locked readiness 이후 별도 승인</td><td><span class="tag filled">최우선</span></td></tr>
-  <tr><td><strong>P2 청킹 — RAG 검색 인덱스 <span style="font-size:.85em;font-weight:400;color:var(--text-dim);">(요건 외 부가)</span></strong></td><td>테스트 0.808, 운영 인덱스 미청킹</td><td><code>index_rag_corpus.py --chunk-size 1200</code> 재인덱싱</td><td><span class="tag outline">부가</span></td></tr>
   <tr><td><strong>가이드 정본 v2</strong></td><td><strong>해결</strong> — 발주처 정본 가이드 v2 수령·반영 완료(2026-06-18)</td><td>완료 · 향후 발주처 갱신본 도착 시 패치(선택)</td><td><span class="tag mid">해결</span></td></tr>
   <tr><td><strong>법률 코퍼스 정제</strong></td><td><strong>해결</strong> — 오염 56% 제거 후 test 78→93%, FNR 21→8%</td><td>완료 · 잔여: 출처불명 제3문체</td><td><span class="tag mid">해결</span></td></tr>
   <tr><td><strong>능동학습 자동화</strong></td><td><strong>배선 해결</strong>(엔지니어링) — 정정→재학습→배포게이트→핫리로드→자동롤백 폐곡선 GPU E2E 7/7. 단 <b>환류=재학습 운영 채택·학습 위치는 미확정</b>(A 무반출 권고/B 온사이트/C 반출)</td><td>배선 완료 · 자동 활성/롤백 기본 OFF(보수적) · 운영 정책 미확정</td><td><span class="tag mid">해결</span></td></tr>
@@ -1918,8 +1917,8 @@ footer strong{color:var(--text-dim);}
   <div class="gloss-card">
     <div class="gloss-term">RAG</div>
     <div class="gloss-eng">Retrieval-Augmented Generation</div>
-    <div class="gloss-def">관련 문서를 검색(Retrieval)해 근거 후보로 활용하는 방식. 본 시스템에서는 검수 보조용 검색 인덱스(청킹)로만 활용하며, 분류 등급 판정에는 사용하지 않습니다.</div>
-    <div class="gloss-ex">예: 질의 → 관련 규정 문서 상위 5개 검색(하이브리드)</div>
+    <div class="gloss-def">관련 문서를 검색(Retrieval)해 근거 후보로 활용하는 방식. <strong>본 시스템은 쓰지 않습니다</strong> — 2026-09-05 미채택으로 구현물을 걷었습니다. 등급 판정에 관여하지 않는 보완 기능이었습니다.</div>
+    <div class="gloss-ex">용어를 남겨 둔 이유는 프로토타입 검증 기록에 이 말이 남아 있어서입니다.</div>
   </div>
   <div class="gloss-card">
     <div class="gloss-term">F1 점수</div>
@@ -1948,7 +1947,7 @@ footer strong{color:var(--text-dim);}
   <div class="gloss-card">
     <div class="gloss-term">Hybrid 검색</div>
     <div class="gloss-eng">Hybrid Search</div>
-    <div class="gloss-def">키워드가 일치하는 문서를 찾는 어휘 방식(PG ts_rank) + 의미가 비슷한 문서를 찾는 Dense 방식(pgvector)을 RRF로 결합. 두 방식의 장점을 합쳐 검색 정확도를 높입니다.</div>
+    <div class="gloss-def"><strong>미채택.</strong> 키워드가 일치하는 문서를 찾는 어휘 방식 + 의미가 비슷한 문서를 찾는 Dense 방식을 순위 융합으로 결합하는 기법입니다. 프로토타입에서 재어 보았으나(하이브리드 85% &gt; dense 76%), 유사문서 조회 자체를 2026-09-05 미채택으로 걷어 현재 시스템에는 없습니다.</div>
     <div class="gloss-ex">예: "반도체 EUV" 검색 → 어휘(ts_rank)로 정확한 용어 + Dense로 유사 개념 모두 검색</div>
   </div>
   <div class="gloss-card">

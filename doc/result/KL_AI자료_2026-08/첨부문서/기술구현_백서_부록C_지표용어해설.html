@@ -198,10 +198,10 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#basics">공통 원리 · 기호</a>
     <a class="toc-item" href="#terms">핵심 지표 용어</a>
     <a class="toc-item" href="#tools">도구 · 플랫폼 용어</a>
-    <a class="toc-item" href="#search">검색 용어 (BM25·dense·하이브리드)</a>
+    <a class="toc-item" href="#search">검색 용어 (미채택)</a>
     <a class="toc-item" href="#gov">거버넌스 · 운영점 약어</a>
     <a class="toc-item" href="#m-p1">측정 P1 — 분류(F1·미탐률)</a>
-    <a class="toc-item" href="#m-p2">측정 P2 — 검색(Recall@5)</a>
+    <a class="toc-item" href="#m-p2">측정 P2 — 검색(미채택 · Recall@5)</a>
     <a class="toc-item" href="#m-p3">측정 P3 — 합성 LLM</a>
     <a class="toc-item" href="#m-p4">측정 P4 — 문서 추출</a>
     <a class="toc-item" href="#m-p5">측정 P5 — 전체 흐름</a>
@@ -246,9 +246,9 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tr><td><b>fnr_high</b></td><td>고등급 평균 미탐률 (배포 게이트·롤백 기준)</td><td>고등급의 방향성 FNR 평균(예: (FNR_TS+FNR_S1)/2). <b>배포 게이트·자동 롤백의 baseline 기준값</b>으로 쓰여, 신규 모델의 fnr_high가 기준+허용오차를 넘으면 배포 거부·직전 모델로 복귀한다.</td></tr>
           <tr><td><b>review_burden · high_to_s3</b></td><td>검수 부담 · 고등급→S3 오분류</td><td><b>review_burden</b> = 모델이 고등급으로 판정한 비율(사람이 검수해야 할 양). <b>high_to_s3</b> = 고등급(TS·S1) 문서를 S3(공개)로 잘못 떨어뜨린 비율 — 가장 치명적인 미탐 형태라 별도 추적한다.</td></tr>
           <tr><td><b>Recall@5 (재현율@5)</b></td><td>검색이 정답을 상위 5건에 올리는 비율</td><td>검색해서 상위 5건을 가져왔을 때 정답 문서가 그 안에 든 비율. 0.80 = 10번 중 8번은 상위 5건 안에 정답이 있음. "@5"는 "상위 5건 기준".</td></tr>
-          <tr><td><b>MRR · Precision@K</b></td><td>검색 순위 품질 지표</td><td><b>MRR(평균 역순위)</b> = 정답이 처음 등장한 순위의 역수 평균(정답이 위쪽에 올수록 높음). <b>Precision@K</b> = 상위 K건 중 정답 비율. Recall@5와 함께 검색(RAG) 품질을 본다.</td></tr>
+          <tr><td><b>MRR · Precision@K</b></td><td>검색 순위 품질 지표</td><td><b>MRR(평균 역순위)</b> = 정답이 처음 등장한 순위의 역수 평균(정답이 위쪽에 올수록 높음). <b>Precision@K</b> = 상위 K건 중 정답 비율. Recall@5와 함께 검색 품질을 보던 지표다(미채택).</td></tr>
           <tr><td><b>ECE · temperature</b></td><td>신뢰도 보정(캘리브레이션) 지표</td><td><b>ECE(기대 보정 오차)</b> = 모델 confidence와 실제 정답률의 차이(작을수록 잘 보정됨). <b>temperature(온도)</b> = softmax 보정 계수로 <code>temperature.json</code>을 자동 로드해 적용. <b>T&gt;1이면 과신을 완화</b>한다. 단, 이 보정은 <b>검증(val) 분포 내 과신만 완화</b>하며 OOD(골든·실데이터)로는 전이되지 않는다 — 구 후보셋 골든500에서 ECE는 <b>0.18</b>로 여전히 크고 confidence의 정답/오답 판별력도 낮다(AUROC 0.58). 따라서 보정만으로 confidence가 자동확정의 신뢰 근거가 되지는 않으며, 자동확정은 confidence 단독이 아니라 다단 게이트로 판단한다.</td></tr>
-          <tr><td><b>임베딩 (Embedding)</b></td><td>문서를 숫자 벡터로 바꾸는 기술</td><td>"의미가 비슷한지"를 계산할 수 있도록 문서를 벡터로 변환한다. 근거 검색(RAG)의 핵심 기술.</td></tr>
+          <tr><td><b>임베딩 (Embedding)</b></td><td>문서를 숫자 벡터로 바꾸는 기술</td><td>"의미가 비슷한지"를 계산할 수 있도록 문서를 벡터로 변환한다. 의미 비교의 핵심 기술 — 현재는 룰 시드 유사도와 학습 분포 감시에 쓴다.</td></tr>
           <tr><td><b>라벨 일치도</b></td><td>학습 데이터 품질 지표</td><td>합성 LLM이 "이 등급으로 만들었다"고 한 문서가 실제 그 등급 기준에 맞게 생성됐는지의 일치율. 라벨이 틀린 데이터로 배우면 모델도 틀리게 배운다.</td></tr>
           <tr><td><b>누락률 · 품질</b></td><td>문서 추출 정확도</td><td>누락률 = 원문 중 추출에서 빠진 비율(낮을수록 좋음). 품질 = 추출 텍스트가 원문과 얼마나 일치하는지 점수(0~1).</td></tr>
           <tr><td><b>E2E (End-to-End)</b></td><td>전체 흐름 테스트</td><td>업로드부터 등급 산출까지 시스템이 끝까지 정상 동작하는지 확인하는 테스트.</td></tr>
@@ -265,7 +265,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tr><td><b>HuggingFace</b></td><td>AI 모델계의 "앱스토어"</td><td>전 세계가 만든 오픈소스 AI 모델·데이터를 올리고 내려받는 플랫폼. 우리가 쓴 분류·임베딩 모델을 여기서 받는다. <b>폐쇄망</b>에는 미리 다운로드해 오프라인 번들에 담아 인터넷 없이 운영한다.</td></tr>
           <tr><td><b>scikit-learn</b></td><td>표준 머신러닝 계산 라이브러리</td><td>F1·혼동행렬 같은 분류 지표를 계산하는 업계 표준 오픈소스.</td></tr>
           <tr><td><b>transformers</b></td><td>AI 모델 실행·학습 도구</td><td>HuggingFace의 모델을 불러오고 학습·추론하는 오픈소스 라이브러리.</td></tr>
-          <tr><td><b>pgvector</b></td><td>PostgreSQL 벡터 검색</td><td>의미 검색(dense 벡터)과 키워드 검색(bigram tsvector + ts_rank)을 PostgreSQL 안에서 함께 처리한다. 별도 검색엔진 없이 DB로 통합 — 폐쇄망·운영 단순(의사결정_대장 §03).</td></tr>
           <tr><td><b>Ollama</b></td><td>로컬 LLM 실행기</td><td>외부 인터넷 없이 자체 서버(GPU)에서 LLM(Qwen3)을 돌리는 도구. 폐쇄망 운영에 적합.</td></tr>
           <tr><td><b>혼동행렬 (Confusion Matrix)</b></td><td>예측 vs 정답 채점표</td><td>어떤 등급을 어떤 등급으로 맞혔는지/틀렸는지를 행렬로 정리한 표. 여기서 F1·미탐률을 뽑는다.</td></tr>
           <tr><td><b>출처 게이트 (비공지성·Gate-1)</b></td><td>공개 출처면 S3로 상한</td><td>판례·공시 등 이미 공개된 출처 문서는 내용이 비밀급이어도 영업비밀이 될 수 없어(부정경쟁방지법 §2.2 비공지성) 등급을 S3로 cap한다 — S×V×M에서 <b>S(비공지성)=0 → 곱=0 → S3</b>와 같은 귀결이다. 내부 문서엔 적용 안 됨. (학습셋 오염 사례: 공개 판례·심결을 고등급으로 오라벨한 데이터를 정제·제외해 고등급 미탐을 크게 낮췄다.)</td></tr>
@@ -279,17 +278,18 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       </table>
     </div>
 
-    <div class="cat-divider" id="search"><div class="cat-line"></div><span class="cat-label">검색 용어 (BM25·dense·하이브리드)</span><div class="cat-line"></div></div>
+    <div class="cat-divider" id="search"><div class="cat-line"></div><span class="cat-label">검색 용어 (미채택 · BM25·dense·하이브리드)</span><div class="cat-line"></div></div>
+    <div class="callout warn" style="margin:10px 0 14px;"><b>이 아래는 미채택 기능의 용어입니다.</b> 유사문서 조회(검색)는 2026-09-05 미채택으로 코드·DB 에서 걷었습니다 — 등급 결정에 관여하지 않는 보완 기능이라 구현물을 제거했습니다(질의사항 회신서 가-5 · 커밋 <code>319069b9</code>). 용어를 남겨 두는 이유는 프로토타입 검증 결과와 의사결정 대장에 이 말들이 기록으로 남아 있어서입니다. <b>현재 시스템은 검색을 하지 않습니다.</b></div>
     <div class="tbl-wrap">
       <table class="full">
         <thead><tr><th style="width:20%;">이름</th><th style="width:24%;">한 줄</th><th>풀이</th></tr></thead>
         <tbody>
-          <tr><td><b>희소검색 (sparse)</b></td><td>단어 표면형 일치로 찾기</td><td>문서를 단어 빈도 벡터로 보고 <b>표면형 단어 일치</b>로 점수를 낸다. 벡터 성분 대부분이 0이라 "희소(sparse)". 정확한 용어·고유명사엔 강하지만 동의어·문맥엔 약하다. 대표 랭킹 함수가 BM25이며, <b>우리는 그 자리에 <code>ts_rank</code>를 쓴다</b>(아래).</td></tr>
-          <tr><td><b>BM25</b></td><td>희소검색 대표 랭킹 함수</td><td>용어빈도(TF)에 문서길이·희귀도 보정을 더한 고전 검색 점수식(TF-IDF 개선판). <b>⚠ 우리 PostgreSQL 경로는 BM25를 쓰지 않는다</b> — BM25는 레거시 Elasticsearch 경로 용어이고, PG 경로의 어휘 랭커는 <code>ts_rank</code>다. 대외적으로 "BM25류 희소검색"이라 묶어 불러도 개념상 무방하나, <b>정밀하게는 ts_rank로 표기</b>해야 코드와 정합한다.</td></tr>
-          <tr><td><b>ts_rank (bigram tsvector)</b></td><td>우리의 한국어 어휘 랭커</td><td>PostgreSQL 전문검색(full-text search) 랭킹 함수. 한국어는 형태소 경계가 모호해 <b>bigram(2글자 단위) tsvector</b>로 색인한다. 우리 하이브리드의 <b>어휘(키워드) 축 실제 구현</b>이다. (<code>pg_bigm</code>은 랭커가 아니라 선택적 가속 후보 — <code>pg_store.py</code> 주석상 랭커 금지.)</td></tr>
-          <tr><td><b>밀집검색 (dense) · 시맨틱 검색</b></td><td>의미(벡터)로 찾기</td><td>문장을 임베딩 벡터로 바꿔 <b>의미 유사도</b>(코사인 등)로 점수를 낸다. 벡터 값이 꽉 차서 "밀집(dense)". <b>"시맨틱(의미) 검색"과 같은 말</b>이다. 우리 구현 = <code>pgvector</code> + KURE-v1 임베딩. 동의어·문맥·의역엔 강하나 정확한 고유명사엔 약할 수 있다. (RAG의 검색 *기법*이지 RAG 자체가 아님.)</td></tr>
-          <tr><td><b>하이브리드 검색 (BM25+dense)</b></td><td>어휘+의미 결합</td><td>희소(어휘)와 밀집(의미)을 합쳐 서로의 약점을 보완한다. 우리 = <code>dense(pgvector) + ts_rank</code>를 RRF로 융합. 실측 <b>하이브리드 ≈85% &gt; dense 단독 ≈76%</b>(의사결정_대장 §03).</td></tr>
-          <tr><td><b>RRF (상호순위융합)</b></td><td>순위 역수로 결과 합치기</td><td>Reciprocal Rank Fusion. 여러 검색결과를 <b>순위의 역수</b>(<code>1/(k+순위)</code>)로 합산해 하나로 융합한다. 점수 스케일이 달라도 순위로 정규화해 섞을 수 있다. 우리 상수 <b>k=60</b>(Cormack 2009 표준 · <code>_RRF_K</code>).</td></tr>
+          <tr><td><b>희소검색 (sparse)</b></td><td>단어 표면형 일치로 찾기</td><td>문서를 단어 빈도 벡터로 보고 <b>표면형 단어 일치</b>로 점수를 낸다. 벡터 성분 대부분이 0이라 "희소(sparse)". 정확한 용어·고유명사엔 강하지만 동의어·문맥엔 약하다. 대표 랭킹 함수가 BM25이며, <b>프로토타입에서는 그 자리에 <code>ts_rank</code>를 썼다</b>(아래).</td></tr>
+          <tr><td><b>BM25</b></td><td>희소검색 대표 랭킹 함수</td><td>용어빈도(TF)에 문서길이·희귀도 보정을 더한 고전 검색 점수식(TF-IDF 개선판). <b>⚠ 프로토타입의 PostgreSQL 경로는 BM25를 쓰지 않았다</b> — BM25는 레거시 Elasticsearch 경로 용어이고, PG 경로의 어휘 랭커는 <code>ts_rank</code>였다. 대외적으로 "BM25류 희소검색"이라 묶어 불러도 개념상 무방하나, <b>정밀하게는 ts_rank로 표기</b>해야 코드와 정합한다.</td></tr>
+          <tr><td><b>ts_rank (bigram tsvector)</b></td><td>프로토타입의 한국어 어휘 랭커</td><td>PostgreSQL 전문검색(full-text search) 랭킹 함수. 한국어는 형태소 경계가 모호해 <b>bigram(2글자 단위) tsvector</b>로 색인한다. 프로토타입 하이브리드의 <b>어휘(키워드) 축 구현</b>이었다. (<code>pg_bigm</code>은 랭커가 아니라 선택적 가속 후보 — <code>pg_store.py</code> 주석상 랭커 금지.)</td></tr>
+          <tr><td><b>밀집검색 (dense) · 시맨틱 검색</b></td><td>의미(벡터)로 찾기</td><td>문장을 임베딩 벡터로 바꿔 <b>의미 유사도</b>(코사인 등)로 점수를 낸다. 벡터 값이 꽉 차서 "밀집(dense)". <b>"시맨틱(의미) 검색"과 같은 말</b>이다. 프로토타입 구현 = <code>pgvector</code> + KURE-v1 임베딩. 동의어·문맥·의역엔 강하나 정확한 고유명사엔 약할 수 있다. (RAG의 검색 *기법*이지 RAG 자체가 아님.)</td></tr>
+          <tr><td><b>하이브리드 검색 (BM25+dense)</b></td><td>어휘+의미 결합</td><td>희소(어휘)와 밀집(의미)을 합쳐 서로의 약점을 보완한다. 프로토타입 = <code>dense(pgvector) + ts_rank</code>를 RRF로 융합. 실측 <b>하이브리드 ≈85% &gt; dense 단독 ≈76%</b>(의사결정_대장 §03).</td></tr>
+          <tr><td><b>RRF (상호순위융합)</b></td><td>순위 역수로 결과 합치기</td><td>Reciprocal Rank Fusion. 여러 검색결과를 <b>순위의 역수</b>(<code>1/(k+순위)</code>)로 합산해 하나로 융합한다. 점수 스케일이 달라도 순위로 정규화해 섞을 수 있다. 프로토타입 상수 <b>k=60</b>(Cormack 2009 표준 · <code>_RRF_K</code>).</td></tr>
           <tr><td><b>reranker (재정렬)</b></td><td>상위 후보를 정밀 재채점</td><td>1차 검색 상위 N건을 더 무거운 <b>cross-encoder</b> 모델로 다시 채점해 재정렬한다. <b>본 시스템은 재정렬을 쓰지 않는다</b> — 우리 코퍼스 실측 효과가 약 +1%p 로 사실상 무용이라 비활성으로 두었고, 2026-09-05 유사문서 조회를 미채택하면서 구현물을 걷었다. 용어는 의사결정 이력을 읽는 데 필요해 남긴다.</td></tr>
           <tr><td><b>OCR (광학 문자 인식)</b></td><td>스캔본에서 글자 추출</td><td>Optical Character Recognition. 스캔 이미지·PDF에서 텍스트를 추출한다. <b>본 시스템은 OCR을 사용하지 않으며 번들·배포 이미지에 동봉하지 않는다</b>(2026-08-02) — FUN-022 요건은 <b>전자문서</b> 텍스트 추출이라 OCR은 요건 외이고, 실행에 필요한 <code>poppler</code>가 GPL이라 반출 경로에서 소거했다. 스캔 PDF가 들어오면 본문 0자로 추출되어 <code>processing_status='failed'</code>로 격리된다(무음 저등급 통과 없음).</td></tr>
         </tbody>
@@ -320,7 +320,8 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     </div>
 
     <div class="global-card" id="m-p2">
-      <h3>P2 — Recall@5 · 응답속도 (검색 / 임베딩)</h3>
+      <h3>P2 — Recall@5 · 응답속도 (검색 · 미채택 / 임베딩)</h3>
+      <div class="callout warn" style="margin:10px 0 14px;"><b>이 아래는 미채택 기능의 용어입니다.</b> 유사문서 조회(검색)는 2026-09-05 미채택으로 코드·DB 에서 걷었습니다 — 등급 결정에 관여하지 않는 보완 기능이라 구현물을 제거했습니다(질의사항 회신서 가-5 · 커밋 <code>319069b9</code>). 용어를 남겨 두는 이유는 프로토타입 검증 결과와 의사결정 대장에 이 말들이 기록으로 남아 있어서입니다. <b>현재 시스템은 검색을 하지 않습니다.</b></div>
       <p style="font-size:13.5px;"><b>모델 / 오픈소스:</b> 임베딩 = KURE-v1/BGE-M3(<code>nlpai-lab/KURE-v1</code>·<code>BAAI/bge-m3</code>, HuggingFace), 검색 = PostgreSQL <code>pgvector</code>(dense) + bigram tsvector <code>ts_rank</code>(어휘), 속도 백분위 = <code>numpy</code>.</p>
       <p style="font-size:13.5px;"><b>측정 방법:</b> ① 쿼리마다 "정답 문서"가 미리 지정된 평가용 쿼리 세트를 준비한다. ② 쿼리를 임베딩으로 벡터화 → pgvector(dense)+ts_rank(어휘) 하이브리드로 상위 5건 검색. ③ <b>Recall@5</b> = <code>정답이 상위 5건에 든 쿼리 수 ÷ 전체 쿼리 수</code>. ④ <b>응답속도</b> = 검색 호출마다 시간을 측정해 p50/p95로 보고. → 핵심은 "정답 문서가 미리 태깅된 쿼리 세트"가 있어야 측정된다는 점.</p>
     </div>
@@ -353,7 +354,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tr><td>분류 모델</td><td>KF-DeBERTa + HuggingFace transformers</td><td>등급 예측</td><td>오픈소스</td></tr>
           <tr><td>분류 지표 계산</td><td>scikit-learn</td><td>F1 · 미탐률 · 혼동행렬</td><td>오픈소스(BSD)</td></tr>
           <tr><td>임베딩</td><td>KURE-v1 (HuggingFace · BGE-M3 폴백)</td><td>문서 → 벡터</td><td>오픈소스</td></tr>
-          <tr><td>검색</td><td>PostgreSQL pgvector + ts_rank</td><td>벡터(dense) + 키워드(bigram) 하이브리드</td><td>오픈소스(PostgreSQL License)</td></tr>
           <tr><td>합성 LLM</td><td>Qwen3 + Ollama</td><td>학습 데이터 생성</td><td>Apache 2.0 (공공 적합)</td></tr>
           <tr><td>문서 추출</td><td>rhwp-python + unhwp · python-docx · pdfminer.six · openpyxl · python-pptx</td><td>텍스트 추출</td><td>MIT / BSD-3 (AGPL 없음)</td></tr>
           <tr><td>실험 추적</td><td>MLflow</td><td>측정 지표·이력 기록</td><td>오픈소스</td></tr>
