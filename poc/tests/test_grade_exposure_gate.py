@@ -138,3 +138,50 @@ def test_ordinary_text_passes_in_both():
     text = "원가 구조와 수율 개선 방안을 정리한 검토 자료이다."
     assert not _exposes_grade(text, is_real=True)
     assert not _exposes_grade(text, is_real=False)
+
+
+# ── 전각 문자 (2026-09-05) ──────────────────────────────────────────────────
+#
+# 한국 공문서·구형 한글 문서에는 전각 알파벳·숫자가 섞인다. 전처리
+# (m2_preprocess/normalizer.py)는 NFKC 로 접으므로 **분류 경로는 안전한데**, 이 게이트는
+# 정규화 **전** 원문에 돈다(생성 직후·검수큐 적재 전). 그래서 전각을 하나도 못 잡았다:
+#
+#     본 문서의 등급은 TS 이다.     잡힘
+#     본 문서의 등급은 ＴＳ 이다.    **놓침**  (U+FF34 U+FF33)
+#     본 문서는 １급 비밀이다.       **놓침**  (U+FF11)
+#
+# ⚠ 접은 결과는 검사에만 쓴다 — 검수자가 읽는 것은 원문이어야 하므로 본문은 바꾸지 않는다.
+
+def test_fullwidth_grade_code_is_caught():
+    """전각 알파벳으로 쓴 등급 코드도 잡는다."""
+    assert _exposes_grade_token("본 문서의 등급은 \uff34\uff33 이다.")      # ＴＳ
+    assert _exposes_grade_token("문서 등급 \uff33\uff11 로 분류함.")        # Ｓ１
+
+
+def test_fullwidth_korean_grade_is_caught_for_synthetic():
+    """전각 숫자로 쓴 한국어 등급 표기도 합성 후보에서는 노출이다."""
+    assert _exposes_grade_token("본 문서는 \uff11급 비밀 자료이다.")        # １급
+
+
+def test_folding_does_not_widen_the_real_document_vocabulary():
+    """실문서 경로는 접기만 하고 **어휘는 그대로** — 보안표시는 여전히 노출이 아니다.
+
+    실문서에 찍힌 '1급 비밀'은 비밀관리성(M) 판단의 근거지 답 노출이 아니다. 전각을 접는
+    것이 그 구분까지 흐리면 안 된다.
+    """
+    from koipa.services.proxy_gold_candidate_service import _exposes_grade
+
+    assert not _exposes_grade("본 문서는 \uff11급 비밀 자료이다.", is_real=True)
+    assert not _exposes_grade("본 문서는 1급 비밀 자료이다.", is_real=True)
+    # 등급 코드는 전각이든 반각이든 실문서에서도 노출이다(라벨이 샌 것).
+    assert _exposes_grade("등급 \uff34\uff33 로 분류.", is_real=True)
+    assert _exposes_grade("등급 TS 로 분류.", is_real=True)
+
+
+def test_folding_does_not_change_the_text():
+    """본문을 고치지 않는다 — 검수자가 읽는 것은 원문이다."""
+    from koipa.services.synth_quality import _fold_for_match
+
+    src = "본 문서는 \uff11급 비밀이다."
+    assert _fold_for_match(src) != src, "검사용으로는 접힌다"
+    assert "\uff11" in src, "원본 문자열은 그대로 남는다"

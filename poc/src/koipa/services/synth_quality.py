@@ -77,9 +77,28 @@ def _grade_term_pattern() -> "re.Pattern[str]":
     return re.compile("|".join(parts), re.IGNORECASE)
 
 
+def _fold_for_match(text: str) -> str:
+    """검사용 정규화 — 전각을 반각으로 접는다. **본문은 고치지 않는다.**
+
+    [2026-09-05] 종전에는 원문 그대로 찾아서 전각 표기를 하나도 못 잡았다:
+
+        본 문서의 등급은 TS 이다.     잡힘
+        본 문서의 등급은 ＴＳ 이다.    **놓침**  (U+FF34 U+FF33)
+        본 문서는 １급 비밀이다.       **놓침**  (U+FF11)
+
+    전처리(m2_preprocess/normalizer.py)는 NFKC 로 이미 접으므로 **분류 경로는 안전하다.**
+    이 게이트는 정규화 **전** 원문에 돌기 때문에(생성 직후·검수큐 적재 전) 여기서 따로 접는다.
+
+    ⚠ 접은 결과는 검사에만 쓴다. 검수자가 읽는 것은 원문이어야 하므로 본문을 바꾸지 않는다.
+    """
+    import unicodedata  # noqa: PLC0415
+
+    return unicodedata.normalize("NFKC", text or "")
+
+
 def _exposes_grade_token(text: str) -> bool:
     """본문에 등급 표기가 남았는가 — 문서 한 건으로 판정 가능한 유일한 지표."""
-    return bool(_grade_term_pattern().search(text or ""))
+    return bool(_grade_term_pattern().search(_fold_for_match(text)))
 
 
 def screen_batch(

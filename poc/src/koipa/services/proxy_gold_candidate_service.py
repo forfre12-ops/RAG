@@ -55,7 +55,11 @@ _GRADE_TOKEN = re.compile(r"\b(TS|S1|S2|S3)\b")
 def _exposes_grade(text: str, *, is_real: bool) -> bool:
     """검수자가 읽기 전에 답을 보게 되는가 — 출처에 따라 어휘를 달리한다."""
     if is_real:
-        return bool(_GRADE_TOKEN.search(text or ""))
+        # 전각 표기(ＴＳ·Ｓ１)도 접어서 본다 — 한국 공문서·구형 한글 문서에 섞인다.
+        # 검사용 접기일 뿐 본문은 그대로다(synth_quality._fold_for_match 와 같은 규약).
+        from koipa.services.synth_quality import _fold_for_match  # noqa: PLC0415
+
+        return bool(_GRADE_TOKEN.search(_fold_for_match(text)))
     from koipa.services.synth_quality import _exposes_grade_token  # noqa: PLC0415
 
     return _exposes_grade_token(text)
