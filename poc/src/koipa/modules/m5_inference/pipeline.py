@@ -1069,8 +1069,13 @@ class InferencePipeline:
         # ev==0(무신호)은 conf=0으로 이미 저신뢰 게이트가 잡으므로 0<ev<floor 구간만 표기한다.
         try:
             _min_ev = float(settings.rule_fallback_min_evidence)
-        except Exception:  # noqa: BLE001
-            _min_ev = 0.0
+        except Exception as exc:  # noqa: BLE001
+            # [2026-09-06] 종전 폴백은 0.0 이었다. 아래가 `if _min_ev > 0:` 이므로 그 값은
+            # **게이트를 끄는 값**이지 기본값이 아니다(선언된 기본값은 config.py 의 0.9).
+            # 설정 읽기 실패 한 번에 위 주석이 설명하는 미탐 방지 장치가 조용히 사라졌다.
+            # 선언된 기본값으로 떨어지고, 흔적을 남긴다(다른 설정 여섯 곳과 같은 방식).
+            _min_ev = 0.9
+            _warn_setting_fallback("rule_fallback_min_evidence", _min_ev, exc)
         if _min_ev > 0:
             _ev_total = sum((lab.rule_result.grade_scores if lab.rule_result else {}).values())
             if 0.0 < _ev_total < _min_ev:

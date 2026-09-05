@@ -165,7 +165,13 @@ def snap_model() -> dict:
     if not raw_dir:
         # 빈 값이면 리포 루트로 떨어지지 않도록 여기서 끊는다.
         info["measured"] = False
-        info["why"] = "classifier_model_dir 이 비어 있다 — 이 환경에서는 모델 축을 잴 수 없다"
+        # [2026-09-06] 사유만 적으면 운영자는 "여긴 못 재는 환경"으로 읽고 넘긴다.
+        # 실제로는 환경변수 하나다 — 모델은 리포에 있다. 할 일을 같이 적는다.
+        info["why"] = (
+            "classifier_model_dir 이 비어 있다 — 환경변수를 주면 잰다: "
+            "CLASSIFIER_MODEL_DIR=artifacts/classifier_p1_v5_clean/v-fe4b386b "
+            "(Makefile 의 P1_MODEL 과 같은 값)"
+        )
         return info
 
     d = _ROOT / raw_dir
@@ -366,10 +372,14 @@ def compare(base: dict, now: dict) -> int:
     print("\n" + "=" * 74)
     print(" ④ 배포 모델")
     print("=" * 74)
-    if base["model"] != now["model"]:
-        for k in sorted(set(base["model"]) | set(now["model"])):
-            if base["model"].get(k) != now["model"].get(k):
-                print(f"  [델타] {k}: {base['model'].get(k)} → {now['model'].get(k)}")
+    # [2026-09-06] why 는 사람에게 하는 설명이지 측정값이 아니다. 문구를 고치면 회귀로
+    # 잡혀서, 안내를 개선할수록 게이트가 시끄러워진다 — 그러면 아무도 안 고친다.
+    _b_model = {k: v for k, v in base["model"].items() if k != "why"}
+    _n_model = {k: v for k, v in now["model"].items() if k != "why"}
+    if _b_model != _n_model:
+        for k in sorted(set(_b_model) | set(_n_model)):
+            if _b_model.get(k) != _n_model.get(k):
+                print(f"  [델타] {k}: {_b_model.get(k)} → {_n_model.get(k)}")
                 regressions += 1
     elif not now["model"].get("measured", False):
         # [2026-09-06] **못 잰 것을 '변화 없음' 이라 말하지 않는다.**

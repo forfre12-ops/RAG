@@ -81,6 +81,32 @@ def _only_import_error(handler: ast.ExceptHandler) -> bool:
     return bool(names) and all(n in ("ImportError", "ModuleNotFoundError") for n in names)
 
 
+_METRIC_HINTS = ("prom_metrics", ".inc(", ".labels(", ".observe(", ".set(")
+
+
+def _classify(try_body: list) -> str:
+    """try 블록이 무엇을 감쌌는가 — 우선순위를 가르는 것은 이것이다.
+
+    [2026-09-06] 종전에는 판정 경로 파일 안이면 전부 "등급이 조용히 달라질 수 있는 자리"로
+    셌다. 실제로 열어 보니 메트릭 증가와 lazy import 가 절반 가까이였다. 그런 것이 섞여
+    숫자가 커지면 목록을 아무도 안 연다.
+
+        metric   메트릭 증가 실패 — 등급과 무관
+        import   lazy import 폴백 — 등급과 무관(선택 의존성)
+        other    그 밖 — 실제 검토 대상
+    """
+    import ast as _ast
+
+    if not try_body:
+        return "other"
+    src = "\n".join(_ast.unparse(st) for st in try_body)
+    if any(h in src for h in _METRIC_HINTS) and "settings" not in src:
+        return "metric"
+    if all(isinstance(st, (_ast.Import, _ast.ImportFrom)) for st in try_body):
+        return "import"
+    return "other"
+
+
 def scan(py: Path) -> list[tuple[int, str, bool]]:
     """(줄번호, 예외타입, import폴백여부) 목록."""
     try:
@@ -88,14 +114,16 @@ def scan(py: Path) -> list[tuple[int, str, bool]]:
     except SyntaxError:
         return []
     out = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.ExceptHandler):
+    for tnode in ast.walk(tree):
+        if not isinstance(tnode, ast.Try):
             continue
-        if any(_is_trace(st) for st in ast.walk(node) if isinstance(st, (ast.Raise, ast.Expr))):
-            continue
-        t = node.type
-        label = ast.unparse(t) if t is not None else "bare except"
-        out.append((node.lineno, label, _only_import_error(node)))
+        for node in tnode.handlers:
+            if any(_is_trace(st) for st in ast.walk(node) if isinstance(st, (ast.Raise, ast.Expr))):
+                continue
+            t = node.type
+            label = ast.unparse(t) if t is not None else "bare except"
+            # 분류는 **감싼 것**을 보고 정한다 — 핸들러가 아니라 try 본문이다.
+            out.append((node.lineno, label, _only_import_error(node), _classify(tnode.body)))
     return out
 
 
@@ -109,7 +137,7 @@ def main(argv=None) -> int:
     scripts = sorted(p for p in (_REPO / "scripts").rglob("*.py"))
 
     total_handlers = 0
-    rows: list[tuple[str, int, str, bool, bool]] = []  # rel, line, label, import_fb, on_path
+    rows: list[tuple[str, int, str, bool, bool, str]] = []  # rel, line, label, import_fb, on_path, kind
     for py in files + scripts:
         rel = py.relative_to(_REPO).as_posix()
         try:
@@ -120,19 +148,28 @@ def main(argv=None) -> int:
         except SyntaxError:
             pass
         on_path = any(rel.startswith(d) for d in DECISION_PATH)
-        for line, label, imp in scan(py):
-            rows.append((rel, line, label, imp, on_path))
+        for line, label, imp, kind in scan(py):
+            rows.append((rel, line, label, imp, on_path, kind))
 
     silent = [r for r in rows if not r[3]]
     imp_fb = [r for r in rows if r[3]]
     on_path = [r for r in silent if r[4]]
+    # [2026-09-06] 판정 경로 안이라고 다 "등급이 달라질 수 있는 자리"가 아니다. 실제로
+    # 열어 보니 메트릭 증가와 lazy import 가 절반 가까이였고, 손으로 다 읽은 22건 중
+    # 진짜 결함은 1건이었다. 세는 것과 고를 것이 달랐다 — 여기서 갈라 놓는다.
+    review = [r for r in on_path if r[5] == "other"]
+    metric_only = [r for r in on_path if r[5] == "metric"]
+    lazy_import = [r for r in on_path if r[5] == "import"]
 
     print("=" * 74)
     print(" 무음 예외 감사")
     print("=" * 74)
     print(f"  전체 except 핸들러      {total_handlers:>5} 개  (src/ + scripts/)")
     print(f"  흔적 없는 핸들러        {len(silent):>5} 개  ({len(silent)/max(total_handlers,1)*100:.1f}%)")
-    print(f"    ├ 판정 경로          {len(on_path):>5} 개  <- 등급이 조용히 달라질 수 있는 자리")
+    print(f"    ├ 판정 경로          {len(on_path):>5} 개")
+    print(f"    │   ├ 검토 대상      {len(review):>5} 개  <- 등급이 조용히 달라질 수 있는 자리")
+    print(f"    │   ├ 메트릭만       {len(metric_only):>5} 개     증가 실패 — 등급과 무관")
+    print(f"    │   └ lazy import   {len(lazy_import):>5} 개     선택 의존성 폴백 — 등급과 무관")
     print(f"    └ 그 밖              {len(silent)-len(on_path):>5} 개")
     print(f"  선택 의존성 폴백(제외)  {len(imp_fb):>5} 개  ImportError 전용 - 로그가 소음")
     print("")
@@ -140,16 +177,21 @@ def main(argv=None) -> int:
     for d in DECISION_PATH:
         print(f"    {d}")
 
-    show = on_path if args.path else silent
+    # --path 는 **검토 대상만** 보여준다. 메트릭·lazy import 를 섞으면 목록이 길어져
+    # 사람이 안 연다. 전부 보려면 --list 다.
+    show = review if args.path else silent
     if args.list or args.path:
         print("")
         print("-" * 74)
         cur = None
-        for rel, line, label, _imp, p in sorted(show):
+        for rel, line, label, _imp, p, kind in sorted(show):
             if rel != cur:
                 print(f"\n  {rel}")
                 cur = rel
-            print(f"    :{line:<6} except {label}{'   [판정경로]' if p else ''}")
+            tag = "   [판정경로]" if p else ""
+            if kind != "other":
+                tag += f" ({kind})"
+            print(f"    :{line:<6} except {label}{tag}")
     else:
         print("")
         print("  --list 로 전체, --path 로 판정 경로만 본다.")

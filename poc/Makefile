@@ -191,6 +191,11 @@ p1-eval: ## 배포 P1 모델을 gold 티어(법적근거+전체)로 평가 → r
 	    --report reports/p1_release_legal_direct.md
 	$(PY) scripts/eval_p1_model_gold.py --model-dir $(P1_MODEL) --mode direct \
 	    --report reports/p1_release_holdout_direct.md
+	# [2026-09-06] 서빙 경로 비교도 여기서 갱신한다. check_release_gate 가 읽는 입력은
+	# 셋인데(p1_public·p1_llm·p1_serving) 종전에는 앞의 둘만 만들었다. 셋째는 어떤 타깃도
+	# 안 만들어서 **20일** 낡아 있었다(한도 14일). 권장 경로를 따라도 경고가 남으면
+	# 사람은 그 경고를 무시하게 된다.
+	TESTING=1 $(PY) scripts/eval_serving_vs_raw.py --model-dir $(P1_MODEL) \n	    --report reports/SERVING_VS_RAW.json
 
 p1-eval-v3: ## [legacy] v3 모델 gold 티어 평가 — 운영 경로 아님(역사 비교용)
 	$(PY) scripts/eval_p1_model_gold.py \
@@ -374,6 +379,9 @@ operational-readiness: ## Build combined P1/P2/data readiness report (reads exis
 	    --out reports/operational_readiness.md
 
 readiness: p1-eval operational-readiness ## 배포 모델 재평가 + readiness 빌드 (권장 진입점)
+	@echo ""
+	@echo "  다음: CLASSIFIER_MODEL_DIR=$(P1_MODEL) $(PY) scripts/check_release_gate.py --require-fresh"
+	@echo "  (CLASSIFIER_MODEL_DIR 를 안 주면 'deployed model unknown' 으로 model parity 가 막힌다)"
 
 adversarial-gate: ## 적대 회귀 게이트 — golden_100 위험 미탐(고비밀→S3) baseline 초과 시 FAIL
 	$(PY) scripts/eval_adversarial.py --model-dir $(or $(MODEL_DIR),$(DEPLOYED_MODEL))
