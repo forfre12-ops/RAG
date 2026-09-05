@@ -192,15 +192,20 @@ fi
 [ -d "$mdir/hf" ] || info "[주의] models/hf 부재 → HF_HUB_OFFLINE=1 로 기동 실패 가능(§3)."
 
 # ── 4. 인프라 기동 (postgres·redis) ────────────────────────
-log "4/7  인프라 기동 + postgres 헬시 대기"
-dc_air up -d postgres redis
-for i in $(seq 1 60); do
-  if dc_air exec -T postgres pg_isready -U "$(_env_val POSTGRES_USER || echo koipa)" >/dev/null 2>&1; then
-    info "postgres ready (${i}s)"; break
-  fi
-  [ "$i" = 60 ] && die "postgres 헬시 실패(60s). 'dc_air ps'/'logs postgres' 확인(pgvector 이미지)"
-  sleep 1
-done
+# [2026-09-05] DB 헬시 대기를 엔진 인식으로. 종전에는 `up -d postgres` 후
+# pg_isready 만 기다려, 앱이 MariaDB 를 보게 되면 **엉뚱한 DB 를 확인하고 성공을
+# 보고**했다. db_probe.sh 가 DATABASE_URL 에서 서비스명·프로브를 정한다.
+. "$SELF/db_probe.sh"
+DB_SVC="$(db_service "$(_env_val DATABASE_URL || echo '')")"
+DB_USER="$(_env_val POSTGRES_USER || _env_val MARIADB_USER || echo koipa)"
+DB_PW="$(_env_val POSTGRES_PASSWORD || _env_val MARIADB_PASSWORD || echo '')"
+log "4/7  인프라 기동 + ${DB_SVC} 헬시 대기"
+dc_air up -d "$DB_SVC" redis
+if msg=$(db_wait 60 "$DB_SVC" "$DB_USER" "$DB_USER" dc_air "$DB_PW"); then
+  info "$msg"
+else
+  die "${DB_SVC} 헬시 실패(60s). 'dc_air ps'/'logs ${DB_SVC}' 확인"
+fi
 
 # ── 5. DB 마이그레이션 (19테이블 + 파티션 백필) ────────────
 log "5/7  alembic 마이그레이션 (run --rm api)"

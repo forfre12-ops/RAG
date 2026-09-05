@@ -136,17 +136,20 @@ else
 fi
 
 # ── 2. 인프라 기동 (postgres·redis·minio) ──────────────────
-log "2/7  인프라 기동 + postgres 헬시 대기"
-infra=(postgres redis); [ "$STORAGE" = "minio" ] && infra+=(minio)
+# [2026-09-05] DB 헬시 대기를 엔진 인식으로. 종전에는 `up -d postgres` 후
+# pg_isready 만 기다려, 앱이 MariaDB 를 보게 되면 **엉뚱한 DB 를 확인하고 성공을
+# 보고**했다. db_probe.sh 가 DATABASE_URL 에서 서비스명·프로브를 정한다.
+. "$HERE/db_probe.sh"
+DB_SVC="$(db_service "${DATABASE_URL:-}")"
+log "2/7  인프라 기동 + ${DB_SVC} 헬시 대기"
+infra=("$DB_SVC" redis); [ "$STORAGE" = "minio" ] && infra+=(minio)
 info "인프라: ${infra[*]}  (storage=$STORAGE)"
 dc up -d "${infra[@]}"
-for i in $(seq 1 60); do
-  if dc exec -T postgres pg_isready -U "$PG_USER" -d "$PG_USER" >/dev/null 2>&1; then
-    info "postgres ready (${i}s)"; break
-  fi
-  [ "$i" = 60 ] && die "postgres 헬시 실패(60s). 'ps'/'logs postgres' 확인"
-  sleep 1
-done
+if msg=$(db_wait 60 "$DB_SVC" "$PG_USER" "$PG_USER" dc "${PG_PASSWORD:-}"); then
+  info "$msg"
+else
+  die "${DB_SVC} 헬시 실패(60s). 'ps'/'logs ${DB_SVC}' 확인"
+fi
 
 # ── 3. 분류 모델 external 볼륨 (alembic 前 — api 컨테이너가 ro 마운트하므로 반드시 선존재) ──
 # prod overlay 의 api/worker 는 prod_artifacts(external:true)를 마운트한다. 이 볼륨이 없으면

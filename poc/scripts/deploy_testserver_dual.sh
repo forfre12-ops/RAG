@@ -117,13 +117,24 @@ gen_env() {
 
 dc() { local proj=$1 envf=$2; shift 2; ENV_FILE="$envf" docker compose -p "$proj" --env-file "$envf" $COMPOSE_FILES "$@"; }
 
+# [2026-09-05] DB 헬시 대기를 엔진 인식으로. 종전에는 `up -d postgres` 후
+# pg_isready 만 기다려, 앱이 MariaDB 를 보게 되면 **엉뚱한 DB 를 확인하고 성공을
+# 보고**했다. db_probe.sh 가 DATABASE_URL 에서 서비스명·프로브를 정한다.
+. "$ROOT/scripts/db_probe.sh"
 wait_pg() {
-  local proj=$1 envf=$2 i
+  local proj=$1 envf=$2 svc i
+  svc="$(db_service "$(grep -m1 '^DATABASE_URL=' "$envf" 2>/dev/null | cut -d= -f2-)")"
   for i in $(seq 1 30); do
-    if dc "$proj" "$envf" exec -T postgres pg_isready -U koipa -q 2>/dev/null; then return 0; fi
+    if [ "$svc" = "mariadb" ]; then
+      if dc "$proj" "$envf" exec -T mariadb mariadb-admin ping --silent >/dev/null 2>&1; then
+        return 0
+      fi
+    elif dc "$proj" "$envf" exec -T postgres pg_isready -U koipa -q 2>/dev/null; then
+      return 0
+    fi
     sleep 2
   done
-  c_err "postgres 헬시 대기 초과 ($proj)"; return 1
+  c_err "${svc} 헬시 대기 초과 ($proj)"; return 1
 }
 
 # ── 스택 하나 배포 ──────────────────────────────────────────────────────────

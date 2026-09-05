@@ -65,7 +65,7 @@ elif [ -n "$did" ]; then
   # 이 검사는 문서 1건을 **실제로 적재한다**. 시연 서버라면 지워 두는 편이 낫다.
   # 자동으로 지우지 않는다 - created_by 범위로 지우면 남의 시연 데이터까지 지운다.
   echo "    남긴 검사 문서 지우기(시연 서버라면):"
-  echo "      docker exec -i $PGC psql -U koipa -d koipa -c \"delete from tb_classification_evidence where classification_id in (select classification_id from tb_classifications where doc_id='$did'); delete from tb_classifications where doc_id='$did'; delete from tb_chunks where doc_id='$did'; delete from tb_documents where doc_id='$did';\""
+  echo "      docker exec -i $PGC $DB_CLIENT \"delete from tb_classification_evidence where classification_id in (select classification_id from tb_classifications where doc_id='$did'); delete from tb_classifications where doc_id='$did'; delete from tb_chunks where doc_id='$did'; delete from tb_documents where doc_id='$did';\""
 fi
 
 # 3) 관리자 콘솔 화면이 이 판에 들어 있나

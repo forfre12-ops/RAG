@@ -7,7 +7,7 @@
   `backups/storage` 미러를 복원 대상으로 기대하지만, 그 미러를 **생성하는 쪽이 없었다**. 여기서 만든다.
 
 설계(backup_postgres.py 와 대칭):
-- pg_dump 가 `docker exec ... pg_dump` 인 것과 동일하게, 실행 중 api/worker 컨테이너에서
+- DB 덤프가 `docker exec ...` 인 것과 동일하게, 실행 중 api/worker 컨테이너에서
   `docker exec ... tar` 로 마운트 경로(/app/.storage)를 아카이브한다(호스트 tar/볼륨명 불요).
 - 산출물: `storage-YYYYMMDD-HHMMSS.tar.gz` (gzip tar, 볼륨 내용이 루트).
 - 원문은 이미 at-rest 암호화라 아카이브도 암호문 그대로 — 복원 시 **암호화 키(.env

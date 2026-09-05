@@ -5,7 +5,8 @@
 단계:
 1. 최신 pg/storage 백업 위치 확인 (폐쇄망 저장소=로컬FS, MinIO 미사용)
 2. staging 컨테이너 기동 (별도 compose project)
-3. dr_restore.py 로 실복구 (pg_restore + 로컬FS 미러) — fail-closed
+3. dr_restore.py 로 실복구 (DB 복원 + 로컬FS 미러) — fail-closed.
+   [2026-09-05] DB 복원은 PostgreSQL·MariaDB 양쪽을 탄다(scripts/db_engine.py).
 4. 핵심 read·write 시나리오 5개 검증
 5. 시간 측정 + 리포트 산출
 """
@@ -72,7 +73,7 @@ def stage_commands(staging_compose: str) -> dict[str, list[str] | None]:
     return {
         "find_latest_backups": ["ls", "-la", "backups/"],
         "spin_up_staging": ["docker", "compose", "-p", "koipa-dr", "-f", staging_compose, "up", "-d"],
-        # 실복구는 dr_restore.py(실 pg_restore, fail-closed) — dr_restore_check.py 는 recency
+        # 실복구는 dr_restore.py(실 DB 복원, fail-closed) — dr_restore_check.py 는 recency
         # 점검일 뿐 복원을 하지 않는다. 과거엔 존재하지 않는 --target/--staging 플래그로 호출해
         # argparse 오류(exit 2)로 항상 죽었다.
         "restore_postgres": ["python", "scripts/dr_restore.py", "--target", "postgres", "--staging"],

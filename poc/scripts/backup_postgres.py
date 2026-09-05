@@ -1,7 +1,15 @@
-"""PostgreSQL 일별 백업 → 로컬FS `backups/pg/` (선택: 두 번째 매체 / MinIO).
+"""DB 일별 백업 → 로컬FS `backups/pg/` (선택: 두 번째 매체 / MinIO).
+
+[2026-09-05] PostgreSQL 전용이던 것을 **PostgreSQL·MariaDB 양쪽**으로 넓혔다. 종전에는
+pg_dump 를 직접 불러 MariaDB 배포에서 백업이 아예 돌지 않았다. 엔진 판정과 명령 생성은
+scripts/db_engine.py 가 맡는다(--engine 으로 명시 가능·못 정하면 추측하지 않고 실패).
+파일명은 그대로 둔다 — 운영 런북·cron·내부 문서가 이 이름으로 참조한다.
+
+덤프 형식이 엔진마다 다르다: PostgreSQL custom(*.dump) · MariaDB SQL 텍스트(*.sql).
+확장자가 갈려 있어 잘못된 엔진에 잘못된 덤프를 밀어 넣는 사고를 목록에서 먼저 막는다.
 
 설계:
-- pg_dump는 docker exec로 실행 (호스트에 psql 클라이언트 무관)
+- 덤프는 docker exec 로 실행 (호스트에 클라이언트 설치 불요)
 - 대상 컨테이너는 실행 중 스택에서 자동탐지(--container 로 명시 가능). 하드코딩 기본값이
   airgap(koipa-airgap-*)·dual(koipa-jjw-*/cust-*)에서 빗나가던 문제를 자동탐지로 해소.
 - 산출물: {db}-YYYYMMDD-HHMMSS.dump (custom format, 압축) → backups/pg/
@@ -53,24 +61,31 @@ def run_pg_dump(
     db: str,
     user: str,
     output_dir: Path,
+    engine=None,
+    password: str | None = None,
 ) -> Path:
-    """docker exec pg_dump → 호스트 파일."""
+    """docker exec 로 덤프 → 호스트 파일. PostgreSQL·MariaDB 양쪽.
+
+    이름은 하위호환으로 유지한다(backup_dr.py 가 bp.run_pg_dump 로 부른다).
+    engine 미지정이면 db_engine.detect_engine() 이 정한다.
+    """
+    from db_engine import detect_engine, run  # noqa: PLC0415
+
+    engine = engine or detect_engine()
+    password = password if password is not None else os.environ.get("KOIPA_DB_PASSWORD")
+
     output_dir.mkdir(parents=True, exist_ok=True)
-    name = f"{db}-{_ts()}.dump"
-    out_path = output_dir / name
-    cmd = [
-        "docker", "exec", "-i", container,
-        "pg_dump", "-U", user, "-d", db, "-F", "c", "--no-owner", "--no-privileges",
-    ]
-    logger.info("running: %s → %s", " ".join(cmd), out_path)
+    out_path = output_dir / f"{db}-{_ts()}{engine.dump_suffix}"
+    cmd = engine.dump_argv(container, db, user, password)
+    logger.info("running(%s): %s → %s", engine.name, " ".join(cmd), out_path)
     with out_path.open("wb") as fh:
-        proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.PIPE, check=False)
+        proc = run(cmd, engine, password, stdout=fh, stderr=subprocess.PIPE)
     if proc.returncode != 0:
         out_path.unlink(missing_ok=True)
-        raise RuntimeError(f"pg_dump failed: {proc.stderr.decode(errors='replace')}")
+        raise RuntimeError(f"{engine.name} dump failed: {proc.stderr.decode(errors='replace')}")
     if out_path.stat().st_size == 0:
         out_path.unlink(missing_ok=True)
-        raise RuntimeError("pg_dump produced empty file")
+        raise RuntimeError(f"{engine.name} dump produced empty file")
     return out_path
 
 
@@ -136,6 +151,8 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Koipa Postgres backup")
     p.add_argument("--container", default=None,
                    help="postgres 컨테이너명(미지정 시 자동탐지; 2스택+면 모호→명시 필요)")
+    p.add_argument("--engine", default=None,
+                   help="postgresql | mariadb (미지정 시 DATABASE_URL·실행 컨테이너로 판정)")
     p.add_argument("--db", default=DEFAULT_DB)
     p.add_argument("--user", default=DEFAULT_USER)
     p.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -157,15 +174,20 @@ def main(argv: list[str] | None = None) -> int:
             logger.info("--skip-dump: dry-run only")
             return 0
 
-        container = args.container or autodetect_pg_container()
+        from db_engine import detect_engine  # noqa: PLC0415
+
+        engine = detect_engine(args.engine)
+        container = args.container or autodetect_container((engine.service,))
         if container is None:
             logger.error(
-                "postgres 컨테이너 자동탐지 실패(미가동 또는 2스택+ 모호) — --container 로 명시하세요"
+                "%s 컨테이너 자동탐지 실패(미가동 또는 2스택+ 모호) — --container 로 명시하세요",
+                engine.service,
             )
             return 2
 
         dump_path = run_pg_dump(
-            container=container, db=args.db, user=args.user, output_dir=args.output_dir,
+            container=container, db=args.db, user=args.user,
+            output_dir=args.output_dir, engine=engine,
         )
         logger.info("dump OK: %s (%d bytes)", dump_path, dump_path.stat().st_size)
 

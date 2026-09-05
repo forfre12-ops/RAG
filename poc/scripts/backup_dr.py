@@ -59,6 +59,9 @@ def plan_targets(stacks: dict[str, dict[str, str]], backups_root: Path) -> list[
         targets.append({
             "project": project,
             "pg_container": names["postgres"],
+            # [2026-09-05] 스택마다 DB 엔진이 다를 수 있다(PostgreSQL·MariaDB).
+            # dr_discovery 가 실어 준 값을 그대로 백업 명령에 넘긴다.
+            "engine": names.get("engine", "postgresql"),
             "storage_container": names["storage"],
             "pg_dir": pg_dir,
             "storage_dir": storage_dir,
@@ -73,15 +76,23 @@ def _backup_one(t: dict, args) -> dict:
     # ── PostgreSQL ──
     try:
         if args.dry_run:
-            entry["pg"] = {"status": "PLAN", "container": t["pg_container"], "dir": str(t["pg_dir"])}
+            entry["pg"] = {
+                "status": "PLAN", "container": t["pg_container"],
+                "engine": t.get("engine"), "dir": str(t["pg_dir"]),
+            }
         else:
+            from db_engine import detect_engine  # noqa: PLC0415
+
+            engine = detect_engine(t.get("engine"))
             dump = bp.run_pg_dump(
-                container=t["pg_container"], db=args.db, user=args.user, output_dir=t["pg_dir"],
+                container=t["pg_container"], db=args.db, user=args.user,
+                output_dir=t["pg_dir"], engine=engine,
             )
             if args.second_media_dir is not None:
                 bp.mirror_to_second_media(dump, args.second_media_dir / t["project"] / "pg")
             bp.cleanup_old_backups(t["pg_dir"], args.retention_days)
-            entry["pg"] = {"status": "OK", "file": dump.name, "bytes": dump.stat().st_size}
+            entry["pg"] = {"status": "OK", "engine": t.get("engine"),
+                           "file": dump.name, "bytes": dump.stat().st_size}
     except Exception as exc:  # noqa: BLE001
         entry["pg"] = {"status": "FAIL", "error": str(exc)}
         logger.error("[%s] pg 백업 실패: %s", t["project"], exc)
