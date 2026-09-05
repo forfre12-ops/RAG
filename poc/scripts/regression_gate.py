@@ -149,11 +149,33 @@ def snap_settings() -> dict:
 
 
 def snap_model() -> dict:
+    """배포 모델의 가중치 해시. **잴 수 없으면 그렇게 적는다.**
+
+    [2026-09-06] 종전에는 classifier_model_dir 이 비어 있으면 `_ROOT / ""` 가 리포 루트가
+    되어 is_dir() 을 통과하고, 루트에 가중치 파일이 없으니 해시를 하나도 안 담은 채
+    {"dir": ""} 만 남겼다. 그 값은 매번 같으므로 비교가 늘 통과했고, 출력은
+    "④ 배포 모델 · 변화 없음" 이었다 — **잴 수 없었던 것을 통과로 보고한 것이다.**
+
+    "잴 수 없다"와 "재 봤더니 같다"는 다른 사실이다. 섞으면 게이트를 믿을 수 없다.
+    """
     from koipa.config import settings
 
-    d = _ROOT / str(getattr(settings, "classifier_model_dir", "") or "")
-    info = {"dir": str(getattr(settings, "classifier_model_dir", ""))}
-    if d.is_dir():
+    raw_dir = str(getattr(settings, "classifier_model_dir", "") or "").strip()
+    info: dict = {"dir": raw_dir}
+    if not raw_dir:
+        # 빈 값이면 리포 루트로 떨어지지 않도록 여기서 끊는다.
+        info["measured"] = False
+        info["why"] = "classifier_model_dir 이 비어 있다 — 이 환경에서는 모델 축을 잴 수 없다"
+        return info
+
+    d = _ROOT / raw_dir
+    if not d.is_dir():
+        info["measured"] = False
+        info["why"] = "모델 디렉터리가 없다: %s" % d
+        return info
+
+    info["measured"] = True
+    if True:
         for w in ("model.safetensors", "pytorch_model.bin", "temperature.json"):
             f = d / w
             if f.exists():
@@ -162,6 +184,9 @@ def snap_model() -> dict:
                     for blk in iter(lambda: fh.read(1 << 20), b""):
                         h.update(blk)
                 info[w] = h.hexdigest()[:16]
+    if not any(k.endswith((".safetensors", ".bin", ".json")) for k in info):
+        info["measured"] = False
+        info["why"] = "디렉터리는 있는데 가중치 파일이 없다: %s" % d
     return info
 
 
@@ -176,6 +201,8 @@ def take() -> dict:
 
 def compare(base: dict, now: dict) -> int:
     regressions = 0
+    # 못 잰 축이 있으면 요약에서 "전부 그대로"라고 말하지 않는다.
+    unmeasured = False
     # 기준을 뜬 프로파일과 지금 프로파일이 다르면 비교가 성립하지 않는다.
     # 온도·합의게이트·메타데이터 floor 가 프로파일 소속이라 판정면이 통째로 달라지고,
     # 코드를 한 줄도 안 건드려도 회귀가 수십 건 뜬다(2026-08-27 실측: 기준 full-train
@@ -258,12 +285,25 @@ def compare(base: dict, now: dict) -> int:
             if base["model"].get(k) != now["model"].get(k):
                 print(f"  [델타] {k}: {base['model'].get(k)} → {now['model'].get(k)}")
                 regressions += 1
+    elif not now["model"].get("measured", False):
+        # [2026-09-06] **못 잰 것을 '변화 없음' 이라 말하지 않는다.**
+        # classifier_model_dir 이 비어 있으면 해시를 하나도 담지 못하는데, 그 값은 매번
+        # 같으므로 비교가 늘 통과했다. 그래서 이 축이 비어 있는 채로 통과를 보고했다.
+        unmeasured = True
+        print("  ⚠ **재지 못했다** — %s" % now["model"].get("why", "사유 불명"))
+        print("     이 환경에서는 모델 축이 회귀를 잡지 못한다. 배포 서버에서 다시 돌릴 것.")
     else:
         print("  변화 없음")
 
     print("\n" + "=" * 74)
     if regressions:
         print(f" 회귀 후보 {regressions}건 — 의도한 변경이면 --accept 로 기준을 갱신한다.")
+    elif unmeasured:
+        # [2026-09-06] 못 잰 축이 있으면 **'전부 그대로'라고 말하지 않는다.**
+        # 이 문장이 근거로 인용된다 — 오늘 하루 이 게이트를 열 번 넘게 인용했는데
+        # 모델 축은 비어 있었다.
+        print(" 회귀 없음 — 다만 **모델 축은 재지 못했다**(위 ④ 참조).")
+        print(" 잰 것: 판정면 · API 계약 · 운영 파라미터")
     else:
         print(" 회귀 없음 — 판정면·계약·파라미터·모델 모두 그대로다.")
     print("=" * 74)
