@@ -47,6 +47,52 @@ def _pg_up() -> bool:
     return postgres_available()
 
 
+# _FakeProvider.name = "fake". 이 이름은 config._VALID_LLM_PROVIDER 에 없으므로 운영 경로가
+# 만들 수 없다 — DB 에 llm_provider='fake' 인 행이 있다면 그것은 전부 이 파일이 남긴 것이다.
+_TEST_PROVIDER = "fake"
+
+
+@pytest.fixture(autouse=True)
+def _purge_test_samples():
+    """이 파일이 검수큐에 넣은 행을 지운다 — 앞뒤로 모두.
+
+    왜(2026-09-06). 아래 두 시험은 **실 DB 의 검수큐**에 행을 넣고 치우지 않았다. 그래서
+    돌릴 때마다 쌓였고, 실측으로 194건 중 190건이 이 찌꺼기였다(llm_provider='fake',
+    doc_type='p0persist-…' 또는 'mixed'). 결과가 둘이다.
+
+      · 콘솔 검수 큐가 「검토 대기 192건」으로 뜬다. 사람이 볼 문서가 하나도 아닌데
+        화면은 밀린 검수처럼 읽힌다.
+      · 이미 다른 시험을 한 번 깨뜨렸다 — test_repositories 의 SynthRepo 수명주기 시험이
+        pending 55건 상태에서 list_pending_review(limit=50) 밖으로 밀려 실패했다
+        (2026-08-12). 그때는 그 시험 쪽을 우회시켰고 새는 곳은 막지 않았다.
+
+    학습 편입은 label_source 로 이미 막히므로 데이터 오염은 아니다. 막는 것은 **화면과
+    집계**다.
+
+    앞에서도 지우는 이유: 이미 쌓인 찌꺼기를 이 픽스처가 스스로 걷어내게 하려는 것이다.
+    별도 정리 스크립트를 두면 그것을 돌리는 것을 또 잊는다.
+    """
+    def _purge() -> int:
+        if not _pg_up():
+            return 0
+        from sqlalchemy import delete  # noqa: PLC0415
+
+        from koipa.db import session_scope  # noqa: PLC0415
+        from koipa.db.models import SampleDocument  # noqa: PLC0415
+
+        with session_scope() as db:
+            result = db.execute(
+                delete(SampleDocument).where(
+                    SampleDocument.llm_provider == _TEST_PROVIDER
+                )
+            )
+            return int(result.rowcount or 0)
+
+    _purge()
+    yield
+    _purge()
+
+
 def test_generator_clean_path_threads_model():
     """NoopProvider = 유효 JSON → clean 경로: label_source=None, parse_error=None, llm_model 채워짐."""
     gen = SyntheticDocGenerator(llm=NoopProvider())
