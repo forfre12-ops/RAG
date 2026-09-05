@@ -57,7 +57,10 @@ _BASES = (
     _ROOT / 'src' / 'koipa' / 'modules',
 )
 # 접미 일치로 찾을 때만 훑는 곳. 리포 전체 rglob 은 느리고 오검출이 난다.
-_SEARCH = (_ROOT / 'src', _ROOT / 'scripts', _ROOT / 'tests', _ROOT / 'datasets', _REPO / 'doc')
+# _REPO/'scripts' 포함 — 문서 생성기 일부(build_table_spec·table_spec_meta)는 리포
+# 루트 scripts/ 에 있다. 여기를 안 보면 실재하는 파일을 '없는 파일'로 잡는다(2026-09-05).
+_SEARCH = (_ROOT / 'src', _ROOT / 'scripts', _ROOT / 'tests', _ROOT / 'datasets',
+           _REPO / 'scripts', _REPO / 'doc')
 _index: dict[str, list[Path]] = {}
 
 

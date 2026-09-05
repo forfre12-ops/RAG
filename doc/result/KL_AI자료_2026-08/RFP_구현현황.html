@@ -59,7 +59,7 @@ a{color:#0a0a0a}
     <div class="meta">FUN-003·004·005·022·023·024 세부 33항목 · 실제 소스 대조 검증(2026-07-29 · 최종 반영 2026-08-02) · 엑셀 기입본 동봉</div>
   </div>
 
-  <div class="note"><b>완료 32 · 완료(대체구현) 1</b> (총 33항목). <b>FUN-003-④</b>는 요건이 요구한 프롬프트 체인 <u>기능</u>이 동작하되 LangChain 프레임워크 대신 자체 어댑터로 구현한 건이라 <b>완료(대체구현)</b>으로 표기했습니다(사유는 아래 별도 박스). <b>FUN-003-②</b>는 AI Hub #71739 실활용(공개특허 4,800건 → 학습 7,200행) · 공개판례 3,332건 구축 · 배포 게이트 평가 반영이 모두 확인되어 <b>완료</b>로 판정했습니다(대량 실데이터 확장은 운영단계 과제로 이월). 각 항목 근거는 파일·모듈 경로로 명시했으며 과대주장 없이 부분·옵션·유의사항을 비고에 표기했습니다.</div>
+  <div class="note"><b>완료 31 · 완료(대체구현) 1 · 제외 1</b> (총 33항목). <b>FUN-004-②</b>(RAG 옵션)는 2026-09-05 미채택 결정으로 <b>제외</b>입니다 &#8212; 요건 문구는 RTM 에 그대로 두고 이행 상태만 바꿨습니다(질의사항 회신서 가-5). <b>FUN-003-④</b>는 요건이 요구한 프롬프트 체인 <u>기능</u>이 동작하되 LangChain 프레임워크 대신 자체 어댑터로 구현한 건이라 <b>완료(대체구현)</b>으로 표기했습니다(사유는 아래 별도 박스). <b>FUN-003-②</b>는 AI Hub #71739 실활용(공개특허 4,800건 → 학습 7,200행) · 공개판례 3,332건 구축 · 배포 게이트 평가 반영이 모두 확인되어 <b>완료</b>로 판정했습니다(대량 실데이터 확장은 운영단계 과제로 이월). 각 항목 근거는 파일·모듈 경로로 명시했으며 과대주장 없이 부분·옵션·유의사항을 비고에 표기했습니다.</div>
   <div class="note"><b>2026-08-02 화면 보완 · 정정</b> — 관리자 콘솔에 <b>등급체계 편집</b>(FUN-005-①) · <b>합성 샘플 검수</b>(FUN-003-⑦) · <b>태깅 규칙 관리</b>(FUN-023-④) · <b>정밀도/재현율 지표 카드</b>(FUN-024-①) 화면을 신규 추가했습니다. 그 전에는 해당 기능이 API 전용이었습니다. 아울러 평가 리포트 HTML/PNG <b>산출 CLI</b>(FUN-004-⑤ · FUN-024-③)를 추가하고, 근거 문구 3건을 소스 대조로 정정했습니다 — .hwp 표셀 의존성 pyhwp→<b>unhwp(MIT)</b>, 키워드 시드 405→<b>404건</b>, 룰엔진 핫리로드의 <b>다중 워커 한계</b> 명시.</div>
 
   <h2>FUN-003 · 샘플 문서 생성 및 관리</h2>
@@ -95,7 +95,7 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:88px">세부ID</th><th style="width:64px">상태</th><th>근거·증빙</th><th style="width:280px">비고</th></tr></thead>
     <tbody>
       <tr><td class="id">FUN-004-①</td><td><span class="st done">완료</span></td><td>m4_training/trainer.py train_classifier(KF-DeBERTa base·WeightedTrainer FNR 비대칭 cost)·p1_train_classifier.py --mode full·RTM FUN-004·백서 §03</td><td>BERT계열 4클래스 전이학습 완비. 실 파인튜닝은 full-train 프로파일(enable_training=True)</td></tr>
-      <tr><td class="id">FUN-004-②</td><td><span class="st done">완료</span></td><td>m5_inference/pipeline.py run(use_rag)·하이브리드 검색(ts_rank+RRF·KURE-v1·pgvector)·rag/indexer.index_guide·answer.py</td><td>선택 옵션(기본 OFF). RAG는 보완 컨텍스트·질의응답 부가이며 등급을 바꾸지 않음(요건의 '선택 옵션' 성격과 일치)</td></tr>
+      <tr><td class="id">FUN-004-②</td><td><span class="st done">제외</span></td><td>&#8212; (구현물 제거: koipa/rag · adapters/vectorstore · answer.py)</td><td><b>미채택으로 제외.</b> 등급 판정에 관여하지 않는 보완 기능이라 구현물을 걷었다. 요건 문구는 RTM 에 그대로 남긴다. 근거: 2026-09-05 · 유사문서 조회 미채택(질의사항 회신서 가-5) · 커밋 319069b9</td></tr>
       <tr><td class="id">FUN-004-③</td><td><span class="st done">완료</span></td><td>m4_training/chunk_expand.py·TrainSpec.chunk_expand·trainer(TRAIN만 chunk 확장, val/test 문서단위)·test_chunk_expand.py</td><td>옵션(기본 문서단위). 긴 문서 512 truncation 회수용. val/test 미적용으로 누수 차단</td></tr>
       <tr><td class="id">FUN-004-④</td><td><span class="st done">완료</span></td><td>build_labeled_dataset.py(층화 3분할 0.7/0.15/0.15·seed42·dedup 누수가드)·hygiene.stratified_holdout_split·trainer(val=베스트·test=최종)</td><td>층화·결정론·누수차단 완비. 실데이터 희소로 고등급 홀드아웃 희소는 stats 노출</td></tr>
       <tr><td class="id">FUN-004-⑤</td><td><span class="st done">완료</span></td><td>trainer compute_metrics(sklearn Acc·P·R·F1 macro·CM·등급별 FNR)→report.json+MLflow·p1_train_classifier.py --report(Markdown)·m6_evaluation·report.py(HTML+CM PNG)·scripts/render_eval_report.py(산출 CLI)</td><td>Acc/P/R/F1/CM/FNR 리포트 완비 — JSON·Markdown은 학습 파이프라인 자동 산출, HTML+CM PNG는 render_eval_report.py CLI로 산출(2026-08-02 진입점 추가). FNR(고등급 미탐)이 핵심 KPI로 별도 강조</td></tr>

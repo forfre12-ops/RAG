@@ -161,7 +161,7 @@ footer strong{color:var(--text-dim);}
         </tr>
         <tr>
           <td><code>FUN-004</code></td>
-          <td>분류 모델 학습 — KF-DeBERTa, Train/Val/Test 자동분리, RAG 옵션, 온프렘 GPU <span style="font-size:.92em;color:#666;">— RAG 규정보완은 증거 제공까지이고 판정 투입은 선택(기본 OFF).</span></td>
+          <td>분류 모델 학습 — KF-DeBERTa, Train/Val/Test 자동분리, RAG 옵션, 온프렘 GPU <span style="font-size:.92em;color:#666;">— <b>RAG 옵션은 미채택으로 제외</b> — 등급 판정에 관여하지 않는 보완 기능이라 구현물(rag_context 증거 제공)을 걷었다. 근거: 2026-09-05 · 유사문서 조회 미채택(질의사항 회신서 가-5) · 커밋 319069b9. 나머지(KF-DeBERTa 학습 · Train/Val/Test 자동분리 · 온프렘 GPU)는 이행.</span></td>
           <td class="center">M4</td>
           <td>백서 §03 모델선정 · §06 검증</td>
           <td><code>api/training.py</code> → <code>services/training_service.py</code>(게이트·잡등록) → <code>workers/tasks.py</code>(Celery) → <code>modules/m4_training/trainer.py</code><br/>
