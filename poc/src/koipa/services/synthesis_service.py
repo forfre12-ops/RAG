@@ -19,6 +19,7 @@ from koipa.repositories import ClassifyRepo, SynthRepo
 from koipa.schemas.synthesis import (
     SynthGenerateRequest,
     SynthGenerateResponse,
+    SynthJobStatus,
     SyntheticDocItem,
     SynthQueueResponse,
     SynthReviewRequest,
@@ -67,19 +68,64 @@ TRAINING_EXCLUDED_LABEL_SOURCES = frozenset({"noop_fallback", "llm_nonjson"})
 # 여부와 무관한 축이라 마커의 구멍을 덮는다.
 TRAINING_EXCLUDED_PROVIDERS = frozenset({"noop"})
 
+# [2026-09-05] **게이트를 못 돌린 배치**도 학습에 넣지 않는다(monimo 세션 지적).
+# 워커의 누출 게이트는 fail-open 이다 — screen_batch 가 예외를 내면 전량을 검수큐로 넣고
+# batch_verdict='gate_error' 만 남긴다. 생성 결과를 버리지 않는 판단은 맞지만, 그 문서가
+# 승인만 되면 **검사받지 않은 채로** 학습셋에 들어갔다.
+#
+# ⚠ gate_error 는 "게이트를 못 돌렸다"이지 "누출이 있다"가 아니다 — 사유를 잡음과 섞지
+#   않는다(build_training_rows 가 사유별로 센다).
+TRAINING_EXCLUDED_VERDICTS = frozenset({"gate_error"})
+
+
+def _batch_verdict(quality_report) -> str | None:
+    """행에 남은 게이트 판정. 워커가 quality_report JSON 에 넣는다."""
+    if isinstance(quality_report, dict):
+        v = quality_report.get("batch_verdict")
+        return str(v) if v else None
+    return None
+
 
 def _is_training_admissible(
-    label_source: str | None, llm_provider: str | None = None
+    label_source: str | None,
+    llm_provider: str | None = None,
+    batch_verdict: str | None = None,
 ) -> bool:
-    """검수 승인 합성 샘플이 학습셋에 편입 가능한지 — 본문 출처 위생.
+    """검수 승인 합성 샘플이 학습셋에 편입 가능한지 — 본문 출처·검사 위생.
 
-    두 축으로 막는다:
-      · label_source  noop_fallback / llm_nonjson  (파싱 실패로 만들어진 본문)
-      · llm_provider  noop                          (테스트 전용 더미 provider 산출물)
+    세 축으로 막는다:
+      · label_source   noop_fallback / llm_nonjson  (파싱 실패로 만들어진 본문)
+      · llm_provider   noop                          (테스트 전용 더미 provider 산출물)
+      · batch_verdict  gate_error                    (누출 게이트를 **못 돌린** 배치)
+
+    셋 다 기본값이 있어 옛 호출은 깨지지 않는다 — 인자를 안 주면 그 축은 검사하지 않는다.
     """
     if (llm_provider or "").strip().lower() in TRAINING_EXCLUDED_PROVIDERS:
         return False
+    if (batch_verdict or "").strip() in TRAINING_EXCLUDED_VERDICTS:
+        return False
     return label_source not in TRAINING_EXCLUDED_LABEL_SOURCES
+
+
+# 판 이름 = **생산 조건까지 담은 내용 해시**.
+#
+# [2026-09-05] 앞선 판은 doc_id·label·text 만 넣었다. 그러면 같은 문서 집합이라도 **다른
+# 모델·다른 프롬프트·다른 품질 기준으로 만든 것이 같은 판 이름**을 갖는다. 재현용 이름이
+# 재현을 보장하지 못하는 셈이라, 학습 행에 보존하는 생산 조건을 함께 넣는다.
+#
+# 시각은 넣지 않는다 — 같은 내용이 매번 다른 판이 되면 되짚기가 무의미해진다.
+def _dataset_version(rows: list[dict]) -> str:
+    digest = hashlib.sha256()
+    for r in sorted(rows, key=lambda x: str(x.get("doc_id"))):
+        for key in (
+            "doc_id", "label", "text",
+            "llm_provider", "llm_model", "body_prompt_version",
+            "qc_prompt_version", "quality_score",
+        ):
+            digest.update(str(r.get(key)).encode("utf-8"))
+            digest.update(b"|")
+        digest.update(b";")
+    return "synth-%s-%d" % (digest.hexdigest()[:10], len(rows))
 
 
 class SynthesisService:
@@ -239,11 +285,45 @@ class SynthesisService:
                     synth_id=synth_id,
                     final_status=sd.review_status,
                     applied_grade=applied_grade,
-                    added_to_dataset_version=None,  # W6 학습 데이터셋 빌드 시 연결
+                    # [2026-09-05] 이 문서가 들어간 판 **전부**. 단일 값 필드는 한 문서가
+                    # 여러 판에 들어간 이력을 표현하지 못했고 늘 비어 있었다.
+                    dataset_versions=(
+                        repo.dataset_versions_of(synth_id)
+                        if hasattr(repo, "dataset_versions_of") else []
+                    ),
                 )
         except SQLAlchemyError as exc:
             logger.warning("synth review skipped: synth_id=%s err=%s", synth_id, exc)
             return None
+
+    def job_status(self, synth_job_id) -> "SynthJobStatus":
+        """생성 작업 1건 — 상태 + 그 작업이 만든 문서.
+
+        [2026-09-05] 종전에는 물을 수 없던 질문이다. 응답이 synth_job_id 를 주는데
+        조회 경로가 없었고 문서 쪽에도 job 칸이 없었다.
+        """
+        jid = uuid.UUID(str(synth_job_id))
+        rec = {}
+        try:
+            rec = self.jobs.get(jid) or {}
+        except Exception:  # noqa: BLE001
+            logger.warning("잡 조회 실패: job_id=%s", jid, exc_info=True)
+
+        sample_ids: list = []
+        try:
+            with session_scope() as db:
+                sample_ids = SynthRepo(db).samples_of_job(jid)
+        except SQLAlchemyError as exc:
+            logger.warning("잡 문서 조회 실패: job_id=%s err=%s", jid, exc)
+
+        return SynthJobStatus(
+            synth_job_id=jid,
+            status=str(rec.get("status") or "unknown"),
+            sample_ids=sample_ids,
+            persisted=rec.get("persisted"),
+            leakage_gate=rec.get("leakage_gate"),
+            error=rec.get("error"),
+        )
 
     def build_training_rows(
         self, *, limit: int | None = None, stamp_version: bool = False
@@ -294,11 +374,18 @@ class SynthesisService:
                 rows: list[dict] = []
                 excluded_noise = 0
                 excluded_empty = 0
+                # 게이트를 못 돌린 건은 **따로** 센다 — 잡음과 섞으면 게이트가 몇 번
+                # 깨졌는지를 나중에 셀 수 없다(rag-f1 지적).
+                excluded_gate_error = 0
                 for s in samples:
+                    _verdict = _batch_verdict(getattr(s, "quality_report", None))
+                    if _verdict in TRAINING_EXCLUDED_VERDICTS:
+                        excluded_gate_error += 1  # 검사받지 않은 문서 — 잡음과 다른 사유
+                        continue
                     if not _is_training_admissible(
-                        s.label_source, getattr(s, "llm_provider", None)
+                        s.label_source, getattr(s, "llm_provider", None), _verdict
                     ):
-                        excluded_noise += 1  # noop_fallback/llm_nonjson = 학습 편입 금지
+                        excluded_noise += 1  # noop_fallback/llm_nonjson/noop = 학습 편입 금지
                         continue
                     text = (s.generated_content or "").strip()
                     if not text:
@@ -339,25 +426,15 @@ class SynthesisService:
                     approved_total, len(rows), excluded_noise, excluded_empty,
                     grade_corrected,
                 )
-                # 판 이름 — **내용 해시**다. 같은 승인 집합이면 같은 값이 나온다.
-                # 시각으로 가르면 같은 내용이 매번 다른 판이 되어 되짚기가 안 된다.
-                digest = hashlib.sha256()
-                for r in sorted(rows, key=lambda x: x["doc_id"]):
-                    digest.update(r["doc_id"].encode("utf-8"))
-                    digest.update(b"|")
-                    digest.update(r["label"].encode("utf-8"))
-                    digest.update(b"|")
-                    digest.update((r["text"] or "").encode("utf-8"))
-                    digest.update(b"\n")
-                dataset_version = "synth-%s-%d" % (digest.hexdigest()[:10], len(rows))
+                dataset_version = _dataset_version(rows)
 
                 if stamp_version and rows:
-                    marked = repo.mark_added_to_dataset(
-                        [r["doc_id"] for r in rows], dataset_version
+                    added = repo.record_dataset_membership(
+                        [r["doc_id"] for r in rows], dataset_version,
                     )
                     logger.info(
-                        "학습셋 판 기록: version=%s rows=%d marked=%d",
-                        dataset_version, len(rows), marked,
+                        "학습셋 판 기록(append-only): version=%s rows=%d added=%d",
+                        dataset_version, len(rows), added,
                     )
 
                 return {
@@ -367,18 +444,26 @@ class SynthesisService:
                     "included": len(rows),
                     "excluded_noise": excluded_noise,
                     "excluded_empty": excluded_empty,
+                    # 누출 게이트를 못 돌린 배치의 건수. "게이트가 걸렀다"와 다른 사실이라
+                    # 잡음과 섞지 않는다 — 이 값이 0 이 아니면 게이트가 깨진 적이 있다.
+                    "excluded_gate_error": excluded_gate_error,
                     # 검수자가 등급을 고친 건수. 카운트로 내보내야 "교정이 반영됐다"를
                     # 학습셋을 열어 보지 않고도 확인할 수 있다.
                     "grade_corrected": grade_corrected,
                 }
         except SQLAlchemyError as exc:
             logger.warning("build_training_rows skipped: %s", exc)
+            # [2026-09-05] 이 경로에도 dataset_version 을 낸다. 앞선 판은 이 키를 빼서
+            # 호출 스크립트가 무조건 읽다가 KeyError 로 끝났다 — DB 오류가 KeyError 로
+            # 둔갑하면 진짜 사유가 가려진다.
             return {
                 "rows": [],
+                "dataset_version": _dataset_version([]),
                 "approved_total": 0,
                 "included": 0,
                 "excluded_noise": 0,
                 "excluded_empty": 0,
+                "excluded_gate_error": 0,
                 "grade_corrected": 0,
             }
 

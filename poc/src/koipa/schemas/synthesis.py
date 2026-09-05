@@ -88,4 +88,20 @@ class SynthReviewResponse(BaseModel):
     # 이 건이 학습행으로 만들어질 때 쓰일 등급. corrected_grade 를 보냈으면 그 값,
     # 아니면 생성 시 목표 등급. 반려면 학습에 들어가지 않으므로 참고값이다.
     applied_grade: Optional[Grade] = None
-    added_to_dataset_version: Optional[str] = None
+    # [2026-09-05] 이 문서가 들어간 학습셋 판 **전부**. 종전에는 단일 값 필드였고 늘 비었다 —
+    # 한 문서가 여러 판에 들어갈 수 있으므로 목록이 맞다(tb_sample_dataset_membership).
+    dataset_versions: list[str] = Field(default_factory=list)
+
+
+class SynthJobStatus(BaseModel):
+    """생성 작업 1건의 상태 — "이 작업이 성공했나 · 몇 건 만들었나 · 어느 문서인가"."""
+
+    synth_job_id: UUID
+    # 잡 저장소가 보고하는 상태. 저장소에 없으면 unknown(만료·재기동 등).
+    status: str
+    # 실제로 검수큐에 적재된 문서. 생성 건수와 다를 수 있다 — 누출 게이트가 거른다.
+    sample_ids: list[UUID] = Field(default_factory=list)
+    persisted: Optional[int] = None
+    # 누출 게이트 결과(판정·생성수·적재수·사유). 없으면 아직 안 돌았거나 옛 잡이다.
+    leakage_gate: Optional[dict] = None
+    error: Optional[str] = None

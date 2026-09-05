@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""안 쓰는 것 전수조사 — 테이블·컬럼·엔드포인트·설정·정의.
+"""안 쓰는 것 전수조사 — 테이블·컬럼·엔드포인트·설정.
 
 왜 필요한가.
   "안 쓰는 기능이 있느냐"는 범위 질문이다. 기억나는 것을 몇 개 grep 해서 답하면
@@ -12,7 +12,12 @@
   ② 컬럼     models.py 밖에서 참조 0 인 컬럼.
   ③ 엔드포인트 라우터에 등록됐으나 콘솔·테스트·문서 어디서도 부르지 않는 경로.
   ④ 설정     Settings 필드 중 정의부 밖 참조 0.
-  ⑤ 정의     함수·클래스 중 AST 참조 0.
+
+여기서 세지 않는 것 — 옆 도구로 간다.
+  · 정의(함수·클래스) 참조 0 → scripts/audit_wiring.py ①
+  · 죽은 모듈·세대 중복·주석처리 코드·중복 본문 → scripts/audit_code_debt.py
+  [2026-09-05] 이 docstring 은 "⑤ 정의"를 세겠다고 적어 두고 main() 은 넷만 돌렸다.
+  검사기가 약속한 것을 안 세면, 안 센 면이 깨끗한 것처럼 읽힌다.
 
 무엇을 세지 않는가(오탐 방지).
   · 프레임워크가 이름으로 부르는 것(라우터 핸들러·Celery task·pytest fixture·
@@ -32,6 +37,14 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
+
+# 한국어 Windows 콘솔은 cp949 다. 절 제목의 em dash 하나에 출력이 통째로 죽어
+# (UnicodeEncodeError) 검사 결과를 못 읽었다 - 문자를 쫓지 말고 출구를 고정한다.
+# report_holdout_independence.py 가 같은 이유로 이미 쓰는 방식이다.
+for _s in ("stdout", "stderr"):
+    _f = getattr(sys, _s)
+    if getattr(_f, "encoding", "") and _f.encoding.lower() not in ("utf-8", "utf-8-sig"):
+        setattr(sys, _s, io.TextIOWrapper(_f.buffer, encoding="utf-8", errors="replace"))
 
 _ROOT = Path(__file__).resolve().parent.parent
 _SRC = _ROOT / "src"

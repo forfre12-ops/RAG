@@ -558,7 +558,7 @@ paths:
                 target_grade: { $ref: '#/components/schemas/Grade' }
                 domain:
                   type: string
-                  enum: [ai, bio, business, defense, finance, hr, legal, ma, mixed, public, security, semiconductor, tech]
+                  enum: [ai, battery, bio, business, defense, finance, hr, legal, ma, mixed, pharma, public, security, semiconductor, tech, 경영정보, 기타, 바이오_농업, 반도체, 배터리, 소프트웨어, 화학_제약]
                   default: mixed
                   description: >-
                     생성기가 프롬프트를 가진 도메인(m1_synthesis.generator.DOMAIN_DOC_TYPES).
@@ -567,11 +567,14 @@ paths:
                 count: { type: integer, minimum: 1, maximum: 500 }
                 llm_provider:
                   type: string
-                  enum: [anthropic, openai, google, vllm_qwen, vllm_exaone]
+                  enum: [anthropic, gemini, google, lm_studio, local_openai, noop, ollama, openai, vllm]
                   default: anthropic
-                seed_documents:
-                  type: array
-                  items: { type: string, description: "Guide 문서 ID" }
+                  description: >-
+                    설정 정본(config._VALID_LLM_PROVIDER)에서 파생한다. 2026-09-05 이전에는
+                    vllm_qwen·vllm_exaone 을 받았는데 팩토리가 모르는 이름이라 생성 시
+                    ValueError 였고, 반대로 팩토리가 아는 ollama·local_openai·lm_studio 는
+                    요청할 수 없었다. 요청한 값이 실제 생성에 쓰이며, 그 provider 로 만들 수
+                    없으면 **실패로 끝난다**(전역 설정으로 되돌리지 않는다).
                 actor: { $ref: '#/components/schemas/Actor' }
       responses:
         '202':
@@ -584,6 +587,50 @@ paths:
                   synth_job_id: { type: string, format: uuid }
                   expected_count: { type: integer }
                   estimated_cost_usd: { type: number, format: float }
+                  dispatched:
+                    type: boolean
+                    description: >-
+                      워커로 발사됐는가. false 면 **등록만 되고 생성은 일어나지 않는다**
+                      (브로커 미가용·발사 실패). 2026-09-05 이전에는 이 사실이 로그에만
+                      남아 호출자가 알 수 없었다.
+                  dispatch_note:
+                    type: [string, "null"]
+                    description: dispatched=false 인 사유. 발사됐으면 null.
+
+  /synth/jobs/{synth_job_id}:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [synthesis]
+      summary: 생성 작업 상태와 그 작업이 만든 문서
+      description: >-
+        2026-09-05 신설. 응답이 synth_job_id 를 주는데 조회 경로가 없어
+        "이 작업이 성공했나 · 몇 건 만들었나 · 어느 문서인가"를 물을 수 없었다.
+      parameters:
+        - in: path
+          name: synth_job_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: 작업 상태
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  synth_job_id: { type: string, format: uuid }
+                  status:
+                    type: string
+                    description: 잡 저장소가 보고하는 상태. 저장소에 없으면 unknown.
+                  sample_ids:
+                    type: array
+                    items: { type: string, format: uuid }
+                    description: 실제로 검수큐에 적재된 문서. 누출 게이트가 거른 건은 빠진다.
+                  persisted: { type: [integer, "null"] }
+                  leakage_gate:
+                    type: [object, "null"]
+                    description: 누출 게이트 결과(판정·생성수·적재수·사유).
+                  error: { type: [string, "null"] }
 
   /synth/queue:
     get:
@@ -741,27 +788,38 @@ paths:
     post:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [guide]
-      summary: 학습 가이드 문서 등록·갱신 (FUN-002 연계)
+      summary: 가이드 문서 **버전 등록** (파일을 받지 않는다)
       description: |
-        KL이 관리하는 영업비밀 가이드 문서를 Koipa가 학습 기준으로 사용할 수 있도록
-        등록한다. 등록 시 자동으로 KURE-v1 임베딩되어 현재 RAG 백엔드
-        collection/alias에 반영된다. 현재 기본은 PostgreSQL pgvector이며 ES는 레거시 경로다.
+        가이드 문서의 버전 이력을 등록한다. **파일을 받지 않는다.**
+
+        2026-09-05 정정. 종전 계약은 multipart 로 파일을 필수로 받고 "KURE-v1 임베딩되어
+        RAG 백엔드 collection/alias 에 반영된다"고 적었는데, 구현은 그 바이트를 **받아서
+        버렸다**(services/guide_service.py 머리말이 그렇게 적고 있었다). RAG 자체도
+        2026-09-05 미채택으로 걷혔다.
+
+        세 가지가 잘못이었다 — 발주처가 파일을 올리면 무언가 보관·활용된다고 읽고,
+        버릴 바이트에 크기 검사·읽기 비용을 들이며, 무엇보다 **원문이 우리 서버 메모리를
+        한 번 지났다**(무반출 원칙에서 굳이 만들 경로가 아니다).
+
+        요건도 아니다 — 종전 "FUN-002" 는 정본 요구사항 추적표에 없는 번호였다.
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
-              required: [guide_id, version, file, actor]
+              required: [guide_id, version, actor]
               properties:
                 guide_id: { type: string }
                 version: { type: string, example: "v2.1" }
                 effective_date: { type: string, format: date }
-                change_summary: { type: string, maxLength: 4000 }
-                file:
+                change_summary: { type: string, maxLength: 2000 }
+                doc_type: { type: string, nullable: true }
+                filename:
                   type: string
-                  format: binary
-                  description: HWP/DOCX/PDF
+                  nullable: true
+                  description: >-
+                    사람이 어느 문서를 등록했는지 적는 **메타**. 파일은 받지 않는다.
                 actor: { $ref: '#/components/schemas/Actor' }
       responses:
         '201':
@@ -773,12 +831,6 @@ paths:
                 properties:
                   guide_id: { type: string }
                   version: { type: string }
-                  indexed:
-                    type: boolean
-                    description: Elasticsearch 인덱스 적재 완료 여부 (alias 기준)
-                  embedding_vector_count:
-                    type: integer
-                    description: 청크 단위 임베딩 벡터 개수 (KURE-v1 1024차원 기준)
                   triggers_retraining: { type: boolean }
 
   /guide/documents/{guide_id}:

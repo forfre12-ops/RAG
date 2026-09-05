@@ -8,7 +8,10 @@
 
 - 업로드 요청 수신 (guide_id·version·effective_date·change_summary·doc_type·filename)
 - guides 테이블에 버전 이력 저장 (PG 가용 시 영속, 미가용 시 in-memory 폴백)
-- 파일 본문(content_bytes)은 추출·색인·저장 어디에도 쓰이지 않는다 — 받되 버린다.
+- [2026-09-05] **파일 수신 자체를 없앴다.** 받아서 버리는 바이트에 크기 검사·읽기 비용을
+  들였고, 무엇보다 발주처 원문이 우리 서버 메모리를 한 번 지났다 — 무반출 원칙에서 굳이
+  만들 경로가 아니다. 이제 JSON 으로 버전 메타만 받는다(filename 은 사람이 어느 문서를
+  등록했는지 적는 선택 메타).
 """
 
 from __future__ import annotations
@@ -118,14 +121,14 @@ class GuideService:
         version: str,
         effective_date: Optional[str],
         change_summary: Optional[str],
-        content_bytes: bytes,
+        content_bytes: bytes | None = None,
         actor_user_id: str,
         doc_type: Optional[str] = None,
         filename: Optional[str] = None,
     ) -> GuideUploadResponse:
         logger.debug(
             "guide upload enter: guide_id=%s version=%s bytes=%d actor=%s",
-            guide_id, version, len(content_bytes or b""), actor_user_id,
+            guide_id, version, len(content_bytes or b""), actor_user_id,  # noqa: ARG002
         )
         rec = _GuideRecord(
             guide_id=guide_id,

@@ -1008,7 +1008,9 @@ def s11_concurrent_stress(ctx: ScenarioContext) -> None:
 
 
 # ----------------------------------------------------------------
-# S10. RAG 인용 충실도 — evidence가 입력 본문에 존재하는가
+# S10. 분류 근거 일치성 — evidence 가 입력 본문에 존재하는가
+#      (2026-09-05 개명: 옛 이름 'RAG 인용 충실도'. RAG 는 미채택으로 걷혔고 이 검사는
+#       검색과 무관하다 — 분류가 내놓은 근거가 본문에 실제로 있는지만 본다)
 # ----------------------------------------------------------------
 
 _TS_KEYWORDS = ("특급기밀", "TS등급", "극비", "Top Secret")
@@ -1436,7 +1438,21 @@ def s14_store_dr(ctx: ScenarioContext) -> None:
         return
 
     docker_bin = _os.environ.get("PSH_S14_DOCKER_BIN", "docker")
-    container_name = _os.environ.get("PSH_S14_PG_CONTAINER", "koipa-jjw-postgres-1")
+    # [2026-09-05] 기본 컨테이너를 **설정에서 유도한다**. 종전에는 koipa-jjw-postgres-1 이
+    # 박혀 있어 DB 를 바꿔도 안 따라왔다 — MariaDB 로 옮긴 뒤에도 PostgreSQL 을 재고
+    # "DR 을 확인했다"고 보고할 수 있는 모양이었다.
+    #
+    # ⚠ 어느 DB 를 재야 하는지(폐쇄망 번들의 DB 결정)는 여기서 정하지 않는다. 지금 도는
+    #   DATABASE_URL 이 가리키는 쪽을 잰다. 그것이 "이 배포의 DR"이다.
+    _default_container = "koipa-jjw-postgres-1"
+    try:
+        from koipa.config import settings as _st  # noqa: PLC0415
+
+        if str(getattr(_st, "database_url", "")).startswith(("mariadb", "mysql")):
+            _default_container = "koipa-poc-mariadb-1"
+    except Exception:  # noqa: BLE001
+        pass
+    container_name = _os.environ.get("PSH_S14_PG_CONTAINER", _default_container)
 
     def _pg_ok() -> bool:
         try:

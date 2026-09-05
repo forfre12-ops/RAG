@@ -15,10 +15,15 @@ from typing import Any
 
 @dataclass
 class ServiceStatus:
-    postgres: str = "UNKNOWN"
-    elasticsearch: str = "UNKNOWN"
+    # [2026-09-05] db 로 이름을 바꿨다 — 재는 대상이 처음부터 koipa.db.engine 이었고,
+    # 그것은 DATABASE_URL 이 가리키는 DB 다(현재 MariaDB). 이름만 PostgreSQL 이었다.
+    db: str = "UNKNOWN"
     redis: str = "UNKNOWN"
-    minio: str = "UNKNOWN"
+    # elasticsearch·minio 는 재지 않는다. 쓰지 않는 백엔드라 늘 DOWN 이 찍혀
+    # 환경 보고서가 "무언가 죽어 있다"로 읽혔다. 어느 KPI 도 요구하지 않는다
+    # (kpis.py: "es·minio 를 요구하던 이전 정의는 쓰지 않는 백엔드를 전제해 영구 SKIP").
+    elasticsearch: str = "N/A"
+    minio: str = "N/A"
 
 
 @dataclass
@@ -82,7 +87,12 @@ def _gpu() -> str:
     return "N/A"
 
 
-def _svc_postgres() -> str:
+def _svc_db() -> str:
+    """설정된 DB 를 잰다 — DATABASE_URL 이 가리키는 곳(MariaDB 또는 PostgreSQL).
+
+    [2026-09-05] 이름이 _svc_postgres 였는데 처음부터 koipa.db.engine 을 썼다.
+    재는 대상은 맞았고 이름만 틀렸다.
+    """
     try:
         from sqlalchemy import text
 
@@ -177,12 +187,8 @@ def capture_env(
 
     svc = ServiceStatus()
     if probe_services:
-        svc = ServiceStatus(
-            postgres=_svc_postgres(),
-            elasticsearch=_svc_es(),
-            redis=_svc_redis(),
-            minio=_svc_minio(),
-        )
+        # es·minio 는 재지 않는다(위 ServiceStatus 주석 참조).
+        svc = ServiceStatus(db=_svc_db(), redis=_svc_redis())
 
     return EnvSnapshot(
         python=platform.python_version(),

@@ -34,6 +34,9 @@ from koipa.modules.m6_evaluation.metrics import (  # noqa: E402
     compute_metrics_from_arrays,
     compute_metrics_from_db,
 )
+from koipa.modules.m6_evaluation.calibration import (  # noqa: E402
+    compute_calibration_from_db,
+)
 from koipa.modules.m6_evaluation.report import (  # noqa: E402
     render_confusion_matrix_png,
     render_html_report,
@@ -101,15 +104,35 @@ def main() -> int:
     cm_result = build_confusion_matrix(y_true, y_pred, labels=metrics.labels)
     measured_at = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
 
+    # [2026-09-05] 보정 진단(ECE·Brier)을 함께 싣는다.
+    #
+    # report.py 에는 렌더링 블록이 **처음부터 있었는데**(calibration.ece·brier·bins)
+    # 값을 넘기는 곳이 없어 `{% if calibration %}` 가 늘 거짓이었다. calibration.py 162줄도
+    # 아무도 부르지 않았다 — 모듈 머리말은 "report 가 호출할 수 있게 한다"고 적혀 있었다.
+    #
+    # 이 시스템의 핵심 위험은 미보정 서빙이 OOD 문체에서 과신해 고등급을 무음으로 놓치는
+    # 것이다. 보정이 실제로 맞는지는 ECE 로만 보인다. DB 가 없거나 표본이 0이면 None 이고,
+    # 그때는 종전처럼 이 절이 렌더링되지 않는다(측정 못 한 것을 0 으로 적지 않는다).
+    calibration = None
+    if model_version and model_version != "n/a":
+        calibration = compute_calibration_from_db(model_version)
+        if calibration is None:
+            print(f"[report] 보정 진단 생략 — DB 미가용이거나 {model_version} 분류 0건")
+
     html = render_html_report(
         metrics, cm_result,
         measured_at=measured_at,
         include_cm_image=not args.no_cm_image,
+        calibration=calibration,
     )
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
-    print(f"[report] HTML → {out} (model={model_version} · n={metrics.sample_count})")
+    _cal = (f" · ECE {calibration.ece:.4f}" if calibration else " · 보정 진단 없음")
+    print(
+        f"[report] HTML → {out} "
+        f"(model={model_version} · n={metrics.sample_count}{_cal})"
+    )
 
     if args.png_out:
         png_out = Path(args.png_out)

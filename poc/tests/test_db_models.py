@@ -65,6 +65,9 @@ def test_orm_metadata_has_expected_tables():
         "tb_chunks",
         "tb_document_labels",
         "tb_document_factor_scores",
+        # [2026-09-05] 승인본 ↔ 학습셋 판 연결(append-only). 칼럼 하나로는 한 문서가
+        # 여러 판에 들어간 이력을 잃는다.
+        "tb_sample_dataset_membership",
         "tb_classifications",
         "tb_classification_evidence",
         "tb_model_versions",

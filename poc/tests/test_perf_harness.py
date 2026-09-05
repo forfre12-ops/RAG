@@ -102,17 +102,17 @@ class TestAvailableResources:
 
     def test_from_env_snapshot_maps_services(self):
         env = MagicMock()
-        env.services.postgres = "UP"
-        env.services.elasticsearch = "DOWN"
+        # [2026-09-05] postgres → db. 재는 대상은 처음부터 koipa.db.engine(설정된 DB)이었고
+        # 이름만 PostgreSQL 이었다. es·minio 는 이제 재지 않으므로 항상 False 다.
+        env.services.db = "UP"
         env.services.redis = "UP"
-        env.services.minio = "UNKNOWN"
         env.gpu = "N/A"
 
         with patch("koipa.perf.harness._detect_trained_model", return_value=False):
             r = AvailableResources.from_env_snapshot(env, "noop")
         assert r.pg is True
-        assert r.es is False
         assert r.redis is True
+        assert r.es is False, "쓰지 않는 백엔드를 요구하면 영구 SKIP 이 된다"
         assert r.minio is False
         assert r.llm is False  # noop
         assert r.gpu is False  # N/A

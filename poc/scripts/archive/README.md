@@ -13,3 +13,17 @@
 - 데모 E2E: `demo_e2e_8010.py` (← `demo_al_loop_8010.py`, `demo_content_8010.py`)
 
 필요하면 `git mv scripts/archive/<파일> scripts/`로 되살릴 수 있음.
+
+## 2026-09-05 — 세대 중복 스크립트 11개 이관
+
+`build_direct_authored_catalog_training_corpus` 8판 · `build_direct_authored_proxy_eval_v2` 1판
+(합 9판 · 2,146줄).
+
+**지우지 않고 옮긴 이유.** 이 스크립트들이 배포본 `v-fe4b386b` 의 학습셋을 만들었다.
+지우면 그 데이터셋을 어떻게 만들었는지 재현할 길이 없어진다. 작업 폴더에서만 뺐다.
+
+⚠ **참조 검사를 한 번 틀렸다.** 처음에는 파일명(`....py`)으로 찾아 "11개 전부 참조 0"으로
+읽고 11개를 옮겼는데, `from scripts import build_direct_authored_proxy_eval` 처럼
+**확장자 없이 모듈명으로 import** 하는 자리를 못 봤다. 전체 시험이 수집 단계에서 멈춰
+드러났고 두 개(`build_direct_authored_proxy_eval` · `_v2_2`)를 되돌렸다.
+파이썬 모듈은 파일명이 아니라 **모듈명**으로 참조된다.

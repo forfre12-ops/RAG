@@ -13,6 +13,7 @@ from koipa.api.rate_limit import limiter
 from koipa.schemas.synthesis import (
     SynthGenerateRequest,
     SynthGenerateResponse,
+    SynthJobStatus,
     SynthQueueResponse,
     SynthReviewRequest,
     SynthReviewResponse,
@@ -47,6 +48,16 @@ def synth_queue(
     offset: int = Query(default=0, ge=0),
 ):
     return SynthesisService().queue(status=status, limit=limit, offset=offset)
+
+
+@router.get("/synth/jobs/{synth_job_id}", response_model=SynthJobStatus)
+def synth_job_status(synth_job_id: UUID):
+    """생성 작업 1건의 상태와 그 작업이 만든 문서.
+
+    [2026-09-05] 종전에는 응답이 synth_job_id 를 주는데 조회 경로가 없었다 —
+    "이 작업이 성공했나 · 몇 건 만들었나 · 어느 문서인가"를 물을 수 없었다.
+    """
+    return SynthesisService().job_status(synth_job_id)
 
 
 @router.post(

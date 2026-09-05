@@ -132,6 +132,11 @@ def _publish_callback_webhook(callback_url: str | None, payload: dict) -> None:
     publish_callback(callback_url, payload)
 
 
+# 아직 학습셋 판이 정해지지 않은 상태의 자리표시. 빌드가 실제 판 이름으로 한 줄 더 쌓는다
+# (append-only 라 이 줄은 남는다 — "만들어졌다"와 "학습셋에 들어갔다"는 다른 사실이다).
+_JOB_PENDING_VERSION = "pending-review"
+
+
 def _persist_synth_samples(
     docs: list, *, job_id: str | None, screen: dict | None = None
 ) -> int:
@@ -210,8 +215,23 @@ def _persist_synth_samples(
                 "metrics": _metrics,
                 "gate": "synth_quality.screen_batch",
             } if _sc else None
-            # 점수는 "통과했는가"를 한 숫자로. 걸린 문서는 애초에 여기 오지 않는다(admit 만 넘어옴).
-            _q_score = None if not _sc else (1.0 if _verdict == "ok" else 0.5)
+            # 점수는 "어떤 검사를 통과했는가"를 한 숫자로. 걸린 문서는 애초에 여기 오지
+            # 않는다(admit 만 넘어온다).
+            #
+            # [2026-09-05] 세 갈래로 나눈다(monimo 세션 지적). 종전에는 ok 가 아니면 전부
+            # 0.5 라 **"게이트를 못 돌렸다"와 "표본이 모자라 코퍼스 지표를 판정 안 했다"가
+            # 같은 값**이었다 — 점수만 보고는 게이트가 깨진 것을 알 수 없었다.
+            #   1.0  코퍼스 지표까지 통과
+            #   0.5  표본 부족으로 코퍼스 지표 미판정(문서 단위 검사는 통과)
+            #   0.0  게이트를 못 돌렸다 — 검사받지 않은 문서다(학습 편입 불가)
+            if not _sc:
+                _q_score = None
+            elif _verdict == "ok":
+                _q_score = 1.0
+            elif _verdict == "gate_error":
+                _q_score = 0.0
+            else:
+                _q_score = 0.5
 
             for d in docs:
                 grade_code = str(getattr(d, "target_grade", "") or "")
@@ -224,7 +244,7 @@ def _persist_synth_samples(
                         grade_code,
                     )
                     continue
-                synth_repo.create_sample(
+                sd = synth_repo.create_sample(
                     target_level_id=level_id,
                     llm_provider=str(getattr(d, "llm_provider", "") or "unknown"),
                     llm_model=str(getattr(d, "llm_model", "") or "unknown"),
@@ -240,6 +260,18 @@ def _persist_synth_samples(
                     qc_prompt_version=_pv_qc,
                 )
                 persisted += 1
+                # [2026-09-05] 어느 생성 작업이 만든 문서인지 잇는다. 종전에는 응답이
+                # synth_job_id 를 주는데 그 뒤로 이어지는 곳이 없어, "이 작업이 몇 건
+                # 만들었나 · 어느 문서인가"를 물을 수 없었다. 판 이름은 아직 없다
+                # (학습셋 빌드 때 정해진다) — 그래서 pending 자리표시로 둔다.
+                if job_id:
+                    try:
+                        synth_repo.record_dataset_membership(
+                            [sd.sample_id], _JOB_PENDING_VERSION,
+                            synth_job_id=job_id,
+                        )
+                    except Exception:  # noqa: BLE001
+                        logger.warning("job 연결 기록 실패: job_id=%s", job_id, exc_info=True)
                 try:
                     from koipa.api.prom_metrics import SYNTH_SAMPLE_PERSISTED_TOTAL  # noqa: PLC0415
 
@@ -295,19 +327,25 @@ def synthesize_batch(
     partial: list[dict] = []
     try:
         # [2026-09-05] 요청한 provider 로 생성한다. 없으면 전역 설정값(종전 동작).
-        # 알 수 없는 이름이면 build_provider 가 ValueError 를 내므로 여기서 잡아
-        # 전역 설정으로 되돌린다 — 오타 하나로 배치 전체가 죽지 않게.
+        #
+        # ⚠ **못 만들면 실패로 끝낸다.** 앞선 판은 전역 설정으로 되돌렸는데 그것이 틀렸다 —
+        #   OpenAI 를 요청했는데 키가 없어 Anthropic 으로 생성되면 조용한 오작동이고,
+        #   되돌려 만든 문서는 어느 모델 산인지 아무도 모르는 채 검수큐에 쌓인다.
+        #   여기서 죽으면 잡이 실패로 남고 사유가 보인다.
         _llm = None
         if llm_provider:
-            try:
-                from koipa.adapters.llm import build_provider  # noqa: PLC0415
+            from koipa.adapters.llm import build_provider  # noqa: PLC0415
 
+            try:
                 _llm = build_provider(llm_provider)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "요청 provider %r 를 만들 수 없어 전역 설정으로 되돌린다: %s",
-                    llm_provider, exc,
-                )
+            except Exception as exc:
+                raise RuntimeError(
+                    "요청한 LLM provider %r 로 생성할 수 없다(%s: %s). "
+                    "전역 설정으로 되돌리지 않는다 — 요청한 모델과 실제 쓴 모델이 갈리면 "
+                    "산출물의 출처를 알 수 없게 된다." % (
+                        llm_provider, type(exc).__name__, exc,
+                    )
+                ) from exc
         gen = SyntheticDocGenerator(llm=_llm)
         docs = gen.generate(SynthRequest(target_grade=grade, domain=domain, count=count))
         partial = [

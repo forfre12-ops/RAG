@@ -507,9 +507,7 @@ class SampleDocument(Base):
     reviewed_by: Mapped[str | None] = mapped_column(String(50))
     reviewed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     rejection_reason: Mapped[str | None] = mapped_column(Text)
-    # [2026-09-05] 승인본이 어느 학습셋 판에 들어갔는지. 자동 편입이 아니라 **추적**이다 —
-    # 빌드 스크립트가 방출할 때 찍고, "이 승인본이 어느 셋에 들어갔나"를 되짚는 데 쓴다.
-    added_to_dataset_version: Mapped[str | None] = mapped_column(String(64))
+
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
@@ -615,6 +613,41 @@ class AdvisoryLock(Base):
     __tablename__ = "tb_advisory_locks"
 
     name: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+
+class SampleDatasetMembership(Base):
+    """승인 합성본이 어느 학습셋 판에 들어갔는지 — **append-only**.
+
+    [2026-09-05] 앞선 판은 tb_sample_documents 에 칼럼 하나였는데 UPDATE 로 덮어써서
+    **한 문서가 여러 판에 들어간 이력을 잃었다.** 재방출 한 번이면 앞선 기록이 사라진다.
+
+    같은 표에서 생성 작업 연결도 푼다 — synth_job_id 가 어디에도 없어 "이 작업이 만든
+    문서"를 물을 수 없었다(응답은 synth_job_id 를 주는데 그 뒤로 이어지는 곳이 없었다).
+
+    지우거나 고치지 않는다. 쌓는다.
+    """
+
+    __tablename__ = "tb_sample_dataset_membership"
+
+    membership_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    sample_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tb_sample_documents.sample_id", ondelete="CASCADE"),
+    )
+    dataset_version: Mapped[str] = mapped_column(String(64))
+    # 어느 생성 작업에서 나온 문서인가. 단발 호출·옛 행은 NULL.
+    synth_job_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True))
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        # 같은 판에 두 번 넣지 않는다. 재방출은 같은 내용이면 같은 판 이름이라 무해하게
+        # 부딪히고, 내용이 바뀌면 새 판으로 한 줄 더 쌓인다.
+        UniqueConstraint("sample_id", "dataset_version", name="uq_sdm_sample_version"),
+        Index("idx_sdm_version", "dataset_version"),
+        Index("idx_sdm_job", "synth_job_id"),
+    )
 
 
 class Guide(Base):

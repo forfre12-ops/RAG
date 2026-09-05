@@ -6,17 +6,16 @@
 
 from __future__ import annotations
 
-import json
-from typing import Optional
-
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 
 from koipa.api._jwt_auth import require_auth
 from koipa.api._rbac import require_role
 from koipa.api.confirm import bind_authenticated_actor
-from koipa.config import settings
-from koipa.schemas.common import Actor
-from koipa.schemas.guide import GuideUploadResponse, GuideVersionList
+from koipa.schemas.guide import (
+    GuideUploadResponse,
+    GuideVersionList,
+    GuideVersionRegisterRequest,
+)
 from koipa.services.guide_service import GuideService
 
 router = APIRouter(tags=["guide"], dependencies=[Depends(require_auth)])
@@ -29,48 +28,32 @@ router = APIRouter(tags=["guide"], dependencies=[Depends(require_auth)])
     response_model=GuideUploadResponse,
     status_code=201,
 )
-async def upload_guide(
-    guide_id: str = Form(...),
-    version: str = Form(...),
-    actor: str = Form(..., description="Actor JSON 문자열 (multipart 제약)"),
-    effective_date: Optional[str] = Form(default=None),
-    change_summary: Optional[str] = Form(default=None),
-    doc_type: Optional[str] = Form(default=None),
-    file: UploadFile = File(...),
+def register_guide_version(
+    req: GuideVersionRegisterRequest,
     auth: dict = Depends(require_role("admin", "kl_backend")),
 ):
-    try:
-        actor_obj = Actor.model_validate(json.loads(actor))
-    except (json.JSONDecodeError, ValueError) as exc:
-        raise HTTPException(status_code=422, detail=f"invalid actor json: {exc}") from exc
+    """가이드 **버전 등록** — 파일을 받지 않는다.
+
+    [2026-09-05] 종전에는 multipart 로 파일을 필수로 받고 20MB 한도까지 검사한 뒤
+    **버렸다**(서비스 머리말이 그렇게 적고 있었다: "받되 버린다"). 세 가지가 잘못이었다 —
+    발주처가 파일을 올리면 무언가 보관·활용된다고 읽고, 버릴 바이트에 검사·읽기 비용을
+    들이며, 무엇보다 **원문이 우리 서버 메모리를 한 번 지났다**(무반출 원칙에서 굳이 만들
+    경로가 아니다). RTM 요건도 아니다.
+
+    파일명은 사람이 어느 문서를 등록했는지 적는 선택 메타로만 남는다.
+    """
+    actor_obj = req.actor
     # [#13] actor_user_id 감사 신원을 인증 principal 로 확정(body 자칭 위조 차단; JWT sub 우선).
     bind_authenticated_actor(actor_obj, auth)
-    # R3: 업로드 본문 크기 한도 검증 — OOM·DoS 차단.
-    # 1차: file.size (multipart Content-Length 기반, 클라이언트 신고값).
-    # 2차: read 후 실제 바이트 길이 (조작 방지).
-    max_bytes = settings.max_upload_mb * 1024 * 1024
-    declared_size = getattr(file, "size", None)
-    if declared_size is not None and declared_size > max_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"file too large: {declared_size} bytes > {max_bytes} bytes ({settings.max_upload_mb}MB)",
-        )
-    body = await file.read()
-    if len(body) > max_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"file too large: {len(body)} bytes > {max_bytes} bytes ({settings.max_upload_mb}MB)",
-        )
     return GuideService.get_instance().upload(
-        guide_id=guide_id,
-        version=version,
-        effective_date=effective_date,
-        change_summary=change_summary,
-        content_bytes=body,
+        guide_id=req.guide_id,
+        version=req.version,
+        effective_date=req.effective_date,
+        change_summary=req.change_summary,
         actor_user_id=actor_obj.user_id,
         # tenant 제거: 격리는 KL 포털 전담 → 전역 네임스페이스로 적재.
-        doc_type=doc_type,
-        filename=file.filename or f"{guide_id}.txt",
+        doc_type=req.doc_type,
+        filename=req.filename,
     )
 
 

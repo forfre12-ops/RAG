@@ -8,7 +8,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from koipa.db.models import PromptVersion, SampleDocument
+from koipa.db.models import PromptVersion, SampleDatasetMembership, SampleDocument
 
 
 class SynthRepo:
@@ -153,27 +153,70 @@ class SynthRepo:
         self.db.flush()
         return pv
 
-    def mark_added_to_dataset(
-        self, sample_ids: "list[uuid.UUID] | list[str]", version: str
+    def record_dataset_membership(
+        self,
+        sample_ids: "list[uuid.UUID] | list[str]",
+        version: str,
+        *,
+        synth_job_id: "uuid.UUID | str | None" = None,
     ) -> int:
-        """승인본에 학습셋 판 이름을 찍는다 — "이 문서가 어느 셋에 들어갔나"의 답.
+        """승인본이 어느 학습셋 판에 들어갔는지 **쌓는다**(append-only).
 
-        [2026-09-05] SynthReviewResponse 에 필드만 있고 표에 칸이 없어 늘 None 이었다.
-        자동 편입을 만들지 않는다 — 승인분이 바로 학습으로 흘러가면 검수가 형식이 된다.
-        빌드가 방출한 뒤에 되쓰는 **추적**이다.
+        [2026-09-05] 앞선 판은 tb_sample_documents 의 칼럼 하나를 UPDATE 했는데,
+        재방출하면 덮어써서 **한 문서가 여러 판에 들어간 이력을 잃었다.**
+
+        같은 판에 두 번 넣는 것은 무해하게 건너뛴다(UNIQUE 로 막고 여기서 미리 거른다).
+        자동 학습 편입이 아니다 — 방출한 것을 기록만 한다.
+
+        Returns: 새로 쌓인 줄 수(이미 있던 것은 세지 않는다).
         """
         if not sample_ids:
             return 0
         ids = [uuid.UUID(str(i)) if not isinstance(i, uuid.UUID) else i
                for i in sample_ids]
-        n = (
-            self.db.query(SampleDocument)
-            .filter(SampleDocument.sample_id.in_(ids))
-            .update({"added_to_dataset_version": version},
-                    synchronize_session=False)
-        )
-        self.db.flush()
-        return int(n or 0)
+        job = (uuid.UUID(str(synth_job_id))
+               if synth_job_id and not isinstance(synth_job_id, uuid.UUID)
+               else synth_job_id)
 
+        existing = {
+            r[0] for r in self.db.execute(
+                select(SampleDatasetMembership.sample_id).where(
+                    SampleDatasetMembership.dataset_version == version,
+                    SampleDatasetMembership.sample_id.in_(ids),
+                )
+            ).all()
+        }
+        added = 0
+        for sid in ids:
+            if sid in existing:
+                continue
+            self.db.add(SampleDatasetMembership(
+                sample_id=sid, dataset_version=version, synth_job_id=job,
+            ))
+            added += 1
+        if added:
+            self.db.flush()
+        return added
+
+    def dataset_versions_of(self, sample_id: "uuid.UUID | str") -> list[str]:
+        """이 문서가 들어간 판을 **전부** 돌려준다 — 칼럼 방식이 잃던 바로 그 이력."""
+        sid = uuid.UUID(str(sample_id)) if not isinstance(sample_id, uuid.UUID) else sample_id
+        rows = self.db.execute(
+            select(SampleDatasetMembership.dataset_version)
+            .where(SampleDatasetMembership.sample_id == sid)
+            .order_by(SampleDatasetMembership.membership_id)
+        ).all()
+        return [r[0] for r in rows]
+
+    def samples_of_job(self, synth_job_id: "uuid.UUID | str") -> list[uuid.UUID]:
+        """이 생성 작업이 만든 문서 — 종전에는 물을 수 없던 질문."""
+        jid = (uuid.UUID(str(synth_job_id))
+               if not isinstance(synth_job_id, uuid.UUID) else synth_job_id)
+        rows = self.db.execute(
+            select(SampleDatasetMembership.sample_id)
+            .where(SampleDatasetMembership.synth_job_id == jid)
+            .order_by(SampleDatasetMembership.membership_id)
+        ).all()
+        return [r[0] for r in rows]
     def get_prompt(self, version: str) -> PromptVersion | None:
         return self.db.get(PromptVersion, version)

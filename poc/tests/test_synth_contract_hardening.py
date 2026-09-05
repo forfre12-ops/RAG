@@ -109,11 +109,21 @@ def test_task_accepts_llm_provider():
 
 
 # ── ⑥ 승인본이 어느 학습셋 판에 들어갔는지 되짚을 수 있다 ────────────
-def test_sample_row_has_dataset_version_column():
-    """응답 스키마에만 있고 표에 칸이 없어 늘 None 이던 것을 실제 칼럼으로 뒀다."""
-    from koipa.db.models import SampleDocument  # noqa: PLC0415
+def test_dataset_membership_is_append_only():
+    """칼럼 하나가 아니라 **연결 표**여야 이력이 남는다.
 
-    assert hasattr(SampleDocument, "added_to_dataset_version")
+    [2026-09-05] 앞선 판은 tb_sample_documents 의 칼럼을 UPDATE 로 덮어써서, 재방출하면
+    한 문서가 여러 판에 들어간 기록을 잃었다. 같은 표에서 생성 작업 연결도 푼다.
+    """
+    from koipa.db.models import SampleDatasetMembership, SampleDocument  # noqa: PLC0415
+
+    cols = {c.name for c in SampleDatasetMembership.__table__.columns}
+    assert {"sample_id", "dataset_version", "synth_job_id"} <= cols
+    # 덮어쓰던 칼럼은 되돌렸다 — 남겨 두면 표와 어느 쪽이 진실인지 갈린다.
+    assert not hasattr(SampleDocument, "added_to_dataset_version")
+    # 같은 판에 두 번 넣지 않는다.
+    uq = {c.name for c in SampleDatasetMembership.__table__.constraints if c.name}
+    assert "uq_sdm_sample_version" in uq
 
 
 def test_dataset_version_is_content_hash(monkeypatch):
@@ -197,3 +207,127 @@ def test_api_accepts_both_alias_and_canonical():
             target_grade="TS", domain=d, count=1,
             actor=Actor(user_id="t", role="admin"),
         )
+
+
+# ── 누출 게이트 fail-open (2026-09-05 monimo 세션 지적) ──────────────
+#
+# 워커의 게이트는 screen_batch 예외 시 전량을 검수큐로 넣고 batch_verdict='gate_error' 만
+# 남긴다. 생성 결과를 버리지 않는 판단은 맞지만, 그 문서가 승인만 되면 **검사받지 않은
+# 채로** 학습셋에 들어갔다. 검수큐에는 남기고 학습 편입만 막는다.
+
+def test_gate_error_sample_is_refused_for_training():
+    from koipa.services.synthesis_service import _is_training_admissible as ok  # noqa: PLC0415
+
+    assert ok(None, "anthropic", "ok") is True
+    assert ok(None, "anthropic", "too_small_for_corpus_metrics") is True
+    assert ok(None, "anthropic", "gate_error") is False, (
+        "게이트를 못 돌린 문서가 학습 편입 가능으로 나왔다"
+    )
+    # 옛 호출(인자 둘·하나)이 깨지지 않는다
+    assert ok(None, "anthropic") is True
+    assert ok(None) is True
+
+
+def test_gate_error_is_counted_separately_from_noise(monkeypatch):
+    """'게이트를 못 돌렸다'와 '게이트가 걸렀다'는 다른 사실이다 — 합치면 못 센다."""
+    import types  # noqa: PLC0415
+
+    from koipa.services import synthesis_service as mod  # noqa: PLC0415
+
+    def _s(sid, *, verdict=None, label_source=None):
+        return types.SimpleNamespace(
+            sample_id=sid, generated_content="본문 " + sid, label_source=label_source,
+            corrected_level_id=None, target_level_id=1, doc_type="tech",
+            llm_provider="anthropic", llm_model="m", body_prompt_version="v2-x",
+            qc_prompt_version="metric-gate-v1", quality_score=1.0,
+            quality_report={"batch_verdict": verdict} if verdict else None,
+        )
+
+    rows = [
+        _s("ok1", verdict="ok"),
+        _s("broken", verdict="gate_error"),          # 검사받지 않음
+        _s("noise", label_source="noop_fallback"),   # 자리표시 본문
+    ]
+
+    class _Repo:
+        def __init__(self, _db): pass
+        def count_by_status(self, _s): return len(rows)
+        def list_by_status(self, _s, limit=0, offset=0): return rows if offset == 0 else []
+        def record_dataset_membership(self, ids, v, **kw): return len(ids)
+
+    class _Cls:
+        def __init__(self, _db): pass
+        def level_id_by_code(self, code): return 1 if code == "S2" else 2
+
+    class _Db:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    monkeypatch.setattr(mod, "SynthRepo", _Repo)
+    monkeypatch.setattr(mod, "ClassifyRepo", _Cls)
+    monkeypatch.setattr(mod, "session_scope", lambda: _Db())
+
+    res = mod.SynthesisService().build_training_rows()
+    assert res["included"] == 1, res
+    assert res["excluded_gate_error"] == 1, "게이트 미실행 건이 따로 세어지지 않는다"
+    assert res["excluded_noise"] == 1, "잡음과 섞였다"
+
+
+def test_error_path_still_carries_dataset_version(monkeypatch):
+    """DB 오류가 호출부에서 KeyError 로 둔갑하면 진짜 사유가 가려진다."""
+    from sqlalchemy.exc import SQLAlchemyError  # noqa: PLC0415
+
+    from koipa.services import synthesis_service as mod  # noqa: PLC0415
+
+    def _boom():
+        raise SQLAlchemyError("DB 없음")
+
+    monkeypatch.setattr(mod, "session_scope", _boom)
+    res = mod.SynthesisService().build_training_rows()
+    for k in ("dataset_version", "excluded_gate_error", "included"):
+        assert k in res, f"오류 경로에 {k} 가 없다 — 호출부가 KeyError 로 끝난다"
+
+
+def test_dataset_version_covers_production_conditions():
+    """같은 문서 집합이라도 다른 모델·프롬프트로 만든 것은 다른 판이어야 한다."""
+    from koipa.services.synthesis_service import _dataset_version  # noqa: PLC0415
+
+    base = {"doc_id": "a", "label": "S2", "text": "본문", "llm_provider": "anthropic",
+            "llm_model": "claude-x", "body_prompt_version": "v2-aaa",
+            "qc_prompt_version": "metric-gate-v1", "quality_score": 1.0}
+    assert _dataset_version([base]) == _dataset_version([base])
+    assert _dataset_version([base]) != _dataset_version([dict(base, llm_model="gpt-x")])
+    assert _dataset_version([base]) != _dataset_version([dict(base, body_prompt_version="v2-b")])
+    assert _dataset_version([base]) != _dataset_version([dict(base, quality_score=0.5)])
+
+
+# ── ② 생성 작업 ↔ 문서 연결 (조회 경로) ─────────────────────────────
+def test_job_status_endpoint_exists_and_answers():
+    """응답이 synth_job_id 를 주는데 조회 경로가 없었다 —
+    "이 작업이 성공했나 · 몇 건 만들었나 · 어느 문서인가"를 물을 수 없었다.
+    """
+    import uuid as _uuid  # noqa: PLC0415
+
+    from fastapi.testclient import TestClient  # noqa: PLC0415
+
+    from koipa.api.app import app  # noqa: PLC0415
+
+    with TestClient(app) as cli:
+        r = cli.get(
+            f"/api/v1/synth/jobs/{_uuid.uuid4()}",
+            headers={"X-API-Key": "test-key", "X-Actor-Role": "admin"},
+        )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # 없는 잡도 답한다 — 404 로 감추면 "만료됐다"와 "그런 잡이 없다"를 못 가린다.
+    assert body["status"] == "unknown"
+    for f in ("synth_job_id", "sample_ids", "persisted", "leakage_gate", "error"):
+        assert f in body, f"{f} 가 응답에 없다"
+
+
+def test_membership_answers_both_questions():
+    """한 표로 둘을 푼다 — 이 문서가 들어간 판 · 이 작업이 만든 문서."""
+    from koipa.repositories.synth_repo import SynthRepo  # noqa: PLC0415
+
+    for m in ("record_dataset_membership", "dataset_versions_of", "samples_of_job"):
+        assert hasattr(SynthRepo, m), f"{m} 가 없다"

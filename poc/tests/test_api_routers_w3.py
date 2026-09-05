@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import io
-import json
 import sys
 import uuid
 
@@ -203,17 +202,17 @@ class TestGuideRouter:
     def test_upload_then_list_versions(self):
         gid = f"guide-{uuid.uuid4().hex[:6]}"
         with TestClient(app) as cli:
+            # [2026-09-05] 파일을 받지 않는다 — 버전 메타만 JSON 으로 등록한다.
             r = cli.post(
                 "/api/v1/guide/documents",
                 headers=HDR,
-                data={
+                json={
                     "guide_id": gid,
                     "version": "v1.0",
                     "effective_date": "2026-06-01",
                     "change_summary": "initial",
-                    "actor": json.dumps(ACTOR),
+                    "actor": ACTOR,
                 },
-                files={"file": ("guide.txt", io.BytesIO(b"sample guide content"), "text/plain")},
             )
             assert r.status_code == 201, r.text
             body = r.json()
