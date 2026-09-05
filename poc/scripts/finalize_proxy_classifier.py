@@ -45,6 +45,9 @@ from koipa.source_provenance import (  # noqa: E402
 )
 from koipa.proxy_training_finalization import (  # noqa: E402
     ProxyTrainingFinalizationError,
+    # 엄격 JSON 리더는 src 가 정본이다. 여기에 같은 본문이 한 벌 더 있었고(해시 동일)
+    # 이 파일은 이미 같은 모듈에서 다른 이름을 가져오고 있었다 - 사본이 될 이유가 없었다.
+    _strict_json_object,
     canonical_trace_bytes,
     evaluate_checkpoint_traces,
     fit_document_temperature,
@@ -73,37 +76,6 @@ def _sha256_file(path: Path) -> str:
         for block in iter(lambda: handle.read(1 << 20), b""):
             digest.update(block)
     return digest.hexdigest()
-
-
-def _strict_json_object(path: Path, *, purpose: str) -> tuple[dict[str, object], bytes]:
-    if path.is_symlink() or not path.is_file():
-        raise ProxyTrainingFinalizationError(f"{purpose} is not a regular file: {path}")
-
-    def reject_constant(value: str) -> None:
-        raise ValueError(f"non-standard JSON constant {value}")
-
-    def reject_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
-        result: dict[str, object] = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError(f"duplicate JSON key {key!r}")
-            result[key] = value
-        return result
-
-    try:
-        raw = path.read_bytes()
-        value = json.loads(
-            raw.decode("utf-8"),
-            parse_constant=reject_constant,
-            object_pairs_hook=reject_duplicates,
-        )
-    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
-        raise ProxyTrainingFinalizationError(
-            f"cannot read {purpose} {path}: {exc}"
-        ) from exc
-    if not isinstance(value, dict):
-        raise ProxyTrainingFinalizationError(f"{purpose} must be a JSON object: {path}")
-    return value, raw
 
 
 def verify_materialized_training_run(

@@ -41,13 +41,11 @@ PUBLIC = ("판례", "공시", "금융보고서", "보도자료", "공개")
 
 
 def wilson_upper(k: int, n: int, z: float = 1.96) -> float:
-    if n == 0:
-        return 1.0
-    p = k / n
-    d = 1 + z * z / n
-    c = p + z * z / (2 * n)
-    r = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5)
-    return min(1.0, (c + r) / d)
+    # 정본은 src 에 있다 - koipa.modules.m6_evaluation.eval_cards.wilson_interval.
+    # 이 스크립트 11벌이 각자 같은 식을 다시 짜고 있었다(등가 확인: 45,451쌍 불일치 0).
+    from koipa.modules.m6_evaluation.eval_cards import wilson_interval  # noqa: PLC0415
+
+    return wilson_interval(k, n, z=z)[1]
 
 
 def is_public(r: dict) -> bool:

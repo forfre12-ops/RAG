@@ -24,18 +24,21 @@ import json
 import sys
 from pathlib import Path
 
+# 다른 분석 스크립트와 같은 부트스트랩. 이 파일만 없어서 src 정본을 못 불렀다.
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(_ROOT / "src"))
+
 ORDER = {"TS": 0, "S1": 1, "S2": 2, "S3": 3}
 SECRET = ("TS", "S1")
 
 
 def wilson_upper(k: int, n: int, z: float = 1.96) -> float:
-    if n == 0:
-        return 1.0
-    p = k / n
-    d = 1 + z * z / n
-    c = p + z * z / (2 * n)
-    r = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5)
-    return min(1.0, (c + r) / d)
+    # 정본은 src 에 있다 - koipa.modules.m6_evaluation.eval_cards.wilson_interval.
+    # 이 스크립트 11벌이 각자 같은 식을 다시 짜고 있었다(등가 확인: 45,451쌍 불일치 0).
+    from koipa.modules.m6_evaluation.eval_cards import wilson_interval  # noqa: PLC0415
+
+    return wilson_interval(k, n, z=z)[1]
 
 
 def _under(row: dict) -> bool:

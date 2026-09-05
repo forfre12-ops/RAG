@@ -42,6 +42,10 @@ DECOR_EXEMPT = (
     "model_validator", "validator", "root_validator", "property", "setter",
     "staticmethod", "classmethod", "contextmanager", "asynccontextmanager",
     "lru_cache", "cache", "overload", "fixture", "hookimpl", "listens_for",
+    # [2026-09-05] Celery 시그널 훅. @worker_process_init.connect 로 붙는 함수는
+    # 호출부가 소스에 없다 - _init_worker_logging 이 죽은 정의로 잘못 세어졌다.
+    "worker_process_init.connect", "worker_ready.connect", "task_prerun.connect",
+    "task_postrun.connect", "task_failure.connect", "connect",
 )
 NAME_EXEMPT_PREFIX = ("test_", "_test", "__")
 PROTOCOL = {
@@ -49,6 +53,10 @@ PROTOCOL = {
     "__aexit__", "__call__", "__eq__", "__hash__", "__len__", "__iter__",
     "__getitem__", "__contains__", "__post_init__", "dispatch", "lifespan",
     "file_response", "handle_starttag", "handle_endtag",
+    # [2026-09-05] HuggingFace Trainer 가 이름으로 부르는 훅. TrainerCallback 서브클래스와
+    # Trainer 서브클래스의 오버라이드라 소스에 호출부가 없다 - 넷 다 오탐이었다.
+    "on_train_begin", "on_train_end", "on_step_end", "on_epoch_end",
+    "on_evaluate", "on_log", "on_save", "compute_loss",
 }
 
 
