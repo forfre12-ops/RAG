@@ -485,7 +485,10 @@ def expected_files(
     for svc in components:
         files.append(f"docker-images/{svc}.tar")
     for m in models:
-        if m.role == "embedding":
+        # [2026-09-05] classifier 도 HF 캐시 레이아웃이다 — 런타임이 hub id 로 찾는다.
+        # 종전에는 models/{org}-{name}/ 를 선언했는데 그 경로는 아무도 보지 않았고,
+        # 담는 코드도 없어 verify_install 이 늘 결손을 보고할 자리였다.
+        if m.role in ("embedding", "classifier"):
             # [#2] 임베더는 HF 캐시 레이아웃으로 실린다(HF_HOME=/models/hf; compose 가
             # ../models:/models 마운트 → 오프라인 로드 경로 models/hf/hub/models--<org>--<name>/).
             # 종전엔 models/<org>-<name>/ 로 잘못 선언돼 실제 스테이징 경로와 어긋났고(그나마
@@ -1565,9 +1568,28 @@ def _copy_embedder_cache(
     """
     import shutil  # noqa: PLC0415
 
-    embedders = [m for m in manifest.models if m.role == "embedding"]
+    # [2026-09-05] **학습 베이스 모델(role=classifier)도 여기서 담는다.**
+    #
+    # 종전에는 role=="embedding" 만 담았다. kf-deberta-base 는 role="classifier" 라
+    # 어디에도 스테이징되지 않았고, 폐쇄망에서 학습을 걸면 이렇게 죽었다(실측):
+    #
+    #     OSError: We couldn't connect to 'https://huggingface.co' … and couldn't
+    #     find them in the cached files.
+    #
+    # 런타임이 hub id 로 참조하기 때문이다(CLASSIFIER_BASE_MODEL=kakaobank/kf-deberta-base
+    # + HF_HOME=/models/hf + HF_HUB_OFFLINE=1). files_expected 가 선언하던
+    # models/{org}-{name}/ 는 런타임이 보는 곳이 아니다.
+    #
+    # 추론은 무관하다(CLASSIFIER_MODEL_DIR 이 평문 경로로 학습본을 가리킨다). 학습만
+    # 못 하는데, 폐쇄망은 enable_incremental_retrain=True 이고 증분 재학습은 매번
+    # kf-deberta-base 에서 풀 파인튜닝한다(warm-start 없음).
+    #
+    # ⚠ LLM(role=llm)은 넣지 않는다 — vLLM/Ollama 의 HTTP endpoint 로 서빙하지
+    #   transformers 가 HF 캐시에서 로드하지 않는다.
+    _HF_CACHE_ROLES = ("embedding", "classifier")
+    embedders = [m for m in manifest.models if m.role in _HF_CACHE_ROLES]
     if not embedders:
-        print("  [WARN] manifest 에 임베딩 모델 없음 — 임베더 스테이징 skip", file=sys.stderr)
+        print("  [WARN] manifest 에 HF 캐시로 담을 모델 없음 — 스테이징 skip", file=sys.stderr)
         return True
 
     hub = _resolve_hf_cache_dir()
@@ -1586,9 +1608,16 @@ def _copy_embedder_cache(
             except Exception as exc:  # noqa: BLE001
                 print(f"  [embed] 다운로드 불가: {exc}", file=sys.stderr)
         if not src.exists():
+            # 역할마다 없을 때 벌어지는 일이 다르다 — 같은 문구를 쓰면 오해한다.
+            if m.role == "classifier":
+                why = ("폐쇄망에서 **학습**이 이 오류로 죽습니다: OSError "
+                       "'couldn't connect to huggingface.co … not found in cached files'. "
+                       "추론은 CLASSIFIER_MODEL_DIR 로 뜨므로 영향이 없습니다")
+            else:
+                why = ("airgap(onprem-local)은 require_real_embedder=True 라 이게 없으면 "
+                       "startup 이 죽습니다(#2)")
             print(
-                f"  [ERR] 임베딩 모델 HF 캐시 부재: {src}. airgap(onprem-local)은 "
-                f"require_real_embedder=True 라 이게 없으면 startup 이 죽습니다(#2). "
+                f"  [ERR] {m.role} 모델 HF 캐시 부재: {src}. {why}. "
                 f"`python scripts/cache_kure_v1.py --models {m.name}` 로 먼저 캐시하세요.",
                 file=sys.stderr,
             )

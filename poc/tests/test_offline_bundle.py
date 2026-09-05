@@ -608,3 +608,91 @@ def test_pip_download_cmd_pins_linux_platform():
 def test_pip_download_cmd_host_platform_when_empty():
     cmd = _pip_download_cmd(Path("req.txt"), Path("wheels"), "")
     assert "--platform" not in cmd and "--only-binary=:all:" not in cmd
+
+
+# ── 학습 베이스 모델이 번들에 담기는가 (2026-09-05) ──────────────────────────
+#
+# 실측(로컬 full-train 스택에 실제 학습 잡을 던져 확인):
+#
+#     OSError: We couldn't connect to 'https://huggingface.co' to load the files,
+#     and couldn't find them in the cached files.   → 0.14초 만에 실패
+#
+# 컨테이너 HF 캐시에는 임베더(KURE-v1)만 있었다. kf-deberta-base 는 role="classifier" 라
+# 스테이징 함수의 대상(role=="embedding")에서 빠져 **어디에도 담기지 않았다.**
+# 런타임은 hub id 로 참조한다(CLASSIFIER_BASE_MODEL + HF_HOME + HF_HUB_OFFLINE=1).
+#
+# 추론은 무관하다(CLASSIFIER_MODEL_DIR 이 평문 경로로 학습본을 가리킨다). 학습만 못 하는데,
+# 폐쇄망은 enable_incremental_retrain=True 이고 증분 재학습은 매번 kf-deberta-base 에서
+# 풀 파인튜닝한다(warm-start 없음).
+#
+# ⚠ LLM(Qwen3-14B)은 대상이 아니다 — vLLM/Ollama 의 HTTP endpoint 로 서빙하지
+#   transformers 가 HF 캐시에서 로드하지 않는다.
+
+def _models_for_cache_test():
+    return [
+        ModelEntry(name="nlpai-lab/KURE-v1", dim=1024, sha256=None,
+                   license="MIT", role="embedding"),
+        ModelEntry(name="kakaobank/kf-deberta-base", dim=None, sha256=None,
+                   license="MIT", role="classifier"),
+        ModelEntry(name="Qwen/Qwen3-14B", dim=None, sha256=None,
+                   license="Apache-2.0", role="llm"),
+    ]
+
+
+def test_classifier_base_model_is_staged_into_hf_cache(tmp_path, monkeypatch):
+    """분류기 베이스 모델이 HF 캐시 레이아웃으로 담긴다 — 담기지 않으면 학습이 죽는다."""
+    import build_offline_bundle as B
+
+    fake_hub = tmp_path / "hostcache" / "hub"
+    for name in ("models--nlpai-lab--KURE-v1", "models--kakaobank--kf-deberta-base"):
+        d = fake_hub / name
+        d.mkdir(parents=True)
+        (d / "config.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(B, "_resolve_hf_cache_dir", lambda: fake_hub)
+
+    class _Man:
+        models = _models_for_cache_test()
+
+    out = tmp_path / "bundle"
+    out.mkdir()
+    assert B._copy_embedder_cache(_Man(), out, allow_download=False) is True
+
+    hub = out / "models" / "hf" / "hub"
+    assert (hub / "models--kakaobank--kf-deberta-base").is_dir(), "베이스 모델이 안 담겼다"
+    assert (hub / "models--nlpai-lab--KURE-v1").is_dir(), "임베더가 안 담겼다"
+
+
+def test_llm_is_not_staged_into_hf_cache(tmp_path, monkeypatch):
+    """LLM 은 HF 캐시로 담지 않는다 — endpoint 로 서빙하지 로컬 로드가 아니다(28GB 낭비)."""
+    import build_offline_bundle as B
+
+    fake_hub = tmp_path / "hostcache" / "hub"
+    (fake_hub / "models--Qwen--Qwen3-14B").mkdir(parents=True)
+    monkeypatch.setattr(B, "_resolve_hf_cache_dir", lambda: fake_hub)
+
+    class _Man:
+        models = [m for m in _models_for_cache_test() if m.role == "llm"]
+
+    out = tmp_path / "bundle"
+    out.mkdir()
+    B._copy_embedder_cache(_Man(), out, allow_download=False)
+    hub = out / "models" / "hf" / "hub"
+    assert not (hub / "models--Qwen--Qwen3-14B").exists(), "LLM 이 HF 캐시로 담겼다"
+
+
+def test_missing_base_model_is_reported_as_error(tmp_path, monkeypatch, capsys):
+    """캐시에 없으면 조용히 넘어가지 않고 실패로 보고한다 — 나중에 학습이 죽는 것보다 낫다."""
+    import build_offline_bundle as B
+
+    fake_hub = tmp_path / "hostcache" / "hub"
+    fake_hub.mkdir(parents=True)
+    monkeypatch.setattr(B, "_resolve_hf_cache_dir", lambda: fake_hub)
+
+    class _Man:
+        models = [m for m in _models_for_cache_test() if m.role == "classifier"]
+
+    out = tmp_path / "bundle"
+    out.mkdir()
+    assert B._copy_embedder_cache(_Man(), out, allow_download=False) is False
+    err = capsys.readouterr().err
+    assert "classifier" in err and "학습" in err, err
