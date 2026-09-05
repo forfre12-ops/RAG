@@ -180,11 +180,18 @@ def test_domain_aliases_fold_to_canonical():
     )
 
     for alias, canon in (("semiconductor", "반도체"), ("battery", "배터리"),
-                         ("pharma", "화학_제약"), ("bio", "바이오_농업")):
+                         ("pharma", "화학_제약")):
         assert canonical_domain(alias) == canon
         assert canon in DOMAIN_DOC_TYPES, f"{canon} 문서 유형이 없으면 생성할 수 없다"
     assert canonical_domain("tech") == "tech"      # 별칭 아닌 것은 그대로
     assert canonical_domain(None) == "mixed"
+
+    # [2026-09-05 정정] bio 는 접지 않는다. 종전엔 바이오_농업 으로 접혔는데 두 항목이
+    # 서로 다른 산업이라(신약·임상 vs 품종·종자) 「바이오·제약」을 고른 사람이 종자 문서를
+    # 받았다. 접기는 같은 산업의 두 이름에만 쓴다.
+    assert canonical_domain("bio") == "bio"
+    assert "신약" in DOMAIN_DOC_TYPES["bio"], "bio 는 제약 계열 문서 유형이어야 한다"
+    assert "종자" in DOMAIN_DOC_TYPES["바이오_농업"], "바이오_농업 은 농업 계열이어야 한다"
 
 
 # ── E-2 학습셋에 실재하는 한국 산업 도메인을 생성기가 안다 ───────────

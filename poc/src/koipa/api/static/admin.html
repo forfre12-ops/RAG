@@ -651,22 +651,11 @@ details.adv[open]{padding-bottom:12px;}
             <select id="sy-grade"></select>
           </div>
           <div class="field">
+            <!-- [2026-09-05] 제공자 목록과 같은 이유로 서버가 채운다. 손으로 적은 13개는
+                 생성기가 아는 것보다 적어 배터리·화학_제약·소프트웨어·경영정보·기타를
+                 고를 수 없었다. healthz 의 synth_domains_supported 를 쓴다. -->
             <label class="fld">도메인</label>
-            <select id="sy-domain">
-              <option value="mixed">mixed (혼합)</option>
-              <option value="tech">tech (기술)</option>
-              <option value="business">business (영업)</option>
-              <option value="hr">hr (인사)</option>
-              <option value="finance">finance (재무)</option>
-              <option value="legal">legal (법무)</option>
-              <option value="public">public (대외 공개자료)</option>
-              <option value="security">security (보안·암호키)</option>
-              <option value="ma">ma (인수합병)</option>
-              <option value="defense">defense (방위산업)</option>
-              <option value="semiconductor">semiconductor (반도체)</option>
-              <option value="ai">ai (인공지능)</option>
-              <option value="bio">bio (바이오·제약)</option>
-            </select>
+            <select id="sy-domain"></select>
           </div>
           <div class="field">
             <label class="fld">생성 건수</label>
@@ -675,17 +664,17 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <div class="row3" style="margin-top:8px;">
           <div class="field">
-            <!-- 이 칸은 생성기를 고르지 않는다 — submit() 은 비용 추정에만 쓴다. 실제 생성기는 워커가
-                 서버 설정으로 만든다(settings.llm_provider). -->
-            <label class="fld">비용 추정용 제공자</label>
-            <select id="sy-provider">
-              <option value="noop">noop (결정론 · 외부 API 없이)</option>
-              <option value="anthropic">anthropic (Claude)</option>
-              <option value="openai">openai (GPT)</option>
-              <option value="google">google (Gemini)</option>
-              <option value="vllm_qwen">vllm_qwen (온프렘)</option>
-              <option value="vllm_exaone">vllm_exaone (온프렘)</option>
-            </select>
+            <!-- [2026-09-05] 두 가지를 고쳤다.
+                 ① 라벨이 「비용 추정용 제공자」였고 주석에도 "이 칸은 생성기를 고르지 않는다"고
+                    적혀 있었는데, 이제 워커가 이 값으로 실제 생성기를 만든다
+                    (synthesis_service 가 태스크로 넘기고 tasks.synthesize_batch 가 받는다).
+                    화면이 동작과 반대로 적혀 있었다.
+                 ② 선택지를 손으로 적어 두어 서버 정본과 갈렸다 — 「온프렘」이라 적힌
+                    vllm_qwen·vllm_exaone 은 서버가 422 로 거부하고, 실제로 되는
+                    ollama·vllm·local_openai·lm_studio 는 화면에 없었다. 이제 healthz 의
+                    llm_providers_supported 로 채운다(등급 셀렉트와 같은 방식). -->
+            <label class="fld">생성 제공자 (LLM)</label>
+            <select id="sy-provider"></select>
           </div>
           <div class="field">
             <!-- [2026-08-24] 「검수 큐」 → 「학습 후보 검토 큐」. 운영 탭의 검수 큐(분류 결과)와
@@ -1404,6 +1393,11 @@ function applyServerConfig(d){
   // 새로 붙인 게이팅이 죽어도 **뒤 초기화(검수 임계·대시보드)는 살아야 한다.**
   // 2026-08-23 에 정확히 그 반대가 됐다 — 함수 하나가 던지자 화면 절반이 비었다.
   try{ applySynthAvailability(d&&d.llm_provider); }catch(e){ console && console.warn && console.warn('synth note skipped', e); }
+  // 같은 이유로 따로 감싼다 — 목록 채우기가 죽어도 나머지 초기화는 살아야 한다.
+  try{ syncLlmProviders(d&&d.llm_providers_supported, d&&d.llm_provider); }
+  catch(e){ console && console.warn && console.warn('provider list skipped', e); }
+  try{ syncSynthDomains(d&&d.synth_domains_supported); }
+  catch(e){ console && console.warn && console.warn('domain list skipped', e); }
 }
 
 /* ---- 1. CLASSIFY ---- */
@@ -2881,6 +2875,64 @@ function syncActiveGrades(codes){
   });
 }
 
+/* ---- 생성 제공자 목록 동기화 — 서버가 받는 값만 화면에 둔다 ----
+ * [2026-09-05] 종전엔 이 목록이 HTML 에 손으로 적혀 있었고 서버 정본과 갈렸다.
+ * 「온프렘」이라 적힌 vllm_qwen·vllm_exaone 은 서버가 422 로 거부했고, 실제로 되는
+ * ollama·vllm·local_openai·lm_studio 는 화면에 없었다 — 폐쇄망 기본값이 ollama 인데
+ * 콘솔로는 그걸 지정할 방법이 없었다는 뜻이다. 이제 healthz 가 목록을 내려준다.
+ *
+ * 목록을 못 받으면(구버전 서버·healthz 실패) 이 서버가 쓰는 제공자 하나만 남긴다.
+ * 서버가 자기 설정으로 쓰는 값은 정의상 서버가 받는 값이라, 폼이 422 를 만들지 않는다. */
+const LLM_PROVIDER_KR = {
+  noop: '결정론 · 외부 API 없이',
+  anthropic: 'Claude',
+  openai: 'GPT',
+  google: 'Gemini',
+  gemini: 'Gemini',
+  ollama: '온프렘 · Ollama',
+  vllm: '온프렘 · vLLM',
+  local_openai: '온프렘 · OpenAI 호환',
+  lm_studio: '온프렘 · LM Studio',
+};
+function syncLlmProviders(list, active){
+  const sel=$('sy-provider'); if(!sel) return;
+  const act=String(active||'');
+  let names=(Array.isArray(list)?list:[]).map(String).filter(Boolean);
+  if(!names.length) names = act ? [act] : ['noop'];
+  const prev=sel.value;
+  sel.innerHTML=names.map(n=>{
+    const kr=LLM_PROVIDER_KR[n];
+    const mark=(n===act)?' — 이 서버 설정':'';
+    return `<option value="${esc(n)}">${esc(n)}${kr?' ('+esc(kr)+')':''}${mark}</option>`;
+  }).join('');
+  // 고르던 값이 여전히 유효하면 유지하고, 아니면 이 서버가 쓰는 제공자를 기본으로 둔다.
+  if(prev && names.indexOf(prev)>=0) sel.value=prev;
+  else if(act && names.indexOf(act)>=0) sel.value=act;
+}
+
+/* ---- 생성 도메인 목록 동기화 — 제공자와 같은 이유로 서버가 준다 ----
+ * [2026-09-05] 화면에 13개가 손으로 적혀 있었고 생성기가 아는 것보다 적었다. 배터리·
+ * 화학_제약·소프트웨어·경영정보·기타는 서버가 받는데 고를 수가 없었다. healthz 가
+ * 정본으로 접은 목록을 주므로 semiconductor/반도체 처럼 같은 것이 두 줄로 뜨지 않는다. */
+const SYNTH_DOMAIN_KR = {
+  mixed: '혼합', tech: '기술', business: '영업', hr: '인사', finance: '재무',
+  legal: '법무', public: '대외 공개자료', security: '보안·암호키', ma: '인수합병',
+  defense: '방위산업', ai: '인공지능', bio: '바이오·제약',
+};
+function syncSynthDomains(list){
+  const sel=$('sy-domain'); if(!sel) return;
+  let names=(Array.isArray(list)?list:[]).map(String).filter(Boolean);
+  // 목록을 못 받으면 mixed 하나만 둔다 — 빈 셀렉트로 두면 폼이 빈 값을 보내 422 가 된다.
+  if(!names.length) names=['mixed'];
+  const prev=sel.value;
+  sel.innerHTML=names.map(n=>{
+    const kr=SYNTH_DOMAIN_KR[n];
+    return `<option value="${esc(n)}">${esc(n)}${kr?' ('+esc(kr)+')':''}</option>`;
+  }).join('');
+  if(prev && names.indexOf(prev)>=0) sel.value=prev;
+  else if(names.indexOf('mixed')>=0) sel.value='mixed';
+}
+
 /* [2026-08-24] 「API 키 자동 채움」 블록을 없앴다. 주소에 ?key= 를 붙여 여는 경로였는데,
  * 사용자 지시로 **웹 화면에서 키·토큰을 받지 않는다**. 인증은 같은 오리진 쿠키가
  * 맡고, 없으면 401 → 로그인 화면으로 보낸다(위 bounceToLogin). */
@@ -2905,6 +2957,8 @@ loadGoldenBuilds();  // 등록 가능한 문서 묶음 목록(자유 입력 칸�
 onTrainPresetChange();   // 학습 규모 preset 설명 채우기(기본=정식 학습)
 syncWriteGate();
 syncActiveGrades();
+syncLlmProviders();  // 빈 셀렉트를 남기지 않는다 — checkHealth 가 곧 서버 목록으로 덮는다
+syncSynthDomains();
 checkHealth();
 /* [2026-08-24] 새로고침하면 검토 목록이 빈 화면으로 돌아가던 것을 고친다(사용자 지적).
    QUEUE 는 메모리 변수라 새로고침에 사라지는데 init 이 loadReviewQueue 를 부르지 않아,

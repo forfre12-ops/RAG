@@ -21,6 +21,25 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from koipa.config import settings
+# 허용 provider 의 정본은 config 다. schemas/synthesis.py 도 같은 이름을 가져다 쓴다 —
+# 목록을 두 벌 두면 갈린다(그래서 콘솔이 갈렸다).
+from koipa.config import _VALID_LLM_PROVIDER
+
+def _synth_domains_supported() -> list[str]:
+    """합성 생성 폼에 띄울 도메인 — API 가 받는 값을 정본으로 접어 중복을 없앤다.
+
+    생성기는 요청 도메인을 canonical_domain() 으로 접은 뒤 프롬프트를 만든다. 접기 전 이름을
+    그대로 내보내면 semiconductor 와 반도체 가 나란히 떠서 고르는 사람에게는 서로 다른
+    선택지로 보이는데 결과는 같다. 접은 뒤 내보내면 한 줄만 남는다.
+
+    생성기 import 는 여기서 한다 — health 모듈이 LLM 어댑터 사슬을 모듈 로드 시점에
+    끌고 오지 않게 한다(앱은 어차피 합성 라우터를 통해 이미 싣는다).
+    """
+    from koipa.modules.m1_synthesis.generator import canonical_domain  # noqa: PLC0415
+    from koipa.schemas.synthesis import _SYNTH_DOMAINS  # noqa: PLC0415
+
+    return sorted({canonical_domain(d) for d in _SYNTH_DOMAINS})
+
 
 router = APIRouter(tags=["health"])
 _START = time.time()
@@ -375,6 +394,18 @@ def healthz():
         "deploy_profile": getattr(settings, "deploy_profile", "unknown"),
         "embedding_provider": getattr(settings, "embedding_provider", "unknown"),
         "llm_provider": getattr(settings, "llm_provider", "unknown"),
+        # [2026-09-05] 이 서버가 **받는** provider 목록. 콘솔의 합성 생성 폼이 제공자
+        #   드롭다운을 손으로 적어 두고 있었고, 그 목록이 서버 정본과 갈렸다 —
+        #   화면에 "온프렘"이라 적힌 vllm_qwen·vllm_exaone 두 개가 정작 서버가 422 로
+        #   거부하는 값이었고, 실제로 되는 ollama·vllm·local_openai·lm_studio 는
+        #   화면에 없었다. 등급 셀렉트가 이미 서버 값으로 채워지는 것과 같은 방식으로
+        #   목록도 서버가 내려준다. 손으로 적은 목록은 또 갈린다.
+        "llm_providers_supported": sorted(_VALID_LLM_PROVIDER),
+        # 합성 생성 폼의 도메인 목록도 같은 이유로 서버가 준다. 화면에 손으로 적혀 있던
+        # 13개는 생성기가 아는 것보다 적어 배터리·화학_제약·소프트웨어·경영정보·기타를
+        # 고를 수 없었다. **정본으로 접은 뒤** 내보낸다 — semiconductor 와 반도체 를
+        # 나란히 띄우면 같은 것이 두 줄로 보인다(고르는 사람에겐 다른 것으로 읽힌다).
+        "synth_domains_supported": _synth_domains_supported(),
         "classifier_model_dir": operational_config["classifier_model_dir"],
         "operational_config": operational_config,
         "readiness": _readiness_snapshot(),
