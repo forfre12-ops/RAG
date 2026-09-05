@@ -117,7 +117,7 @@ a{color:#0a0a0a}
       <tr><td class="c">가-3-1</td><td>SVM 점수 산정</td><td><b>정정</b></td><td>3요건은 독립 판독되지 않습니다. 곱셈은 교차 확인입니다</td></tr>
       <tr><td class="c">가-3-2</td><td>XAI 방법</td><td><b>정정</b></td><td>Attention·Gradient Saliency 를 쓰지 않습니다</td></tr>
       <tr><td class="c">가-4</td><td>룰 기반 방식</td><td><b>정정</b></td><td>출현 빈도가 아니라 가중합 argmax 다. 시드 404개</td></tr>
-      <tr><td class="c">가-5</td><td>DB·Vector DB 명세</td><td>제공</td><td>「테이블_정의서」 동봉(19표). 유사문서 조회 미채택으로 Vector DB 는 제공 범위에서 제외</td></tr>
+      <tr><td class="c">가-5</td><td>DB·Vector DB 명세</td><td>제공</td><td>「테이블_정의서」 동봉(20표). 유사문서 조회 미채택으로 Vector DB 는 제공 범위에서 제외</td></tr>
       <tr><td class="c">가-6</td><td>통신 방법</td><td>별도 회신</td><td>「API 통신 방안 검토 회신」으로 분리</td></tr>
       <tr><td class="c">가-7</td><td>능동 학습</td><td>제공</td><td>「학습 데이터 입력 경로 명세서」 동봉</td></tr>
       <tr><td class="c">나-1</td><td>샘플 생성 워크플로우</td><td>회신</td><td>생성 &rarr; 검수 큐 &rarr; 승인 &rarr; 학습행</td></tr>
@@ -493,7 +493,7 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:34%">문서</th><th style="width:16%">규모</th><th>내용</th></tr></thead>
     <tbody>
-      <tr><td><a href="테이블_정의서.html"><code>테이블_정의서</code></a></td><td class="c">19표 217칼럼</td><td>표별 논리명·기본키·인덱스·외래키와 서버별 배포 구분, 칼럼별 물리명·논리명·데이터 타입·NULL·키·기본값·설명을 담습니다</td></tr>
+      <tr><td><a href="테이블_정의서.html"><code>테이블_정의서</code></a></td><td class="c">20표 221칼럼</td><td>표별 논리명·기본키·인덱스·외래키와 서버별 배포 구분, 칼럼별 물리명·논리명·데이터 타입·NULL·키·기본값·설명을 담습니다</td></tr>
       <tr><td><a href="ERD_개체관계도.html"><code>ERD_개체관계도</code></a></td><td class="c">관계 27(외래키 24 · 논리 참조 3)</td><td>외래키 관계 도식과 관계 목록입니다</td></tr>
     </tbody>
   </table>
@@ -502,7 +502,7 @@ a{color:#0a0a0a}
   <div class="note">
     <b>표 개수에 대한 보충.</b> 애플리케이션이 ORM 으로 매핑하는 표는 <b>20개</b>이고, 그중
     <code>tb_document_factor_scores</code> 는 읽고 쓰는 코드가 없고 실 데이터도 비어 있어
-    정의서에서 뺐습니다. 그래서 제공 문서에 실린 표는 <b>19개 217칼럼</b>입니다.
+    정의서에서 뺐습니다. 그래서 제공 문서에 실린 표는 <b>20개 221칼럼</b>입니다.
     <br><br>
     2026-09-05 유사문서 조회를 미채택하면서 검색용 표 2종(<code>tb_rag_vectors</code> ·
     <code>tb_rag_aliases</code>)과 관련 칼럼 9개를 소스·DB 양쪽에서 걷었습니다.

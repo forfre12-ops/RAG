@@ -119,7 +119,7 @@ a{color:#0a0a0a}
       <tr><td class="c">가-3-1</td><td>SVM 점수 산정</td><td>회신</td><td>키워드 등급이 먼저 정해지고, 곱셈(S&times;V&times;M)은 그 위의 교차 확인입니다</td></tr>
       <tr><td class="c">가-3-2</td><td>XAI 방법</td><td>회신</td><td>Attention·Gradient Saliency 는 쓰지 않습니다. 매칭 구간·판정 경로로 근거를 제시합니다</td></tr>
       <tr><td class="c">가-4</td><td>룰 기반 방식</td><td><b>귀사 파악 상이</b></td><td>출현 빈도가 아니라 가중합 argmax 다. 시드 404개</td></tr>
-      <tr><td class="c">가-5</td><td>DB·Vector DB 명세</td><td>제공</td><td><code>테이블정의서_ERD</code> 동봉(19표). 유사문서 조회 미채택으로 Vector DB 는 제외</td></tr>
+      <tr><td class="c">가-5</td><td>DB·Vector DB 명세</td><td>제공</td><td><code>테이블정의서_ERD</code> 동봉(20표). 유사문서 조회 미채택으로 Vector DB 는 제외</td></tr>
       <tr><td class="c">가-6</td><td>통신 방법</td><td>별도 회신</td><td>「API 통신 방안 검토 회신」으로 분리</td></tr>
       <tr><td class="c">가-7</td><td>능동 학습</td><td>제공</td><td>「학습 데이터 입력 경로 명세서」 동봉</td></tr>
       <tr><td class="c">나-1</td><td>샘플 생성 워크플로우</td><td>회신</td><td>생성 &rarr; 검수 큐 &rarr; 승인 &rarr; 학습행</td></tr>
@@ -525,13 +525,13 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:34%">문서</th><th style="width:16%">규모</th><th>내용</th></tr></thead>
     <tbody>
-      <tr><td><a href="테이블정의서_ERD.html"><code>테이블정의서_ERD</code></a></td><td class="c">19표 217칼럼</td><td>요청하신 <b>테이블 명세와 칼럼 명세를 한 문서</b>에 담았습니다. 표별 논리명·기본키·인덱스·외래키·파티션 여부와 <b>서버별 배포 구분</b>(지재원 · 고객사), 칼럼별 물리명·논리명·데이터 타입·NULL·키·기본값·설명을 모두 포함하며, 외래키 관계 도식(ERD)과 관계 정의 24건을 함께 실었습니다</td></tr>
+      <tr><td><a href="테이블정의서_ERD.html"><code>테이블정의서_ERD</code></a></td><td class="c">20표 221칼럼</td><td>요청하신 <b>테이블 명세와 칼럼 명세를 한 문서</b>에 담았습니다. 표별 논리명·기본키·인덱스·외래키·파티션 여부와 <b>서버별 배포 구분</b>(지재원 · 고객사), 칼럼별 물리명·논리명·데이터 타입·NULL·키·기본값·설명을 모두 포함하며, 외래키 관계 도식(ERD)과 관계 정의 25건을 함께 실었습니다</td></tr>
     </tbody>
   </table>
   </div>
 
   <div class="note">
-    <b>표 개수에 대한 보충.</b> 정의서는 <b>19표 217칼럼</b>입니다. 유사문서 조회를 채택하지 않기로
+    <b>표 개수에 대한 보충.</b> 정의서는 <b>20표 221칼럼</b>입니다. 유사문서 조회를 채택하지 않기로
     하여 벡터 검색 전용 표 2종과 그에 딸린 칼럼을 제외했고, 어느 코드도 읽고 쓰지 않는 표 1개를
     함께 걷었습니다.
     <br><br>

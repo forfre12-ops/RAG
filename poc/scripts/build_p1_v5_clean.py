@@ -70,9 +70,42 @@ LABELS = {"TS", "S1", "S2", "S3"}
 # 상 고등급 synthetic-court 1868건 중 1821건이 강한 판결서명 보유·표본 전수 공개판결문 확인.
 _COURT_MARKERS = ("원고", "피고", "상고", "판결", "심결", "주문", "피고인", "항소", "대법원", "선고")
 
+# [2026-09-05] 위 마커만으로는 **47건을 놓쳤다.** 2026-07-26 주석이 적어 둔 잔여
+# (1868-1821=47)가 정확히 이것인데, 왜 남았는지는 적혀 있지 않았다. 이유는 띄어쓰기다.
+#
+# 판결문은 당사자 표제를 【원 고】·【주 문】·【신 청 인】처럼 **글자 사이를 띄어** 쓴다.
+# 위 마커는 붙여 쓴 부분 문자열이라 하나도 맞지 않는다. 실측(배포본 학습셋
+# datasets/labeled_p1_v5_clean):
+#
+#     #1933 두산중공업 경업금지가처분   현행 적중 1개('주문') → 문턱 3 미달 → 미검출
+#                                    표제 포함 6개          → 검출
+#
+#     train 47건 · val 8건 · test 8건 미검출. 그중 TS/S1 이 39건 — 공개 판결문을
+#     최고등급으로 가르치고 있었다(이 파일의 규칙이 스스로 "정의상 S3"라고 적은 그것).
+#
+# 고치는 방법으로 마커에 공백 허용을 그냥 붙이면 안 된다 — '발주 문서'가 '주 문'에
+# 걸린다. 그래서 **【 】 안에 든 소송 표제**로 한정한다. 회사 내부 문서는 당사자 역할을
+# 【 】로 묶지 않는다. 실측 오검출 0건(판례 계열 아닌 행 중 적중 0).
+_COURT_HEADINGS = re.compile(
+    r"【\s*(?:"
+    r"원\s*고|피\s*고(?:\s*인)?|주\s*문|이\s*유|"
+    r"신\s*청\s*인|피\s*신\s*청\s*인|"
+    r"상\s*고\s*인|피\s*상\s*고\s*인|항\s*고\s*인|피\s*항\s*고\s*인|"
+    r"채\s*권\s*자|채\s*무\s*자|"
+    r"변\s*호\s*인|검\s*사|감\s*정\s*인|"
+    r"변\s*론\s*종\s*결|청\s*구\s*취\s*지|원\s*심\s*판\s*결"
+    r")\s*】"
+)
+
+
+def _court_heading_hits(text: str) -> int:
+    """【 】 소송 표제의 **종류 수**. 같은 표제가 여러 번 나와도 1로 센다."""
+    return len({re.sub(r"\s+", "", m.group(0)) for m in _COURT_HEADINGS.finditer(text or "")})
+
 
 def _court_marker_hits(text: str) -> int:
-    return sum(1 for m in _COURT_MARKERS if m in (text or ""))
+    text = text or ""
+    return sum(1 for m in _COURT_MARKERS if m in text) + _court_heading_hits(text)
 
 
 def is_public_ruling(record: dict) -> bool:

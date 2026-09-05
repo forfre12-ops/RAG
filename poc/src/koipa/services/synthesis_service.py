@@ -78,6 +78,31 @@ TRAINING_EXCLUDED_PROVIDERS = frozenset({"noop"})
 TRAINING_EXCLUDED_VERDICTS = frozenset({"gate_error"})
 
 
+# [2026-09-05] **배치 게이트는 코퍼스를 재지 않는다.** screen_batch 는 생성 요청 한 건
+# (docs 1~500)을 재는데, 학습 코퍼스는 여러 배치의 승인분이 합쳐진 다른 집합이다.
+# 게다가 24건 미만 배치는 코퍼스 지표를 **아예 계산하지 않는다**
+# (synth_quality.MIN_DOCS_FOR_CORPUS_METRICS) — 작은 배치에서 거짓 양성이 나기 때문이다.
+#
+# 그래서 20건씩 나눠 요청하면 게이트는 매번 "표본 부족"으로 통과시키고, 합쳐진 코퍼스는
+# 아무도 재지 않는다. 실측(2026-09-05): 리포의 학습셋 중 **23개**가 20건 배치로는 전부
+# 'too_small_for_corpus_metrics' 인데 합치면 'corpus_leak' 이다. 예:
+#     datasets/labeled_p1_v5_masked/train.jsonl  n=400  length_only_1nn 0.570 (임계 0.55)
+#
+# 여기서는 **재기만 한다.** 막을지는 호출부가 정한다 — dataset_leakage 모듈이 audit 과
+# check_or_raise 를 나눠 둔 것과 같은 분담이다. 값을 반환 dict 에 실어 빌더가 인쇄·차단한다.
+def _corpus_leakage(rows: list[dict]) -> dict:
+    """합쳐진 학습 코퍼스의 누출 지표. 판정하지 않고 사실만 낸다."""
+    from koipa.dataset_leakage import audit  # noqa: PLC0415 - 지연 import(무거운 모듈 회피)
+
+    try:
+        return audit((str(r.get("label") or ""), str(r.get("text") or "")) for r in rows)
+    except Exception as exc:  # noqa: BLE001
+        # 계량이 깨져도 학습셋 방출은 막지 않는다. 다만 **조용히 통과시키지 않는다** —
+        # 빌더가 이 키를 보고 "재지 못했다"를 인쇄한다(fail-open 을 눈에 보이게).
+        logger.warning("코퍼스 누출 계량 실패: %s", exc)
+        return {"documents": 0, "error": "%s: %s" % (type(exc).__name__, exc)}
+
+
 def _batch_verdict(quality_report) -> str | None:
     """행에 남은 게이트 판정. 워커가 quality_report JSON 에 넣는다."""
     if isinstance(quality_report, dict):
@@ -341,8 +366,13 @@ class SynthesisService:
         **자동 학습 편입이 아니다** — 방출한 것을 기록만 한다.
 
         Returns: {"rows":[...], "approved_total":n, "included":n,
-                  "excluded_noise":n, "excluded_empty":n, "dataset_version":str}
+                  "excluded_noise":n, "excluded_empty":n, "excluded_gate_error":n,
+                  "grade_corrected":n, "dataset_version":str, "corpus_leakage":{...}}
                  — 무음 드롭 없이 사유별 카운트 노출.
+
+        [2026-09-05] corpus_leakage 를 함께 낸다. 생성 시점 배치 게이트는 요청 한 건만
+        재고 24건 미만이면 코퍼스 지표를 아예 계산하지 않는다 — 합쳐진 이 코퍼스는
+        지금까지 아무도 재지 않았다.
         """
         try:
             with session_scope() as db:
@@ -450,6 +480,8 @@ class SynthesisService:
                     # 검수자가 등급을 고친 건수. 카운트로 내보내야 "교정이 반영됐다"를
                     # 학습셋을 열어 보지 않고도 확인할 수 있다.
                     "grade_corrected": grade_corrected,
+                    # 합쳐진 코퍼스의 누출 지표. 배치 게이트가 재지 못하는 자리다(위 주석).
+                    "corpus_leakage": _corpus_leakage(rows),
                 }
         except SQLAlchemyError as exc:
             logger.warning("build_training_rows skipped: %s", exc)
@@ -465,6 +497,8 @@ class SynthesisService:
                 "excluded_empty": 0,
                 "excluded_gate_error": 0,
                 "grade_corrected": 0,
+                # 오류 경로에도 같은 키를 낸다 — 호출부가 조건 없이 읽는다.
+                "corpus_leakage": {"documents": 0},
             }
 
     @staticmethod

@@ -109,7 +109,20 @@ REVISIONS = [
      "<b>표 <code>tb_advisory_locks</code> 를 넣었다</b>(18 → 19표 · 216칼럼) — 감사 "
      "해시체인과 모델 활성화의 임계구역을 두 DB 에서 같은 방식으로 잠그기 위한 표다."),
     ("6", "2026-09-05", "이 문서 머리말의 커밋",
-     '<b>합성 검수 표에 학습셋 판 칸을 넣었다</b>(19표 216 → 217칼럼) &mdash; <code>tb_sample_documents.added_to_dataset_version</code>. 종전에는 API 응답 스키마에만 필드가 있고 표에 칸이 없어 값이 늘 비었다 &mdash; 승인본이 어느 학습셋 판에 들어갔는지 되짚을 수 없던 자리다. <b>자동 편입이 아니라 기록</b>이며, 빌드가 방출한 뒤 되쓴다.<br>곁들여 <b>프롬프트 버전·품질 결과 칸이 실제로 채워지기 시작했다</b>. <code>*_prompt_version</code> 세 칸은 <code>tb_prompt_versions</code> 를 가리키는 외래키라 행을 먼저 등록해야 하는데 워커가 그 등록을 하지 않아 늘 NULL 이었다(실측: IntegrityError 1452).'),
+     '<b>프롬프트 버전·품질 결과 칸이 실제로 채워지기 시작했다.</b> '
+     '<code>tb_sample_documents</code> 의 <code>*_prompt_version</code> 세 칸은 '
+     '<code>tb_prompt_versions</code> 를 가리키는 외래키라 행을 먼저 등록해야 하는데 '
+     '워커가 그 등록을 하지 않아 늘 NULL 이었다(실측: IntegrityError 1452). '
+     '<code>quality_score</code>·<code>quality_report</code> 도 같은 이유로 비어 있었다 '
+     '&mdash; 검수자가 "이 문서가 어떤 검사를 통과해 여기 있는가"를 화면에서 알 수 없었다.'),
+    ("7", "2026-09-05", "이 문서 머리말의 커밋",
+     '<b>표 <code>tb_sample_dataset_membership</code> 를 넣었다</b>(19 → 20표 · 217 → '
+     '221칼럼 · FK 24 → 25건) &mdash; 합성 승인본이 어느 학습셋 판에 들어갔는지 기록한다.'
+     '<br>같은 날 앞선 판에서는 이것을 <code>tb_sample_documents</code> 의 칼럼 하나'
+     '(<code>added_to_dataset_version</code>)로 넣었다가 **되돌렸다.** 칼럼은 UPDATE 라 '
+     '한 문서가 여러 판에 들어가면 앞선 판 기록을 잃는다. 행을 더하기만 하는 연결 표로 '
+     '바꾸고 <code>UNIQUE(sample_id, dataset_version)</code> 로 중복을 막는다. '
+     '<b>자동 학습 편입이 아니라 기록</b>이며, 빌드가 방출한 뒤 남긴다.'),
 ]
 
 
@@ -983,6 +996,22 @@ def main() -> int:
     stale = [n for n in META.TABLES if n not in {t["name"] for t in tables}
              and n not in ex_tables]
 
+    # [2026-09-05] **설명만 남은 죽은 칼럼**을 센다. 종전 검사는 코드→메타 한 방향만
+    # 봤다(설명 없는 칼럼). 반대 방향은 아무도 안 봐서, 코드에서 칼럼을 걷어도
+    # META.COLS 의 설명이 그대로 남았다 — RAG 폐기로 걷은 9칼럼이 실제로 그 상태다.
+    #
+    # ⚠ 이것은 **오류가 아니다.** render 는 코드 칼럼을 훑고 설명을 찾아 붙이므로 메타에만
+    #   남은 항목은 문서에 실리지 않는다(직접 렌더해 19개 중 0개 확인). 죽은 무게이고,
+    #   다음에 같은 이름의 칼럼이 다시 생기면 옛 설명이 조용히 붙는 것이 진짜 위험이다.
+    live_cols = {t["name"]: {c["name"] for c in t["cols"]} for t in parse_models()}
+    dead_cols = [
+        "%s.%s" % (tn, cn)
+        for tn, cols in getattr(META, "COLS", {}).items()
+        if tn in live_cols
+        for cn in cols
+        if cn not in live_cols[tn] and cn not in ex_cols.get(tn, {})
+    ]
+
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
                             capture_output=True, text=True).stdout.strip() or "unknown"
     today = _dt.date.today().isoformat()
@@ -1004,6 +1033,12 @@ def main() -> int:
     if stale:
         print("  [오류] table_spec_meta.TABLES 에만 있고 코드에 없음:", ", ".join(stale))
         ok = False
+    if dead_cols:
+        # 문서에는 실리지 않으므로 ok 를 내리지 않는다 — 보이게만 한다.
+        print("  [메모] 코드에 없는데 설명만 남은 칼럼 %d개 — 문서에는 실리지 않는다."
+              " 같은 이름이 다시 생기면 옛 설명이 붙으니 걷어 두는 편이 낫다:"
+              % len(dead_cols))
+        print("        " + ", ".join(dead_cols))
     if missing:
         print(f"  [경고] 설명 없는 컬럼 {len(missing)}개:")
         for t, c in missing[:20]:
