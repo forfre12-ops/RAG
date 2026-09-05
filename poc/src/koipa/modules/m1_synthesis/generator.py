@@ -207,6 +207,36 @@ DOMAIN_DOC_TYPES = {
 }
 
 
+# [2026-09-05] 프롬프트 버전 — 재현·감사 앵커.
+#
+# tb_sample_documents 의 *_prompt_version 세 칸이 늘 비어 있었다. 채울 값이 없었기 때문이다.
+# 프롬프트를 고쳐도 "어느 프롬프트로 만든 문서인가"를 되짚을 수 없었고, 그래서 품질이
+# 갈렸을 때 원인을 프롬프트로 좁힐 수 없었다.
+#
+# 사람이 올리는 번호 대신 **내용 해시**를 쓴다. 올리는 것을 잊어도 내용이 바뀌면 값이 바뀐다.
+# 형식: "v2-<sha256 앞 8자>" — v2 는 등급명 대신 상황으로 유도하는 현행 프롬프트 세대다.
+
+
+def _prompt_version(*parts: str) -> str:
+    digest = hashlib.sha256()
+    for part in parts:
+        digest.update((part or "").encode("utf-8"))
+        digest.update(b"\0")
+    return "v2-" + digest.hexdigest()[:8]
+
+
+def outline_prompt_version() -> str:
+    """개요 프롬프트 버전 — 현재 개요·본문이 한 호출이라 본문과 같은 값이다."""
+    return body_prompt_version()
+
+
+def body_prompt_version() -> str:
+    """본문 프롬프트 버전 — 시스템 프롬프트 + 등급 상황문 전체의 해시."""
+    situ = json.dumps(GRADE_SITUATION_PROMPTS, ensure_ascii=False, sort_keys=True)
+    doct = json.dumps(DOMAIN_DOC_TYPES, ensure_ascii=False, sort_keys=True)
+    return _prompt_version(SYSTEM_PROMPT, situ, doct)
+
+
 class PromptLanguageContractError(ValueError):
     """A required Korean prompt was damaged or decoded with the wrong codec."""
 

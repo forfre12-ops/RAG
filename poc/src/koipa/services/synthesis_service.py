@@ -34,12 +34,18 @@ def _grade_code(grade) -> str:
     return getattr(grade, "value", grade)
 
 # 추정 비용 (development phase, USD/문서) — Claude Sonnet 4.6 기준
+# [2026-09-05] 키를 팩토리 이름으로 맞췄다. 종전 vllm_qwen·vllm_exaone 은 build_provider 가
+# 모르는 이름이라 API 스키마에서 걷혔다(정본 = config._VALID_LLM_PROVIDER).
+# 자체호스팅(로컬 endpoint)은 API 과금이 없어 0 이다.
 COST_PER_DOC_USD = {
     "anthropic": 0.012,
     "openai": 0.010,
     "google": 0.008,
-    "vllm_qwen": 0.0,    # 자체호스팅
-    "vllm_exaone": 0.0,
+    "gemini": 0.008,
+    "vllm": 0.0,          # 자체호스팅
+    "local_openai": 0.0,
+    "ollama": 0.0,
+    "lm_studio": 0.0,
     "noop": 0.0,
 }
 
@@ -50,9 +56,28 @@ COST_PER_DOC_USD = {
 #   보존해 둔 목적이 바로 이 하드 위생 게이트다.
 TRAINING_EXCLUDED_LABEL_SOURCES = frozenset({"noop_fallback", "llm_nonjson"})
 
+# [2026-09-05] **provider 로도 막는다.** 위 마커만으로는 못 막는 구멍이 있었다 — 직접 실행 확인:
+#   LLM_PROVIDER=noop 생성 → label_source=None · 게이트 통과(학습편입가능=True)
+# 마커는 **파싱 실패 경로에서만** 붙는데(generator.py 의 fallback), NoopProvider 는 파싱되는
+# JSON 을 준다. 그래서 "테스트용 더미"라고 스스로 선언한 산출물이 승인만 되면 학습셋에 들어갔다.
+# 게다가 결정론적이라 같은 본문이 중복으로 들어간다.
+#
+# provider 는 생성 시점에 확정돼 tb_sample_documents.llm_provider 로 보존된다 — 파싱 성공
+# 여부와 무관한 축이라 마커의 구멍을 덮는다.
+TRAINING_EXCLUDED_PROVIDERS = frozenset({"noop"})
 
-def _is_training_admissible(label_source: str | None) -> bool:
-    """검수 승인 합성 샘플이 학습셋에 편입 가능한지(본문 출처 위생) — noop_fallback/llm_nonjson 배제."""
+
+def _is_training_admissible(
+    label_source: str | None, llm_provider: str | None = None
+) -> bool:
+    """검수 승인 합성 샘플이 학습셋에 편입 가능한지 — 본문 출처 위생.
+
+    두 축으로 막는다:
+      · label_source  noop_fallback / llm_nonjson  (파싱 실패로 만들어진 본문)
+      · llm_provider  noop                          (테스트 전용 더미 provider 산출물)
+    """
+    if (llm_provider or "").strip().lower() in TRAINING_EXCLUDED_PROVIDERS:
+        return False
     return label_source not in TRAINING_EXCLUDED_LABEL_SOURCES
 
 
@@ -80,18 +105,32 @@ class SynthesisService:
         )
         # 운영(브로커 가용): 실제 Celery synthesize_batch.delay() 발사 → worker가 생성·검수큐 적재.
         # 테스트/브로커 미가용/eager는 발사하지 않고 작업 등록만(동작·테스트 보존, dryrun 의미).
+        #
+        # [2026-09-05] 그 사실을 **응답으로도 알린다.** 종전에는 브로커가 없거나 발사가
+        # 실패해도 202 만 돌려줘 호출자는 "등록만 되고 생성은 안 됨"을 알 수 없었다.
+        dispatched = False
+        dispatch_note = "브로커 미가용 — 작업 등록만 됨(생성은 일어나지 않는다)"
         if _celery_dispatch_available():
             try:
                 from koipa.workers.tasks import synthesize_batch  # noqa: PLC0415
 
+                # [2026-09-05] llm_provider 를 함께 넘긴다. 종전에는 job payload 와
+                # 비용 추정에만 쓰이고 실제 생성은 전역 설정값으로 돌아, **요청자가 고른
+                # 모델과 실제로 쓴 모델이 달라질 수 있었다.**
                 synthesize_batch.delay(
                     req.target_grade.value,
                     req.count,
                     domain=req.domain,
                     job_id=str(job_id),
+                    llm_provider=req.llm_provider,
                 )
                 logger.info("synth enqueued to celery: job_id=%s count=%d", job_id, req.count)
-            except Exception:  # noqa: BLE001
+                dispatched = True
+                dispatch_note = None
+            except Exception as exc:  # noqa: BLE001
+                dispatch_note = "발사 실패 — 작업 등록만 됨(생성은 일어나지 않는다): %s" % (
+                    type(exc).__name__,
+                )
                 logger.warning(
                     "celery enqueue failed for synth — left as registered: job_id=%s",
                     job_id, exc_info=True,
@@ -104,6 +143,8 @@ class SynthesisService:
             synth_job_id=job_id,
             expected_count=req.count,
             estimated_cost_usd=round(unit * req.count, 4),
+            dispatched=dispatched,
+            dispatch_note=dispatch_note,
         )
 
     def queue(
@@ -245,7 +286,9 @@ class SynthesisService:
                 excluded_noise = 0
                 excluded_empty = 0
                 for s in samples:
-                    if not _is_training_admissible(s.label_source):
+                    if not _is_training_admissible(
+                        s.label_source, getattr(s, "llm_provider", None)
+                    ):
                         excluded_noise += 1  # noop_fallback/llm_nonjson = 학습 편입 금지
                         continue
                     text = (s.generated_content or "").strip()

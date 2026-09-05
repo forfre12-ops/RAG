@@ -89,7 +89,7 @@ pre.term .cmd{color:#fff;font-weight:700}
       ※ 화면에 보이는 <b>「데모 데이터 초기화」</b> 버튼은 고객사 운영 프로파일에서 <b>서버가 404로 차단</b>합니다(<code>demo_console_enabled=False</code>) — 시연용 물리삭제 기능이 운영에 노출되지 않도록 화면이 아니라 <b>서버에서</b> 막습니다.
     </figcaption>
   </figure>
-  <div class="note"><b>본 문서의 화면 캡처 조건(고지).</b> 2026-08-02 <b>고객사 프로파일(onprem-local) 배포본</b>을 실제로 띄워 촬영했으며, 합성 이미지가 아닙니다. 촬영 당시에는 프로파일에 관계없이 모든 카드가 표시됐고, <b>이후 배포본에서 지재원 전용 카드(합성 생성·검증문서 후보 빌더)를 고객사 프로파일에서 숨기도록 변경</b>했습니다 — 따라서 <b>화면 2·3은 현행 배포본에서는 지재원 모델 공장 콘솔에서만 보입니다</b>(기능이 없어진 것이 아니라 표시 서버가 갈린 것). <b>신규 배포 직후 상태라 목록·지표가 비어 있는 화면이 있습니다</b> — 이는 데이터가 아직 없다는 뜻이지 기능 부재가 아닙니다(§2 검토본·서명 화면은 실제 빌드 산출물 24건을 넣어 촬영).</div>
+  <div class="note"><b>본 문서의 화면 캡처 조건(고지).</b> 2026-08-02 <b>고객사 프로파일(onprem-local) 배포본</b>을 실제로 띄워 촬영했으며, 합성 이미지가 아닙니다. 촬영 당시에는 프로파일에 관계없이 모든 카드가 표시됐고, <b>이후 배포본에서 지재원 전용 카드(합성 생성·검증문서 후보 빌더)를 고객사 프로파일에서 숨기도록 변경</b>했습니다 &mdash; 화면만이 아니라 <b>서버에서 <code>/api/v1/synth/*</code> 라우터 자체가 등록되지 않습니다</b>(<code>enable_training=True</code> 인 <code>full-train</code> 에서만 등록 · <code>app.py</code>). 고객사 프로파일에서는 이 경로가 <b>404</b> 입니다 — 따라서 <b>화면 2·3은 현행 배포본에서는 지재원 모델 공장 콘솔에서만 보입니다</b>(기능이 없어진 것이 아니라 표시 서버가 갈린 것). <b>신규 배포 직후 상태라 목록·지표가 비어 있는 화면이 있습니다</b> — 이는 데이터가 아직 없다는 뜻이지 기능 부재가 아닙니다(§2 검토본·서명 화면은 실제 빌드 산출물 24건을 넣어 촬영).</div>
 
   <h2>0-1. 먼저 용어 — "모의문서"와 "골든셋"은 다른 것</h2>
   <p>둘을 섞으면 이후 논의가 어긋나므로 먼저 분리합니다. <b>모의문서 = 입력(학습·시연에 쓸 문서)</b>, <b>골든셋 = 정답지(채점 기준)</b>이며, 골든셋은 신뢰도에 따라 <b>3계층</b>으로 분리 관리됩니다.</p>
@@ -270,12 +270,12 @@ pre.term .cmd{color:#fff;font-weight:700}
 
   <h2>5. 주체 · 권한 매트릭스</h2>
   <table>
-    <thead><tr><th style="width:190px">작업</th><th style="width:150px">필요 권한</th><th>수행 주체</th></tr></thead>
+    <thead><tr><th style="width:170px">작업</th><th style="width:130px">필요 권한</th><th style="width:150px">어느 서버에서</th><th>수행 주체</th></tr></thead>
     <tbody>
-      <tr><td>모의문서 배치 생성</td><td><code>admin</code> · <code>kl_backend</code></td><td>발주처 관리자(또는 KL 백엔드 연동)</td></tr>
-      <tr><td>합성 검수 승인·반려</td><td><code>admin</code> · <code>reviewer</code></td><td>발주처 검수자</td></tr>
-      <tr><td>골든셋 빌드 실행</td><td><code>admin</code> · <code>kl_backend</code></td><td>발주처 관리자</td></tr>
-      <tr><td>검토본 열람</td><td><code>admin</code> · <code>reviewer</code></td><td>발주처 검수자</td></tr>
+      <tr><td>모의문서 배치 생성</td><td><code>admin</code> · <code>kl_backend</code></td><td><b>지재원 모델공장</b><br /><span class="src">full-train</span></td><td>발주처 관리자(또는 KL 백엔드 연동)</td></tr>
+      <tr><td>합성 검수 승인·반려</td><td><code>admin</code> · <code>reviewer</code></td><td><b>지재원 모델공장</b><br /><span class="src">full-train</span></td><td>발주처 검수자</td></tr>
+      <tr><td>골든셋 빌드 실행</td><td><code>admin</code> · <code>kl_backend</code></td><td><b>지재원 모델공장</b><br /><span class="src">full-train</span></td><td>발주처 관리자</td></tr>
+      <tr><td>검토본 열람</td><td><code>admin</code> · <code>reviewer</code></td><td>둘 다</td><td>발주처 검수자</td></tr>
       <tr><td><b>서명 승격</b>(locked)</td><td><code>admin</code> · <code>reviewer</code> <b>실계정</b></td><td>발주처 검수자 — <b>기계·시스템 계정 불가</b></td></tr>
       <tr><td>운영 확정·교정</td><td><code>admin</code> · <code>reviewer</code></td><td>발주처 관리자</td></tr>
       <tr><td>재학습본 활성화</td><td><code>admin</code></td><td>발주처 관리자(현장 결정)</td></tr>

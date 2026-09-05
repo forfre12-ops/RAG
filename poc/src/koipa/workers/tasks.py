@@ -9,6 +9,7 @@ API → Redis 큐 → Worker가 무거운 작업을 수행. Redis 없으면 task
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -131,7 +132,9 @@ def _publish_callback_webhook(callback_url: str | None, payload: dict) -> None:
     publish_callback(callback_url, payload)
 
 
-def _persist_synth_samples(docs: list, *, job_id: str | None) -> int:
+def _persist_synth_samples(
+    docs: list, *, job_id: str | None, screen: dict | None = None
+) -> int:
     """[P0#1] 생성 문서를 검수큐(tb_sample_documents)에 적재 — generate→queue→review 루프 마감.
 
     이전 워커는 list[dict]만 반환하고 SynthRepo.create_sample 을 호출하지 않아, 검수큐가 비어
@@ -140,6 +143,13 @@ def _persist_synth_samples(docs: list, *, job_id: str | None) -> int:
 
     best-effort: DB 미가용/오류는 로깅만(워커를 죽이거나 retry→재생성 유발하지 않음). 생성은 이미
     성공했으므로 적재 실패는 loud ERROR 로 가시화하되 예외를 전파하지 않는다.
+
+    [2026-09-05] 품질 결과·프롬프트 버전을 함께 남긴다. 종전에는 create_sample() 이 받는
+    quality_score·quality_report·*_prompt_version 다섯 칸을 아무도 채우지 않아, 검수자가
+    "이 문서가 어떤 검사를 통과해 여기 있는가"를 화면에서 알 수 없었다.
+
+    Args:
+        screen: screen_batch() 결과. 없으면 품질 칸을 비운 채 적재한다(하위호환).
 
     Returns: 적재 성공 건수.
     """
@@ -154,6 +164,55 @@ def _persist_synth_samples(docs: list, *, job_id: str | None) -> int:
             cls_repo = ClassifyRepo(db)
             synth_repo = SynthRepo(db)
             level_cache: dict[str, int | None] = {}
+
+            # 프롬프트 버전 — 내용 해시. **세 칸은 tb_prompt_versions 를 가리키는 외래키라
+            # 행을 먼저 등록해야 한다**(실측: IntegrityError 1452). 등록에 실패하면 값을
+            # 비우고 적재는 계속한다 — 버전 기록 때문에 생성 결과를 잃으면 안 된다.
+            _pv_body = _pv_outline = _pv_qc = None
+            try:
+                from koipa.modules.m1_synthesis.generator import (  # noqa: PLC0415
+                    GRADE_SITUATION_PROMPTS, SYSTEM_PROMPT,
+                    body_prompt_version, outline_prompt_version,
+                )
+
+                _pv_body = body_prompt_version()
+                _pv_outline = outline_prompt_version()
+                # QC 는 LLM 프롬프트가 아니라 계량 게이트다(synth_quality.screen_batch).
+                # 그래도 어느 게이트를 통과했는지는 같은 방식으로 되짚을 수 있어야 한다.
+                _pv_qc = "metric-gate-v1"
+                _tpl = SYSTEM_PROMPT + "\n\n" + json.dumps(
+                    GRADE_SITUATION_PROMPTS, ensure_ascii=False, sort_keys=True
+                )
+                synth_repo.upsert_prompt(
+                    _pv_body, chain_stage="body", template=_tpl,
+                    created_by="worker", notes="내용 해시 자동 등록",
+                )
+                if _pv_outline != _pv_body:
+                    synth_repo.upsert_prompt(
+                        _pv_outline, chain_stage="outline", template=_tpl,
+                        created_by="worker", notes="내용 해시 자동 등록",
+                    )
+                synth_repo.upsert_prompt(
+                    _pv_qc, chain_stage="qc",
+                    template="synth_quality.screen_batch — 등급명 노출·길이 누출·tell 커버 계량 게이트",
+                    created_by="worker", notes="LLM 프롬프트 아님(계량 게이트)",
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("프롬프트 버전 등록 실패 — 버전 칸을 비우고 적재 계속: %s", exc)
+                _pv_body = _pv_outline = _pv_qc = None
+
+            # 품질 결과 — screen_batch 가 이미 잰 것을 행에 남긴다.
+            _sc = screen or {}
+            _metrics = _sc.get("metrics") or {}
+            _verdict = _sc.get("batch_verdict")
+            _q_report = {
+                "batch_verdict": _verdict,
+                "metrics": _metrics,
+                "gate": "synth_quality.screen_batch",
+            } if _sc else None
+            # 점수는 "통과했는가"를 한 숫자로. 걸린 문서는 애초에 여기 오지 않는다(admit 만 넘어옴).
+            _q_score = None if not _sc else (1.0 if _verdict == "ok" else 0.5)
+
             for d in docs:
                 grade_code = str(getattr(d, "target_grade", "") or "")
                 if grade_code not in level_cache:
@@ -170,9 +229,15 @@ def _persist_synth_samples(docs: list, *, job_id: str | None) -> int:
                     llm_provider=str(getattr(d, "llm_provider", "") or "unknown"),
                     llm_model=str(getattr(d, "llm_model", "") or "unknown"),
                     generated_content=str(getattr(d, "body", "") or ""),
+                    generated_outline=(getattr(d, "title", None) or None),
                     doc_type=(getattr(d, "domain", None) or None),
                     label_source=getattr(d, "label_source", None),
                     parse_error=getattr(d, "parse_error", None),
+                    quality_score=_q_score,
+                    quality_report=_q_report,
+                    outline_prompt_version=_pv_outline,
+                    body_prompt_version=_pv_body,
+                    qc_prompt_version=_pv_qc,
                 )
                 persisted += 1
                 try:
@@ -209,6 +274,7 @@ def synthesize_batch(
     count: int,
     domain: str = "mixed",
     job_id: str | None = None,
+    llm_provider: str | None = None,
 ) -> list[dict]:
     """합성 문서 N건 생성 + 누출 게이트 + 검수큐 적재.
 
@@ -228,7 +294,21 @@ def synthesize_batch(
 
     partial: list[dict] = []
     try:
-        gen = SyntheticDocGenerator()
+        # [2026-09-05] 요청한 provider 로 생성한다. 없으면 전역 설정값(종전 동작).
+        # 알 수 없는 이름이면 build_provider 가 ValueError 를 내므로 여기서 잡아
+        # 전역 설정으로 되돌린다 — 오타 하나로 배치 전체가 죽지 않게.
+        _llm = None
+        if llm_provider:
+            try:
+                from koipa.adapters.llm import build_provider  # noqa: PLC0415
+
+                _llm = build_provider(llm_provider)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "요청 provider %r 를 만들 수 없어 전역 설정으로 되돌린다: %s",
+                    llm_provider, exc,
+                )
+        gen = SyntheticDocGenerator(llm=_llm)
         docs = gen.generate(SynthRequest(target_grade=grade, domain=domain, count=count))
         partial = [
             {
@@ -260,7 +340,7 @@ def synthesize_batch(
             )
 
         # [P0#1] 검수큐 적재 — best-effort(예외 미전파: retry→재생성 방지). 루프 마감.
-        persisted = _persist_synth_samples(admitted_docs, job_id=job_id)
+        persisted = _persist_synth_samples(admitted_docs, job_id=job_id, screen=screen)
         _record_job_done(
             job_id,
             results=partial,

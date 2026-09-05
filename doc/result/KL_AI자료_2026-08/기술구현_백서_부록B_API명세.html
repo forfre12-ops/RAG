@@ -1176,7 +1176,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <p class="ep-desc">시연 콘솔(<code>parse_demo</code>/admin)의 '실적재 시연'으로 생성된 문서·분류·청크만 <strong>물리삭제</strong>한다. 시연 반복 시 데모 데이터가 운영 집계를 오염시키는 것을 막는 용도다.</p>
         <div class="callout"><div class="callout-label">파괴적 엔드포인트 — 2중 안전장치</div><p style="font-size:13px;"><b>① 스코프 고정</b> — 삭제 대상이 <code>created_by='demo-console'</code>로 하드코딩돼 있어 다른 <code>created_by</code>는 매칭 자체가 불가하다. 실 운영 데이터는 구조적으로 지워지지 않는다.<br><b>② 프로파일 차단</b> — <code>demo_console_enabled=false</code>(운영 프로파일 기본)면 <code>404</code>로 거부한다. 즉 <b>납품 운영본에서는 이 엔드포인트가 존재하지 않는다.</b></p></div>
         <h4>Response 200 — DemoPurgeResponse</h4>
-        <p style="font-size:13px;"><code>{documents, classifications, chunks, rag_vectors, warnings[]}</code> — 각 항목의 실삭제 건수.</p>
+        <p style="font-size:13px;"><code>{purged, documents, classifications, chunks, warnings[]}</code> — 각 항목의 실삭제 건수.</p>
         <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 admin 권한 필요</span><span class="sc s4xx">404 데모 콘솔 비활성(운영 기본)</span></div>
       </div>
     </div>
@@ -1200,9 +1200,8 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
             <tr><td class="f-name">target_grade</td><td class="f-type">string</td><td class="f-req yes">●</td><td>TS / S1 / S2 / S3</td></tr>
             <tr><td class="f-name">count</td><td class="f-type">integer</td><td class="f-req yes">●</td><td>생성 건수 (1~500)</td></tr>
             <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role}</td></tr>
-            <tr><td class="f-name">domain</td><td class="f-type">string</td><td></td><td>tech / business / hr / finance / legal / mixed (기본 mixed)</td></tr>
-            <tr><td class="f-name">llm_provider</td><td class="f-type">string</td><td></td><td>anthropic / openai / google / vllm_qwen / vllm_exaone / noop (기본 anthropic)</td></tr>
-            <tr><td class="f-name">seed_documents</td><td class="f-type">string[]</td><td></td><td>시드 문서 ID(선택)</td></tr>
+            <tr><td class="f-name">domain</td><td class="f-type">string</td><td></td><td>생성기 정본(<code>DOMAIN_DOC_TYPES</code>)에서 파생 — tech / business / finance / hr / legal / mixed / public / security / ma / defense / semiconductor / bio / ai (기본 mixed)</td></tr>
+            <tr><td class="f-name">llm_provider</td><td class="f-type">string</td><td></td><td>설정 정본(<code>config._VALID_LLM_PROVIDER</code>)에서 파생 — anthropic / openai / google / gemini / local_openai / vllm / ollama / lm_studio / noop (기본 anthropic). <b>요청한 값이 실제 생성에 쓰인다</b>(2026-09-05 이전에는 전역 설정값으로 생성돼 갈릴 수 있었다)</td></tr>
           </tbody>
         </table>
         <h4>Response 202 — SynthGenerateResponse</h4>

@@ -23,16 +23,22 @@ from .common import Actor, Grade
 _SYNTH_DOMAINS = sorted(DOMAIN_DOC_TYPES)
 SYNTH_DOMAIN_PATTERN = r"^(" + "|".join(_SYNTH_DOMAINS) + r")$"
 
+# [2026-09-05] LLM provider 목록도 **정본에서 파생**한다.
+#
+# 종전에는 여기 손으로 적어 두었고 팩토리와 갈렸다 — API 는 vllm_qwen·vllm_exaone 을 받는데
+# build_provider() 는 그 이름을 모르고(ValueError), 팩토리가 아는 ollama·local_openai·
+# lm_studio·vllm 은 API 로 넣을 수 없었다. 도메인 목록에서 같은 실수를 한 뒤라 같은 방식으로
+# 막는다 — 정본은 config._VALID_LLM_PROVIDER 이고 여기서 파생한다.
+from koipa.config import _VALID_LLM_PROVIDER as _LLM_PROVIDERS  # noqa: E402
+
+LLM_PROVIDER_PATTERN = r'^(' + '|'.join(sorted(_LLM_PROVIDERS)) + r')$'
+
 
 class SynthGenerateRequest(BaseModel):
     target_grade: Grade
     domain: str = Field(default="mixed", pattern=SYNTH_DOMAIN_PATTERN)
     count: int = Field(ge=1, le=500)
-    llm_provider: str = Field(
-        default="anthropic",
-        pattern=r"^(anthropic|openai|google|vllm_qwen|vllm_exaone|noop)$",
-    )
-    seed_documents: list[str] = Field(default_factory=list)
+    llm_provider: str = Field(default="anthropic", pattern=LLM_PROVIDER_PATTERN)
     actor: Actor
 
 
@@ -40,6 +46,12 @@ class SynthGenerateResponse(BaseModel):
     synth_job_id: UUID
     expected_count: int
     estimated_cost_usd: float
+    # [2026-09-05] 발사 여부를 응답에 담는다. 종전에는 브로커가 없거나 발사에 실패해도
+    # 202 만 돌려줘 **호출자가 "등록만 되고 생성은 안 됨"을 알 수 없었다**(로그에만 남았다).
+    #   dispatched=True   워커로 발사됨 — 생성이 진행된다
+    #   dispatched=False  등록만 됨 — 브로커 미가용이거나 발사 실패. 생성은 일어나지 않는다
+    dispatched: bool = False
+    dispatch_note: str | None = None
 
 
 class SyntheticDocItem(BaseModel):

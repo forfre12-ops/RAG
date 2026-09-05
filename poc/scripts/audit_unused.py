@@ -76,7 +76,9 @@ EXPLAINED_COLS = {
 }
 EXPLAINED_TABLES = {
     "tb_evaluation_factors": "판정 요건(S·V·M) 시드 표 — alembic 이 채우고 런타임은 읽기만",
-    "tb_prompt_versions": "합성 프롬프트 버전 — 합성 화면이 요건(FUN-003-⑦)이라 넣기만",
+    # [2026-09-05] 해소됨 — 워커가 적재 전에 upsert_prompt() 로 등록하고 sample 행이
+    # 외래키로 참조한다(쓰기 1 · 읽기 1). 예외 목록에 남겨 두면 이력을 잃으므로 사유만 고친다.
+    "tb_prompt_versions": "합성 프롬프트 버전 — 워커가 등록하고 sample 행이 FK 로 참조(2026-09-05 배선)",
     "tb_advisory_locks": "잠금 행 — 마이그레이션이 미리 넣고 런타임은 FOR UPDATE 로 잡기만",
     "tb_document_factor_scores": "쓰기·읽기 0 · 실 DB 0행 — 정의서에서도 뺐다(EXCLUDED_TABLES)",
 }

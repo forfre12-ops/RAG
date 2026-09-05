@@ -123,7 +123,7 @@ footer strong{color:var(--text-dim);}
 
   <div class="section-sep" id="s1"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">아키텍처 계층</span></div>
   <h2>계층 구조 개요</h2>
-  <p>계층형(layered) 구조. 외부 요청은 <strong>인터페이스(api) → 업무로직(services) → 데이터접근(repositories) → DB</strong> 순으로 흐르고, 등급분류 도메인 처리는 <strong>M1–M6 파이프라인</strong>이 담당한다. 외부 의존(임베딩·LLM·저장소·벡터스토어)은 <strong>어댑터(adapters)</strong>가 Protocol로 추상화해 교체 가능하다.</p>
+  <p>계층형(layered) 구조. 외부 요청은 <strong>인터페이스(api) → 업무로직(services) → 데이터접근(repositories) → DB</strong> 순으로 흐르고, 등급분류 도메인 처리는 <strong>M1–M6 파이프라인</strong>이 담당한다. 외부 의존(임베딩·LLM·저장소)은 <strong>어댑터(adapters)</strong>가 Protocol로 추상화해 교체 가능하다.</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th style="width:150px">계층 / 패키지</th><th>책임</th><th style="width:110px">구분</th></tr></thead>
@@ -132,7 +132,7 @@ footer strong{color:var(--text-dim);}
       <tr><td class="nowrap"><strong>services</strong></td><td>업무 로직(분류 서빙·검수·골든빌드·감사·재학습·웹훅 등) 오케스트레이션</td><td><span class="tag sup">업무로직</span></td></tr>
       <tr><td class="nowrap"><strong>modules (M1–M6)</strong></td><td>등급분류 도메인 파이프라인 — 생성·전처리·라벨링·학습·추론·평가</td><td><span class="tag core">도메인</span></td></tr>
       <tr><td class="nowrap"><strong>repositories</strong></td><td>DB 접근 계층(테이블별 CRUD·질의) — 업무로직과 ORM 분리</td><td><span class="tag sup">데이터접근</span></td></tr>
-      <tr><td class="nowrap"><strong>adapters</strong></td><td>외부 연동 추상화(임베딩·LLM·리랭커·저장소·벡터스토어) — 교체 가능</td><td><span class="tag sup">연동</span></td></tr>
+      <tr><td class="nowrap"><strong>adapters</strong></td><td>외부 연동 추상화(임베딩·LLM·저장소) — 교체 가능</td><td><span class="tag sup">연동</span></td></tr>
       <tr><td class="nowrap"><strong>db</strong></td><td>ORM 모델(models)·세션(session)·마이그레이션(alembic)</td><td><span class="tag sup">데이터</span></td></tr>
       <tr><td class="nowrap"><strong>schemas</strong></td><td>요청/응답·도메인 DTO(Pydantic) — 계약 정의</td><td><span class="tag sup">계약</span></td></tr>
       <tr><td class="nowrap"><strong>workers</strong></td><td>비동기 작업(Celery worker)·주기 스케줄러(beat)</td><td><span class="tag sup">비동기</span></td></tr>
