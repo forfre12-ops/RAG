@@ -210,13 +210,21 @@ def synthesize_batch(
     domain: str = "mixed",
     job_id: str | None = None,
 ) -> list[dict]:
-    """합성 문서 N건 생성 + 검수큐 적재.
+    """합성 문서 N건 생성 + 누출 게이트 + 검수큐 적재.
 
     SyntheticDocGenerator 내부도 best-effort지만, 전체 호출 실패 시 retry.
     생성 성공 시 tb_sample_documents(검수 대기)에 적재해 generate→queue→review 루프를 잇는다(P0#1).
     부분 결과가 있으면 보상 트랜잭션으로 partial 기록.
+
+    [2026-09-05 누출 게이트] 적재 **전**에 services/synth_quality.screen_batch 로 잰다.
+    측정기(koipa.dataset_leakage)는 전부터 있었지만 학습셋 빌더에만 걸려 있어, 합성은
+    만들어서 그대로 검수큐로 갔다. 그 결과 옛 산출물의 33.8%가 본문에 자기 등급명을 노출한
+    채 쌓였다(S1 94.3%) — 검수자가 답이 적힌 문서를 읽으면 검수가 확인 절차가 된다.
+    걸린 문서는 **버리지 않고** 적재에서만 뺀다(생성 비용은 이미 들었고, 무엇이 왜 걸렸는지는
+    job 기록에 남긴다).
     """
     from koipa.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
+    from koipa.services.synth_quality import screen_batch
 
     partial: list[dict] = []
     try:
@@ -233,13 +241,42 @@ def synthesize_batch(
             }
             for d in docs
         ]
+        # [누출 게이트] 재고 통과분만 적재한다. 게이트 자체의 실패가 생성 결과를 버리게
+        # 하면 안 되므로 예외는 흡수하고 전량 통과로 되돌린다(fail-open · 사유는 로그).
+        try:
+            screen = screen_batch([(d.target_grade, d.body) for d in docs])
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("synth 누출 게이트 실패 — 전량 적재로 진행(fail-open): %s", exc)
+            screen = {"admit": list(range(len(docs))), "flagged": [],
+                      "metrics": {}, "batch_verdict": "gate_error"}
+
+        admit = set(screen["admit"])
+        admitted_docs = [d for i, d in enumerate(docs) if i in admit]
+        if len(admitted_docs) != len(docs):
+            logger.warning(
+                "synth 누출 게이트: %d/%d 건만 검수큐로 — verdict=%s reasons=%s",
+                len(admitted_docs), len(docs), screen["batch_verdict"],
+                sorted({f["reason"] for f in screen["flagged"]}),
+            )
+
         # [P0#1] 검수큐 적재 — best-effort(예외 미전파: retry→재생성 방지). 루프 마감.
-        persisted = _persist_synth_samples(docs, job_id=job_id)
+        persisted = _persist_synth_samples(admitted_docs, job_id=job_id)
         _record_job_done(
             job_id,
             results=partial,
             completed=len(partial),
-            extra={"persisted": persisted},
+            extra={
+                "persisted": persisted,
+                # 게이트 결과를 job 에 남긴다 — 화면·감사에서 "왜 40건 만들었는데
+                # 검수큐엔 12건인가"를 열어보지 않고 알 수 있어야 한다.
+                "leakage_gate": {
+                    "verdict": screen["batch_verdict"],
+                    "generated": len(docs),
+                    "admitted": len(admitted_docs),
+                    "flagged": screen["flagged"],
+                    "metrics": screen["metrics"],
+                },
+            },
         )
         return partial
     except Exception as exc:  # noqa: BLE001

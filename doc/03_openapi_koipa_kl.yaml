@@ -558,8 +558,12 @@ paths:
                 target_grade: { $ref: '#/components/schemas/Grade' }
                 domain:
                   type: string
-                  enum: [tech, business, hr, finance, legal, mixed]
+                  enum: [ai, bio, business, defense, finance, hr, legal, ma, mixed, public, security, semiconductor, tech]
                   default: mixed
+                  description: >-
+                    생성기가 프롬프트를 가진 도메인(m1_synthesis.generator.DOMAIN_DOC_TYPES).
+                    2026-09-05 이전에는 앞의 6개만 받았는데, 그 6개는 학습셋에서 이미
+                    채워진 칸이고 정작 얇은 칸(ai·semiconductor·defense)은 거부됐다.
                 count: { type: integer, minimum: 1, maximum: 500 }
                 llm_provider:
                   type: string

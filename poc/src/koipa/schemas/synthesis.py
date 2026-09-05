@@ -7,12 +7,26 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from koipa.modules.m1_synthesis.generator import DOMAIN_DOC_TYPES
+
 from .common import Actor, Grade
+
+# [2026-09-05] 생성기 어휘에서 파생한다 — 손으로 적어 두었더니 어긋났다.
+#
+# 실측: 생성기는 13개 도메인의 프롬프트를 갖고 있는데 API 정규식은 6개
+# (tech·business·hr·finance·legal·mixed)만 받고 있었다. 그 6개는 학습셋에서 이미
+# 등급별 60건 이상으로 채워진 칸이고, 정작 얇은 칸(TS ai 1건·TS semiconductor 1건·
+# TS defense 2건)의 도메인은 생성기가 프롬프트를 갖고 있는데도 API 가 거부했다.
+# 즉 **생성 능력이 필요 없는 칸에만 열려 있었다.**
+#
+# 빈 칸은 scripts/synth_coverage_gaps.py 로 센다.
+_SYNTH_DOMAINS = sorted(DOMAIN_DOC_TYPES)
+SYNTH_DOMAIN_PATTERN = r"^(" + "|".join(_SYNTH_DOMAINS) + r")$"
 
 
 class SynthGenerateRequest(BaseModel):
     target_grade: Grade
-    domain: str = Field(default="mixed", pattern=r"^(tech|business|hr|finance|legal|mixed)$")
+    domain: str = Field(default="mixed", pattern=SYNTH_DOMAIN_PATTERN)
     count: int = Field(ge=1, le=500)
     llm_provider: str = Field(
         default="anthropic",
