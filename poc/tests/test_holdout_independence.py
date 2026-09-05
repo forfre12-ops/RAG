@@ -272,3 +272,54 @@ def test_concern_text_carries_the_breakdown():
     holdout = [_row(" ".join([_BOILER, _filler(90 + i)])) for i in range(4)]
     msg = [c for c in assess(train, holdout)["concerns"] if "같은 문장" in c][0]
     assert "상투어" in msg and "빼면" in msg, msg
+
+
+# ── 한 등급뿐인 평가셋 (2026-09-05) ─────────────────────────────────────────
+#
+# 과분류 측정 전용 셋은 전부 같은 등급이다(공개문서 300건 = 전부 S3). 그런 셋에서 길이
+# 1-NN 은 이웃이 무조건 같은 등급이라 **항상 1.000** 이 나오고 무작위 기대값도 1.000 이다.
+# 그런데 경고는 무작위 기준선을 보지 않고 1nn > 0.55 만 봐서 늘 켜졌고, 학습셋과 본문중복
+# 0 · 문장공유 0.0000 인 완전 독립 셋이 usable_for_comparison=false 로 막혔다.
+#
+# 설명을 concerns 에 넣으면 안 된다 — usable = independent and not concerns 라 설명이 곧
+# 차단이 된다. notes 로 갈랐다.
+
+
+def _single(n=12):
+    return [_row("공개 안내문 %d 호로 배포한 자료이며 열람 제한이 없다. " % i * (3 + i % 5))
+            for i in range(n)]
+
+
+def test_single_grade_set_is_not_blocked_by_length():
+    train = [_row(" ".join(_filler(i) for i in range(4)), label="S2") for i in range(20)]
+    rep = assess(train, _single())
+    assert rep["overlap"]["shared_sentences"]["coverage"] == 0.0
+    assert rep["concerns"] == [], rep["concerns"]
+    assert rep["usable_for_comparison"] is True
+
+
+def test_single_grade_set_says_why_length_was_skipped():
+    """조용히 빼지 않는다 — 왜 안 봤는지가 남는다."""
+    train = [_row(" ".join(_filler(i) for i in range(4)), label="S2") for i in range(20)]
+    notes = assess(train, _single())["notes"]
+    assert notes and "등급이 1종뿐" in notes[0]
+    # 값 자체는 그대로 보고한다(숨기지 않는다).
+    assert assess(train, _single())["holdout_leakage"]["length_only_1nn"] == 1.0
+
+
+def test_multi_grade_set_still_judged_on_length():
+    """등급이 둘 이상이면 길이 축은 그대로 판정에 쓴다(회귀 방지)."""
+    train = [_row(" ".join(_filler(i) for i in range(4)), label="S2") for i in range(20)]
+    skewed = ([_row("짧은 안내 문장이 반복되는 공개 자료이다. " * 2, label="S3") for _ in range(8)]
+              + [_row("긴 내부 검토 자료의 본문이 이어진다. " * 40, label="TS") for _ in range(8)])
+    rep = assess(train, skewed)
+    assert rep["notes"] == []
+    assert any("길이" in c or "Theil" in c for c in rep["concerns"]), rep["concerns"]
+
+
+def test_notes_never_block_the_verdict():
+    """notes 는 판정을 바꾸지 않는다 — concerns 와 갈라 둔 이유."""
+    train = [_row(" ".join(_filler(i) for i in range(4)), label="S2") for i in range(20)]
+    rep = assess(train, _single())
+    assert rep["notes"], "이 셋은 note 가 있어야 한다"
+    assert rep["usable_for_comparison"] is True

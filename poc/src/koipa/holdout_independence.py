@@ -216,7 +216,28 @@ def assess(
                 f"{key} {value['shared']}개가 겹친다 — 같은 작문 습관을 공유한다"
                 " (본문·가족이 달라도 습관은 배운다)"
             )
-    if holdout_leakage.get("documents"):
+    # [2026-09-05] **등급이 하나뿐인 셋에서는 길이 지표가 성립하지 않는다.**
+    # 1-NN 은 이웃이 무조건 같은 등급이라 항상 1.000 이 나오고 무작위 기대값도 1.000 이다.
+    # 그런데 경고는 무작위 기준선을 보지 않고 1nn > 0.55 만 봐서 **항상 켜졌다.**
+    #
+    # 실측: datasets/proxy_gold/public_s3_challenges/public-s3-300 — 공개문서 300건이
+    # 전부 S3 인 과분류 측정 전용 셋이다. 학습셋과 본문중복 0 · 문장공유 0.0000 으로
+    # 완전히 독립인데도 이 경고 하나 때문에 usable_for_comparison=false 가 됐다.
+    # 정당한 평가 도구를 쓸 수 없다고 말하는 셈이었다.
+    #
+    # 등급이 둘 미만이면 길이 축을 판정에서 뺀다. 값은 그대로 보고하고 사유는 notes 에
+    # 남긴다 — concerns 에 넣으면 설명이 곧 차단이 된다(usable = not concerns).
+    notes: list[str] = []
+    grades_present = len(holdout_leakage.get("length_by_grade") or {})
+    length_axis_applies = grades_present >= 2
+    if holdout_leakage.get("documents") and not length_axis_applies:
+        notes.append(
+            "등급이 %d종뿐이라 길이 지표를 판정에 쓰지 않았다 — 1-NN 은 이웃이 무조건 같은"
+            " 등급이라 항상 1.000 이 나온다(무작위 기대값도 1.000). 과분류 전용 셋처럼 한"
+            " 등급만 담은 것은 정상이다. 문장 공유·계보 축은 그대로 봤다." % grades_present
+        )
+
+    if holdout_leakage.get("documents") and length_axis_applies:
         if holdout_leakage["length_only_1nn"] > RECOMMENDED_MAX_LENGTH_LEAK:
             concerns.append(
                 f"홀드아웃 길이-only {holdout_leakage['length_only_1nn']:.3f}"
@@ -247,6 +268,9 @@ def assess(
         "holdout_leakage": holdout_leakage,
         "train_leakage": train_leakage,
         "concerns": concerns,
+        # 판정을 막지는 않지만 읽는 사람이 알아야 하는 것. concerns 와 갈라 둔다 —
+        # usable_for_comparison 이 concerns 의 유무로 정해지기 때문이다.
+        "notes": notes,
         "usable_for_comparison": independent and not concerns,
         # 통과해도 이 문장을 넘는 주장은 할 수 없다. 보고서에 박아 둔다 —
         # 지표만 인용되고 한정이 떨어져 나가는 일이 반복됐다.
