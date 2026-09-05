@@ -75,26 +75,17 @@ if str(_HERE) not in sys.path:
 
 
 def _check_postgres() -> bool:
-    """Postgres 가용성 — 판정은 _pg_probe 한 곳에만 둔다(같은 검사를 복제하지 않는다)."""
+    """DB 가용성 — 판정은 _pg_probe 한 곳에만 둔다(같은 검사를 복제하지 않는다).
+
+    PostgreSQL·MariaDB 양쪽을 본다(함수 이름은 호출부 호환으로 유지).
+    """
     from _pg_probe import postgres_available
 
     return postgres_available()
 
 
-def _check_es() -> bool:
-    """ES 9200 포트 빠른 연결 확인 (0.5초 이내)."""
-    import socket
-    try:
-        sock = socket.create_connection(("localhost", 9200), timeout=0.5)
-        sock.close()
-        return True
-    except OSError:
-        return False
-
-
 # 모듈 로드 시점에 한 번만 확인 (세션 전체에서 재사용)
 _PG_AVAILABLE = _check_postgres()
-_ES_AVAILABLE = _check_es()
 
 # pytest marker 기반 자동 skip
 # fullstack: Postgres + ES + 기타 인프라 필요
@@ -108,7 +99,15 @@ def pytest_collection_modifyitems(config, items):
             # TestClient를 쓰는 테스트는 infra 없으면 skip
             markers = [m.name for m in item.iter_markers()]
             if "fullstack" in markers:
-                item.add_marker(pytest.mark.skip(reason="fullstack: postgres not available"))
+                # [2026-09-05] 메시지에 실제 엔드포인트를 싣는다. "postgres not available"
+                # 만 뜨면 MariaDB 기본값에서 DB 가 떠 있는데도 왜 건너뛰는지 알 수 없다
+                # (실측: 그 상태로 fullstack 52건이 조용히 skip 됐다).
+                from _pg_probe import pg_endpoint  # noqa: PLC0415
+
+                _h, _p = pg_endpoint()
+                item.add_marker(pytest.mark.skip(
+                    reason=f"fullstack: DB 접속 불가 {_h}:{_p} (DATABASE_URL 또는 설정 확인)"
+                ))
 
 
 @pytest.fixture(autouse=True)

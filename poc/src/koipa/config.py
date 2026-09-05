@@ -211,7 +211,10 @@ class Settings(BaseSettings):
 
     # --- 인프라 ---
     # 디폴트는 localhost dev DB. 운영은 DATABASE_URL env 필수.
-    database_url: str = "postgresql+psycopg://koipa:koipa_dev@localhost:5432/koipa"
+    # [2026-09-05] 기본 DB 를 MariaDB 로 넘겼다(자세한 것은 .env.example 머리말).
+    # 기존 배포는 DATABASE_URL 을 명시하고 있어 영향받지 않는다(223 실측 확인).
+    # PostgreSQL 로 되돌리려면 이 값만 바꾸면 된다 — 코드 변경 0.
+    database_url: str = "mariadb+pymysql://koipa:koipa_dev@localhost:13306/koipa"
     redis_url: str = "redis://localhost:6379/0"
 
     minio_endpoint: str = "localhost:9000"

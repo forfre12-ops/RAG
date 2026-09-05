@@ -1,8 +1,10 @@
 name: koipa-poc
 
 services:
+  # [2026-09-05] 기본 DB 가 MariaDB 로 넘어가면서 postgres 는 **opt-in** 이 됐다.
+  # 223 등 기존 배포는 DATABASE_URL 을 명시하고 있어 그대로 PostgreSQL 로 돈다
+  # (실측 확인). 되돌리려면 아래 api/worker/beat 의 DATABASE_URL 만 바꾸면 된다.
   postgres:
-    # ES 제거(의사결정_대장 §03 ⓑ) — pgvector dense + ts_rank 하이브리드. (stock pgvector 이미지, pg_bigm 불요)
     # [공급망] digest 고정 — 태그는 가변이라 같은 pg16 이 다른 바이트를 가리킬 수 있다.
     # 갱신 시: docker pull <tag> 후 `docker images --digests` 값을 옮겨 적고 doc/14 재평가.
     image: pgvector/pgvector:pg16@sha256:131dcf7ff6a900545df8e7e092c270aa8c6db2f2c818e408cb45ec21316b74e6
@@ -21,13 +23,16 @@ services:
       interval: 5s
       retries: 10
 
-  # [2026-09] 로컬 개발 DB 를 MariaDB 로 옮기는 작업 중 추가 — KL 포털이 쓰는 DB 가
-  # MariaDB 라 거기에 스키마를 따로 구성해 넣기로 했다. api/worker 는 여전히 위 postgres
-  # 를 바라본다(depends_on 미변경) — 전환 여부는 아직 결정 사항이라 opt-in 으로만 둔다.
-  # 켜려면: `docker compose up -d mariadb` 후 `.env` 의 DATABASE_URL 을
-  # `mariadb+pymysql://koipa:koipa_dev@localhost:13306/koipa` 로 바꾸고
-  # `alembic upgrade mariadb@head` (기존 postgres 계열과 독립된 branch, poc/alembic/
-  # versions/f2a3b4c5d6e7_mariadb_baseline.py 참조).
+  # [2026-09-05] **기본 DB**. 이 값은 **dev 스택에만** 닿는다 — 운영 배포
+  # (base + prod + dual/gpu)는 prod.yml 의 `environment: !override` 가 여기 environment 를
+  # 통째로 덮고 DATABASE_URL 을 env_file(.env.jjw 등)에서 받는다. 실증:
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.dual.yml config
+  #   → env_file 의 postgresql+psycopg 가 그대로 나온다(2026-09-05 확인).
+  # 223 실서버도 ~/poc/.env.jjw 에 DATABASE_URL 을 명시하고 있어 영향받지 않는다.
+  # KL 포털이 쓰는 DB 가 MariaDB 라 거기에 전용 데이터베이스를
+  # 만들어 쓰기로 했다. 스키마는 독립 alembic 계열이다:
+  #   alembic upgrade mariadb@head   (poc/alembic/versions/f2a3b4c5d6e7_mariadb_baseline.py)
+  # PostgreSQL 계열은 `alembic upgrade postgres@head` 로 따로 선다.
   mariadb:
     # [공급망] digest 고정 — poc/src/koipa/db/models.py 가 10.11 에서 검증됐다(active_key
     # 생성 칼럼·복합 PK AUTO_INCREMENT 등, 커밋 ef294c56·f2a3b4c5d6e7). 올릴 때는
@@ -85,9 +90,8 @@ services:
     # [2026-08-24] 아티팩트 저장을 s3://mlflow/(minio) 에서 같은 볼륨 안 로컬 경로로 옮겼다.
     # minio 를 뺄 수 있게 하는 지점이다 — 이 의존을 안 끊으면 mlflow 가 기동하지 못한다.
     # backend-store 가 이미 같은 볼륨의 SQLite 라 저장 위치가 한곳으로 모이는 셈이다.
-    depends_on:
-      postgres:
-        condition: service_healthy
+    # [2026-09-05] postgres depends_on 을 뺐다. 이 서비스는 SQLite 를 쓰므로 어느 DB 에도
+    # 의존하지 않는데, 그 의존 때문에 기본 스택에서 쓰지도 않는 postgres 가 함께 떴다.
     ports:
       - "5000:5000"
 
@@ -97,7 +101,7 @@ services:
       dockerfile: Dockerfile.api
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
+      DATABASE_URL: mariadb+pymysql://koipa:${MARIADB_PASSWORD:-koipa_dev}@mariadb:3306/koipa
       # [2026-08-24] dev 도 로컬FS 로 통일 (종전 기본값 minio). 실배포 프로파일이 전부 local 이라
       # dev 만 다른 백엔드면 여기서 통과한 것이 배포에서 다르게 도는 경로가 생긴다.
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
@@ -107,7 +111,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
-      postgres:
+      mariadb:
         condition: service_healthy
       redis:
         condition: service_started
@@ -127,7 +131,7 @@ services:
     command: celery -A koipa.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
+      DATABASE_URL: mariadb+pymysql://koipa:${MARIADB_PASSWORD:-koipa_dev}@mariadb:3306/koipa
       REDIS_URL: redis://redis:6379/0
       # [2026-08-24] dev 도 로컬FS 로 통일 (종전 기본값 minio) — api 쪽 주석 참조.
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
@@ -135,7 +139,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
       - redis
-      - postgres
+      - mariadb
     volumes:
       - ./src:/app/src
       - ../docker-data/modelcache:/root/.cache/huggingface
@@ -150,7 +154,7 @@ services:
     command: celery -A koipa.workers.celery_app beat -l info
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
+      DATABASE_URL: mariadb+pymysql://koipa:${MARIADB_PASSWORD:-koipa_dev}@mariadb:3306/koipa
       REDIS_URL: redis://redis:6379/0
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
