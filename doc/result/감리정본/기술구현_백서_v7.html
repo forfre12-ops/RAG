@@ -326,7 +326,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="hero-kpi pass"><span class="dot"></span> 프로토타입 타당성 <b>확인</b></div>
       <div class="hero-kpi pass"><span class="dot"></span> 분류 모델 선정 <b>KF-DeBERTa</b></div>
       <div class="hero-kpi pass"><span class="dot"></span> 합성 LLM 선정 <b>Qwen3</b></div>
-      <div class="hero-kpi pass"><span class="dot"></span> 임베딩·검색 선정 <b>KURE-v1 · pgvector</b></div>
+      <div class="hero-kpi pass"><span class="dot"></span> 임베딩 모델 선정 <b>KURE-v1</b></div>
       <div class="hero-kpi pass"><span class="dot"></span> 보안등급 <b>4단계</b> 자동분류 설계</div>
       <div class="hero-kpi pass"><span class="dot"></span> 미탐 방어 <b>2-게이트 + 판정 가드</b></div>
       <div class="hero-kpi pass"><span class="dot"></span> 폐쇄망 온프렘 구동 <b>확인</b></div>
@@ -388,7 +388,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <li>
           <div class="tl-date">1단계 · 완료</div>
           <div class="tl-title">설계·아키텍처 확정</div>
-          <div class="tl-desc">시스템 구조와 문서 분류 워크플로우 설계, 핵심 기술 스택(검색엔진·벡터DB) 결정.</div>
+          <div class="tl-desc">시스템 구조와 문서 분류 워크플로우 설계, 핵심 기술 스택 결정.</div>
         </li>
         <li>
           <div class="tl-date">2단계 · 완료</div>
@@ -448,7 +448,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <table>
           <thead><tr><th>서비스</th><th>버전</th><th>역할</th><th>포트</th><th>특이사항</th></tr></thead>
           <tbody>
-            <tr><td class="td-code">postgres + pgvector</td><td>16</td><td>문서·분류·학습 메타 + <b>벡터검색</b>(트랜잭션 정본에 통합)</td><td>5432</td><td>월별 파티셔닝 · pgvector HNSW · ts_rank(bigram) 한국어 렉시컬</td></tr>
+            <tr><td class="td-code">DB</td><td>MariaDB 10.11 · 폐쇄망 번들은 PostgreSQL 16</td><td>문서·분류·학습 메타</td><td>5432</td><td>시간축 인덱스 · 보존기간 삭제(파티션 없음)</td></tr>
             <tr><td class="td-code">로컬FS</td><td>—</td><td>문서·모델·아티팩트 스토리지(file://)</td><td>—</td><td>원본 AES-256-GCM 암호화 · MinIO 미사용</td></tr>
             <tr><td class="td-code">redis</td><td>7.2</td><td>Celery 브로커·백엔드 · 잡상태·아웃박스/DLQ</td><td>6379</td><td>폐쇄망 적합 · 임베딩 캐시는 인메모리 LRU</td></tr>
             <tr><td class="td-code">mlflow</td><td>2.16.2</td><td>학습 실험 추적</td><td>5000</td><td>모델 버전·지표 이력 관리</td></tr>
@@ -457,7 +457,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </table>
       </div>
 
-      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 위 표는 <b>지재원 풀 스택</b> 기준이다. <b>고객사 폐쇄망 번들 = api·worker·beat·redis·nginx(mTLS)</b> <b>+ KL 제공 PostgreSQL</b>, 스토리지=로컬 파일시스템. <b>LLM(Qwen3-14B)은 번들에 포함하지 않는다</b> — GPU 보유 고객사가 vLLM/Ollama로 기동한 망 내 엔드포인트를 <code>LLM_PROVIDER</code> 설정으로 연결하며, 용도는 RAG <code>/answer</code>·선택적 2차판정으로 한정되고 <b>분류 핫패스에는 쓰이지 않아 미연결 상태에서도 등급 분류가 동작</b>한다. <b>mlflow·학습 파이프라인은 지재원 전용</b>(번들 미포함 · 스토리지=로컬FS로 MinIO 미사용). tier별 구성은 §2.1.2 참조.</p>
+      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 위 표는 <b>지재원 풀 스택</b> 기준이다. <b>고객사 폐쇄망 번들 = api·worker·beat·redis·nginx(mTLS)</b> <b>+ KL 제공 PostgreSQL</b>, 스토리지=로컬 파일시스템. <b>LLM(Qwen3-14B)은 번들에 포함하지 않는다</b> — GPU 보유 고객사가 vLLM/Ollama로 기동한 망 내 엔드포인트를 <code>LLM_PROVIDER</code> 설정으로 연결하며, 용도는 선택적 2차판정으로 한정되고 <b>분류 핫패스에는 쓰이지 않아 미연결 상태에서도 등급 분류가 동작</b>한다. <b>mlflow·학습 파이프라인은 지재원 전용</b>(번들 미포함 · 스토리지=로컬FS로 MinIO 미사용). tier별 구성은 §2.1.2 참조.</p>
 
       <h3>2.1.1 서버 구조도</h3>
       <div style="margin:16px 0;overflow-x:auto;">
@@ -472,7 +472,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           </defs>
           <!-- Docker Compose 경계 -->
           <rect x="6" y="86" width="728" height="246" rx="10" fill="rgba(0,0,0,.02)" stroke="rgba(0,0,0,.10)" stroke-width="1" stroke-dasharray="7,4"/>
-          <text x="18" y="106" font-size="10" fill="#a3a3a3" font-family="Geist Mono,monospace">Docker Compose · 5 containers · 지재원 풀 스택 (ES 제거 · 벡터는 pgvector)</text>
+          <text x="18" y="106" font-size="10" fill="#a3a3a3" font-family="Geist Mono,monospace">Docker Compose · 5 containers · 지재원 풀 스택</text>
 
           <!-- 클라이언트 -->
           <rect x="290" y="6" width="160" height="38" rx="6" fill="#fff" stroke="rgba(0,0,0,.14)" stroke-width="1.5"/>
@@ -510,7 +510,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <line x1="300" y1="222" x2="218" y2="257" stroke="#737373" stroke-width="1.2" marker-end="url(#arr)"/>
           <!-- to 로컬FS -->
           <line x1="370" y1="222" x2="370" y2="257" stroke="#737373" stroke-width="1.2" marker-end="url(#arr)"/>
-          <!-- to pgvector -->
+          <!-- to 스토리지 -->
           <line x1="450" y1="222" x2="520" y2="257" stroke="#404040" stroke-width="1.2" marker-end="url(#arr-blue)"/>
           <!-- to MLflow -->
           <line x1="487" y1="222" x2="664" y2="257" stroke="#737373" stroke-width="1.2" marker-end="url(#arr)"/>
@@ -519,8 +519,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <!-- PG -->
           <rect x="18" y="257" width="116" height="62" rx="6" fill="#fff" stroke="rgba(0,0,0,.13)" stroke-width="1.3"/>
           <text x="76" y="276" text-anchor="middle" font-size="11.5" font-weight="600" fill="#0a0a0a" font-family="Geist Mono,monospace">postgres</text>
-          <text x="76" y="292" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist,sans-serif">:5432  ·  RDB+pgvector</text>
-          <text x="76" y="308" text-anchor="middle" font-size="9.5" fill="#737373" font-family="Geist,sans-serif">월별 PARTITION</text>
+          <text x="76" y="292" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist,sans-serif">:5432  ·  RDB</text>
+          <text x="76" y="308" text-anchor="middle" font-size="9.5" fill="#737373" font-family="Geist,sans-serif"></text>
 
           <!-- Redis -->
           <rect x="160" y="257" width="116" height="62" rx="6" fill="#fff" stroke="rgba(0,0,0,.13)" stroke-width="1.3"/>
@@ -534,11 +534,11 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <text x="370" y="292" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist,sans-serif">file://  ·  로컬 스토리지</text>
           <text x="370" y="308" text-anchor="middle" font-size="9.5" fill="#737373" font-family="Geist,sans-serif">docs / models / artifacts</text>
 
-          <!-- pgvector (postgres 내장) -->
+          <!-- 스토리지 -->
           <rect x="462" y="257" width="116" height="62" rx="6" fill="rgba(0,0,0,.03)" stroke="rgba(0,0,0,.18)" stroke-width="1.3" stroke-dasharray="5,3"/>
-          <text x="520" y="276" text-anchor="middle" font-size="10.5" font-weight="600" fill="#525252" font-family="Geist Mono,monospace">pgvector</text>
+          <text x="520" y="276" text-anchor="middle" font-size="10.5" font-weight="600" fill="#525252" font-family="Geist Mono,monospace">DB</text>
           <text x="520" y="292" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist,sans-serif">postgres 확장</text>
-          <text x="520" y="308" text-anchor="middle" font-size="9.5" fill="#737373" font-family="Geist,sans-serif">HNSW · ts_rank</text>
+          <text x="520" y="308" text-anchor="middle" font-size="9.5" fill="#737373" font-family="Geist,sans-serif"></text>
 
           <!-- MLflow -->
           <rect x="606" y="257" width="116" height="62" rx="6" fill="#fff" stroke="rgba(0,0,0,.13)" stroke-width="1.3"/>
@@ -579,11 +579,11 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <!-- 고객사 agent 박스 -->
           <rect x="356" y="44" width="240" height="278" rx="10" fill="#fff" stroke="#0a0a0a" stroke-width="1.5"/>
           <text x="476" y="34" text-anchor="middle" font-size="12.5" font-weight="600" fill="#0a0a0a" font-family="Geist,sans-serif">고객사 AI agent (N곳)</text>
-          <text x="476" y="62" text-anchor="middle" font-size="10.5" fill="#525252" font-family="Geist,sans-serif">추론(등급 분류) · RAG 보조 · 감사</text>
+          <text x="476" y="62" text-anchor="middle" font-size="10.5" fill="#525252" font-family="Geist,sans-serif">추론(등급 분류) · 감사</text>
           <rect x="372" y="76" width="208" height="34" rx="5" fill="#fafafa" stroke="rgba(0,0,0,.08)" stroke-width="1"/>
           <text x="476" y="97" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist Mono,monospace">API + worker · 룰엔진</text>
           <rect x="372" y="118" width="208" height="34" rx="5" fill="#fafafa" stroke="rgba(0,0,0,.08)" stroke-width="1"/>
-          <text x="476" y="139" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist Mono,monospace">postgres + pgvector (HNSW)</text>
+          <text x="476" y="139" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist Mono,monospace">DB (MariaDB / PostgreSQL)</text>
           <rect x="372" y="160" width="208" height="34" rx="5" fill="#fafafa" stroke="rgba(0,0,0,.08)" stroke-width="1"/>
           <text x="476" y="181" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist Mono,monospace">qwen3 LLM · 분류기(추론)</text>
           <text x="476" y="216" text-anchor="middle" font-size="9.5" fill="#a3a3a3" font-family="Geist,sans-serif">없음: ES · MLflow · 학습 파이프라인 · 웹</text>
@@ -594,7 +594,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <!-- 지재원 → 고객사: 오프라인 번들 적재 -->
           <line x1="224" y1="230" x2="356" y2="135" stroke="#404040" stroke-width="1.5" marker-end="url(#tp-arr-blue)"/>
           <text x="290" y="170" text-anchor="middle" font-size="9.5" fill="#404040" font-family="Geist,sans-serif">① 번들 적재</text>
-          <text x="290" y="184" text-anchor="middle" font-size="9" fill="#737373" font-family="Geist,sans-serif">pgvector·참조테이블</text>
+          <text x="290" y="184" text-anchor="middle" font-size="9" fill="#737373" font-family="Geist,sans-serif">참조테이블</text>
 
           <!-- 고객사 → 지재원: 집계 진단지표만 환류 (A안, 문서 반출 없음) -->
           <line x1="356" y1="290" x2="224" y2="290" stroke="#737373" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#tp-arr)"/>
@@ -613,13 +613,13 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </div>
         <div class="card">
           <div class="card-label">고객사 agent (N곳)</div>
-          <div class="card-desc">추론(등급 분류)·RAG 보조·감사 전담. API+worker·postgres+pgvector·룰엔진·qwen3 LLM·분류기 보유. ES·MLflow·학습 파이프라인·웹 프론트는 없음.</div>
+          <div class="card-desc">추론(등급 분류)·감사 전담. API+worker·DB·룰엔진·qwen3 LLM·분류기 보유. MLflow·학습 파이프라인·웹 프론트는 없음.</div>
         </div>
       </div>
 
       <div class="callout info">
         <span class="callout-icon">ℹ</span>
-        <div class="callout-body">웹 페이지 전부와 원문 저장(로컬FS) 구성은 <b>발주처(KL)</b> 범위로, 한국지식재산보호원 범위가 아니다. 고객사 agent는 OpenAPI 계약만 노출하고 KL이 이를 소비한다. pgvector는 골든셋 수천~수십만 건을 HNSW로 sub-100ms 검색하며 수백만 건까지 여유가 있다.</div>
+        <div class="callout-body">웹 페이지 전부와 원문 저장(로컬FS) 구성은 <b>발주처(KL)</b> 범위로, 한국지식재산보호원 범위가 아니다. 고객사 agent는 OpenAPI 계약만 노출하고 KL이 이를 소비한다.</div>
       </div>
 
       <div class="callout warn">
@@ -663,14 +663,6 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <div class="card-desc">KURE-v1(한국어 특화) 기본 · BGE-M3 폴백</div>
         </div>
         <div class="card">
-          <div class="card-label">검색·벡터DB</div>
-          <div class="card-desc">pgvector — PostgreSQL 내장 벡터검색 (+ts_rank bigram 한국어 렉시컬)</div>
-        </div>
-        <div class="card">
-          <div class="card-label">리랭커</div>
-          <div class="card-desc">검색 결과 재정렬(BGE Reranker 계열), 선택 적용</div>
-        </div>
-        <div class="card">
           <div class="card-label">스토리지</div>
           <div class="card-desc">로컬 스토리지(file:// · 원본 AES-256-GCM)</div>
         </div>
@@ -681,7 +673,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="card-grid col2" style="margin:16px 0;">
         <div class="card"><div class="card-label">작업 유실 방지</div><div class="card-desc">업로드된 분류 작업은 비동기 큐로 처리하되, 제출과 기록을 원자적으로 묶어 유실을 막고 실패 작업은 재처리 경로로 보장한다.</div></div>
         <div class="card"><div class="card-label">변조 방지 감사로그</div><div class="card-desc">모든 처리 단계를 해시 체인으로 기록해 사후 변조를 탐지한다. 행위자·조직 정보는 위조 가능한 요청 값이 아니라 인증 정보에서 도출한다.</div></div>
-        <div class="card"><div class="card-label">접근 격리</div><div class="card-desc">고객사 간 격리는 <b>KL 포털이 일원 담당</b>(고객사별 폐쇄망 분리 배포)하고, 앱 내부는 단일 고객사 범위에서 <b>RBAC·열람권한(등급) 스코프</b>로 조회·검색을 강제한다. 검수 화면의 RAG 유사사례 노출에도 등급 스코프를 적용하며, 권한 미확정 시 빈 결과를 반환한다(fail-closed).</div></div>
+        <div class="card"><div class="card-label">접근 격리</div><div class="card-desc">고객사 간 격리는 <b>KL 포털이 일원 담당</b>(고객사별 폐쇄망 분리 배포)하고, 앱 내부는 단일 고객사 범위에서 <b>RBAC·열람권한(등급) 스코프</b>로 조회·검색을 강제한다.</div></div>
         <div class="card"><div class="card-label">저신뢰 검수 라우팅</div><div class="card-desc">분류 신뢰도가 기준 미만이면 거부가 아니라 <b>검수자 큐로 자동 배분</b>해 사람이 확인하게 한다(미탐 위험 보호).</div></div>
       </div>
 
@@ -775,9 +767,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <text x="710" y="158" font-size="8.5" fill="#a3a3a3" font-family="Geist,sans-serif">확정 등급 →</text>
           <text x="710" y="170" font-size="8.5" fill="#a3a3a3" font-family="Geist,sans-serif">KL 후속 기능(§1.2)</text>
 
-          <!-- RAG 근거 검색 (병렬, 점선) -->
+          <!-- 검수 큐 · 관제 -->
           <rect x="14" y="240" width="170" height="44" rx="6" fill="#fafafa" stroke="rgba(0,0,0,.10)" stroke-width="1"/>
-          <text x="99" y="259" text-anchor="middle" font-size="10" font-weight="600" fill="#525252" font-family="Geist,sans-serif">RAG 근거 검색 (pgvector)</text>
+          <text x="99" y="259" text-anchor="middle" font-size="10" font-weight="600" fill="#525252" font-family="Geist,sans-serif">검수 큐 · 관제</text>
           <text x="99" y="273" text-anchor="middle" font-size="9" fill="#737373" font-family="Geist,sans-serif">유사 기준문서 Top-K</text>
           <line x1="99" y1="240" x2="99" y2="186" stroke="#a3a3a3" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#wf-arr-dim)"/>
           <text x="110" y="218" font-size="8.5" fill="#a3a3a3" font-family="Geist,sans-serif">⑥과 병렬 · 근거 첨부만 (등급 불개입)</text>
@@ -833,25 +825,6 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
       <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 근거 제공(①)은 자원과 무관하게 항상 보장되고, 자연어 설명(②)은 자원 여건에 따라 선택적으로 보강된다(KL 참고자료 §1-2 "GPU가 존재하더라도 운영 자원 여건 충족 시 LLM 설명 생성" 정합).</p>
 
-      <h4>분류기의 RAG 보완 — 현재 "근거 첨부", 목표 "규정 룰 투입"(FUN-004 선택 옵션)</h4>
-      <p>FUN-004는 학습된 분류 모델에 <b>RAG 보완</b>을 "선택 옵션"으로 둔다. 현재 구현 범위와 설계 목표를 구분하면 다음과 같다.</p>
-
-      <p style="margin:12px 0 4px;"><b>현재(구현됨) — 근거 첨부, 등급 불개입.</b> "분류기가 RAG를 참고한다"의 현행 의미는 다음과 같다.</p>
-      <ul>
-        <li><b>언제:</b> ⑥ 등급 추론과 <b>병렬</b>로 실행된다. 분류가 RAG 응답을 기다리지 않는다.</li>
-        <li><b>어떻게:</b> 문서에서 만든 쿼리를 확장한 뒤, <b>pgvector</b>에서 dense 벡터(코사인 HNSW, 필요 시 ts_rank bigram 렉시컬 병행)로 사전 색인된 유사 규정·선례 중 <b>유사 문서 Top-K</b>를 검색한다.</li>
-        <li><b>결과의 용도:</b> 검색된 유사 규정·선례는 분류 결과에 <code>rag_context</code> <b>"증거" 목록으로 첨부만</b> 된다 — "이 문서는 이런 기존 기준문서들과 유사하다"를 사람(관리자·검수자)이 확정 판단 시 참고할 수 있게 하는 자료다. <i>(검수 화면 안에서 유사 기존-라벨 사례를 직접 제시하는 보조 기능은 Phase 2 로드맵이다(§11.2 본개발 과제).)</i></li>
-        <li><b>하지 않는 것:</b> RAG 결과는 등급 결정에 <b>불개입</b>이다 — 등급 계산(softmax·집계·confidence)에 입력되지 않고, 자동확정 게이트는 어디까지나 <b>룰-모델 합의</b>로 판정한다. 검색 결과가 무엇이든 등급은 변하지 않는다.</li>
-        <li><b>실패 시:</b> pgvector 검색이 실패하면 근거 없이 분류만 정상 진행한다(graceful degradation). RAG는 운영 분류의 가용성 의존점이 아니다.</li>
-      </ul>
-
-      <p style="margin:12px 0 4px;"><b>목표(설계) — 규정 조항을 판정에 투입.</b> 다음 단계의 RAG 보완은 사내 규정·지침을 RAG로 검색해, 적중한 <b>해당 규정 조항을 룰엔진·LLM 판정에 직접 투입</b>함으로써 등급 산정을 보완하는 방향이다. 핵심은 kNN 선례 다수결(유사 사례의 라벨을 투표로 합산)이 아니라, <b>적중 규정의 조항 자체를 룰로 투입</b>해 비공지성·관리성 등 3요건 판독을 보강하는 데 있다.</p>
-      <div class="callout warn">
-        <span class="callout-icon">⚠</span>
-        <div class="callout-body"><b>적용 범위 주의 — 현재는 증거 제공까지만 구현됨.</b> "규정 조항을 판정에 투입"은 설계 목표이며, FUN-004의 <b>선택 옵션</b>으로 자원(GPU·LLM) 여건을 고려해 <b>기본 OFF 토글</b>로 둔다. 토글이 꺼진 기본 운영에서 RAG는 등급을 바꾸지 않으며, 자동확정은 룰-모델 합의 게이트로만 판정한다.</div>
-      </div>
-
-      <div class="note"><b>임계값 실측(2026-08-28).</b> <code>review_confidence_threshold</code> 는 배포 프로파일이 정한다 — <code>onprem-local</code>·<code>full-train</code> 0.5 · <code>lite-noapi</code> 0.7. 이 사업의 배포 대상은 앞의 둘이므로 <b>운영 임계는 0.5</b> 다. 같은 프로파일이 temperature(2.03)·escalation τ(0.30)·합의 게이트(ON)도 함께 정한다. 재현: <code>DEPLOY_PROFILE=full-train python -c "from koipa.config import settings; print(settings.review_confidence_threshold)"</code></div>
       <h4>등급 산정 방식 — 3요건 S×V×M 곱셈</h4>
       <p>등급 매핑은 부정경쟁방지법의 영업비밀 3요건 점수의 <b>곱</b>으로 정의한다. 가산식(요소별 점수를 더해 100점 만점으로 합산)이 아니라 <b>곱셈식</b>이므로, <b>한 요건이라도 0이면 곱이 0이 되어 S3(공개)</b>가 된다 — 비공지성·유용성·관리성 중 하나라도 결격이면 영업비밀이 성립하지 않는다는 법리를 그대로 옮긴 매핑이다.</p>
       <p><b>다만 구현에서 S·V·M 은 서로 독립하게 판독되지 않는다.</b> 키워드 룰이 먼저 등급(content grade)을 정하고, S·V·M 레벨은 그 등급과 두 신호(공개 출처 키워드 매칭 여부 · 관리성 키워드 매칭 여부)에서 파생된다(<code>m3_labeling/rule_engine.py</code> <code>label()</code>). 따라서 곱셈은 독립된 세 번째 판독이 아니라 <b>키워드 등급에 대한 교차 확인</b>으로 동작한다.</p>
@@ -976,7 +949,6 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
       <h4>예외·실패 경로</h4>
       <ul>
-        <li><b>RAG 검색 실패:</b> 분류를 중단하지 않는다 — 근거 없이 등급 산출을 계속한다(silent graceful degradation).</li>
         <li><b>비동기 작업 실패:</b> DLQ(Dead Letter Queue) 스트림에 적재 후 재처리 경로를 보장한다. Outbox 원자 발행으로 제출 단계 유실도 차단(§2.3).</li>
         <li><b>권한 외 접근:</b> 인증 신원 결속 + RBAC·등급 스코프 조회로 403 차단(IDOR/BOLA, §2.3). 고객사 간 격리는 KL 포털·폐쇄망 분리 배포가 담당.</li>
         <li><b>FNR 회귀 방지:</b> 갱신 모델은 평가 게이트 + 사람 사인오프 없이는 배포되지 않는다(§2.4.1).</li>
@@ -996,7 +968,6 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td class="td-code">B2<br>라벨 후보 생성 (M3)</td><td>배치 도구</td><td>키워드 룰 엔진이 1차 라벨 후보를 부여하고, 룰 확신이 임계값 미달이면 LLM이 폴백으로 후보를 생성한다. <b>3요건(비공지성 S·경제적 유용성 V·비밀관리성 M) 레벨(각 0·1·2)을 그 등급에서 파생</b>해 근거를 동반 출력한 뒤, <b>곱(S×V×M) 매핑으로 교차 확인</b>한다 — 곱이 더 높은 보안등급을 가리키면 그쪽을 취한다(FNR-safe, 하향 없음)(FUN-023). <b>기계는 "후보"까지만 단다.</b></td></tr>
             <tr><td class="td-code">B3<br>사람 검수 · 학습셋 확정</td><td>관리자</td><td>라벨 후보를 검수하여 학습셋에 편입한다(FUN-003: 라벨 자동 부여 → 관리자 검수 후 편입).</td></tr>
             <tr><td class="td-code">B4<br>초기 모델 학습 (M4)</td><td>배치 (GPU)</td><td>KF-DeBERTa fine-tune. MLflow run_id로 전 과정 추적, safetensors로 <b>지재원 내부 모델 저장소</b>(로컬FS/MLflow 아티팩트 <code>koipa-models</code> — 지재원 학습 전용, KL 원문저장과는 별개)에 저장 → 오프라인 번들로 고객사에 배포된다.</td></tr>
-            <tr><td class="td-code">B5<br>기준문서 색인 (pgvector)</td><td>배치 (<code>rag_indexer</code>)</td><td>dense 벡터(pgvector HNSW) + ts_rank bigram 렉시컬로 PostgreSQL에 색인한다. 이 색인이 운영 ⑥의 <b>RAG 근거 검색 풀</b>이 된다.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1158,24 +1129,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
          ============================ -->
     <section id="s03">
       <h2><span class="num">03</span> 모델 선정</h2>
-      <p class="h2-sub">프로토타입에서 후보를 비교 실측해 분류 모델·합성 LLM·검색엔진을 선정한 근거.</p>
+      <p class="h2-sub">프로토타입에서 후보를 비교 실측해 분류 모델·합성 LLM 을 선정한 근거.</p>
 
-      <h3>3.1 벡터검색 선정 — PostgreSQL + pgvector</h3>
-      <p>RAG 검색(유사 규정·선례 조회, 답변 합성)에는 별도 검색엔진(Elasticsearch) 대신 <b>PostgreSQL + pgvector</b>를 선정했다. 등급 결정은 분류기가 수행하고 벡터검색은 보조(설명·RAG)에 국한되며, 코퍼스 규모가 수천 건이라 분산 검색엔진의 강점이 쓰이지 않기 때문이다. 근거는 5가지다.</p>
-      <div class="card-grid col2" style="margin:16px 0;">
-        <div class="card"><div class="card-label">검색 품질 동등 (실 PG 측정)</div><div class="card-desc">dense <b>Recall@5 ≈ ES 하이브리드(BM25+RRF)</b>(당시 bge-m3 측정 0.722=0.722, △+0.000). 하이브리드는 추가 이득 0이면서 약 4배 느림(52→226ms) — ES의 강점이 본 시스템에선 미사용. <b>실 PG 풀스택 측정 완료(2026-06-24, 하이브리드 85%&gt;dense 76%)</b> · 단 쿼리가 합성·LLM 생성이라 실 운영쿼리 모니터는 본개발(현 임베딩 기본=KURE-v1). 검색 모델 선정은 §7.2.</div></div>
-        <div class="card"><div class="card-label">컴포넌트 감소 · 정합성</div><div class="card-desc">PostgreSQL은 감사·확정/보정 <b>트랜잭션 때문에 어차피 필수</b> → pgvector는 신규 컴포넌트 0(ES는 무거운 1개 추가). 문서·청크·벡터·분류가 <b>한 ACID</b>로 묶여 이중쓰기 불일치가 사라진다.</div></div>
-        <div class="card"><div class="card-label">규모 적합</div><div class="card-desc">골든셋 수천 건 → pgvector HNSW로 sub-100ms(수백만까지 여유). ES의 분산·대규모 강점은 불필요하다.</div></div>
-        <div class="card"><div class="card-label">라이선스 · 폐쇄망</div><div class="card-desc">ES Hybrid RRF는 platinum 라이선스가 필요하나 pgvector·PostgreSQL은 오픈 — 폐쇄망 설치·번들이 단순해진다.</div></div>
-        <div class="card"><div class="card-label">메타 필터 · 한국어 렉시컬</div><div class="card-desc">등급·출처 등 메타데이터 필터를 SQL <code>WHERE</code>로 깔끔히 표현 — ES 필터 DSL보다 명료하다. 한국어 키워드는 <b>ts_rank(bigram tsvector)</b>로 렉시컬 채점(pg_bigm GIN은 선택 후보가속)해 고등급 검색을 보강한다.</div></div>
-        <div class="card"><div class="card-label">용도 적합</div><div class="card-desc">등급 결정은 분류기, 검색은 RAG 보조, 관리자 자연어 검색은 불필요 → ES 하이브리드의 정교함이 필요 없다.</div></div>
-      </div>
-      <div class="callout info">
-        <span class="callout-icon">ℹ</span>
-        <div class="callout-body"><b>요약.</b> 검색 품질은 ES와 동등(△0)한데 ES는 더 무겁고·느리고·라이선스가 걸린다. PostgreSQL은 트랜잭션 정본으로 어차피 필수이므로, pgvector를 쓰면 <b>컴포넌트 하나가 통째로 빠지고 데이터 정합성까지 얻는다</b>.</div>
-      </div>
-
-      <h3>3.2 분류 모델 선정 — KF-DeBERTa</h3>
+      <h3>3.1 분류 모델 선정 — KF-DeBERTa</h3>
       <p>4단계 보안등급 분류기로는 한국어 금융·법률 도메인에 특화된 <b>KF-DeBERTa</b>를 선정했다. 장문 특화 후보(KoBigBird)와 비교했을 때, <b>긴 문서는 512토큰 청킹(③)으로 분해해 처리</b>하므로 단일 입력 길이가 짧아도 정확도 손실이 없고 학습·운영은 더 가벼웠다. 장문 계약·M&amp;A 메모처럼 꼬리쪽에 핵심이 몰린 문서도 청크 단위로 분해되어 ⑥의 <b>최고-위험 청크 집계</b>로 다뤄지므로, 모델의 최대 입력 길이가 등급 판정의 제약이 되지 않는다. <b>(단, 청킹·최고-위험 집계는 추론 경로에 적용되며, 현재 학습은 문서 단위 512 truncation으로 — 청크 단위 학습은 본개발 정밀화 과제다.)</b></p>
       <div class="tbl-wrap">
         <table>
@@ -1208,10 +1164,10 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
       <div class="callout">
         <span class="callout-icon">◆</span>
-        <div class="callout-body"><b>왜 학습 분류기인가 — 벡터검색 단독이 아니라.</b> 동일 평가셋(학습 누출 제거)에서 학습 분류기와 벡터 kNN을 정면 비교하면 <b>분류기 정확도 77% / 고등급 FNR 6.6%</b> vs <b>벡터 kNN 최선 49%</b>로 분류기가 정확도·미탐 모두 크게 앞선다. 등급은 문서의 <b>주제가 아니라 비공지·경제가치·관리(S/V/M) 판단</b>에서 나오므로, "유사 문서를 찾는" 검색으로는 등급을 가를 수 없다 — 검색 정확도가 R@5 94%여도 S1 검출은 5~9%로 붕괴하고, 레퍼런스에 따라 28~76%로 출렁인다. 분류기는 등급 판별 특징을 학습해 이 벽을 넘고(미탐 안정), 0.7GB·CPU 333ms로 가벼워 GPU 없이도 추론된다. 따라서 <b>등급 결정자는 학습 분류기</b>, 벡터검색은 설명·RAG 보조로 역할을 나눈다.</div>
+        <div class="callout-body"><b>왜 학습 분류기인가 — 벡터검색 단독이 아니라.</b> 동일 평가셋(학습 누출 제거)에서 학습 분류기와 벡터 kNN을 정면 비교하면 <b>분류기 정확도 77% / 고등급 FNR 6.6%</b> vs <b>벡터 kNN 최선 49%</b>로 분류기가 정확도·미탐 모두 크게 앞선다. 등급은 문서의 <b>주제가 아니라 비공지·경제가치·관리(S/V/M) 판단</b>에서 나오므로, "유사 문서를 찾는" 검색으로는 등급을 가를 수 없다 — 검색 정확도가 R@5 94%여도 S1 검출은 5~9%로 붕괴하고, 레퍼런스에 따라 28~76%로 출렁인다. 분류기는 등급 판별 특징을 학습해 이 벽을 넘고(미탐 안정), 0.7GB·CPU 333ms로 가벼워 GPU 없이도 추론된다. 따라서 <b>등급 결정자는 학습 분류기</b>다. 유사문서 조회는 2026-09-05 미채택으로 제외했다.</div>
       </div>
 
-      <h3>3.3 합성 LLM 선정 — Qwen3 (vs Gemma 실측)</h3>
+      <h3>3.2 합성 LLM 선정 — Qwen3 (vs Gemma 실측)</h3>
       <p>학습용 합성문서 생성 LLM으로 <b>Qwen3</b>를 유지한다. S1(1급 비밀) 약점 보강을 위한 합성증강 효과를 <b>Qwen vs Gemma로 4-seed(42·43·44·45) 실측</b>했다(base=train_subset 550건·S1 27, 모델당 S1 합성 60건, holdout_eval.clean 42, KF-DeBERTa 학습).</p>
       <div class="tbl-wrap">
         <table>
@@ -1244,7 +1200,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </table>
       </div>
 
-      <h3>3.4 LLM 오케스트레이션 — 유연한 교체 구조</h3>
+      <h3>3.3 LLM 오케스트레이션 — 유연한 교체 구조</h3>
       <p>합성·추론에 쓰는 LLM은 어댑터로 추상화해 <b>LLM 종류(자체 모델·외부 API)가 바뀌어도 동일한 구조로 동작</b>하도록 설계한다(FUN-003). 표준 오케스트레이션 프레임워크(LangChain 등)가 필요한 경우 합성 모듈에 한정해 적용할 수 있는 구조이며, 폐쇄망 환경에서는 외부 의존성과 데이터 흐름을 최소화·투명화하는 자체 구현을 기본으로 한다.</p>
     </section>
 
@@ -1288,7 +1244,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <h4>분류 모델 학습</h4>
           <div class="mod-fun">KF-DeBERTa 학습 · 실험 추적 · 모델 버전 관리</div>
           <p>선정한 분류 모델(KF-DeBERTa)을 4등급 분류기로 학습한다. 학습 데이터는 등급별 층화 70/15/15로 학습/검증/평가셋에 자동 분리하며, 같은 내용이 학습·평가에 동시 포함되는 누수를 차단(정규화 텍스트 dedup)해 평가셋이 <b>모델이 한 번도 보지 않은 데이터</b>가 되도록 보장한다. 평가셋 기준으로 정확도·정밀도·재현율·F1 리포트를 산출하고, 본 사업 핵심 KPI인 <b>미탐율(FNR — 고등급을 낮은 등급으로 흘린 비율)</b>을 등급별로 분리 보고한다.</p>
-          <p>모델 선정은 단순 정확도가 아니라 <b>미탐 최소화</b>를 기준으로 한다. 고등급(TS·S1) 표본에 비대칭 손실 가중을 주고, '전부 고등급 찍기' 식 게이밍을 막는 합성 지표(미탐율 + 과분류율 + 단일클래스 패널티)로 best 모델을 선택한다. 평가는 신뢰수준을 구분한 다층 체계(합성 일관성 → LLM pseudo-gold → 디오염 holdout → 운영 관리자 확정 locked)로 운영한다. 단 locked가 0인 동안 보고 수치는 <b>프록시·상대비교·메커니즘 검증</b>으로만 사용한다. 학습 과정·결과는 실험 추적 도구(MLflow)로 기록하고, 모델은 버전 단위로 저장·배포한다(온프렘 GPU). RAG 인덱싱은 선택 옵션이다.</p>
+          <p>모델 선정은 단순 정확도가 아니라 <b>미탐 최소화</b>를 기준으로 한다. 고등급(TS·S1) 표본에 비대칭 손실 가중을 주고, '전부 고등급 찍기' 식 게이밍을 막는 합성 지표(미탐율 + 과분류율 + 단일클래스 패널티)로 best 모델을 선택한다. 평가는 신뢰수준을 구분한 다층 체계(합성 일관성 → LLM pseudo-gold → 디오염 holdout → 운영 관리자 확정 locked)로 운영한다. 단 locked가 0인 동안 보고 수치는 <b>프록시·상대비교·메커니즘 검증</b>으로만 사용한다. 학습 과정·결과는 실험 추적 도구(MLflow)로 기록하고, 모델은 버전 단위로 저장·배포한다(온프렘 GPU).</p>
           <div style="margin:12px 0;padding:10px 12px;border-left:3px solid var(--accent,#3b6ea5);background:rgba(59,110,165,0.06);font-size:13px;line-height:1.6;">
             <b>데이터 단계 구분</b> — 위 학습/검증/평가셋은 <b>모델을 만드는 개발·검증 단계에서만</b> 쓰는 라벨링된 데이터다.
             <b>실운영 단계에서는 이 셋을 쓰지 않는다.</b> 운영 시에는 그날그날 새로 들어온 실문서를 학습된 모델이 분류하고,
@@ -1302,9 +1258,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="mod-box">
         <div class="mod-label"><span class="mid">M5</span>추론<br>FUN-005</div>
         <div class="mod-body">
-          <h4>문서 분류 추론 + 근거 검색(RAG)</h4>
-          <div class="mod-fun">청크 집계 분류 · 신뢰도 게이트 · RAG 근거 검색(병렬)</div>
-          <p>문서를 분할 단위로 분류한 뒤 집계해 등급과 신뢰도(confidence)를 산출한다. 신뢰도가 기준 미만이면 검수자 큐로 자동 배분한다. 동시에 유사 기준문서를 검색(RAG)해 판단 근거로 첨부하되, 검색은 등급 결정에 개입하지 않으며 검색이 실패해도 분류는 정상 진행된다.</p>
+          <h4>문서 분류 추론</h4>
+          <div class="mod-fun">청크 집계 분류 · 신뢰도 게이트</div>
+          <p>문서를 분할 단위로 분류한 뒤 집계해 등급과 신뢰도(confidence)를 산출한다. 신뢰도가 기준 미만이면 검수자 큐로 자동 배분한다.</p>
         </div>
       </div>
 
@@ -1479,8 +1435,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <thead><tr><th>검증 층</th><th>대상</th><th>결과</th></tr></thead>
           <tbody>
             <tr><td><b>단위·경량</b></td><td>핵심 로직(룰엔진·집계·게이트 등)</td><td class="td-pass">858 (lite)</td></tr>
-            <tr><td><b>DB-backed</b></td><td>PG 스키마·트랜잭션·파티션</td><td class="td-pass">20/20</td></tr>
-            <tr><td><b>풀스택</b></td><td>PG + pgvector 통합 경로</td><td class="td-pass">103/103</td></tr>
+            <tr><td><b>DB-backed</b></td><td>DB 스키마·트랜잭션</td><td class="td-pass">20/20</td></tr>
+            <tr><td><b>풀스택</b></td><td>DB 통합 경로</td><td class="td-pass">103/103</td></tr>
             <tr><td><b>실 GPU E2E</b></td><td>교정 → 학습 → 배포 → 핫리로드 폐곡선</td><td class="td-pass">7/7</td></tr>
             <tr><td><b>라이브 API 데모</b></td><td>PDF → S1(1.000) → confirm/relabel → 재학습 큐</td><td class="td-pass">동작 확인</td></tr>
           </tbody>
@@ -1517,16 +1473,16 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>7.1 분류 모델 — 타당성 확인 · 모델 선정 완료</h3>
-      <p>분류 모델로 <b>KF-DeBERTa</b>를 선정하고, 4단계 보안등급 분류가 정상 동작함을 확인했다. <b>현행 배포본은 v5_clean(<code>v-fe4b386b</code>, 2026-07-29 승격), 직전 배포본·롤백은 v4_clean(<code>v-dd3abab9</code>)</b>이다. <b>v5 헤드라인은 서빙경로 hardened holdout(n=42) F1_macro 0.917(직전 v4 0.688) · 공개 판례 과분류 0.79→0.04 · high→S3 위험미탐 0</b>이다(§3.2). (직전 v4의 누출 제거 clean 실측은 정확도 77% · 고등급 FNR 6.6% · F1_macro ≈0.78이며, 109-홀드아웃 0.686 등은 학습 텍스트 42% 중복이라 참고치 — 이 셋에선 v5≈v4다.) 다만 학습에 포함되지 않은 새로운 문체에서는 일부 문서가 실제보다 낮은 등급으로 분류되는 경향이 관찰되었다. 이를 줄이기 위해 <b>룰/메타데이터 게이트를 우선 강화하고 운영 관리자 확정에서 배우는 루프</b>가 본개발의 핵심이며, 비밀문서 미탐(누락)을 가장 중요한 관리 지표로 두고, 저신뢰 오류는 검수 라우팅으로, <b>고신뢰 하향 오분류는 §2의 판정 시점 미탐 가드(최고-위험 청크 집계·콘텐츠 가드)</b>로 별도 차단한다.</p>
+      <p>분류 모델로 <b>KF-DeBERTa</b>를 선정하고, 4단계 보안등급 분류가 정상 동작함을 확인했다. <b>현행 배포본은 v5_clean(<code>v-fe4b386b</code>, 2026-07-29 승격), 직전 배포본·롤백은 v4_clean(<code>v-dd3abab9</code>)</b>이다. <b>v5 헤드라인은 서빙경로 hardened holdout(n=42) F1_macro 0.917(직전 v4 0.688) · 공개 판례 과분류 0.79→0.04 · high→S3 위험미탐 0</b>이다(§3.1). (직전 v4의 누출 제거 clean 실측은 정확도 77% · 고등급 FNR 6.6% · F1_macro ≈0.78이며, 109-홀드아웃 0.686 등은 학습 텍스트 42% 중복이라 참고치 — 이 셋에선 v5≈v4다.) 다만 학습에 포함되지 않은 새로운 문체에서는 일부 문서가 실제보다 낮은 등급으로 분류되는 경향이 관찰되었다. 이를 줄이기 위해 <b>룰/메타데이터 게이트를 우선 강화하고 운영 관리자 확정에서 배우는 루프</b>가 본개발의 핵심이며, 비밀문서 미탐(누락)을 가장 중요한 관리 지표로 두고, 저신뢰 오류는 검수 라우팅으로, <b>고신뢰 하향 오분류는 §2의 판정 시점 미탐 가드(최고-위험 청크 집계·콘텐츠 가드)</b>로 별도 차단한다.</p>
 
-      <h3>7.2 검색(임베딩) 모델 — 모델 선정 완료</h3>
-      <p>검색 모델로 <b>KURE-v1</b>(한국어 특화, BGE-M3 폴백)을 선정했다. 합성 코퍼스에서의 초기 검색 정확도는 <b>Recall@5 약 0.67~0.72로 목표(0.80)에 미달</b>했다. 원인은 검색 알고리즘이 아니라 <b>합성 데이터 본문이 비슷한 표현을 반복하는 다양성 부족</b>이다 — 쿼리와 정답 문서가 거의 같은 표현을 공유해 변별이 어려운 구조였다(데이터 한계). 운영 문서의 표현 다양성은 관리자 확정·검색 로그를 통해 관찰하고, 목표 충족 여부는 locked 기반으로만 판단한다.</p>
+      <h3>7.2 임베딩 모델 — 모델 선정 완료</h3>
+      <p>임베딩 모델로 <b>KURE-v1</b>(한국어 특화, BGE-M3 폴백)을 선정했다. 2026-09-05 유사문서 조회를 미채택하면서 <b>검색 용도는 없어졌고</b>, 임베딩은 다음 두 곳에 남는다 — <b>룰 1차 판정의 시드 키워드 유사도</b>(<code>m3_labeling/rule_engine.py</code>)와 <b>학습 데이터 분포 변화 감시</b>의 중심점 계산(<code>m4_training/trainer.py</code> · <code>drift_detection_enabled</code>). 기동 시 워밍업과 <code>/ready</code> 준비 점검도 이 모델을 쓴다. GPU 없이 CPU 로 동작하며, 모델을 못 읽으면 결정론적 해시 임베딩으로 폴백한다(<code>EMB_PROVIDER=hash</code> — 시험·드라이런용).</p>
 
       <h3>7.3 문서 추출 — 구현 완료 · 실문서 검증 예정</h3>
       <p>HWP·DOCX·PDF·Excel·PPTX 추출 파이프라인을 구현했다. HWP 실문서를 확보한 뒤 최종 추출 품질을 검증한다.</p>
 
       <h3>7.4 전체 흐름(E2E) — 정상 동작 확인</h3>
-      <p>업로드 → 추출 → 분류 → 근거 검색까지 전체 흐름이 정상 동작하며, 응답속도도 목표 기준을 충족했다.</p>
+      <p>업로드 → 추출 → 분류 → 근거 제시까지 전체 흐름이 정상 동작하며, 응답속도도 목표 기준을 충족했다.</p>
       <div class="card-grid col3" style="margin:16px 0;">
         <div class="card card-pass"><div class="card-label">분류 응답 (근거검색 미사용)</div><div class="card-value sm">약 0.4초</div><div class="card-desc">목표 10초 이내 충족</div></div>
         <div class="card card-pass"><div class="card-label">분류 응답 (근거검색 포함)</div><div class="card-value sm">약 9초</div><div class="card-desc">목표 30초 이내 충족</div></div>
@@ -1546,7 +1502,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>7.6 운영점 실측 — 평가↔서빙 갭과 운영 임계값</h3>
-      <p>동일 모델·동일 홀드아웃(109건)이라도 <b>"무엇으로 재느냐"에 따라 안전성 수치가 크게 달라진다</b>는 점을 실측으로 확인했다. 원시 argmax로 재면 안전성을 과대평가하므로, <b>실배포 경로 전체를 통과시켜 측정(C-eval)</b>해야 운영 동작과 일치한다. <b>(아래 절대 수치는 누출 잔존 109셋 기준이자 직전 배포본 v4 — 이 셋에선 v5≈v4(개선 주장 없음). 상대 개선폭(argmax↔서빙경로)의 근거로만 보고, 절대 고등급 FNR의 운영 기준은 직전 v4 clean 6.6%다, §3.2.)</b></p>
+      <p>동일 모델·동일 홀드아웃(109건)이라도 <b>"무엇으로 재느냐"에 따라 안전성 수치가 크게 달라진다</b>는 점을 실측으로 확인했다. 원시 argmax로 재면 안전성을 과대평가하므로, <b>실배포 경로 전체를 통과시켜 측정(C-eval)</b>해야 운영 동작과 일치한다. <b>(아래 절대 수치는 누출 잔존 109셋 기준이자 직전 배포본 v4 — 이 셋에선 v5≈v4(개선 주장 없음). 상대 개선폭(argmax↔서빙경로)의 근거로만 보고, 절대 고등급 FNR의 운영 기준은 직전 v4 clean 6.6%다, §3.1.)</b></p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>측정 경로</th><th>방향성 FNR</th><th>FNR_TS</th><th>F1</th><th>Accuracy</th></tr></thead>
@@ -1556,12 +1512,12 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           </tbody>
         </table>
       </div>
-      <p>서빙경로의 미탐(방향성 FNR)이 원시 argmax 대비 <b>약 9배 낮다</b>(0.167 → 0.018). 원시 argmax로 재면 안전성을 9배 과대평가하므로, 평가는 반드시 서빙경로(<code>evaluate_via_serving</code>)로 한다. <b>(† 표의 절대 수치는 직전 v4의 오염 holdout(누출 42%) 참고치이며, 운영 기준 절대 고등급 FNR은 §3.2 clean 6.6%(직전 v4)다; 현행 v5는 hardened high→S3 위험미탐 0.)</b></p>
+      <p>서빙경로의 미탐(방향성 FNR)이 원시 argmax 대비 <b>약 9배 낮다</b>(0.167 → 0.018). 원시 argmax로 재면 안전성을 9배 과대평가하므로, 평가는 반드시 서빙경로(<code>evaluate_via_serving</code>)로 한다. <b>(† 표의 절대 수치는 직전 v4의 오염 holdout(누출 42%) 참고치이며, 운영 기준 절대 고등급 FNR은 §3.1 clean 6.6%(직전 v4)다; 현행 v5는 hardened high→S3 위험미탐 0.)</b></p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>운영점</th><th>기본값</th><th>근거 · 옵션</th></tr></thead>
           <tbody>
-            <tr><td><b>C-esc (escalation τ)</b></td><td class="td-code">0.30 (onprem 기본 ON)</td><td><b>onprem-local/full-train 배포 프로파일 기본 τ=0.30 ON</b> — clean 홀드아웃(누출0 n=77) 실측 미탐 FNR 0.174(argmax)→0.087, TS recall 0.91→1.0, 검수부하 +5pp(과분류 불변). 더 낮추면(τ 0.10~0.12) FNR≤0.05이나 검수부하 0.8+로 급증 — 운영 검수역량에 맞춰 <code>.env</code>로 조정. 운영 관리자 확정 라벨이 쌓이면 운영점 재확정(§3.2·§11).</td></tr>
+            <tr><td><b>C-esc (escalation τ)</b></td><td class="td-code">0.30 (onprem 기본 ON)</td><td><b>onprem-local/full-train 배포 프로파일 기본 τ=0.30 ON</b> — clean 홀드아웃(누출0 n=77) 실측 미탐 FNR 0.174(argmax)→0.087, TS recall 0.91→1.0, 검수부하 +5pp(과분류 불변). 더 낮추면(τ 0.10~0.12) FNR≤0.05이나 검수부하 0.8+로 급증 — 운영 검수역량에 맞춰 <code>.env</code>로 조정. 운영 관리자 확정 라벨이 쌓이면 운영점 재확정(§3.1·§11).</td></tr>
             <tr><td><b>B1 (범용약어 weight 배수)</b></td><td class="td-code">1.0 유지</td><td>배수를 낮추면 FNR_S1이 0.053→0.21로 악화(S1 recall에 load-bearing)되고 F1도 하락 → 낮추면 순손해. <b>1.0 유지 확정</b>.</td></tr>
             <tr><td><b>C-eval (서빙경로 평가)</b></td><td class="td-code">활성</td><td>실배포 경로 전체를 통과해 측정 → eval이 배포 동작과 일치함을 보장.</td></tr>
           </tbody>
@@ -1580,7 +1536,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           </tbody>
         </table>
       </div>
-      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 홀드아웃에서도 판례를 제거해 비즈니스 문서만 남긴 평가셋(<code>holdout_business.jsonl</code> 90건)으로 재측정했다. 오염 원본은 아카이브로 보관한다. <b>이것이 §3.2의 OSS F1 0.848(정제 전)과 정제 후 수치의 차이를 설명한다.</b> 단, 이는 <b>법률 오염</b> 정제이고, 이와 별개로 <b>홀드아웃과 학습셋의 텍스트 42% 중복(누출)</b>도 존재한다 — 따라서 직전 v4의 정직한 운영값은 <b>누출까지 제거한 clean 실측(정확도 77% · 고등급 FNR 6.6%)</b>이며, 0.686 등 109-홀드아웃 수치는 참고치다(현행 v5 헤드라인은 §3.2).</p>
+      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 홀드아웃에서도 판례를 제거해 비즈니스 문서만 남긴 평가셋(<code>holdout_business.jsonl</code> 90건)으로 재측정했다. 오염 원본은 아카이브로 보관한다. <b>이것이 §3.1의 OSS F1 0.848(정제 전)과 정제 후 수치의 차이를 설명한다.</b> 단, 이는 <b>법률 오염</b> 정제이고, 이와 별개로 <b>홀드아웃과 학습셋의 텍스트 42% 중복(누출)</b>도 존재한다 — 따라서 직전 v4의 정직한 운영값은 <b>누출까지 제거한 clean 실측(정확도 77% · 고등급 FNR 6.6%)</b>이며, 0.686 등 109-홀드아웃 수치는 참고치다(현행 v5 헤드라인은 §3.1).</p>
     </section>
 
     <!-- ============================
@@ -1611,7 +1567,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <h3>8.2 멀티 고객 납품</h3>
       <p>본 제품은 이 고객사에 우선 납품하되, <b>다른 기업에도 납품 가능</b>하도록 설계한다. 고객사별 차이는 <b>코드 수정 없이 설정·데이터로만</b> 흡수한다.</p>
       <div class="card-grid col2" style="margin:16px 0;">
-        <div class="card"><div class="card-label">공통 분류기 + 고객사별 설정</div><div class="card-desc">신규 고객사는 모델 재학습 없이 등급체계 룰셋 설정으로 적응한다(사내 규정·지침 RAG 투입은 목표 단계의 선택 옵션, §4 FUN-004).</div></div>
+        <div class="card"><div class="card-label">공통 분류기 + 고객사별 설정</div><div class="card-desc">신규 고객사는 모델 재학습 없이 등급체계 룰셋 설정으로 적응한다.</div></div>
         <div class="card"><div class="card-label">설치 단위 / 조직 격리</div><div class="card-desc">폐쇄망은 고객사별 단독 설치, 연결형은 다수 고객을 동시에 운용할 수 있으며 조직 간 데이터는 격리한다.</div></div>
         <div class="card"><div class="card-label">등급체계 자체 수정</div><div class="card-desc">고객사마다 다른 비밀등급 체계를 관리자가 추가·변경·삭제할 수 있다. 코드 변경이 필요 없다.</div></div>
         <div class="card"><div class="card-label">버전 단위 모델 배포</div><div class="card-desc">모델은 버전 단위 아티팩트로 배포·갱신해 고객사 간 일관된 릴리즈를 보장한다.</div></div>
