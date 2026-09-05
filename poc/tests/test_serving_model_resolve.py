@@ -137,3 +137,43 @@ def test_admin_reload_endpoint_requires_admin_and_reloads():
         body = r.json()
         assert body["reloaded"] is True
         assert "model_version" in body
+
+
+# ── 리로드 거부는 500 이 아니라 409 다 (2026-09-05) ──────────────────────────
+#
+# 실측(로컬 full-train 스택 상대 콘솔 e2e --allow-writes):
+#
+#   POST /api/v1/admin/model/reload
+#     → InferencePipeline._load_model()
+#     → ValueError: model config.id2label ... refusing to load (fail-closed)
+#     → 처리되지 않고 **HTTP 500**
+#
+# 거부 자체는 옳다 — 등급 매핑이 어긋난 모델을 올리면 softmax 인덱스가 엉뚱한 등급에
+# 붙어 미탐이 난다. 문제는 그것이 500 으로 나가서 화면에 "서버 내부 오류가 발생했습니다"
+# 만 뜬다는 것이다. 운영자가 무엇을 해야 할지 알 수 없고 진짜 장애와 구분도 안 된다.
+# 이 사업의 오류 계약은 심볼릭 코드 없이 **HTTP 상태로 분기**한다(ICD).
+def test_reload_refusal_is_409_not_500(monkeypatch):
+    """등급 매핑 불일치로 거부할 때 409 와 사유가 나온다 — 500 이면 안 된다."""
+    from fastapi.testclient import TestClient
+
+    import koipa.services.classify_service as cs
+    from koipa.api.app import app
+    from koipa.config import settings
+
+    class _Refusing:
+        def reload_model(self):
+            raise ValueError(
+                "model config.id2label is missing/invalid or its code set does not "
+                "match the active grade registry; refusing to load (fail-closed)"
+            )
+
+    monkeypatch.setattr(cs.ClassifyService, "get_instance", staticmethod(lambda: _Refusing()))
+
+    with TestClient(app, raise_server_exceptions=False) as cli:
+        r = cli.post("/api/v1/admin/model/reload",
+                     headers={"X-API-Key": settings.api_key, "X-Actor-Role": "admin"})
+    assert r.status_code == 409, "거부는 409 여야 한다 (실제 %s)" % r.status_code
+    detail = r.json().get("detail", "")
+    # 운영자가 무엇을 봐야 하는지 문구에 남는다.
+    assert "id2label" in detail, detail
+    assert "미탐" in detail, detail

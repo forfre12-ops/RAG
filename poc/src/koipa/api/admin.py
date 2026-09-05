@@ -42,7 +42,30 @@ class ReloadModelResponse(BaseModel):
 )
 def reload_model() -> ReloadModelResponse:
     from koipa.services.classify_service import ClassifyService  # noqa: PLC0415
-    info = ClassifyService.get_instance().reload_model()
+    try:
+        info = ClassifyService.get_instance().reload_model()
+    except ValueError as exc:
+        # [2026-09-05] **의도된 거부를 500 으로 내보내지 않는다.**
+        #
+        # 파이프라인은 등급 매핑이 어긋난 모델을 fail-closed 로 거부한다(pipeline.py
+        # _load_model — config.id2label 이 활성 등급 레지스트리와 맞지 않으면 softmax
+        # 인덱스가 엉뚱한 등급에 붙어 미탐이 난다). 그 판단은 옳다.
+        #
+        # 그런데 종전에는 처리 없이 올라가 **HTTP 500** 이 됐다. 화면에는 "서버 내부
+        # 오류가 발생했습니다"만 떠서 운영자가 무엇을 해야 하는지 알 수 없었고, 진짜
+        # 장애와 구분도 안 됐다(실측: 로컬 스택 e2e --allow-writes).
+        #
+        # 이 사업의 오류 계약은 심볼릭 코드 없이 **HTTP 상태로 분기**한다(ICD). 그래서
+        # 거부는 409 로 낸다 — 같은 파일의 demo purge 거부와 같은 관례다.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "모델 리로드를 거부했습니다 — 대상 모델의 등급 매핑이 현재 등급 "
+                "레지스트리와 맞지 않습니다. 그대로 올리면 확률이 엉뚱한 등급에 붙어 "
+                "미탐이 납니다. 대상 모델의 config.id2label 을 확인하십시오. 사유: %s"
+                % exc
+            ),
+        ) from exc
     return ReloadModelResponse(
         reloaded=bool(info["reloaded"]),
         model_dir=info.get("model_dir"),
