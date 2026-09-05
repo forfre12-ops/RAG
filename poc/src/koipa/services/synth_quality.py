@@ -9,7 +9,9 @@
 이 모듈은 그 자리를 채운다 — 생성 직후, 검수큐 적재 **전**.
 
 판정 기준(등급명 노출은 0 이어야 한다)
-    grade_token_exposed  본문에 'TS'·'S1' 등 등급 문자열이 남은 문서 수.
+    grade_token_exposed  본문에 등급 표기가 남은 문서 수 — 'TS'·'S1' 같은 코드뿐 아니라
+                         '1급 비밀'·'대외비'·'Level 1 Secret' 까지 본다
+                         (generator.FORBIDDEN_GRADE_TERMS 가 정본).
                          검수 후보에서는 0 이 기준이다(allow_grade_token=False).
     tell_coverage        한 등급에만 나오는 문장을 가진 문서 비율. 임계 0.10.
     length_only_1nn      글자 수만 보고 이웃 등급을 따라갔을 때 적중률. 임계 0.55.
@@ -26,6 +28,8 @@
 from __future__ import annotations
 
 import logging
+import re
+from functools import lru_cache
 from typing import Any, Sequence
 
 from koipa.dataset_leakage import (
@@ -41,11 +45,41 @@ logger = logging.getLogger(__name__)
 MIN_DOCS_FOR_CORPUS_METRICS = 24
 
 
-def _exposes_grade_token(text: str) -> bool:
-    """본문에 등급 문자열이 남았는가 — 문서 한 건으로 판정 가능한 유일한 지표."""
-    from koipa.dataset_leakage import _GRADE_TOKEN  # noqa: PLC0415
+@lru_cache(maxsize=1)
+def _grade_term_pattern() -> "re.Pattern[str]":
+    """생성기가 금지한 등급 어휘 전체를 잡는 정규식.
 
-    return bool(_GRADE_TOKEN.search(text or ""))
+    [2026-09-05] 종전에는 dataset_leakage._GRADE_TOKEN 하나만 썼다. 그것은
+    ``\b(TS|S1|S2|S3)\b`` 뿐이라 생성기가 실제로 쓰는 한국어 표기를 하나도 못 잡았다:
+
+        본 문서는 [가상기업A]의 1급 비밀로 분류된 자료입니다.      → 놓침
+        본 문서는 [가상기업A]의 특급기밀 수준의 정보를 포함한다.    → 놓침
+        This document is material classified as Level 1 Secret.  → 놓침
+        본 문서의 등급은 S1 이다.                                → 잡힘
+
+    실측(rag_corpus_v2 720건): 등급표현이 있는 527건 중 192건만 잡혔다 —
+    **377건(52.4%)이 답을 적은 채로 검수 후보에 들어갔다.** 검수자가 답을 보고 읽으면
+    검수가 검증이 아니라 확인 절차가 된다.
+
+    목록은 generator.FORBIDDEN_GRADE_TERMS 에서 가져온다 — 프롬프트가 금지하는 것과
+    게이트가 검사하는 것이 갈라지지 않게 한다.
+    """
+    from koipa.modules.m1_synthesis.generator import (  # noqa: PLC0415
+        FORBIDDEN_GRADE_TERMS,
+    )
+
+    # 영문 약어(TS·S1…)는 낱말 경계를 요구한다 — "S1" 이 "PS100" 안에서 걸리면 안 된다.
+    # 한국어에는 낱말 경계가 없으므로(조사가 붙는다) 그대로 찾는다.
+    parts = []
+    for term in FORBIDDEN_GRADE_TERMS:
+        esc = re.escape(term)
+        parts.append(r"\b%s\b" % esc if term.isascii() else esc)
+    return re.compile("|".join(parts), re.IGNORECASE)
+
+
+def _exposes_grade_token(text: str) -> bool:
+    """본문에 등급 표기가 남았는가 — 문서 한 건으로 판정 가능한 유일한 지표."""
+    return bool(_grade_term_pattern().search(text or ""))
 
 
 def screen_batch(

@@ -113,6 +113,29 @@ GRADE_SITUATION_PROMPTS = {
     },
 }
 
+# [2026-09-05] 프롬프트가 금지하는 등급 어휘 — **게이트가 이 목록을 읽는다.**
+#
+# 종전에는 이 목록이 프롬프트 문자열 안에만 있었고, 검사하는 쪽
+# (synth_quality._exposes_grade_token)은 dataset_leakage._GRADE_TOKEN 을 썼다. 그것은
+# \b(TS|S1|S2|S3)\b 뿐이라 "1급 비밀"·"대외비"·"Level 1 Secret" 을 하나도 못 잡는다.
+# 실측(rag_corpus_v2 720건): 실제 등급표현이 있는 문서 527건 중 게이트가 잡은 것은 192건 —
+# **377건(52.4%)이 답을 적은 채로 검수 후보에 들어갔다.** 검수 후보에서 등급 노출은
+# 0 이 기준인데(allow_grade_token=False) 절반이 통과한 것이다.
+#
+# 프롬프트와 게이트가 같은 목록을 보게 해서 다시 갈라지지 않게 한다.
+#
+# ⚠ 이 목록을 dataset_leakage._GRADE_TOKEN 으로 합치지 말 것. 그쪽은 실문서가 섞인
+#   학습셋에도 돌고, 실문서에 찍힌 "대외비" 는 **비밀관리성(M)의 근거**다
+#   (rule_engine._MANAGEMENT_MARKING_TERMS 가 점수로 쓴다). 생성물에서만 금지다.
+FORBIDDEN_GRADE_TERMS: tuple[str, ...] = (
+    "TS", "S1", "S2", "S3",
+    "특급기밀", "특급 기밀", "1급 비밀", "1급비밀", "2급 비밀", "2급비밀",
+    "3급 비밀", "3급비밀", "대외비", "극비", "사외비",
+    "Top Secret", "Level 1 Secret", "Level 2 Secret", "Level 3 Secret",
+    "Confidential Material",
+)
+
+
 SYSTEM_PROMPT = """당신은 한국 조직에서 쓰이는 현실적인 사내 문서를 작성하는 전문 문서 작성자다.
 주어진 문서 상황·맥락을 읽고 해당 상황에 실재할 법한 가상의 사내 문서를 작성한다.
 
