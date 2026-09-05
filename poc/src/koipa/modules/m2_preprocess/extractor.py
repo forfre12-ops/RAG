@@ -131,7 +131,49 @@ class ExtractResult:
     warnings: list[str] = field(default_factory=list)
 
 
+def _substantive_len(text: str) -> int:
+    """분류에 쓸 수 있는 실질 문자 수 — 공백과 placeholder 는 세지 않는다.
+
+    U+FFFC(객체 자리표시자) · U+FEFF(BOM) · U+200B(zero-width space)는 글자 수만 늘리고
+    분류에 아무 신호도 주지 않는다. 종전 HWP 가드가 `not text.strip()` 만 보다가 placeholder
+    한 글자에 속았던 것이 이 함수가 생긴 이유다.
+    """
+    return sum(1 for c in (text or "") if not c.isspace() and c not in ("￼", "﻿", "​"))
+
+
+def _guard_thin_body(res: "ExtractResult") -> "ExtractResult":
+    """본문이 분류 가능 하한 미만이면 검수로 라우팅한다 — **형식을 가리지 않고.**
+
+    [2026-09-06] 종전에는 이 가드가 `_extract_hwp` 안에만 있었다. 추출기 10개 중 1개다.
+    같은 실패 모양(내용이 표·글상자·이미지 안에만 있어 본문이 얇게 나옴)은 docx·pptx·pdf·
+    xls 에도 그대로 있는데, 그쪽은 경고 없이 quality 그대로 통과해 **전부 S3 로 떨어졌다**
+    = 무음 미탐.
+
+    더 나쁜 것은 `legacy_office.py` 머리말이 "회수 못 하는 문서는 본문이 얇게 나오고, 그러면
+    extractor 의 body_below_classifiable_threshold 가드가 검수로 라우팅한다 — 무음으로 새지
+    않는다" 고 **적어 두었다는 점이다.** 그 경로(.doc 348건 · .ppt 1,050건)에는 가드가 없었다.
+    아는 것과 검사하는 것이 다른 곳에 있었다.
+
+    ⚠ 추출 실패로 만들지 않는다 — 짧지만 정상인 문서까지 막힌다. 검수 라우팅까지만 한다.
+      경고는 `classify_service` 의 게이트가 읽어 needs_review 로 보낸다.
+    """
+    if _substantive_len(res.text) >= _MIN_SUBSTANTIVE_CHARS:
+        return res
+    warnings = list(res.warnings or [])
+    _warn_once(warnings, "body_below_classifiable_threshold")
+    res.warnings = warnings
+    return res
+
+
 def extract(path: str | Path) -> ExtractResult:
+    """형식별 추출기로 보내고, **공통 안전 가드**를 거쳐 돌려준다.
+
+    가드를 여기 두는 이유: 형식마다 따로 걸면 새 추출기를 붙일 때 빠뜨린다 — 실제로 빠뜨렸다.
+    """
+    return _guard_thin_body(_dispatch_extract(path))
+
+
+def _dispatch_extract(path: str | Path) -> ExtractResult:
     p = Path(path)
     suffix = p.suffix.lower().lstrip(".")
     if suffix in SUPPORTED_FORMAT_GROUPS["plain"]:
@@ -435,11 +477,9 @@ def _extract_hwp(p: Path) -> ExtractResult:
     # `not text.strip()` 뿐이라 객체 placeholder 한 글자(U+FFFC)에 속았고, 그런 문서는 내용
     # 없이 전부 S3 로 떨어진다 = 무음 미탐.
     # ⚠ 추출 실패로는 만들지 않는다 — 짧지만 정상인 문서까지 막힌다. 검수 라우팅까지만 한다.
-    _subs = "".join(
-        c for c in text
-        if not c.isspace() and c not in ("￼", "﻿", "​")
-    )
-    if len(_subs) < _MIN_SUBSTANTIVE_CHARS:
+    # [2026-09-06] 판정은 _substantive_len 하나로 모았다 — extract() 가 모든 형식에 같은
+    # 가드를 걸므로 여기 남은 것은 HWP 표 회수 로직이 이 경고에 **먼저** 반응해야 하기 때문이다.
+    if _substantive_len(text) < _MIN_SUBSTANTIVE_CHARS:
         _warn_once(warnings, "body_below_classifiable_threshold")
 
     # 본문은 뽑혔지만 표 셀이 빠졌을 수 있다(rhwp의 조용한 표 미추출) — 커버리지 판정.

@@ -190,9 +190,91 @@ def snap_model() -> dict:
     return info
 
 
+# 검수 라우팅 게이트가 여전히 열리는가 — 탐침표.
+#
+# ⚠ 이 탐침은 **모델 없이** 돈다(룰 폴백). 그래서 모델 신뢰도에 걸리는 게이트
+#   (저신뢰 임계 · 합의 · 2차의견)는 여기서 안 잡힌다. 잡히는 것만 잡는다고 적어 두고,
+#   못 잡는 것을 잡은 척하지 않는다.
+GATE_PROBES = [
+    # (이름, 본문, 메타데이터)
+    ("m0_conflict",
+     "국방용 전자전투 시스템의 초고주파 레이더 설계 파라미터와 시험 결과를 정리한 문서입니다.",
+     {"access_scope": "all_employees"}),
+    ("high_grade_plain",
+     "국방용 전자전투 시스템의 초고주파 레이더 설계 파라미터와 시험 결과를 정리한 문서입니다.",
+     None),
+    ("restricted_access_conflict",
+     "사내 공지사항입니다. 다음 주 전사 워크숍 일정을 안내드립니다. 참석 부탁드립니다.",
+     {"access_scope": "approved_only"}),
+    ("security_marking_floor",
+     "사내 공지사항입니다. 다음 주 전사 워크숍 일정을 안내드립니다. 참석 부탁드립니다.",
+     {"security_marking": "secret"}),
+    ("abbrev_only",
+     "본 문서는 EUV, ALD, CMP 공정에 관한 내부 자료입니다. 상세 조건은 별첨 참조.",
+     None),
+    ("no_metadata",
+     "당사의 차세대 반도체 식각 공정 레시피와 수율 개선 파라미터를 정리한 문서입니다.",
+     None),
+]
+
+# 라우팅에 쓰이는 경고 토큰 — classify_service 의 게이트가 읽는 그 문자열이다.
+GATE_TOKENS = (
+    "cap-conflict", "sparse-evidence", "abbrev-only-escalation",
+    "body_below_classifiable_threshold", "metadata-access-conflict",
+    "metadata-management-conflict", "s2-underclass-risk", "gate-fail-open",
+    "metadata-floor", "source-prior", "fnr-safe override",
+)
+
+
+def snap_gates() -> dict:
+    """탐침 문서마다 **어느 게이트가 발동했는가**.
+
+    [2026-09-06 신설] 종전 4축은 이 축을 안 봤다. 룰 등급이 그대로여도 게이트가 조용히
+    안 열리면 문서는 자동확정으로 나간다 — 등급은 안 변했으니 판정면 축에도 안 걸린다.
+    실제로 오늘 이 자리에서 **시험이 하나도 없는 게이트 둘**을 찾았다.
+
+    플래그(metadata_floor_enabled 등)는 축 ③ 이 따로 감시하므로 여기서는 **강제로 켜고
+    게이트 로직 자체**를 잰다. 플래그가 꺼져 있어서 안 열린 것과 로직이 깨져서 안 열린 것은
+    다른 사실이고, 섞으면 어느 쪽인지 알 수 없다.
+    """
+    os.environ.setdefault("TESTING", "1")
+    from koipa.config import settings
+
+    saved = {}
+    for flag in ("metadata_floor_enabled", "agreement_gate_enabled"):
+        saved[flag] = getattr(settings, flag, None)
+        try:
+            setattr(settings, flag, True)
+        except Exception:  # noqa: BLE001 — 못 켜면 못 켠 대로 잰다(아래 note 에 남는다)
+            pass
+
+    out: dict = {}
+    try:
+        from koipa.modules.m5_inference.pipeline import InferencePipeline
+
+        pipe = InferencePipeline()
+        for name, text, md in GATE_PROBES:
+            res = pipe.run(text, metadata=md)
+            label = res.label.value if hasattr(res.label, "value") else str(res.label)
+            fired = sorted({t for t in GATE_TOKENS if any(t in w for w in (res.warnings or []))})
+            out[name] = "%s|%.3f|%s" % (label, float(res.confidence), ",".join(fired))
+    except Exception as exc:  # noqa: BLE001
+        # 못 재면 **못 쟀다고 적는다.** 조용히 빈 dict 를 남기면 다음 비교가 통과한다.
+        out = {"__measured__": "False", "__why__": "%s: %s" % (type(exc).__name__, exc)}
+    finally:
+        for flag, val in saved.items():
+            if val is not None:
+                try:
+                    setattr(settings, flag, val)
+                except Exception:  # noqa: BLE001
+                    pass
+    return out
+
+
 def take() -> dict:
     return {
         "decisions": snap_decisions(),
+        "gates": snap_gates(),
         "api": snap_api(),
         "settings": snap_settings(),
         "model": snap_model(),
@@ -203,6 +285,10 @@ def compare(base: dict, now: dict) -> int:
     regressions = 0
     # 못 잰 축이 있으면 요약에서 "전부 그대로"라고 말하지 않는다.
     unmeasured = False
+    # [2026-09-06] 축마다 **실제로 쟀는지**를 기록한다. 종전에는 요약의 '잰 것' 목록이
+    # 고정 문자열이었고, 그래서 재지 못한 축까지 잰 것처럼 실렸다. 세어서 만든다.
+    measured_axes: list[str] = ["판정면", "API 계약", "운영 파라미터"]
+    skipped_axes: list[str] = []
     # 기준을 뜬 프로파일과 지금 프로파일이 다르면 비교가 성립하지 않는다.
     # 온도·합의게이트·메타데이터 floor 가 프로파일 소속이라 판정면이 통째로 달라지고,
     # 코드를 한 줄도 안 건드려도 회귀가 수십 건 뜬다(2026-08-27 실측: 기준 full-train
@@ -291,9 +377,35 @@ def compare(base: dict, now: dict) -> int:
         # 같으므로 비교가 늘 통과했다. 그래서 이 축이 비어 있는 채로 통과를 보고했다.
         unmeasured = True
         print("  ⚠ **재지 못했다** — %s" % now["model"].get("why", "사유 불명"))
+        skipped_axes.append("배포 모델")
         print("     이 환경에서는 모델 축이 회귀를 잡지 못한다. 배포 서버에서 다시 돌릴 것.")
     else:
         print("  변화 없음")
+
+    print("\n" + "=" * 74)
+    print(" ⑤ 검수 라우팅 게이트")
+    print("=" * 74)
+    bg = base.get("gates") or {}
+    ng = now.get("gates") or {}
+    if not bg:
+        # 옛 기준 파일에는 이 축이 없다 — 회귀로 세지 않고 갱신을 안내한다.
+        print("  ⚠ 기준에 이 축이 없다 — --accept 로 기준을 갱신하면 다음부터 잰다.")
+        unmeasured = True
+        skipped_axes.append("검수 라우팅")
+    elif ng.get("__measured__") == "False":
+        print("  ⚠ **재지 못했다** — %s" % ng.get("__why__", "사유 불명"))
+        unmeasured = True
+        skipped_axes.append("검수 라우팅")
+    else:
+        measured_axes.append("검수 라우팅")
+        gdiff = 0
+        for k in sorted(set(bg) | set(ng)):
+            if bg.get(k) != ng.get(k):
+                gdiff += 1
+                regressions += 1
+                print("  %s\n      전: %s\n      후: %s" % (k, bg.get(k), ng.get(k)))
+        if not gdiff:
+            print("  변화 없음 — 탐침 %d건" % len(ng))
 
     print("\n" + "=" * 74)
     if regressions:
@@ -302,10 +414,10 @@ def compare(base: dict, now: dict) -> int:
         # [2026-09-06] 못 잰 축이 있으면 **'전부 그대로'라고 말하지 않는다.**
         # 이 문장이 근거로 인용된다 — 오늘 하루 이 게이트를 열 번 넘게 인용했는데
         # 모델 축은 비어 있었다.
-        print(" 회귀 없음 — 다만 **모델 축은 재지 못했다**(위 ④ 참조).")
-        print(" 잰 것: 판정면 · API 계약 · 운영 파라미터")
+        print(" 회귀 없음 — 다만 **재지 못한 축이 있다**: %s" % " · ".join(skipped_axes))
+        print(" 잰 것: %s" % " · ".join(measured_axes))
     else:
-        print(" 회귀 없음 — 판정면·계약·파라미터·모델 모두 그대로다.")
+        print(" 회귀 없음 — %s · 배포 모델 모두 그대로다." % " · ".join(measured_axes))
     print("=" * 74)
     return 1 if regressions else 0
 
@@ -325,7 +437,8 @@ def main(argv=None) -> int:
         out.write_text(json.dumps(now, ensure_ascii=False, indent=1), encoding="utf-8")
         n = sum(len(v) for v in now["decisions"].values())
         print(f"기준 저장: {out}")
-        print(f"  판정면 {n}건 · API 경로 {len(now['api']['paths'])} · 스키마 {len(now['api']['schemas'])}"
+        print(f"  판정면 {n}건 · 게이트 탐침 {len(now.get('gates') or {})}건"
+              f" · API 경로 {len(now['api']['paths'])} · 스키마 {len(now['api']['schemas'])}"
               f" · 파라미터 {len(now['settings'])}")
         return 0
 
