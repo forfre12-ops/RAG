@@ -183,6 +183,43 @@ def record_text(record: Mapping[str, object]) -> str:
     return "\n\n".join(part for part in (title, body) if part)
 
 
+def record_seed(doc_id: str, salt: str = "") -> int:
+    """레코드 해시 — 등급·순번과 무관한 씨앗.
+
+    순번(enumerate)을 씨앗으로 쓰면 소스가 등급별로 묶여 있을 때 그대로 등급과 상관된다.
+    doc_id 만 쓰므로 정렬을 바꿔도 같은 문서는 같은 값을 받는다.
+    """
+    key = f"{doc_id or ''}|{salt}"
+    return int(hashlib.sha256(key.encode("utf-8")).hexdigest()[:12], 16)
+
+
+def neutral_padding(doc_id: str, notes: Sequence[str], heading: str) -> str:
+    """등급 간 길이 분포를 겹치게 만드는 중립 문단.
+
+    길이가 등급을 알려주면 모델은 내용을 안 읽고 글자 수로 맞힌다. 이 프로젝트가 실제로
+    데인 자리다 - 봉인 평가셋이 길이만으로 96% 적중해 비교에 쓸 수 없게 된 적이 있다.
+    그래서 등급과 무관한 씨앗으로 중립 문단을 붙여 분포를 겹치게 만든다.
+
+    ⚠ **문장 풀(notes)과 머리말(heading)은 학습셋과 평가셋이 서로 달라야 한다.**
+    같은 문장을 쓰면 두 셋이 문장을 공유하고, holdout_independence 가 그것을 오염으로
+    센다. 실측으로 두 빌더의 풀은 8개씩이고 겹치는 문장이 0개다 - 의도된 분리다.
+
+    갈리면 안 되는 것은 텍스트가 아니라 **이 함수의 셈법**이다. 종전에는 학습셋 빌더
+    (build_direct_authored_catalog_training_corpus_v6)와 평가셋 빌더
+    (build_direct_authored_proxy_eval_v3)가 같은 셈법을 각자 갖고 있었다. 한쪽만 고치면
+    두 셋의 길이 분포가 조용히 갈리고, 그러면 누출 지표를 나란히 놓고 비교할 수 없다.
+    """
+    if not notes:
+        return ""
+    seed = record_seed(doc_id, "length")
+    count = seed % (len(notes) * 3)
+    if count == 0:
+        return ""
+    start = (seed >> 8) % len(notes)
+    picked = [notes[(start + i) % len(notes)] for i in range(count)]
+    return heading + " ".join(picked)
+
+
 def _required_text(record: Mapping[str, object], key: str, errors: list[str]) -> str:
     value = str(record.get(key) or "").strip()
     if not value:

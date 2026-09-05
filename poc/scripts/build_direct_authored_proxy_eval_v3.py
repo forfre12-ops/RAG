@@ -79,7 +79,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from koipa.dataset_leakage import check_or_raise  # noqa: E402
 from koipa.holdout_independence import assess  # noqa: E402
-from koipa.proxy_corpus import validate_proxy_record  # noqa: E402
+from koipa.proxy_corpus import (  # noqa: E402
+    neutral_padding,
+    record_seed,
+    validate_proxy_record,
+)
 from eval_fact_pools import NEUTRAL_NOTES, POOLS  # noqa: E402
 from v6_fact_pools import FACTOR_SCORE_KEY  # noqa: E402
 
@@ -119,8 +123,11 @@ def _read_jsonl(path: Path) -> list[dict]:
 
 
 def _seed(row: dict, salt: str = "") -> int:
-    """레코드 해시 — 등급·순번과 무관해야 한다(순번은 소스 정렬이 등급별이면 그대로 샌다)."""
-    return int(hashlib.sha256(f"{row.get('doc_id') or ''}|{salt}".encode("utf-8")).hexdigest()[:12], 16)
+    """레코드 해시 — 등급·순번과 무관해야 한다(순번은 소스 정렬이 등급별이면 그대로 샌다).
+
+    셈법은 koipa.proxy_corpus.record_seed 가 정본이다 — 학습셋 빌더와 두 벌이었다.
+    """
+    return record_seed(str(row.get("doc_id") or ""), salt)
 
 
 def _blocks(text: str) -> list[str]:
@@ -216,14 +223,15 @@ def _pick(row: dict, factor: str, level: int, offset: int = 0) -> tuple[str, str
 
 
 def _neutral_padding(row: dict) -> str:
-    """등급 간 길이 분포를 겹치게 만든다. 씨앗은 레코드 해시(등급 독립)."""
-    seed = _seed(row, "length")
-    count = seed % (len(NEUTRAL_NOTES) * 3)
-    if count == 0:
-        return ""
-    start = (seed >> 8) % len(NEUTRAL_NOTES)
-    picked = [NEUTRAL_NOTES[(start + i) % len(NEUTRAL_NOTES)] for i in range(count)]
-    return "\n\n## 9. 기록 관리 메모\n\n" + " ".join(picked)
+    """등급 간 길이 분포를 겹치게 만든다. 씨앗은 레코드 해시(등급 독립).
+
+    [2026-09-06] 셈법은 koipa.proxy_corpus.neutral_padding 이 정본이다 — 학습셋 빌더와
+    두 벌로 갖고 있었다. **문장 풀(eval_fact_pools.NEUTRAL_NOTES)과 머리말은 학습셋과
+    달라야 한다** — 같으면 두 셋이 문장을 공유해 holdout_independence 가 오염으로 센다.
+    """
+    return neutral_padding(
+        str(row.get("doc_id") or ""), NEUTRAL_NOTES, "\n\n## 9. 기록 관리 메모\n\n"
+    )
 
 
 def _rewrite_text(row: dict, scores: dict[str, int]) -> tuple[str, dict[str, str]]:

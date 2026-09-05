@@ -62,7 +62,11 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from koipa.dataset_leakage import check_or_raise, grade_tells  # noqa: E402
-from koipa.proxy_corpus import validate_proxy_record  # noqa: E402
+from koipa.proxy_corpus import (  # noqa: E402
+    neutral_padding,
+    record_seed,
+    validate_proxy_record,
+)
 from v6_fact_pools import FACTOR_SCORE_KEY, POOLS  # noqa: E402
 
 
@@ -108,9 +112,9 @@ def _seed(row: dict, salt: str = "") -> int:
     """레코드 해시 — 등급·순번과 무관해야 한다.
 
     enumerate 순번을 쓰면 소스가 등급별로 묶여 있을 때 그대로 등급과 상관된다.
+    셈법은 koipa.proxy_corpus.record_seed 가 정본이다 — 평가셋 빌더와 두 벌이었다.
     """
-    key = f"{row.get('doc_id') or ''}|{salt}"
-    return int(hashlib.sha256(key.encode("utf-8")).hexdigest()[:12], 16)
+    return record_seed(str(row.get("doc_id") or ""), salt)
 
 
 def _blocks_with_offsets(text: str) -> list[tuple[int, int, str]]:
@@ -247,14 +251,15 @@ def _replace_section(blocks: list[str], indices: list[int], body: str) -> None:
 
 
 def _neutral_padding(row: dict) -> str:
-    """등급 간 길이 분포를 겹치게 만드는 중립 문단(v5 와 동일한 방식·배수)."""
-    seed = _seed(row, "length")
-    count = seed % (len(NEUTRAL_NOTES) * 3)
-    if count == 0:
-        return ""
-    start = (seed >> 8) % len(NEUTRAL_NOTES)
-    picked = [NEUTRAL_NOTES[(start + i) % len(NEUTRAL_NOTES)] for i in range(count)]
-    return "\n\n## 검토 메모\n\n" + " ".join(picked)
+    """등급 간 길이 분포를 겹치게 만드는 중립 문단(v5 와 동일한 방식·배수).
+
+    [2026-09-06] 셈법은 koipa.proxy_corpus.neutral_padding 이 정본이다. 평가셋 빌더
+    (build_direct_authored_proxy_eval_v3)가 같은 셈법을 따로 갖고 있었고, 한쪽만 고치면
+    두 셋의 길이 분포가 조용히 갈려 누출 지표를 나란히 비교할 수 없게 된다.
+    **문장 풀과 머리말은 여기 그대로 둔다** — 평가셋과 문장을 공유하면 그것은 오염이다
+    (두 풀은 8개씩이고 겹치는 문장이 0개다).
+    """
+    return neutral_padding(str(row.get("doc_id") or ""), NEUTRAL_NOTES, "\n\n## 검토 메모\n\n")
 
 
 def _rebuild_evidence(text: str, quotes: dict[str, str], doc_id: str) -> dict:
