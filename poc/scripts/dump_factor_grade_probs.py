@@ -47,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     from transformers import AutoTokenizer
 
     from koipa.modules.m3_labeling.rule_engine import grade_from_svm
+    from koipa.modules.m5_inference.factor_model import cls_to_worst, head_classes
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from train_factor_model import _build_model, _load  # noqa: PLC0415
@@ -54,13 +55,21 @@ def main(argv: list[str] | None = None) -> int:
     mdir = Path(args.model)
     meta = json.loads((mdir / "meta.json").read_text("utf-8"))
     tok = AutoTokenizer.from_pretrained(str(mdir))
-    model = _build_model(meta["base_model"], torch)
-    model.load_state_dict(torch.load(mdir / "model.pt", map_location="cuda", weights_only=True))
+    # 헤드 폭은 체크포인트가 갖고 있다. 종전엔 _build_model 의 기본값(3)으로 만들어
+    # 4-class 체크포인트(artifacts/factor_model 의 20개 중 18개)를 못 실었다.
+    state = torch.load(mdir / "model.pt", map_location="cuda", weights_only=True)
+    n_classes = int(meta.get("classes") or head_classes(state))
+    model = _build_model(meta["base_model"], torch, n_classes)
+    model.load_state_dict(state)
     model.cuda().eval()
 
-    # 27 조합 -> 등급 대응표를 미리 만든다(매 문서 재계산 방지).
-    combos = [(s, v, m) for s in range(3) for v in range(3) for m in range(3)]
-    combo_grade = {c: grade_from_svm(*c) for c in combos}
+    # 조합 -> 등급 대응표를 미리 만든다(매 문서 재계산 방지). 3-class 면 27, 4-class 면 64.
+    # 판정식은 3-레벨이므로 unknown 은 cls_to_worst 로 접어 넣는다 — 여러 조합이 같은
+    # 3-레벨 삼항으로 접히지만 등급별 확률 합산이라 질량은 그대로 보존된다.
+    fold = cls_to_worst if n_classes == 4 else int
+    combos = [(s, v, m)
+              for s in range(n_classes) for v in range(n_classes) for m in range(n_classes)]
+    combo_grade = {c: grade_from_svm(*(fold(x) for x in c)) for c in combos}
 
     texts, truth, grades = _load(Path(args.eval))
     step = max(1, args.chunk_chars - args.chunk_overlap)
@@ -76,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
                           return_tensors="pt").to("cuda")
                 lg = model(enc["input_ids"], enc["attention_mask"])
                 probs.append(torch.stack([F.softmax(x, -1) for x in lg]))
-            p = torch.cat(probs, dim=1).mean(1)  # [3, 3] 요소 x 수준
+            p = torch.cat(probs, dim=1).mean(1)  # [3, n_classes] 요소 x 수준
             pf = p.tolist()
             gp: dict[str, float] = {}
             for (s, v, m), g in combo_grade.items():
@@ -85,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
                 "idx": idx,
                 "truth_grade": grades[idx],
                 "truth_factors": dict(zip(FACTORS, truth[idx])),
-                "pred_factors": {f: int(max(range(3), key=lambda k: pf[i][k]))
+                "pred_factors": {f: int(max(range(n_classes), key=lambda k: pf[i][k]))
                                  for i, f in enumerate(FACTORS)},
                 "grade_probs": {g: round(v, 6) for g, v in sorted(gp.items())},
                 "n_chunks": len(pieces),

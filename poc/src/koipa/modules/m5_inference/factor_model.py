@@ -45,6 +45,28 @@ def cls_to_worst(c: int) -> int:
     return 2 if c == CLS_UNKNOWN else int(c)
 
 
+def head_classes(state_dict, *, default: int = 4) -> int:
+    """체크포인트가 실제로 가진 요소 헤드의 폭을 읽는다.
+
+    meta.json 이 클래스 수를 적지 않던 때가 있어 로더마다 상수로 짐작했고, 그 상수가
+    서로 달랐다(서빙 4 · scripts/train_factor_model 기본 3). 실측하면 artifacts/factor_model
+    의 20개 중 v8 계열 18개가 4-class, 옛 v1_gpu·v3_chunk 만 3-class 다 — 어느 상수를
+    골라도 한쪽은 못 싣는다. 정답은 가중치가 갖고 있으므로 가중치에서 읽는다.
+
+    3-class = (proven_absent, lv1, lv2) · 4-class = 여기에 unknown 이 붙는다.
+    4-class 코드를 3-레벨 판정식(grade_from_svm)에 넣을 때는 cls_to_worst 로 접는다.
+    """
+    weight = None
+    try:
+        weight = state_dict.get("head_secrecy.weight")
+    except AttributeError:
+        return default
+    try:
+        return int(weight.shape[0])
+    except (AttributeError, IndexError, TypeError):
+        return default
+
+
 @dataclass
 class FactorPrediction:
     """요소 예측 한 건. 등급은 여기서 나오지만 배포 결정에는 안 쓴다(섀도)."""
@@ -128,12 +150,24 @@ class FactorInference:
             from transformers import AutoTokenizer
 
             self._tokenizer = AutoTokenizer.from_pretrained(self.base, **self._hub_kwargs())
-            model = _build_model(self.base, torch, 4)
             # weights_only=True: model.pt 는 pickle 이라 임의 코드 실행 경로가 열린다.
             # state_dict 만 필요하므로 텐서 외 객체는 아예 역직렬화하지 않는다.
-            model.load_state_dict(
-                torch.load(self.model_dir / "model.pt", map_location="cpu", weights_only=True)
+            state = torch.load(
+                self.model_dir / "model.pt", map_location="cpu", weights_only=True
             )
+            # 서빙 게이트는 unknown 유보(CLS_UNKNOWN=3)를 전제로 짜여 있다. 3-class 체크포인트를
+            # 실으면 그 층이 조용히 의미를 잃으므로 싣지 않고 이유를 남긴다 — 종전에도 shape
+            # 불일치로 실패하던 경로이고, 달라지는 것은 메시지가 읽힌다는 것뿐이다.
+            n_classes = head_classes(state)
+            if n_classes != 4:
+                self.load_error = (
+                    f"factor head has {n_classes} classes; serving gate requires 4 "
+                    f"(proven_absent/lv1/lv2/unknown): {self.model_dir}"
+                )
+                logger.warning("factor model load refused: %s", self.load_error)
+                return False
+            model = _build_model(self.base, torch, n_classes)
+            model.load_state_dict(state)
             model.eval()
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
             model.to(self._device)

@@ -361,7 +361,11 @@ def main(argv: list[str] | None = None) -> int:
     meta = {
         "base_model": args.base,
         "factors": list(FACTORS),
-        "levels": [0, 1, 2],
+        # 헤드 폭을 적는다. 안 적던 때가 있어 로더마다 3 또는 4 로 짐작했고 그 상수가
+        # 서로 달라 한쪽 체크포인트를 못 실었다. levels 도 [0,1,2] 로 고정돼 있어
+        # 4-class(unknown 포함) 산출물과 어긋났다.
+        "classes": args.classes,
+        "levels": list(range(args.classes)),
         "train": args.train,
         "val": args.val,
         "epochs": args.epochs,

@@ -45,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     from transformers import AutoTokenizer
 
     from koipa.modules.m3_labeling.rule_engine import grade_from_svm
+    from koipa.modules.m5_inference.factor_model import cls_to_worst, head_classes
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from train_factor_model import _build_model, _load  # noqa: PLC0415
@@ -53,9 +54,17 @@ def main(argv: list[str] | None = None) -> int:
     meta = json.loads((mdir / "meta.json").read_text("utf-8"))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(str(mdir))
-    model = _build_model(meta["base_model"], torch)
-    model.load_state_dict(torch.load(mdir / "model.pt", map_location=device, weights_only=True))
+    # 헤드 폭은 체크포인트가 갖고 있다. 종전엔 _build_model 의 기본값(3)으로 만들어
+    # 4-class 체크포인트(artifacts/factor_model 의 20개 중 18개)를 못 실었다.
+    state = torch.load(mdir / "model.pt", map_location=device, weights_only=True)
+    n_classes = int(meta.get("classes") or head_classes(state))
+    model = _build_model(meta["base_model"], torch, n_classes)
+    model.load_state_dict(state)
     model.to(device).eval()
+
+    # 판정식(grade_from_svm)과 truth 는 3-레벨이다. 4-class 예측의 unknown 은
+    # cls_to_worst 로 접어 넣는다(보수적 완성 — src 정본과 같은 규칙).
+    fold = cls_to_worst if n_classes == 4 else int
 
     report: dict = {"model": str(mdir), "sets": {}}
     for spec in args.eval:
@@ -79,14 +88,14 @@ def main(argv: list[str] | None = None) -> int:
                         probs.append(torch.stack([F.softmax(x, -1) for x in lg]))
                     p = torch.cat(probs, dim=1)  # [3, n_chunks, 3]
                     agg = p.mean(1) if args.agg == "mean" else p.max(1).values
-                    preds.append(tuple(int(agg[k].argmax()) for k in range(3)))
+                    preds.append(tuple(fold(int(agg[k].argmax())) for k in range(3)))
             else:
                 for i in range(0, len(texts), args.batch):
                     enc = tok(texts[i:i + args.batch], truncation=True,
                               max_length=meta["max_len"], padding="max_length",
                               return_tensors="pt").to(device)
                     logits = model(enc["input_ids"], enc["attention_mask"])
-                    p = [lg.argmax(-1).tolist() for lg in logits]
+                    p = [[fold(c) for c in lg.argmax(-1).tolist()] for lg in logits]
                     preds.extend(zip(p[0], p[1], p[2]))
 
         entry: dict = {"n": len(preds), "factors": {}}
