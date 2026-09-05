@@ -120,7 +120,7 @@ footer strong{color:var(--text-dim);}
       <tr><td>버전</td><td><code>v-fe4b386b</code> (artifacts/classifier_p1_v5_clean, "v5_clean") — 활성 <code>.env</code> 포인터(2026-07-29 승격, gate_p1_candidate 3축 PASS · 커밋 f5316df). 직전 배포본·롤백 타깃 <code>v-dd3abab9</code>(artifacts/classifier_p1_retrain_v4_clean, "v4_clean"). step3/<code>v-f9b5cedb</code>는 정제 전 비교 baseline</td></tr>
       <tr><td>유형</td><td>텍스트 분류 (4-class)</td></tr>
       <tr><td>출력 등급</td><td>TS(특급) · S1(1급) · S2(2급) · S3(공개) — <code>id2label</code> 코드셋 검증</td></tr>
-      <tr><td>임베딩(검색)</td><td>KURE-v1 (BGE-M3 기반 한국어 특화) · 1024-dim + pgvector(PostgreSQL)</td></tr>
+      <tr><td>임베딩</td><td>KURE-v1 (BGE-M3 기반 한국어 특화) · 1024-dim &mdash; 룰 시드 유사도·학습 분포 감시에 쓴다</td></tr>
       <tr><td>등급 산정</td><td>B안 <strong>S×V×M 곱셈</strong>(각 0/1/2점) + 모델 softmax 결합</td></tr>
     </tbody>
   </table></div>
@@ -171,7 +171,7 @@ footer strong{color:var(--text-dim);}
     <thead><tr><th></th><th>내용</th></tr></thead>
     <tbody>
       <tr><td><strong>입력</strong></td><td>문서 텍스트(512 토큰 청킹) + 메타데이터(출처·보안표시·접근범위 — KL 제공)</td></tr>
-      <tr><td><strong>출력</strong></td><td>등급(TS/S1/S2/S3) + confidence + 근거(S/V/M 분해·키워드·위치) + RAG 유사 기준문서</td></tr>
+      <tr><td><strong>출력</strong></td><td>등급(TS/S1/S2/S3) + confidence + 근거(S/V/M 분해·키워드·위치)</td></tr>
       <tr><td><strong>상태</strong></td><td><code>staging</code>(자동확정 후보) / <code>needs_review</code>(검수 필요) — confidence 임계(기본 0.7)·출처충돌 단독이 아니라 <strong>다단 게이트</strong>로 결정: 희소근거 게이트(<code>rule_fallback_min_evidence=0.9</code>, 룰-폴백 기본 ON) + 합의 게이트(<code>agreement_gate_enabled</code>, base 기본 OFF·운영 프로파일 별도). 자동확정은 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용. §06 참조.</td></tr>
     </tbody>
   </table></div>

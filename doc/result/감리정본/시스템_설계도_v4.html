@@ -274,7 +274,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
         <div class="diag" style="margin:0;gap:6px;">
           <div class="node" style="min-width:120px;"><div class="nt">분류기</div><div class="nd">KF-DeBERTa · 등급+신뢰도</div></div>
           <div class="node" style="min-width:110px;"><div class="nt">룰 모델</div><div class="nd">S/V/M 키워드</div></div>
-          <div class="node" style="min-width:110px;"><div class="nt">RAG 근거</div><div class="nd">pgvector 유사 선례</div></div>
+          <div class="node" style="min-width:110px;"><div class="nt">메타데이터</div><div class="nd">출처·보안표시</div></div>
           <div class="node" style="min-width:120px;"><div class="nt">메타데이터</div><div class="nd">보안표시·접근범위·출처</div></div>
         </div>
       </div>
@@ -426,7 +426,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
   <section id="s10">
     <div class="sec-head"><span class="n">10</span><h2>확인 ② RDB(PostgreSQL) 필수</h2></div>
     <div class="sec-sub">이 시스템 데이터는 "검색 문서"가 아니라 <b>트랜잭션·관계형 파이프라인</b>이다 — 검색은 보조(근거).</div>
-    <div class="band"><div class="bt">PostgreSQL 단일 정본</div><p>등급 확정/보정(행잠금)·감사체인(pg_advisory)·교정 멱등(UNIQUE)이 ACID·FK·즉시일관성을 요구하고, <b>pgvector가 PG 안에서 벡터+lexical을 통합</b>(dense 76%·하이브리드 85%, 의사결정_대장 §03)한다. 별도 검색엔진은 이중시스템 부담만 늘 뿐이라 두지 않는다. <b>고객사=운영 RDB 필수 / 지재원=파일+가벼운 DB로 충분</b>(§05·§07).</p></div>
+    <div class="band"><div class="bt">관계형 DB 단일 정본</div><p>등급 확정/보정(행잠금)·감사체인(잠금 행)·교정 멱등(UNIQUE)이 ACID·FK·즉시일관성을 요구한다. 별도 검색엔진은 두지 않는다 &mdash; 2026-09-05 유사문서 조회 미채택으로 검색 자체가 없다. 납품 정본은 MariaDB 10.11, 폐쇄망 번들은 PostgreSQL 16 이며 같은 ORM 이 두 방언 모두에서 돈다. <b>고객사=운영 RDB 필수 / 지재원=파일+가벼운 DB로 충분</b>(§05·§07).</p></div>
   </section>
 
   <!-- 11 남은 의사결정 -->
@@ -473,7 +473,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 
 <footer>
   <span>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 · 2026-07-01 · Koipa AI Engine · 학습 GPU(지재원 A100)·추론 CPU·무반출 + 분류기·RDB + 안전 골조(게이트=가시성) 하드닝 · 상세 근거는 기술구현 백서 v7 · 설계검토 하드닝 반영 내역</span>
-  <span class="stack">Python · FastAPI · PostgreSQL+pgvector · KF-DeBERTa(추론 CPU / 학습 A100 GPU) · KURE-v1 · Optuna(오프라인 튜닝 CLI) · OTel · Docker(폐쇄망)</span>
+  <span class="stack">Python · FastAPI · MariaDB / PostgreSQL · KF-DeBERTa(추론 CPU / 학습 A100 GPU) · KURE-v1 · Optuna(오프라인 튜닝 CLI) · OTel · Docker(폐쇄망)</span>
 </footer>
 </body>
 </html>

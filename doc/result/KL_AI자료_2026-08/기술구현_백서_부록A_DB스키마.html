@@ -216,7 +216,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       <span class="badge">부록 A</span>
       <span class="badge outline">DB Schema</span>
       <span style="color:var(--text-dim);font-size:12px;">·</span>
-      <span style="color:var(--text-dim);font-size:12px;">PostgreSQL 16 · SQLAlchemy ORM · 19테이블 + RAG 2테이블 (Koipa 소유)</span>
+      <span style="color:var(--text-dim);font-size:12px;">MariaDB 10.11 (폐쇄망 번들 PostgreSQL 16) · SQLAlchemy ORM · 20테이블 (Koipa 소유)</span>
       <span style="color:var(--text-dim);font-size:12px;">·</span>
       <span style="color:var(--text-dim);font-size:12px;">2026-07-17 갱신</span>
     </div>
@@ -453,8 +453,6 @@ btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.m
           <tr><td class="td-col">alternatives</td><td class="td-type">JSONB</td><td class="td-nn yes">●</td><td>[{level_code, score}] 전체 등급 softmax</td></tr>
           <tr><td class="td-col">aggregation_method</td><td class="td-type">VARCHAR(20)</td><td></td><td>hybrid / rule / llm</td></tr>
           <tr><td class="td-col">chunk_count</td><td class="td-type">SMALLINT</td><td></td><td>분류에 사용된 청크 수</td></tr>
-          <tr><td class="td-col">rag_used</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>RAG 검색 사용 여부</td></tr>
-          <tr><td class="td-col">rag_top_k</td><td class="td-type">SMALLINT</td><td></td><td>RAG 검색 수</td></tr>
           <tr><td class="td-col">status</td><td class="td-type">VARCHAR(20)</td><td class="td-nn yes">●</td><td>staging / confirmed / rejected</td></tr>
           <tr><td class="td-col">inference_ms</td><td class="td-type">INTEGER</td><td></td><td>추론 소요 ms</td></tr>
           <tr><td class="td-col">classified_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●</td><td></td></tr>
@@ -481,9 +479,6 @@ btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.m
           <tr><td class="td-col">excerpt</td><td class="td-type">TEXT</td><td class="td-nn yes">●</td><td>근거 문장 발췌</td></tr>
           <tr><td class="td-col">excerpt_start / excerpt_end</td><td class="td-type">INTEGER</td><td></td><td>원문 내 문자 위치</td></tr>
           <tr><td class="td-col">contribution</td><td class="td-type">NUMERIC(4,3)</td><td class="td-nn yes">●</td><td>분류 결정 기여도 (0~1)</td></tr>
-          
-          <tr><td class="td-col">rag_ref_doc_id</td><td class="td-type">UUID</td><td></td><td>RAG 참조 문서 ID</td></tr>
-          <tr><td class="td-col">rag_similarity</td><td class="td-type">NUMERIC(4,3)</td><td></td><td>코사인 유사도</td></tr>
         </tbody>
       </table></div>
     </section>
@@ -635,7 +630,7 @@ btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.m
 
 <footer>
   <span>부록 A — DB 스키마 · KOIPA AI 기술 구현 백서 v7 · 2026-07-17 갱신</span>
-  <span>PostgreSQL 16 · SQLAlchemy ORM · 19테이블 + RAG 2테이블 (Koipa 소유 · 문서·감사·비용·가이드 포함)</span>
+  <span>MariaDB 10.11 (폐쇄망 번들 PostgreSQL 16) · SQLAlchemy ORM · 20테이블 (Koipa 소유 · 문서·감사·비용·가이드 포함)</span>
 </footer>
 
 <script>

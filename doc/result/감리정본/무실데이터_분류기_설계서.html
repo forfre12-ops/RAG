@@ -273,8 +273,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
       <h3>기둥 2 — 고객사(운영): 관리자 확정을 선례로</h3>
       <pre><code>관리자 등급 확정 → tb_corrections 적재
-        ↓ 다음 유사 문서
-유사 선례 검색 → "과거 이 문서는 S1로 확정됨" → FNR-safe 적용 (재학습 0)</code></pre>
+        ↓ 같은 문서 재분류
+exact-match 선례(동일 doc_id / file_hash) → "과거 이 문서는 S1로 확정됨" → FNR-safe 적용 (재학습 0)</code></pre>
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
         <div class="callout-body"><b>선례 적용의 절대 제약 (안 지키면 위험).</b> 임베딩 유사도 ≠ 등급(등급은 출처·관리수준에 좌우, 임베딩은 내용만 봄). 따라서 ① 선례가 <b>더 높으면 상향 override</b> / 충돌·유사면 <b>검수 라우팅</b>만, ② <b>자동 하향 override 절대 금지</b>(임베딩 유사도로 무인 미탐 주입), ③ exact-match 재사용(이미 구현)에서 출발 → 고유사 kNN은 <b>shadow mode로 검증 후에만</b> 권한 부여, ④ 신뢰 보정만(사람 서명, 머신 제외) + 메타데이터 교차확인.</div>
