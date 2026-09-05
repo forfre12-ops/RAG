@@ -91,3 +91,50 @@ def test_batch_flags_exposed_documents_without_dropping_them():
     assert res["admit"] == [1], res
     assert [f["reason"] for f in res["flagged"]] == ["grade_token_exposed"]
     assert res["flagged"][0]["index"] == 0
+
+
+# ── 골든 콘솔 품질 지표 — 출처별로 어휘가 다르다 (2026-09-05) ────────────────
+#
+# 같은 정규식이 두 벌 있었다(dataset_leakage · proxy_gold_candidate_service). 두 벌이면
+# 다음에 한쪽만 고쳐진다 — 오늘 고친 결함 셋이 전부 그 모양이었다.
+#
+# 그런데 콘솔 쪽은 **넓히면 안 되는 자리**다. 이 서비스는 실문서도 다루고
+# (public_real · organization_real), 실문서에 찍힌 "대외비"는 검수자가 봐야 하는 문서의
+# 일부이며 비밀관리성(M) 판단의 근거다(rule_engine._MANAGEMENT_MARKING_TERMS 가 점수로 쓴다).
+# 생성기가 지어낸 것과 원본에 찍혀 있던 것은 성격이 다르다.
+
+from koipa.services.proxy_gold_candidate_service import _exposes_grade
+
+
+def test_synthetic_candidate_uses_the_broad_vocabulary():
+    """합성 후보에서는 프롬프트가 금지한 표기 전부가 노출이다."""
+    for text in (
+        "본 문서는 [가상기업A]의 1급 비밀로 분류된 자료입니다.",
+        "본 자료는 대외비이며 외부 공유를 금지합니다.",
+        "This document is classified as Level 1 Secret.",
+    ):
+        assert _exposes_grade(text, is_real=False), text
+
+
+def test_real_document_marking_is_not_treated_as_exposure():
+    """실문서의 보안표시는 노출이 아니다 — 그것이 곧 비밀관리성 근거다."""
+    for text in (
+        "본 문서는 대외비로 지정되어 관계자 외 열람을 제한한다.",
+        "표지에 극비 표기가 있으며 지정된 인원만 열람한다.",
+    ):
+        assert not _exposes_grade(text, is_real=True), text
+        # 같은 문장이 합성 후보에서 나오면 생성기가 금지를 어긴 것이다.
+        assert _exposes_grade(text, is_real=False), text
+
+
+def test_grade_code_is_exposure_in_both():
+    """등급 코드는 어느 쪽에서도 노출이다 — 실문서에 있으면 라벨이 새어 든 것이다."""
+    for text in ("이 문서의 등급은 S1 이다.", "grade: TS"):
+        assert _exposes_grade(text, is_real=True), text
+        assert _exposes_grade(text, is_real=False), text
+
+
+def test_ordinary_text_passes_in_both():
+    text = "원가 구조와 수율 개선 방안을 정리한 검토 자료이다."
+    assert not _exposes_grade(text, is_real=True)
+    assert not _exposes_grade(text, is_real=False)

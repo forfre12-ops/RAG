@@ -38,7 +38,27 @@ _VALID_GRADES = {"TS", "S1", "S2", "S3"}
 #   없기 때문이다(B3). 화면 문구에서 '학습 제외' 라고 쓰면 근거 없는 주장이 된다.
 _VALID_ACTIONS = {"approve", "change", "defer", "reject", "discard", "reopen", "exclude"}
 # 본문에 등급 문자열이 그대로 남아 있으면 검수자가 읽기 전에 답을 본다.
+#
+# [2026-09-05] **출처별로 어휘가 다르다.** 종전에는 이 좁은 정규식 하나였는데, 합성
+# 생성물은 한국어로 등급을 말한다("본 문서는 1급 비밀로 분류된 자료입니다"). 실측
+# rag_corpus_v2 720건에서 이 식이 잡는 것은 192건뿐이고 실제로는 569건이 등급을 말한다.
+#
+# 그런데 **실문서에서는 넓히면 안 된다.** 실문서에 찍힌 "대외비"는 검수자가 봐야 하는
+# 문서의 일부이고 비밀관리성(M) 판단의 근거다(rule_engine._MANAGEMENT_MARKING_TERMS 가
+# 점수로 쓴다). 생성기가 지어낸 것과 원본에 찍혀 있던 것은 성격이 다르다.
+#
+#   합성 후보  generator.FORBIDDEN_GRADE_TERMS 전부 — 프롬프트가 금지한 것을 어겼다는 뜻
+#   실문서     등급 코드(TS·S1·S2·S3)만 — 문서에 그 코드가 있으면 라벨이 새어 든 것이다
 _GRADE_TOKEN = re.compile(r"\b(TS|S1|S2|S3)\b")
+
+
+def _exposes_grade(text: str, *, is_real: bool) -> bool:
+    """검수자가 읽기 전에 답을 보게 되는가 — 출처에 따라 어휘를 달리한다."""
+    if is_real:
+        return bool(_GRADE_TOKEN.search(text or ""))
+    from koipa.services.synth_quality import _exposes_grade_token  # noqa: PLC0415
+
+    return _exposes_grade_token(text)
 _DOCUMENT_ORIGINS = {"uploaded_document", "public_real", "organization_real"}
 
 
@@ -312,7 +332,11 @@ class ProxyGoldCandidateService:
             hit += best == lab
         leak = round(hit / len(pairs), 3)
 
-        exposed = sum(1 for _ln, g, c in graded if _GRADE_TOKEN.search(c.get("text") or ""))
+        exposed = sum(
+            1 for _ln, _g, c in graded
+            if _exposes_grade(c.get("text") or "",
+                              is_real=bool(c.get("is_actual_document")))
+        )
         per_grade: dict[str, dict[str, int]] = {}
         for g in sorted(_VALID_GRADES):
             v = sorted(ln for ln, gg, _c in graded if gg == g)
