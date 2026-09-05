@@ -3,7 +3,10 @@
 API → Redis 큐 → Worker가 무거운 작업을 수행. Redis 없으면 task는 동기 호출용 함수로도 사용 가능.
 
 부분 실패 처리 (2026-05 추가):
-- classify_async / synthesize_batch: bind=True + max_retries=3 + 지수 백오프
+- classify_async / synthesize_batch / golden_build_task: bind=True + max_retries=2 + 지수 백오프
+  (countdown = 2 ** attempts → 1초, 2초. 최악 대기 3초)
+  ⚠ [2026-09-06 정정] 여기 max_retries=3 이라 적혀 있었는데 실제 데코레이터는 셋 다 2 다.
+    숫자를 세는 시험이 없어 아무도 몰랐다 — tests/test_worker_retry_contract.py 가 이제 막는다.
 - 모든 retry 실패 시 보상 트랜잭션: 이미 처리된 결과를 status="partial"로 JobStore에 기록
 """
 
