@@ -242,7 +242,6 @@ footer strong{color:var(--text-dim);}
     <tbody>
       <tr><td class="nowrap"><strong>embedding</strong></td><td><code>hf_embedding</code>(KURE-v1) · <code>hash_embedding</code> · <code>cache_layer</code></td><td>hash는 폴백(운영 거부)</td></tr>
       <tr><td class="nowrap"><strong>llm</strong></td><td><code>vllm</code> · <code>local_openai</code> · <code>anthropic</code> · <code>openai</code> · <code>noop</code></td><td>폐쇄망=로컬(vLLM/Ollama)</td></tr>
-      <tr><td class="nowrap"><strong>reranker</strong></td><td><code>bge_reranker</code> · <code>noop</code></td><td>선택(검색 보조)</td></tr>
       <tr><td class="nowrap"><strong>storage</strong></td><td><code>local_store</code> · <code>encrypted_store</code>(AES-256-GCM) · <code>minio_store</code> · <code>seaweedfs_store</code></td><td>폐쇄망=로컬FS+원본암호화</td></tr>
       <tr><td class="nowrap"><strong>vectorstore</strong></td><td><code>pg_store</code>(pgvector) · <code>inmemory_store</code> · <code>es_store</code></td><td>정본=pgvector(ES 폐기)</td></tr>
     </tbody>

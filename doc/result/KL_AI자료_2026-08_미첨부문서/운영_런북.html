@@ -165,7 +165,6 @@ footer strong{color:var(--text-dim);}
     <thead><tr><th>증상</th><th>현재 거동</th><th>조치</th></tr></thead>
     <tbody>
       <tr><td>PostgreSQL 다운</td><td>InferencePipeline 생성이 유한 폴백(약 21s)으로 종료</td><td>DB 복구 우선, 폴백 동안 신규 분류 보류, 복구 후 outbox 재처리</td></tr>
-      <tr><td>벡터검색(pgvector) 이슈</td><td>RAG 보조검색 품질 저하 — 분류·확정은 PG 트랜잭션으로 정상(RAG는 보조)</td><td>pgvector 확장·<code>tb_rag_vectors</code>(HNSW/tsv) 점검, 필요 시 재색인. PG 인스턴스 자체 다운은 위 행 참조</td></tr>
       <tr><td>LLM API 장애</td><td>재시도+백오프</td><td><strong>서킷브레이커</strong>(본개발)로 지연 증폭 차단, 합성·검수 일시 보류</td></tr>
       <tr><td>스토리지(로컬FS) 장애</td><td>무음 폴백 탐지(헬스)</td><td>원문 저장 경로 점검, 복구 후 재업로드</td></tr>
     </tbody>

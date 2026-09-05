@@ -138,7 +138,7 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:12%">항목</th><th style="width:28%">목록(2쪽)</th><th style="width:28%">상세(3~4쪽)</th><th>비고</th></tr></thead>
     <tbody>
       <tr><td>IF-02</td><td><code>POST /classify</code></td><td><code>GET /api/v1/classify</code></td><td>파일 전송이므로 <b>POST</b> 가 맞다</td></tr>
-      <tr><td>IF-03</td><td><code>POST /classify/callback</code></td><td><code>GET /api/v1/classify/callback</code></td><td>본문 전송이므로 <b>POST</b> 가 맞다</td></tr>
+      <tr><td>IF-03</td><td><code>POST /classify/callback</code></td><td><code>GET /api/v1/classify/callback</code></td><td>본문 전송이므로 <b>POST</b> 가 맞다. 덧붙여 이 경로는 <b>관리시스템이 여는 수신 경로</b>이며 분류 엔진의 라우트가 아니다 — 엔진은 요청 본문의 <code>callback_url</code> 로 결과를 보낸다(&sect;4)</td></tr>
     </tbody>
   </table>
   </div>

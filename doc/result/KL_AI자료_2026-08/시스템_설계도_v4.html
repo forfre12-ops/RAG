@@ -402,7 +402,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
       <li><b>P0#6 메타모픽 deploy gate.</b> 순방향 메타모픽 회귀(불변식 위반)를 <b>배포 게이트 hard-signal</b>로 배선</li>
       <li><b>P0#7 SSRF 가드.</b> 웹훅 콜백에서 <b>클라우드 메타데이터·예약대역 무조건 차단</b> + loopback·비 http(s) 거부</li>
     </ul></div>
-    <div class="band"><div class="bt">관측 가시성 + 운영 검수 대시보드</div><p>품질이 조용히 떨어지던 지점을 메트릭·트레이스로 노출했다: <b>① LLM 비용추적 전 경로 배선</b>(개발/운영 분리 집계) <b>② 비동기 작업 상태 메트릭</b>(진입 카운터+소요시간 히스토그램) <b>③ OTel 추론·검색 span</b>(스칼라·비민감만, 본문 미노출) <b>④ 검색 폴백 가시화</b>(reranker→RRF·encode 실패·쿼리확장 폴백). 이 신호를 <code>GET /admin/dashboard</code> <b>한 화면</b>으로 종합 — 이중검토 보류·locked readiness·교정 backlog·kill-gate 발동·임베딩 드리프트를 함께 본다(섹션별 독립 best-effort·부분 가용 표기).</p></div>
+    <div class="band"><div class="bt">관측 가시성 + 운영 검수 대시보드</div><p>품질이 조용히 떨어지던 지점을 메트릭·트레이스로 노출했다: <b>① LLM 비용추적 전 경로 배선</b>(개발/운영 분리 집계) <b>② 비동기 작업 상태 메트릭</b>(진입 카운터+소요시간 히스토그램) <b>③ OTel 추론·검색 span</b>(스칼라·비민감만, 본문 미노출) 이 신호를 <code>GET /admin/dashboard</code> <b>한 화면</b>으로 종합 — 이중검토 보류·locked readiness·교정 backlog·kill-gate 발동·임베딩 드리프트를 함께 본다(섹션별 독립 best-effort·부분 가용 표기).</p></div>
     <div class="band gray"><div class="bt">통제 루프 — 지재원 export/import 런북 (G1·G2)</div><p>지재원(개발)에서 고객사(운영)로 가는 릴리스·활성·검수반입을 런북으로 통제한다: <b>G1 — 수동 활성 엔드포인트</b>(<code>POST /admin/model/activate</code>, deploy gate 통과 + force 시 감사) · <b>G2 — 검수 반입 <code>--as-candidate</code></b>(고객사 교정을 <code>gold_candidate</code>로만 편입해 <b>평가셋 오염 차단</b>, 지재원 golden-build 기본 무변경). CI 하드게이트(P0#5)가 이 통제가 코드 회귀로 풀리지 않게 영속화한다.</p></div>
     <div style="margin-top:10px;font-size:12.5px;color:var(--dim);">상세 반영 내역: 설계검토 하드닝 반영 내역 · 분류 검수 게이트 강화 보고서 · 운영 런북 — <b>본 묶음 미포함</b>(감리 산출물 트랙 · 요청 시 별도 제공)</div>
   </section>

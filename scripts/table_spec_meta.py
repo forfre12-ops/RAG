@@ -55,24 +55,13 @@ EXCLUDED_TABLES = {
         "쓰기·읽기 참조 0 · 실 DB 0행. 요건 점수는 tb_classifications 에 저장된다",
 }
 
-EXCLUDED_COLUMNS = {
-    # 표: {칼럼: 빼는 사유}
-    "tb_classifications": {
-        "rag_used": "유사문서 조회 폐기",
-        "rag_top_k": "유사문서 조회 폐기",
-    },
-    "tb_classification_evidence": {
-        "rag_ref_doc_id": "유사문서 조회 폐기",
-        "rag_similarity": "유사문서 조회 폐기",
-    },
-    "tb_guides": {
-        "indexed": "벡터 색인 폐기",
-        "embedding_vector_count": "벡터 색인 폐기",
-        "index_name": "벡터 색인 폐기",
-        "alias": "벡터 색인 폐기",
-        "model": "벡터 색인 폐기",
-    },
-}
+# [2026-09-05] 비웠다. 여기 있던 9개 칼럼(rag_used·rag_top_k·rag_ref_doc_id·
+# rag_similarity·indexed·embedding_vector_count·index_name·alias·model)은
+# "정의서가 코드보다 앞선 상태"를 담아 둔 것이었는데, 커밋 319069b9 가 소스와
+# ORM 에서 실제로 걷었고 마이그레이션 a3b4c5d6e7f8 이 DB 에서 떨궜다.
+# 이제 코드에 없으므로 제외할 것도 없다. 생성기가 --check 에서
+# "제외 목록이 코드보다 뒤처졌다"로 이 상태를 잡아 준다.
+EXCLUDED_COLUMNS: dict[str, dict[str, str]] = {}
 # ── 배치 — 이 표를 어느 서버에 두는가 (2026-09-02 조사) ─────────────────────
 #
 # 근거는 `poc/scripts/audit_table_placement.py` 전수 조사다(표 19개 · src 203파일).
@@ -108,6 +97,7 @@ PLACEMENT = {
     "tb_llm_usage":               ("지재원", "유사문서 조회 폐기 후 LLM 을 부르는 경로는 골든셋 빌드뿐이고 그것은 지재원 작업이다. 고객사 프로파일에도 로컬 LLM(ollama)이 설정돼 있으나 부르는 자리가 없다"),
     "tb_audit_log":               ("둘 다", "감사 로그. 양쪽 모두 필수"),
     "tb_guides":                  ("둘 다", "등급 판정 가이드 이력"),
+    "tb_advisory_locks":          ("둘 다", "감사 해시체인·모델 활성화의 동시성 잠금. 행 자체가 잠금 대상이라 데이터가 아니다"),
 }
 
 TABLES = {
@@ -128,8 +118,9 @@ TABLES = {
     "tb_prompt_versions": ("G", "프롬프트 버전", "합성 문서 생성에 쓴 프롬프트 템플릿 버전."),
     "tb_sample_documents": ("G", "합성 문서", "LLM 이 생성한 학습용 문서와 그 검수 상태."),
     "tb_llm_usage": ("H", "LLM 사용량", "LLM 호출별 토큰·비용·지연."),
-    "tb_audit_log": ("H", "감사 로그", "전 API 호출 기록. occurred_at 기준 월별 RANGE 파티션."),
-    "tb_guides": ("H", "가이드 버전", "가이드 문서 업로드·색인 버전 이력."),
+    "tb_audit_log": ("H", "감사 로그", "전 API 호출 기록. 보존기간(기본 730일)이 지난 행은 오래된 달부터 지운다 — 해시 체인이 끊기지 않도록 앞에서부터 이어서 지운다."),
+    "tb_guides": ("H", "가이드 버전", "가이드 문서 업로드 버전 이력."),
+    "tb_advisory_locks": ("H", "동시성 잠금", "이름 하나에 행 하나. 임계구역에 드는 쪽이 그 행을 SELECT ... FOR UPDATE 로 잡는다. PostgreSQL 의 pg_advisory_xact_lock 과 MariaDB 의 GET_LOCK 은 잠금 수명이 서로 달라(트랜잭션 대 커넥션) 같은 코드로 쓸 수 없어, 두 엔진에서 똑같이 트랜잭션 수명인 행 잠금으로 맞췄다."),
 }
 
 # 여러 테이블에 같은 뜻으로 나오는 컬럼 — 테이블별 설명이 없을 때만 쓴다.
@@ -261,7 +252,7 @@ COLS = {
         "version_id": "모델 버전 PK",
         "version_label": "버전 라벨 — v-fe4b386b 형식(학습 산출물 해시)",
         "base_model": "기반 사전학습 모델 이름",
-        "model_type": "모델 종류 — classifier · reranker",
+        "model_type": "모델 종류. 코드가 넣는 값은 classifier 하나이며 기본값이다",
         "trained_at": "학습 완료 시각",
         "training_run_id": "이 모델을 만든 학습 실행 ID",
         "training_data_count": "학습 샘플 수",
@@ -270,6 +261,7 @@ COLS = {
         "model_size_mb": "모델 크기(MB)",
         "mlflow_run_id": "MLflow 실험 추적 ID",
         "is_active": "활성 여부. 생성 칼럼 active_key 의 UNIQUE 제약으로 활성 1건만 허용합니다",
+        "active_key": "is_active 에서 DB 가 계산하는 칼럼 — 활성이면 1, 아니면 NULL. 여기 걸린 UNIQUE 인덱스가 활성 1건 제약을 만든다(UNIQUE 는 NULL 을 여러 개 허용하므로 비활성 행은 제한이 없다). 애플리케이션은 쓰지 않는다",
         "activated_at": "활성화 시각",
         "deactivated_at": "비활성화 시각",
         "rolled_back_from": "자동 롤백 출처 버전(자기 참조)",
@@ -376,7 +368,7 @@ COLS = {
         "called_at": "호출 시각",
     },
     "tb_audit_log": {
-        "audit_id": "감사 PK(파티션 키와 복합)",
+        "audit_id": "감사 PK. 파티션을 두던 시절 파티션 키를 기본키에 넣어야 해 복합키가 됐고, 파티션을 걷은 뒤에도 복합키는 그대로 둔다 — 바꾸면 기존 행의 키가 흔들린다",
         "request_id": "요청 추적 ID. 같은 요청에서 나온 여러 기록을 잇는다",
         "actor_id": "행위자 계정 ID",
         "actor_role": "행위자 역할",
@@ -388,7 +380,10 @@ COLS = {
         "user_agent": "요청 User-Agent",
         "success": "처리 성공 여부",
         "error_code": "실패 코드",
-        "occurred_at": "발생 시각. 월별 RANGE 파티션 키",
+        "occurred_at": "발생 시각. 기본키의 뒷자리이자 시간축 인덱스 idx_audit_occurred 의 선두 칼럼이다",
+    },
+    "tb_advisory_locks": {
+        "name": "잠금 이름. 값은 audit_chain(감사 해시체인) · model_activation(모델 활성화) 둘이며 마이그레이션이 미리 넣어 둔다 — 런타임에 만들면 처음 쓰는 둘이 서로의 미커밋 행을 못 봐 같이 들어간다",
     },
     "tb_guides": {
         "id": "행 PK",

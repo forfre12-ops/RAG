@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>테이블 정의서</title>
+<title>테이블정의서 · ERD | KOIPA AI 영업비밀 등급분류 시스템</title>
 <style>
 :root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
 *{box-sizing:border-box}
@@ -13,18 +13,21 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Ap
 .eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
 h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
 .meta{font-size:12.5px;color:var(--dim)}
-h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
-h3{font-size:13px;font-weight:800;margin:20px 0 6px}
-p{margin:8px 0}
+h2{font-size:17px;font-weight:800;letter-spacing:-.02em;margin:38px 0 12px}
+h3{font-size:14.5px;font-weight:700;margin:22px 0 6px 18px}
+p{margin:8px 0 8px 18px}
+ul,ol{margin:8px 0 8px 18px;padding-left:20px}
 table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
 th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 th{background:var(--mid);font-weight:700}
 td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
 td.c{text-align:center;white-space:nowrap;font-weight:700}
 code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
-.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
-.tw{overflow-x:auto}
-.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace}
+.note{background:var(--surf);border:1px solid var(--line);padding:12px 16px;margin:14px 0 14px 18px;font-size:13px}
+pre{background:var(--surf);border:1px solid var(--line);padding:12px 14px;margin:10px 0 10px 18px;font-size:11.5px;font-family:ui-monospace,monospace;overflow-x:auto;line-height:1.55}
+.q{background:var(--mid);border-left:3px solid #a1a1aa;padding:10px 14px;margin:18px 0 10px 18px;font-size:13px;font-weight:700}
+.tw{overflow-x:auto;margin-left:18px}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace;margin-left:18px}
 .foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
 .on{color:#0a0a0a}
 .off{color:#71717a}
@@ -67,558 +70,590 @@ a{color:#0a0a0a}
 .part{color:#92400e;font-weight:700}
 .flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
 </style>
+<style>
+
+.ts-edge
+.ts-node rect{transition:stroke .12s;}
+.ts-node:hover rect{stroke:#1e293b;stroke-width:2;}
+table.spec{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.spec th{background:#f4f4f5;text-align:left;font-weight:600;font-size:11.5px;
+  padding:6px 8px;border:1px solid #d4d4d8;white-space:nowrap;}
+table.spec td{padding:5px 8px;border:1px solid #e4e4e7;vertical-align:top;}
+table.spec td.c-name{font-family:ui-monospace,monospace;font-size:11.5px;white-space:nowrap;}
+table.spec td.c-type{font-family:ui-monospace,monospace;font-size:11px;color:#3f3f46;white-space:nowrap;}
+table.spec td.c-key{text-align:center;font-size:10.5px;font-weight:700;white-space:nowrap;}
+table.spec td.c-nn{text-align:center;}
+.k-pk{color:#b45309;}.k-fk{color:#1d4ed8;}.k-uq{color:#15803d;}
+.spec-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:26px 0 4px;}
+.spec-head h3{margin:0;font-family:ui-monospace,monospace;}
+.spec-logical{font-size:13px;color:#52525b;}
+.spec-badge{display:inline-block;background:#18181b;color:#fff;font-size:9.5px;font-weight:700;
+  letter-spacing:.04em;padding:2px 7px;border-radius:3px;font-family:ui-monospace,monospace;}
+.spec-note{font-size:12.5px;color:#52525b;margin:2px 0 8px;line-height:1.6;}
+.spec-idx{font-size:11.5px;color:#52525b;margin:6px 0 0;line-height:1.7;}
+.spec-idx code{font-size:11px;}
+
+.tbl-wrap{overflow-x:auto;}
+.num{font-family:ui-monospace,monospace;font-size:10.5px;font-weight:700;color:var(--dim);
+  padding:2px 7px;background:var(--mid);border:1px solid var(--line);margin-right:6px}
+.group-header{display:flex;align-items:center;gap:10px;margin:40px 0 10px}
+.group-header h2{margin:0}
+@media print{
+  table.spec{font-size:8pt}
+  .tbl-wrap{overflow:visible}
+  section{break-inside:auto}
+}
+</style>
 </head>
 <body>
+<div id="top"></div>
 <nav class="nav">
   <div class="nav-inner">
     <a class="brand" href="#">
       <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
       <span class="brand-name">한국지식재산보호원</span>
       <span class="brand-sep">/</span>
-      <span class="brand-sub">테이블 정의서</span>
+      <span class="brand-sub">테이블정의서 · ERD</span>
     </a>
     <div class="nav-right"><span class="nav-badge">감리 산출물</span></div>
   </div>
 </nav>
 <div class="wrap">
   <div class="top">
-    <div class="eyebrow">감리 산출물 · 데이터</div>
-    <h1>테이블 정의서</h1>
-    <div class="meta">DAR-005 데이터 구조 · 테이블 21 · 컬럼 239 · ORM 메타데이터 + 마이그레이션 정의에서 생성 · 2026-08-26</div>
+    <div class="eyebrow">감리 산출물 · 데이터베이스 정의</div>
+    <h1>테이블정의서 · ERD</h1>
+    <div class="meta">MariaDB 10.11 · InnoDB · utf8mb4 / utf8mb4_bin · 19테이블 216칼럼 · 등급체계·문서·라벨링·추론·학습·보정·합성·운영 8개 그룹 · 2026-09-05 생성</div>
   </div>
-
-  <table class="docinfo">
-    <tbody>
-      <tr><th>요구사항</th><td><code>DAR-005</code> (관련 산출물: 데이터 사전, 테이블 정의서) · <code>DAR-006</code></td></tr>
-      <tr><th>생성 원본</th><td><code>poc/src/koipa/db/models.py</code> — SQLAlchemy <code>Base.metadata</code></td></tr>
-      <tr><th>짝 문서</th><td><code>ERD_개체관계도</code> (관계) · <code>데이터_거버넌스_계획</code> (표준·보존)</td></tr>
-      <tr><th>DBMS</th><td>PostgreSQL · 확장 <code>pgvector</code></td></tr>
-      <tr><th>작성일</th><td>2026-08-26</td></tr>
-      <tr><th>근거 커밋</th><td><code>d3fe51c3</code></td></tr>
-    </tbody>
-  </table>
-
-
-  <div class="note">
-    <b>범위.</b> AI 엔진이 소유한 스키마 <b>테이블 21 개, 컬럼 239개</b>다.
-    ORM 메타데이터에서 생성했으므로 구동 중인 코드와 일치한다. KL 포털의 스키마는 별도이며
-    두 시스템의 연계는 <code>tb_documents.external_ref</code> 로 한다.
-  </div>
-
-  <h2>1. 요약</h2>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:22%">항목</th><th style="width:14%">수</th><th>비고</th></tr></thead>
-    <tbody>
-      <tr><td>테이블</td><td class="n">21</td><td>ORM 매핑 19 + 마이그레이션 생성 2(검색용). 월별 파티션 부모 테이블 3 개 포함(<code>tb_chunks</code>, <code>tb_llm_usage</code>, <code>tb_audit_log</code>)</td></tr>
-      <tr><td>컬럼</td><td class="n">249</td><td>물리명·논리명·데이터 타입·NULL 허용 여부·키·기본값·참조를 표기했다</td></tr>
-      <tr><td>인덱스</td><td class="n">43</td><td>PK 제외</td></tr>
-      <tr><td>외래키</td><td class="n">26</td><td>관계도는 <code>ERD_개체관계도</code></td></tr>
-      <tr><td>컬럼 주석</td><td class="n gap">0</td><td class="gap">스키마에 <code>COMMENT ON COLUMN</code> 이 정의되어 있지 않다(보완 대상)</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <h2>2. 테이블 목록</h2>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:8%">#</th><th style="width:24%">논리명</th><th style="width:30%">물리명</th><th style="width:12%">영역</th><th>컬럼 수</th></tr></thead>
-    <tbody>
-      <tr><td class="c">1</td><td>등급 체계</td><td><code>tb_classification_levels</code></td><td>기준</td><td class="n">11</td></tr>
-      <tr><td class="c">2</td><td>평가요소</td><td><code>tb_evaluation_factors</code></td><td>기준</td><td class="n">8</td></tr>
-      <tr><td class="c">3</td><td>등급 키워드</td><td><code>tb_level_keywords</code></td><td>기준</td><td class="n">10</td></tr>
-      <tr><td class="c">4</td><td>문서 청크</td><td><code>tb_chunks</code></td><td>문서</td><td class="n">12</td></tr>
-      <tr><td class="c">5</td><td>문서 평가요소 점수</td><td><code>tb_document_factor_scores</code></td><td>문서</td><td class="n">3</td></tr>
-      <tr><td class="c">6</td><td>문서 라벨</td><td><code>tb_document_labels</code></td><td>문서</td><td class="n">11</td></tr>
-      <tr><td class="c">7</td><td>문서</td><td><code>tb_documents</code></td><td>문서</td><td class="n">20</td></tr>
-      <tr><td class="c">8</td><td>분류 판정 근거</td><td><code>tb_classification_evidence</code></td><td>분류</td><td class="n">13</td></tr>
-      <tr><td class="c">9</td><td>분류 결과</td><td><code>tb_classifications</code></td><td>분류</td><td class="n">16</td></tr>
-      <tr><td class="c">10</td><td>검수 교정 이력</td><td><code>tb_corrections</code></td><td>분류</td><td class="n">10</td></tr>
-      <tr><td class="c">11</td><td>모델 버전</td><td><code>tb_model_versions</code></td><td>학습</td><td class="n">18</td></tr>
-      <tr><td class="c">12</td><td>학습셋 구성</td><td><code>tb_training_datasets</code></td><td>학습</td><td class="n">5</td></tr>
-      <tr><td class="c">13</td><td>학습 에폭 지표</td><td><code>tb_training_epochs</code></td><td>학습</td><td class="n">7</td></tr>
-      <tr><td class="c">14</td><td>학습 실행</td><td><code>tb_training_runs</code></td><td>학습</td><td class="n">21</td></tr>
-      <tr><td class="c">15</td><td>프롬프트 버전</td><td><code>tb_prompt_versions</code></td><td>데이터</td><td class="n">9</td></tr>
-      <tr><td class="c">16</td><td>합성·샘플 문서</td><td><code>tb_sample_documents</code></td><td>데이터</td><td class="n">21</td></tr>
-      <tr><td class="c">17</td><td>감사 로그</td><td><code>tb_audit_log</code></td><td>운영</td><td class="n">13</td></tr>
-      <tr><td class="c">18</td><td>가이드 문서</td><td><code>tb_guides</code></td><td>운영</td><td class="n">13</td></tr>
-      <tr><td class="c">19</td><td>LLM 사용량</td><td><code>tb_llm_usage</code></td><td>운영</td><td class="n">15</td></tr>
-      <tr><td class="c">20</td><td>벡터 저장소</td><td><code>tb_rag_vectors</code></td><td>검색</td><td class="n">10</td></tr>
-      <tr><td class="c">21</td><td>컬렉션 별칭</td><td><code>tb_rag_aliases</code></td><td>검색</td><td class="n">3</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <p>벡터 검색을 위해 <code>pgvector</code> 확장이 필요하다. 등급 체계, 평가요소, 키워드는 코드 상수가 아니라 테이블이 정본이므로 운영 중 변경할 수 있다.</p>
-  <h2>3. 기준 · 3개</h2>
-  <h3>등급 체계 <code>tb_classification_levels</code></h3>
-  <p>등급 체계의 정본. 등급 코드, 명칭, 순서(<code>level_order</code>), 손실 가중치를 담으며 애플리케이션의 <code>GradeRegistry</code> 가 이 값을 읽는다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>level_id</code></td><td>등급 식별자</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>level_code</code></td><td>등급 코드</td><td class="src">VARCHAR(20)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>level_name</code></td><td>등급 명칭</td><td class="src">VARCHAR(50)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>level_order</code></td><td>등급 순서</td><td class="src">SMALLINT</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>description</code></td><td>설명</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>color_hex</code></td><td>표시 색상</td><td class="src">VARCHAR(7)</td><td class="c">Y</td><td class="c">—</td><td class="src">#808080</td><td class="src">—</td></tr>
-      <tr><td><code>loss_weight</code></td><td>학습 손실 가중치</td><td class="src">NUMERIC(4, 2)</td><td class="c">Y</td><td class="c">—</td><td class="src">1.0</td><td class="src">—</td></tr>
-      <tr><td><code>is_active</code></td><td>사용 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">True</td><td class="src">—</td></tr>
-      <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>updated_at</code></td><td>수정 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>created_by</code></td><td>생성자</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>level_id</code> · 컬럼 11 · 인덱스 1 · FK 0</p>
-  <h3>평가요소 <code>tb_evaluation_factors</code></h3>
-  <p>평가요소 정본 — 비공지성(S)·경제적 유용성(V)·비밀관리성(M)</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>factor_id</code></td><td>평가요소 식별자</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>factor_code</code></td><td>평가요소 코드</td><td class="src">VARCHAR(30)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>factor_name</code></td><td>평가요소 명칭</td><td class="src">VARCHAR(100)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>description</code></td><td>설명</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>weight</code></td><td>가중치</td><td class="src">NUMERIC(3, 2)</td><td class="c">N</td><td class="c">—</td><td class="src">0.25</td><td class="src">—</td></tr>
-      <tr><td><code>is_active</code></td><td>사용 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">True</td><td class="src">—</td></tr>
-      <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>updated_at</code></td><td>수정 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>factor_id</code> · 컬럼 8 · 인덱스 0 · FK 0</p>
-  <h3>등급 키워드 <code>tb_level_keywords</code></h3>
-  <p>룰 엔진이 사용하는 키워드 목록. 등급, 평가요소, 가중치, 패턴 유형을 담으며 여기에 등록하면 코드 변경 없이 룰이 갱신된다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>keyword_id</code></td><td>키워드 식별자</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>level_id</code></td><td>등급 식별자</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_classification_levels.level_id</td></tr>
-      <tr><td><code>keyword</code></td><td>키워드</td><td class="src">VARCHAR(200)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>pattern_type</code></td><td>매칭 방식</td><td class="src">VARCHAR(20)</td><td class="c">N</td><td class="c">—</td><td class="src">exact</td><td class="src">—</td></tr>
-      <tr><td><code>factor_id</code></td><td>평가요소 식별자</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_evaluation_factors.factor_id</td></tr>
-      <tr><td><code>weight</code></td><td>가중치</td><td class="src">NUMERIC(3, 2)</td><td class="c">Y</td><td class="c">—</td><td class="src">1.0</td><td class="src">—</td></tr>
-      <tr><td><code>source</code></td><td>출처</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">—</td><td class="src">manual</td><td class="src">—</td></tr>
-      <tr><td><code>is_active</code></td><td>사용 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">True</td><td class="src">—</td></tr>
-      <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>keyword_id</code> · 컬럼 10 · 인덱스 2 · FK 2</p>
-  <h2>4. 문서 · 4개</h2>
-  <h3>문서 청크 <code>tb_chunks</code></h3>
-  <p>청크 분할 결과. 월별 파티션의 부모 테이블이며 실제 INSERT 는 하위 파티션으로 자동 분배된다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>chunk_id</code></td><td>청크 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">PK</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>doc_id</code></td><td>문서 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>chunk_index</code></td><td>청크 순번</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>content</code></td><td>본문</td><td class="src">TEXT</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>token_count</code></td><td>토큰 수</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>char_count</code></td><td>글자 수</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>section_path</code></td><td>문서 내 위치</td><td class="src">ARRAY</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>overlap_prev</code></td><td>이전 청크 중첩 길이</td><td class="src">SMALLINT</td><td class="c">Y</td><td class="c">—</td><td class="src">0</td><td class="src">—</td></tr>
-      <tr><td><code>overlap_next</code></td><td>다음 청크 중첩 길이</td><td class="src">SMALLINT</td><td class="c">Y</td><td class="c">—</td><td class="src">0</td><td class="src">—</td></tr>
-      <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">PK</td><td class="src">server_default</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>chunk_id, created_at</code> · 컬럼 12 · 인덱스 1 · FK 0</p>
-  <h3>문서 평가요소 점수 <code>tb_document_factor_scores</code></h3>
-  <p>문서별 평가요소(S·V·M) 점수</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>doc_id</code></td><td>문서 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">tb_documents.doc_id</td></tr>
-      <tr><td><code>factor_id</code></td><td>평가요소 식별자</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">tb_evaluation_factors.factor_id</td></tr>
-      <tr><td><code>score</code></td><td>평가요소 점수</td><td class="src">NUMERIC(4, 2)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>doc_id, factor_id</code> · 컬럼 3 · 인덱스 0 · FK 2</p>
-  <h3>문서 라벨 <code>tb_document_labels</code></h3>
-  <p>문서에 부여된 라벨. 골든셋 계층과 라벨 출처를 담으며 학습셋 구성의 입력이 된다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>doc_id</code></td><td>문서 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">tb_documents.doc_id</td></tr>
-      <tr><td><code>level_id</code></td><td>등급 식별자</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_classification_levels.level_id</td></tr>
-      <tr><td><code>labeled_by</code></td><td>라벨 부여 주체</td><td class="src">VARCHAR(30)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>labeler_id</code></td><td>라벨 부여자</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>confidence</code></td><td>신뢰도</td><td class="src">NUMERIC(3, 2)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>total_score</code></td><td>총점</td><td class="src">NUMERIC(4, 2)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>notes</code></td><td>비고</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>is_verified</code></td><td>검증 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">False</td><td class="src">—</td></tr>
-      <tr><td><code>verified_by</code></td><td>검증자</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>labeled_at</code></td><td>라벨 부여 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>verified_at</code></td><td>검증 일시</td><td class="src">DATETIME</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>doc_id</code> · 컬럼 11 · 인덱스 2 · FK 2</p>
-  <h3>문서 <code>tb_documents</code></h3>
-  <p>업로드 문서 대장. 원문과 정규화 텍스트는 저장소에 두고 DB 에는 접근 경로만 보관한다. 추출 방식, 추출 품질, 처리 상태를 함께 기록하여 품질 미달 문서의 격리 판정에 사용한다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>doc_id</code></td><td>문서 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">PK</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>external_ref</code></td><td>외부 시스템 참조키</td><td class="src">VARCHAR(100)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>filename</code></td><td>파일명</td><td class="src">VARCHAR(500)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>source_format</code></td><td>원본 파일 형식</td><td class="src">VARCHAR(10)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>file_size_bytes</code></td><td>파일 크기(바이트)</td><td class="src">BIGINT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>file_hash</code></td><td>파일 해시</td><td class="src">VARCHAR(64)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>metadata</code></td><td>메타데이터</td><td class="src">JSONB</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>raw_text_uri</code></td><td>원문 텍스트 경로</td><td class="src">VARCHAR(500)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>normalized_text_uri</code></td><td>정규화 텍스트 경로</td><td class="src">VARCHAR(500)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>text_preview</code></td><td>본문 미리보기</td><td class="src">VARCHAR(2000)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>char_count</code></td><td>글자 수</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>extraction_method</code></td><td>추출 방식</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">—</td><td class="src">parser</td><td class="src">—</td></tr>
-      <tr><td><code>extraction_quality</code></td><td>추출 품질</td><td class="src">NUMERIC(3, 2)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>ocr_used</code></td><td>OCR 사용 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">False</td><td class="src">—</td></tr>
-      <tr><td><code>processing_status</code></td><td>처리 상태</td><td class="src">VARCHAR(20)</td><td class="c">N</td><td class="c">—</td><td class="src">pending</td><td class="src">—</td></tr>
-      <tr><td><code>error_message</code></td><td>오류 메시지</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>uploaded_at</code></td><td>업로드 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>processed_at</code></td><td>처리 완료 일시</td><td class="src">DATETIME</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>created_by</code></td><td>생성자</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>deleted_at</code></td><td>삭제 일시</td><td class="src">DATETIME</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>doc_id</code> · 컬럼 20 · 인덱스 6 · FK 0</p>
-  <h2>5. 분류 · 3개</h2>
-  <h3>분류 판정 근거 <code>tb_classification_evidence</code></h3>
-  <p>판정 근거. 분류 1 건에 평가요소별 근거가 여러 행으로 연결된다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>evidence_id</code></td><td>근거 식별자</td><td class="src">BIGINT</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>classification_id</code></td><td>분류 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_classifications.classification_id</td></tr>
-      <tr><td><code>chunk_id</code></td><td>청크 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>evidence_type</code></td><td>근거 유형</td><td class="src">VARCHAR(20)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>factor_id</code></td><td>평가요소 식별자</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_evaluation_factors.factor_id</td></tr>
-      <tr><td><code>excerpt</code></td><td>근거 발췌문</td><td class="src">TEXT</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>excerpt_start</code></td><td>발췌 시작 위치</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>excerpt_end</code></td><td>발췌 종료 위치</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>contribution</code></td><td>판정 기여도</td><td class="src">NUMERIC(4, 3)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>rag_ref_doc_id</code></td><td>RAG 참조 문서 식별자</td><td class="src">UUID</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>rag_similarity</code></td><td>RAG 유사도</td><td class="src">NUMERIC(4, 3)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>evidence_id</code> · 컬럼 13 · 인덱스 2 · FK 2</p>
-  <h3>분류 결과 <code>tb_classifications</code></h3>
-  <p>분류 실행 1 건의 결과. 예측 등급, 신뢰도, 청크 집계 방식, 청크 수와 함께 상태값(자동확정 또는 검수 대기)을 보관한다. <code>initial_status</code> 는 사람이 개입하기 전의 값이므로 자동확정률 산정의 기준이 된다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>classification_id</code></td><td>분류 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">PK</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>doc_id</code></td><td>문서 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_documents.doc_id</td></tr>
-      <tr><td><code>model_version</code></td><td>모델 버전</td><td class="src">VARCHAR(50)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>predicted_level_id</code></td><td>예측 등급</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_classification_levels.level_id</td></tr>
-      <tr><td><code>confidence</code></td><td>신뢰도</td><td class="src">NUMERIC(5, 4)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>alternatives</code></td><td>차순위 등급 분포</td><td class="src">JSONB</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>automation_assessment</code></td><td>자동화 판정 결과</td><td class="src">JSONB</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>aggregation_method</code></td><td>청크 집계 방식</td><td class="src">VARCHAR(20)</td><td class="c">Y</td><td class="c">—</td><td class="src">hybrid</td><td class="src">—</td></tr>
-      <tr><td><code>chunk_count</code></td><td>청크 수</td><td class="src">SMALLINT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>rag_used</code></td><td>RAG 사용 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">False</td><td class="src">—</td></tr>
-      <tr><td><code>rag_top_k</code></td><td>RAG 참조 건수</td><td class="src">SMALLINT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>status</code></td><td>상태</td><td class="src">VARCHAR(20)</td><td class="c">N</td><td class="c">—</td><td class="src">staging</td><td class="src">—</td></tr>
-      <tr><td><code>initial_status</code></td><td>초기 상태</td><td class="src">VARCHAR(20)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>inference_ms</code></td><td>추론 소요시간(ms)</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>classified_at</code></td><td>분류 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>classification_id</code> · 컬럼 16 · 인덱스 6 · FK 2</p>
-  <h3>검수 교정 이력 <code>tb_corrections</code></h3>
-  <p>운영 검수에서 사람이 등급을 변경한 기록. 재학습 입력이며 어느 학습 실행에 반영되었는지 추적한다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>correction_id</code></td><td>교정 식별자</td><td class="src">BIGINT</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>classification_id</code></td><td>분류 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_classifications.classification_id</td></tr>
-      <tr><td><code>original_level_id</code></td><td>교정 전 등급</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_classification_levels.level_id</td></tr>
-      <tr><td><code>corrected_level_id</code></td><td>교정 후 등급</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_classification_levels.level_id</td></tr>
-      <tr><td><code>direction</code></td><td>교정 방향</td><td class="src">VARCHAR(10)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>reason</code></td><td>교정 사유</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>corrected_by</code></td><td>교정자</td><td class="src">VARCHAR(50)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>corrected_at</code></td><td>교정 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>consumed_in_run</code></td><td>반영된 학습 실행</td><td class="src">UUID</td><td class="c">Y</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_training_runs.run_id</td></tr>
-      <tr><td><code>consumed_at</code></td><td>학습 반영 일시</td><td class="src">DATETIME</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>correction_id</code> · 컬럼 10 · 인덱스 4 · FK 4</p>
-  <h2>6. 학습 · 4개</h2>
-  <h3>모델 버전 <code>tb_model_versions</code></h3>
-  <p>모델 버전 관리 대장. 활성 여부, 활성·비활성 시각, 롤백 원본과 사유, 등급 체계 스냅샷을 보관한다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>version_id</code></td><td>모델 버전 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">PK</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>version_label</code></td><td>모델 버전 표기</td><td class="src">VARCHAR(50)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>base_model</code></td><td>기반 모델</td><td class="src">VARCHAR(100)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>model_type</code></td><td>모델 유형</td><td class="src">VARCHAR(20)</td><td class="c">Y</td><td class="c">—</td><td class="src">classifier</td><td class="src">—</td></tr>
-      <tr><td><code>trained_at</code></td><td>학습 완료 일시</td><td class="src">DATETIME</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>training_run_id</code></td><td>학습 실행 식별자</td><td class="src">UUID</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>training_data_count</code></td><td>학습 데이터 건수</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>metrics</code></td><td>평가 지표</td><td class="src">JSONB</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>model_uri</code></td><td>모델 저장 경로</td><td class="src">VARCHAR(500)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>mlflow_run_id</code></td><td>MLflow 실행 식별자</td><td class="src">VARCHAR(64)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>is_active</code></td><td>사용 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">False</td><td class="src">—</td></tr>
-      <tr><td><code>activated_at</code></td><td>활성화 일시</td><td class="src">DATETIME</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>deactivated_at</code></td><td>비활성화 일시</td><td class="src">DATETIME</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>rolled_back_from</code></td><td>롤백 원본 버전</td><td class="src">UUID</td><td class="c">Y</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_model_versions.version_id</td></tr>
-      <tr><td><code>rollback_reason</code></td><td>롤백 사유</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>level_snapshot</code></td><td>등급 체계 스냅샷</td><td class="src">JSONB</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>version_id</code> · 컬럼 18 · 인덱스 2 · FK 1</p>
-  <h3>학습셋 구성 <code>tb_training_datasets</code></h3>
-  <p>학습 실행에 포함된 문서와 그 등급. 학습셋 구성을 추적한다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>id</code></td><td>식별자</td><td class="src">BIGINT</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>run_id</code></td><td>학습 실행 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_training_runs.run_id</td></tr>
-      <tr><td><code>doc_id</code></td><td>문서 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_documents.doc_id</td></tr>
-      <tr><td><code>split_type</code></td><td>데이터 분할 유형</td><td class="src">VARCHAR(10)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>level_id</code></td><td>등급 식별자</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_classification_levels.level_id</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>id</code> · 컬럼 5 · 인덱스 2 · FK 3</p>
-  <h3>학습 에폭 지표 <code>tb_training_epochs</code></h3>
-  <p>에폭별 지표</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>run_id</code></td><td>학습 실행 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">tb_training_runs.run_id</td></tr>
-      <tr><td><code>epoch</code></td><td>에폭 번호</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>train_loss</code></td><td>학습 손실</td><td class="src">REAL</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>val_loss</code></td><td>검증 손실</td><td class="src">REAL</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>val_metrics</code></td><td>검증 지표</td><td class="src">JSONB</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>learning_rate</code></td><td>학습률</td><td class="src">REAL</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>logged_at</code></td><td>기록 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>run_id, epoch</code> · 컬럼 7 · 인덱스 0 · FK 1</p>
-  <h3>학습 실행 <code>tb_training_runs</code></h3>
-  <p>학습 실행 1 건의 기록. 지표와 배포 게이트 판정 결과를 담는다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>run_id</code></td><td>학습 실행 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">PK</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>model_version</code></td><td>모델 버전</td><td class="src">UUID</td><td class="c">Y</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_model_versions.version_id</td></tr>
-      <tr><td><code>mlflow_run_id</code></td><td>MLflow 실행 식별자</td><td class="src">VARCHAR(64)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>status</code></td><td>상태</td><td class="src">VARCHAR(20)</td><td class="c">N</td><td class="c">—</td><td class="src">queued</td><td class="src">—</td></tr>
-      <tr><td><code>started_at</code></td><td>시작 일시</td><td class="src">DATETIME</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>completed_at</code></td><td>완료 일시</td><td class="src">DATETIME</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>duration_sec</code></td><td>소요 시간(초)</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>total_samples</code></td><td>전체 표본 수</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>train_count</code></td><td>학습 건수</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>val_count</code></td><td>검증 건수</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>test_count</code></td><td>시험 건수</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>split_method</code></td><td>분할 방식</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">—</td><td class="src">stratified</td><td class="src">—</td></tr>
-      <tr><td><code>split_seed</code></td><td>분할 난수 시드</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>hyperparameters</code></td><td>하이퍼파라미터</td><td class="src">JSONB</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>final_metrics</code></td><td>최종 지표</td><td class="src">JSONB</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>trigger_type</code></td><td>실행 계기 유형</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">—</td><td class="src">manual</td><td class="src">—</td></tr>
-      <tr><td><code>trigger_ref</code></td><td>실행 계기 참조</td><td class="src">VARCHAR(100)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>error_message</code></td><td>오류 메시지</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>created_by</code></td><td>생성자</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>run_id</code> · 컬럼 21 · 인덱스 4 · FK 1</p>
-  <h2>7. 데이터 · 2개</h2>
-  <h3>프롬프트 버전 <code>tb_prompt_versions</code></h3>
-  <p>프롬프트 버전</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>prompt_version</code></td><td>프롬프트 버전</td><td class="src">VARCHAR(30)</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>chain_stage</code></td><td>체인 단계</td><td class="src">VARCHAR(20)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>template</code></td><td>템플릿</td><td class="src">TEXT</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>created_by</code></td><td>생성자</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>notes</code></td><td>비고</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>prompt_version</code> · 컬럼 9 · 인덱스 0 · FK 0</p>
-  <h3>합성·샘플 문서 <code>tb_sample_documents</code></h3>
-  <p>합성 문서 및 샘플 문서 대장. 생성에 사용한 프롬프트 버전과 의도한 등급을 함께 보관한다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>sample_id</code></td><td>샘플 식별자</td><td class="src">UUID</td><td class="c">N</td><td class="c">PK</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>doc_id</code></td><td>문서 식별자</td><td class="src">UUID</td><td class="c">Y</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_documents.doc_id</td></tr>
-      <tr><td><code>target_level_id</code></td><td>목표 등급</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_classification_levels.level_id</td></tr>
-      <tr><td><code>corrected_level_id</code></td><td>교정 후 등급</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_classification_levels.level_id</td></tr>
-      <tr><td><code>doc_type</code></td><td>문서 유형</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>outline_prompt_version</code></td><td>개요 생성 프롬프트 버전</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_prompt_versions.prompt_version</td></tr>
-      <tr><td><code>body_prompt_version</code></td><td>본문 생성 프롬프트 버전</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_prompt_versions.prompt_version</td></tr>
-      <tr><td><code>qc_prompt_version</code></td><td>품질검사 프롬프트 버전</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_prompt_versions.prompt_version</td></tr>
-      <tr><td><code>llm_provider</code></td><td>LLM 제공자</td><td class="src">VARCHAR(30)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>llm_model</code></td><td>LLM 모델명</td><td class="src">VARCHAR(50)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>generated_outline</code></td><td>생성된 개요</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>generated_content</code></td><td>생성된 본문</td><td class="src">TEXT</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>quality_score</code></td><td>품질 점수</td><td class="src">NUMERIC(3, 2)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>quality_report</code></td><td>품질 검사 결과</td><td class="src">JSONB</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>label_source</code></td><td>라벨 출처</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>parse_error</code></td><td>파싱 오류</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>review_status</code></td><td>검수 상태</td><td class="src">VARCHAR(20)</td><td class="c">Y</td><td class="c">—</td><td class="src">pending_review</td><td class="src">—</td></tr>
-      <tr><td><code>reviewed_by</code></td><td>검수자</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>reviewed_at</code></td><td>검수 일시</td><td class="src">DATETIME</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>rejection_reason</code></td><td>반려 사유</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>sample_id</code> · 컬럼 21 · 인덱스 3 · FK 6</p>
-  <h2>8. 운영 · 3개</h2>
-  <h3>감사 로그 <code>tb_audit_log</code></h3>
-  <p>모든 API 호출 기록. 월별 파티션의 부모 테이블이며 영업비밀 관리 시스템의 필수 항목이다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>audit_id</code></td><td>감사 로그 식별자</td><td class="src">BIGINT</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>request_id</code></td><td>요청 식별자</td><td class="src">UUID</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>actor_id</code></td><td>행위자</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>actor_role</code></td><td>행위자 역할</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>action</code></td><td>수행 동작</td><td class="src">VARCHAR(50)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>target_type</code></td><td>대상 유형</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>target_id</code></td><td>대상 식별자</td><td class="src">VARCHAR(100)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>payload_hash</code></td><td>요청 본문 해시</td><td class="src">VARCHAR(64)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>ip_address</code></td><td>접속 IP</td><td class="src">INET</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>user_agent</code></td><td>클라이언트 정보</td><td class="src">VARCHAR(500)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>success</code></td><td>성공 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">True</td><td class="src">—</td></tr>
-      <tr><td><code>error_code</code></td><td>오류 코드</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>occurred_at</code></td><td>발생 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">PK</td><td class="src">server_default</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>audit_id, occurred_at</code> · 컬럼 13 · 인덱스 3 · FK 0</p>
-  <h3>가이드 문서 <code>tb_guides</code></h3>
-  <p>가이드 문서 업로드 이력</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>id</code></td><td>식별자</td><td class="src">BIGINT</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>guide_id</code></td><td>가이드 식별자</td><td class="src">VARCHAR(200)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>version</code></td><td>버전</td><td class="src">VARCHAR(50)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>effective_date</code></td><td>시행일</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>change_summary</code></td><td>변경 요약</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>doc_type</code></td><td>문서 유형</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>filename</code></td><td>파일명</td><td class="src">VARCHAR(500)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>indexed</code></td><td>색인 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">False</td><td class="src">—</td></tr>
-      <tr><td><code>embedding_vector_count</code></td><td>임베딩 벡터 수</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">—</td><td class="src">0</td><td class="src">—</td></tr>
-      <tr><td><code>index_name</code></td><td>색인 명칭</td><td class="src">VARCHAR(300)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>alias</code></td><td>색인 별칭</td><td class="src">VARCHAR(300)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>model</code></td><td>모델명</td><td class="src">VARCHAR(100)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>registered_at</code></td><td>등록 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>id</code> · 컬럼 13 · 인덱스 2 · FK 0</p>
-  <h3>LLM 사용량 <code>tb_llm_usage</code></h3>
-  <p>LLM 호출 사용량과 비용 귀속 정보. 월별 파티션의 부모 테이블이다</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>usage_id</code></td><td>사용 기록 식별자</td><td class="src">BIGINT</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>provider</code></td><td>LLM 제공자</td><td class="src">VARCHAR(30)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>model</code></td><td>모델명</td><td class="src">VARCHAR(50)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>purpose</code></td><td>호출 목적</td><td class="src">VARCHAR(30)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>reference_type</code></td><td>연관 대상 유형</td><td class="src">VARCHAR(20)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>reference_id</code></td><td>연관 대상 식별자</td><td class="src">VARCHAR(100)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>input_tokens</code></td><td>입력 토큰 수</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>output_tokens</code></td><td>출력 토큰 수</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>cost_usd</code></td><td>비용(USD)</td><td class="src">NUMERIC(10, 6)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>cost_krw</code></td><td>비용(원)</td><td class="src">NUMERIC(12, 2)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>billing_phase</code></td><td>비용 귀속 단계</td><td class="src">VARCHAR(20)</td><td class="c">N</td><td class="c">—</td><td class="src">development</td><td class="src">—</td></tr>
-      <tr><td><code>latency_ms</code></td><td>응답 소요시간(ms)</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>success</code></td><td>성공 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">True</td><td class="src">—</td></tr>
-      <tr><td><code>error_code</code></td><td>오류 코드</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>called_at</code></td><td>호출 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">PK</td><td class="src">server_default</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="src">PK <code>usage_id, called_at</code> · 컬럼 15 · 인덱스 3 · FK 0</p>
-
-  
-  <h3>벡터 저장소 <code>tb_rag_vectors</code></h3>
-  <p>검색용 청크와 임베딩 벡터. <b>별도의 Vector DB 제품이 아니라</b> PostgreSQL 에
-  <code>pgvector</code> 확장을 설치해 같은 인스턴스에 둔다. ORM 매핑 없이 마이그레이션으로
-  생성되므로 애플리케이션 모델 목록(19표)에는 나타나지 않는다.</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>collection</code></td><td>컬렉션명</td><td class="src">TEXT</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>id</code></td><td>벡터 식별자</td><td class="src">TEXT</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>doc_id</code></td><td>문서 식별자</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">논리 참조 tb_documents</td></tr>
-      <tr><td><code>chunk_idx</code></td><td>청크 순번</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>content</code></td><td>청크 본문</td><td class="src">TEXT</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>bigram_text</code></td><td>바이그램 색인용 본문</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">한국어 ts_rank 용</td></tr>
-      <tr><td><code>embedding</code></td><td>임베딩 벡터</td><td class="src">VECTOR</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">pgvector 확장 타입</td></tr>
-      <tr><td><code>tsv</code></td><td>전문검색 색인</td><td class="src">TSVECTOR</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>payload</code></td><td>부가 메타</td><td class="src">JSONB</td><td class="c">N</td><td class="c">—</td><td class="src">'{}'</td><td class="src">heading_path 등</td></tr>
-      <tr><td><code>created_at</code></td><td>생성 시각</td><td class="src">TIMESTAMPTZ</td><td class="c">N</td><td class="c">—</td><td class="src">now()</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <h3>컬렉션 별칭 <code>tb_rag_aliases</code></h3>
-  <p>컬렉션 별칭 → 실제 컬렉션 매핑. 색인을 새로 만들 때 별칭만 바꿔 무중단으로 전환한다.</p>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:20%">컬럼(물리명)</th><th style="width:22%">논리명</th><th style="width:18%">데이터 타입</th><th style="width:6%">NULL</th><th style="width:6%">키</th><th style="width:12%">기본값</th><th style="width:16%">참조</th></tr></thead>
-    <tbody>
-      <tr><td><code>alias</code></td><td>별칭</td><td class="src">TEXT</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>collection</code></td><td>실제 컬렉션명</td><td class="src">TEXT</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">논리 참조 tb_rag_vectors.collection</td></tr>
-      <tr><td><code>updated_at</code></td><td>갱신 시각</td><td class="src">TIMESTAMPTZ</td><td class="c">N</td><td class="c">—</td><td class="src">now()</td><td class="src">—</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <h2>9. 개정 이력</h2>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
-    <tbody>
-      <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. ORM 메타데이터에서 생성했으며 감리 산출물로 신규 편입했다</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <div class="foot">근거 파일 — <code>poc/src/koipa/db/models.py</code> · <code>poc/alembic/</code> · <code>doc/07_DB_스키마_v2.sql</code></div>
+<section id="tables-index"><h2><span class="num">01</span> 테이블 목록</h2>
+<p class="spec-note"><b>물리 타입 전환 규약</b> — <code>DATETIME(6)</code> 는 UTC 로 저장하며 시간대 변환은 응용이 수행합니다. <code>CHAR(36)</code> UUID 는 소문자 표준형으로만 저장합니다(콜레이션이 <code>utf8mb4_bin</code> 이므로 대소문자가 섞이면 다른 값이 됩니다). <code>JSON</code> 은 LONGTEXT + 검증 제약이므로 키로 거르는 질의에는 생성 칼럼과 인덱스가 필요합니다. 배열은 JSON 배열로 담습니다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>그룹</th><th>물리명</th><th>논리명</th><th>컬럼</th><th>기본키</th><th>배치</th><th>파티션</th></tr></thead><tbody>
+<tr><td class="c-key">A 등급체계</td><td class="c-name"><a href="#t-tb_classification_levels">tb_classification_levels</a></td><td>분류 등급</td><td class="c-nn">11</td><td class="c-type">level_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">A 등급체계</td><td class="c-name"><a href="#t-tb_evaluation_factors">tb_evaluation_factors</a></td><td>평가 요건</td><td class="c-nn">8</td><td class="c-type">factor_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">A 등급체계</td><td class="c-name"><a href="#t-tb_level_keywords">tb_level_keywords</a></td><td>등급 키워드</td><td class="c-nn">9</td><td class="c-type">keyword_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">B 문서</td><td class="c-name"><a href="#t-tb_documents">tb_documents</a></td><td>문서</td><td class="c-nn">20</td><td class="c-type">doc_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">B 문서</td><td class="c-name"><a href="#t-tb_chunks">tb_chunks</a></td><td>청크</td><td class="c-nn">10</td><td class="c-type">chunk_id, created_at</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">C 라벨링</td><td class="c-name"><a href="#t-tb_document_labels">tb_document_labels</a></td><td>문서 라벨</td><td class="c-nn">11</td><td class="c-type">doc_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">D 추론</td><td class="c-name"><a href="#t-tb_classifications">tb_classifications</a></td><td>분류 결과</td><td class="c-nn">13</td><td class="c-type">classification_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">D 추론</td><td class="c-name"><a href="#t-tb_classification_evidence">tb_classification_evidence</a></td><td>분류 근거</td><td class="c-nn">10</td><td class="c-type">evidence_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">E 학습</td><td class="c-name"><a href="#t-tb_model_versions">tb_model_versions</a></td><td>모델 버전</td><td class="c-nn">18</td><td class="c-type">version_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">E 학습</td><td class="c-name"><a href="#t-tb_training_runs">tb_training_runs</a></td><td>학습 실행</td><td class="c-nn">20</td><td class="c-type">run_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">E 학습</td><td class="c-name"><a href="#t-tb_training_epochs">tb_training_epochs</a></td><td>학습 에폭</td><td class="c-nn">7</td><td class="c-type">run_id, epoch</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">E 학습</td><td class="c-name"><a href="#t-tb_training_datasets">tb_training_datasets</a></td><td>학습 데이터셋</td><td class="c-nn">5</td><td class="c-type">id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">F 보정</td><td class="c-name"><a href="#t-tb_corrections">tb_corrections</a></td><td>보정</td><td class="c-nn">10</td><td class="c-type">correction_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">G 합성</td><td class="c-name"><a href="#t-tb_prompt_versions">tb_prompt_versions</a></td><td>프롬프트 버전</td><td class="c-nn">6</td><td class="c-type">prompt_version</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">—</td></tr>
+<tr><td class="c-key">G 합성</td><td class="c-name"><a href="#t-tb_sample_documents">tb_sample_documents</a></td><td>합성 문서</td><td class="c-nn">21</td><td class="c-type">sample_id</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">—</td></tr>
+<tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tb_llm_usage">tb_llm_usage</a></td><td>LLM 사용량</td><td class="c-nn">15</td><td class="c-type">usage_id, called_at</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">—</td></tr>
+<tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tb_audit_log">tb_audit_log</a></td><td>감사 로그</td><td class="c-nn">13</td><td class="c-type">audit_id, occurred_at</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tb_guides">tb_guides</a></td><td>가이드 버전</td><td class="c-nn">8</td><td class="c-type">id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tb_advisory_locks">tb_advisory_locks</a></td><td>동시성 잠금</td><td class="c-nn">1</td><td class="c-type">name</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+</tbody></table></div></section>
+<section id="placement"><h2><span class="num">02</span> 서버별 배포 구분</h2>
+<p class="spec-note">서버별로 생성하는 표를 구분합니다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>구분</th><th>표 수</th><th>어느 서버에 만드는가</th><th>표</th></tr></thead><tbody>
+<tr><td class="c-name">둘 다</td><td class="c-nn">16</td><td>지재원 · 고객사 양쪽</td><td class="c-type">tb_advisory_locks, tb_audit_log, tb_chunks, tb_classification_evidence, tb_classification_levels, tb_classifications, tb_corrections, tb_document_labels, tb_documents, tb_evaluation_factors, tb_guides, tb_level_keywords, tb_model_versions, tb_training_datasets, tb_training_epochs, tb_training_runs</td></tr>
+<tr><td class="c-name">지재원만</td><td class="c-nn">3</td><td>지재원 서버에만</td><td class="c-type">tb_llm_usage, tb_prompt_versions, tb_sample_documents</td></tr>
+</tbody></table></div>
+<p class="spec-note" style="margin-top:12px">지재원 19종 · 고객사 16종을 생성합니다.</p>
+</section>
+<section id="erd"><h2><span class="num">03</span> ERD 관계도</h2>
+<p class="spec-note">실선은 FK 제약, 점선은 제약 없는 참조입니다.</p>
+<div style="overflow-x:auto;border:1px solid rgba(0,0,0,.12);padding:16px;margin:14px 0;background:#fafafa;">
+<svg id="erd-root" viewBox="0 0 1280 746" width="100%" style="max-width:1280px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="개체 관계도 — 상자를 클릭하면 그 표의 관계만 표시된다">
+<defs><marker id="erd-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#3f3f46"/></marker><marker id="erd-arrow-on" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/></marker></defs>
+<style>.erd-box{cursor:pointer;outline:none}.erd-box rect{fill:#fff;stroke:#18181b;stroke-width:1.2}.erd-edge{fill:none;stroke:#52525b;stroke-width:1.4;marker-end:url(#erd-arrow)}.erd-edge.logical{stroke-dasharray:6 4}#erd-root:has(.erd-box:hover) .erd-edge,#erd-root:has(.erd-box:focus) .erd-edge{stroke:#e4e4e7;stroke-width:1;marker-end:none}#erd-root:has(.erd-box:hover) .erd-box rect,#erd-root:has(.erd-box:focus) .erd-box rect{stroke:#d4d4d8}#erd-root:has(.erd-box:hover) .erd-box text,#erd-root:has(.erd-box:focus) .erd-box text{fill:#a1a1aa}@media print{#erd-root .erd-edge{stroke:#52525b;stroke-width:1.4}#erd-root .erd-box rect{stroke:#18181b}}#erd-root .erd-box[data-t="tb_advisory_locks"]:hover ~ .erd-edge[data-c="tb_advisory_locks"],#erd-root .erd-box[data-t="tb_advisory_locks"]:hover ~ .erd-edge[data-p="tb_advisory_locks"],#erd-root .erd-box[data-t="tb_advisory_locks"]:focus ~ .erd-edge[data-c="tb_advisory_locks"],#erd-root .erd-box[data-t="tb_advisory_locks"]:focus ~ .erd-edge[data-p="tb_advisory_locks"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_advisory_locks"]:hover rect,#erd-root .erd-box[data-t="tb_advisory_locks"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_advisory_locks"]:hover text,#erd-root .erd-box[data-t="tb_advisory_locks"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_audit_log"]:hover ~ .erd-edge[data-c="tb_audit_log"],#erd-root .erd-box[data-t="tb_audit_log"]:hover ~ .erd-edge[data-p="tb_audit_log"],#erd-root .erd-box[data-t="tb_audit_log"]:focus ~ .erd-edge[data-c="tb_audit_log"],#erd-root .erd-box[data-t="tb_audit_log"]:focus ~ .erd-edge[data-p="tb_audit_log"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_audit_log"]:hover rect,#erd-root .erd-box[data-t="tb_audit_log"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_audit_log"]:hover text,#erd-root .erd-box[data-t="tb_audit_log"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_chunks"]:hover ~ .erd-edge[data-c="tb_chunks"],#erd-root .erd-box[data-t="tb_chunks"]:hover ~ .erd-edge[data-p="tb_chunks"],#erd-root .erd-box[data-t="tb_chunks"]:focus ~ .erd-edge[data-c="tb_chunks"],#erd-root .erd-box[data-t="tb_chunks"]:focus ~ .erd-edge[data-p="tb_chunks"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_chunks"]:hover rect,#erd-root .erd-box[data-t="tb_chunks"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_chunks"]:hover text,#erd-root .erd-box[data-t="tb_chunks"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_classification_evidence"]:hover ~ .erd-edge[data-c="tb_classification_evidence"],#erd-root .erd-box[data-t="tb_classification_evidence"]:hover ~ .erd-edge[data-p="tb_classification_evidence"],#erd-root .erd-box[data-t="tb_classification_evidence"]:focus ~ .erd-edge[data-c="tb_classification_evidence"],#erd-root .erd-box[data-t="tb_classification_evidence"]:focus ~ .erd-edge[data-p="tb_classification_evidence"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_classification_evidence"]:hover rect,#erd-root .erd-box[data-t="tb_classification_evidence"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_classification_evidence"]:hover text,#erd-root .erd-box[data-t="tb_classification_evidence"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_classification_levels"]:hover ~ .erd-edge[data-c="tb_classification_levels"],#erd-root .erd-box[data-t="tb_classification_levels"]:hover ~ .erd-edge[data-p="tb_classification_levels"],#erd-root .erd-box[data-t="tb_classification_levels"]:focus ~ .erd-edge[data-c="tb_classification_levels"],#erd-root .erd-box[data-t="tb_classification_levels"]:focus ~ .erd-edge[data-p="tb_classification_levels"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_classification_levels"]:hover rect,#erd-root .erd-box[data-t="tb_classification_levels"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_classification_levels"]:hover text,#erd-root .erd-box[data-t="tb_classification_levels"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_classifications"]:hover ~ .erd-edge[data-c="tb_classifications"],#erd-root .erd-box[data-t="tb_classifications"]:hover ~ .erd-edge[data-p="tb_classifications"],#erd-root .erd-box[data-t="tb_classifications"]:focus ~ .erd-edge[data-c="tb_classifications"],#erd-root .erd-box[data-t="tb_classifications"]:focus ~ .erd-edge[data-p="tb_classifications"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_classifications"]:hover rect,#erd-root .erd-box[data-t="tb_classifications"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_classifications"]:hover text,#erd-root .erd-box[data-t="tb_classifications"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_corrections"]:hover ~ .erd-edge[data-c="tb_corrections"],#erd-root .erd-box[data-t="tb_corrections"]:hover ~ .erd-edge[data-p="tb_corrections"],#erd-root .erd-box[data-t="tb_corrections"]:focus ~ .erd-edge[data-c="tb_corrections"],#erd-root .erd-box[data-t="tb_corrections"]:focus ~ .erd-edge[data-p="tb_corrections"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_corrections"]:hover rect,#erd-root .erd-box[data-t="tb_corrections"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_corrections"]:hover text,#erd-root .erd-box[data-t="tb_corrections"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_document_labels"]:hover ~ .erd-edge[data-c="tb_document_labels"],#erd-root .erd-box[data-t="tb_document_labels"]:hover ~ .erd-edge[data-p="tb_document_labels"],#erd-root .erd-box[data-t="tb_document_labels"]:focus ~ .erd-edge[data-c="tb_document_labels"],#erd-root .erd-box[data-t="tb_document_labels"]:focus ~ .erd-edge[data-p="tb_document_labels"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_document_labels"]:hover rect,#erd-root .erd-box[data-t="tb_document_labels"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_document_labels"]:hover text,#erd-root .erd-box[data-t="tb_document_labels"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_documents"]:hover ~ .erd-edge[data-c="tb_documents"],#erd-root .erd-box[data-t="tb_documents"]:hover ~ .erd-edge[data-p="tb_documents"],#erd-root .erd-box[data-t="tb_documents"]:focus ~ .erd-edge[data-c="tb_documents"],#erd-root .erd-box[data-t="tb_documents"]:focus ~ .erd-edge[data-p="tb_documents"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_documents"]:hover rect,#erd-root .erd-box[data-t="tb_documents"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_documents"]:hover text,#erd-root .erd-box[data-t="tb_documents"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_evaluation_factors"]:hover ~ .erd-edge[data-c="tb_evaluation_factors"],#erd-root .erd-box[data-t="tb_evaluation_factors"]:hover ~ .erd-edge[data-p="tb_evaluation_factors"],#erd-root .erd-box[data-t="tb_evaluation_factors"]:focus ~ .erd-edge[data-c="tb_evaluation_factors"],#erd-root .erd-box[data-t="tb_evaluation_factors"]:focus ~ .erd-edge[data-p="tb_evaluation_factors"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_evaluation_factors"]:hover rect,#erd-root .erd-box[data-t="tb_evaluation_factors"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_evaluation_factors"]:hover text,#erd-root .erd-box[data-t="tb_evaluation_factors"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_guides"]:hover ~ .erd-edge[data-c="tb_guides"],#erd-root .erd-box[data-t="tb_guides"]:hover ~ .erd-edge[data-p="tb_guides"],#erd-root .erd-box[data-t="tb_guides"]:focus ~ .erd-edge[data-c="tb_guides"],#erd-root .erd-box[data-t="tb_guides"]:focus ~ .erd-edge[data-p="tb_guides"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_guides"]:hover rect,#erd-root .erd-box[data-t="tb_guides"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_guides"]:hover text,#erd-root .erd-box[data-t="tb_guides"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_level_keywords"]:hover ~ .erd-edge[data-c="tb_level_keywords"],#erd-root .erd-box[data-t="tb_level_keywords"]:hover ~ .erd-edge[data-p="tb_level_keywords"],#erd-root .erd-box[data-t="tb_level_keywords"]:focus ~ .erd-edge[data-c="tb_level_keywords"],#erd-root .erd-box[data-t="tb_level_keywords"]:focus ~ .erd-edge[data-p="tb_level_keywords"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_level_keywords"]:hover rect,#erd-root .erd-box[data-t="tb_level_keywords"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_level_keywords"]:hover text,#erd-root .erd-box[data-t="tb_level_keywords"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_llm_usage"]:hover ~ .erd-edge[data-c="tb_llm_usage"],#erd-root .erd-box[data-t="tb_llm_usage"]:hover ~ .erd-edge[data-p="tb_llm_usage"],#erd-root .erd-box[data-t="tb_llm_usage"]:focus ~ .erd-edge[data-c="tb_llm_usage"],#erd-root .erd-box[data-t="tb_llm_usage"]:focus ~ .erd-edge[data-p="tb_llm_usage"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_llm_usage"]:hover rect,#erd-root .erd-box[data-t="tb_llm_usage"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_llm_usage"]:hover text,#erd-root .erd-box[data-t="tb_llm_usage"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_model_versions"]:hover ~ .erd-edge[data-c="tb_model_versions"],#erd-root .erd-box[data-t="tb_model_versions"]:hover ~ .erd-edge[data-p="tb_model_versions"],#erd-root .erd-box[data-t="tb_model_versions"]:focus ~ .erd-edge[data-c="tb_model_versions"],#erd-root .erd-box[data-t="tb_model_versions"]:focus ~ .erd-edge[data-p="tb_model_versions"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_model_versions"]:hover rect,#erd-root .erd-box[data-t="tb_model_versions"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_model_versions"]:hover text,#erd-root .erd-box[data-t="tb_model_versions"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_prompt_versions"]:hover ~ .erd-edge[data-c="tb_prompt_versions"],#erd-root .erd-box[data-t="tb_prompt_versions"]:hover ~ .erd-edge[data-p="tb_prompt_versions"],#erd-root .erd-box[data-t="tb_prompt_versions"]:focus ~ .erd-edge[data-c="tb_prompt_versions"],#erd-root .erd-box[data-t="tb_prompt_versions"]:focus ~ .erd-edge[data-p="tb_prompt_versions"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_prompt_versions"]:hover rect,#erd-root .erd-box[data-t="tb_prompt_versions"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_prompt_versions"]:hover text,#erd-root .erd-box[data-t="tb_prompt_versions"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_sample_documents"]:hover ~ .erd-edge[data-c="tb_sample_documents"],#erd-root .erd-box[data-t="tb_sample_documents"]:hover ~ .erd-edge[data-p="tb_sample_documents"],#erd-root .erd-box[data-t="tb_sample_documents"]:focus ~ .erd-edge[data-c="tb_sample_documents"],#erd-root .erd-box[data-t="tb_sample_documents"]:focus ~ .erd-edge[data-p="tb_sample_documents"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_sample_documents"]:hover rect,#erd-root .erd-box[data-t="tb_sample_documents"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_sample_documents"]:hover text,#erd-root .erd-box[data-t="tb_sample_documents"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_training_datasets"]:hover ~ .erd-edge[data-c="tb_training_datasets"],#erd-root .erd-box[data-t="tb_training_datasets"]:hover ~ .erd-edge[data-p="tb_training_datasets"],#erd-root .erd-box[data-t="tb_training_datasets"]:focus ~ .erd-edge[data-c="tb_training_datasets"],#erd-root .erd-box[data-t="tb_training_datasets"]:focus ~ .erd-edge[data-p="tb_training_datasets"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_training_datasets"]:hover rect,#erd-root .erd-box[data-t="tb_training_datasets"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_training_datasets"]:hover text,#erd-root .erd-box[data-t="tb_training_datasets"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_training_epochs"]:hover ~ .erd-edge[data-c="tb_training_epochs"],#erd-root .erd-box[data-t="tb_training_epochs"]:hover ~ .erd-edge[data-p="tb_training_epochs"],#erd-root .erd-box[data-t="tb_training_epochs"]:focus ~ .erd-edge[data-c="tb_training_epochs"],#erd-root .erd-box[data-t="tb_training_epochs"]:focus ~ .erd-edge[data-p="tb_training_epochs"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_training_epochs"]:hover rect,#erd-root .erd-box[data-t="tb_training_epochs"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_training_epochs"]:hover text,#erd-root .erd-box[data-t="tb_training_epochs"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tb_training_runs"]:hover ~ .erd-edge[data-c="tb_training_runs"],#erd-root .erd-box[data-t="tb_training_runs"]:hover ~ .erd-edge[data-p="tb_training_runs"],#erd-root .erd-box[data-t="tb_training_runs"]:focus ~ .erd-edge[data-c="tb_training_runs"],#erd-root .erd-box[data-t="tb_training_runs"]:focus ~ .erd-edge[data-p="tb_training_runs"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tb_training_runs"]:hover rect,#erd-root .erd-box[data-t="tb_training_runs"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tb_training_runs"]:hover text,#erd-root .erd-box[data-t="tb_training_runs"]:focus text{fill:#1e3a8a}</style>
+<g class="erd-box" data-t="tb_advisory_locks" tabindex="0">
+<rect x="26" y="330" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="349" font-size="12.5" font-weight="700" fill="#0a0a0a">동시성 잠금</text>
+<text class="t2" x="36" y="365" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_advisory_locks · 1칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_audit_log" tabindex="0">
+<rect x="26" y="406" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="425" font-size="12.5" font-weight="700" fill="#0a0a0a">감사 로그</text>
+<text class="t2" x="36" y="441" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_audit_log · 13칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_chunks" tabindex="0">
+<rect x="366" y="330" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="349" font-size="12.5" font-weight="700" fill="#0a0a0a">문서 청크</text>
+<text class="t2" x="376" y="365" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_chunks · 10칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_classification_evidence" tabindex="0">
+<rect x="706" y="330" width="208" height="46" rx="4"/>
+<text class="t1" x="716" y="349" font-size="12.5" font-weight="700" fill="#0a0a0a">분류 판정 근거</text>
+<text class="t2" x="716" y="365" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_classification_evidence · 10칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_classification_levels" tabindex="0">
+<rect x="26" y="102" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="121" font-size="12.5" font-weight="700" fill="#0a0a0a">등급 체계</text>
+<text class="t2" x="36" y="137" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_classification_levels · 11칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_classifications" tabindex="0">
+<rect x="366" y="254" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="273" font-size="12.5" font-weight="700" fill="#0a0a0a">분류 결과</text>
+<text class="t2" x="376" y="289" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_classifications · 13칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_corrections" tabindex="0">
+<rect x="1046" y="292" width="208" height="46" rx="4"/>
+<text class="t1" x="1056" y="311" font-size="12.5" font-weight="700" fill="#0a0a0a">검수 교정 이력</text>
+<text class="t2" x="1056" y="327" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_corrections · 10칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_document_labels" tabindex="0">
+<rect x="366" y="406" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="425" font-size="12.5" font-weight="700" fill="#0a0a0a">문서 라벨</text>
+<text class="t2" x="376" y="441" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_document_labels · 11칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_documents" tabindex="0">
+<rect x="26" y="178" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="197" font-size="12.5" font-weight="700" fill="#0a0a0a">문서</text>
+<text class="t2" x="36" y="213" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_documents · 20칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_evaluation_factors" tabindex="0">
+<rect x="26" y="254" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="273" font-size="12.5" font-weight="700" fill="#0a0a0a">평가요소</text>
+<text class="t2" x="36" y="289" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_evaluation_factors · 8칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_guides" tabindex="0">
+<rect x="26" y="482" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="501" font-size="12.5" font-weight="700" fill="#0a0a0a">가이드 문서</text>
+<text class="t2" x="36" y="517" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_guides · 8칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_level_keywords" tabindex="0">
+<rect x="366" y="482" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="501" font-size="12.5" font-weight="700" fill="#0a0a0a">등급 키워드</text>
+<text class="t2" x="376" y="517" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_level_keywords · 9칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_llm_usage" tabindex="0">
+<rect x="26" y="558" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="577" font-size="12.5" font-weight="700" fill="#0a0a0a">LLM 사용량</text>
+<text class="t2" x="36" y="593" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_llm_usage · 15칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_model_versions" tabindex="0">
+<rect x="366" y="102" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="121" font-size="12.5" font-weight="700" fill="#0a0a0a">모델 버전</text>
+<text class="t2" x="376" y="137" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_model_versions · 18칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_prompt_versions" tabindex="0">
+<rect x="26" y="26" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="45" font-size="12.5" font-weight="700" fill="#0a0a0a">프롬프트 버전</text>
+<text class="t2" x="36" y="61" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_prompt_versions · 6칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_sample_documents" tabindex="0">
+<rect x="366" y="178" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="197" font-size="12.5" font-weight="700" fill="#0a0a0a">합성·샘플 문서</text>
+<text class="t2" x="376" y="213" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_sample_documents · 21칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_training_datasets" tabindex="0">
+<rect x="1046" y="368" width="208" height="46" rx="4"/>
+<text class="t1" x="1056" y="387" font-size="12.5" font-weight="700" fill="#0a0a0a">학습셋 구성</text>
+<text class="t2" x="1056" y="403" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_training_datasets · 5칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_training_epochs" tabindex="0">
+<rect x="1046" y="216" width="208" height="46" rx="4"/>
+<text class="t1" x="1056" y="235" font-size="12.5" font-weight="700" fill="#0a0a0a">학습 에폭 지표</text>
+<text class="t2" x="1056" y="251" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_training_epochs · 7칼럼</text>
+</g>
+<g class="erd-box" data-t="tb_training_runs" tabindex="0">
+<rect x="706" y="254" width="208" height="46" rx="4"/>
+<text class="t1" x="716" y="273" font-size="12.5" font-weight="700" fill="#0a0a0a">학습 실행</text>
+<text class="t2" x="716" y="289" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_training_runs · 20칼럼</text>
+</g>
+<path class="erd-edge" data-c="tb_level_keywords" data-p="tb_classification_levels" d="M366,500 C300,500 300,112 234,112"><title>등급 키워드.level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tb_level_keywords" data-p="tb_evaluation_factors" d="M366,510 C300,510 300,272 234,272"><title>등급 키워드.factor_id → 평가요소</title></path>
+<path class="erd-edge" data-c="tb_document_labels" data-p="tb_documents" d="M366,424 C300,424 300,188 234,188"><title>문서 라벨.doc_id → 문서</title></path>
+<path class="erd-edge" data-c="tb_document_labels" data-p="tb_classification_levels" d="M366,434 C300,434 300,116 234,116"><title>문서 라벨.level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tb_classifications" data-p="tb_documents" d="M366,272 C300,272 300,194 234,194"><title>분류 결과.doc_id → 문서</title></path>
+<path class="erd-edge" data-c="tb_classifications" data-p="tb_classification_levels" d="M366,282 C300,282 300,119 234,119"><title>분류 결과.predicted_level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tb_classification_evidence" data-p="tb_classifications" d="M706,342 C640,342 640,272 574,272"><title>분류 판정 근거.classification_id → 분류 결과</title></path>
+<path class="erd-edge" data-c="tb_classification_evidence" data-p="tb_evaluation_factors" d="M706,353 H638 Q629,353 629,362 V621 Q629,630 620,630 H298 Q289,630 289,621 V292 Q289,282 280,282 H234"><title>분류 판정 근거.factor_id → 평가요소</title></path>
+<path class="erd-edge" data-c="tb_model_versions" data-p="tb_model_versions" d="M574,115 C614,106 614,144 574,135"><title>모델 버전.rolled_back_from → 모델 버전</title></path>
+<path class="erd-edge" data-c="tb_training_runs" data-p="tb_model_versions" d="M706,277 C640,277 640,125 574,125"><title>학습 실행.model_version → 모델 버전</title></path>
+<path class="erd-edge" data-c="tb_training_epochs" data-p="tb_training_runs" d="M1046,239 C980,239 980,264 914,264"><title>학습 에폭 지표.run_id → 학습 실행</title></path>
+<path class="erd-edge" data-c="tb_training_datasets" data-p="tb_training_runs" d="M1046,380 C980,380 980,273 914,273"><title>학습셋 구성.run_id → 학습 실행</title></path>
+<path class="erd-edge" data-c="tb_training_datasets" data-p="tb_documents" d="M1046,391 H989 Q980,391 980,400 V636 Q980,645 971,645 H309 Q300,645 300,636 V210 Q300,201 291,201 H234"><title>학습셋 구성.doc_id → 문서</title></path>
+<path class="erd-edge" data-c="tb_training_datasets" data-p="tb_classification_levels" d="M1046,402 H1000 Q991,402 991,411 V651 Q991,660 982,660 H320 Q311,660 311,651 V132 Q311,123 302,123 H234"><title>학습셋 구성.level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tb_corrections" data-p="tb_classifications" d="M1046,302 H978 Q969,302 969,311 V666 Q969,675 960,675 H638 Q629,675 629,666 V292 Q629,282 620,282 H574"><title>검수 교정 이력.classification_id → 분류 결과</title></path>
+<path class="erd-edge" data-c="tb_corrections" data-p="tb_classification_levels" d="M1046,311 H989 Q980,311 980,320 V681 Q980,690 971,690 H309 Q300,690 300,681 V136 Q300,127 291,127 H234"><title>검수 교정 이력.original_level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tb_corrections" data-p="tb_classification_levels" d="M1046,319 H1000 Q991,319 991,328 V696 Q991,705 982,705 H320 Q311,705 311,696 V140 Q311,131 302,131 H234"><title>검수 교정 이력.corrected_level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tb_corrections" data-p="tb_training_runs" d="M1046,328 C980,328 980,281 914,281"><title>검수 교정 이력.consumed_in_run → 학습 실행</title></path>
+<path class="erd-edge" data-c="tb_sample_documents" data-p="tb_documents" d="M366,188 C300,188 300,208 234,208"><title>합성·샘플 문서.doc_id → 문서</title></path>
+<path class="erd-edge" data-c="tb_sample_documents" data-p="tb_classification_levels" d="M366,193 C300,193 300,134 234,134"><title>합성·샘플 문서.target_level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tb_sample_documents" data-p="tb_classification_levels" d="M366,198 C300,198 300,138 234,138"><title>합성·샘플 문서.corrected_level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tb_sample_documents" data-p="tb_prompt_versions" d="M366,204 C300,204 300,38 234,38"><title>합성·샘플 문서.outline_prompt_version → 프롬프트 버전</title></path>
+<path class="erd-edge" data-c="tb_sample_documents" data-p="tb_prompt_versions" d="M366,209 C300,209 300,49 234,49"><title>합성·샘플 문서.body_prompt_version → 프롬프트 버전</title></path>
+<path class="erd-edge" data-c="tb_sample_documents" data-p="tb_prompt_versions" d="M366,214 C300,214 300,60 234,60"><title>합성·샘플 문서.qc_prompt_version → 프롬프트 버전</title></path>
+<path class="erd-edge logical" data-c="tb_chunks" data-p="tb_documents" d="M366,353 C300,353 300,214 234,214"><title>문서 청크.doc_id → 문서</title></path>
+<path class="erd-edge logical" data-c="tb_classification_evidence" data-p="tb_chunks" d="M706,364 C640,364 640,353 574,353"><title>분류 판정 근거.chunk_id → 문서 청크</title></path>
+<path class="erd-edge logical" data-c="tb_model_versions" data-p="tb_training_runs" d="M366,125 C640,125 640,290 914,290"><title>모델 버전.training_run_id → 학습 실행</title></path>
+<text x="26" y="738" font-size="10.5" fill="#71717a">상자에 마우스를 올리거나 클릭하면 그 표에 걸린 관계만 파랗게 남습니다. 다른 곳을 클릭하면 풀립니다.</text>
+</svg>
+</div>
+<p class="spec-note">FK 제약 24건 · 제약 없는 참조 3건 (§05 참조).</p>
+</section>
+<section id="tables"><h2><span class="num">04</span> 테이블별 정의</h2>
+<div class="group-header" id="g-A"><span class="spec-badge">A</span> <b>등급체계</b> — 영업비밀 등급 정의와 판정 요건·키워드 사전.</div>
+<div class="spec-head" id="t-tb_classification_levels"><h3>tb_classification_levels</h3><span class="spec-logical">분류 등급</span></div>
+<p class="spec-note">영업비밀 등급(TS·S1·S2·S3) 정의. 등급을 참조하는 모든 테이블의 부모.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">level_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">AUTO_INCREMENT</td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>등급 PK</td></tr>
+<tr><td class="c-name">level_code</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"><span class="k-uq">UQ</span></td><td class="c-type"></td><td class="c-type"></td><td>등급 코드 — TS · S1 · S2 · S3</td></tr>
+<tr><td class="c-name">level_name</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>등급 표시명</td></tr>
+<tr><td class="c-name">level_order</td><td class="c-type">SMALLINT</td><td class="c-type">SMALLINT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>정렬 순서. 숫자가 작을수록 상위 등급</td></tr>
+<tr><td class="c-name">description</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>등급 정의 문구</td></tr>
+<tr><td class="c-name">color_hex</td><td class="c-type">VARCHAR(7)</td><td class="c-type">VARCHAR(7)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;#808080&#x27;</td><td class="c-type">&#x27;#808080&#x27;</td><td>화면 표시색</td></tr>
+<tr><td class="c-name">loss_weight</td><td class="c-type">DECIMAL(4,2)</td><td class="c-type">NUMERIC(4,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">1.0</td><td class="c-type">1.0</td><td>학습 손실 가중치. 상위 등급 미탐에 더 큰 벌점을 주기 위한 값</td></tr>
+<tr><td class="c-name">is_active</td><td class="c-type">TINYINT(1)</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">1</td><td class="c-type">true</td><td>활성 여부. FALSE 는 삭제가 아니라 이력 보존</td></tr>
+<tr><td class="c-name">created_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>생성 시각</td></tr>
+<tr><td class="c-name">updated_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>수정 시각</td></tr>
+<tr><td class="c-name">created_by</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>생성자 ID</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>level_id</code><br><code>INDEX idx_cl_active_order (is_active, level_order)</code></p>
+<div class="spec-head" id="t-tb_evaluation_factors"><h3>tb_evaluation_factors</h3><span class="spec-logical">평가 요건</span></div>
+<p class="spec-note">등급 판정 요건. 정본은 3요건 — 비공지성(S)·경제적 유용성(V)·비밀관리성(M).</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">factor_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">AUTO_INCREMENT</td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>요건 PK</td></tr>
+<tr><td class="c-name">factor_code</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"><span class="k-uq">UQ</span></td><td class="c-type"></td><td class="c-type"></td><td>요건 코드 — 정본 SECRECY · VALUE · MANAGEMENT. 레거시 4요소는 is_active=FALSE 로 보존</td></tr>
+<tr><td class="c-name">factor_name</td><td class="c-type">VARCHAR(100)</td><td class="c-type">VARCHAR(100)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>요건명 — 비공지성(S) · 경제적 유용성(V) · 비밀관리성(M)</td></tr>
+<tr><td class="c-name">description</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>요건 정의 문구</td></tr>
+<tr><td class="c-name">weight</td><td class="c-type">DECIMAL(3,2)</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">0.25</td><td class="c-type">0.25</td><td>미사용. 요건 가중치는 등급 산정에 쓰지 않습니다. 등급은 키워드 룰이 정하며 S×V×M 은 상향 교차 확인용입니다. 하위호환 기본 1.0</td></tr>
+<tr><td class="c-name">is_active</td><td class="c-type">TINYINT(1)</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">1</td><td class="c-type">true</td><td>정본 3요건 TRUE · 레거시 4요소 FALSE</td></tr>
+<tr><td class="c-name">created_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>생성 시각</td></tr>
+<tr><td class="c-name">updated_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>수정 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>factor_id</code></p>
+<div class="spec-head" id="t-tb_level_keywords"><h3>tb_level_keywords</h3><span class="spec-logical">등급 키워드</span></div>
+<p class="spec-note">룰 기반 1차 판정에 쓰는 등급별 키워드 사전.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">keyword_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">AUTO_INCREMENT</td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>키워드 PK</td></tr>
+<tr><td class="c-name">level_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>이 키워드가 가리키는 등급 <span style="color:#71717a">→ tb_classification_levels.level_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">keyword</td><td class="c-type">VARCHAR(200)</td><td class="c-type">VARCHAR(200)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>키워드 문자열</td></tr>
+<tr><td class="c-name">pattern_type</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;exact&#x27;</td><td class="c-type">&#x27;exact&#x27;</td><td>매칭 방식 — exact · regex 등</td></tr>
+<tr><td class="c-name">factor_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>이 키워드가 근거로 삼는 요건. NULL 이면 요건 무관 <span style="color:#71717a">→ tb_evaluation_factors.factor_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">weight</td><td class="c-type">DECIMAL(3,2)</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">1.0</td><td class="c-type">1.0</td><td>키워드 가중치</td></tr>
+<tr><td class="c-name">source</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;manual&#x27;</td><td class="c-type">&#x27;manual&#x27;</td><td>출처 — manual(사람 등록) · seed(초기 시드) 등</td></tr>
+<tr><td class="c-name">is_active</td><td class="c-type">TINYINT(1)</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">1</td><td class="c-type">true</td><td>활성 여부. FALSE 면 사전에서 빼되 이력은 남긴다</td></tr>
+<tr><td class="c-name">created_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>생성 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>keyword_id</code><br><code>INDEX idx_lk_level_active (level_id, is_active)</code><br><code>(MariaDB 정본에 두지 않습니다 — 대응 인덱스 없음)</code><br><span style="color:#71717a">현행 PostgreSQL — <code>INDEX idx_lk_keyword_trgm (keyword) USING gin</code></span></p>
+<div class="group-header" id="g-B"><span class="spec-badge">B</span> <b>문서</b> — 업로드 원문 메타와 청킹 결과.</div>
+<div class="spec-head" id="t-tb_documents"><h3>tb_documents</h3><span class="spec-logical">문서</span></div>
+<p class="spec-note">업로드 문서의 메타·추출 텍스트 위치·처리 상태. 청크·분류·라벨·학습셋이 모두 참조하는 중심 허브.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td class="c-type">앱 uuid.uuid4</td><td>문서 PK</td></tr>
+<tr><td class="c-name">external_ref</td><td class="c-type">VARCHAR(100)</td><td class="c-type">VARCHAR(100)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>외부 시스템(KL 포털·EDMS) 원천 문서 키. 연동 조인 키</td></tr>
+<tr><td class="c-name">filename</td><td class="c-type">VARCHAR(500)</td><td class="c-type">VARCHAR(500)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>원본 파일명</td></tr>
+<tr><td class="c-name">source_format</td><td class="c-type">VARCHAR(10)</td><td class="c-type">VARCHAR(10)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>원본 포맷 — hwp · hwpx · pdf · docx · xlsx · txt 등</td></tr>
+<tr><td class="c-name">file_size_bytes</td><td class="c-type">BIGINT</td><td class="c-type">BIGINT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>원본 파일 크기(바이트)</td></tr>
+<tr><td class="c-name">file_hash</td><td class="c-type">VARCHAR(64)</td><td class="c-type">VARCHAR(64)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>원본 SHA-256. 같은 파일 재업로드 판별</td></tr>
+<tr><td class="c-name">metadata</td><td class="c-type">_JSON_PORTABLE</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;{}&#x27;</td><td class="c-type">&#x27;{}&#x27;</td><td>문서 속성 JSON. 출처(source_type)·보안표시·접근범위 등 등급 판정 입력을 담습니다</td></tr>
+<tr><td class="c-name">raw_text_uri</td><td class="c-type">VARCHAR(500)</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>추출 원문 텍스트 저장 위치</td></tr>
+<tr><td class="c-name">normalized_text_uri</td><td class="c-type">VARCHAR(500)</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>정규화 텍스트 저장 위치</td></tr>
+<tr><td class="c-name">text_preview</td><td class="c-type">VARCHAR(2000)</td><td class="c-type">VARCHAR(2000)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>본문 앞부분 미리보기(최대 2,000자)</td></tr>
+<tr><td class="c-name">char_count</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>추출 본문 글자 수</td></tr>
+<tr><td class="c-name">extraction_method</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;parser&#x27;</td><td class="c-type">&#x27;parser&#x27;</td><td>추출 경로 — parser(전자문서 파싱) · ocr</td></tr>
+<tr><td class="c-name">extraction_quality</td><td class="c-type">DECIMAL(3,2)</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>추출 품질 점수(0~1)</td></tr>
+<tr><td class="c-name">ocr_used</td><td class="c-type">TINYINT(1)</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">0</td><td class="c-type">false</td><td>OCR 사용 여부</td></tr>
+<tr><td class="c-name">processing_status</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;pending&#x27;</td><td class="c-type">&#x27;pending&#x27;</td><td>처리 상태 — pending · processing · done · failed</td></tr>
+<tr><td class="c-name">error_message</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>처리 실패 사유</td></tr>
+<tr><td class="c-name">uploaded_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>업로드 시각</td></tr>
+<tr><td class="c-name">processed_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>처리 완료 시각</td></tr>
+<tr><td class="c-name">created_by</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>업로드 주체 ID</td></tr>
+<tr><td class="c-name">deleted_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>논리 삭제 시각. NULL 이면 활성이며 조회는 NULL 행만 노출합니다</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>doc_id</code><br><code>INDEX idx_doc_status (processing_status)</code><br><code>INDEX idx_doc_format (source_format)</code><br><code>INDEX idx_doc_uploaded (uploaded_at DESC)</code><br><code>UNIQUE INDEX idx_doc_hash (file_hash)</code><br><span style="color:#71717a">현행 PostgreSQL — <code>UNIQUE INDEX idx_doc_hash (file_hash) WHERE file_hash IS NOT NULL</code></span><br><code>(MariaDB 정본에 두지 않습니다 — 대응 인덱스 없음)</code><br><span style="color:#71717a">현행 PostgreSQL — <code>INDEX idx_doc_metadata (metadata) USING gin</code></span><br><code>INDEX idx_doc_pending (processing_status, uploaded_at)</code><br><span style="color:#71717a">현행 PostgreSQL — <code>INDEX idx_doc_pending (uploaded_at) WHERE processing_status = &#x27;pending&#x27;</code></span></p>
+<div class="spec-head" id="t-tb_chunks"><h3>tb_chunks</h3><span class="spec-logical">청크</span></div>
+<p class="spec-note">문서를 512 토큰 단위로 자른 조각.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">chunk_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td class="c-type">앱 uuid.uuid4</td><td>청크 PK</td></tr>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>원문 문서. FK 제약 없이 애플리케이션이 정합을 보증합니다</td></tr>
+<tr><td class="c-name">chunk_index</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>문서 내 청크 순번(0-base)</td></tr>
+<tr><td class="c-name">content</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>청크 본문</td></tr>
+<tr><td class="c-name">token_count</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>토큰 수(최대 512)</td></tr>
+<tr><td class="c-name">char_count</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>글자 수</td></tr>
+<tr><td class="c-name">section_path</td><td class="c-type">_ARRAY_TEXT_PORTABLE</td><td class="c-type">_ARRAY_TEXT_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>계층 섹션 경로 — 예: {3장, 3.1절}</td></tr>
+<tr><td class="c-name">overlap_prev</td><td class="c-type">SMALLINT</td><td class="c-type">SMALLINT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">0</td><td class="c-type">0</td><td>앞 청크와 겹친 토큰 수(기본 64)</td></tr>
+<tr><td class="c-name">overlap_next</td><td class="c-type">SMALLINT</td><td class="c-type">SMALLINT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">0</td><td class="c-type">0</td><td>뒤 청크와 겹친 토큰 수(기본 64)</td></tr>
+<tr><td class="c-name">created_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>생성 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>chunk_id</code>, <code>created_at</code><br><code>INDEX idx_chunk_created (created_at)</code><br><code>INDEX idx_chunk_doc (doc_id, chunk_index)</code></p>
+<div class="group-header" id="g-C"><span class="spec-badge">C</span> <b>라벨링</b> — 문서별 확정 등급과 요건 점수.</div>
+<div class="spec-head" id="t-tb_document_labels"><h3>tb_document_labels</h3><span class="spec-logical">문서 라벨</span></div>
+<p class="spec-note">문서 1건의 확정 등급 1행. 라벨 주체(사람·LLM·룰)를 함께 기록합니다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span> <span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>대상 문서(PK) <span style="color:#71717a">→ tb_documents.doc_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">level_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>확정 등급 <span style="color:#71717a">→ tb_classification_levels.level_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">labeled_by</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>라벨 주체 — human · llm · rule</td></tr>
+<tr><td class="c-name">labeler_id</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>라벨 작성자 계정 ID</td></tr>
+<tr><td class="c-name">confidence</td><td class="c-type">DECIMAL(3,2)</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>라벨 확신도(0~1)</td></tr>
+<tr><td class="c-name">total_score</td><td class="c-type">DECIMAL(4,2)</td><td class="c-type">NUMERIC(4,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>요건 점수 합계</td></tr>
+<tr><td class="c-name">notes</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>라벨 메모</td></tr>
+<tr><td class="c-name">is_verified</td><td class="c-type">TINYINT(1)</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">0</td><td class="c-type">false</td><td>검증(서명) 완료 여부</td></tr>
+<tr><td class="c-name">verified_by</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>검증자 계정 ID</td></tr>
+<tr><td class="c-name">labeled_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>라벨 시각</td></tr>
+<tr><td class="c-name">verified_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>검증 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>doc_id</code><br><code>INDEX idx_dl_level (level_id)</code><br><code>INDEX idx_dl_labeled_by (labeled_by)</code></p>
+<div class="group-header" id="g-D"><span class="spec-badge">D</span> <b>추론</b> — 분류 결과와 그 판단 근거.</div>
+<div class="spec-head" id="t-tb_classifications"><h3>tb_classifications</h3><span class="spec-logical">분류 결과</span></div>
+<p class="spec-note">모델 추론 1회의 결과. 등급·확신도·게이트 판정을 남긴다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">classification_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td class="c-type">앱 uuid.uuid4</td><td>분류 PK</td></tr>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>대상 문서 <span style="color:#71717a">→ tb_documents.doc_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">model_version</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>판정에 쓴 모델 버전 라벨</td></tr>
+<tr><td class="c-name">predicted_level_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>예측 등급 <span style="color:#71717a">→ tb_classification_levels.level_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">confidence</td><td class="c-type">DECIMAL(5,4)</td><td class="c-type">NUMERIC(5,4)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>예측 확신도(0~1). 온도 보정 후 값</td></tr>
+<tr><td class="c-name">alternatives</td><td class="c-type">_JSON_PORTABLE</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;[]&#x27;</td><td class="c-type">&#x27;[]&#x27;</td><td>차순위 등급과 점수 JSON 배열</td></tr>
+<tr><td class="c-name">automation_assessment</td><td class="c-type">_JSON_PORTABLE</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>자동확정 게이트가 결정 시점에 본 신호 스냅샷 JSON. 이 컬럼 도입 전 행은 NULL</td></tr>
+<tr><td class="c-name">aggregation_method</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;hybrid&#x27;</td><td class="c-type">&#x27;hybrid&#x27;</td><td>청크 결과 합산 방식 — hybrid 등</td></tr>
+<tr><td class="c-name">chunk_count</td><td class="c-type">SMALLINT</td><td class="c-type">SMALLINT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>판정에 사용한 청크 수</td></tr>
+<tr><td class="c-name">status</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;staging&#x27;</td><td class="c-type">&#x27;staging&#x27;</td><td>현재 상태 — staging · confirmed · needs_review</td></tr>
+<tr><td class="c-name">initial_status</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>게이트의 최초 판정을 생성 시점에 동결한 값. 이후 검수·보정이 건드리지 않는다. 도입 전 행은 NULL</td></tr>
+<tr><td class="c-name">inference_ms</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>추론 소요 시간(밀리초)</td></tr>
+<tr><td class="c-name">classified_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>분류 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>classification_id</code><br><code>INDEX idx_cls_doc (doc_id, classified_at DESC)</code><br><code>INDEX idx_cls_status (status)</code><br><code>INDEX idx_cls_initial_status (initial_status)</code><br><code>INDEX idx_cls_model_level (model_version, predicted_level_id, status)</code><br><code>INDEX idx_cls_staging (status, classified_at DESC)</code><br><span style="color:#71717a">현행 PostgreSQL — <code>INDEX idx_cls_staging (classified_at DESC) WHERE status = &#x27;staging&#x27;</code></span><br><code>INDEX idx_cls_classified (classified_at)</code></p>
+<div class="spec-head" id="t-tb_classification_evidence"><h3>tb_classification_evidence</h3><span class="spec-logical">분류 근거</span></div>
+<p class="spec-note">분류 1건이 어느 청크의 어느 구간을 근거로 삼았는지.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">evidence_id</td><td class="c-type">BIGINT</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">AUTO_INCREMENT</td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>근거 PK</td></tr>
+<tr><td class="c-name">classification_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>대상 분류 <span style="color:#71717a">→ tb_classifications.classification_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">chunk_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>근거가 된 청크</td></tr>
+<tr><td class="c-name">evidence_type</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>근거 종류 — keyword · attention 등</td></tr>
+<tr><td class="c-name">factor_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>이 근거가 뒷받침하는 요건. NULL 이면 요건 무관 <span style="color:#71717a">→ tb_evaluation_factors.factor_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">excerpt</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>근거 발췌 원문</td></tr>
+<tr><td class="c-name">excerpt_start</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>발췌 시작 위치(청크 내 문자 오프셋)</td></tr>
+<tr><td class="c-name">excerpt_end</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>발췌 끝 위치</td></tr>
+<tr><td class="c-name">contribution</td><td class="c-type">DECIMAL(4,3)</td><td class="c-type">NUMERIC(4,3)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>이 근거의 기여도</td></tr>
+<tr><td class="c-name">created_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>생성 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>evidence_id</code><br><code>INDEX idx_ce_classification (classification_id)</code><br><code>INDEX idx_ce_chunk_contrib (chunk_id, contribution DESC)</code></p>
+<div class="group-header" id="g-E"><span class="spec-badge">E</span> <b>학습</b> — 모델 버전 레지스트리와 학습 실행 이력.</div>
+<div class="spec-head" id="t-tb_model_versions"><h3>tb_model_versions</h3><span class="spec-logical">모델 버전</span></div>
+<p class="spec-note">학습된 분류기 버전 레지스트리. 활성 버전은 항상 1개.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">version_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td class="c-type">앱 uuid.uuid4</td><td>모델 버전 PK</td></tr>
+<tr><td class="c-name">version_label</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"><span class="k-uq">UQ</span></td><td class="c-type"></td><td class="c-type"></td><td>버전 라벨 — v-fe4b386b 형식(학습 산출물 해시)</td></tr>
+<tr><td class="c-name">base_model</td><td class="c-type">VARCHAR(100)</td><td class="c-type">VARCHAR(100)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>기반 사전학습 모델 이름</td></tr>
+<tr><td class="c-name">model_type</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;classifier&#x27;</td><td class="c-type">&#x27;classifier&#x27;</td><td>모델 종류. 코드가 넣는 값은 classifier 하나이며 기본값이다</td></tr>
+<tr><td class="c-name">trained_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>학습 완료 시각</td></tr>
+<tr><td class="c-name">training_run_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>이 모델을 만든 학습 실행 ID</td></tr>
+<tr><td class="c-name">training_data_count</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>학습 샘플 수</td></tr>
+<tr><td class="c-name">metrics</td><td class="c-type">_JSON_PORTABLE</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;{}&#x27;</td><td class="c-type">&#x27;{}&#x27;</td><td>최종 지표 JSON — F1 · FNR · Recall 등</td></tr>
+<tr><td class="c-name">model_uri</td><td class="c-type">VARCHAR(500)</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>모델 저장 경로</td></tr>
+<tr><td class="c-name">mlflow_run_id</td><td class="c-type">VARCHAR(64)</td><td class="c-type">VARCHAR(64)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>MLflow 실험 추적 ID</td></tr>
+<tr><td class="c-name">is_active</td><td class="c-type">TINYINT(1)</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">0</td><td class="c-type">false</td><td>활성 여부. 생성 칼럼 active_key 의 UNIQUE 제약으로 활성 1건만 허용합니다</td></tr>
+<tr><td class="c-name">active_key</td><td class="c-type">SMALLINT</td><td class="c-type">SMALLINT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>is_active 에서 DB 가 계산하는 칼럼 — 활성이면 1, 아니면 NULL. 여기 걸린 UNIQUE 인덱스가 활성 1건 제약을 만든다(UNIQUE 는 NULL 을 여러 개 허용하므로 비활성 행은 제한이 없다). 애플리케이션은 쓰지 않는다</td></tr>
+<tr><td class="c-name">activated_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>활성화 시각</td></tr>
+<tr><td class="c-name">deactivated_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>비활성화 시각</td></tr>
+<tr><td class="c-name">rolled_back_from</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>자동 롤백 출처 버전(자기 참조) <span style="color:#71717a">→ tb_model_versions.version_id</span></td></tr>
+<tr><td class="c-name">rollback_reason</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>롤백 사유</td></tr>
+<tr><td class="c-name">level_snapshot</td><td class="c-type">_JSON_PORTABLE</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>학습 시점 등급체계 스냅샷 JSON</td></tr>
+<tr><td class="c-name">created_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>생성 시각</td></tr>
+<tr><td class="c-name">active_key</td><td class="c-type">TINYINT(1) GENERATED ALWAYS AS (IF(is_active=1,1,NULL)) VIRTUAL</td><td class="c-type">(없음 — 현행은 부분 인덱스)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>활성일 때만 1, 아니면 NULL. UNIQUE 인덱스 idx_mv_active 가 활성 1건만 허용하도록 보증합니다</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>version_id</code><br><code>UNIQUE INDEX idx_mv_active (active_key)</code><br><code>INDEX idx_mv_mlflow (mlflow_run_id)</code></p>
+<div class="spec-head" id="t-tb_training_runs"><h3>tb_training_runs</h3><span class="spec-logical">학습 실행</span></div>
+<p class="spec-note">학습 잡 1회의 설정·자원·결과.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">run_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td class="c-type">앱 uuid.uuid4</td><td>학습 실행 PK</td></tr>
+<tr><td class="c-name">model_version</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>이 실행이 만든 모델 버전 <span style="color:#71717a">→ tb_model_versions.version_id</span></td></tr>
+<tr><td class="c-name">mlflow_run_id</td><td class="c-type">VARCHAR(64)</td><td class="c-type">VARCHAR(64)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>MLflow 실험 추적 ID</td></tr>
+<tr><td class="c-name">status</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;queued&#x27;</td><td class="c-type">&#x27;queued&#x27;</td><td>실행 상태 — queued · running · done · failed</td></tr>
+<tr><td class="c-name">started_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>시작 시각</td></tr>
+<tr><td class="c-name">completed_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>종료 시각</td></tr>
+<tr><td class="c-name">duration_sec</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>소요 초</td></tr>
+<tr><td class="c-name">total_samples</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>전체 샘플 수</td></tr>
+<tr><td class="c-name">train_count</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>학습 분할 건수</td></tr>
+<tr><td class="c-name">val_count</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>검증 분할 건수</td></tr>
+<tr><td class="c-name">test_count</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>시험 분할 건수</td></tr>
+<tr><td class="c-name">split_method</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;stratified&#x27;</td><td class="c-type">&#x27;stratified&#x27;</td><td>분할 방식 — stratified 등</td></tr>
+<tr><td class="c-name">split_seed</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>분할 난수 시드. 재현에 필요하다</td></tr>
+<tr><td class="c-name">hyperparameters</td><td class="c-type">_JSON_PORTABLE</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;{}&#x27;</td><td class="c-type">&#x27;{}&#x27;</td><td>하이퍼파라미터 JSON — epochs · lr · batch_size 등</td></tr>
+<tr><td class="c-name">final_metrics</td><td class="c-type">_JSON_PORTABLE</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>최종 지표 JSON. 배포 게이트 판정을 포함합니다</td></tr>
+<tr><td class="c-name">trigger_type</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;manual&#x27;</td><td class="c-type">&#x27;manual&#x27;</td><td>기동 방식 — manual · scheduled · active_learning</td></tr>
+<tr><td class="c-name">trigger_ref</td><td class="c-type">VARCHAR(100)</td><td class="c-type">VARCHAR(100)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>기동 근거 식별자</td></tr>
+<tr><td class="c-name">error_message</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>실패 사유. 학습 잡 조회 API 가 이 값을 그대로 내보낸다</td></tr>
+<tr><td class="c-name">created_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>생성 시각</td></tr>
+<tr><td class="c-name">created_by</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>요청자 ID</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>run_id</code><br><code>INDEX idx_tr_model (model_version)</code><br><code>INDEX idx_tr_status (status)</code><br><code>INDEX idx_tr_date (started_at DESC)</code><br><code>INDEX idx_tr_created (created_at)</code></p>
+<div class="spec-head" id="t-tb_training_epochs"><h3>tb_training_epochs</h3><span class="spec-logical">학습 에폭</span></div>
+<p class="spec-note">학습 실행 안의 에폭별 손실·지표.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">run_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span> <span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>대상 학습 실행(복합 PK) <span style="color:#71717a">→ tb_training_runs.run_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">epoch</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type"></td><td class="c-type"></td><td>에폭 번호(복합 PK)</td></tr>
+<tr><td class="c-name">train_loss</td><td class="c-type">FLOAT</td><td class="c-type">REAL</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>학습 손실</td></tr>
+<tr><td class="c-name">val_loss</td><td class="c-type">FLOAT</td><td class="c-type">REAL</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>검증 손실</td></tr>
+<tr><td class="c-name">val_metrics</td><td class="c-type">_JSON_PORTABLE</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;{}&#x27;</td><td class="c-type">&#x27;{}&#x27;</td><td>에폭별 검증 지표 JSON</td></tr>
+<tr><td class="c-name">learning_rate</td><td class="c-type">FLOAT</td><td class="c-type">REAL</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>스케줄러 적용 후 실제 학습률</td></tr>
+<tr><td class="c-name">logged_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>기록 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>run_id</code>, <code>epoch</code></p>
+<div class="spec-head" id="t-tb_training_datasets"><h3>tb_training_datasets</h3><span class="spec-logical">학습 데이터셋</span></div>
+<p class="spec-note">학습 실행이 어느 문서를 train/val/test 중 무엇으로 썼는지.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">id</td><td class="c-type">BIGINT</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">AUTO_INCREMENT</td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>행 PK</td></tr>
+<tr><td class="c-name">run_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>대상 학습 실행 <span style="color:#71717a">→ tb_training_runs.run_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>학습에 쓴 문서 <span style="color:#71717a">→ tb_documents.doc_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">split_type</td><td class="c-type">VARCHAR(10)</td><td class="c-type">VARCHAR(10)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>분할 구분 — train · val · test</td></tr>
+<tr><td class="c-name">level_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>학습 시점 라벨 등급 <span style="color:#71717a">→ tb_classification_levels.level_id ON DELETE RESTRICT</span></td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>id</code><br><code>UNIQUE tb_training_datasets_run_id_doc_id_key (run_id, doc_id)</code><br><code>INDEX idx_td_run_split (run_id, split_type)</code><br><code>INDEX idx_td_doc (doc_id)</code></p>
+<div class="group-header" id="g-F"><span class="spec-badge">F</span> <b>보정</b> — 검수자 확정·교정 결과. 운영 재학습의 진실 소스.</div>
+<div class="spec-head" id="t-tb_corrections"><h3>tb_corrections</h3><span class="spec-logical">보정</span></div>
+<p class="spec-note">검수자의 확정·교정 기록. 재학습에 반영된 행만 소비 표시가 붙는다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">correction_id</td><td class="c-type">BIGINT</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">AUTO_INCREMENT</td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>보정 PK</td></tr>
+<tr><td class="c-name">classification_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>대상 분류 <span style="color:#71717a">→ tb_classifications.classification_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">original_level_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>AI 예측 등급 <span style="color:#71717a">→ tb_classification_levels.level_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">corrected_level_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>검수자 확정 등급. 확정만 하고 고치지 않았으면 예측 등급과 같다 <span style="color:#71717a">→ tb_classification_levels.level_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">direction</td><td class="c-type">VARCHAR(10)</td><td class="c-type">VARCHAR(10)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>보정 방향 — underclass(미탐 보정) · overclass(과분류 보정) · lateral(동위 변경) · confirm(확정)</td></tr>
+<tr><td class="c-name">reason</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>보정 사유</td></tr>
+<tr><td class="c-name">corrected_by</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>검수자 계정 ID</td></tr>
+<tr><td class="c-name">corrected_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>보정 시각</td></tr>
+<tr><td class="c-name">consumed_in_run</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>이 보정을 반영한 재학습 실행. NULL 이면 미반영 <span style="color:#71717a">→ tb_training_runs.run_id</span></td></tr>
+<tr><td class="c-name">consumed_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>재학습 반영 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>correction_id</code><br><code>UNIQUE uq_corr_cls_level_by (classification_id, corrected_level_id, corrected_by)</code><br><code>INDEX idx_corr_cls (classification_id)</code><br><code>INDEX idx_corr_direction (direction)</code><br><code>INDEX idx_corr_at (corrected_at DESC)</code><br><code>INDEX idx_corr_unconsumed (consumed_in_run)</code><br><span style="color:#71717a">현행 PostgreSQL — <code>INDEX idx_corr_unconsumed (consumed_in_run) WHERE consumed_in_run IS NULL</code></span></p>
+<div class="group-header" id="g-G"><span class="spec-badge">G</span> <b>합성</b> — 학습용 합성 문서 생성 이력과 프롬프트 버전.</div>
+<div class="spec-head" id="t-tb_prompt_versions"><h3>tb_prompt_versions</h3><span class="spec-logical">프롬프트 버전</span></div>
+<p class="spec-note">합성 문서 생성에 쓴 프롬프트 템플릿 버전.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">prompt_version</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type"></td><td class="c-type"></td><td>프롬프트 버전 PK</td></tr>
+<tr><td class="c-name">chain_stage</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>생성 단계 — outline · body · qc</td></tr>
+<tr><td class="c-name">template</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>프롬프트 템플릿 원문</td></tr>
+<tr><td class="c-name">created_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>생성 시각</td></tr>
+<tr><td class="c-name">created_by</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>등록자 ID</td></tr>
+<tr><td class="c-name">notes</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>메모</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>prompt_version</code></p>
+<div class="spec-head" id="t-tb_sample_documents"><h3>tb_sample_documents</h3><span class="spec-logical">합성 문서</span></div>
+<p class="spec-note">LLM 이 생성한 학습용 문서와 그 검수 상태.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">sample_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td class="c-type">앱 uuid.uuid4</td><td>합성 문서 PK</td></tr>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>문서 테이블에 적재됐을 때의 문서 ID. 미적재면 NULL <span style="color:#71717a">→ tb_documents.doc_id</span></td></tr>
+<tr><td class="c-name">target_level_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>생성 때 요구한 등급 <span style="color:#71717a">→ tb_classification_levels.level_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">corrected_level_id</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>검수자가 고친 등급. NULL 이면 교정 없음. 학습행 라벨은 이 값을 우선합니다 <span style="color:#71717a">→ tb_classification_levels.level_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">doc_type</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>문서 종류</td></tr>
+<tr><td class="c-name">outline_prompt_version</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>개요 생성에 쓴 프롬프트 버전 <span style="color:#71717a">→ tb_prompt_versions.prompt_version</span></td></tr>
+<tr><td class="c-name">body_prompt_version</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>본문 생성에 쓴 프롬프트 버전 <span style="color:#71717a">→ tb_prompt_versions.prompt_version</span></td></tr>
+<tr><td class="c-name">qc_prompt_version</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td class="c-type"></td><td>품질검사에 쓴 프롬프트 버전 <span style="color:#71717a">→ tb_prompt_versions.prompt_version</span></td></tr>
+<tr><td class="c-name">llm_provider</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>생성 LLM 제공자</td></tr>
+<tr><td class="c-name">llm_model</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>생성 LLM 모델명</td></tr>
+<tr><td class="c-name">generated_outline</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>생성된 개요</td></tr>
+<tr><td class="c-name">generated_content</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>생성된 본문</td></tr>
+<tr><td class="c-name">quality_score</td><td class="c-type">DECIMAL(3,2)</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>품질 점수</td></tr>
+<tr><td class="c-name">quality_report</td><td class="c-type">_JSON_PORTABLE</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>품질검사 상세 JSON</td></tr>
+<tr><td class="c-name">label_source</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>본문 출처 마커 — NULL(정상 생성) · noop_fallback(자리표시 본문·학습 편입 금지) · llm_nonjson(비-JSON 응답)</td></tr>
+<tr><td class="c-name">parse_error</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>생성 응답 파싱 실패 사유</td></tr>
+<tr><td class="c-name">review_status</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;pending_review&#x27;</td><td class="c-type">&#x27;pending_review&#x27;</td><td>검수 상태 — pending_review · approved · rejected</td></tr>
+<tr><td class="c-name">reviewed_by</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>검수자 계정 ID</td></tr>
+<tr><td class="c-name">reviewed_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>검수 시각</td></tr>
+<tr><td class="c-name">rejection_reason</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>반려 사유</td></tr>
+<tr><td class="c-name">created_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>생성 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>sample_id</code><br><code>INDEX idx_sd_status (review_status)</code><br><code>INDEX idx_sd_level (target_level_id)</code><br><code>INDEX idx_sd_status_created (review_status, created_at)</code></p>
+<div class="group-header" id="g-H"><span class="spec-badge">H</span> <b>운영</b> — 비용·감사·가이드 이력.</div>
+<div class="spec-head" id="t-tb_llm_usage"><h3>tb_llm_usage</h3><span class="spec-logical">LLM 사용량</span></div>
+<p class="spec-note">LLM 호출별 토큰·비용·지연.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">usage_id</td><td class="c-type">BIGINT</td><td class="c-type">BIGINT</td><td class="c-nn"></td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">AUTO_INCREMENT</td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>사용 기록 PK</td></tr>
+<tr><td class="c-name">provider</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>LLM 제공자</td></tr>
+<tr><td class="c-name">model</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>모델명</td></tr>
+<tr><td class="c-name">purpose</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>호출 목적 — 합성 · 라벨링 · 질의응답 등</td></tr>
+<tr><td class="c-name">reference_type</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>연관 대상 종류</td></tr>
+<tr><td class="c-name">reference_id</td><td class="c-type">VARCHAR(100)</td><td class="c-type">VARCHAR(100)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>연관 대상 식별자</td></tr>
+<tr><td class="c-name">input_tokens</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>입력 토큰 수</td></tr>
+<tr><td class="c-name">output_tokens</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>출력 토큰 수</td></tr>
+<tr><td class="c-name">cost_usd</td><td class="c-type">DECIMAL(10,6)</td><td class="c-type">NUMERIC(10,6)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>비용(USD)</td></tr>
+<tr><td class="c-name">cost_krw</td><td class="c-type">DECIMAL(12,2)</td><td class="c-type">NUMERIC(12,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>비용(KRW)</td></tr>
+<tr><td class="c-name">billing_phase</td><td class="c-type">VARCHAR(20)</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;development&#x27;</td><td class="c-type">&#x27;development&#x27;</td><td>과금 구분 — development · operation</td></tr>
+<tr><td class="c-name">latency_ms</td><td class="c-type">INT</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>응답 지연(밀리초)</td></tr>
+<tr><td class="c-name">success</td><td class="c-type">TINYINT(1)</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">1</td><td class="c-type">true</td><td>호출 성공 여부</td></tr>
+<tr><td class="c-name">error_code</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>실패 코드</td></tr>
+<tr><td class="c-name">called_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>호출 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>usage_id</code>, <code>called_at</code><br><code>INDEX idx_lu_called (called_at)</code><br><code>INDEX idx_lu_phase (billing_phase, called_at DESC)</code><br><code>INDEX idx_lu_purpose (purpose)</code><br><code>INDEX idx_lu_ref (reference_type, reference_id)</code></p>
+<div class="spec-head" id="t-tb_audit_log"><h3>tb_audit_log</h3><span class="spec-logical">감사 로그</span></div>
+<p class="spec-note">전 API 호출 기록. 보존기간(기본 730일)이 지난 행은 오래된 달부터 지운다 — 해시 체인이 끊기지 않도록 앞에서부터 이어서 지운다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">audit_id</td><td class="c-type">BIGINT</td><td class="c-type">BIGINT</td><td class="c-nn"></td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">AUTO_INCREMENT</td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>감사 PK. 파티션을 두던 시절 파티션 키를 기본키에 넣어야 해 복합키가 됐고, 파티션을 걷은 뒤에도 복합키는 그대로 둔다 — 바꾸면 기존 행의 키가 흔들린다</td></tr>
+<tr><td class="c-name">request_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>요청 추적 ID. 같은 요청에서 나온 여러 기록을 잇는다</td></tr>
+<tr><td class="c-name">actor_id</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>행위자 계정 ID</td></tr>
+<tr><td class="c-name">actor_role</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>행위자 역할</td></tr>
+<tr><td class="c-name">action</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>수행한 동작</td></tr>
+<tr><td class="c-name">target_type</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>대상 종류</td></tr>
+<tr><td class="c-name">target_id</td><td class="c-type">VARCHAR(100)</td><td class="c-type">VARCHAR(100)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>대상 식별자</td></tr>
+<tr><td class="c-name">payload_hash</td><td class="c-type">VARCHAR(64)</td><td class="c-type">VARCHAR(64)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>요청 본문 SHA-256. 본문 원문은 남기지 않고 해시만 남긴다</td></tr>
+<tr><td class="c-name">ip_address</td><td class="c-type">_INET_PORTABLE</td><td class="c-type">_INET_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>요청 IP(INET 타입)</td></tr>
+<tr><td class="c-name">user_agent</td><td class="c-type">VARCHAR(500)</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>요청 User-Agent</td></tr>
+<tr><td class="c-name">success</td><td class="c-type">TINYINT(1)</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">1</td><td class="c-type">true</td><td>처리 성공 여부</td></tr>
+<tr><td class="c-name">error_code</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>실패 코드</td></tr>
+<tr><td class="c-name">occurred_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>발생 시각. 기본키의 뒷자리이자 시간축 인덱스 idx_audit_occurred 의 선두 칼럼이다</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>audit_id</code>, <code>occurred_at</code><br><code>INDEX idx_audit_occurred (occurred_at, audit_id)</code><br><code>INDEX idx_audit_actor (actor_id, occurred_at DESC)</code><br><code>INDEX idx_audit_target (target_type, target_id)</code><br><code>INDEX idx_audit_action (action, occurred_at DESC)</code></p>
+<div class="spec-head" id="t-tb_guides"><h3>tb_guides</h3><span class="spec-logical">가이드 버전</span></div>
+<p class="spec-note">가이드 문서 업로드 버전 이력.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">id</td><td class="c-type">BIGINT</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">AUTO_INCREMENT</td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>행 PK</td></tr>
+<tr><td class="c-name">guide_id</td><td class="c-type">VARCHAR(200)</td><td class="c-type">VARCHAR(200)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>가이드 논리 ID</td></tr>
+<tr><td class="c-name">version</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>가이드 버전. (guide_id, version) 전역 UNIQUE</td></tr>
+<tr><td class="c-name">effective_date</td><td class="c-type">VARCHAR(30)</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>시행일</td></tr>
+<tr><td class="c-name">change_summary</td><td class="c-type">TEXT</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>변경 요약</td></tr>
+<tr><td class="c-name">doc_type</td><td class="c-type">VARCHAR(50)</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>문서 종류</td></tr>
+<tr><td class="c-name">filename</td><td class="c-type">VARCHAR(500)</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td class="c-type"></td><td>원본 파일명</td></tr>
+<tr><td class="c-name">registered_at</td><td class="c-type">DATETIME(6)</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">CURRENT_TIMESTAMP(6)</td><td class="c-type">now()</td><td>등록 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>id</code><br><code>UNIQUE uq_guides_id_version (guide_id, version)</code><br><code>INDEX idx_guides_guide_id (guide_id)</code><br><code>INDEX idx_guides_registered (registered_at)</code></p>
+<div class="spec-head" id="t-tb_advisory_locks"><h3>tb_advisory_locks</h3><span class="spec-logical">동시성 잠금</span></div>
+<p class="spec-note">이름 하나에 행 하나. 임계구역에 드는 쪽이 그 행을 SELECT ... FOR UPDATE 로 잡는다. PostgreSQL 의 pg_advisory_xact_lock 과 MariaDB 의 GET_LOCK 은 잠금 수명이 서로 달라(트랜잭션 대 커넥션) 같은 코드로 쓸 수 없어, 두 엔진에서 똑같이 트랜잭션 수명인 행 잠금으로 맞췄다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>NULL</th><th>키</th><th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">name</td><td class="c-type">VARCHAR(64)</td><td class="c-type">VARCHAR(64)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type"></td><td class="c-type"></td><td>잠금 이름. 값은 audit_chain(감사 해시체인) · model_activation(모델 활성화) 둘이며 마이그레이션이 미리 넣어 둔다 — 런타임에 만들면 처음 쓰는 둘이 서로의 미커밋 행을 못 봐 같이 들어간다</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>name</code></p>
+</section>
+<section id="fk"><h2><span class="num">05</span> 관계 정의</h2>
+<p class="spec-note">FK 제약 24건입니다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>자식 테이블</th><th>자식 컬럼</th><th>부모</th><th>ON DELETE</th></tr></thead><tbody>
+<tr><td class="c-name">tb_level_keywords</td><td class="c-name">level_id</td><td class="c-name">tb_classification_levels.level_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_level_keywords</td><td class="c-name">factor_id</td><td class="c-name">tb_evaluation_factors.factor_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_document_labels</td><td class="c-name">doc_id</td><td class="c-name">tb_documents.doc_id</td><td class="c-type">CASCADE</td></tr>
+<tr><td class="c-name">tb_document_labels</td><td class="c-name">level_id</td><td class="c-name">tb_classification_levels.level_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_classifications</td><td class="c-name">doc_id</td><td class="c-name">tb_documents.doc_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_classifications</td><td class="c-name">predicted_level_id</td><td class="c-name">tb_classification_levels.level_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_classification_evidence</td><td class="c-name">classification_id</td><td class="c-name">tb_classifications.classification_id</td><td class="c-type">CASCADE</td></tr>
+<tr><td class="c-name">tb_classification_evidence</td><td class="c-name">factor_id</td><td class="c-name">tb_evaluation_factors.factor_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_model_versions</td><td class="c-name">rolled_back_from</td><td class="c-name">tb_model_versions.version_id</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tb_training_runs</td><td class="c-name">model_version</td><td class="c-name">tb_model_versions.version_id</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tb_training_epochs</td><td class="c-name">run_id</td><td class="c-name">tb_training_runs.run_id</td><td class="c-type">CASCADE</td></tr>
+<tr><td class="c-name">tb_training_datasets</td><td class="c-name">run_id</td><td class="c-name">tb_training_runs.run_id</td><td class="c-type">CASCADE</td></tr>
+<tr><td class="c-name">tb_training_datasets</td><td class="c-name">doc_id</td><td class="c-name">tb_documents.doc_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_training_datasets</td><td class="c-name">level_id</td><td class="c-name">tb_classification_levels.level_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_corrections</td><td class="c-name">classification_id</td><td class="c-name">tb_classifications.classification_id</td><td class="c-type">CASCADE</td></tr>
+<tr><td class="c-name">tb_corrections</td><td class="c-name">original_level_id</td><td class="c-name">tb_classification_levels.level_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_corrections</td><td class="c-name">corrected_level_id</td><td class="c-name">tb_classification_levels.level_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_corrections</td><td class="c-name">consumed_in_run</td><td class="c-name">tb_training_runs.run_id</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tb_sample_documents</td><td class="c-name">doc_id</td><td class="c-name">tb_documents.doc_id</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tb_sample_documents</td><td class="c-name">target_level_id</td><td class="c-name">tb_classification_levels.level_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_sample_documents</td><td class="c-name">corrected_level_id</td><td class="c-name">tb_classification_levels.level_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tb_sample_documents</td><td class="c-name">outline_prompt_version</td><td class="c-name">tb_prompt_versions.prompt_version</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tb_sample_documents</td><td class="c-name">body_prompt_version</td><td class="c-name">tb_prompt_versions.prompt_version</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tb_sample_documents</td><td class="c-name">qc_prompt_version</td><td class="c-name">tb_prompt_versions.prompt_version</td><td class="c-type">NO ACTION</td></tr>
+</tbody></table></div>
+<p class="spec-note" style="margin-top:12px;"><b>제약 없는 참조 3건</b> — <code>tb_chunks.doc_id → tb_documents</code> · <code>tb_classification_evidence.chunk_id → tb_chunks</code> · <code>tb_model_versions.training_run_id → tb_training_runs</code>. 애플리케이션이 정합을 보증합니다.</p>
+</section>
+<section id="scope"><h2><span class="num">06</span> 범위</h2>
+<p class="spec-note">본 시스템이 생성·소유하는 개체만 수록합니다. KL 원천 문서 저장소·EDMS·회원/권한·자가진단은 외부 시스템이며, 연동 키는 <code>tb_documents.external_ref</code> · <code>tb_documents.metadata</code> 입니다.</p>
+</section>
+<section id="revisions"><h2><span class="num">07</span> 개정 이력</h2>
+<div class="tw"><table>
+<thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:18%">근거 커밋</th><th>내용</th></tr></thead><tbody>
+<tr><td>1</td><td>2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. ORM 메타데이터와 마이그레이션 정의에서 생성해 감리 산출물로 편입</td></tr>
+<tr><td>2</td><td>2026-08-29</td><td><code>fca08e04</code></td><td>관계선이 상자에 가려지던 도식을 다시 그리고, 검색용 표 2종을 포함해 21표로 확장. 칼럼 목록이 두 곳에 중복 수록돼 있던 것을 이 문서로 일원화. 표별 인덱스·FK 개수를 §01 에 추가</td></tr>
+<tr><td>3</td><td>2026-08-29</td><td><code>5c7ed034</code></td><td>어떤 코드도 읽지 않고 실 데이터도 전부 비어 있던 <b>칼럼 10개를 삭제</b>(249 → 239). 대리키를 <code>SERIAL</code> 에서 표준 <code>GENERATED ALWAYS AS IDENTITY</code> 로 전환</td></tr>
+<tr><td>4</td><td>2026-09-03</td><td><code>5c7ed034</code></td><td><b>유사문서 조회 폐기</b> — 검색용 표 2종(21 → 19표)에 이어 표 1개와 칼럼 9개를 더 뺐다(19표 226칼럼 → <b>18표 214칼럼</b>). <b>⚠ 뺀 것은 소스에 아직 남아 있다</b> — 정의서가 코드보다 앞선 상태이며 소스 정리는 다음 차수다.<br>납품 DB 를 <b>MariaDB 10.11</b> 로 맞췄다. 물리 타입·기본값·인덱스·파티션·채번을 MariaDB 정본으로 적고 현행 PostgreSQL 표기를 대조용으로 병기했다. 스토리지 엔진·문자셋·콜레이션 선언을 머리말에 넣었다.<br>§02 <b>서버별 배포 구분</b>을 신설했다 — 근거는 <code>poc/scripts/audit_table_placement.py</code> 전수 조사. 절 번호가 03 에서 겹치던 것을 바로잡고, 제약 없는 참조 목록과 제외 칼럼을 <code>table_spec_meta.py</code> 한 곳에 두어 도식·캡션·본문이 같은 값을 쓰도록 고쳤습니다</td></tr>
+<tr><td>5</td><td>2026-09-05</td><td><code>5c7ed034</code></td><td><b>4차에서 '소스에 아직 남아 있다'고 적었던 것을 실제로 걷었다</b> — 커밋 <code>319069b9</code> 가 소스·ORM 에서, 마이그레이션 <code>a3b4c5d6e7f8</code> 이 DB 에서 유사문서 조회 칼럼 9개와 검색용 표 2종을 떨궜다. 이제 정의서와 코드가 같은 것을 가리킨다.<br><b>파티션을 걷었다</b> — 223 실서버 30일 실측(<code>tb_audit_log</code> 71,161행 · 30MB · 연 환산 87만행)에서 파티션이 필요한 규모가 아니었고, 오래된 파티션을 떼는 코드가 0건이라 효용의 절반은 애초에 쓰지 않고 있었다. 시간축 인덱스 3개(<code>b4c5d6e7f8a9</code>)와 보존기간 삭제(<code>services/retention.py</code> · 기본 꺼짐)로 대신한다. <code>tb_audit_log</code> 의 복합 기본키는 그대로 둔다.<br><b>표 <code>tb_advisory_locks</code> 를 넣었다</b>(18 → 19표 · 216칼럼) — 감사 해시체인과 모델 활성화의 임계구역을 두 DB 에서 같은 방식으로 잠그기 위한 표다.</td></tr>
+</tbody></table></div>
+</section>
+<div class="foot">테이블정의서 · ERD — 한국지식재산보호원 AI 영업비밀 등급분류 시스템 · 2026-09-05 생성</div>
 </div>
 </body>
 </html>

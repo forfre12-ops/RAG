@@ -8,9 +8,8 @@
 다시 돌리면 되고, 설명이 빠진 컬럼은 생성 때 경고로 드러난다.
 
 진실 소스(이 스크립트가 직접 읽는 파일):
-    poc/src/koipa/db/models.py                          ORM 19테이블 · 컬럼·타입·키·인덱스
-    poc/alembic/versions/a1b2c3d4e5f6_pg_rag_vectorstore.py    RAG 2테이블 DDL
-    poc/alembic/versions/a7b8c9d0e1f2_rag_vectors_column_comments.py  RAG 컬럼 주석
+    poc/src/koipa/db/models.py                          ORM 20테이블 · 컬럼·타입·키·인덱스
+    (RAG 2표 DDL 파서는 남겨 두었으나 2026-09-05 부로 생성물에 넣지 않는다)
     scripts/table_spec_meta.py                          한국어 논리명·용도·컬럼 설명
 
 사용:
@@ -20,7 +19,7 @@
 ⚠ 순서가 있다. 이 스크립트는 문서를 통째로 다시 쓰므로 §02 관계도의 <svg> 도 임시본으로
    덮는다. 반드시 뒤이어 아래를 돌려 정본 관계도를 다시 넣는다.
 
-    python poc/scripts/build_erd.py --apply --with-rag
+    python poc/scripts/build_erd.py --apply --spec
 
    (정본 관계도 = 상자에 선이 가리지 않게 통로로 우회시키고, 상자에 마우스를 올리거나
     키보드로 고르면 그 표에 붙은 관계선만 파랗게 칠하는 CSS 를 <svg> 안에 담은 것)
@@ -58,10 +57,16 @@ SKELETON = ROOT / "doc" / "result" / "KL_회신_2026-08-28" / "KL_질의사항_�
 # 같은 문서가 제출 묶음마다 사본으로 놓인다. 한 곳만 쓰면 나머지가 뒤처진다 —
 # 실측 2026-08-29: 칼럼 10개를 뺀 뒤 KL_AI자료 사본만 239 로 갱신되고 회신 첨부본은
 # 249 인 채로 남아 두 사본이 어긋났다. build_erd.py 와 같이 존재하는 사본 전부에 쓴다.
+#
+# [2026-09-05] 감리문서 사본을 여기 넣었다. `doc/감리문서/테이블_정의서.html` 은 손으로
+# 쓴 사본이라 2026-08-26 판 1 에서 멈춰 있었고, 그 사이 판이 5 까지 갔다. 실측으로
+# 그 사본은 없어진 표 2종(tb_rag_vectors·tb_rag_aliases)과 없어진 칼럼 9개를 아직
+# 싣고 있었다. 파일 이름만 다르고(밑줄 위치) 내용은 같은 문서이므로 함께 생성한다.
 OUTS = [
     ROOT / "doc" / "result" / "KL_AI자료_2026-08" / "테이블정의서_ERD.html",
     ROOT / "doc" / "result" / "KL_회신_2026-08-28" / "첨부" / "테이블정의서_ERD.html",
     ROOT / "doc" / "result" / "KL_AI자료_2026-08" / "첨부문서" / "테이블정의서_ERD.html",
+    ROOT / "doc" / "감리문서" / "테이블_정의서.html",
 ]
 
 # 개정 이력. 손으로 붙여 두면 생성기가 다시 돌 때 지워지므로 여기에 둔다.
@@ -89,7 +94,21 @@ REVISIONS = [
      "<code>poc/scripts/audit_table_placement.py</code> 전수 조사. "
      "절 번호가 03 에서 겹치던 것을 바로잡고, 제약 없는 참조 목록과 제외 칼럼을 "
      "<code>table_spec_meta.py</code> 한 곳에 두어 도식·캡션·본문이 같은 값을 쓰도록 "
-     "고쳤습니다"),]
+     "고쳤습니다"),
+    ("5", "2026-09-05", "이 문서 머리말의 커밋",
+     "<b>4차에서 '소스에 아직 남아 있다'고 적었던 것을 실제로 걷었다</b> — 커밋 "
+     "<code>319069b9</code> 가 소스·ORM 에서, 마이그레이션 "
+     "<code>a3b4c5d6e7f8</code> 이 DB 에서 유사문서 조회 칼럼 9개와 검색용 표 2종을 "
+     "떨궜다. 이제 정의서와 코드가 같은 것을 가리킨다.<br>"
+     "<b>파티션을 걷었다</b> — 223 실서버 30일 실측(<code>tb_audit_log</code> 71,161행 · "
+     "30MB · 연 환산 87만행)에서 파티션이 필요한 규모가 아니었고, 오래된 파티션을 떼는 "
+     "코드가 0건이라 효용의 절반은 애초에 쓰지 않고 있었다. 시간축 인덱스 3개"
+     "(<code>b4c5d6e7f8a9</code>)와 보존기간 삭제"
+     "(<code>services/retention.py</code> · 기본 꺼짐)로 대신한다. "
+     "<code>tb_audit_log</code> 의 복합 기본키는 그대로 둔다.<br>"
+     "<b>표 <code>tb_advisory_locks</code> 를 넣었다</b>(18 → 19표 · 216칼럼) — 감사 "
+     "해시체인과 모델 활성화의 임계구역을 두 DB 에서 같은 방식으로 잠그기 위한 표다."),
+]
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -491,9 +510,14 @@ def parse_rag() -> list[dict]:
 #
 # ⚠ tb_chunks 는 회원사 운영이 시작되면 늘어난다(문서 1건당 청크 수십 개). 운영 규모에서
 #   다시 판단할 것 — 지금 안 두는 것이지 영영 두지 않는다는 뜻이 아니다.
-PARTITIONS = {
-    "tb_audit_log": "occurred_at",
-}
+# [2026-09-05] 비웠다. 커밋 90c0d96a 로 **파티션 없이 가기로** 했고, 실측으로 확인했다.
+#   docker exec koipa-poc-mariadb-1 mariadb -ukoipa koipa -e
+#     "SELECT TABLE_NAME, PARTITION_NAME FROM information_schema.PARTITIONS
+#       WHERE TABLE_SCHEMA='koipa' AND TABLE_NAME IN (...)"
+#   → tb_audit_log · tb_llm_usage · tb_chunks 셋 다 PARTITION_NAME 이 NULL.
+# 대신 시간축 인덱스(b4c5d6e7f8a9)와 보존기간 삭제(services/retention.py)를 쓴다.
+# PostgreSQL 계열 마이그레이션에는 파티션이 남아 있으나 납품 정본은 MariaDB 다.
+PARTITIONS: dict[str, str] = {}
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -523,6 +547,7 @@ LAYOUT = [
     ("tb_llm_usage", 3, 40),
     ("tb_audit_log", 3, 80),
     ("tb_guides", 3, 120),
+    ("tb_advisory_locks", 3, 160),
 ]
 
 

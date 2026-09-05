@@ -261,7 +261,10 @@ def main() -> int:
                 if "초안" in sec or "초안" in line:
                     continue
                 # "현재 라우터에 없다"고 밝혀 둔 자리는 경고이지 주장이 아니다.
-                if re.search(r"없다|없습니다|존재하지 않|미구현", line):
+                # [2026-09-05] 상대편(KL 관리시스템)이 여는 경로를 적은 자리도 같다 —
+                # IF-03 콜백 수신 경로가 그렇다. 엔진은 callback_url 로 보내기만 한다.
+                if re.search(r"없다|없습니다|존재하지 않|미구현"
+                             r"|라우트가 아닙니다|수신 경로", line):
                     continue
                 if (path not in T["routes"]
                         and not any(p.startswith(path) for p in T["routes"])

@@ -217,7 +217,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#ep-review-queue"><span class="toc-method get">GET</span> /review-queue</a>
     <a class="toc-item" href="#ep-training"><span class="toc-method post">POST</span> /train</a>
     <a class="toc-item" href="#ep-train-jobs"><span class="toc-method get">GET</span> /train/jobs</a>
-    <a class="toc-item" href="#ep-answer"><span class="toc-method post">POST</span> /answer</a>
     <a class="toc-item" href="#ep-synthesis"><span class="toc-method post">POST</span> /synth/generate</a>
     <a class="toc-item" href="#ep-documents"><span class="toc-method post">POST</span> /documents</a>
     <a class="toc-item" href="#ep-documents-analyze"><span class="toc-method post">POST</span> /documents/analyze</a>
@@ -233,7 +232,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#ep-model-activate"><span class="toc-method post">POST</span> /admin/model/activate</a>
     <a class="toc-item" href="#ep-admin-status"><span class="toc-method get">GET</span> /admin/dashboard</a>
     <a class="toc-item" href="#ep-dashboard-summary"><span class="toc-method get">GET</span> /dashboard/summary</a>
-    <a class="toc-item" href="#ep-rag-search"><span class="toc-method post">POST</span> /rag/search</a>
     <a class="toc-item" href="#ep-demo-purge"><span class="toc-method post">POST</span> /admin/demo/purge</a>
     <a class="toc-item" href="#ep-metrics-latest"><span class="toc-method get">GET</span> /metrics/latest</a>
     <a class="toc-item" href="#ep-metrics-history"><span class="toc-method get">GET</span> /metrics/history</a>
@@ -300,8 +298,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tbody>
             <tr><td class="f-name">doc_id</td><td class="f-type">string (UUID)</td><td class="f-req yes">●</td><td>분류 대상 문서 ID. <code>content</code> 미전달 시 이 ID로 저장 본문(normalized_text_uri)을 읽어 분류</td></tr>
             <tr><td class="f-name">content</td><td class="f-type">string (≤1MB)</td><td></td><td>본문 직접 전달(선택). 없으면 <code>doc_id</code>로 저장 본문 조회. <span style="color:var(--text-dim)">※ 필드명은 <code>text</code>가 아니라 <code>content</code></span></td></tr>
-            <tr><td class="f-name">use_rag</td><td class="f-type">boolean</td><td></td><td>RAG 컨텍스트 사용 여부 (기본 <code>false</code>). <span style="color:var(--text-dim)">※ 필드명은 <code>rag_enabled</code>가 아니라 <code>use_rag</code></span></td></tr>
-            <tr><td class="f-name">rag_namespace</td><td class="f-type">string</td><td></td><td>RAG 검색 네임스페이스 (선택)</td></tr>
             <tr><td class="f-name">return_evidence</td><td class="f-type">boolean</td><td></td><td>근거 스팬(evidence) 반환 여부 (기본 <code>true</code>)</td></tr>
             <tr><td class="f-name">text_already_preprocessed</td><td class="f-type">boolean</td><td></td><td>본문이 이미 전처리됨 — 전처리 단계 skip (기본 <code>false</code>)</td></tr>
             <tr><td class="f-name">title</td><td class="f-type">string</td><td></td><td>문서 제목 (선택)</td></tr>
@@ -321,7 +317,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
             <tr><td class="f-name">scores</td><td class="f-type">object</td><td>{level_code → score} 전체 등급 softmax</td></tr>
             <tr><td class="f-name">evaluation_factors</td><td class="f-type">object | null</td><td>3요건 점수 <code>{secrecy(S), value(V), management(M), scores}</code>, 각 0·1·2점. 등급 매핑은 <strong>적용서 §4.6 분기표</strong>(예: S=2·V=2면 M=0→S1·M≥1→TS, 그 외 곱≥1→S2·=0→S3, S=0은 S3).</td></tr>
             <tr><td class="f-name">evidence</td><td class="f-type">EvidenceSpan[]</td><td>[{start, end, text, weight, tag}] 근거 스팬 (<code>return_evidence=true</code> 시)</td></tr>
-            <tr><td class="f-name">rag_context_used</td><td class="f-type">RagContextHit[]</td><td>[{source_doc, chunk_id, score, text}] 사용된 RAG 청크</td></tr>
             <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>사용된 모델 버전 (예: v-XXXXXXXX)</td></tr>
             <tr><td class="f-name">status</td><td class="f-type">string</td><td>staging / needs_review. needs_review 트리거(동작): (1) confidence&lt;0.7, (2) 출처 cap이 고등급 상향 신호를 덮을 때(cap-conflict), (3) 본문 없음 시 fail-secure로 최고등급 격리, (4) 룰 등급과 모델 등급이 불일치하거나 저마진 고등급일 때 검수 라우팅(운영 배포 기본 활성), (5) 근거 스팬이 부족한 룰-폴백 경로(sparse-evidence), (6) opt-in 메타 floor 게이트(기본 OFF)에서 <code>access_scope</code>가 제한 범위인데 예측 등급이 낮을 때. FNR-safe override로 모델 등급과 콘텐츠 등급이 불일치하면 더 높은(민감) 등급을 채택한다.</td></tr>
             <tr><td class="f-name">warnings</td><td class="f-type">string[]</td><td>저신뢰 검수 권고 등 경고 메시지 (예: low-confidence)</td></tr>
@@ -580,7 +575,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
             <tr><td class="f-name">base_model</td><td class="f-type">string</td><td></td><td>기본 kf-deberta-base</td></tr>
             <tr><td class="f-name">dataset_version</td><td class="f-type">string</td><td></td><td>학습 데이터셋 버전(예: labeled_clean_nolegal)</td></tr>
             <tr><td class="f-name">hyperparams</td><td class="f-type">object</td><td></td><td>epochs·batch_size·learning_rate 등 자유 dict</td></tr>
-            <tr><td class="f-name">use_rag</td><td class="f-type">boolean</td><td></td><td>RAG 증강 학습 여부 (기본 false)</td></tr>
           </tbody>
         </table>
         <h4>Response 202 — TrainResponse</h4>
@@ -633,31 +627,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       </div>
     </div>
 
-    <div class="ep" id="ep-answer">
-      <div class="ep-header">
-        <span class="method post">POST</span>
-        <span class="ep-path">/api/v1/answer</span>
-        <span class="ep-summary">RAG 답변 합성</span>
-        <span class="ep-auth">API Key</span>
-      </div>
-      <div class="ep-body">
-        <p class="ep-desc">온프렘/로컬 RAG 검색 컨텍스트를 바탕으로 답변과 citation을 생성한다. 분류 핫패스와 별개이며, LLM 미사용 또는 실패 시 deterministic fallback을 반환할 수 있다.</p>
-        <h4>Request Body — RagAnswerRequest</h4>
-        <table class="ftbl">
-          <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">query</td><td class="f-type">string</td><td class="f-req yes">●</td><td>질의 본문(1~4000자)</td></tr>
-            <tr><td class="f-name">namespace</td><td class="f-type">string | null</td><td></td><td>RAG collection</td></tr>
-            <tr><td class="f-name">top_k</td><td class="f-type">integer</td><td></td><td>1~20, 기본 5</td></tr>
-            <tr><td class="f-name">grade</td><td class="f-type">Grade | null</td><td></td><td>분류 결과를 별도 단계에서 받은 경우 전달</td></tr>
-            <tr><td class="f-name">use_reranker</td><td class="f-type">boolean</td><td></td><td>기본 true</td></tr>
-            <tr><td class="f-name">metadata</td><td class="f-type">object | null</td><td></td><td>추가 필터</td></tr>
-          </tbody>
-        </table>
-        <h4>Response 200 — RagAnswerResult</h4>
-        <p style="font-size:13px;"><code>{answer, citations:[{source_doc, chunk_id, score, rank}], grade, usage, warnings, deterministic_fallback}</code></p>
-      </div>
-    </div>
 
     <!-- ===== 문서 업로드 ===== -->
     <div class="cat-divider"><div class="cat-line"></div><span class="cat-label">문서 추출·청킹 (FUN-022)</span><div class="cat-line"></div></div>
@@ -684,8 +653,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
             <tr><td class="f-name"><b>security_marking</b></td><td class="f-type">string</td><td></td><td><b>KL 보안표시</b>(ICD §3.2) — <code>top_secret·secret·confidential·none</code>. 표시 등급이 내용 예측보다 높으면 격리 등급 상향(floor) 입력이 된다 <span class="nego-chip">협의 필요</span></td></tr>
             <tr><td class="f-name"><b>access_scope</b></td><td class="f-type">string</td><td></td><td><b>KL 접근범위</b>(ICD §3.3) — <code>approved_only·designated·department·all_employees</code>. 제한적이면 검수 라우팅 <span class="nego-chip">협의 필요</span></td></tr>
             <tr><td class="f-name"><b>source_type</b></td><td class="f-type">string</td><td></td><td>출처 provenance — <code>public·registered_patent·academic·internal·external_confidential</code>. 공개 출처면 S3로 cap된다</td></tr>
-            <tr><td class="f-name">index_for_rag</td><td class="f-type">boolean</td><td></td><td>true면 업로드 문서를 RAG 검색 컬렉션에도 적재 (기본 false)</td></tr>
-            <tr><td class="f-name">rag_namespace</td><td class="f-type">string</td><td></td><td>RAG 적재 컬렉션 (미지정 시 기본 <code>"uploads"</code>)</td></tr>
           </tbody>
         </table>
         <h4>Response 201 — DocumentUploadResponse</h4>
@@ -703,7 +670,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
             <tr><td class="f-name">extraction_quality</td><td class="f-type">float</td><td>0.0~1.0 M2 품질 점수</td></tr>
             <tr><td class="f-name">ocr_used</td><td class="f-type">boolean</td><td>OCR 사용 여부</td></tr>
             <tr><td class="f-name">persisted</td><td class="f-type">boolean</td><td>DB 저장 성공 여부</td></tr>
-            <tr><td class="f-name">rag_indexed / rag_collection / rag_vector_count</td><td class="f-type">bool / string / int</td><td><code>index_for_rag=true</code> 시 RAG 적재 결과</td></tr>
             <tr><td class="f-name">warnings</td><td class="f-type">string[]</td><td>처리 중 발생한 경고 메시지 목록</td></tr>
           </tbody>
         </table>
@@ -764,7 +730,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       </div>
       <div class="ep-body">
         <p class="ep-desc">가이드 문서를 등록하고 RAG 인덱싱 결과를 반환한다. 버전 조회는 특정 <code>guide_id</code>의 현재 학습 버전과 등록 버전 목록을 반환한다.</p>
-        <p style="font-size:13px;"><code>GuideUploadResponse = {guide_id, version, indexed, embedding_vector_count, triggers_retraining}</code></p>
+        <p style="font-size:13px;"><code>GuideUploadResponse = {guide_id, version, triggers_retraining}</code></p>
         <p style="font-size:13px;"><code>GuideVersionList = {guide_id, current_training_version, versions:[{version, effective_date, change_summary, registered_at}]}</code></p>
       </div>
     </div>
@@ -1030,29 +996,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       </div>
     </div>
 
-    <div class="ep" id="ep-rag-search">
-      <div class="ep-header">
-        <span class="method post">POST</span>
-        <span class="ep-path">/api/v1/rag/search</span>
-        <span class="ep-summary">유사 문서·청크 Top-K 검색 (LLM 미호출)</span>
-        <span class="ep-auth">JWT / API Key · 60 req/min</span>
-      </div>
-      <div class="ep-body">
-        <p class="ep-desc">검수 화면에서 '이 문서와 비슷한 과거 문서'를 제시해 검수자 판단을 돕는 <strong>검색 전용</strong> 엔드포인트다. <code>/answer</code>와 달리 <strong>LLM을 호출하지 않는다</strong> — 요건상 RAG는 검색이고 답변 생성은 요건 외이므로, LLM-free 고객사에서도 이 경로는 동작한다.</p>
-        <div class="callout"><div class="callout-label">보안 결정 — 등급 ACL 없음 (의도된 설계)</div><p style="font-size:13px;">인증(<code>require_auth</code>)만 요구하고 등급별 접근제어는 두지 않는다. 응답 <code>hits[].text</code>에 청크 원문이 담기므로 인증 주체는 TS/S1 청크도 열람할 수 있다. 배포 전제(<b>단일 고객사 폐쇄망 · 상류 KL 포털 격리</b>)에서 동일 주체가 <code>/documents</code>·<code>/classify</code>로도 같은 문서에 접근 가능하므로 신규 권한상승이 아니다. 다중검수자·최소권한이 요건화되면 등급/컬렉션 화이트리스트 필터를 도입한다.</p></div>
-        <h4>Response 200</h4>
-        <table class="ftbl">
-          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">query</td><td class="f-type">string</td><td>질의 원문</td></tr>
-            <tr><td class="f-name">count</td><td class="f-type">integer</td><td>반환 hit 수</td></tr>
-            <tr><td class="f-name">elapsed_ms</td><td class="f-type">integer</td><td>검색 소요(ms)</td></tr>
-            <tr><td class="f-name">hits[]</td><td class="f-type">array</td><td><code>{source_doc, chunk_id, score, text}</code></td></tr>
-          </tbody>
-        </table>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">401 인증 필요</span><span class="sc s4xx">429 한도 초과</span></div>
-      </div>
-    </div>
 
     <div class="ep" id="ep-demo-purge">
       <div class="ep-header">

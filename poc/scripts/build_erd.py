@@ -69,6 +69,7 @@ LOGICAL = {
     "tb_audit_log": "감사 로그",
     "tb_guides": "가이드 문서",
     "tb_llm_usage": "LLM 사용량",
+    "tb_advisory_locks": "동시성 잠금",
 }
 
 # 외래키 제약은 없으나 논리적으로 참조하는 관계. FK 목록에는 안 잡히지만 관계는 실재한다.
@@ -356,6 +357,89 @@ def build_svg() -> str:
     return "\n".join(out)
 
 
+# ── 관계 목록·개수 (2026-09-05) ────────────────────────────────────────────
+#
+# 왜 여기서 쓰나. 종전에는 이 스크립트가 <svg> 만 갈아 끼우고 문서 본문의 관계 목록과
+# 머리말 개수는 손으로 적혀 있었다. 그래서 실측 2026-09-05 에 셋이 서로 달랐다 —
+# 머리 배지 "관계 25" · 캡션 "관계 27(외래키 26 · 논리 참조 1)" · 목록 27행인데
+# 코드의 진실은 외래키 24 · 논리 참조 3 이었다. 도식만 코드에서 뽑고 숫자는 손으로
+# 적으면 이렇게 갈린다. 이제 넷 다 같은 함수가 만든다.
+
+def _area(child: str) -> str:
+    """관계의 영역 — 자식 표가 속한 그룹 이름. 정본은 table_spec_meta.GROUPS 다."""
+    try:
+        sys.path.insert(0, str(_ROOT.parent / "scripts"))
+        import table_spec_meta as _meta        # noqa: PLC0415
+
+        gid = _meta.TABLES.get(child, ("", "", ""))[0]
+        for g, gname, _desc in _meta.GROUPS:
+            if g == gid:
+                return gname
+    except Exception:                          # noqa: BLE001
+        pass
+    return "—"
+
+
+def build_relations() -> tuple[str, int, int]:
+    """(관계 목록 tbody, 외래키 수, 논리 참조 수)."""
+    _cols, fks = parse_models()
+    rows = []
+    for child, col, parent in fks:
+        area = "자기참조" if child == parent else _area(child)
+        rows.append((child, col, parent, area))
+    for child, col, parent in LOGICAL_FK:
+        rows.append((child, col, parent, "논리 참조"))
+    rows.sort(key=lambda r: (r[3] == "논리 참조", r[0], r[1]))
+
+    def cell(t: str) -> str:
+        return f'{LOGICAL.get(t, t)}<br /><span class="src">{t}</span>'
+
+    body = "\n".join(
+        f'      <tr><td>{cell(c)}</td><td><code>{col}</code></td>'
+        f'<td>{cell(pa)}</td><td class="c">{ar}</td></tr>'
+        for c, col, pa, ar in rows
+    )
+    return body, len(fks), len(LOGICAL_FK)
+
+
+def _replace_between(s: str, start: str, end: str, new: str) -> str | None:
+    i = s.find(start)
+    if i < 0:
+        return None
+    j = s.find(end, i + len(start))
+    if j < 0:
+        return None
+    return s[: i + len(start)] + new + s[j:]
+
+
+def apply_body(s: str, ntab: int) -> tuple[str, list[str]]:
+    """관계 목록·개수 문구를 코드값으로 맞춘다. 바꾼 자리 이름을 함께 돌려준다."""
+    body, nfk, nsoft = build_relations()
+    total = nfk + nsoft
+    done = []
+
+    out = _replace_between(s, '<h2>2. 관계 목록</h2>', '</tbody>', "")
+    if out is not None:                       # 표 전체를 다시 쓴다
+        head = ('\n  <div class="tw">\n  <table>\n'
+                '    <thead><tr><th style="width:32%">자식 테이블</th>'
+                '<th style="width:22%">외래키 컬럼</th>'
+                '<th style="width:32%">부모 테이블</th>'
+                '<th style="width:14%">영역</th></tr></thead>\n    <tbody>\n')
+        s = _replace_between(s, '<h2>2. 관계 목록</h2>', '</tbody>', head + body + "\n    ")
+        done.append("관계 목록 %d행" % (nfk + nsoft))
+
+    s2 = re.sub(r"테이블 \d+ 개 · 관계 \d+ 개\(외래키 \d+ · 논리 참조 \d+\)",
+                f"테이블 {ntab} 개 · 관계 {total} 개(외래키 {nfk} · 논리 참조 {nsoft})", s)
+    if s2 != s:
+        done.append("캡션")
+        s = s2
+    s2 = re.sub(r"테이블 \d+ · 관계 \d+ ·", f"테이블 {ntab} · 관계 {total} ·", s)
+    if s2 != s:
+        done.append("머리 배지")
+        s = s2
+    return s, done
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="ERD 문서의 <svg> 를 교체한다")
@@ -370,13 +454,20 @@ def main(argv=None) -> int:
 
     name = "테이블정의서_ERD.html" if args.spec else "ERD_개체관계도.html"
     targets = [
+        # [2026-09-05] 감리문서 사본은 이름의 밑줄 위치가 다르다(테이블_정의서.html).
+        # build_table_spec.OUTS 와 같은 목록을 봐야 한 쪽만 뒤처지지 않는다.
+        _ROOT.parent / "doc" / "감리문서" / ("테이블_정의서.html" if args.spec else name),
         _ROOT.parent / "doc" / "감리문서" / name,
         _ROOT.parent / "doc" / "result" / "KL_회신_2026-08-28" / "첨부" / name,
         _ROOT.parent / "doc" / "result" / "KL_AI자료_2026-08" / name,
         _ROOT.parent / "doc" / "result" / "KL_AI자료_2026-08" / "첨부문서" / name,
     ]
     n = 0
+    seen = set()
     for p in targets:
+        if p in seen:            # --spec 이 아닐 때 감리문서 두 항목이 같은 파일을 가리킨다
+            continue
+        seen.add(p)
         if not p.exists():
             print(f"  [없음] {p}")
             continue
@@ -386,9 +477,10 @@ def main(argv=None) -> int:
             print(f"  [svg 없음] {p.name}")
             continue
         s = s[:i] + svg + s[j + len("</svg>"):]
+        s, done = apply_body(s, len(parse_models()[0]))
         io.open(p, "w", encoding="utf-8", newline="").write(s)
         n += 1
-        print(f"  교체 {p.name}")
+        print(f"  교체 {p.name}" + (" · " + " · ".join(done) if done else ""))
     print(f"{n}개 문서 갱신")
     return 0
 

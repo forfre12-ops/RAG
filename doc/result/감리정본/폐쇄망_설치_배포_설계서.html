@@ -166,8 +166,8 @@ footer strong{color:var(--text-dim);}
       <tr><td>이미지 적재</td><td><code>docker load</code> — 인프라 + API + Worker</td></tr>
       <tr><td>의존성 설치</td><td>python wheel 오프라인 설치 + torch 배치</td></tr>
       <tr><td>구성</td><td>환경변수(<code>.env</code>) 작성 — 엔드포인트·시크릿·배포 프로파일</td></tr>
-      <tr><td>DB 부트스트랩</td><td>스키마 마이그레이션 + 파티션 백필</td></tr>
-      <tr><td>스토리지 초기화</td><td>로컬FS(.storage) 디렉토리 자동 생성 (벡터검색 <code>tb_rag_vectors</code>는 마이그레이션이 생성 — 별도 템플릿·사전 불요)</td></tr>
+      <tr><td>DB 부트스트랩</td><td>스키마 마이그레이션</td></tr>
+      <tr><td>스토리지 초기화</td><td>로컬FS(.storage) 디렉토리 자동 생성 — 별도 템플릿·사전 불요</td></tr>
       <tr><td>모델 배치·기동</td><td>학습 가중치·보정값 배치 → 전체 기동</td></tr>
       <tr><td>검증·관측성</td><td>헬스체크·스모크 분류 + 모니터링 구성, (옵션) mTLS 적용</td></tr>
     </tbody>
@@ -217,11 +217,10 @@ vi .env   # 엔드포인트·시크릿·배포 프로파일·로컬 LLM endpoint
 
 # 5) 인프라 기동 → DB 부트스트랩
 docker compose up -d postgres redis
-docker compose run --rm api alembic upgrade head   # 스키마 + 파티션 + 벡터(tb_rag_vectors) (컨테이너 내 실행)
+docker compose run --rm api alembic upgrade postgres@head   # 스키마 (컨테이너 내 실행)
 
 # 6) 스토리지 초기화
 #   로컬 스토리지(.storage) 디렉토리 자동 생성 — 별도 버킷 불요
-#   벡터검색: 별도 초기화 불요 (tb_rag_vectors는 alembic 마이그레이션이 생성)
 
 # 7) 모델 배치 → 전체 기동
 #   분류기 학습본·보정값·임베딩·LLM 모델 배치 후
@@ -231,11 +230,10 @@ docker compose up -d
   <div class="section-sep" id="s7"><span class="section-sep-num">07</span><span class="section-sep-line"></span><span class="section-sep-title">부트스트랩 · 초기화 상세</span></div>
   <h2>DB · 스토리지 · 인덱스</h2>
   <ul>
-    <li><strong>스키마</strong> — 마이그레이션이 baseline + 후속 변경(핫패스 인덱스, 13개월 월 파티션 백필)을 멱등 적용.</li>
+    <li><strong>스키마</strong> — 마이그레이션이 baseline + 후속 변경(핫패스 인덱스·시간축 인덱스)을 멱등 적용.</li>
     <li><strong>로컬FS 스토리지(.storage)</strong> — 원문·모델·아티팩트를 로컬 파일시스템에 보관(MinIO/객체스토리지 버킷 미사용).</li>
-    <li><strong>벡터검색 초기화</strong> — 별도 절차 불요. <code>tb_rag_vectors</code>(pgvector dense + bigram-tsvector ts_rank)는 alembic 마이그레이션이 생성, 색인은 적재 시 자동.</li>
     <li><strong>모델</strong> — 학습 가중치를 서빙 위치에 배치, 보정값(temperature) 동반(부재 시 무보정·과신 위험).</li>
-    <li><strong>파티션</strong> — 주기작업(beat)이 매일 향후 월 파티션을 선생성.</li>
+    <li><strong>보존기간</strong> — 파티션은 두지 않는다(2026-09-05). 감사 로그는 보존기간(기본 730일)이 지난 행을 오래된 달부터 지운다. 기본은 꺼져 있고 <code>RETENTION_ENABLED=1</code> 로 켠다.</li>
   </ul>
 
   <div class="section-sep" id="s8"><span class="section-sep-num">08</span><span class="section-sep-line"></span><span class="section-sep-title">배포 프로파일</span></div>
@@ -257,7 +255,6 @@ docker compose up -d
     <li><strong>헬스체크</strong> — <code>/api/v1/healthz/live</code>(프로세스)·<code>/ready</code>(의존성 실측)·<code>/deep</code>(전체).</li>
     <li><strong>컨테이너</strong> — API·Worker·Beat·PostgreSQL(pgvector)·Redis 기동(스토리지=로컬FS · MLflow=지재원 전용). Worker는 전 큐 구독, Beat는 단일 인스턴스.</li>
     <li><strong>스모크 분류</strong> — 샘플 문서 업로드 → 분류 → 등급·신뢰도 반환 확인.</li>
-    <li><strong>검색</strong> — pgvector 확장 설치 + <code>tb_rag_vectors</code> 적재 건수 확인, <code>/ready</code> 의존성 통과.</li>
     <li><strong>관측성</strong> — 모니터링 타깃 정상, KPI 대시보드·알람 로드.</li>
   </ul>
 
@@ -283,7 +280,6 @@ docker compose up -d
       <tr><td>설치 절차서</td><td><span class="tag done">해결</span></td><td><code>docs/INSTALL.md</code> 동봉 (단계별 커맨드)</td></tr>
       <tr><td>DB 마이그레이션</td><td><span class="tag done">해결</span></td><td>api 이미지에 alembic 동봉 → <code>docker compose run --rm api alembic upgrade head</code></td></tr>
       <tr><td><code>install.sh</code> 의존성</td><td><span class="tag done">해결</span></td><td>참조 파일명을 <code>_requirements_no_torch.txt</code>로 정합</td></tr>
-      <tr><td>벡터 스키마</td><td><span class="tag done">해결</span></td><td>alembic 마이그레이션이 <code>tb_rag_vectors</code>(pgvector + bigram tsvector) 생성 — 별도 템플릿 불요</td></tr>
       <tr><td>모델 가중치 5종</td><td><span class="tag plan">빌드 시</span></td><td>KURE-v1·BGE-M3·Qwen3-14B·분류기 학습본+보정값 — 외부망 빌드 호스트에서 캐시·동봉</td></tr>
       <tr><td>실 이미지 tar · SHA256</td><td><span class="tag plan">빌드 시</span></td><td>현 dry-run → <code>--version 1.0.0</code> 실빌드(docker save + 스캔 + 체크섬)</td></tr>
       <tr><td>GPU 스택 버전</td><td><span class="tag dep">확인필요</span></td><td>Driver·CUDA·Container Toolkit 버전 — 발주처와 확정</td></tr>

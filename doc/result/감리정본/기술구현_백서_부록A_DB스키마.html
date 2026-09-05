@@ -225,7 +225,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
   <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
     <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
   </div>
-    <p class="lede">현재 ORM 기준 19개 테이블과 Alembic SQL의 RAG 2테이블(<code>tb_rag_vectors</code> 임베딩 · <code>tb_rag_aliases</code> 무중단 재색인 alias)을 운영한다. <code>tb_chunks</code>·<code>tb_llm_usage</code>·<code>tb_audit_log</code>는 월별 RANGE PARTITION 부모 테이블이다. 채점은 3요건(S·V·M) 곱셈식(B안)으로 정합되어 있다.</p>
+    <p class="lede">현재 ORM 기준 19개 테이블을 운영한다. <code>tb_chunks</code>·<code>tb_llm_usage</code>·<code>tb_audit_log</code>는 월별 RANGE PARTITION 부모 테이블이다. 채점은 3요건(S·V·M) 곱셈식(B안)으로 정합되어 있다.</p>
     <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;max-width:700px;">본 부록은 <b>현재 소스가 생성·매핑하는 Koipa 애플리케이션 테이블</b>을 다룬다 — AI 코어 6모듈(M1 합성·M2 청킹·M3 라벨링·M4 학습·M5 추론·M6 보정), 등급체계, 문서/감사/비용/가이드 운영 테이블. 현 ORM에는 <code>tb_documents</code>, <code>tb_audit_log</code>, <code>tb_llm_usage</code>, <code>tb_guides</code>도 Koipa 모델로 포함된다. KL 원천 문서·EDMS·회원/권한·자가진단(<code>tb_self_assessments</code>)은 외부 시스템이며, 연동 키는 <code>external_ref</code>와 메타데이터로 다룬다.</p>
     <hr class="hero-sep">
 
@@ -285,7 +285,7 @@ var texts=root.querySelectorAll(".erd-node text");var btns=root.querySelectorAll
 function apply(mode){texts.forEach(function(t){var k=t.closest(".erd-node").dataset.table;if(mode==="logical"){t.textContent=LOGICAL[k]||k;t.setAttribute("font-size","11");}else{t.textContent=k;t.setAttribute("font-size","11.5");}});btns.forEach(function(b){b.classList.toggle("active",b.dataset.mode===mode);});}
 btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.mode);});});})();</script>
 </div>
-      <p style="font-size:12px;color:#888;margin:-6px 0 18px;">※ 이 ERD 그림은 핵심 AI 테이블 중심의 축약도다. 현재 ORM에는 <code>tb_documents</code>·<code>tb_audit_log</code>·<code>tb_llm_usage</code>·<code>tb_guides</code>가 추가로 매핑되어 있으며, <code>tb_rag_vectors</code>는 Alembic SQL로 생성된다. 미표시(오프라인) 시에도 아래 관계와 운영 테이블 메모를 함께 본다.</p>
+      <p style="font-size:12px;color:#888;margin:-6px 0 18px;">※ 이 ERD 그림은 핵심 AI 테이블 중심의 축약도다. 현재 ORM에는 <code>tb_documents</code>·<code>tb_audit_log</code>·<code>tb_llm_usage</code>·<code>tb_guides</code>가 추가로 매핑되어 있다. 미표시(오프라인) 시에도 아래 관계와 운영 테이블 메모를 함께 본다.</p>
       <div class="group-desc">핵심 외래키 관계 (텍스트)</div>
       <ul class="rel-list">
         <li><code>tb_chunks</code> <span class="rel-arrow">→</span> <code>tb_documents</code> (doc_id · <b>Koipa 문서 레코드</b>, KL 원천 키는 <code>external_ref</code>)</li>
@@ -300,7 +300,7 @@ btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.m
         <li><code>tb_corrections</code> <span class="rel-arrow">→</span> <code>tb_classifications</code> · <code>tb_classification_levels</code> · <code>tb_training_runs</code></li>
         <li><code>tb_sample_documents</code> <span class="rel-arrow">→</span> <code>tb_classification_levels</code> · <code>tb_prompt_versions</code></li>
       </ul>
-      <div class="partition-box">⚡ <b>파티션 테이블 3개</b> — <code>tb_chunks</code>(<code>RANGE BY created_at</code>) · <code>tb_llm_usage</code>(<code>RANGE BY called_at</code>) · <code>tb_audit_log</code>(<code>RANGE BY occurred_at</code>)가 모두 월별 RANGE 파티션 부모다(baseline 000000000001 + backfill e5f6a7b8c9d0). ORM은 부모만 매핑하며, INSERT는 자동 라우팅. 그 외 운영 테이블: <code>tb_documents</code>(문서·URI·메타), <code>tb_guides</code>(가이드 버전), <code>tb_rag_vectors</code>(pgvector RAG 저장소), <code>tb_rag_aliases</code>(무중단 재색인 alias).</div>
+      <div class="partition-box">⚡ <b>파티션 테이블 3개</b> — <code>tb_chunks</code>(<code>RANGE BY created_at</code>) · <code>tb_llm_usage</code>(<code>RANGE BY called_at</code>) · <code>tb_audit_log</code>(<code>RANGE BY occurred_at</code>)가 모두 월별 RANGE 파티션 부모다(baseline 000000000001 + backfill e5f6a7b8c9d0). ORM은 부모만 매핑하며, INSERT는 자동 라우팅. 그 외 운영 테이블: <code>tb_documents</code>(문서·URI·메타), <code>tb_guides</code>(가이드 버전).</div>
     </section>
 
     <!-- Group A — 등급체계 -->
@@ -394,52 +394,6 @@ btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.m
         <span class="idx-chip">PK (chunk_id, created_at)</span>
         <span class="idx-chip">IDX doc_id, chunk_index</span>
       </div>
-      <h4 style="font-size:14px;margin:18px 0 8px;">벡터 검색 — PostgreSQL pgvector 통합</h4>
-      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">벡터 임베딩(KURE-v1 1024차원)은 Alembic 마이그레이션이 생성하는 <code>tb_rag_vectors.embedding</code> 컬럼에 저장하고 HNSW 인덱스로 검색한다. <code>tb_chunks</code>는 원문 청크·페이지·섹션 메타의 운영 원장이고, RAG 검색용 벡터/렉시컬 색인은 <code>tb_rag_vectors</code>가 담당한다. 한국어 렉시컬은 앱이 만든 bigram 토큰 <code>tsvector</code>를 <code>ts_rank</code>로 채점(코어 FTS)하고, <code>pg_bigm</code> GIN은 설치 시 후보생성 가속으로만 보완한다.</p>
-      <pre>-- 확장 (1회)
-CREATE EXTENSION IF NOT EXISTS vector;     -- 벡터 검색 (pgvector)
-CREATE EXTENSION IF NOT EXISTS pg_bigm;    -- (선택) 한국어 bigram GIN 후보가속 — 랭킹은 코어 ts_rank
-
--- RAG 벡터 테이블 (KURE-v1 = 1024차원)
-CREATE TABLE tb_rag_vectors (
-  collection  TEXT NOT NULL,        -- 논리 네임스페이스(ES index 대체). PK 1번째
-  id          TEXT NOT NULL,        -- 항목 고유 ID(컬렉션 내 유일, 보통 doc_id#chunk_idx). PK 2번째
-  doc_id      TEXT,                 -- 원문 문서 식별자(느슨한 참조·FK 아님). 문서 단위 삭제·필터
-  chunk_idx   INTEGER,              -- 문서 내 청크 순번(0-base). 원문 재구성·인접 청크 조회
-  content     TEXT NOT NULL,        -- 청크 원문 텍스트. 결과 반환 + pg_bigm 후보생성 대상
-  bigram_text TEXT,                 -- content의 bigram 토큰(앱이 채움). 한국어 ts_rank 채점 소스(조사·굴절에 강함)
-  embedding   vector(1024),         -- dense 임베딩(KURE-v1/BGE-M3, 차원 고정·가변불가). HNSW 코사인 kNN 대상
-  tsv         tsvector GENERATED ALWAYS AS (to_tsvector('simple', coalesce(bigram_text, ''))) STORED,  -- 어휘 인덱스원(bigram서 DB 자동파생). 어절 NL R@5 47%→bigram 87%
-  payload     JSONB NOT NULL DEFAULT '{}'::jsonb,  -- 임의 메타데이터(heading_path·source·등급 등)
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 적재 시각(재색인·감사)
-  PRIMARY KEY (collection, id)      -- 복합 PK — 같은 id 다른 컬렉션 공존(재색인 blue/green)
-);
-
--- 의미 검색용 HNSW 인덱스 (코사인 거리)
-CREATE INDEX idx_ragvec_embedding
-  ON tb_rag_vectors USING hnsw (embedding vector_cosine_ops);
-
--- 한국어 렉시컬 랭커 — 앱이 만든 bigram 텍스트의 tsvector + ts_rank (코어 FTS)
-CREATE INDEX idx_ragvec_tsv ON tb_rag_vectors USING gin (tsv);
-
--- (선택) 후보생성 가속 — pg_bigm GIN. 랭킹 아님(위 ts_rank).
-CREATE INDEX idx_ragvec_content_bigm
-  ON tb_rag_vectors USING gin (content gin_bigm_ops);
-
--- Blue/Green 무중단 재색인 alias
-CREATE TABLE tb_rag_aliases (
-  alias       TEXT PRIMARY KEY,     -- 논리 이름(예: uploads). 앱이 참조하는 안정적 이름
-  collection  TEXT NOT NULL,        -- 실제 물리 collection(예: uploads_v3). 재색인 시 이 값만 교체
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()  -- alias→collection 갱신 시각
-);
-
--- 최근접 이웃 (상위 5건)
-SELECT id, doc_id, content
-FROM   tb_rag_vectors
-WHERE  collection = :collection
-ORDER  BY embedding &lt;=&gt; :q
-LIMIT  5;</pre>
-      <p class="note-soft" style="font-size:13px;color:var(--text-dim);margin:8px 0 0;">※ 골든셋 수천~수십만 건은 HNSW로 sub-100ms 응답이며 수백만 건까지 여유가 있다. 임베딩 컬럼은 고객사 agent의 Postgres+pgvector에 오프라인 골든 번들로 적재된다.</p>
     </section>
 
     <!-- Group C -->
@@ -550,7 +504,7 @@ LIMIT  5;</pre>
           <tr><td class="td-pk">version_id</td><td class="td-type">UUID PK</td><td></td></tr>
           <tr><td class="td-col">version_label</td><td class="td-type">VARCHAR(50) UNIQUE</td><td>v-fe4b386b 형식 (해시 기반)</td></tr>
           <tr><td class="td-col">base_model</td><td class="td-type">VARCHAR(100)</td><td>kakaobank/kf-deberta-base</td></tr>
-          <tr><td class="td-col">model_type</td><td class="td-type">VARCHAR(20)</td><td>classifier / reranker (기본 classifier)</td></tr>
+          <tr><td class="td-col">model_type</td><td class="td-type">VARCHAR(20)</td><td>classifier (기본값이자 현재 유일한 값)</td></tr>
           <tr><td class="td-col">trained_at</td><td class="td-type">TIMESTAMPTZ</td><td>학습 완료 시각</td></tr>
           <tr><td class="td-fk">training_run_id</td><td class="td-type">UUID</td><td>학습 실행 참조 (tb_training_runs.run_id)</td></tr>
           <tr><td class="td-col">training_data_count</td><td class="td-type">INTEGER</td><td>학습 샘플 수</td></tr>
