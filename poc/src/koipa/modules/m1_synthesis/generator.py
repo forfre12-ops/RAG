@@ -204,7 +204,38 @@ DOMAIN_DOC_TYPES = {
     "semiconductor": "공정 레시피 명세, EUV 파라미터 설계서, 수율 개선 연구노트, 반도체 설계 도면",
     "bio": "신약 후보물질 연구노트, 임상시험 프로토콜, 화합물 합성 경로, FDA 전략 기획서",
     "ai": "사전학습 데이터셋 명세, 모델 가중치 관리 문서, RLHF 보상 설계서, 핵심 알고리즘 특허 전략",
+    # [2026-09-05] 학습셋에 **실재하는데 생성기가 모르던** 한국 산업 도메인 — 944행(37.0%).
+    # 이 칸들은 어휘를 통일해도 문서 유형을 모르면 채울 수 없었다.
+    "배터리": "양극재 조성 설계서, 셀 공정 레시피, 전해액 배합 연구노트, 수명 시험 성적서",
+    "반도체": "공정 레시피 명세, 노광 파라미터 설계서, 수율 개선 연구노트, 소자 설계 도면",
+    "화학_제약": "합성 경로 연구노트, 원료 배합비 명세, 임상 프로토콜, 제형 안정성 시험서",
+    "바이오_농업": "품종 육성 기록, 유전자원 관리 대장, 재배 시험 보고서, 종자 처리 공정서",
+    "소프트웨어": "아키텍처 설계서, API 명세, 릴리스 노트, 장애 사후분석 보고서",
+    "경영정보": "경영 실적 보고, 조직 개편안, 예산 배분 계획, 이사회 안건서",
+    "기타": "내부 공지, 업무 협조전, 교육 자료, 절차 안내서",
 }
+
+
+# [2026-09-05] 어휘 통일 — 같은 산업이 영문·한글 두 칸으로 갈려 있었다.
+#
+# 학습셋 실측: semiconductor 1 vs 반도체 159 · pharma 2 vs 화학_제약 102 ·
+# battery 2 vs 배터리 29 · bio 0 vs 바이오_농업 9. 갈림 때문에 커버리지 빈 칸 9개·
+# 얇은 칸 4개가 없던 문제로 부풀려졌다(TS battery 2 + 배터리 12 = 14 — 합치면 얇지 않다).
+#
+# **한글을 정본으로 삼는다** — 행 수가 압도적으로 많고(159 대 1), 학습셋 실물이 그 이름을 쓴다.
+# 영문 이름은 계속 받되 한글로 접어 넣는다(옛 요청·옛 데이터가 깨지지 않게).
+DOMAIN_ALIASES = {
+    "semiconductor": "반도체",
+    "battery": "배터리",
+    "pharma": "화학_제약",
+    "bio": "바이오_농업",
+}
+
+
+def canonical_domain(name: str | None) -> str:
+    """도메인 이름을 정본으로 접는다. 모르는 이름은 그대로 둔다(거부는 스키마가 한다)."""
+    key = (name or "").strip()
+    return DOMAIN_ALIASES.get(key, key) or "mixed"
 
 
 # [2026-09-05] 프롬프트 버전 — 재현·감사 앵커.
@@ -448,6 +479,7 @@ class SyntheticDocGenerator:
             if hasattr(req.target_grade, "value")
             else str(req.target_grade)
         )
+        req_domain = canonical_domain(req.domain)
         situation = GRADE_SITUATION_PROMPTS.get(
             grade_code, GRADE_SITUATION_PROMPTS["S3"]
         )
@@ -461,9 +493,9 @@ class SyntheticDocGenerator:
             situation=req.scenario_context or situation["situation"],
             disclosure_scope=req.disclosure_scope or situation["disclosure_scope"],
             harm_potential=req.harm_potential or situation["harm_potential"],
-            domain=req.domain,
+            domain=req_domain,
             doc_types=req.document_type_hint
-            or DOMAIN_DOC_TYPES.get(req.domain, DOMAIN_DOC_TYPES["mixed"]),
+            or DOMAIN_DOC_TYPES.get(req_domain, DOMAIN_DOC_TYPES["mixed"]),
             structure_requirements=structure_requirements,
             len_min=req.len_min,
             len_max=req.len_max,
@@ -521,10 +553,10 @@ class SyntheticDocGenerator:
             # [C16] resp.text가 비면 placeholder(_fallback_body)=noop_fallback(학습 금지 마커),
             # 실 LLM이 비-JSON 텍스트를 주면 llm_nonjson — 둘을 label_source로 구분(grep 식별).
             raw_text = resp.text or ""
-            body = raw_text or _fallback_body(grade_code, req.domain)
+            body = raw_text or _fallback_body(grade_code, req_domain)
             label_source = "llm_nonjson" if raw_text else "noop_fallback"
             doc_types = req.document_type_hint or DOMAIN_DOC_TYPES.get(
-                req.domain, "내부 자료"
+                req_domain, "내부 자료"
             )
             title = (
                 f"{doc_types.split(',')[0].strip()} 합성 v{abs(hash(user)) % 10000:04d}"
@@ -532,7 +564,7 @@ class SyntheticDocGenerator:
             doc_type = doc_types.split(",")[0].strip()
             return SynthDoc(
                 target_grade=grade_code,
-                domain=req.domain,
+                domain=req_domain,
                 title=title,
                 body=body,
                 document_type=doc_type,
@@ -550,7 +582,7 @@ class SyntheticDocGenerator:
         body = parsed.get("body", "") or ""
         return SynthDoc(
             target_grade=grade_code,
-            domain=req.domain,
+            domain=req_domain,
             title=parsed.get("title", "") or "",
             body=body,
             document_type=parsed.get("document_type", "") or "",

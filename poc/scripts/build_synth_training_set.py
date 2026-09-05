@@ -35,13 +35,23 @@ def main(argv=None) -> int:
         default=None,
         help="최대 행 수(기본=전량). 스모크 확인용.",
     )
+    ap.add_argument(
+        "--stamp",
+        action="store_true",
+        help=(
+            "방출한 판 이름을 승인본 행(added_to_dataset_version)에 되쓴다. "
+            "'이 문서가 어느 셋에 들어갔나'를 되짚기 위한 기록이며 학습을 돌리지는 않는다."
+        ),
+    )
     args = ap.parse_args(argv)
 
     # 표준 스크립트 관례: src 를 import 경로에 추가(standalone 실행 지원).
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
     from koipa.services.synthesis_service import SynthesisService
 
-    result = SynthesisService().build_training_rows(limit=args.limit)
+    result = SynthesisService().build_training_rows(
+        limit=args.limit, stamp_version=args.stamp,
+    )
     rows = result["rows"]
 
     out = Path(args.out)
@@ -53,6 +63,9 @@ def main(argv=None) -> int:
     # ascii-safe 요약(cp949 콘솔 안전). 무음 드롭 금지 — 사유별 카운트 노출.
     summary = {
         "out": str(out),
+        # 판 이름 = 내용 해시. 같은 승인 집합이면 같은 값 — 시각이 아니라 내용으로 가른다.
+        "dataset_version": result["dataset_version"],
+        "stamped": bool(args.stamp),
         "approved_total": result["approved_total"],
         "included": result["included"],
         "excluded_noise": result["excluded_noise"],

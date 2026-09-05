@@ -153,5 +153,27 @@ class SynthRepo:
         self.db.flush()
         return pv
 
+    def mark_added_to_dataset(
+        self, sample_ids: "list[uuid.UUID] | list[str]", version: str
+    ) -> int:
+        """승인본에 학습셋 판 이름을 찍는다 — "이 문서가 어느 셋에 들어갔나"의 답.
+
+        [2026-09-05] SynthReviewResponse 에 필드만 있고 표에 칸이 없어 늘 None 이었다.
+        자동 편입을 만들지 않는다 — 승인분이 바로 학습으로 흘러가면 검수가 형식이 된다.
+        빌드가 방출한 뒤에 되쓰는 **추적**이다.
+        """
+        if not sample_ids:
+            return 0
+        ids = [uuid.UUID(str(i)) if not isinstance(i, uuid.UUID) else i
+               for i in sample_ids]
+        n = (
+            self.db.query(SampleDocument)
+            .filter(SampleDocument.sample_id.in_(ids))
+            .update({"added_to_dataset_version": version},
+                    synchronize_session=False)
+        )
+        self.db.flush()
+        return int(n or 0)
+
     def get_prompt(self, version: str) -> PromptVersion | None:
         return self.db.get(PromptVersion, version)

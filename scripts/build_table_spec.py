@@ -108,6 +108,8 @@ REVISIONS = [
      "<code>tb_audit_log</code> 의 복합 기본키는 그대로 둔다.<br>"
      "<b>표 <code>tb_advisory_locks</code> 를 넣었다</b>(18 → 19표 · 216칼럼) — 감사 "
      "해시체인과 모델 활성화의 임계구역을 두 DB 에서 같은 방식으로 잠그기 위한 표다."),
+    ("6", "2026-09-05", "이 문서 머리말의 커밋",
+     '<b>합성 검수 표에 학습셋 판 칸을 넣었다</b>(19표 216 → 217칼럼) &mdash; <code>tb_sample_documents.added_to_dataset_version</code>. 종전에는 API 응답 스키마에만 필드가 있고 표에 칸이 없어 값이 늘 비었다 &mdash; 승인본이 어느 학습셋 판에 들어갔는지 되짚을 수 없던 자리다. <b>자동 편입이 아니라 기록</b>이며, 빌드가 방출한 뒤 되쓴다.<br>곁들여 <b>프롬프트 버전·품질 결과 칸이 실제로 채워지기 시작했다</b>. <code>*_prompt_version</code> 세 칸은 <code>tb_prompt_versions</code> 를 가리키는 외래키라 행을 먼저 등록해야 하는데 워커가 그 등록을 하지 않아 늘 NULL 이었다(실측: IntegrityError 1452).'),
 ]
 
 

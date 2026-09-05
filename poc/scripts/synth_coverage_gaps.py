@@ -45,7 +45,20 @@ def _load(root: Path) -> list[dict]:
 
 
 def _domain(r: dict) -> str:
-    return r.get("domain") or r.get("doc_type") or "(미상)"
+    """도메인을 **정본으로 접어** 센다.
+
+    [2026-09-05] 같은 산업이 영문·한글 두 칸으로 갈려 빈 칸·얇은 칸이 부풀려져 있었다 —
+    실측: semiconductor 1 vs 반도체 159 · pharma 2 vs 화학_제약 102 · battery 2 vs 배터리 29.
+    TS battery 2 + 배터리 12 = 14 라 합치면 얇지 않은데 둘 다 "얇은 칸"으로 보고됐다.
+    접어 세면 빈 칸 20→11 · 얇은 칸 18→14 다.
+    """
+    raw = r.get("domain") or r.get("doc_type") or "(미상)"
+    try:
+        from koipa.modules.m1_synthesis.generator import canonical_domain  # noqa: PLC0415
+
+        return canonical_domain(raw)
+    except Exception:  # noqa: BLE001
+        return raw
 
 
 def analyse(rows: list[dict], *, min_per_cell: int) -> dict:

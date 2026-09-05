@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from koipa.modules.m1_synthesis.generator import DOMAIN_DOC_TYPES
+from koipa.modules.m1_synthesis.generator import DOMAIN_ALIASES, DOMAIN_DOC_TYPES
 
 from .common import Actor, Grade
 
@@ -20,7 +20,9 @@ from .common import Actor, Grade
 # 즉 **생성 능력이 필요 없는 칸에만 열려 있었다.**
 #
 # 빈 칸은 scripts/synth_coverage_gaps.py 로 센다.
-_SYNTH_DOMAINS = sorted(DOMAIN_DOC_TYPES)
+# [2026-09-05] 별칭도 받는다 — 옛 요청(semiconductor·battery·pharma·bio)이 깨지지 않게.
+# 생성기가 canonical_domain() 으로 정본(한글)에 접어 넣는다.
+_SYNTH_DOMAINS = sorted(set(DOMAIN_DOC_TYPES) | set(DOMAIN_ALIASES))
 SYNTH_DOMAIN_PATTERN = r"^(" + "|".join(_SYNTH_DOMAINS) + r")$"
 
 # [2026-09-05] LLM provider 목록도 **정본에서 파생**한다.

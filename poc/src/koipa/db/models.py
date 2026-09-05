@@ -507,6 +507,9 @@ class SampleDocument(Base):
     reviewed_by: Mapped[str | None] = mapped_column(String(50))
     reviewed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     rejection_reason: Mapped[str | None] = mapped_column(Text)
+    # [2026-09-05] 승인본이 어느 학습셋 판에 들어갔는지. 자동 편입이 아니라 **추적**이다 —
+    # 빌드 스크립트가 방출할 때 찍고, "이 승인본이 어느 셋에 들어갔나"를 되짚는 데 쓴다.
+    added_to_dataset_version: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (

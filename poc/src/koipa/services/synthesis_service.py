@@ -7,6 +7,7 @@ PoC: /synth/generate는 작업 등록만 (실 생성은 Celery synthesize_batch 
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import logging
 import uuid
 from typing import Optional
@@ -244,7 +245,9 @@ class SynthesisService:
             logger.warning("synth review skipped: synth_id=%s err=%s", synth_id, exc)
             return None
 
-    def build_training_rows(self, *, limit: int | None = None) -> dict:
+    def build_training_rows(
+        self, *, limit: int | None = None, stamp_version: bool = False
+    ) -> dict:
         """[W6] 검수 승인 + 정상 산출 합성 샘플 → 학습 행. generate→queue→review→train 루프 마감.
 
         사람이 승인한 합성 문서를 학습셋 행({doc_id,text,label,source,domain})으로 변환한다.
@@ -252,8 +255,14 @@ class SynthesisService:
         노이즈의 학습 유입을 차단한다(하드 위생 게이트 — P0#1이 보존한 label_source의 소비처).
         스냅샷 시맨틱: 매 호출이 승인 전체에서 재빌드(결정적·중복 없음).
 
+        [2026-09-05] 판 이름(dataset_version)을 함께 낸다. 내용 해시라 같은 승인 집합이면
+        같은 값이 나온다 — 시각이 아니라 내용으로 판을 가른다. stamp_version=True 면 그 값을
+        각 승인본 행에 되써서 "이 문서가 어느 셋에 들어갔나"를 되짚을 수 있게 한다.
+        **자동 학습 편입이 아니다** — 방출한 것을 기록만 한다.
+
         Returns: {"rows":[...], "approved_total":n, "included":n,
-                  "excluded_noise":n, "excluded_empty":n} — 무음 드롭 없이 사유별 카운트 노출.
+                  "excluded_noise":n, "excluded_empty":n, "dataset_version":str}
+                 — 무음 드롭 없이 사유별 카운트 노출.
         """
         try:
             with session_scope() as db:
@@ -306,6 +315,19 @@ class SynthesisService:
                         "domain": s.doc_type,
                         "label_source": s.label_source,
                         "grade_corrected": s.corrected_level_id is not None,
+                        # [2026-09-05] 생산 이력 — 학습 행에서도 되짚을 수 있게 함께 낸다.
+                        #
+                        # 기존 학습셋 2,554행에는 이 칸이 없어 "어느 LLM 산인가"를 데이터에서
+                        # 되짚을 수 없다(로컬 대 상용 비교를 하려 해도 기준선이 없다).
+                        # 앞으로 만드는 행부터는 남는다.
+                        "llm_provider": getattr(s, "llm_provider", None),
+                        "llm_model": getattr(s, "llm_model", None),
+                        "body_prompt_version": getattr(s, "body_prompt_version", None),
+                        "qc_prompt_version": getattr(s, "qc_prompt_version", None),
+                        "quality_score": (
+                            float(_qs) if (_qs := getattr(s, "quality_score", None)) is not None
+                            else None
+                        ),
                     })
                     if limit is not None and len(rows) >= limit:
                         break
@@ -317,8 +339,30 @@ class SynthesisService:
                     approved_total, len(rows), excluded_noise, excluded_empty,
                     grade_corrected,
                 )
+                # 판 이름 — **내용 해시**다. 같은 승인 집합이면 같은 값이 나온다.
+                # 시각으로 가르면 같은 내용이 매번 다른 판이 되어 되짚기가 안 된다.
+                digest = hashlib.sha256()
+                for r in sorted(rows, key=lambda x: x["doc_id"]):
+                    digest.update(r["doc_id"].encode("utf-8"))
+                    digest.update(b"|")
+                    digest.update(r["label"].encode("utf-8"))
+                    digest.update(b"|")
+                    digest.update((r["text"] or "").encode("utf-8"))
+                    digest.update(b"\n")
+                dataset_version = "synth-%s-%d" % (digest.hexdigest()[:10], len(rows))
+
+                if stamp_version and rows:
+                    marked = repo.mark_added_to_dataset(
+                        [r["doc_id"] for r in rows], dataset_version
+                    )
+                    logger.info(
+                        "학습셋 판 기록: version=%s rows=%d marked=%d",
+                        dataset_version, len(rows), marked,
+                    )
+
                 return {
                     "rows": rows,
+                    "dataset_version": dataset_version,
                     "approved_total": approved_total,
                     "included": len(rows),
                     "excluded_noise": excluded_noise,

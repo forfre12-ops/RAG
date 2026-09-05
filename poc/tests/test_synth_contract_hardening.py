@@ -106,3 +106,94 @@ def test_task_accepts_llm_provider():
     assert "llm_provider" in inspect.signature(fn).parameters, (
         "요청자가 고른 모델과 실제로 쓴 모델이 갈린다"
     )
+
+
+# ── ⑥ 승인본이 어느 학습셋 판에 들어갔는지 되짚을 수 있다 ────────────
+def test_sample_row_has_dataset_version_column():
+    """응답 스키마에만 있고 표에 칸이 없어 늘 None 이던 것을 실제 칼럼으로 뒀다."""
+    from koipa.db.models import SampleDocument  # noqa: PLC0415
+
+    assert hasattr(SampleDocument, "added_to_dataset_version")
+
+
+def test_dataset_version_is_content_hash(monkeypatch):
+    """판 이름은 **내용 해시**다 — 같은 승인 집합이면 같은 값이어야 되짚기가 된다.
+
+    시각으로 가르면 같은 내용이 매번 다른 판이 되어 추적이 무의미해진다.
+    """
+    import types  # noqa: PLC0415
+
+    from koipa.services import synthesis_service as mod  # noqa: PLC0415
+
+    def _s(sid, text, code="S2"):
+        return types.SimpleNamespace(
+            sample_id=sid, generated_content=text, label_source=None,
+            corrected_level_id=None, target_level_id=1, doc_type="tech",
+            llm_provider="anthropic", llm_model="m", body_prompt_version="v2-x",
+            qc_prompt_version="metric-gate-v1", quality_score=1.0,
+        )
+
+    rows = [_s("a", "본문 하나"), _s("b", "본문 둘")]
+
+    class _Repo:
+        def __init__(self, _db): pass
+        def count_by_status(self, _s): return len(rows)
+        def list_by_status(self, _s, limit=0, offset=0): return rows if offset == 0 else []
+        def mark_added_to_dataset(self, ids, version): return len(ids)
+
+    class _Cls:
+        def __init__(self, _db): pass
+        def level_id_by_code(self, code): return 1 if code == "S2" else 2
+
+    class _Db:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    monkeypatch.setattr(mod, "SynthRepo", _Repo)
+    monkeypatch.setattr(mod, "ClassifyRepo", _Cls)
+    monkeypatch.setattr(mod, "session_scope", lambda: _Db())
+
+    a = mod.SynthesisService().build_training_rows()
+    b = mod.SynthesisService().build_training_rows()
+    assert a["dataset_version"] == b["dataset_version"], "같은 내용인데 판 이름이 갈렸다"
+    assert a["dataset_version"].startswith("synth-")
+    # 생산 이력이 학습 행까지 나온다 — 로컬 대 상용 비교의 기준선.
+    for f in ("llm_provider", "llm_model", "body_prompt_version", "quality_score"):
+        assert f in a["rows"][0], f"생산 이력 {f} 가 학습 행에 없다"
+
+
+# ── E-1 도메인 어휘 통일 ─────────────────────────────────────────────
+def test_domain_aliases_fold_to_canonical():
+    """같은 산업이 영문·한글 두 칸으로 갈려 커버리지 빈 칸이 부풀려져 있었다."""
+    from koipa.modules.m1_synthesis.generator import (  # noqa: PLC0415
+        DOMAIN_DOC_TYPES, canonical_domain,
+    )
+
+    for alias, canon in (("semiconductor", "반도체"), ("battery", "배터리"),
+                         ("pharma", "화학_제약"), ("bio", "바이오_농업")):
+        assert canonical_domain(alias) == canon
+        assert canon in DOMAIN_DOC_TYPES, f"{canon} 문서 유형이 없으면 생성할 수 없다"
+    assert canonical_domain("tech") == "tech"      # 별칭 아닌 것은 그대로
+    assert canonical_domain(None) == "mixed"
+
+
+# ── E-2 학습셋에 실재하는 한국 산업 도메인을 생성기가 안다 ───────────
+def test_generator_knows_korean_industry_domains():
+    """실측: 이 도메인들이 학습셋 944행(37.0%)인데 생성기가 몰라 채울 수 없었다."""
+    from koipa.modules.m1_synthesis.generator import DOMAIN_DOC_TYPES  # noqa: PLC0415
+
+    for d in ("배터리", "반도체", "화학_제약", "바이오_농업",
+              "소프트웨어", "경영정보", "기타"):
+        assert d in DOMAIN_DOC_TYPES, f"{d} 도메인을 생성기가 모른다"
+        assert len(DOMAIN_DOC_TYPES[d]) > 10, f"{d} 문서 유형이 비었다"
+
+
+def test_api_accepts_both_alias_and_canonical():
+    from koipa.schemas.synthesis import SynthGenerateRequest  # noqa: PLC0415
+    from koipa.schemas.common import Actor  # noqa: PLC0415
+
+    for d in ("semiconductor", "반도체", "배터리", "경영정보"):
+        SynthGenerateRequest(
+            target_grade="TS", domain=d, count=1,
+            actor=Actor(user_id="t", role="admin"),
+        )
