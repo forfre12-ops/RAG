@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 
 from koipa.api.app import app
@@ -20,6 +21,20 @@ from koipa.services.job_store import InMemoryJobStore, get_default_store
 
 client = TestClient(app)
 API = "/api/v1"
+
+
+@pytest.fixture(autouse=True)
+def _own_job_store(monkeypatch):
+    """이 시험들은 잡 목록 **전체**를 본다 — 남의 잡이 섞이면 답이 달라진다.
+
+    [2026-09-05] 실측: 잡 저장소가 Redis 라 앞선 실행의 golden_register 잡 84개가
+    남아 있었고, 이 파일도 두 번째 실행부터 4건이 계속 깨졌다. 기능이 아니라 시험
+    격리의 문제다. 시험마다 process-local 저장소를 새로 끼운다.
+    """
+    from koipa.services import job_store as _js  # noqa: PLC0415
+
+    monkeypatch.setattr(_js, "_default", _js.InMemoryJobStore(), raising=False)
+    yield
 _ACTOR = Actor(user_id="builder1", role="admin")
 _AUTH = {"X-API-Key": "test-key", "X-Actor-Role": "admin"}
 

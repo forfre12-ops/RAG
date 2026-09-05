@@ -46,14 +46,46 @@ def _read(p: Path) -> str:
         return ""
 
 
+_SELF = Path(__file__).resolve()
+
+
 def _py(root: Path) -> list[Path]:
-    return sorted(p for p in root.rglob("*.py") if "__pycache__" not in str(p))
+    """검사 대상 .py 목록. **이 파일 자신은 뺀다.**
+
+    [2026-09-05] EXPLAINED_COLS 에 칼럼 이름을 적자마자 '참조 0' 이 7건에서 0건이 됐다 —
+    blob 에 poc/scripts/*.py 가 통째로 들어가고 거기 이 파일이 포함되기 때문이다.
+    사유를 적었다는 이유로 죽은 것이 살아 있는 것처럼 보이면 도구가 거짓말을 한다.
+    """
+    return sorted(p for p in root.rglob("*.py")
+                  if "__pycache__" not in str(p) and p.resolve() != _SELF)
+
+
+# ── 설명이 끝난 '참조 0' ──────────────────────────────────────────────
+#
+# 아래는 "안 쓰는 것"이 아니라 **애플리케이션이 읽고 쓸 일이 없는 것**이다. 사유를 여기
+# 적어 두고 요약에서 갈라 센다. 목록에는 계속 보이되 사유가 함께 나온다 — 감추는 것이
+# 아니라 이미 답한 것을 표시하는 것이다. 그러지 않으면 다음 사람이 같은 조사를 되풀이한다.
+EXPLAINED_COLS = {
+    "evidence_id": "IDENTITY 기본키 — DB 가 채운다",
+    "usage_id": "IDENTITY 기본키 — DB 가 채운다",
+    "labeled_at": "server_default now() — DB 가 채운다",
+    "logged_at": "server_default now() — DB 가 채운다",
+    "active_key": "Computed 칼럼 — is_active 에서 DB 가 계산. UNIQUE 인덱스가 활성 1건 제약을 만든다",
+    "model_type": "server_default 'classifier' — 코드가 넣는 값이 하나뿐이고 읽지 않는다(기록용)",
+    "split_method": "실 데이터에 값이 있어 보류(2026-08-29 판단 유지)",
+}
+EXPLAINED_TABLES = {
+    "tb_evaluation_factors": "판정 요건(S·V·M) 시드 표 — alembic 이 채우고 런타임은 읽기만",
+    "tb_prompt_versions": "합성 프롬프트 버전 — 합성 화면이 요건(FUN-003-⑦)이라 넣기만",
+    "tb_advisory_locks": "잠금 행 — 마이그레이션이 미리 넣고 런타임은 FOR UPDATE 로 잡기만",
+    "tb_document_factor_scores": "쓰기·읽기 0 · 실 DB 0행 — 정의서에서도 뺐다(EXCLUDED_TABLES)",
+}
 
 
 # ── ① 테이블 ─────────────────────────────────────────────────────────
 # 쓰기 신호: 모델 클래스 생성자 호출 · bulk_insert · insert(Model) · Model(...) 대입
 # 읽기 신호: select(Model) · query(Model) · Model.컬럼 접근
-def audit_tables(detail: bool) -> tuple[int, int, int]:
+def audit_tables(detail: bool) -> tuple[int, int, int, int]:
     models_py = _SRC / "koipa" / "db" / "models.py"
     src = _read(models_py)
     tree = ast.parse(src)
@@ -106,14 +138,19 @@ def audit_tables(detail: bool) -> tuple[int, int, int]:
             mark = "  <-- 쓰기 0(영원히 빈다)"
         elif read[cls] == 0:
             mark = "  <-- 읽기 0(넣기만 한다)"
+        why = EXPLAINED_TABLES.get(tname)
+        if mark and why:
+            mark += f"  [설명됨] {why}"
         print(f"  {tname:<32}{cls:<24}{write[cls]:>6}{read[cls]:>6}{mark}")
+    unexplained = sorted({t for _c, t in list(no_write) + list(no_read)
+                          if t not in EXPLAINED_TABLES})
     print(f"\n  표 {len(tables)}개 · 쓰기 0 {len(no_write)}개 · 읽기 0 {len(no_read)}개 "
-          f"· 양쪽 0 {len(dead)}개")
-    return len(tables), len(no_write), len(no_read)
+          f"· 양쪽 0 {len(dead)}개 · 설명 안 된 것 {len(unexplained)}개")
+    return len(tables), len(no_write), len(no_read), len(unexplained)
 
 
 # ── ② 컬럼 ───────────────────────────────────────────────────────────
-def audit_columns(detail: bool) -> tuple[int, int]:
+def audit_columns(detail: bool) -> tuple[int, int, int]:
     models_py = _SRC / "koipa" / "db" / "models.py"
     tree = ast.parse(_read(models_py))
     cols: dict[str, str] = {}
@@ -143,9 +180,11 @@ def audit_columns(detail: bool) -> tuple[int, int]:
     print(" 2. 컬럼 — models.py 밖 참조 0")
     print("=" * 76)
     for c, t in dead:
-        print(f"  {c:<34}{t}")
-    print(f"\n  {len(dead)}건 / 검사한 컬럼 {len(cols)}개")
-    return len(cols), len(dead)
+        why = EXPLAINED_COLS.get(c)
+        print(f"  {c:<34}{t:<30}" + (f"[설명됨] {why}" if why else ""))
+    unexplained = [c for c, _t in dead if c not in EXPLAINED_COLS]
+    print(f"\n  {len(dead)}건 / 검사한 컬럼 {len(cols)}개 · 설명 안 된 것 {len(unexplained)}개")
+    return len(cols), len(dead), len(unexplained)
 
 
 # ── ③ 엔드포인트 ─────────────────────────────────────────────────────
@@ -232,8 +271,8 @@ def main(argv=None) -> int:
     ap.add_argument("--detail", action="store_true")
     args = ap.parse_args(argv)
 
-    n_t, nw, nr = audit_tables(args.detail)
-    n_c, dc = audit_columns(args.detail)
+    n_t, nw, nr, tu = audit_tables(args.detail)
+    n_c, dc, cu = audit_columns(args.detail)
     n_e, de = audit_endpoints(args.detail)
     n_s, ds = audit_settings(args.detail)
 
@@ -241,8 +280,10 @@ def main(argv=None) -> int:
     print("=" * 76)
     print(" 요약")
     print("=" * 76)
-    print(f"  테이블      쓰기 0 {nw:>3} · 읽기 0 {nr:>3}   / {n_t}")
-    print(f"  컬럼        참조 0 {dc:>3}                / {n_c}")
+    print(f"  테이블      쓰기 0 {nw:>3} · 읽기 0 {nr:>3}   / {n_t}"
+          f"   (설명 안 된 것 {tu})")
+    print(f"  컬럼        참조 0 {dc:>3}                / {n_c}"
+          f"   (설명 안 된 것 {cu})")
     print(f"  엔드포인트  호출 0 {de:>3}                / {n_e}")
     print(f"  설정        참조 0 {ds:>3}                / {n_s}")
     print()

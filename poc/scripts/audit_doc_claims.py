@@ -57,8 +57,13 @@ CLAIMS = [
     ('키워드 수',    r'(?:키워드|시드)\s*(?:정확\s*)?(\d{3})\s*개', '룰 시드 키워드 수'),
     ('게이트 수',    r'게이트\s*(\d{1,2})\s*개', '검수 라우팅 게이트 수'),
     # 'Response 200 필드 타입 설명' 은 응답표 머리글이지 필드 수가 아니다.
-    ('응답 필드 수', r'(?<!\d)(\d{2})\s*필드', 'API 응답 필드 수'),
-    ('평가셋 건수',  r'(\d{3})\s*건\s*(?:실측|평가)', '판정식 실측 건수'),
+    # [2026-09-05] '03 필드 정의' 같은 **절 번호 + 절 제목**이 필드 수로 잡혔다.
+    # 0 으로 시작하는 두 자리는 수량 표기가 아니다(표 개수 패턴도 [1-9] 로 시작한다).
+    ('응답 필드 수', r'(?<!\d)([1-9]\d)\s*필드', 'API 응답 필드 수'),
+    # [2026-09-05] '평가셋 건수' 주장을 뺐다. 한 값이 아니다 —
+    #   993 = 평가셋 4종 합 · 777 = gold_real · 256 = 홀드아웃 · 100 = 또 다른 셋.
+    # 게다가 "1,000건 실측"의 뒤 세 자리가 000 으로 잡혀 다섯 번째 값을 만들고 있었다.
+    # 서로 다른 대상을 한 칸에 모아 놓고 갈린다고 보고하면 도구를 못 믿게 된다.
 ]
 
 
@@ -104,6 +109,20 @@ def truth_from_code() -> dict:
     return out
 
 
+_REV_HEAD = re.compile(r"(?:\d+\s*[.·]?\s*)?개정\s*이력")
+
+
+def _drop_revisions(text: str) -> str:
+    """개정 이력 절을 잘라낸다.
+
+    [2026-09-05] 여기에는 **과거 값**이 적힌다("19표 226칼럼 → 18표 214칼럼"). 그것을
+    현재 주장으로 세면 같은 문서가 저 혼자 갈리는 것으로 보인다 — 실측으로 세 자리가
+    그렇게 잡혔다. 절 제목부터 문서 끝까지를 뺀다(개정 이력은 늘 마지막 절이다).
+    """
+    m = _REV_HEAD.search(text)
+    return text[: m.start()] if m else text
+
+
 def collect(dirs: list[str]) -> dict:
     """{주장이름: {값: [파일...]}}"""
     found: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
@@ -112,7 +131,7 @@ def collect(dirs: list[str]) -> dict:
         if not base.exists():
             continue
         for p in sorted(base.rglob('*.html')):
-            text = strip_html(p.read_text(encoding='utf-8', errors='replace'))
+            text = _drop_revisions(strip_html(p.read_text(encoding='utf-8', errors='replace')))
             rel = str(p.relative_to(_REPO))
             for name, pattern, _desc in CLAIMS:
                 for m in re.finditer(pattern, text):
@@ -140,12 +159,21 @@ def main(argv=None) -> int:
     print('=' * 76)
     found = collect(dirs)
     conflicts = 0
+    # [2026-09-05] 표 개수는 기준이 둘이고 둘 다 맞다 — ORM 매핑 20 / 제공 정의서 19.
+    # 정의서는 코드가 읽고 쓰지 않는 tb_document_factor_scores 를 뺀다
+    # (scripts/table_spec_meta.EXCLUDED_TABLES). 두 값이 함께 나오는 것은 갈린 것이
+    # 아니므로 참값 집합으로 두고, 그 집합 밖의 값이 있을 때만 갈림으로 본다.
+    orm_n = truth.get('ORM 매핑 표', 0)
+    ok_sets = {'표 개수': {str(orm_n), str(orm_n - 1)}}
+
     for name, _pat, desc in CLAIMS:
         vals = found.get(name)
         if not vals:
             continue
-        mark = '★' if len(vals) > 1 else ' '
-        if len(vals) > 1:
+        allowed = ok_sets.get(name)
+        split = len(vals) > 1 and not (allowed and set(vals) <= allowed)
+        mark = '★' if split else ' '
+        if split:
             conflicts += 1
         print(f'\n{mark} {name} ({desc}) — 서로 다른 값 {len(vals)}종')
         for v, files in sorted(vals.items(), key=lambda kv: -len(kv[1])):

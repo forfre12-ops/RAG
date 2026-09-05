@@ -15,14 +15,39 @@ from __future__ import annotations
 import json
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 
 from koipa.api.app import app
 from koipa.config import settings
 from koipa.services.golden_build_service import GoldenBuildService, _ledger_paths
 
+# [2026-09-05] 잡 저장소가 Redis 라 앞선 실행의 잡이 남는다. 실행마다 다른 표식을 붙여
+# 이 실행이 만든 행만 세게 한다. 꼬리(endswith)로 거르므로 표식은 **뒤에** 온다.
+RUN = uuid.uuid4().hex[:8]
+
+
+def _name(stem: str) -> str:
+    """이 실행에서만 쓰는 파일 이름. 네 시험의 꼬리가 서로 겹치지 않게 한다."""
+    return f"{stem}_{RUN}.jsonl"
+
+
 client = TestClient(app)
 API = "/api/v1"
+
+
+@pytest.fixture(autouse=True)
+def _own_job_store(monkeypatch):
+    """이 시험들은 잡 목록 **전체**를 본다 — 남의 잡이 섞이면 답이 달라진다.
+
+    [2026-09-05] 실측: 잡 저장소가 Redis 라 앞선 실행의 golden_register 잡 84개가
+    남아 있었고, 전체 시험 두 번째 실행에서 이 파일 4건이 깨졌다. 기능이 아니라
+    시험 격리의 문제였다. 시험마다 process-local 저장소를 새로 끼운다.
+    """
+    from koipa.services import job_store as _js  # noqa: PLC0415
+
+    monkeypatch.setattr(_js, "_default", _js.InMemoryJobStore(), raising=False)
+    yield
 _AUTH = {"X-API-Key": "test-key", "X-Actor-Role": "admin"}
 
 
@@ -102,12 +127,13 @@ def test_api_marks_reuse(tmp_path, monkeypatch):
 def test_job_list_has_one_row_per_file(tmp_path, monkeypatch):
     """목록에 같은 원본 파일이 두 행으로 뜨지 않는다 — 사용자가 본 그 증상."""
     monkeypatch.setattr(settings, "api_key", "test-key")
-    p = _slate(tmp_path, "dup.jsonl")
+    name = _name("one")
+    p = _slate(tmp_path, name)
     body = {"build_path": str(p), "actor": {"user_id": "reviewer1", "role": "admin"}}
     for _ in range(3):
         client.post(f"{API}/golden/jobs/register", json=body, headers=_AUTH)
     rows = client.get(f"{API}/golden/jobs?limit=100", headers=_AUTH).json()["jobs"]
-    mine = [j for j in rows if (j.get("source_path") or "").endswith("dup.jsonl")]
+    mine = [j for j in rows if (j.get("source_path") or "").endswith(name)]
     assert len(mine) == 1, mine
 
 
@@ -144,9 +170,10 @@ def _rows_for(name, monkeypatch):
 
 def test_existing_duplicate_rows_are_folded(tmp_path, monkeypatch):
     """가드 이전에 쌓인 쌍둥이 3행이 한 행으로 접히고, 접었다는 사실이 응답에 남는다."""
-    p = _slate(tmp_path, "old_dup.jsonl")
+    name = _name("old")
+    p = _slate(tmp_path, name)
     _register_twins(GoldenBuildService(), p, 3)
-    body, mine = _rows_for("old_dup.jsonl", monkeypatch)
+    body, mine = _rows_for(name, monkeypatch)
     assert len(mine) == 1, mine
     assert mine[0]["folded_duplicates"] == 2      # 감추되 감췄다고 말한다
     assert body["folded_duplicates"] >= 2
@@ -154,9 +181,10 @@ def test_existing_duplicate_rows_are_folded(tmp_path, monkeypatch):
 
 def test_folded_row_is_the_one_holding_the_work(tmp_path, monkeypatch):
     """대표 행은 **진행분이 있는 쪽**이다 — 최신 행이 빈 잡이던 223 실측 때문."""
-    p = _slate(tmp_path, "work_dup.jsonl")
+    name = _name("work")
+    p = _slate(tmp_path, name)
     made = _register_twins(GoldenBuildService(), p, 3, decided_on=[(0, 2)])
-    _body, mine = _rows_for("work_dup.jsonl", monkeypatch)
+    _body, mine = _rows_for(name, monkeypatch)
     assert len(mine) == 1
     assert mine[0]["job_id"] == str(made[0]), "가장 오래됐지만 결정이 쌓인 행이 남아야 한다"
     assert mine[0]["decided_count"] == 2
@@ -164,8 +192,9 @@ def test_folded_row_is_the_one_holding_the_work(tmp_path, monkeypatch):
 
 def test_two_rows_with_signatures_are_both_kept(tmp_path, monkeypatch):
     """서명이 두 곳에 갈라져 있으면 접지 않는다 — 감추면 사람 서명이 화면에서 사라진다."""
-    p = _slate(tmp_path, "split_dup.jsonl")
+    name = _name("split")
+    p = _slate(tmp_path, name)
     _register_twins(GoldenBuildService(), p, 3, decided_on=[(0, 2), (1, 1)])
-    _body, mine = _rows_for("split_dup.jsonl", monkeypatch)
+    _body, mine = _rows_for(name, monkeypatch)
     assert len(mine) == 2, mine
     assert sorted(j["decided_count"] for j in mine) == [1, 2]
