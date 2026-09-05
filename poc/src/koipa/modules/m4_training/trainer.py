@@ -1181,10 +1181,31 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
                     (out_dir / "temperature.json").write_text(
                         json.dumps(_rep, ensure_ascii=False, indent=2), encoding="utf-8"
                     )
-            except Exception:  # noqa: BLE001 — 자동 보정 실패는 학습/dump 를 막지 않음
-                pass
-        except Exception:  # noqa: BLE001 — 보정 dump 실패는 학습을 막지 않음
-            pass
+            except Exception as exc:  # noqa: BLE001 — 자동 보정 실패는 학습을 막지 않는다
+                import logging as _lg  # noqa: PLC0415 - 이 모듈 관례(쓰는 자리에서 지역 import)
+                logger = _lg.getLogger(__name__)
+                # [2026-09-05] **조용히 넘기지 않는다.** 종전에는 `pass` 여서 실패가
+                # 아무 흔적도 남기지 않았다. 실측: GPU 환경에서 학습했더니
+                # temperature.json 이 안 나왔는데 로그에 한 줄도 없었다 — 그 venv 에
+                # pymysql 이 없어 m6_evaluation import 가 koipa.db 의 create_engine 에서
+                # 죽은 것이었다(메모리: 로컬 실행은 poc/.venv 로).
+                #
+                # 보정이 없으면 서빙이 T=1.0 무보정으로 돌고, 이 시스템에서 그것은
+                # OOD 과신 → 고등급 무음 미탐이다. 산출물이 조용히 그 상태로 나오면 안 된다.
+                logger.error(
+                    "온도 보정 실패 — temperature.json 이 없는 채로 산출된다. "
+                    "이 모델을 그대로 서빙하면 무보정(T=1.0)이라 OOD 과신으로 고등급 "
+                    "미탐이 난다. val_logits.jsonl 은 남아 있으니 "
+                    "scripts/calibrate_classifier.py 로 따로 만들 것. 사유: %s: %s",
+                    type(exc).__name__, exc, exc_info=True,
+                )
+        except Exception as exc:  # noqa: BLE001 — 보정 dump 실패는 학습을 막지 않는다
+            import logging as _lg  # noqa: PLC0415
+            logger = _lg.getLogger(__name__)
+            logger.error(
+                "검증셋 logits dump 실패 — temperature.json 도 만들 수 없다(무보정 서빙 "
+                "위험). 사유: %s: %s", type(exc).__name__, exc, exc_info=True,
+            )
 
         # [드리프트 배선] 학습 표본 임베딩으로 train centroid 저장 → run_drift_check 활성화.
         # 기존: centroid 미저장이라 drift_tick이 영원히 skip(드리프트 감지 무력). 베스트에포트(비치명적).
