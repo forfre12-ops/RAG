@@ -432,6 +432,7 @@ export const scenarios = [
 
   {
     id: 'demo.ops.dashboard-refresh',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '운영 현황 타일이 서버 수치로 채워진다',
     async run({ server, check }) {
       const page = await demo(server);

@@ -61,6 +61,7 @@ const card = (page, docId) => page.q(`.scard[data-id="${docId}"]`);
 export const scenarios = [
   {
     id: 'signoff.boot.candidates-are-drawn',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '서명 화면이 뜨고 후보 카드가 실제로 그려진다',
     why: '2026-08-18 에 mdInline 이 빠져 화면이 한 건도 못 그렸는데 콘솔 시험 423건이 통과했다',
     async run({ server, check }) {
@@ -82,6 +83,7 @@ export const scenarios = [
 
   {
     id: 'signoff.pending.is-visible-but-has-no-form',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '합의 미달 후보는 보이되 결정 폼이 없다',
     why: '폼이 있으면 "왜 눌러도 안 되나" 가 되고, 빼 버리면 "왜 안 보이나" 가 된다',
     async run({ server, check }) {
@@ -99,6 +101,7 @@ export const scenarios = [
 
   {
     id: 'signoff.identity.comes-from-session',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '서명자 신원은 세션에서 온다 — 화면이 이름을 받지 않는다',
     why: '서명자가 자칭이 될 수 있던 경로를 2026-08-17 에 막았다. 화면에 이름 입력칸이 있으면 안 된다',
     async run({ server, check }) {
@@ -134,6 +137,7 @@ export const scenarios = [
 
   {
     id: 'signoff.preflight.summary-comes-from-server',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '서명 전 점검이 서버 기준 수치를 보여준다',
     why: '종전에는 무엇이 막을지가 제출한 뒤에야 드러났다',
     async run({ server, check }) {
@@ -179,6 +183,7 @@ export const scenarios = [
 
   {
     id: 'signoff.decision.grade-dropdown-updates-screen',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '등급 드롭다운만 건드려도 카운터와 카드가 함께 움직인다',
     why: '2026-08-21 — 결정은 저장되는데 화면이 하나도 안 움직여 검수자가 안 눌린 줄 알고 다시 눌렀다',
     async run({ server, check }) {
@@ -197,6 +202,7 @@ export const scenarios = [
 
   {
     id: 'signoff.decision.reject-is-not-counted-as-promotion',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '거부는 결정으로는 세되 승격 예정에서는 빠진다',
     why: '화면 숫자와 서버의 locked_by_grade 가 다른 규칙으로 세면 결과가 어긋난다',
     async run({ server, check }) {
@@ -214,6 +220,7 @@ export const scenarios = [
 
   {
     id: 'signoff.filter.todo-narrows-to-undecided',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '「미결정」 필터가 남은 것만 남기고, 보기 전용은 거기 끼지 않는다',
     why: '결정될 수 없는 후보를 미결정에 넣으면 아무리 눌러도 줄지 않는 잔여가 생긴다',
     async run({ server, check }) {
@@ -232,6 +239,7 @@ export const scenarios = [
 
   {
     id: 'signoff.submit.sends-decided-only-with-session-identity',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     writes: true,
     title: '제출하면 결정한 것만, 세션 신원과 함께 나간다',
     why: '미결정까지 실려 나가면 고르지 않은 후보가 서명된다',
@@ -262,6 +270,7 @@ export const scenarios = [
 
   {
     id: 'signoff.submit.preview-says-live-is-unchanged',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     writes: true,
     title: '라이브 반영을 안 켜고 낸 제출은 미리보기라고 말하고, 결정은 남는다',
     why: '조용히 미리보기로 끝나면 검수자는 반영된 줄 알거나 처음부터 다시 한다',
@@ -283,6 +292,7 @@ export const scenarios = [
 
   {
     id: 'signoff.submit.publish-checkbox-goes-out',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     writes: true,
     title: '라이브 반영을 켜면 그 값이 함께 나간다',
     why: '체크는 했는데 요청에 안 실리면 아무도 모르게 미리보기로 끝난다',
@@ -304,6 +314,7 @@ export const scenarios = [
 
   {
     id: 'signoff.submit.nothing-decided-is-refused-here',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '아무것도 고르지 않고 제출하면 화면에서 막는다',
     why: '빈 서명이 서버까지 가면 왕복 한 번을 버리고 사유도 흐려진다',
     async run({ server, check }) {
@@ -341,6 +352,7 @@ export const scenarios = [
 
   {
     id: 'signoff.restore.decisions-survive-a-reload',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '하던 결정은 창을 닫았다 열어도 복원되고, 지울 수 있다',
     why: '120건짜리 회차에서 60건 하다 창을 닫으면 60건을 다시 눌러야 했다',
     async run({ server, check }) {
@@ -363,6 +375,7 @@ export const scenarios = [
 
   {
     id: 'signoff.xss.embedded-document-does-not-execute',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '후보 본문·문서번호에 든 HTML 은 글자로만 나온다',
     why: '<script id="data"> 블록이 문서 내용으로 조기 종료되면 저장형 XSS 가 된다',
     async run({ server, check }) {

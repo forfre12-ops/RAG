@@ -30,7 +30,12 @@ export const scenarios = [
       check.includes(page.text('dash-meta'), '생성', '언제 만든 수치인지 적는다');
       // ⚠ 문구·구분기호는 화면 손질로 자주 바뀐다(2026-08-23 에도 바뀌었다). 뜻이 유지되는지만 본다.
       check.data.matches(grid, /실\s*0\s*[·/]\s*합\s*3/, '등급별로 실문서/합성을 갈라 보여준다');
-      check.matches(grid, /실문서\s*0/, '서명분이 전부 합성인 등급이 있으면 그 사실을 알린다');
+      // [2026-09-05] check → check.data 로 옮겼다. 이 배지는 **서명>0 인데 실문서가 0인
+      // 등급이 있을 때만** 뜬다(admin.html 의 allSynth). 서명이 0/0 인 서버에서는 안 뜨는 것이
+      // 맞고(2026-08-24 에 사용자 지적으로 일부러 갈라 놓은 동작이다), 대신 "서명된 검증문서가
+      // 아직 없습니다"가 뜬다. 그런데 일반 check 로 두어 **빈 실서버에서 거짓 실패**가 났다.
+      // 데이터 모양에 기대는 확인이므로 실서버 모드에서는 건너뛴다(바로 위 32행과 같은 부류).
+      check.data.matches(grid, /실문서\s*0/, '서명분이 전부 합성인 등급이 있으면 그 사실을 알린다');
       check.data.matches(grid, /부족[:\s].*TS.*S1.*S2.*S3/, '무엇이 부족한지 적는다');
       assertNoScriptErrors(check, page);
       return page;

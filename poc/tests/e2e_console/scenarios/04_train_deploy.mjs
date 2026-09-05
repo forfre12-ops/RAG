@@ -217,6 +217,7 @@ export const scenarios = [
 
   {
     id: 'metrics.latest-then-confusion',
+    needsData: true,  // 실서버 모드 건너뜀 — 본보기 잡·평가 이력이 있어야 성립
     title: '성적 조회 → 이력 → 혼동행렬이 순서대로 열리고 출처를 밝힌다',
     why: '수치만 크게 뜨고 어느 평가셋인지 없으면 감리 질의에 그 자리에서 답할 수 없다',
     async run({ server, check }) {

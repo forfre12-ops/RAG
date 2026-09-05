@@ -116,13 +116,19 @@ export const scenarios = [
        + '기본값이 박혀 있었고 ?key= 로 주소에 실어 여는 경로가 있었다. 인증은 같은 오리진 '
        + 'HttpOnly 쿠키가 맡는다.',
     async run({ server, check }) {
-      const page = await openPage(server, '/console/admin.html', { query: '?key=e2e-real-key' });
+      // [2026-09-05] 지키려는 것은 **"주소에 실려 온 값을 채택하지 않는다"** 이지
+      // "아무 값도 없다" 가 아니다. 종전에는 뒤엣것으로 대신 확인해서, 실서버 모드처럼
+      // 하니스가 진짜 키를 미리 심어 둔 상태에서 **제품은 맞는데 시험이 깨졌다**.
+      // URL 이 준 그 값인지를 직접 본다 — 두 모드에서 모두 참이고, 콘솔이 정말로 ?key= 를
+      // 채택하면 두 모드 다 잡는다.
+      const URL_KEY = 'e2e-url-supplied-key-must-not-be-adopted';
+      const page = await openPage(server, '/console/admin.html', { query: `?key=${URL_KEY}` });
       await page.settle();
       check.ok(!page.$('cfg-key'), '키 입력칸이 화면에 없다');
       check.eq(page.dialogs.filter((d) => d.kind === 'prompt').length, 0, '키를 묻는 창도 없다');
-      check.eq(page.win.localStorage.getItem('koipa_api_key'), null,
+      check.ne(page.win.localStorage.getItem('koipa_api_key'), URL_KEY,
         '주소에 실려 온 값을 저장하지 않는다');
-      check.ok(!server.calls.some((c) => c.headers['x-api-key']),
+      check.ok(!server.calls.some((c) => c.headers['x-api-key'] === URL_KEY),
         '그 값으로 요청이 나가지 않는다',
         JSON.stringify(server.calls.map((c) => [c.path, c.headers['x-api-key']])));
       return page;
