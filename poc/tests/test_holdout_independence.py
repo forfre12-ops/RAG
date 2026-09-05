@@ -323,3 +323,89 @@ def test_notes_never_block_the_verdict():
     rep = assess(train, _single())
     assert rep["notes"], "이 셋은 note 가 있어야 한다"
     assert rep["usable_for_comparison"] is True
+
+
+# ── 오염은 정형 문구가 아니라 '같은 원본' 이다 (2026-09-05) ──────────────────
+#
+# 임계 0.02 의 근거는 "상투어는 한두 종"이라는 전제였다. **한국어 판결문은 정형 문구가
+# 수십 종**이라(맺음말·인용 서식이 25자를 넘어 정규화를 통과한다) 판례가 든 홀드아웃은
+# 어떻게 만들어도 그 문턱을 못 넘었다.
+#
+#     셋            문장공유   같은원본   판정 근거
+#     hardened42     0.0952     1건     길이축도 실패 → 막힘
+#     v5 test        0.1875     4건     길이축도 실패 → 막힘
+#     길이균형        0.1200     0건     오염 0 · 길이축 통과인데 **이것 하나로 막혔다**
+#
+# 길이균형 셋의 공유 19종을 전수 읽었다 — **같은 원본은 0건**, 전부 정형이었다.
+#
+# 그래서 판정에 same_source_documents 를 넣고(clean_holdout_leakage 와 같은 검증된 기준),
+# 커버리지는 **문장 풀 공유**를 잡는 자리로 남겼다(모듈 주석이 스스로 "풀 공유는 1.0
+# 근처"라고 적었다).
+#
+# ⚠ 느슨하게 푼 것이 아님을 시험으로 고정한다 — 같은 원본이 있으면 여전히 막힌다.
+
+_LEGAL_BOILER = [
+    "그러므로 상고를 기각하고 상고비용은 패소자의 부담으로 하기로 하여 주문과 같이 판결한다.",
+    "선고 #후# 판결(공#상, #), 대법원 #. 자 #항원# 심결 주문 상고를 기각한다.",
+    "이에 원심결을 파기하고 사건을 특허청 항고심판소에 환송하기로 의견이 일치되었다.",
+]
+
+
+def _case(i, n_body=6):
+    """사건마다 고유한 본문 + 공통 맺음말."""
+    body = [_filler(i * 20 + k) for k in range(n_body)]
+    return _row(" ".join(body + _LEGAL_BOILER))
+
+
+def test_boilerplate_only_still_blocks_and_that_is_the_open_problem():
+    """정형 문구만 공유해도 **여전히 막힌다** — 아직 풀지 못한 문제라 시험으로 남긴다.
+
+    ⚠ 2026-09-05 에 이것을 통과시키려고 판정을 "상투어를 뺀 커버리지"로 옮겨 봤다가
+      **되돌렸다.** 그렇게 하면 문장 풀 공유 보호가 깨진다 — 풀 문장이 학습셋 여러 문서에
+      나오면 빈도 기준이 그것을 상투어로 분류해 버린다(바로 아래 풀 공유 시험이 잡았다).
+
+      즉 **빈도로는 정형 문구와 공유 풀을 못 가른다.** 다른 기준이 필요하고 그것은
+      사람 판단이다. 이 시험은 "고쳐야 할 것"이 아니라 **현재 상태의 기록**이다 —
+      기준이 정해져 통과하게 되면 그때 이 시험을 뒤집는다.
+
+    실측 영향: 길이 균형 홀드아웃(같은 원본 0 · Theil's U 0.080 · 공유 20종 전수 확인
+    결과 오염 0)이 이것 하나 때문에 usable_for_comparison=false 로 남는다.
+    """
+    train = [_case(i) for i in range(8)]
+    holdout = [_case(50 + i) for i in range(6)]      # 본문은 전부 다르고 맺음말만 공유
+    rep = assess(train, holdout)
+    assert rep["overlap"]["same_source_documents"]["documents"] == 0, "오염은 없다"
+    assert rep["overlap"]["shared_sentences"]["coverage"] > 0.02, "상투어는 실제로 겹친다"
+    assert rep["lineage_independent"] is False, "그런데도 막힌다 — 이것이 남은 문제다"
+
+
+def test_same_source_document_still_blocks():
+    """같은 원본이 길이만 달리해 들어오면 여전히 막는다 — 느슨해지지 않았다."""
+    full = [_filler(i) for i in range(12)]
+    train = [_row(" ".join(full))] + [_case(i) for i in range(5)]
+    truncated = _row(" ".join(full[:9]))              # 같은 문서의 절단본
+    rep = assess(train, [truncated] + [_case(60 + i) for i in range(5)])
+    assert rep["overlap"]["same_source_documents"]["documents"] == 1
+    assert rep["lineage_independent"] is False
+    assert any("같은 원본" in c for c in rep["concerns"]), rep["concerns"]
+
+
+def test_shared_sentence_pool_still_blocks():
+    """문장 풀을 통째로 공유하면 여전히 막는다 — 커버리지 축이 지키는 자리."""
+    pool = [_filler(i) for i in range(10)]
+    train = [_row(" ".join(pool[:6])), _row(" ".join(pool[3:9])), _row(" ".join(pool[2:8]))]
+    # 홀드아웃 전 문서가 같은 풀에서 나온다 → 커버리지가 1.0 로 간다
+    holdout = [_row(" ".join(pool[1:7])), _row(" ".join(pool[4:10])), _row(" ".join(pool[0:6]))]
+    rep = assess(train, holdout)
+    assert rep["overlap"]["shared_sentences"]["coverage"] > 0.50
+    assert rep["lineage_independent"] is False
+
+
+def test_same_source_report_names_the_pair():
+    """어느 문서와 겹치는지 남긴다 — '몇 건'만으로는 확인할 수 없다."""
+    full = [_filler(i) for i in range(12)]
+    train = [{"doc_id": "TRAIN-1", "label": "S3", "text": " ".join(full)}]
+    holdout = [{"doc_id": "HOLD-1", "label": "S3", "text": " ".join(full[:9])}]
+    ex = assess(train, holdout)["overlap"]["same_source_documents"]["examples"][0]
+    assert ex["holdout_doc_id"] == "HOLD-1" and ex["train_doc_id"] == "TRAIN-1"
+    assert ex["shared_sentences"] >= 3 and ex["ratio"] >= 0.60

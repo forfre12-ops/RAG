@@ -45,11 +45,47 @@ from koipa.dataset_leakage import _normalize_sentences, audit
 RECOMMENDED_MAX_LENGTH_LEAK = 0.55
 RECOMMENDED_MAX_THEILS_U = 0.25
 RECOMMENDED_MAX_TELL_COVERAGE = 0.10
-# 문장 공유는 0 이 정상이다. 독립 저술된 두 코퍼스가 25자 이상 문장을 글자 그대로 공유할
-# 이유가 없다. 그래도 0 이 아니라 0.02 를 두는 이유: 서식 상투어("검토 결과는 다음과 같다"
-# 류)가 우연히 겹칠 수 있고, 그런 한두 종까지 막으면 경보가 무뎌진다. 문장 풀을 공유하면
-# 커버리지가 1.0 근처로 나오므로 이 문턱으로도 충분히 갈린다.
+# 문장 공유. 이 축은 **같은 원본이 양쪽에 든 것**과 **문장 풀을 공유하는 것**을 잡으려고
+# 2026-08-12 에 더했다. 둘 다 메타데이터로는 안 잡힌다.
+#
+# [2026-09-05] 임계가 0.02 였는데 그 근거는 이렇게 적혀 있었다:
+#
+#     "서식 상투어가 우연히 겹칠 수 있고, 그런 **한두 종**까지 막으면 경보가 무뎌진다.
+#      문장 풀을 공유하면 커버리지가 **1.0 근처**로 나오므로 이 문턱으로도 충분히 갈린다."
+#
+# 전제가 "상투어는 한두 종"이었다. **한국어 판결문은 정형 문구가 수십 종이다** — 맺음말
+# ("그러므로 상고를 기각하고 … 주문과 같이 판결한다")과 인용 서식("선고 #후# 판결(공#상, #)")이
+# 25자를 넘어 정규화를 통과한다. 그래서 판례가 든 홀드아웃은 **어떻게 만들어도** 이 문턱을
+# 못 넘었다. 실측:
+#
+#     셋            문장공유   같은원본        판정 근거
+#     hardened42     0.0952     1건    길이축도 실패 → 막힘
+#     holdout109     0.1284     2건    길이축도 실패 → 막힘
+#     v5 test        0.1875     4건    길이축도 실패 → 막힘
+#     길이균형        0.1200     0건    오염 0 · 길이축 통과인데 **이것 하나로 막혔다**
+#
+# 길이균형 셋의 공유 19종을 **전수 읽었다 — 같은 원본은 0건**이고 전부 정형이었다.
+#
+# 그래서 두 가지를 한다:
+#   ① 판정에 **같은 원본 문서 수**를 넣는다(아래 _same_source_documents). 이 축이 원래
+#      잡으려던 것이고, clean_holdout_leakage 가 쓰는 검증된 기준이다.
+#   ② 커버리지 임계를 **풀 공유를 가릴 만큼**으로 올린다. 이 주석이 스스로 적은 대로 풀
+#      공유는 1.0 근처다. 0.50 은 관측된 상투어 최댓값(0.19)의 2.6배이고 풀 공유의 절반이라
+#      둘 사이를 넉넉히 가른다.
+#
+# ⚠ 느슨하게 푼 것이 아니다 — 이 변경으로 통과하게 되는 셋은 **길이균형 하나뿐**이다.
+#   나머지는 같은 원본이 실제로 있고 길이 축도 못 넘어 그대로 막힌다.
+# ⚠ **0.50 으로 올려 보았다가 0.02 로 되돌렸다(2026-09-05).** 판정을 "상투어를 뺀
+#   커버리지"로 옮기면 판례가 든 셋이 통과하는데, 그렇게 하면 **문장 풀 공유 보호가
+#   깨진다** — 풀 문장이 학습셋 여러 문서에 나오면 빈도 기준이 그것을 상투어로 분류한다.
+#   시험 test_shared_sentence_pool_breaks_independence_despite_clean_metadata 가 잡았다.
+#   빈도로는 정형 문구와 공유 풀을 못 가른다. 다른 기준이 필요하고, 그것은 사람 판단이다.
 RECOMMENDED_MAX_SHARED_SENTENCE_COVERAGE = 0.02
+
+# 같은 원본으로 보는 기준 — clean_holdout_leakage 와 같은 값을 쓴다. 눈으로 확인한
+# 참 6건·거짓 4건을 여백 80% 대 33% 로 갈랐다.
+SAME_SOURCE_MIN_SHARED = 3
+SAME_SOURCE_MIN_RATIO = 0.60
 
 _FAMILY_KEYS = ("document_family_id", "scenario_id", "family_profile_id")
 _GENERATOR_KEYS = ("authoring_method", "primary_judge_model")
@@ -91,6 +127,57 @@ def _overlap(left: set[str], right: set[str]) -> dict[str, Any]:
 # 코퍼스의 서식이지 특정 원본의 내용이 아니다. 한국어 판결문은 맺음말이 정형이라
 # ("그러므로 상고를 기각하고 … 주문과 같이 판결한다") 독립 수집한 두 코퍼스도 반드시 겹친다.
 _BOILERPLATE_MIN_TRAIN_DOCS = 3
+
+
+def _same_source_documents(
+    train_rows: Sequence[Mapping[str, Any]],
+    holdout_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """홀드아웃 문서 중 학습셋 어느 한 문서와 **같은 원본**인 것 — 이 축이 원래 잡으려던 것.
+
+    커버리지는 정형 문구까지 세므로 한국어 판례가 든 셋에서는 늘 높게 나온다. 오염은
+    **문서 짝**으로 봐야 한다 — 홀드아웃 문서 하나가 학습 문서 하나와 문장을 많이 공유하면
+    같은 원본이 길이만 달리해 들어간 것이다.
+
+    기준은 clean_holdout_leakage 와 같다(짝과 공유 >= 3 · max(공유/홀드, 공유/학습) >= 0.60).
+    눈으로 확인한 참 6건·거짓 4건을 여백 80% 대 33% 로 갈랐다. 실측 예:
+
+        holdout109 #56 = train #1933   두산중공업 경업금지가처분 · 문장 51/51 · 라벨 S1 대 TS
+    """
+    train_sents = [_normalize_sentences(_text(r)) for r in train_rows]
+    inverted: dict[str, list[int]] = {}
+    for i, sents in enumerate(train_sents):
+        for sentence in sents:
+            inverted.setdefault(sentence, []).append(i)
+
+    hits: list[dict[str, Any]] = []
+    for row in holdout_rows:
+        sents = _normalize_sentences(_text(row))
+        if not sents:
+            continue
+        counts: dict[int, int] = {}
+        for sentence in sents:
+            for i in inverted.get(sentence, ()):
+                counts[i] = counts.get(i, 0) + 1
+        if not counts:
+            continue
+        idx, shared = max(counts.items(), key=lambda kv: kv[1])
+        if shared < SAME_SOURCE_MIN_SHARED:
+            continue
+        ratio = max(shared / len(sents), shared / (len(train_sents[idx]) or 1))
+        if ratio < SAME_SOURCE_MIN_RATIO:
+            continue
+        hits.append({
+            "holdout_doc_id": str(row.get("doc_id")),
+            "train_doc_id": str(train_rows[idx].get("doc_id")),
+            "shared_sentences": shared,
+            "ratio": round(ratio, 4),
+        })
+    return {
+        "documents": len(hits),
+        "coverage": round(len(hits) / (len(holdout_rows) or 1), 4),
+        "examples": hits[:3],
+    }
 
 
 def _shared_sentences(
@@ -186,6 +273,7 @@ def assess(
         for key in (*_GENERATOR_KEYS, "generation_lineage")
     }
     sentences = _shared_sentences(train_rows, holdout_rows)
+    same_source = _same_source_documents(train_rows, holdout_rows)
 
     holdout_leakage = audit((str(r.get("label") or ""), _text(r)) for r in holdout_rows)
     train_leakage = audit((str(r.get("label") or ""), _text(r)) for r in train_rows)
@@ -194,11 +282,28 @@ def assess(
         document["shared"] == 0
         and all(v["shared"] == 0 for v in family.values())
         and all(v["shared"] == 0 for v in generator.values())
+        # [2026-09-05] 오염은 **문서 짝**으로 본다. 커버리지는 정형 문구까지 세므로 한국어
+        # 판례가 든 셋에서는 늘 높다(상단 상수 주석의 실측 참조).
+        and same_source["documents"] == 0
+        # ⚠ 커버리지 축은 **그대로 둔다.** 2026-09-05 에 상투어를 뺀 값으로 옮겨 보았다가
+        #   되돌렸다 — 문장 풀 공유 시험(test_shared_sentence_pool_breaks_independence…)이
+        #   통과해 버렸다. 풀 문장이 학습셋 여러 문서에 나오면 빈도 기준이 그것을 "상투어"로
+        #   분류하기 때문이다. 즉 **빈도로는 정형 문구와 공유 풀을 못 가른다**
+        #   (_shared_sentences docstring 에 적어 둔 그 한계다).
+        #   판례가 든 셋이 이 문턱을 못 넘는 것은 남은 문제이고, 푸는 것은 사람 판단이다.
         and sentences["coverage"] <= RECOMMENDED_MAX_SHARED_SENTENCE_COVERAGE
     )
     concerns: list[str] = []
     if document["shared"]:
         concerns.append(f"같은 본문 {document['shared']}건이 양쪽에 있다")
+    if same_source["documents"]:
+        ex = same_source["examples"][0] if same_source["examples"] else {}
+        concerns.append(
+            "홀드아웃 %d건이 학습셋 문서와 **같은 원본**이다(길이만 달라 본문 해시는 갈린다)"
+            " — 예: 홀드 %s ↔ 학습 %s · 문장 %s개 공유 · 비율 %s"
+            % (same_source["documents"], ex.get("holdout_doc_id"), ex.get("train_doc_id"),
+               ex.get("shared_sentences"), ex.get("ratio"))
+        )
     if sentences["coverage"] > RECOMMENDED_MAX_SHARED_SENTENCE_COVERAGE:
         concerns.append(
             f"홀드아웃 {sentences['coverage']:.1%} 가 학습셋과 같은 문장을 품고 있다"
@@ -264,6 +369,8 @@ def assess(
             "family": family,
             "generator": generator,
             "shared_sentences": sentences,
+            # 이 축이 원래 잡으려던 것 — 정형 문구가 아니라 같은 원본 문서.
+            "same_source_documents": same_source,
         },
         "holdout_leakage": holdout_leakage,
         "train_leakage": train_leakage,
