@@ -626,28 +626,57 @@ def s6_synth(ctx: ScenarioContext) -> None:
         ctx.record("s6_1", lat)
     ctx.record("s6_4", queue_ok)
 
-    # 라벨 일치도: 4등급 × 10건 = 40건 noop 합성 후 룰 라벨러 일치율
+    # 라벨 일치도: 4등급 × 5건 합성 후 룰 라벨러 일치율.
+    #
+    # [2026-09-06] 종전 코드는 NoopProvider.synthesize(...) 를 불렀는데 **그런 메서드가 없다**
+    # (있는 것은 generate). 그래서 이 측정은 매번 AttributeError 로 죽었고, except 가
+    # "doc/02 §부록 D 800건 결과(100%)를 보고용으로 차용" 이라며 **1.00 을 하드코딩**했다.
+    # 그 값이 성능 보고서에 "S6.2 라벨 일치도 100.0% · PASS" 로 실렸다 — 잰 적 없는 수치다.
+    #
+    # 같은 것을 제대로 재는 경로가 리포에 있다(scripts/p3_generate_synthetic.py):
+    # SyntheticDocGenerator + LabelingPipeline. 그쪽 실측은 25.0% 다. 여기서도 그 경로를 쓴다.
+    # ⚠ 못 재면 **기록하지 않는다.** 무측정은 SKIP 으로 남아야지 PASS 로 둔갑하면 안 된다.
     try:
-        from koipa.adapters.llm.noop_provider import NoopProvider  # type: ignore
-        from koipa.modules.m3_labeling.rule_labeler import label_text  # type: ignore
+        from koipa.adapters.llm import build_provider  # type: ignore
+        from koipa.modules.m1_synthesis.generator import (  # type: ignore
+            SynthRequest,
+            SyntheticDocGenerator,
+        )
+        from koipa.modules.m3_labeling.pipeline import LabelingPipeline  # type: ignore
 
-        provider = NoopProvider()
-        targets = ["TS", "S1", "S2", "S3"]
+        gen = SyntheticDocGenerator(llm=build_provider("noop"))
+        labeler = LabelingPipeline()
         correct = 0
         total = 0
-        for target in targets:
-            for _ in range(10):
-                # noop이 target 등급에 맞는 본문 템플릿을 사용한다는 가정
-                txt = provider.synthesize(target_grade=target, domain="tech")
-                pred = label_text(txt)
+        preds: list[str] = []
+        for target in ("TS", "S1", "S2", "S3"):
+            for i in range(5):
+                req = SynthRequest(
+                    target_grade=target, domain="tech", count=1, len_min=600, len_max=1800,
+                )
+                doc = gen.generate_one(req)
+                body = getattr(doc, "content", None) or getattr(doc, "text", "") or str(doc)
+                res = labeler.label(body)
+                pred = res.grade.value if hasattr(res.grade, "value") else str(res.grade)
+                preds.append(pred)
                 if pred == target:
                     correct += 1
                 total += 1
         if total:
             ctx.record("s6_2", correct / total)
-    except Exception:
-        # 모듈/시그니처 불일치 시 fallback: doc/02 §부록 D 800건 결과(100%)를 보고용으로 차용
-        ctx.record("s6_2", 1.00)
+            print("[PSH][S6] S6.2 라벨 일치도 %d/%d = %.1f%%" % (correct, total, correct / total * 100))
+            # [2026-09-06] 이 값을 읽는 사람이 "합성 문서의 N% 가 맞다"로 오해하지 않게
+            # **예측 분포**를 함께 낸다. 실측: 룰 라벨러가 목표 등급과 무관하게 전부 S2 를
+            # 찍어서 25% 가 나왔다 — 4등급 중 하나가 우연히 맞은 것이고 합성 품질 지표가
+            # 아니다(룰 판정의 실제 결정자는 키워드 argmax 다).
+            uniq = sorted(set(preds))
+            print("[PSH][S6] S6.2 룰 예측 분포: %s" % {g: preds.count(g) for g in uniq})
+            if len(uniq) == 1:
+                print("[PSH][S6] ⚠ 룰 라벨러가 **한 등급만** 찍는다(%s) — 이 지표는 합성 품질이 "
+                      "아니라 룰 엔진의 상수 출력을 재고 있다." % uniq[0])
+    except Exception as exc:  # noqa: BLE001
+        # 못 잰 것을 통과로 보고하지 않는다 — 값을 안 남기면 KPI 는 SKIP 이 된다.
+        print("[PSH][S6] S6.2 무측정 — %s: %s" % (type(exc).__name__, exc))
 
     # S6.5 approve 후 dataset 연결 — 승인할 항목이 있어야 잰다. 합성은 워커(celery)가
     # 생성하는데 dryrun 에는 워커가 없어 큐가 비고, 그래서 지금까지 값도 사유도 없이
@@ -736,8 +765,12 @@ def s7_urgent_retrain(ctx: ScenarioContext) -> None:
 
         status = evaluate_retraining_need(urgent_underclass_threshold=10)
         ctx.record("s7_1", status.retrain_status in {"OK", "RETRAIN_RECOMMENDED", "URGENT_RETRAIN"})
-    except Exception:
-        ctx.record("s7_1", True)  # 결정 함수 자체가 import 가능하다는 사실로 통과
+    except Exception as exc:  # noqa: BLE001
+        # [2026-09-06] 종전에는 여기서 True 를 기록했다 — "결정 함수가 import 된다는 사실로
+        # 통과". 임계가 ge True 라 그 값은 **지어낸 PASS** 였다. 재학습 임계 판정이 예외로
+        # 죽었는데 보고서에는 통과로 실렸다. 못 재면 기록하지 않는다 — 하니스가 SKIP 으로
+        # 집계하고, 그것이 정직한 보고다.
+        print("[PSH][S7] S7.1 무측정 — %s: %s" % (type(exc).__name__, exc))
 
 
 # ----------------------------------------------------------------
@@ -1270,9 +1303,11 @@ def s17_audit_log(ctx: ScenarioContext) -> None:
 
         with session_scope() as db:
             rows = AuditRepo(db).recent_for_actor(actor_id) or []
-    except Exception:
-        ctx.record("s17_1", 0.0)
-        ctx.record("s17_3", False)
+    except Exception as exc:  # noqa: BLE001
+        # [2026-09-06] 종전에는 0.0 / False 를 기록했다. 실패 방향이라 위험하진 않지만
+        # **'못 쟀다'가 '미달'로 보고된다.** 둘은 다른 사실이고, 미달로 적히면 사람이 없는
+        # 결함을 쫓는다. 기록하지 않으면 SKIP 이다.
+        print("[PSH][S17] S17.1/S17.3 무측정 — %s: %s" % (type(exc).__name__, exc))
         return
 
     n_audit = len(rows)
