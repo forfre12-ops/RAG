@@ -42,6 +42,9 @@ ALLOWLIST_FILES = (
     "docs/LEGACY_RAW_MODEL_PROVENANCE.md",
     "pyproject.toml",
     "uv.lock",
+    # 콘솔 출구 고정 공용 모듈. 위 스크립트들이 import 하므로 번들에 함께 들어가야
+    # import 폐쇄가 닫힌다(2026-09-07 p1_train_classifier 에서 실제로 열렸다).
+    "scripts/_cli_io.py",
     "scripts/build_proxy_runtime_release.py",
     "scripts/build_proxy_scenarios.py",
     "scripts/run_proxy_generation_shards.py",
