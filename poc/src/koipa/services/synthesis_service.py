@@ -407,8 +407,17 @@ class SynthesisService:
                 # 게이트를 못 돌린 건은 **따로** 센다 — 잡음과 섞으면 게이트가 몇 번
                 # 깨졌는지를 나중에 셀 수 없다(rag-f1 지적).
                 excluded_gate_error = 0
+                # [2026-09-06] 누출 의심 배치에서 온 승인분은 **막지 않고 센다.**
+                #   누출은 배치 구성의 성질이라, 그 문서가 합본에서도 누출을 만드는지는
+                #   합본을 봐야 안다 — 빌더가 합쳐진 코퍼스에 검사를 다시 돌린다
+                #   (--strict 면 exit 1). 여기서 행 단위로 영구 차단하면 과차단이 자리만
+                #   옮기는 셈이고, 그 문서를 다른 조합으로 다시 쓸 길이 막힌다.
+                #   대신 몇 건이 그 출신인지 **반드시 보이게** 낸다(무음 통과 금지).
+                from_leaky_batch = 0
                 for s in samples:
                     _verdict = _batch_verdict(getattr(s, "quality_report", None))
+                    if _verdict == "corpus_leak":
+                        from_leaky_batch += 1
                     if _verdict in TRAINING_EXCLUDED_VERDICTS:
                         excluded_gate_error += 1  # 검사받지 않은 문서 — 잡음과 다른 사유
                         continue
@@ -452,9 +461,10 @@ class SynthesisService:
                 grade_corrected = sum(1 for r in rows if r["grade_corrected"])
                 logger.info(
                     "synth training rows built: approved=%d included=%d "
-                    "excluded_noise=%d excluded_empty=%d grade_corrected=%d",
+                    "excluded_noise=%d excluded_empty=%d grade_corrected=%d "
+                    "from_leaky_batch=%d",
                     approved_total, len(rows), excluded_noise, excluded_empty,
-                    grade_corrected,
+                    grade_corrected, from_leaky_batch,
                 )
                 dataset_version = _dataset_version(rows)
 
@@ -477,6 +487,11 @@ class SynthesisService:
                     # 누출 게이트를 못 돌린 배치의 건수. "게이트가 걸렀다"와 다른 사실이라
                     # 잡음과 섞지 않는다 — 이 값이 0 이 아니면 게이트가 깨진 적이 있다.
                     "excluded_gate_error": excluded_gate_error,
+                    # 누출 의심 배치(corpus_leak)에서 온 승인분 수. **막지 않고 센다** -
+                    # 누출은 배치 구성의 성질이라 합본에서도 그런지는 합본을 봐야 안다
+                    # (아래 corpus_leakage 가 그 자리다). 0 이 아니면 빌더가 그 사실을
+                    # 인쇄해야 한다 - 조용히 섞이면 나중에 되짚을 수 없다.
+                    "from_leaky_batch": from_leaky_batch,
                     # 검수자가 등급을 고친 건수. 카운트로 내보내야 "교정이 반영됐다"를
                     # 학습셋을 열어 보지 않고도 확인할 수 있다.
                     "grade_corrected": grade_corrected,

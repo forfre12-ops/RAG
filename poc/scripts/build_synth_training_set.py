@@ -114,6 +114,9 @@ def main(argv=None) -> int:
         # 놓고 여기서 인쇄하지 않아, "게이트가 몇 번 깨졌나"를 세는 유일한 값이
         # 계산만 되고 버려지고 있었다. 0 이 아니면 게이트가 깨진 적이 있다는 뜻이다.
         "excluded_gate_error": result.get("excluded_gate_error", 0),
+        # 누출 의심 배치에서 온 승인분. 막지 않으므로 **반드시 보이게** 낸다 —
+        # 0 이 아니면 아래 corpus_leakage 를 특히 눈여겨볼 것.
+        "from_leaky_batch": result.get("from_leaky_batch", 0),
         "grade_corrected": result["grade_corrected"],
     }
 

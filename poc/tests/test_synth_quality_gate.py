@@ -45,7 +45,12 @@ def test_clean_small_batch_passes_with_explicit_verdict():
 
 
 def test_length_separated_corpus_is_held():
-    """등급별로 길이가 갈리면 본문을 안 읽어도 등급이 맞는다 — 배치째 보류."""
+    """등급별로 길이가 갈리면 본문을 안 읽어도 등급이 맞는다 — 배치째 판정.
+
+    [2026-09-06] 판정은 그대로 내되 **검수큐에서 빼지는 않는다.** 누출은 배치 구성의
+    성질이라 같은 문서가 다른 조합에서는 안 걸린다 — 통째로 버리면 다시 쓸 기회가
+    없어진다. 학습 자격은 빌더가 합쳐진 코퍼스를 다시 재서 정한다.
+    """
     docs = []
     for i in range(MIN_DOCS_FOR_CORPUS_METRICS):
         grade = ["TS", "S1", "S2", "S3"][i % 4]
@@ -54,8 +59,8 @@ def test_length_separated_corpus_is_held():
         docs.append((grade, _body(grade, i, length=length)))
     out = screen_batch(docs)
     assert out["batch_verdict"] == "corpus_leak"
-    assert out["admit"] == [], "길이만으로 등급이 갈리는 배치가 통과했다"
-    assert out["metrics"]["length_only_1nn"] > 0.55
+    assert len(out["admit"]) == len(docs), "검수큐에서 빼면 사람이 볼 기회가 없어진다"
+    assert out["metrics"]["length_only_1nn"] > 0.55, "길이 갈림은 그대로 탐지되어야 한다"
 
 
 def test_clean_large_batch_passes():
@@ -124,16 +129,23 @@ def test_single_grade_batch_still_blocks_grade_token():
     assert len(result["admit"]) == len(docs) - 1
 
 
-def test_two_grade_batch_split_by_length_is_still_blocked():
-    """등급이 둘 이상이면 길이 축은 그대로 본다 — 이 완화가 게이트를 무디게 하면 안 된다."""
+def test_two_grade_batch_split_by_length_is_still_detected():
+    """등급이 둘 이상이면 길이 축은 그대로 본다 — 이 완화가 게이트를 무디게 하면 안 된다.
+
+    [2026-09-06] 다만 **검수큐에서 빼지는 않는다.** 누출은 배치 구성의 성질이지 문서의
+    성질이 아니라, 같은 문서가 다른 조합에서는 안 걸린다. 통째로 버리면 다시 쓸 기회가
+    없어진다 — 판정은 행에 남기고, 학습 자격은 빌더가 합쳐진 코퍼스를 다시 재서 정한다.
+    """
     from koipa.services.synth_quality import screen_batch
 
     short = _docs("S3", 30, "공개 안내 자료다. " * 10)
     long_ = _docs("TS", 30, "내부 검토 자료다. " * 200)
     result = screen_batch(short + long_)
 
-    assert result["batch_verdict"] == "corpus_leak"
-    assert result["admit"] == []
+    assert result["batch_verdict"] == "corpus_leak", "탐지 자체는 그대로여야 한다"
+    assert len(result["admit"]) == 60, "검수큐에서 빼면 사람이 볼 기회가 없어진다"
+    # 배치 전체의 성질을 문서마다 적지 않는다 — batch_verdict 가 그 말을 한다.
+    assert not [f for f in result["flagged"] if f["reason"] == "corpus_leak"]
 
 
 # ── 문서 품질 하한 (2026-09-06) ────────────────────────────────────────────

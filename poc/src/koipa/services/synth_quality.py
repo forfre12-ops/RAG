@@ -225,18 +225,30 @@ def screen_batch(
     # 코퍼스 지표가 임계를 넘으면 **배치 전체**를 보류한다. 어느 문서가 원인인지
     # 단독으로 가릴 수 없는 지표라(길이 분포·등급 전용 문장은 배치의 성질이다)
     # 문서를 골라내는 대신 배치를 통째로 세운다.
+    # [2026-09-06] **검수큐에서 빼지 않는다.** 종전에는 admit=[] 이라 100건을 만들어도
+    # 0건이 사람에게 갔다.
+    #
+    # 누출은 **배치 구성의 성질**이지 문서의 성질이 아니다 — 등급별로 길이가 갈렸다는 것은
+    # 그 묶음을 나란히 놓고 봐야 보이는 것이고, 같은 문서가 다른 조합에서는 안 걸린다.
+    # 통째로 버리면 **다시 쓸 기회 자체가 없어진다.** 생성 비용은 이미 들었다.
+    #
+    # 안전은 뒤에서 지킨다: 이 판정이 행에 남고(quality_report.batch_verdict),
+    # 학습셋 빌더가 **합쳐진 코퍼스 전체**에 누출 검사를 다시 돌린다
+    # (scripts/build_synth_training_set.py, --strict 면 exit 1). 학습에 들어갈 자격은
+    # 그 자리에서 정하는 것이 맞다 — 실제로 학습에 쓰이는 것은 이 배치가 아니라 합본이다.
     tells = grade_tells([(g, t) for _i, g, t in kept])
-    for i, _g, _t in kept:
-        flagged.append({"index": i, "reason": "corpus_leak"})
     logger.warning(
-        "synth 배치 보류 — length_only_1nn=%.3f(임계 %.2f) tell_coverage=%.3f(임계 %.2f) "
-        "tell문장 %d개. 프롬프트가 등급별로 길이·문장을 갈라 쓰고 있을 수 있다.",
+        "synth 배치 누출 의심 — length_only_1nn=%.3f(임계 %.2f) tell_coverage=%.3f(임계 %.2f) "
+        "tell문장 %d개. 검수큐에는 넣되 판정을 행에 남긴다 — 프롬프트가 등급별로 길이·문장을 "
+        "갈라 쓰고 있을 수 있다.",
         leak, max_length_leak, cover, max_tell_coverage, len(tells),
     )
     return {
         "metrics": metrics,
-        "admit": [],
+        "admit": [i for i, _g, _t in kept],
+        # 배치 전체의 성질을 문서마다 적지 않는다 — batch_verdict 가 그 말을 한다.
+        # flagged 는 **실제로 뺀 것**(등급명 노출)만 담는다.
         "flagged": flagged,
-            "quality_flagged": quality_flagged,
+        "quality_flagged": quality_flagged,
         "batch_verdict": "corpus_leak",
     }
