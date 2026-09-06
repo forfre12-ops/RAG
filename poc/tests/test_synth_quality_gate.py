@@ -134,3 +134,43 @@ def test_two_grade_batch_split_by_length_is_still_blocked():
 
     assert result["batch_verdict"] == "corpus_leak"
     assert result["admit"] == []
+
+
+# ── 문서 품질 하한 (2026-09-06) ────────────────────────────────────────────
+#
+# 8지표 하한(한글비율·고유4gram·문단수·긴문단·수치사실·중복문단)이 proxy_corpus 에만
+# 걸려 있었다 — _quality_errors 호출부가 그 파일 한 곳뿐이라, 같은 합성 문서가 어느
+# 버튼으로 만들었느냐에 따라 다른 기준을 받았다.
+#
+# **떨어뜨리지는 않고 표시만 한다.** 이 하한은 고등급 1,200자 이상 구조 문서 기준으로
+# 잡힌 값이고 콘솔 생성은 600~2,000자다. 얇다고 검수자에게서 감추면 사람이 볼 기회가
+# 없어진다 — 검수는 "쓸 수 있나"를 사람이 판단하는 자리다.
+#
+# 실측(현행 생성기 60건): 통과 53 · 표시 7 (문단 5개 미만 5 · 수치 3개 미만 2)
+
+def test_thin_document_is_flagged_but_not_dropped():
+    from koipa.services.synth_quality import screen_batch
+
+    thin = ("S1", "한 문단짜리 짧은 메모다. " * 12)          # 문단 1개 · 수치 0개
+    result = screen_batch([thin])
+
+    assert 0 in result["admit"], "얇다고 검수자에게서 감추면 안 된다"
+    assert not result["flagged"], "품질은 '걸림'이 아니라 '표시'다"
+    reasons = [q["reason"] for q in result["quality_flagged"]]
+    assert reasons and reasons[0].startswith("low_quality:quality:")
+    assert result["metrics"]["low_quality_documents"] == 1
+
+
+def test_document_shaped_text_is_not_flagged():
+    from koipa.services.synth_quality import screen_batch
+
+    body = "\n\n".join(
+        f"{i}. 검토 항목\n{i}차 점검에서 확인한 수치는 {i * 7}건이며 기준치 {i * 11} 대비"
+        f" 차이는 {i * 4} 이다. 담당 역할과 기한을 함께 적는다."
+        for i in range(1, 7)
+    )
+    result = screen_batch([("S1", body)])
+
+    assert result["admit"] == [0]
+    assert result["quality_flagged"] == []
+    assert result["metrics"]["low_quality_documents"] == 0

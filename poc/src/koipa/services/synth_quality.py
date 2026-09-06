@@ -96,6 +96,22 @@ def _fold_for_match(text: str) -> str:
     return unicodedata.normalize("NFKC", text or "")
 
 
+def _document_quality_errors(text: str) -> list[str]:
+    """문서 한 건의 품질 하한 — 정본은 proxy_corpus 의 SYNTHETIC_QUALITY_POLICY 다.
+
+    목록을 여기 다시 적지 않는다. 두 벌을 두면 갈리고, 갈리면 같은 합성 문서가 경로에
+    따라 다른 기준을 받는다 — 고치려는 것이 바로 그 상태다. 사유 문자열은
+    ``quality:<지표>:<값><비교><임계>`` 모양이라 그대로 기록에 남긴다.
+    """
+    from koipa.proxy_corpus import SYNTHETIC, _quality_errors  # noqa: PLC0415
+
+    try:
+        return _quality_errors(text, origin=SYNTHETIC)
+    except Exception as exc:  # noqa: BLE001 — 계량 실패가 생성 경로를 끊으면 안 된다
+        logger.warning("문서 품질 계량 실패 — 이 건은 통과시킨다: %s", exc)
+        return []
+
+
 def _exposes_grade_token(text: str) -> bool:
     """본문에 등급 표기가 남았는가 — 문서 한 건으로 판정 가능한 유일한 지표."""
     return bool(_grade_term_pattern().search(_fold_for_match(text)))
@@ -111,6 +127,7 @@ def screen_batch(
 
     Returns:
         {"metrics": {...}, "admit": [인덱스], "flagged": [{"index":i, "reason":str}],
+         "quality_flagged": [{"index":i, "reason":"low_quality:<지표>"}],
          "batch_verdict": "ok" | "corpus_leak" | "too_small_for_corpus_metrics"}
 
         admit  검수큐에 넣어도 되는 문서의 원본 인덱스
@@ -124,8 +141,34 @@ def screen_batch(
     for i in sorted(exposed_idx):
         flagged.append({"index": i, "reason": "grade_token_exposed"})
 
+    # ①-2 문서 품질 하한 — 한 건으로 판정 가능하므로 표본 수와 무관하게 본다.
+    #
+    # [2026-09-06] 이 하한(한글비율·고유4gram·문단수·긴문단·수치사실·중복문단 8지표)은
+    # proxy_corpus 에만 걸려 있었다. 전수로 확인한 결과 _quality_errors 호출부는
+    # proxy_corpus.py 한 곳뿐이었고, 그래서 **같은 합성 문서가 어느 버튼으로 만들었느냐에
+    # 따라 다른 기준을 받았다** — 콘솔 산출물은 이 검사를 한 번도 받지 않았다.
+    #
+    # 붙이기 전에 재 봤다(datasets/ab_synth/current_s1.jsonl, 현행 생성기 60건):
+    #     통과 53 · 탈락 7   사유 blocks<5 5건 · numeric_facts<3 3건 · long_blocks<3 1건
+    # 88% 가 통과하고 탈락분은 문단 5개 미만·수치 3개 미만인 얇은 문서다 — 기준이 과한
+    # 것이 아니라 걸러야 할 것을 거른다.
+    # **떨어뜨리지 않고 표시만 한다.** 왜 그런가.
+    #   이 하한은 proxy 코퍼스(고등급 1,200자 이상의 구조 문서) 기준으로 잡힌 값이고,
+    #   콘솔 생성은 기본 600~2,000자다. 얇다고 검수자에게서 **감추면** 사람이 그것을 볼
+    #   기회가 없어진다 — 검수는 "쓸 수 있나"를 사람이 판단하는 자리다. 그래서 여기서는
+    #   기록만 남기고, 떨어뜨릴지는 학습 편입 단계에서 정한다.
+    quality_flagged: list[dict[str, Any]] = []
+    for i, (_g, text) in enumerate(rows):
+        if i in exposed_idx or not (text or "").strip():
+            continue
+        errors = _document_quality_errors(text)
+        if errors:
+            # 첫 사유만 남긴다 — 어느 지표에 걸렸는지가 고칠 실마리다.
+            quality_flagged.append({"index": i, "reason": f"low_quality:{errors[0]}"})
+
     kept = [(i, g, t) for i, (g, t) in enumerate(rows) if i not in exposed_idx]
     metrics = audit([(g, t) for _i, g, t in kept]) if kept else {"documents": 0}
+    metrics["low_quality_documents"] = len(quality_flagged)
 
     # ② 코퍼스 단위 — 표본이 모자라면 판정하지 않는다(작은 배치에서 거짓 양성).
     if len(kept) < MIN_DOCS_FOR_CORPUS_METRICS:
@@ -133,6 +176,7 @@ def screen_batch(
             "metrics": metrics,
             "admit": [i for i, _g, _t in kept],
             "flagged": flagged,
+            "quality_flagged": quality_flagged,
             "batch_verdict": "too_small_for_corpus_metrics",
         }
 
@@ -163,6 +207,7 @@ def screen_batch(
             "metrics": metrics,
             "admit": [i for i, _g, _t in kept],
             "flagged": flagged,
+            "quality_flagged": quality_flagged,
             "batch_verdict": "single_grade_corpus_metrics_skipped",
         }
 
@@ -173,6 +218,7 @@ def screen_batch(
             "metrics": metrics,
             "admit": [i for i, _g, _t in kept],
             "flagged": flagged,
+            "quality_flagged": quality_flagged,
             "batch_verdict": "ok",
         }
 
@@ -191,5 +237,6 @@ def screen_batch(
         "metrics": metrics,
         "admit": [],
         "flagged": flagged,
+            "quality_flagged": quality_flagged,
         "batch_verdict": "corpus_leak",
     }
