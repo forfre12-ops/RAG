@@ -701,6 +701,11 @@ details.adv[open]{padding-bottom:12px;}
              감리에서 "이 기능 고장났다"로 읽힌다. 알려야 할 사실은 그대로 두고 색과 분량만 줄인다. -->
         <div id="sy-noop-note" class="sec-note" style="display:none;margin-top:10px;line-height:1.6;"></div>
         <div id="sy-info" class="hint"></div>
+        <!-- [2026-09-06] 무엇을 만들지 화면이 알려준다.
+             종전에는 사람이 터미널에서 scripts/synth_coverage_gaps.py 를 돌려 표를 읽고,
+             조합을 외운 뒤 위 폼에 등급·도메인을 손으로 다시 넣어야 했다. 필요한 정보가
+             이미 있는데 화면이 그것을 몰랐다. 칸을 누르면 폼이 채워진다. -->
+        <div id="sy-coverage" style="margin-top:12px;"></div>
         <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">검토 대기 0건 — 승인한 건만 학습 데이터가 됩니다.</div></div>
         <p class="sec-note">생성은 뒤에서 처리됩니다 — 잠시 후 새로고침하세요. 승인 시 <b>확정 등급</b>을 바꾸면 그 등급으로 학습 데이터가 만들어집니다.</p>
       </div>
@@ -2623,6 +2628,61 @@ async function synthGenerate(){
   finally{ btn.disabled=false; btn.textContent='생성 요청'; }
 }
 
+/* ---- 채울 자리 격자 (등급 × 도메인) ----
+ * [2026-09-06] 합성을 **양**으로 늘리는 것은 실측으로 막혀 있다(합성-only F1 0.26).
+ * 남는 쓸모는 실데이터가 구조적으로 못 주는 칸을 메우는 것이고, 그 칸이 어디인지는
+ * 서버가 계산해 준다(GET /synth/coverage). 화면은 **보여주기만** 한다 — 자동으로
+ * 만들어 주는 버튼은 두지 않는다. 현실에 없는 조합인지는 사람이 판단해야 한다. */
+function pickCoverageCell(grade, domain){
+  const g=$('sy-grade'), d=$('sy-domain');
+  if(g && Array.from(g.options).some(o=>o.value===grade)) g.value=grade;
+  if(d && Array.from(d.options).some(o=>o.value===domain)) d.value=domain;
+  else if(d) log(`도메인 「${domain}」 은 생성 목록에 없다 — 등급만 채웠다`,'warn');
+  log(`채울 자리 선택: ${grade} × ${domain}`,'ok');
+  const c=$('sy-count'); if(c) c.focus();
+}
+
+async function loadSynthCoverage(){
+  const box=$('sy-coverage'); if(!box) return;
+  let d;
+  try{ d=await api('GET','/synth/coverage'); }
+  catch(e){ box.innerHTML=`<div class="hint">채울 자리 격자를 불러오지 못했습니다: ${esc(errKo(e))}</div>`; return; }
+  if(!d || !d.available){
+    box.innerHTML=`<div class="hint">채울 자리 격자 없음 — ${esc((d&&d.reason)||'학습셋을 읽지 못했습니다')}</div>`;
+    return;
+  }
+  const grades=['TS','S1','S2','S3'];
+  const thin={}, empty={};
+  (d.thin||[]).forEach(c=>{ thin[c.grade+'|'+c.domain]=c; });
+  (d.empty||[]).forEach(c=>{ empty[c.grade+'|'+c.domain]=c; });
+
+  // 빈 칸·얇은 칸만 색으로 구분한다. 충분한 칸은 눈에 띄지 않아야 후보가 보인다.
+  const cell=(g,dom)=>{
+    // 인라인 핸들러 안에서 함수를 부르지 않는다 — 정적 검사기가 그것을 핸들러로 읽는다.
+    const gq=esc(g), dq=esc(dom);
+    const key=g+'|'+dom, n=(d.grid||{})[key]||0;
+    const t=thin[key], e=empty[key];
+    const real=(t||e||{}).real;
+    const bg = e ? 'var(--warn-bg,#fff4e5)' : (t ? 'var(--info-bg,#eef4ff)' : 'transparent');
+    const tip = e ? `빈 칸 (실문서 ${real}건)` : (t ? `얇은 칸 — ${n}건 (실문서 ${real}건)` : `${n}건`);
+    return `<td style="text-align:right;padding:2px 8px;background:${bg};cursor:pointer"
+              title="${esc(tip)}" onclick="pickCoverageCell('${gq}','${dq}')">${n===0?'·':n}</td>`;
+  };
+  const rows=(d.domains||[]).map(dom=>
+    `<tr><td style="padding:2px 8px;white-space:nowrap">${esc(dom)}</td>${grades.map(g=>cell(g,dom)).join('')}</tr>`
+  ).join('');
+
+  box.innerHTML =
+    `<div class="hint" style="margin-bottom:4px"><b>채울 자리</b>(학습셋 기준) — 칸을 누르면 위 폼이 채워집니다 ·
+       문서 ${d.documents}건 · 칸 ${d.cells_filled}/${d.cells_total} ·
+       실문서 유래 ${Math.round((d.real_share||0)*100)}% ·
+       <b>빈 칸 ${(d.empty||[]).length}</b> · <b>얇은 칸(&lt;${d.min_per_cell}) ${(d.thin||[]).length}</b></div>
+     <div style="overflow-x:auto"><table style="border-collapse:collapse;font-family:var(--font-mono);font-size:12px">
+       <tr><th></th>${grades.map(g=>`<th style="padding:2px 8px">${g}</th>`).join('')}</tr>${rows}
+     </table></div>
+     <div class="sec-note" style="margin-top:8px;line-height:1.6">${esc(d.caveat||'')}<br/>이 표는 <b>학습셋</b>을 셉니다. 여기서 만든 문서는 검토 큐로 가고, 승인·학습셋 편입 뒤에야 이 수가 늘어납니다.</div>`;
+}
+
 async function loadSynthQueue(){
   const status=$('sy-status').value;
   try{
@@ -2959,6 +3019,7 @@ syncWriteGate();
 syncActiveGrades();
 syncLlmProviders();  // 빈 셀렉트를 남기지 않는다 — checkHealth 가 곧 서버 목록으로 덮는다
 syncSynthDomains();
+loadSynthCoverage();  // 채울 자리 격자 — 무엇을 만들지 화면이 먼저 알려준다
 checkHealth();
 /* [2026-08-24] 새로고침하면 검토 목록이 빈 화면으로 돌아가던 것을 고친다(사용자 지적).
    QUEUE 는 메모리 변수라 새로고침에 사라지는데 init 이 loadReviewQueue 를 부르지 않아,

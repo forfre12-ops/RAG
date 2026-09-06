@@ -105,3 +105,46 @@ class SynthJobStatus(BaseModel):
     # 누출 게이트 결과(판정·생성수·적재수·사유). 없으면 아직 안 돌았거나 옛 잡이다.
     leakage_gate: Optional[dict] = None
     error: Optional[str] = None
+
+
+class SynthCoverageCell(BaseModel):
+    """격자 한 칸 — (등급 × 도메인).
+
+    ``real`` 은 그 칸의 **실문서 유래** 건수다. 빈 칸이라도 실문서가 있으면 합성이 급하지
+    않다 — 화면이 이 구분을 보여줘야 사람이 무엇을 만들지 고를 수 있다.
+    """
+
+    grade: Grade
+    domain: str
+    n: int
+    real: int
+
+
+class SynthCoverageResponse(BaseModel):
+    """합성으로 채울 자리 — 등급 × 도메인 격자.
+
+    화면이 이 값으로 표를 그리고, 칸을 누르면 생성 폼(등급·도메인)이 채워진다. 종전에는
+    사람이 터미널에서 표를 읽고 조합을 외운 뒤 폼에 손으로 다시 넣어야 했다.
+
+    ⚠ 이 응답은 **후보**다. 판단은 사람이 한다 — caveat 를 화면에 그대로 띄운다.
+    """
+
+    # 학습셋을 못 읽으면 available=False + reason. 격자는 참고 정보라, 이것 때문에
+    # 생성 화면 전체가 죽으면 안 된다(500 을 내지 않는다).
+    available: bool
+    reason: Optional[str] = None
+    dataset_dir: Optional[str] = None
+
+    documents: int = 0
+    grades: dict[str, int] = Field(default_factory=dict)
+    domains: list[str] = Field(default_factory=list)
+    cells_total: int = 0
+    cells_filled: int = 0
+    min_per_cell: int = 0
+    # "TS|반도체" -> 건수. 키에 도메인 이름이 들어가므로 한글 키가 그대로 나온다.
+    grid: dict[str, int] = Field(default_factory=dict)
+    empty: list[SynthCoverageCell] = Field(default_factory=list)
+    thin: list[SynthCoverageCell] = Field(default_factory=list)
+    # 실문서 유래 비중(0~1). 나머지가 합성이다.
+    real_share: float = 0.0
+    caveat: Optional[str] = None

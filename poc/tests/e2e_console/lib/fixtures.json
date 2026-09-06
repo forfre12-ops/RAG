@@ -895,22 +895,55 @@
     },
     "readiness": {
       "ready": false,
-      "per_grade": { "TS": 1, "S1": 0, "S2": 0, "S3": 0 },
-      "missing": ["S1", "S2", "S3"],
+      "per_grade": {
+        "TS": 1,
+        "S1": 0,
+        "S2": 0,
+        "S3": 0
+      },
+      "missing": [
+        "S1",
+        "S2",
+        "S3"
+      ],
       "reason": "per-grade minimum not met",
-      "real_per_grade": { "TS": 0, "S1": 0, "S2": 0, "S3": 0 },
-      "synthetic_per_grade": { "TS": 1, "S1": 0, "S2": 0, "S3": 0 }
+      "real_per_grade": {
+        "TS": 0,
+        "S1": 0,
+        "S2": 0,
+        "S3": 0
+      },
+      "synthetic_per_grade": {
+        "TS": 1,
+        "S1": 0,
+        "S2": 0,
+        "S3": 0
+      }
     }
   },
   "POST /golden/jobs/{job_id}/signoff": {
     "locked": 2,
     "rejected": 1,
-    "locked_by_grade": { "TS": 1, "S1": 0, "S2": 1, "S3": 0 },
+    "locked_by_grade": {
+      "TS": 1,
+      "S1": 0,
+      "S2": 1,
+      "S3": 0
+    },
     "rejected_reasons": {},
     "readiness": {
       "ready": false,
-      "per_grade": { "TS": 2, "S1": 0, "S2": 1, "S3": 0 },
-      "missing": ["S1", "S2", "S3"],
+      "per_grade": {
+        "TS": 2,
+        "S1": 0,
+        "S2": 1,
+        "S3": 0
+      },
+      "missing": [
+        "S1",
+        "S2",
+        "S3"
+      ],
       "reason": "per-grade minimum not met"
     },
     "published": false,
@@ -1276,5 +1309,70 @@
     "corrections": 12,
     "verified_labels": 74,
     "db": "ok"
+  },
+  "GET /synth/coverage": {
+    "available": true,
+    "reason": null,
+    "dataset_dir": "datasets/labeled_p1_v5_clean",
+    "documents": 5,
+    "grades": {
+      "TS": 1,
+      "S1": 0,
+      "S2": 1,
+      "S3": 3
+    },
+    "domains": [
+      "반도체",
+      "public"
+    ],
+    "cells_total": 8,
+    "cells_filled": 3,
+    "min_per_cell": 12,
+    "grid": {
+      "TS|반도체": 1,
+      "TS|public": 0,
+      "S1|반도체": 0,
+      "S1|public": 0,
+      "S2|반도체": 1,
+      "S2|public": 0,
+      "S3|반도체": 0,
+      "S3|public": 3
+    },
+    "empty": [
+      {
+        "grade": "TS",
+        "domain": "public",
+        "n": 0,
+        "real": 0
+      },
+      {
+        "grade": "S1",
+        "domain": "반도체",
+        "n": 0,
+        "real": 0
+      }
+    ],
+    "thin": [
+      {
+        "grade": "TS",
+        "domain": "반도체",
+        "n": 1,
+        "real": 1
+      },
+      {
+        "grade": "S2",
+        "domain": "반도체",
+        "n": 1,
+        "real": 0
+      },
+      {
+        "grade": "S3",
+        "domain": "public",
+        "n": 3,
+        "real": 3
+      }
+    ],
+    "real_share": 0.8,
+    "caveat": "빈 칸이라고 다 채울 것은 아니다. 현실에 없는 조합(예: 공개 보도자료 도메인의 TS)을 억지로 채우면 모델에 없는 규칙을 가르친다. 실문서가 이미 있는 칸은 합성이 급하지 않다."
   }
 }

@@ -1,4 +1,4 @@
-"""POST /synth/generate + GET /synth/queue + POST /synth/{id}/review."""
+"""POST /synth/generate + GET /synth/queue + GET /synth/coverage + POST /synth/{id}/review."""
 
 # future annotations 비활성: slowapi/pydantic forward-ref 평가에서 fail.
 
@@ -11,6 +11,7 @@ from koipa.api._rbac import require_role
 from koipa.api.confirm import bind_authenticated_actor
 from koipa.api.rate_limit import limiter
 from koipa.schemas.synthesis import (
+    SynthCoverageResponse,
     SynthGenerateRequest,
     SynthGenerateResponse,
     SynthJobStatus,
@@ -18,6 +19,7 @@ from koipa.schemas.synthesis import (
     SynthReviewRequest,
     SynthReviewResponse,
 )
+from koipa.services.synth_coverage import DEFAULT_MIN_PER_CELL, coverage_report
 from koipa.services.synthesis_service import SynthesisService
 
 router = APIRouter(tags=["synthesis"], dependencies=[Depends(require_auth)])
@@ -48,6 +50,31 @@ def synth_queue(
     offset: int = Query(default=0, ge=0),
 ):
     return SynthesisService().queue(status=status, limit=limit, offset=offset)
+
+
+# 조회는 broad(라우터의 require_auth 만). 학습셋의 등급×도메인 분포일 뿐 본문을 내지 않는다.
+@router.get("/synth/coverage", response_model=SynthCoverageResponse)
+def synth_coverage(
+    min_per_cell: int = Query(
+        default=DEFAULT_MIN_PER_CELL, ge=1, le=1000,
+        description="이 수 미만인 칸을 '얇은 칸'으로 본다",
+    ),
+):
+    """합성으로 채울 자리 — 등급 × 도메인 격자.
+
+    [2026-09-06] 왜 이 경로가 생겼나. 계산은 scripts/synth_coverage_gaps.py 안에만 있어서
+    사람이 터미널에서 표를 읽고 → 조합을 외우고 → 콘솔 폼에 손으로 다시 넣어야 했다.
+    필요한 정보가 이미 있는데 화면이 그것을 몰랐다. 이제 화면이 격자를 띄우고, 칸을
+    누르면 생성 폼(등급·도메인)이 채워진다.
+
+    합성의 쓸모를 '빈 칸 채우기'로 좁히는 근거는 실측이다 — 합성-only 로 학습해 실문서를
+    재면 F1 0.26 이라 양을 늘려도 실문서 성능이 그만큼 오르지 않는다. 남는 쓸모는
+    실데이터가 구조적으로 못 주는 칸(지금은 전부 고등급·산업 도메인)이다.
+
+    ⚠ 응답은 **후보**다. 빈 칸이라고 다 채울 것은 아니며(현실에 없는 조합이 있다) 판단은
+    사람이 한다 — caveat 를 화면에 그대로 띄운다.
+    """
+    return coverage_report(min_per_cell=min_per_cell)
 
 
 @router.get("/synth/jobs/{synth_job_id}", response_model=SynthJobStatus)

@@ -13,6 +13,11 @@
 
 읽기 전용이다 — 어떤 데이터도 고치지 않는다.
 
+[2026-09-06] 계산은 **koipa.services.synth_coverage 가 정본**이다. 종전에는 이 파일
+안에만 있어서, 사람이 터미널에서 표를 읽고 조합을 외운 뒤 콘솔 폼에 손으로 다시 넣어야
+했다. 필요한 정보가 이미 있는데 화면이 그것을 모르는 상태였다. 계산을 src 로 올려
+`GET /synth/coverage` 와 이 스크립트가 **같은 것**을 쓴다.
+
 ⚠ 빈 칸이라고 다 채울 것은 아니다. 도메인×등급 중에는 **현실에 없는 조합**이 있다
   (예: 공개 보도자료 도메인의 TS). 그런 칸을 억지로 채우면 모델에 없는 규칙을 가르친다.
   출력은 후보일 뿐이고, 무엇을 만들지는 사람이 고른다.
@@ -20,7 +25,7 @@
 from __future__ import annotations
 
 import argparse
-import collections
+import io
 import json
 import os
 import sys
@@ -28,127 +33,39 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-GRADES = ["TS", "S1", "S2", "S3"]
+# 한국어 Windows 콘솔은 cp949 다 — 표의 특수문자 하나에 출력이 죽지 않게 출구를 고정한다.
+for _s in ("stdout", "stderr"):
+    _f = getattr(sys, _s)
+    if getattr(_f, "encoding", "") and _f.encoding.lower() not in ("utf-8", "utf-8-sig"):
+        setattr(sys, _s, io.TextIOWrapper(_f.buffer, encoding="utf-8", errors="replace"))
+
+from koipa.services.synth_coverage import (  # noqa: E402
+    DEFAULT_MIN_PER_CELL,
+    analyse,
+    load_training_rows,
+    render_text,
+)
+
 DEFAULT_SET = "datasets/labeled_p1_v5_clean"
-
-
-def _load(root: Path) -> list[dict]:
-    rows: list[dict] = []
-    for name in ("train", "val", "test"):
-        p = root / f"{name}.jsonl"
-        if not p.exists():
-            continue
-        for ln in p.read_text(encoding="utf-8").splitlines():
-            if ln.strip():
-                rows.append(json.loads(ln))
-    return rows
-
-
-def _domain(r: dict) -> str:
-    """도메인을 **정본으로 접어** 센다.
-
-    [2026-09-05] 같은 산업이 영문·한글 두 칸으로 갈려 빈 칸·얇은 칸이 부풀려져 있었다 —
-    실측: semiconductor 1 vs 반도체 159 · pharma 2 vs 화학_제약 102 · battery 2 vs 배터리 29.
-    TS battery 2 + 배터리 12 = 14 라 합치면 얇지 않은데 둘 다 "얇은 칸"으로 보고됐다.
-    접어 세면 빈 칸 20→11 · 얇은 칸 18→14 다.
-    """
-    raw = r.get("domain") or r.get("doc_type") or "(미상)"
-    try:
-        from koipa.modules.m1_synthesis.generator import canonical_domain  # noqa: PLC0415
-
-        return canonical_domain(raw)
-    except Exception:  # noqa: BLE001
-        return raw
-
-
-def analyse(rows: list[dict], *, min_per_cell: int) -> dict:
-    grid: collections.Counter = collections.Counter()
-    real: collections.Counter = collections.Counter()
-    for r in rows:
-        lab = r.get("label")
-        if lab not in GRADES:
-            continue
-        cell = (lab, _domain(r))
-        grid[cell] += 1
-        # 합성이 아닌 것 = 실문서 유래. 빈 칸이라도 실문서가 있으면 합성이 급하지 않다.
-        if (r.get("source") or "") != "synthetic":
-            real[cell] += 1
-
-    domains = sorted({d for _g, d in grid})
-    empty: list[dict] = []
-    thin: list[dict] = []
-    for g in GRADES:
-        for d in domains:
-            n = grid[(g, d)]
-            item = {"grade": g, "domain": d, "n": n, "real": real[(g, d)]}
-            if n == 0:
-                empty.append(item)
-            elif n < min_per_cell:
-                thin.append(item)
-    thin.sort(key=lambda x: x["n"])
-    return {
-        "documents": sum(grid.values()),
-        "grades": {g: sum(v for (gg, _d), v in grid.items() if gg == g) for g in GRADES},
-        "domains": domains,
-        "cells_total": len(GRADES) * len(domains),
-        "cells_filled": len(grid),
-        "empty": empty,
-        "thin": thin,
-        "min_per_cell": min_per_cell,
-        "grid": {f"{g}|{d}": grid[(g, d)] for g in GRADES for d in domains},
-        "real_share": round(
-            sum(real.values()) / sum(grid.values()), 3
-        ) if grid else 0.0,
-    }
-
-
-def _render(out: dict) -> None:
-    print("=" * 74)
-    print(" 합성으로 채울 자리 — 등급 × 도메인 격자")
-    print("=" * 74)
-    print(f"  문서 {out['documents']:,}건 · 도메인 {len(out['domains'])}종 · "
-          f"칸 {out['cells_filled']}/{out['cells_total']} 채워짐")
-    print(f"  실문서 유래 비중 {out['real_share']:.1%}  (나머지는 합성)")
-    print(f"  등급 분포 {out['grades']}")
-    print()
-
-    w = max((len(d) for d in out["domains"]), default=8) + 2
-    print("  " + " " * w + "".join(f"{g:>8}" for g in GRADES))
-    for d in out["domains"]:
-        line = f"  {d:<{w}}"
-        for g in GRADES:
-            n = out["grid"][f"{g}|{d}"]
-            mark = "  ." if n == 0 else f"{n:>4}"
-            line += f"{mark:>8}"
-        print(line)
-    print()
-    print(f"  빈 칸 {len(out['empty'])}개 · 얇은 칸(<{out['min_per_cell']}) {len(out['thin'])}개")
-    if out["thin"]:
-        print("\n  가장 얇은 칸 (합성 후보 — 현실에 있는 조합인지 사람이 고를 것)")
-        for it in out["thin"][:12]:
-            print(f"    {it['grade']:<3} {it['domain']:<16} {it['n']:>3}건 "
-                  f"(실문서 {it['real']}건)")
-    print()
-    print("  ⚠ 빈 칸이라고 다 채울 것은 아니다 — 현실에 없는 조합(예: 보도자료 도메인의 TS)을")
-    print("    억지로 채우면 모델에 없는 규칙을 가르친다. 출력은 후보일 뿐이다.")
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="합성 커버리지 빈 칸 분석")
     ap.add_argument("--set", default=DEFAULT_SET, help="학습셋 디렉터리(train/val/test.jsonl)")
-    ap.add_argument("--min", type=int, default=12, dest="min_per_cell",
+    ap.add_argument("--min", type=int, default=DEFAULT_MIN_PER_CELL, dest="min_per_cell",
                     help="이 수 미만이면 '얇은 칸'으로 본다")
     ap.add_argument("--json", help="결과를 이 경로에 JSON 으로 쓴다")
     a = ap.parse_args(argv)
 
     root = Path(a.set)
-    rows = _load(root)
+    rows = load_training_rows(root)
     if not rows:
         print(f"[gaps] 학습셋을 못 읽었다: {root}", file=sys.stderr)
         return 2
 
     out = analyse(rows, min_per_cell=a.min_per_cell)
-    _render(out)
+    for line in render_text(out):
+        print(line)
     if a.json:
         Path(a.json).write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"  → {a.json}")

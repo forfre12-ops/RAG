@@ -660,6 +660,46 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/SyntheticDoc' }
 
+  /synth/coverage:
+    get:
+      x-audience: internal    # 당사 운영면 - KL 은 호출하지 않는다
+      tags: [synthesis]
+      summary: 합성으로 채울 자리 - 등급 x 도메인 격자
+      description: >-
+        학습셋의 등급 x 도메인 분포와 빈 칸/얇은 칸을 낸다. 콘솔이 이 값으로 표를 그리고,
+        칸을 누르면 생성 폼(등급/도메인)이 채워진다. 읽기 전용이며 본문을 내지 않는다.
+        빈 칸이라고 다 채울 것은 아니다 - 응답의 caveat 를 화면에 그대로 띄운다.
+      parameters:
+        - in: query
+          name: min_per_cell
+          description: 이 수 미만인 칸을 '얇은 칸'으로 본다
+          schema: { type: integer, default: 12, minimum: 1, maximum: 1000 }
+      responses:
+        '200':
+          description: 격자. 학습셋을 못 읽으면 available=false 와 reason 을 준다(500 아님).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  available: { type: boolean }
+                  reason: { type: string, nullable: true }
+                  dataset_dir: { type: string, nullable: true }
+                  documents: { type: integer }
+                  grades: { type: object, additionalProperties: { type: integer } }
+                  domains: { type: array, items: { type: string } }
+                  cells_total: { type: integer }
+                  cells_filled: { type: integer }
+                  min_per_cell: { type: integer }
+                  grid:
+                    type: object
+                    description: "'<등급>|<도메인>' -> 건수"
+                    additionalProperties: { type: integer }
+                  empty: { type: array, items: { $ref: '#/components/schemas/SynthCoverageCell' } }
+                  thin: { type: array, items: { $ref: '#/components/schemas/SynthCoverageCell' } }
+                  real_share: { type: number, description: 실문서 유래 비중(0~1) }
+                  caveat: { type: string, nullable: true }
+
   /synth/{synth_id}/review:
     post:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
@@ -2043,6 +2083,14 @@ components:
         f1_macro: { type: number, nullable: true }
         fnr_overall: { type: number, nullable: true }
 
+    SynthCoverageCell:
+      type: object
+      description: 격자 한 칸. real 은 그 칸의 실문서 유래 건수 - 실문서가 있으면 합성이 급하지 않다.
+      properties:
+        grade: { type: string, enum: [TS, S1, S2, S3] }
+        domain: { type: string }
+        n: { type: integer }
+        real: { type: integer }
     SyntheticDoc:
       type: object
       properties:
