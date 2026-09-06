@@ -42,13 +42,12 @@ RANK = {g: i for i, g in enumerate(ORDER)}
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 1.0)
-    p = k / n
-    d = 1 + z * z / n
-    c = p + z * z / (2 * n)
-    r = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5)
-    return (max(0.0, (c - r) / d), min(1.0, (c + r) / d))
+    # 정본은 src 에 있다 - koipa.modules.m6_evaluation.eval_cards.wilson_interval.
+    # 이름이 wilson_upper 가 아니라 wilson 이어서 지난 정리(11벌)에서 빠졌다.
+    # 반환도 (하한, 상한) 튜플 그대로라 정본을 그대로 돌려주면 된다.
+    from koipa.modules.m6_evaluation.eval_cards import wilson_interval  # noqa: PLC0415
+
+    return wilson_interval(k, n, z=z)
 
 
 def main(argv: list[str] | None = None) -> int:

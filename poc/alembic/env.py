@@ -1,8 +1,17 @@
 """Alembic 실행 환경. koipa.db.Base.metadata와 settings.database_url을 사용.
 
 2026-05-28: init.sql 외부 부트스트랩 폐기. 모든 DDL은 alembic 단일 경로로 일원화.
-- 신규 DB: `alembic upgrade head` 한 번으로 baseline + 모든 후속 revision 적용.
+- 신규 DB: baseline + 모든 후속 revision을 한 번에 적용.
 - 기존 production DB(80d75521b95a stamp 완료 상태): 자동 호환, 후속 revision만 적용.
+
+[2026-09-06] **`alembic upgrade head` 를 그냥 부르지 말 것.** 계열이 둘이라 head 가
+모호하다(MariaDB 도입 이후). 계열을 이름으로 부른다:
+
+    PostgreSQL   alembic upgrade postgres@head
+    MariaDB      alembic upgrade mariadb@head
+
+이 머리말이 한동안 `upgrade head` 라고 적고 있었다 — 개별 마이그레이션 파일에는 올바르게
+적혀 있었는데 여기만 낡았다. 그대로 따라 하면 "Multiple head revisions" 에서 멈춘다.
 """
 
 from logging.config import fileConfig
