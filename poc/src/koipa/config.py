@@ -6,7 +6,7 @@
 - 빈 자격증명으로 운영 모드(`poc_mode=full`) 진입 시 startup에서 fail-fast.
 
 배포 프로파일 (2026-05-29 추가):
-- KOIPA_DEPLOY_PROFILE 한 줄로 4-tier 납품 모드 전환:
+- DEPLOY_PROFILE 한 줄로 4-tier 납품 모드 전환:
     lite-noapi    : GPU·외부 API 모두 없음 (noop LLM + hash embedding + inmemory + 학습 OFF)
     lite-cloud    : GPU 없음, 외부 LLM 사용 (anthropic/openai + KURE/hash + PG + 학습 OFF)
     onprem-local  : GPU 보유, 폐쇄망 (local_openai/ollama + KURE/BGE + PG + 로컬FS저장 + 학습 OFF)
@@ -184,7 +184,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
     # --- 배포 프로파일 ---
-    # 4-tier 납품 모드. .env에 KOIPA_DEPLOY_PROFILE=... 한 줄로 전환.
+    # 4-tier 납품 모드. .env 에 DEPLOY_PROFILE=... 한 줄로 전환.
+    # [2026-09-06] 이름을 바로잡았다 — 문서·주석 네 곳이 KOIPA_DEPLOY_PROFILE 이라 적고
+    # 있었는데 그 이름으로는 **안 먹는다**(실측: 그 변수만 세우면 lite-noapi 로 떨어진다).
+    # 접두사 없는 DEPLOY_PROFILE 이 정본이다(Settings 는 env_prefix 를 쓰지 않는다).
     # 빈 문자열이면 프로파일 미적용 (개별 키만 사용).
     deploy_profile: str = "lite-noapi"
 
@@ -975,7 +978,7 @@ class Settings(BaseSettings):
 
 
 def apply_profile_defaults(s: Settings) -> dict[str, str]:
-    """KOIPA_DEPLOY_PROFILE에 따라 미설정 키만 default로 채움.
+    """DEPLOY_PROFILE 에 따라 미설정 키만 default로 채움.
 
     명시값(.env 또는 env)은 항상 우선 — 빈 문자열이거나 환경변수 미설정인 키만
     프로파일 default로 덮어씀. 같은 인스턴스를 in-place 수정.
@@ -1201,7 +1204,7 @@ def assert_production_credentials() -> None:
     if _sg["off"]:
         logger.warning(
             "production(full) 모드인데 안전 게이트 OFF: %s. 영업비밀 보안 운영이면 하드닝 "
-            "프로파일(KOIPA_DEPLOY_PROFILE=onprem-local|full-train) 또는 REQUIRE_SAFETY_GATES=1 "
+            "프로파일(DEPLOY_PROFILE=onprem-local|full-train) 또는 REQUIRE_SAFETY_GATES=1 "
             "로 강제하세요(클라우드 개발/데모 tier면 의도된 상태).",
             ", ".join(_sg["off"]),
         )

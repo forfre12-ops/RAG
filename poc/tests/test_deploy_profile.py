@@ -255,3 +255,33 @@ def test_admin_console_mounts_without_enabling_purge(monkeypatch: pytest.MonkeyP
         monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
         cfg_mod.settings = _orig_settings
         importlib.reload(app_mod)
+
+
+# ── 프로파일 환경변수 이름 (2026-09-06) ────────────────────────────────────
+#
+# 문서·주석 네 곳이 KOIPA_DEPLOY_PROFILE 이라 적고 있었는데 **그 이름으로는 안 먹는다.**
+# Settings 는 env_prefix 를 쓰지 않으므로 접두사 없는 DEPLOY_PROFILE 이 정본이다.
+# 틀린 이름은 조용히 무시돼 lite-noapi 로 떨어지고, 그러면 학습·합성 라우터가 통째로
+# 사라진다 — 운영자에게 그 이름을 알려주던 오류 메시지도 있었다.
+
+def test_deploy_profile_env_name_is_unprefixed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """DEPLOY_PROFILE 이 정본이고 KOIPA_ 접두사 이름은 안 먹는다 — 실측을 시험으로 고정."""
+    import koipa.config as cfg_mod
+
+    monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
+    monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+    monkeypatch.setenv("KOIPA_DEPLOY_PROFILE", "full-train")
+    _orig = cfg_mod.settings
+    importlib.reload(cfg_mod)
+    try:
+        assert cfg_mod.settings.deploy_profile != "full-train", (
+            "KOIPA_DEPLOY_PROFILE 이 먹기 시작했다면 이름이 두 벌이 된 것이다 — "
+            "문서와 코드가 다시 갈린다. 정본은 DEPLOY_PROFILE 하나다."
+        )
+        monkeypatch.setenv("DEPLOY_PROFILE", "full-train")
+        importlib.reload(cfg_mod)
+        assert cfg_mod.settings.deploy_profile == "full-train"
+    finally:
+        monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+        monkeypatch.delenv("KOIPA_DEPLOY_PROFILE", raising=False)
+        cfg_mod.settings = _orig

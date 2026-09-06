@@ -45,8 +45,9 @@ os.environ.setdefault("TESTING", "1")
 # 라우트·설정은 배포 프로파일에 따라 달라진다 — lite 계열은 학습·합성 라우터를 아예
 # 싣지 않는다. 문서는 운영 배포(full-train) 기준으로 쓰였으므로 koipa 를 import 하기
 # **전에** 프로파일을 고정한다. 이러면 경로 수가 시험 서버(223)의 openapi.json 과 같아진다.
+# ⚠ 이름은 접두사 없는 DEPLOY_PROFILE 이다. KOIPA_DEPLOY_PROFILE 로도 세우던 줄이
+# 있었으나 그 이름으로는 안 먹는다(실측: 그것만 세우면 lite-noapi 로 떨어진다) — 지웠다.
 os.environ.setdefault("DEPLOY_PROFILE", "full-train")
-os.environ.setdefault("KOIPA_DEPLOY_PROFILE", "full-train")
 
 _REPO = _HERE.parent.parent
 _DEFAULT_ROOT = _REPO / "doc" / "result" / "KL_회신_2026-08-28"

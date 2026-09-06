@@ -36,7 +36,9 @@ if [ -z "$target" ]; then
     target=airgap; reason="번들 레이아웃 감지"
   else
     # 2) DEPLOY_PROFILE 힌트
-    prof="${KOIPA_DEPLOY_PROFILE:-${DEPLOY_PROFILE:-}}"
+    # 앱이 읽는 이름은 DEPLOY_PROFILE 하나다(KOIPA_ 접두사는 안 먹는다). 여기서는
+    # 옛 이름으로 내보내던 환경도 배포 대상을 고를 수 있게 둘 다 본다.
+    prof="${DEPLOY_PROFILE:-${KOIPA_DEPLOY_PROFILE:-}}"
     case "$(_norm "$prof")" in
       airgap) target=airgap; reason="DEPLOY_PROFILE=$prof" ;;
       cloud)  target=cloud;  reason="DEPLOY_PROFILE=$prof" ;;

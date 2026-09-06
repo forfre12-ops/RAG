@@ -31,7 +31,7 @@ $COMPOSE down                          # 전체 정지 (named 볼륨은 보존)
 
 ## 2. 분류 서빙 · 안전 게이트 상태 확인
 
-운영 프로파일은 `KOIPA_DEPLOY_PROFILE=onprem-local`(또는 `full-train`). 이 프로파일 기본값:
+운영 프로파일은 `DEPLOY_PROFILE=onprem-local`(또는 `full-train`). 이 프로파일 기본값:
 
 | 게이트 | 기본(onprem-local) | 역할 |
 |---|---|---|
