@@ -148,3 +148,58 @@ def test_coverage_endpoint_answers():
         assert body["cells_total"] == 4 * len(body["domains"])
         for cell in body["thin"]:
             assert cell["n"] < body["min_per_cell"]
+
+
+# ── 만든 근거를 행에 남긴다 (2026-09-07) ───────────────────────────────────
+#
+# 합성의 쓸모는 '빈 칸 채우기'로 좁혀져 있다(양으로 늘리는 것은 실측으로 막혔다 —
+# 합성-only 로 학습해 실문서를 재면 F1 0.26). 그런데 학습 행에 "이 문서는 S1×배터리
+# 칸이 1건이라 만들었다"가 남지 않아, 나중에 사람이 서명한 골든셋이 생겨도 **빈 칸
+# 채우기가 실제로 도움이 됐는지 되짚을 수 없었다.**
+#
+# ⚠ **요청 시점**의 격자를 박아 둔다. 나중에 다시 계산하면 이미 채워진 뒤라 원래
+#   얇았다는 사실이 사라진다.
+
+def test_coverage_cell_marks_thin_and_full_cells():
+    from koipa.workers.tasks import _coverage_cell
+
+    thin = _coverage_cell("S1", "배터리")
+    if not (thin and thin.get("available")):
+        pytest.skip("학습셋을 읽을 수 없는 환경이다")
+    assert thin["was_thin"] is True and thin["n"] < thin["min_per_cell"]
+    assert thin["domain"] == "배터리"
+
+    full = _coverage_cell("TS", "business")
+    assert full["was_thin"] is False and full["n"] >= full["min_per_cell"]
+
+
+def test_coverage_cell_folds_domain_to_canonical():
+    """영문 별칭으로 요청해도 정본 이름으로 기록된다 — 안 접으면 칸이 갈린다."""
+    from koipa.workers.tasks import _coverage_cell
+
+    cell = _coverage_cell("TS", "semiconductor")
+    if not (cell and cell.get("available")):
+        pytest.skip("학습셋을 읽을 수 없는 환경이다")
+    assert cell["domain"] == "반도체"
+
+
+def test_coverage_cell_never_breaks_generation(monkeypatch):
+    """격자를 못 읽어도 생성·적재를 막지 않는다 — 근거 기록은 부가 정보다."""
+    import koipa.services.synth_coverage as cov
+    from koipa.workers import tasks
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("학습셋 없음")
+
+    monkeypatch.setattr(cov, "coverage_report", _boom)
+    assert tasks._coverage_cell("TS", "business") is None
+
+
+def test_training_row_carries_the_reason():
+    """행에 실리는 형태 — quality_report 에서 꺼내 학습 행으로 넘긴다."""
+    from koipa.services.synthesis_service import _coverage_at_request
+
+    cell = {"available": True, "grade": "S1", "domain": "배터리", "n": 1, "was_thin": True}
+    assert _coverage_at_request({"coverage_at_request": cell}) == cell
+    assert _coverage_at_request({"batch_verdict": "ok"}) is None
+    assert _coverage_at_request(None) is None

@@ -111,6 +111,19 @@ def _batch_verdict(quality_report) -> str | None:
     return None
 
 
+def _coverage_at_request(quality_report) -> dict | None:
+    """이 문서를 만들 때 그 (등급 x 도메인) 칸이 얼마나 얇았는가.
+
+    합성의 쓸모는 '빈 칸 채우기'로 좁혀져 있는데(양으로 늘리는 것은 실측으로 막혔다),
+    학습 행에 그 근거가 없으면 나중에 사람이 서명한 골든셋이 생겨도 **빈 칸 채우기가
+    실제로 도움이 됐는지 되짚을 수 없다.** 워커가 요청 시점의 격자를 행에 박아 둔다.
+    """
+    if isinstance(quality_report, dict):
+        cell = quality_report.get("coverage_at_request")
+        return cell if isinstance(cell, dict) else None
+    return None
+
+
 def _is_training_admissible(
     label_source: str | None,
     llm_provider: str | None = None,
@@ -450,6 +463,10 @@ class SynthesisService:
                         "llm_model": getattr(s, "llm_model", None),
                         "body_prompt_version": getattr(s, "body_prompt_version", None),
                         "qc_prompt_version": getattr(s, "qc_prompt_version", None),
+                        # 만든 근거. 나중에 "빈 칸 채우기가 도움이 됐나"를 되짚을 유일한 실마리다.
+                        "coverage_at_request": _coverage_at_request(
+                            getattr(s, "quality_report", None)
+                        ),
                         "quality_score": (
                             float(_qs) if (_qs := getattr(s, "quality_score", None)) is not None
                             else None

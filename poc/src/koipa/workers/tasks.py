@@ -140,6 +140,45 @@ def _publish_callback_webhook(callback_url: str | None, payload: dict) -> None:
 _JOB_PENDING_VERSION = "pending-review"
 
 
+def _coverage_cell(grade: str, domain: str | None) -> dict | None:
+    """요청 시점의 (등급 x 도메인) 격자 칸. 못 읽으면 None 을 돌려준다.
+
+    왜 요청 시점이냐. 나중에 다시 계산하면 이미 채워진 뒤라 **원래 얇았다는 사실이
+    사라진다.** "이 문서는 그때 1건뿐이던 칸을 메우려고 만들었다"가 되짚을 수 있어야
+    나중에 골든셋이 생겼을 때 빈 칸 채우기의 값어치를 잴 수 있다.
+
+    격자를 못 읽어도 생성·적재를 막지 않는다 - 근거 기록은 부가 정보다.
+    """
+    try:
+        from koipa.services.synth_coverage import (  # noqa: PLC0415
+            coverage_report,
+            row_domain,
+        )
+
+        report = coverage_report()
+        if not report.get("available"):
+            return {"available": False, "reason": report.get("reason")}
+        canon = row_domain({"domain": domain or ""})
+        key = f"{grade}|{canon}"
+        n = int((report.get("grid") or {}).get(key, 0))
+        thin = {(c["grade"], c["domain"]): c for c in report.get("thin", [])}
+        empty = {(c["grade"], c["domain"]) for c in report.get("empty", [])}
+        cell = thin.get((grade, canon))
+        return {
+            "available": True,
+            "grade": grade,
+            "domain": canon,
+            "n": n,
+            "real": int(cell["real"]) if cell else None,
+            "was_empty": (grade, canon) in empty,
+            "was_thin": cell is not None,
+            "min_per_cell": report.get("min_per_cell"),
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("커버리지 칸 기록 실패 - 근거 없이 적재한다: %s", exc)
+        return None
+
+
 def _persist_synth_samples(
     docs: list, *, job_id: str | None, screen: dict | None = None
 ) -> int:
@@ -209,6 +248,9 @@ def _persist_synth_samples(
                 logger.warning("프롬프트 버전 등록 실패 — 버전 칸을 비우고 적재 계속: %s", exc)
                 _pv_body = _pv_outline = _pv_qc = None
 
+            # 배치는 한 (등급, 도메인) 조합으로 만들어진다 — 첫 문서에서 읽는다.
+            grade = str(getattr(docs[0], "target_grade", "") or "") if docs else ""
+            domain = getattr(docs[0], "domain", None) if docs else None
             # 품질 결과 — screen_batch 가 이미 잰 것을 행에 남긴다.
             _sc = screen or {}
             _metrics = _sc.get("metrics") or {}
@@ -217,6 +259,18 @@ def _persist_synth_samples(
                 "batch_verdict": _verdict,
                 "metrics": _metrics,
                 "gate": "synth_quality.screen_batch",
+                # [2026-09-07] **왜 이 칸을 만들었는가**를 함께 남긴다.
+                #
+                # 합성의 쓸모는 '빈 칸 채우기'로 좁혀져 있다(양으로 늘리는 것은 실측으로
+                # 막혔다 — 합성-only 로 학습해 실문서를 재면 F1 0.26). 그런데 학습 행에
+                # "이 문서는 S1×배터리 칸이 1건이라 만들었다"가 남지 않아, 나중에 사람이
+                # 서명한 골든셋이 생겨도 **빈 칸 채우기가 실제로 도움이 됐는지 되짚을 수
+                # 없었다.** 오늘 A/B 가 "이 자로는 구분이 안 된다"로 끝난 것과 같은 종류의
+                # 문제다 — 나중에 판정하려면 지금 근거를 남겨야 한다.
+                #
+                # 요청 시점의 격자 상태를 그대로 박아 둔다(그때 얼마나 얇았나). 나중에
+                # 다시 계산하면 이미 채워진 뒤라 원래 얇았다는 사실이 사라진다.
+                "coverage_at_request": _coverage_cell(grade, domain),
             } if _sc else None
             # 점수는 "어떤 검사를 통과했는가"를 한 숫자로. 걸린 문서는 애초에 여기 오지
             # 않는다(admit 만 넘어온다).
