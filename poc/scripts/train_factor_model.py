@@ -110,34 +110,24 @@ def _codes_from_row(row: dict) -> tuple[int, int, int] | None:
     return None
 
 
-def _build_model(base: str, torch, n_classes: int = 3):
-    from transformers import AutoModel
+def _build_model(base: str, torch, n_classes: int):
+    """공유 백본 + 요소별 헤드 3개 — 정본은 src 다.
 
-    class FactorModel(torch.nn.Module):
-        """공유 백본 + 요소별 3-way 헤드 3개."""
+    [2026-09-07] 종전에는 같은 정의가 여기와 서빙(m5_inference/factor_model)에 두 벌
+    있었고 **기본값이 3 과 4 로 갈려 있었다.** 그 갈림이 체크포인트 21개 중 19개를 못
+    싣던 결함의 뿌리다 — 로더만 고치면 같은 사고가 다시 난다.
 
-        def __init__(self) -> None:
-            super().__init__()
-            self.backbone = AutoModel.from_pretrained(base)
-            hidden = self.backbone.config.hidden_size
-            self.dropout = torch.nn.Dropout(0.1)
-            # 헤드를 ModuleList 가 아니라 이름으로 두면 state_dict 가 읽기 쉬워진다.
-            self.head_secrecy = torch.nn.Linear(hidden, n_classes)
-            self.head_value = torch.nn.Linear(hidden, n_classes)
-            self.head_management = torch.nn.Linear(hidden, n_classes)
+    구조가 같음을 확인하고 위임한다: 가중치 키 204개·모양·forward 출력까지 동일
+    (n_classes 3·4 양쪽에서 대조, 출력 최대 차이 0.0).
 
-        def forward(self, input_ids, attention_mask):
-            out = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
-            # DeBERTa 는 pooler 가 없을 수 있어 [CLS] 토큰을 직접 쓴다.
-            cls = out.last_hidden_state[:, 0]
-            cls = self.dropout(cls)
-            return (
-                self.head_secrecy(cls),
-                self.head_value(cls),
-                self.head_management(cls),
-            )
+    기본값을 두지 않는다 — 호출부가 전부 명시하므로, 없애면 두 벌이 조용히 갈리는
+    일 자체가 불가능해진다.
+    """
+    from koipa.modules.m5_inference.factor_model import (  # noqa: PLC0415
+        _build_model as _canonical_build_model,
+    )
 
-    return FactorModel()
+    return _canonical_build_model(base, torch, n_classes)
 
 
 def main(argv: list[str] | None = None) -> int:

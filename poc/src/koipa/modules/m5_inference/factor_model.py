@@ -86,8 +86,19 @@ class FactorPrediction:
         return min(max(p) for p in self.probs) if self.probs else 0.0
 
 
-def _build_model(base: str, torch, n_classes: int = 4):
-    """공유 백본 + 요소별 헤드 3개. 학습 스크립트와 같은 구조여야 가중치가 맞는다."""
+def _build_model(base: str, torch, n_classes: int):
+    """공유 백본 + 요소별 헤드 3개 — **정본**. 학습 스크립트도 이것을 부른다.
+
+    [2026-09-07] 종전에는 같은 정의가 여기와 scripts/train_factor_model.py 에 두 벌
+    있었고, **기본값이 4 와 3 으로 갈려 있었다.** 그래서 기본값으로 부르는 두 스크립트가
+    체크포인트 21개 중 19개(v8 계열 4-class)를 못 실었다. 로더는 먼저 고쳤지만 정의가
+    두 벌인 한 같은 사고가 다시 난다.
+
+    ``n_classes`` 에 **기본값을 두지 않는다.** 호출부 11곳이 이미 전부 명시하고 있고,
+    기본값이 없으면 두 벌이 조용히 갈리는 일 자체가 불가능해진다.
+
+    3-class = (proven_absent, lv1, lv2) · 4-class = 여기에 unknown 이 붙는다.
+    """
     from transformers import AutoModel
 
     class _FactorModel(torch.nn.Module):
