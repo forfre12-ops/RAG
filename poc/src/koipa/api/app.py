@@ -383,9 +383,13 @@ if settings.enable_training or settings.enable_incremental_retrain:
     )
 else:
     logger.info("training router disabled (deploy_profile=%s)", settings.deploy_profile)
-# 합성 생성은 지재원 모델공장 전용 — 학습 라우터와 같은 축에서 막는다.
-# enable_incremental_retrain 은 포함하지 않는다(고객사 야간 증분 노드에는 열지 않음).
-if settings.enable_training:
+# 합성 생성은 지재원 모델공장 전용 — 고객사(onprem-local)는 추론·검수만 한다.
+#
+# [2026-09-06] 조건을 enable_training 에서 **자기 스위치**로 바꿨다. 합성 생성(FUN-003)과
+# 학습은 다른 기능인데 한 축에 묶여 있어, 학습을 끄면 요건 기능이 화면에서도 API 에서도
+# 조용히 사라졌다. 지재원(full-train)에서는 반드시 열려 있어야 한다 —
+# tests/test_synth_router_availability.py 가 그 계약을 잠근다.
+if settings.enable_synthetic_generation:
     app.include_router(synthesis_api.router, prefix="/api/v1")
 else:
     logger.info("synthesis router disabled (deploy_profile=%s)", settings.deploy_profile)

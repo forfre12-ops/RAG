@@ -190,15 +190,23 @@ def test_synthesis_router_visibility(
     profile: str, en_train: bool, en_incr: bool, synth_expected: bool,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """/api/v1/synth* 등록 계약 — enable_training **단독**.
+    """/api/v1/synth* 등록 계약 — **자기 스위치**(enable_synthetic_generation) 단독.
 
     학습 라우터(OR 계약)와 다르다. 합성 문서 생성은 지재원 모델공장 전용이라, 고객사 야간
     증분 재학습 노드(enable_incremental_retrain)에서도 열리면 안 된다.
+
+    [2026-09-06] 조건을 enable_training 에서 떼어냈다. 합성 생성(FUN-003)과 학습은 다른
+    기능인데 한 스위치에 묶여 있어서, **지재원에서 학습을 잠시 꺼도 요건 기능이 화면에서도
+    API 에서도 조용히 사라졌다.** 이 시험이 그 계약을 잠근다 —
+    지재원(full-train) 반드시 열림 · 고객사(onprem-local) 닫힘.
+    스위치를 명시적으로 지워 **프로파일 기본값이 정하게** 한다(conftest 가 시험 편의로
+    켜 두는데, 그 값이 남으면 이 매트릭스가 프로파일이 아니라 conftest 를 재게 된다).
     """
     monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
     monkeypatch.setenv("DEPLOY_PROFILE", profile)
     monkeypatch.setenv("ENABLE_TRAINING", "true" if en_train else "false")
     monkeypatch.setenv("ENABLE_INCREMENTAL_RETRAIN", "true" if en_incr else "false")
+    monkeypatch.delenv("ENABLE_SYNTHETIC_GENERATION", raising=False)
 
     import koipa.config as cfg_mod
     _orig_settings = cfg_mod.settings

@@ -36,6 +36,13 @@ os.environ["AUDIT_DISABLED"] = "0"
 # matrix는 자기 fixture에서 monkeypatch로 override하므로 영향 없음.
 os.environ.setdefault("ENABLE_TRAINING", "true")
 
+# [2026-09-06] 합성 생성 라우터는 **자기 스위치**로 붙는다(enable_synthetic_generation).
+# 종전에는 enable_training 에 얹혀 있어서, 학습을 끄면 FUN-003 요건 기능이 화면에서도
+# API 에서도 조용히 사라졌다 — 축을 나눴다. 시험 환경은 두 라우터를 다 검증하므로 둘 다 켠다.
+# 프로파일 계약(지재원 열림 · 고객사 닫힘)은 test_synth_router_availability 가 자기
+# 환경변수를 세워 따로 확인하므로 이 기본값에 영향받지 않는다.
+os.environ.setdefault("ENABLE_SYNTHETIC_GENERATION", "true")
+
 # 벡터 백엔드 기본 inmemory — 테스트는 실 PG/ES 불요(이전 es→inmemory 폴백과 동일 효과).
 # 기본을 pg로 바꾼 뒤(§03 ⓑ) pg는 지연연결이라 폴백이 없으므로, 테스트는 명시적 inmemory로.
 # 실 백엔드 테스트(test_default_backend_is_pg 등)는 자체 delenv/setenv로 override.

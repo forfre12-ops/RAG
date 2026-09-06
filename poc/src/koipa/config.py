@@ -172,6 +172,10 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # [지재원 관리자 콘솔] 거버넌스 콘솔 서빙 ON(모델공장 운영자용). demo purge/데모 SPA는
         # 계속 OFF(위) — 관리 UI만. 지재원은 enable_training 경로로 학습하므로 야간 증분 플래그는 불필요.
         "serve_admin_console": True,
+        # [합성 생성] 지재원은 모델공장이다 — FUN-003 요건 기능이 여기서는 **반드시** 열려 있어야
+        # 한다. 학습 스위치(enable_training)와 분리해 두었으므로, 학습을 끄고 운영해도 사라지지
+        # 않는다. 고객사(onprem-local)에는 기본값 False 그대로 둔다(사용자 확인 2026-09-06).
+        "enable_synthetic_generation": True,
     },
 }
 
@@ -208,6 +212,17 @@ class Settings(BaseSettings):
     # enabled 게이트로 404). 모든 상태변경(활성화·재학습·확정)은 RBAC 로 보호되므로 UI 노출은 안전.
     # /demo 마운트 조건 = demo_console_enabled OR serve_admin_console.
     serve_admin_console: bool = False
+
+    # [합성 문서 생성] FUN-003 요건 기능. **지재원(full-train)에서는 반드시 열려 있어야 한다.**
+    #
+    # [2026-09-06] 종전에는 이 기능이 enable_training 에 딸려 있었다(app.py 의 라우터 마운트
+    # 조건). 학습과 합성 생성은 다른 기능인데 한 스위치에 묶여 있어, **학습을 끄면 요건
+    # 기능이 조용히 사라졌다** — 화면도 API 도 404 가 된다. 축을 나눈다.
+    #
+    # 프로파일 기본값: full-train(지재원 모델공장) True · 그 밖 False.
+    # 고객사(onprem-local)에는 필요 없다 — 고객사는 추론·검수만 하고 합성은 지재원이 만든다
+    # (사용자 확인 2026-09-06). 필요하면 .env 로 켤 수 있게 값 자체는 열어 둔다.
+    enable_synthetic_generation: bool = False
 
     # --- 인프라 ---
     # 디폴트는 localhost dev DB. 운영은 DATABASE_URL env 필수.
