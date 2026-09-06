@@ -582,8 +582,10 @@ def _hwp_tables_via_hwpx_convert(p: Path) -> tuple[str, list, bytes]:
         # 대조해야 한다(호출부 참조). 다시 변환하면 비용도 들고 결과가 달라질 수 있다.
         return _tables_to_text(tables), tables, blob
     except Exception:  # noqa: BLE001 — 변환 실패가 추출 전체를 막지 않는다
-        # ⚠ 여기서 로깅하려다 NameError 를 냈다(이 모듈엔 logger 가 없다). 예외를
-        #   삼키는 자리에서 되레 죽으면 회수 실패가 추출 실패로 번진다.
+        # [2026-09-07] 종전 주석은 '이 모듈엔 logger 가 없다' 였는데 지금은 있다(19행).
+        #   그 낡은 한 줄 때문에 표 회수 실패가 계속 조용했다. 표 셀에 든 영업비밀이
+        #   본문에 없으면 분류기가 못 보고 저등급으로 미탐한다 — 회수가 실패했다는
+        #   사실은 남겨야 그 자리를 의심할 수 있다.
         return "", [], b""
 
 
@@ -612,7 +614,8 @@ def _hwp_table_coverage(p: Path, doc, text: str, warnings: list[str] | None = No
         if suffix == ".hwp":
             try:
                 hwpx_bytes = doc.to_hwpx_bytes()
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("표 커버리지 판정 실패 — 표 누락 여부가 '판정불가'로 남는다: %s: %s", type(exc).__name__, exc)
                 # 유일한 표-존재 검출기(to_hwpx_bytes)가 이 .hwp에서 실패 — 표 유무 판정 불가.
                 # 조용히 None으로 삼키면 표 속 비밀 미탐이 무음이 된다. 가시화(등급 불변).
                 if warnings is not None:
@@ -621,7 +624,8 @@ def _hwp_table_coverage(p: Path, doc, text: str, warnings: list[str] | None = No
             if _hwpx_bytes_has_table(hwpx_bytes):
                 return "incomplete"
             return None
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("표 커버리지 판정 실패 — 표 누락 여부가 '판정불가'로 남는다: %s: %s", type(exc).__name__, exc)
         return None
     return None
 
@@ -642,7 +646,8 @@ def _hwpx_uncaptured_table_cells(hwpx_bytes: bytes, extracted_text: str) -> bool
     try:
         z = zipfile.ZipFile(io.BytesIO(hwpx_bytes))
         _guard_zip_bomb(z, source="hwpx")
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("hwpx 미회수 셀 판정 실패 — 표 누락을 못 가린다: %s: %s", type(exc).__name__, exc)
         return False
     names = [n for n in z.namelist() if n.lower().endswith(".xml") and "section" in n.lower()]
     if not names:
@@ -670,7 +675,8 @@ def _hwpx_tables(hwpx_bytes: bytes, *, source: str = "hwpx") -> list[ExtractedTa
     try:
         z = zipfile.ZipFile(io.BytesIO(hwpx_bytes))
         _guard_zip_bomb(z, source="hwpx")
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("hwpx 표 회수 실패 — 표 없이 본문만 분류기로 간다: %s: %s", type(exc).__name__, exc)
         return []
     names = [n for n in z.namelist() if n.lower().endswith(".xml") and "section" in n.lower()]
     if not names:
@@ -803,7 +809,8 @@ def _hwp_tables_via_unhwp(p: Path) -> tuple[str | None, list[ExtractedTable]]:
         return None, []
     try:
         md = unhwp.to_markdown(str(p))
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("unhwp 표 회수 실패 — 표 없이 본문만 분류기로 간다: %s: %s", type(exc).__name__, exc)
         return None, []
     if not md:
         return None, []
