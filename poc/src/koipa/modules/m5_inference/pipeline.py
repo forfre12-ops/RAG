@@ -814,7 +814,13 @@ class InferencePipeline:
                                         f"factors aligned to capped grade {cap_code} "
                                         f"(source-prior; observed kept as rule_factors)"
                                     ]
-                        except Exception:  # noqa: BLE001 — 표시 정합 실패가 판정을 막지 않는다
+                        except Exception as exc:  # noqa: BLE001 — 표시 정합 실패가 판정을 막지 않는다
+                            # 등급은 그대로 두고 **표시할 근거만** 원래 값으로 되돌린다.
+                            # 검수자가 보는 근거가 등급과 어긋난 상태가 되므로, 그 사실은 남긴다.
+                            logger.warning(
+                                "요소 표시 정합 실패 — 원래 요소값으로 되돌린다(등급은 그대로): %s: %s",
+                                type(exc).__name__, exc,
+                            )
                             cap_factors = result.factors
                             cap_rule_factors = result.rule_factors
                         result = InferenceResult(
@@ -892,7 +898,15 @@ class InferencePipeline:
                 if m_state != "unknown" and result.factors is not None:
                     try:
                         cur_m = int(float(getattr(result.factors, "management", 0)))
-                    except (TypeError, ValueError):
+                    except (TypeError, ValueError) as exc:
+                        # -1 은 "읽지 못했다"는 뜻이고 아래 비교에서 항상 새 값과 다르므로
+                        # 메타데이터 값이 그대로 적용된다(안전한 방향). 다만 요소값이
+                        # 숫자가 아니었다는 사실 자체가 데이터 결함이라 흔적을 남긴다.
+                        logger.warning(
+                            "management 요소값을 숫자로 읽지 못했다(%r) — 메타데이터 값을 "
+                            "그대로 적용한다: %s",
+                            getattr(result.factors, "management", None), exc,
+                        )
                         cur_m = -1
                     new_m = 0 if m_state == "proven_absent" else int(m_lv or 0)
                     if new_m != cur_m:
@@ -1120,7 +1134,15 @@ class InferencePipeline:
                 pred = self._id2label[pred_idx]
                 scores = {self._code_at(i): round(float(norm[i]), 4) for i in range(n_labels)}
                 conf = min(max(float(norm[pred_idx]), 0.0), 1.0)
-        except Exception:  # noqa: BLE001 — 청크 집계 실패는 단일패스 폴백으로(동작 보존)
+        except Exception as exc:  # noqa: BLE001 — 청크 집계 실패는 단일패스 폴백으로(동작 보존)
+            # 긴 문서를 청크로 나눠 집계하는 경로가 죽으면 단일패스로 내려간다. 등급은
+            # 나오지만 **다른 방법으로 나온 등급**이다 — 핵심 비밀이 한 문단에 있는 긴
+            # 문서에서 집계 경로가 미탐을 막는 장치라, 얼마나 자주 내려가는지 안 보이면
+            # 미탐 원인을 그 자리로 좁힐 수 없다.
+            logger.warning(
+                "청크 집계 실패 — 단일패스 폴백으로 내려간다: %s: %s",
+                type(exc).__name__, exc,
+            )
             pred = None
             scores = None
             conf = None
@@ -1178,7 +1200,13 @@ class InferencePipeline:
                     factors = EvaluationFactors.from_factor_scores(
                         {"SECRECY": float(s2), "VALUE": float(v2), "MANAGEMENT": float(m2)}
                     )
-                except Exception:  # noqa: BLE001
+                except Exception as exc:  # noqa: BLE001
+                    # 등급은 그대로 두고 **표시할 근거만** 원래 값으로 되돌린다.
+                    # 검수자가 보는 근거가 등급과 어긋난 상태가 되므로, 그 사실은 남긴다.
+                    logger.warning(
+                        "요소 표시 정합 실패 — 원래 요소값으로 되돌린다(등급은 그대로): %s: %s",
+                        type(exc).__name__, exc,
+                    )
                     factors = lab.factors
 
         return InferenceResult(
@@ -1224,7 +1252,14 @@ class InferencePipeline:
             from koipa.config import settings  # noqa: PLC0415
             codes = getattr(settings, "severe_agg_codes", None)
             return tuple(codes) if codes else ("TS", "S1")
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 — 설정을 못 읽어도 집계는 돌아야 한다
+            # 어느 등급을 '심각'으로 집계하느냐가 미탐 방지의 축이다. 설정을 못 읽어
+            # 기본값으로 돌아갔다는 사실이 안 보이면, 운영에서 축을 바꿔 두고도
+            # 바뀌지 않은 채 도는 것을 알 수 없다.
+            logger.warning(
+                "severe_agg_codes 설정을 읽지 못해 기본값(TS·S1)으로 집계한다: %s: %s",
+                type(exc).__name__, exc,
+            )
             return ("TS", "S1")
 
     def _aggregate_chunk_probs(self, chunk_probs, chunk_weights):
@@ -1370,7 +1405,13 @@ class InferencePipeline:
                         {"SECRECY": float(s2), "VALUE": float(v2), "MANAGEMENT": float(m2)}
                     )
                     a3_warn = [f"factors aligned to model grade {pred_code} (rule under-detected S/V/M)"]
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                # 등급은 그대로 두고 **표시할 근거만** 원래 값으로 되돌린다.
+                # 검수자가 보는 근거가 등급과 어긋난 상태가 되므로, 그 사실은 남긴다.
+                logger.warning(
+                    "요소 표시 정합 실패 — 원래 요소값으로 되돌린다(등급은 그대로): %s: %s",
+                    type(exc).__name__, exc,
+                )
                 factors = lab.factors
                 rule_factors = None
         from koipa.modules.m3_labeling.rule_engine import has_real_evidence  # noqa: PLC0415
