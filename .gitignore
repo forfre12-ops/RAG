@@ -264,3 +264,6 @@ poc/rpms/
 
 # 용량 측정용 임시 산출물(대용량 파일). 재생성 가능하므로 추적하지 않는다.
 poc/.tmp_capacity/
+
+# 서버 재구성용 데이터 내보내기(scripts/export_migration_data.py) — 리포에 커밋하지 않는다.
+_migration/
