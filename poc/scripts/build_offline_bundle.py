@@ -152,7 +152,14 @@ _ANY_MODEL_RE = re.compile(
 # 폐쇄망 기동에 필수인 코어 서비스 — 번들에 이미지 tar 가 반드시 있어야 한다.
 # nginx-mtls 는 `--profile mtls` 옵션이라 필수에서 제외. main() 이 이 목록으로 dry-run/실빌드
 # 양쪽에서 누락을 fail-closed 검사한다(CI dry-run 이 postgres 누락을 잡도록).
-_REQUIRED_CORE_SERVICES = ("postgres", "redis", "api", "worker", "beat")
+_REQUIRED_CORE_SERVICES = ("redis", "api", "worker", "beat")
+
+# DB 는 **하나는 반드시** 있어야 하되 어느 쪽인지는 배포마다 다르다.
+# [2026-09-07] 종전에는 postgres 를 필수로 못박아 두어 MariaDB 배포본 번들이 만들어지지
+#   않았다(실측: --compose 로 MariaDB 병합본을 줬더니 "코어 서비스 이미지 누락: postgres").
+#   검사의 의도는 "DB 이미지가 번들에 있어야 한다"이지 "postgres 여야 한다"가 아니다.
+#   둘 다 없으면 여전히 fail-closed 다 — 폐쇄망에서 DB 없이 뜨는 번들은 만들 수 없다.
+_REQUIRED_DB_SERVICES = ("postgres", "mariadb")
 
 # 관측성 스택 이미지 — infra/observability/docker-compose.observability.airgap.yml 과 태그 동기.
 # best-effort 동봉(핵심 아님): 저장 실패 시 경고만(빌드 실패 아님). 안전 알림(FnrSpike·
@@ -1833,6 +1840,9 @@ def main() -> int:
     # 코어 서비스 이미지 누락 fail-closed — dry-run 에서도 검사해 CI 가 회귀를 잡는다.
     # (인라인 주석/미확장 ${VAR} 로 postgres 등이 통째 빠지면 폐쇄망 기동 불가.)
     missing_core = [s for s in _REQUIRED_CORE_SERVICES if s not in manifest.components]
+    if not any(s in manifest.components for s in _REQUIRED_DB_SERVICES):
+        # DB 가 하나도 없다 — 어느 쪽이든 있어야 한다.
+        missing_core = list(missing_core) + ["DB(%s 중 하나)" % "|".join(_REQUIRED_DB_SERVICES)]
     if missing_core:
         print(
             f"\n[bundle][FATAL] 폐쇄망 코어 서비스 이미지 누락: {missing_core}. "
