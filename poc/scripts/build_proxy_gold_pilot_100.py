@@ -475,10 +475,21 @@ def main() -> int:
     for index, case in enumerate(cases, start=1):
         doc_id = f"GOLD-PILOT-{case.grade}-{index:03d}"
         stem = _safe_stem(case.title)
+        # [2026-09-08] 등급 제안 사유를 **본문에서 뺐다.** 종전에는 여기서 이어 붙었고,
+        # 그 결과 '## 등급 제안 사유: TS' 가 문서 안에 남아 정답이 그대로 노출됐다
+        # (실측: 이 계열 964건 전부 · 표기와 실제 등급 100% 일치 · 그 줄만 읽으면 97.6%).
+        # 사유는 검수자에게 필요하므로 버리지 않고 metadata 로 옮긴다 — 본문이 아니라
+        # 검수 메타데이터가 원래 자리다.
         document = _repair_mojibake(_contextualize_standard_sentences(
-            _case_specific_appendix(case).strip() + "\n" + _grade_rationale(case).strip() + "\n",
+            _case_specific_appendix(case).strip() + "\n",
             case,
         ))
+        rationale = _repair_mojibake(_contextualize_standard_sentences(
+            _grade_rationale(case).strip(),
+            case,
+        ))
+        # ⚠ 하한은 **사유를 뺀 본문** 기준이다. 종전에는 사유(약 500자)가 포함된 길이를
+        #   쟀으므로 같은 값이어도 실질적으로 더 엄격해진다 — 의도한 것이다.
         minimum = 3200 if case.grade in {"TS", "S1", "S2"} else 1800
         if len(document) < minimum:
             raise RuntimeError(f"document too short: {doc_id} {len(document)}")
@@ -492,6 +503,8 @@ def main() -> int:
             "candidate_status": "proposed",
             "claim_scope": "fictional review-pilot document only; not human-reviewed gold and not customer-real evidence",
             "pilot_batch": "pilot_100_v1",
+            # 본문이 아니라 여기에 둔다 — 검수 화면은 이 칸을 읽어 보여주면 된다.
+            "grade_rationale": rationale,
             "quality_contract": {
                 "minimum_characters": minimum,
                 "required_elements": ["scope", "evidence", "exception", "decision_or_next_step"],

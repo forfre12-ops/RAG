@@ -27,50 +27,15 @@ OUT = ROOT / "datasets/golden_review/_pool_20260809.jsonl"
 _N = int(sys.argv[1]) if len(sys.argv) > 1 else 30
 PER_GRADE = {"TS": _N, "S1": _N, "S2": _N, "S3": _N}
 
-DROP_H2 = ("확인 질문과 답변 기록", "세부 검토 경과", "후속 조치와 종료 조건")
-DROP_H3 = ("검수 전 확인 목록",)
-
-
-def strip_scaffolding(md: str) -> str:
-    out, skip = [], False
-    for ln in md.splitlines():
-        m2 = re.match(r"^##\s+(?!#)(.*)$", ln)
-        if m2:
-            t = m2.group(1).strip()
-            skip = t.startswith("등급 제안 사유") or any(t.startswith(d) for d in DROP_H2)
-            if skip:
-                continue
-        m3 = re.match(r"^###\s+(.*)$", ln)
-        if m3 and any(m3.group(1).strip().startswith(d) for d in DROP_H3):
-            skip = True
-            continue
-        if not skip:
-            out.append(ln)
-    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
-
-
-GRADE_TOK = re.compile(r"\b(TS|S1|S2|S3)\b")
-
-
-def drop_grade_sentences(text: str) -> str:
-    """등급 문자열이 든 문장만 제거한다 — 문서를 통째로 버리지 않는다.
-
-    본문에 'S3가 적절하다' 같은 문장이 남으면 검수자가 본문을 읽기 전에 정답을 본다.
-    문장 단위로 떼어내면 나머지 사실 서술은 그대로 판단 재료로 남는다.
-    """
-    kept_paras = []
-    for para in text.split("\n"):
-        if not para.strip():
-            kept_paras.append(para)
-            continue
-        if para.lstrip().startswith("#"):
-            kept_paras.append(GRADE_TOK.sub("", para).rstrip())
-            continue
-        parts = re.split(r"(?<=다\.)\s+|(?<=[.!?])\s+", para)
-        keep = [s for s in parts if s.strip() and not GRADE_TOK.search(s)]
-        if keep:
-            kept_paras.append(" ".join(keep))
-    return re.sub(r"\n{3,}", "\n\n", "\n".join(kept_paras)).strip()
+# [2026-09-08] 이 로직은 콘솔 후보 풀 정리에서도 필요해져 공용 모듈로 옮겼다.
+# 복사해 두면 두 벌이 조용히 갈라진다 — 한 곳에서만 정의한다.
+from golden_scaffolding import (  # noqa: E402
+    DROP_H2,
+    DROP_H3,
+    GRADE_TOK,
+    drop_grade_sentences,
+    strip_scaffolding,
+)
 
 
 def stratified(items, want, keyfn):
