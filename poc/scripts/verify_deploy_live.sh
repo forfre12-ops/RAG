@@ -81,4 +81,26 @@ done
 # 4) 골든 잡 목록 (f079b24)
 printf '4) GET /golden/jobs         : HTTP %s\n' \
   "$(curl -s -o /dev/null -w '%{http_code}' -H "X-API-Key: $K" -H "X-Actor-Role: admin" "$B/golden/jobs?limit=3")"
+
+# 5) 앱이 외부에 직접 서 있지 않은가 (2026-09-08)
+#
+# 왜 여기서 보나. 2026-08-19 에 223 에서 `0.0.0.0:8000->8000/tcp` 를 실측했다 — 앱이
+# 평문 HTTP 로 바깥에 붙어 있었고, 무인증 login.html 이 admin JWT 를 본문에 담아 KL 망
+# 밖에서 그대로 받아졌다. compose 기본값은 이제 루프백이지만(airgap/prod/dual/dr-staging),
+# **서버에서 만든 expose 파일이 그것을 덮을 수 있다.** 배포가 그 노출을 매번 되살린다.
+# 그래서 YAML 이 아니라 **실제로 뜬 컨테이너**를 본다.
+#
+# 외부 노출이 필요하면 앱이 아니라 프록시를 세운다:
+#   nginx-mtls (--profile mtls)  또는  docker-compose.console-proxy.yml
+bound=$(docker ps --filter "name=api" --format '{{.Ports}}' 2>/dev/null | tr ',' '\n' \
+        | grep -E '(0\.0\.0\.0|\[::\]):[0-9]+->8000' | head -3)
+if [ -n "$bound" ]; then
+  printf '5) 외부 바인드 검사         : \033[31m노출됨\033[0m — %s\n' "$(printf '%s' "$bound" | tr '\n' ' ')"
+  echo "    앱이 평문 HTTP 로 바깥에 서 있다. 노출은 프록시가 해야 한다."
+  echo "    확인: docker ps | grep api    /    조치: expose 파일 제거 후 API_BIND 기본값(127.0.0.1) 사용"
+elif docker ps --filter "name=api" -q 2>/dev/null | grep -q .; then
+  printf '5) 외부 바인드 검사         : 루프백만 (정상)\n'
+else
+  printf '5) 외부 바인드 검사         : 건너뜀 (api 컨테이너를 못 찾음 - 원격에서 실행했나)\n'
+fi
 echo

@@ -98,7 +98,18 @@ services:
     ports:
       # [2026-08-02] 하드코딩 8000 이면 이미 8000 을 쓰는 호스트에서 기동이 실패하고, 운영자가
       # 번들 안 YAML 을 손으로 고쳐야 했다 → .env 로 뺀다(기본값은 종전과 동일).
-      - "${API_PORT:-8000}:8000"
+      #
+      # [2026-09-08] 바인드 주소를 **루프백 기본**으로 바꾼다. 종전에는 주소를 안 적어
+      # 0.0.0.0 이었고, 앱이 평문 HTTP 로 외부에 직접 붙었다. 2026-08-19 에 223 에서
+      # 실측된 그대로다 — `0.0.0.0:8000->8000/tcp` · 보안 헤더 0개 · /docs 무인증 200 ·
+      # 무인증 login.html 이 admin JWT 를 본문에 노출(KL 망 밖에서 수신됨).
+      # 그때 prod.yml·dual.yml·dr-staging.yml 은 127.0.0.1 로 고쳤는데 **이 폐쇄망
+      # 배포본만 빠져 있었다.** 이제 셋과 같은 형태다.
+      #
+      # 외부 노출은 앱이 아니라 프록시가 한다(nginx-mtls `--profile mtls`, 또는
+      # docker-compose.console-proxy.yml). 프록시 없이 임시로 열어야 하면 .env 에
+      # API_BIND=0.0.0.0 을 **명시**한다 — 노출은 기본값이 아니라 결정이어야 한다.
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/healthz/live"]
       interval: 30s
