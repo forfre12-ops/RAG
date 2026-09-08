@@ -39,6 +39,14 @@ const ALLOW_WRITES = flag('--allow-writes');
 const API_KEY = opt('--key') || process.env.KOIPA_E2E_API_KEY || null;
 if (API_KEY) setDefaultStorage({ koipa_api_key: API_KEY });
 
+// [2026-09-09] 배포 서버의 콘솔 인증은 **공유 API 키가 아니라 포털 JWT 쿠키**다
+// (golden.py 가 공유 키를 거부한다: "shared API keys are not allowed"). --key 만 있던 동안
+// 인증이 필요한 화면은 실서버 모드에서 전부 401 로 실패했고, 그것이 서버 결함처럼 보였다.
+// 값은 쿠키 문자열 그대로다:  --cookie 'koipa_access_token=eyJ...'
+// ⚠ 토큰을 명령줄에 그대로 적으면 셸 기록에 남는다. 파일에서 읽는 편이 낫다:
+//     KOIPA_E2E_COOKIE="koipa_access_token=$(cat token.txt)" node run.mjs --base ...
+const COOKIE = opt('--cookie') || process.env.KOIPA_E2E_COOKIE || null;
+
 async function loadScenarios() {
   const dir = path.join(HERE, 'scenarios');
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort();
@@ -66,7 +74,9 @@ if (flag('--list')) {
 
 /* 실서버 모드도 **자체 서버를 띄우고 그리로 넘긴다**(기록 프록시). 그래야 "어떤 요청이
  * 어떤 본문으로 나갔나"를 실서버 상대로도 그대로 확인할 수 있다. */
-const server = await startServer(LIVE_BASE ? { upstream: LIVE_BASE.replace(/\/$/, '') } : {});
+const server = await startServer(
+  LIVE_BASE ? { upstream: LIVE_BASE.replace(/\/$/, ''), cookie: COOKIE } : {},
+);
 
 if (server.live && !AS_JSON) {
   console.log(`실서버 모드: ${server.upstream}`);

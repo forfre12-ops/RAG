@@ -115,12 +115,18 @@ function serveStatic(req, res, urlPath) {
 /** 실서버 모드 — 요청을 그대로 넘기되 **기록은 남긴다.**
  *  기록이 없으면 "어떤 요청이 어떤 본문으로 나갔나" 확인이 통째로 죽어, 실서버 시험이
  *  화면 그림 검사로만 쪼그라든다. 고장 주입·응답 덮어쓰기는 이 모드에서 하지 않는다. */
-async function proxyTo(upstream, req, res, rawBody) {
+async function proxyTo(upstream, req, res, rawBody, cookie = null) {
   const target = upstream.replace(/\/$/, '') + (req.url || '/');
   const headers = { ...req.headers };
   delete headers.host;
   delete headers.connection;
   delete headers['content-length'];
+  // [2026-09-09] 인증 쿠키를 실어 준다. 배포 서버는 콘솔 인증이 포털 JWT 쿠키
+  // (koipa_access_token)인데 하니스는 --key(공유 API 키)밖에 못 넣었다. 그래서 인증이
+  // 필요한 화면은 **실서버 모드에서 영원히 401** 이었고, 그 실패가 서버 결함처럼 보였다
+  // (실측 2026-09-09: golden.status·monitor.dashboard 두 건. 같은 경로를 쿠키로 부르면 200).
+  // jsdom 은 cross-origin 쿠키를 안 실으므로 프록시가 붙이는 자리가 맞다.
+  if (cookie) headers.cookie = headers.cookie ? `${headers.cookie}; ${cookie}` : cookie;
   let up;
   try {
     up = await fetch(target, {
@@ -150,7 +156,7 @@ async function proxyTo(upstream, req, res, rawBody) {
   res.end();
 }
 
-export async function startServer({ upstream = null } = {}) {
+export async function startServer({ upstream = null, cookie = null } = {}) {
   const state = {
     faults: [],
     /** 콘솔이 실제로 보낸 요청 전부 — 시나리오가 "무엇을 어떤 본문으로 불렀나"를 본다. */
@@ -165,7 +171,7 @@ export async function startServer({ upstream = null } = {}) {
     if (urlPath.startsWith('/console') || urlPath.startsWith('/demo')) {
       // 실서버 모드에서는 **배포된 화면**을 받아야 한다 — 로컬 파일로 보면 그 서버를 시험한 것이 아니다.
       if (upstream) {
-        await proxyTo(upstream, req, res, Buffer.alloc(0));
+        await proxyTo(upstream, req, res, Buffer.alloc(0), cookie);
         return;
       }
       serveStatic(req, res, urlPath);
@@ -188,7 +194,7 @@ export async function startServer({ upstream = null } = {}) {
 
     if (!urlPath.startsWith('/api/v1')) {
       if (upstream) {
-        await proxyTo(upstream, req, res, Buffer.alloc(0));
+        await proxyTo(upstream, req, res, Buffer.alloc(0), cookie);
         return;
       }
       res.writeHead(404, { 'Content-Type': 'application/json' }).end('{"detail":"no route"}');
@@ -219,7 +225,7 @@ export async function startServer({ upstream = null } = {}) {
     state.calls.push(call);
 
     if (upstream) {                       // 기록만 하고 그대로 넘긴다
-      await proxyTo(upstream, req, res, raw);
+      await proxyTo(upstream, req, res, raw, cookie);
       return;
     }
 

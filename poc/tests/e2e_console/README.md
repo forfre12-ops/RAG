@@ -134,6 +134,25 @@ KOIPA_E2E_API_KEY=<서버의 API_KEY> node run.mjs --base http://223.130.156.134
 API 키는 `--key` 나 `KOIPA_E2E_API_KEY` 로 준다(콘솔이 `localStorage.koipa_api_key` 를
 읽는 그 경로를 그대로 쓴다). 안 주면 콘솔 기본값으로 전부 401 이 난다.
 
+### 골든 콘솔은 API 키가 아니라 **JWT 쿠키**다
+
+```
+KOIPA_E2E_COOKIE="koipa_access_token=$(cat token.txt)" node run.mjs --base http://…:8000
+```
+
+`golden.py` 가 공유 API 키를 명시적으로 거부한다("shared API keys are not allowed" —
+검수 기록에 사람을 남겨야 하기 때문). 그래서 `--key` 만으로는 인증이 필요한 화면이
+**실서버 모드에서 전부 401** 이 되고, 그 실패가 서버 결함처럼 보인다.
+프록시가 붙여 주므로 `--cookie` 또는 `KOIPA_E2E_COOKIE` 로 주면 된다
+(jsdom 은 cross-origin 쿠키를 안 싣는다 — 그래서 프록시가 붙이는 자리다).
+
+실측 2026-09-09(211 서버): 쿠키 없이 통과 31 → 쿠키 주고 32, `monitor.dashboard` 가
+401 에서 **실수치 렌더 확인**으로 바뀌고 `config.grades.validation` CRASH 가 사라졌다.
+
+⚠ **대가 하나** — 쿠키를 주면 항상 인증된 상태라 401 경로를 못 태운다.
+`demo.auth.401-goes-to-login-not-a-prompt` 하나가 그래서 실패한다. 그 시나리오를 보려면
+쿠키 없이 한 번 더 돌린다. 두 번 돌리는 것이 지금의 정답이다.
+
 건너뛰는 것 셋:
 
 | 표시 | 뜻 | 왜 건너뛰나 |
