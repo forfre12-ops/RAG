@@ -48,18 +48,31 @@ import sys, os
 sys.path.insert(0, {src!r})
 import torch
 torch.set_num_threads({threads})
-# CPU 실측이다. CUDA_VISIBLE_DEVICES 를 비워도 is_available() 은 True 를 돌려주고
-# (device_count 는 0) trainer.py 의 is_bf16_supported() 가 Invalid device id 로 죽는다.
-torch.cuda.is_available = lambda: False
+{device_stanza}
 from koipa.modules.m4_training.trainer import TrainSpec, train_classifier
-print("CAP=%s THREADS=%d" % (
-    torch.backends.cpu.get_cpu_capability(), torch.get_num_threads()), file=sys.stderr, flush=True)
+print("CAP=%s THREADS=%d DEV=%s" % (
+    torch.backends.cpu.get_cpu_capability(), torch.get_num_threads(),
+    (torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu")),
+    file=sys.stderr, flush=True)
 train_classifier(TrainSpec(
     train_path={train!r}, val_path={val!r}, test_path={val!r}, output_dir={out!r},
     epochs={epochs}, batch_size={batch}, max_seq_len={max_seq},
-    use_mlflow=False, bf16=False,
+    use_mlflow=False, bf16={bf16},
 ))
 """
+
+# CPU 실측: CUDA_VISIBLE_DEVICES 를 비워도 is_available() 은 True 를 돌려주고
+# (device_count 는 0) trainer.py 의 is_bf16_supported() 가 Invalid device id 로 죽는다.
+# 그래서 함수 자체를 막는다.
+_CPU_STANZA = "torch.cuda.is_available = lambda: False"
+
+# [2026-09-09] GPU 실측 경로. 종전에는 위 두 줄이 무조건 들어가고 부모가
+# CUDA_VISIBLE_DEVICES="" 를 넣어 **GPU 로는 잴 수가 없었다** — 이 도구가 재학습 소요의
+# 정본인데 GPU 서버(지재원 모델 공장)에서 쓸 수 없다는 뜻이었다. 축을 연다.
+# GPU 가 없는데 --device cuda 를 주면 조용히 CPU 로 돌지 않고 그 자리에서 멈춘다.
+_GPU_STANZA = (
+    "assert torch.cuda.is_available(), 'CUDA 를 못 찾았다 — --device cuda 인데 GPU 가 없다'"
+)
 
 _BAR = re.compile(r"(\d+)/(\d+)\s*\[([0-9:]+)<([0-9:]+),\s*([\d.]+)(s/it|it/s)")
 
@@ -87,18 +100,28 @@ def make_subset(src: Path, n: int, out: Path, seed: int = 20260829) -> int:
 
 def measure(train: Path, val: Path, out_dir: Path, *, threads: int, rows: int,
             epochs: int, batch: int, max_seq: int, settle_steps: int,
-            budget_s: float, verbose: bool) -> dict:
+            budget_s: float, verbose: bool, device: str = "cpu") -> dict:
     expect = math.ceil(rows / batch) * epochs
+    gpu = device == "cuda"
     src = CHILD.format(src=str(_POC / "src"), threads=threads, train=str(train),
                        val=str(val), out=str(out_dir), epochs=epochs,
-                       batch=batch, max_seq=max_seq)
+                       batch=batch, max_seq=max_seq,
+                       device_stanza=_GPU_STANZA if gpu else _CPU_STANZA,
+                       # bf16 은 Ampere(8.0) 이상에서 의미가 있다. 판단은 trainer 에 맡기지
+                       # 않고 여기서 끈다 - 측정끼리 조건이 갈리면 비교가 성립하지 않는다.
+                       bf16=False)
     env = dict(os.environ)
     env.update({
-        "CUDA_VISIBLE_DEVICES": "", "OMP_NUM_THREADS": str(threads),
+        "OMP_NUM_THREADS": str(threads),
         "MKL_NUM_THREADS": str(threads), "HF_HUB_OFFLINE": "1",
         "TRANSFORMERS_OFFLINE": "1", "PYTHONIOENCODING": "utf-8",
         "PYTHONUNBUFFERED": "1", "TOKENIZERS_PARALLELISM": "false",
     })
+    # CPU 측정에서만 장치를 숨긴다. GPU 측정에서 이 값을 비우면 잴 대상이 사라진다.
+    if not gpu:
+        env["CUDA_VISIBLE_DEVICES"] = ""
+    else:
+        env.pop("CUDA_VISIBLE_DEVICES", None)
     t0 = time.time()
     proc = subprocess.Popen([sys.executable, "-c", src], env=env, cwd=str(_POC.parent),
                             stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=0)
@@ -132,10 +155,12 @@ def measure(train: Path, val: Path, out_dir: Path, *, threads: int, rows: int,
         tail = (buf + (proc.stderr.read() or b"")).decode("utf-8", "replace")
         raise SystemExit("학습 막대를 못 읽었다 — 자식 stderr 끝부분:\n%s" % tail[-2000:])
     sit = last["s_per_it"]
-    cap_txt = (cap or "").split()[0][4:] if cap else "unknown"
+    parts = dict(kv.split("=", 1) for kv in (cap or "").split() if "=" in kv)
+    cap_txt = parts.get("CAP", "unknown")
     return {
         "rows": rows, "threads": threads, "epochs": epochs, "batch_size": batch,
         "max_seq_len": max_seq, "cpu_capability": cap_txt,
+        "device": device, "device_name": parts.get("DEV", "unknown"),
         "steps": expect, "s_per_it": sit, "settled_at_step": last["step"],
         "train_only_hours": round(expect * sit / 3600.0, 2),
         "measured_wall_s": round(time.time() - t0, 1),
@@ -154,6 +179,9 @@ def main() -> int:
     ap.add_argument("--budget-s", type=float, default=1200)
     ap.add_argument("--json", default=None)
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--device", choices=("cpu", "cuda"), default="cpu",
+                    help="cpu(기본) 또는 cuda. cuda 인데 GPU 가 없으면 그 자리에서 멈춘다 - "
+                         "조용히 CPU 로 돌면 그 숫자를 GPU 값으로 인용하게 된다")
     a = ap.parse_args()
 
     if a.dataset:
@@ -183,7 +211,7 @@ def main() -> int:
                 print("측정 — %d행 · %d스레드 (스텝 %d)"
                       % (actual, t, math.ceil(actual / a.batch_size) * a.epochs), flush=True)
             out.append(measure(sub, val, work / ("out_%d_t%d" % (n, t)),
-                               threads=t, rows=actual, epochs=a.epochs,
+                               threads=t, rows=actual, epochs=a.epochs, device=a.device,
                                batch=a.batch_size, max_seq=a.max_seq_len,
                                settle_steps=a.settle_steps, budget_s=a.budget_s,
                                verbose=not a.quiet))
