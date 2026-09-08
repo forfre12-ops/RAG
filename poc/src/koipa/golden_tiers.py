@@ -264,9 +264,19 @@ def is_valid_signoff(record: dict) -> bool:
     return isinstance(rids, (list, tuple)) and len(rids) > 0
 
 
+# 콘솔 어휘 → 이 축의 정본 어휘. 조직 보유 실문서를 proxy_gold_candidate_service 는
+# organization_real 로, 여기서는 customer_real 로 부른다(위 _CLOUD_ELIGIBLE_ORIGINS 주석이
+# 그 갈림을 이미 적어 두었다). 매핑이 없으면 explicit 값이 _VALID_ORIGINS 를 못 맞춰
+# unknown 으로 떨어지고, **조직 실문서에 사람이 서명해도 is_real_locked_eval 이 False** 가
+# 된다(2026-09-09 실측). 반출 게이트는 이 매핑에 영향받지 않는다 — unknown 이든
+# customer_real 이든 둘 다 _CLOUD_ELIGIBLE_ORIGINS 밖이라 양쪽 모두 차단이다.
+_ORIGIN_ALIASES = {"organization_real": ORIGIN_CUSTOMER_REAL}
+
+
 def document_origin(record: dict) -> str:
     """본문 실재성 축. 명시 document_origin 우선 → source에서 결정적 유도 → unknown(fail-closed)."""
     explicit = str(record.get("document_origin") or "").strip()
+    explicit = _ORIGIN_ALIASES.get(explicit, explicit)
     if explicit in _VALID_ORIGINS and explicit != ORIGIN_UNKNOWN:
         return explicit
     src = str(record.get("source") or "").strip()

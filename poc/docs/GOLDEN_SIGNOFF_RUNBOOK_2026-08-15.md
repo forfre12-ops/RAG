@@ -18,15 +18,37 @@
 
 ---
 
-## 1. 함정 — 콘솔 버튼은 게이트를 안 움직인다
+## 1. 함정 — 콘솔 버튼만으로는 게이트가 안 움직인다  ★2026-09-09 해소
 
 ```
-KL 배포 콘솔  /golden/candidates/{id}/decision  ->  approved_proxy
-              proxy_gold_candidate_service 주석: "it never creates a locked evaluation record"
+KL 배포 콘솔  /golden/candidates/{id}/decision  ->  approved_proxy   (원장 기록까지)
 게이트가 세는 것  /golden/jobs/{job_id}/signoff  ->  locked_gold_eval
 ```
 
-**콘솔에서 120건을 전부 눌러도 `locked_gold_eval` 은 0 건이다.**
+**종전: 콘솔에서 120건을 전부 눌러도 `locked_gold_eval` 은 0 건이었다.** 결정은 원장
+(`candidate_decisions.jsonl`)에만 남고 `label_source` 를 쓰지 않았는데, 그 원장을 tier 로
+넘기는 코드가 어디에도 없었다. 2026-09-09 실측으로 확인한 값 — 콘솔 후보 1,067건 중
+tier 코퍼스에 존재하는 것 67건(6.3%), 나머지 1,000건은 tier 레코드 자체가 없었다.
+
+**지금: 승격 단계가 생겼다.** 결정을 원장에서 투영해 사람 서명으로 올린다.
+
+```
+POST /api/v1/golden/candidates/promote        {"publish": true}
+python scripts/promote_console_decisions.py --apply --publish
+```
+
+  · 원장은 안 건드린다(투영). 여러 번 돌려도 결과가 같다.
+  · 서명자는 **결정을 내린 검수자**(원장 `actor_id`)다 — 승격을 실행한 사람이 아니다.
+    머신·플레이스홀더 결정자는 `is_human_reviewer` 가 그대로 거부한다.
+  · 이미 쌓인 결정도 소급 승격된다 — 배포 서버에 남아 있는 검수 이력이 그대로 살아난다.
+  · `--publish` 없이 돌리면 후보 폴더의 `locked_console_review.jsonl` 에만 누적하고
+    라이브 readiness 경로(`locked_eval_jsonl`)는 건드리지 않는다.
+
+⚠ **`LOCKED_EVAL_JSONL` 이 비어 있으면 `--publish` 는 반영되지 않는다**(기본값이 빈 값이다).
+  응답·출력의 `publish_note` 가 그 사실을 그대로 말해 준다. 배포 게이트까지 움직이려면
+  프로파일 env 에 경로를 먼저 넣을 것.
+
+배선의 전말과 이유는 `koipa/console_signoff.py` 머리말에 있다.
 
 ---
 

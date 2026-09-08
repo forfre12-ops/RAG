@@ -32,6 +32,8 @@ from koipa.schemas.golden import (
     ProxyGoldCandidateProvenanceRequest,
     ProxyGoldCandidateProvenanceResponse,
     ProxyGoldCandidateDecisionResponse,
+    ProxyGoldPromoteRequest,
+    ProxyGoldPromoteResponse,
     GoldenSignoffRequest,
     GoldenSignoffPreflightResponse,
     GoldenSignoffResponse,
@@ -426,6 +428,36 @@ def proxy_gold_candidate_decision(
         final_grade=candidate["final_grade"],
         latest_decision=candidate["latest_decision"],
     )
+
+
+@router.post(
+    "/golden/candidates/promote",
+    response_model=ProxyGoldPromoteResponse,
+    summary="콘솔 검수 결정을 사람 서명(locked_gold_eval)으로 승격",
+)
+def proxy_gold_candidate_promote(
+    req: ProxyGoldPromoteRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> ProxyGoldPromoteResponse:
+    """등급을 확정한 콘솔 결정을 평가정답으로 승격한다(원장 투영 · 여러 번 돌려도 같은 결과).
+
+    **서명자는 이 요청을 보낸 사람이 아니다.** 원장에 남은 결정자(actor_id = 포털 JWT sub)가
+    reviewer_id 로 들어간다 — 승격은 결정을 옮기는 행위이지 새로 판단하는 행위가 아니다.
+    머신·플레이스홀더 결정자는 promote_to_locked 가 거부한다.
+
+    이 엔드포인트를 부르는 사람에게도 포털 로그인을 요구한다(_console_actor_id). 공유 API
+    키로 평가정답을 만들 수 있으면 '누가 승격했나'가 남지 않는다.
+    """
+    _console_actor_id(auth)
+    try:
+        out = ProxyGoldCandidateService().promote_decisions_to_locked(
+            publish=req.publish, dry_run=req.dry_run
+        )
+    except GoldenSignoffStorageError as exc:
+        # 저장 실패만 사유를 그대로 내려보낸다 — 폴더 권한·경로처럼 화면 앞의 사람이 바로
+        # 고칠 수 있는 종류다(golden_job_signoff 와 같은 이유).
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return ProxyGoldPromoteResponse(**out)
 
 
 @router.get(

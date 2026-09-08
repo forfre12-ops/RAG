@@ -76,7 +76,14 @@ def test_one_ineligible_document_airgaps_the_whole_run():
     airgap, audit = GoldenBuildService._egress_decision(docs, _req(sensitive=False))
     assert airgap is True
     assert audit["reason"] == "origin_not_cloud_eligible"
-    assert audit["blocked_by_origin"] == {"unknown": 1}  # organization_real → unknown(fail-closed)
+    # [2026-09-09] 차단 **사유 이름**이 바뀌었다. 차단 여부는 그대로다(위 허용목록 시험).
+    # 종전: organization_real 이 _VALID_ORIGINS 를 못 맞춰 unknown 으로 떨어져 막혔다 —
+    #       "모르니까 막는다".
+    # 지금: golden_tiers._ORIGIN_ALIASES 가 정본 어휘 customer_real 로 옮긴다 —
+    #       "조직 실문서라서 막는다". 감사 기록에 남는 이유가 사실과 맞게 됐다.
+    # 이 매핑이 필요했던 이유는 반출이 아니라 서명 쪽이다 — 매핑이 없으면 조직 실문서에
+    # 사람이 서명해도 is_real_locked_eval 이 False 였다(test_console_signoff_bridge).
+    assert audit["blocked_by_origin"] == {"customer_real": 1}
 
 
 def test_all_eligible_and_not_declared_sensitive_is_allowed():

@@ -1634,7 +1634,8 @@ paths:
       summary: 합성 Proxy Gold 후보의 관리자 결정 기록
       description: >-
         결정은 append-only 로 원장에 남는다. 등급변경·보류·반려·폐기는 사유가 필수이며
-        미기입 시 422. 승인은 approved_proxy 로만 남고 Locked Gold 평가 레코드를 만들지 않는다.
+        미기입 시 422. 승인은 approved_proxy 로만 남고 이 엔드포인트 자체는 Locked Gold
+        평가 레코드를 만들지 않는다 — 평가정답 승격은 POST /golden/candidates/promote 다.
       parameters:
         - in: path
           name: doc_id
@@ -1659,6 +1660,38 @@ paths:
               schema: { type: object, additionalProperties: true }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422': { description: "사유 필수인 결정에 reason 미기입" }
+
+  /golden/candidates/promote:
+    post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [golden]
+      summary: 콘솔 검수 결정을 사람 서명(locked_gold_eval)으로 승격
+      description: >-
+        등급을 확정한 콘솔 결정을 결정 원장에서 투영해 평가정답으로 올린다. 원장은
+        바꾸지 않으며 여러 번 호출해도 결과가 같다(doc_id 기준 dedup 누적). 서명자는
+        요청자가 아니라 **결정을 내린 검수자**(원장 actor_id)이며, 기계·자리표시 계정의
+        결정은 승격되지 않는다. 등급을 확정하지 않은 결정(보류·폐기·범위밖·재검토)은
+        대상이 아니고, 승격 뒤에 그런 결정이 올라오면 해당 문서는 평가정답에서 빠진다.
+        publish=true 는 배포 게이트가 읽는 라이브 경로까지 반영한다(LOCKED_EVAL_JSONL
+        미설정이면 반영되지 않고 publish_note 로 사유를 알린다).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                publish: { type: boolean, default: false, description: 라이브 readiness 경로까지 반영 }
+                dry_run: { type: boolean, default: false, description: 집계만 하고 파일을 쓰지 않음 }
+      responses:
+        '200':
+          description: 승격 집계. real_locked 는 실문서 평가정답 건수(합성 본문 서명 제외).
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "포털 로그인 없이 호출(공유 API 키 불가)" }
+        '500': { description: "승격 결과를 파일로 남기지 못함(폴더 권한·경로)" }
 
   /golden/candidates/{doc_id}/provenance:
     post:

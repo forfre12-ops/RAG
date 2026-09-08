@@ -267,3 +267,28 @@ class ProxyGoldCandidateDecisionResponse(BaseModel):
     status: str
     final_grade: Optional[str] = None
     latest_decision: Optional[dict] = None
+
+
+class ProxyGoldPromoteRequest(BaseModel):
+    """콘솔 결정 → 사람 서명 승격 요청. 서명자는 요청 본문이 아니라 **원장의 결정자**다.
+
+    reviewer_id 를 받지 않는 것이 이 스키마의 요점이다 — 승격을 실행한 관리자가 아니라
+    등급을 확정한 검수자가 서명자여야 한다(koipa.console_signoff).
+    """
+    publish: bool = False   # 라이브 readiness 읽기경로(locked_eval_jsonl)까지 반영할지
+    dry_run: bool = False   # 판정·집계만 하고 아무 파일도 쓰지 않음
+
+
+class ProxyGoldPromoteResponse(BaseModel):
+    candidates: int            # 콘솔 후보 전체
+    promotable: int            # 그 중 등급을 확정한 결정이 있는 것
+    locked: int                # 이번 실행에서 승격된 건수
+    rejected: int
+    locked_by_grade: dict
+    rejected_reasons: dict
+    real_locked: int           # 누적 locked 중 **실문서** 평가정답(is_real_locked_eval)
+    locked_total: int          # 누적 locked 전체(합성 서명 포함)
+    locked_path: str
+    published: bool
+    publish_note: Optional[str] = None
+    dry_run: bool = False

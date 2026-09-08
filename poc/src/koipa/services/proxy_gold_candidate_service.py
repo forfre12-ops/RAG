@@ -2,7 +2,10 @@
 
 This service deliberately keeps curated synthetic candidates separate from the
 real-document golden corpus.  An administrative approval produces only
-``approved_proxy``; it never creates a locked evaluation record.
+``approved_proxy``; the decision ledger never becomes an evaluation record on
+its own.  Promotion to ``locked_gold_eval`` is a separate, explicit step —
+``promote_decisions_to_locked`` projects the ledger through
+``golden_signoff.promote_to_locked``; see ``koipa.console_signoff``.
 """
 from __future__ import annotations
 
@@ -25,6 +28,9 @@ logger = logging.getLogger(__name__)
 _POC_ROOT = Path(__file__).resolve().parents[3]
 _DEFAULT_ROOT = _POC_ROOT / "datasets" / "proxy_gold" / "single_document_candidates"
 _LEDGER_NAME = "candidate_decisions.jsonl"
+# 콘솔 결정에서 승격된 사람 서명 평가정답. 후보·원장과 같은 폴더에 둔다 — 잡 단위로
+# 갈리는 locked_<job_id>.jsonl 과 달리 콘솔 후보 풀은 하나뿐이라 파일도 하나다.
+_LOCKED_LEDGER_NAME = "locked_console_review.jsonl"
 
 # 후보 목록 캐시 — 키에 (루트·파일수·최신 mtime·전체 바이트·원장 mtime·원장 바이트) 가
 # 들어 있어 파일이 하나라도 바뀌면 자동 무효화된다. 캐시가 없으면 매 요청 30MB 본문을
@@ -205,6 +211,7 @@ class ProxyGoldCandidateService:
         self.root = Path(root).resolve() if root else _DEFAULT_ROOT.resolve()
         self.ledger_path = self.root / _LEDGER_NAME
         self.lock_path = self.root / f"{_LEDGER_NAME}.lock"
+        self.locked_path = self.root / _LOCKED_LEDGER_NAME
 
     def list_candidates(
         self, *, status: str | None = None, grade: str | None = None,
@@ -496,6 +503,101 @@ class ProxyGoldCandidateService:
                 handle.flush()
                 os.fsync(handle.fileno())
         return self.get_candidate(doc_id)
+
+    def promote_decisions_to_locked(
+        self,
+        *,
+        publish: bool = False,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """등급을 확정한 콘솔 결정을 사람 서명(locked_gold_eval)으로 승격한다.
+
+        **이 메서드가 있기 전까지 콘솔 검수는 평가정답을 한 건도 만들지 못했다**(2026-09-09
+        실측). decide() 는 원장에 이벤트만 남기고 label_source 를 쓰지 않았고, 그 원장을
+        tier 로 넘기는 코드가 어디에도 없었다. 배선의 전말은 koipa.console_signoff 참조.
+
+        원장을 **투영**한다 — decide() 의 쓰기 경로는 건드리지 않는다. 그래서:
+
+          · 이미 쌓인 결정도 소급 승격된다(서버에 남아 있는 검수 이력이 그대로 살아난다).
+          · 여러 번 돌려도 결과가 같다(doc_id dedup 누적 — apply_signoff 와 같은 규율).
+          · reviewer_id 는 **결정을 내린 검수자**(원장 actor_id = 포털 JWT sub)다.
+            승격을 실행한 관리자가 아니다. 머신·플레이스홀더는 promote_to_locked 내부
+            is_human_reviewer 가 거부한다(신원 위조 차단).
+
+        publish=False(기본)면 후보 폴더의 locked_console_review.jsonl 에만 누적하고
+        라이브 readiness 읽기경로(settings.locked_eval_jsonl)는 건드리지 않는다 —
+        apply_signoff 와 같은 계약이다. dry_run 은 **쓰기만** 건너뛰고 집계는 그대로 돌려,
+        무엇이 승격될지를 같은 응답 모양으로 미리 보여준다.
+        """
+        from koipa.config import settings  # noqa: PLC0415
+        from koipa.console_signoff import build_promotion_inputs  # noqa: PLC0415
+        from koipa.golden_signoff import (  # noqa: PLC0415
+            merge_locked_records, promote_to_locked,
+        )
+        from koipa.golden_tiers import is_real_locked_eval  # noqa: PLC0415
+        from koipa.services.golden_build_service import (  # noqa: PLC0415
+            _atomic_write_jsonl, _read_jsonl,
+        )
+
+        candidates = self._candidates()
+        records, signoffs = build_promotion_inputs(candidates)
+        result = promote_to_locked(records, signoffs)
+
+        accumulated = merge_locked_records(_read_jsonl(self.locked_path), result.locked)
+        # 승격한 뒤에 검수자가 **판단을 물린** 문서는 평가정답에서 뺀다.
+        #
+        # 원장은 append-only 라 승격 뒤에도 보류·폐기·범위밖·재검토가 얼마든지 올라온다.
+        # 누적만 하면 검수자가 "이건 아니다" 라고 되돌린 문서가 평가정답으로 남는다 —
+        # apply_signoff 가 _merge_rejected_records 로 막는 것과 같은 자리다.
+        # 후보 폴더에서 사라진 doc_id 는 건드리지 않는다(판단을 물린 것이 아니라 알 수 없는
+        # 것이다). 지금 후보로 보이는데 승격 대상이 아닌 것만 뺀다.
+        promoted_ids = {r["doc_id"] for r in records}
+        withdrawn = {
+            str(c.get("doc_id")) for c in candidates
+            if str(c.get("doc_id")) not in promoted_ids
+        }
+        accumulated = [r for r in accumulated if r.get("doc_id") not in withdrawn]
+        if not dry_run and (accumulated or self.locked_path.exists()):
+            _atomic_write_jsonl(self.locked_path, accumulated)
+
+        live_path = str(getattr(settings, "locked_eval_jsonl", "") or "")
+        published = False
+        publish_note = None
+        if publish:
+            # 반영되지 못하는 경우를 조용한 no-op 로 두지 않는다 — 실행한 사람이 화면에서
+            # 바로 알아야 한다(apply_signoff 가 같은 이유로 같은 문구를 쓴다).
+            if not result.locked:
+                publish_note = "publish 요청됐으나 승격 locked 0건 — 반영 대상 없음"
+            elif not live_path:
+                publish_note = (
+                    "publish 요청됐으나 LOCKED_EVAL_JSONL 미설정 — 배포 게이트 미반영. "
+                    "프로파일 env 에 locked_eval_jsonl 경로를 설정하세요"
+                )
+            elif dry_run:
+                publish_note = "dry_run — 라이브 경로에 쓰지 않았습니다(미리보기)"
+            else:
+                _atomic_write_jsonl(
+                    Path(live_path),
+                    merge_locked_records(_read_jsonl(Path(live_path)), result.locked),
+                )
+                published = True
+
+        return {
+            "candidates": len(candidates),
+            "promotable": len(records),
+            "locked": len(result.locked),
+            "rejected": len(result.rejected),
+            "locked_by_grade": result.stats["locked_by_grade"],
+            "rejected_reasons": result.stats["rejected_reasons"],
+            # 실문서 평가정답 — 합성 본문 서명은 locked tier 에는 들어가지만 이 수에는
+            # 안 잡힌다(is_real_locked_eval). 감리 회신의 '실문서 몇 건' 이 이 값이다.
+            "real_locked": sum(1 for r in accumulated if is_real_locked_eval(r)),
+            "locked_total": len(accumulated),
+            "locked_path": str(self.locked_path),
+            "published": published,
+            "publish_note": publish_note,
+            "dry_run": bool(dry_run),
+        }
 
     def record_provenance(
         self,
