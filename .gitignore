@@ -152,6 +152,12 @@ poc/datasets/drift_state.json
 poc/.tmp_guide/
 poc/scripts/_*.py
 poc/scripts/_*.json
+# 예외 — _cli_io.py 는 throwaway 가 아니라 **공용 모듈**이다. scripts 31개가 import 한다.
+# 커밋 2f19edae 가 cp949 출구 고정 코드 133벌을 여기 한 곳으로 모으며 만든 정본인데,
+# 위 `_*` 규칙에 걸려 추적되지 않고 있었다. 그래서 git 으로 배포하면 그 31개가 전부
+# ModuleNotFoundError 로 죽는다 — 2026-09-08 신규 서버(211.233.204.32) 배포에서 실제로
+# setup_console_test_login.py 가 이것 때문에 실패했다(git archive 에 안 담김).
+!poc/scripts/_cli_io.py
 # 참고용 클라이언트 PDF (기밀 — 트래킹 금지)
 doc/*.pdf
 
