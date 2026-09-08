@@ -380,6 +380,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td>게이트</td><td>LLM 2차의견</td><td class="td-code">model_secondopinion_llm_enabled</td><td>False (기각)</td><td>—</td><td>비-TS 자동확정 시 LLM 재확인(비권장)</td></tr>
             <tr><td>집계</td><td>고등급 max-pool</td><td class="td-code">severe_agg_codes</td><td>TS · S1</td><td>—</td><td>핵심 청크 희석 미탐 차단(FNR↓)</td></tr>
             <tr><td>룰부스트</td><td>고위험 패턴 배수</td><td class="td-code">rule_high_risk_weight_multiplier</td><td>1.0</td><td>—</td><td>범용 약어 과분류 조정(재생성 필요)</td></tr>
+<tr><td>게이트</td><td>TS/S1 동점 브레이크</td><td class="td-code">ts_tie_break_enabled</td><td>False</td><td>False</td><td>동점이면 상위(TS) 채택 — <b>상향 전용</b>이라 미탐↓·과분류↑ 방향이다. 기본 OFF 인 이유는 켜면 배포본 판정이 바뀌는데 그 변화를 발주처 평가셋에서 아직 재지 않았기 때문이다. 켤 때는 과분류 축(공개문서)과 함께 측정한다.</td></tr>
+<tr><td>관측</td><td>요소 모델 섀도</td><td class="td-code">factor_shadow_enabled</td><td>False</td><td>False</td><td>S/V/M 요소 모델을 같은 입력에 나란히 돌려 <b>계량만</b> 한다 — 등급·status 를 바꾸지 않는다. 배포본은 등급 우선·요소 후행이고 요소 우선 구조로 옮기기 전에 두 판정이 얼마나 다른지를 먼저 알아야 한다. 기본 OFF(켜면 문서당 추론이 한 번 더 돌아 지연 증가). 구현은 <code>modules/m5_inference/factor_model.py</code>.</td></tr>
+<tr><td>전처리</td><td>PII 마스킹</td><td class="td-code">pii_masking_enabled</td><td>True</td><td class="td-pass">True</td><td>정규화 직후 주민번호·연락처·이메일을 마스킹한다. 보안 민감 도메인이라 기본 ON 이며 배포 프로파일 양쪽에서 켜져 있다. 등급 판정 자체를 바꾸는 노브는 아니고 노출 경계를 좁힌다.</td></tr>
           </tbody>
         </table>
       </div>

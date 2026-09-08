@@ -82,7 +82,7 @@ a{color:#0a0a0a}
   </table>
 
   <h2>2. 배포 범위 고정 — 카피레프트 반출 경로 없음</h2>
-  <div class="note">배포 이미지가 설치하는 extras는 <code>[psh, otel, jwt, hwp, hwp-tables, xls]</code>로 고정돼 있습니다(<code>Dockerfile.api.prod</code>). 이 범위 밖의 선택 구성 — <b>PyMuPDF</b>(AGPL-3.0) · <b>MinIO 서버</b>(AGPL-3.0) · <b>poppler-utils</b>(GPL-2/3, OCR용) — 과 레거시 <b>Elasticsearch</b>(SSPL) 어댑터는 <b>소스에 옵션으로만 존재하고 배포본에 설치되지 않아</b> AGPL·GPL·SSPL 반출 경로가 없습니다. 배포되는 copyleft는 <b>LGPL 2건</b>(psycopg·chardet)과 MPL-2.0 소수뿐이며, 모두 동적 링크·미수정 사용이라 다중배포에 지장 없습니다. <b>권위 목록은 번들 <code>licenses/sbom.cyclonedx.json</code>(배포 이미지에서 직접 산출)</b>입니다.</div>
+  <div class="note">배포 이미지가 설치하는 extras는 <code>[psh, otel, jwt, hwp, hwp-tables, pdf-tables, xls]</code>로 고정돼 있습니다(<code>Dockerfile.api.prod</code>). 이 범위 밖의 선택 구성 — <b>PyMuPDF</b>(AGPL-3.0) · <b>MinIO 서버</b>(AGPL-3.0) · <b>poppler-utils</b>(GPL-2/3, OCR용) — 과 레거시 <b>Elasticsearch</b>(SSPL) 어댑터는 <b>소스에 옵션으로만 존재하고 배포본에 설치되지 않아</b> AGPL·GPL·SSPL 반출 경로가 없습니다. 같은 이유로 <b>SeaweedFS</b>(Apache-2.0) 어댑터도 소스에 있습니다 — <code>adapters/storage/seaweedfs_store.py</code>는 MinIO(AGPL-3.0)를 쓰지 않고도 S3 호환 저장소를 붙일 수 있게 한 <b>AGPL 회피 경로</b>이며, boto3 기반이라 어느 extras 에도 속하지 않고 배포본에 설치되지 않습니다. 폐쇄망 기본 저장소는 로컬 파일시스템(AES-256-GCM 암호화)입니다. 배포되는 copyleft는 <b>LGPL 2건</b>(psycopg·chardet)과 MPL-2.0 소수뿐이며, 모두 동적 링크·미수정 사용이라 다중배포에 지장 없습니다. <b>권위 목록은 번들 <code>licenses/sbom.cyclonedx.json</code>(배포 이미지에서 직접 산출)</b>입니다.</div>
 
   <h2>3. 상용 LLM · 외부 API</h2>
   <ul>

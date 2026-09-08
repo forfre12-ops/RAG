@@ -171,6 +171,10 @@ _REV_RE = re.compile(r"\b([0-9a-f]{12})\b")
 # 옛 판을 이력으로 인용하는 자리(“이 칼럼은 X 가 만든다”)까지 걸면 오탐이 된다.
 # **현행이라고 주장하는 문맥**에서만 head 와 대조한다.
 _REV_CTX = re.compile(r"head|현행|현재 판|적용돼|스키마 판|alembic_version")
+# [2026-09-08] 시점을 밝힌 인용은 현행 주장이 아니다. "2026-08-29 실측 · 당시 X" 처럼
+# 과거를 가리키는 자리까지 head 와 대조하면, 문서를 정확하게 고칠수록 검사기가 시끄러워진다.
+# 그러면 사람이 목록을 안 연다 — 오늘 실제로 그렇게 됐다.
+_REV_PAST = re.compile(r"당시|종전|그 뒤|더 이상|이력|개정|과거|였다|였고|옛 |이전 판")
 
 
 _SRC_BLOB = None
@@ -249,11 +253,22 @@ def main() -> int:
                     continue
                 if abs(float(got) - float(T[key])) > 1e-9:
                     findings.append((rel, s[:m.start()].count("\n") + 1, name, got, T[key]))
+        # [2026-09-08] head 는 **여럿일 수 있다**(PostgreSQL 계열 · MariaDB 계열이 독립 계보).
+        # 참값을 '|' 로 이어 붙여 두고 문자열 통째로 비교하면, 문서가 그중 하나를 정확히
+        # 적어도 어긋남으로 잡힌다. 집합으로 나눠 대조한다.
+        _heads = {h.strip() for h in str(T["alembic_head"]).split("|") if h.strip()}
         for m in _REV_RE.finditer(s):
             rev = m.group(1)
-            if _REV_CTX.search(s[max(0, m.start() - 120):m.start()]) and rev != T["alembic_head"]:
-                findings.append(
-                    (rel, s[:m.start()].count("\n") + 1, "alembic 판", rev, T["alembic_head"]))
+            if rev in _heads:
+                continue
+            before = s[max(0, m.start() - 120):m.start()]
+            after = s[m.end():m.end() + 80]
+            if not _REV_CTX.search(before):
+                continue
+            if _REV_PAST.search(before) or _REV_PAST.search(after):
+                continue  # 시점을 밝힌 인용 — 현행 주장이 아니다
+            findings.append(
+                (rel, s[:m.start()].count("\n") + 1, "alembic 판", rev, T["alembic_head"]))
         if T["routes"]:
             for m in re.finditer(r"/api/v1/[a-z0-9_\-/{}.]+", s):
                 path = m.group(0).rstrip("/.")

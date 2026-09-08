@@ -446,8 +446,8 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
         이유다(&sect;4-3) &mdash; <code>enable_nightly_retrain_schedule</code> 기본값 <code>False</code></td>
       </tr>
       <tr>
-        <td>코드 스키마 head</td><td class="c"><code>d1a2b3c4e5f7</code></td>
-        <td>마이그레이션 18판 중 자식이 없는 판(<code>alembic/versions/</code>) &mdash;
+        <td>코드 스키마 head</td><td class="c"><code>e7f8a9b0c1d2</code><br><span class="meta">+ <code>b0c1d2e3f4a5</code>(MariaDB 계열)</span></td>
+        <td>마이그레이션 27판 중 자식이 없는 판(<code>alembic/versions/</code>). PostgreSQL 계열과 MariaDB 계열이 **독립된 두 계보**라 head 도 둘이다 &mdash; MariaDB 판은 자체 baseline 을 갖고 PostgreSQL DB 에는 적용되지 않는다(<code>_require_mariadb</code> 가드). <span class="meta">[2026-09-08 갱신] 종전에는 <code>d1a2b3c4e5f7</code>·18판으로 적혀 있었다 &mdash;
         2026-08-29 에 미사용 칼럼 10개를 뺀 판이 head 다</td>
       </tr>
     </tbody>
@@ -466,7 +466,7 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
       </tr>
       <tr>
         <td>운영 서버의 마이그레이션 적용 여부</td>
-        <td><b>적용돼 있다</b>(2026-08-29 실측). 시험서버(223)의 alembic 판은 <code>d1a2b3c4e5f7</code> 로 <b>코드 head 와 같다</b> &mdash; &sect;2 경로와 합성 검수 화면의 전제가 갖춰져 있다. 확인 명령 — <code>psql -tAc "select version_num from alembic_version"</code></td>
+        <td><b>적용돼 있다</b>(2026-08-29 실측 · 당시 <code>d1a2b3c4e5f7</code>). <b>[2026-09-08]</b> 그 뒤 코드 head 가 <code>e7f8a9b0c1d2</code> 로 옮겨가 시험서버(223)와 <b>더 이상 같지 않다</b> &mdash; 그 사이 6판이 추가됐고 그중 둘(<code>drop_rag_columns</code>·<code>drop_unused_columns</code>)은 칼럼·표를 지우므로 적용 전에 대상 데이터를 확인해야 한다. &sect;2 경로와 합성 검수 화면의 전제 자체는 그대로다. 확인 명령 — <code>psql -tAc "select version_num from alembic_version"</code></td>
       </tr>
       <tr>
         <td>재학습 소요 시간의 <b>시스템 자동 기록</b></td>
