@@ -18,10 +18,17 @@ grep 해서 답했다. 그건 하한선이지 총계가 아닌데 총계처럼 �
 Celery 태스크, pydantic validator, 콜백)은 소스에 호출부가 없으므로 제외 목록으로 관리한다.
 남는 것을 사람이 읽고 '설계상 미사용'인지 '배선 누락'인지 판단한다.
 
-사용: TESTING=1 python scripts/audit_wiring.py
+사용: TESTING=1 python scripts/audit_wiring.py     (실측 14.5초 · 2026-09-09)
+
+⚠ [2026-09-09] **이 도구는 한동안 돌지 않았다.** ② 는 스크립트마다, ③ 은 컬럼마다
+  소스 전체를 다시 파싱해 3분·10분을 넘겨도 끝나지 않았고, argparse 가 없어 `--help`
+  조차 전수 감사를 그대로 돌렸다. 한 번 훑어 표를 만들고 조회하도록 바꿨다.
+  옛 알고리즘과 스크립트 317개·컬럼 177개 전수 대조 — **어긋난 수 0건**.
+  세는 도구가 안 돌면 다음 사람이 다시 손으로 센다. 느려지면 그때 다시 고칠 것.
 """
 from __future__ import annotations
 
+import argparse
 import ast
 import io
 import re
@@ -66,11 +73,58 @@ def _py_files(root: Path):
             yield p
 
 
+# 파일당 한 번만 읽고 한 번만 파싱한다.
+#
+# 왜(2026-09-09). ② 수동 구간이 스크립트 **하나마다** src/koipa 전체를 다시 파싱하고
+# 다시 읽었다(code_refs_in·text_mentions_in). 스크립트가 316개라 같은 트리를 316번
+# 만들었고, 그 결과 이 도구는 3분을 넘겨도 끝나지 않아 **아무도 돌리지 못했다.**
+# 세는 도구가 안 돌면 다음 사람이 다시 손으로 센다 — 이 도구가 생긴 이유가 그것이다.
+_TEXT_CACHE: dict[Path, str] = {}
+_TREE_CACHE: dict[Path, "ast.AST | None"] = {}
+
+
+def _text(p: Path) -> str:
+    if p not in _TEXT_CACHE:
+        _TEXT_CACHE[p] = p.read_text("utf-8", errors="ignore")
+    return _TEXT_CACHE[p]
+
+
 def _tree(p: Path):
+    if p in _TREE_CACHE:
+        return _TREE_CACHE[p]
     try:
-        return ast.parse(p.read_text("utf-8", errors="ignore"))
+        tree = ast.parse(_text(p))
     except SyntaxError:
-        return None
+        tree = None
+    _TREE_CACHE[p] = tree
+    return tree
+
+
+_TOKEN = re.compile(r"\w+")
+_CODE_TOKENS: dict[Path, dict[str, int]] = {}
+_TEXT_TOKENS: dict[Path, dict[str, int]] = {}
+
+
+def _code_tokens(root: Path) -> dict[str, int]:
+    """root 안 **코드**의 식별자 빈도(문자열·주석 제외). 루트당 한 번만 센다."""
+    if root not in _CODE_TOKENS:
+        _CODE_TOKENS[root] = ref_counts([root])
+    return _CODE_TOKENS[root]
+
+
+def _text_tokens(root: Path) -> dict[str, int]:
+    """root 안 **원문**의 낱말 빈도(주석·문자열 포함). 루트당 한 번만 센다.
+
+    낱말 경계(``\\b``)로 세던 것과 결과가 같다 — ``\\w+`` 는 밑줄을 낱말에 포함하므로
+    ``xx_audit_wiring`` 은 어느 쪽에서도 ``audit_wiring`` 으로 세지 않는다.
+    """
+    if root not in _TEXT_TOKENS:
+        counts: dict[str, int] = {}
+        for p in _py_files(root):
+            for tok in _TOKEN.findall(_text(p)):
+                counts[tok] = counts.get(tok, 0) + 1
+        _TEXT_TOKENS[root] = counts
+    return _TEXT_TOKENS[root]
 
 
 def collect_defs(root: Path) -> dict[str, list[tuple[str, int]]]:
@@ -114,31 +168,19 @@ def ref_counts(roots: list[Path]) -> dict[str, int]:
 
 
 def code_refs_in(root: Path, token: str) -> int:
-    """root 안의 **코드**에서 token 이 참조되는 횟수(문자열·주석 제외)."""
-    n = 0
-    for p in _py_files(root):
-        tree = _tree(p)
-        if tree is None:
-            continue
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Name) and node.id == token:
-                n += 1
-            elif isinstance(node, ast.Attribute) and node.attr == token:
-                n += 1
-            elif isinstance(node, (ast.Import, ast.ImportFrom)):
-                for a in node.names:
-                    if (a.asname or a.name).split(".")[-1] == token:
-                        n += 1
-    return n
+    """root 안의 **코드**에서 token 이 참조되는 횟수(문자열·주석 제외). 표 조회다."""
+    return _code_tokens(root).get(token, 0)
 
 
 def text_mentions_in(root: Path, token: str) -> int:
-    """root 안의 원문에서 token 이 등장하는 총 횟수(주석·문자열 포함)."""
-    pat = re.compile(r"\b" + re.escape(token) + r"\b")
-    return sum(len(pat.findall(p.read_text("utf-8", errors="ignore"))) for p in _py_files(root))
+    """root 안의 원문에서 token 이 등장하는 총 횟수(주석·문자열 포함). 표 조회다."""
+    return _text_tokens(root).get(token, 0)
 
 
 def main() -> int:
+    # 인자를 받지 않지만 파서를 둔다 — 종전에는 `--help` 를 **조용히 무시하고** 전수
+    # 감사를 그대로 돌려, 사용법을 물어본 사람이 몇 분을 기다렸다(2026-09-09).
+    argparse.ArgumentParser(description=__doc__.splitlines()[0], epilog="인자 없음").parse_args()
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     defs = collect_defs(SRC)
     refs = ref_counts([SRC, SCRIPTS, TESTS])
@@ -189,25 +231,28 @@ def main() -> int:
             if table:
                 for n in names:
                     cols[n] = table
-    # models.py 를 뺀 나머지에서의 참조 수
-    outside = {}
-    for name in cols:
-        n = 0
-        for root in (SRC, SCRIPTS, TESTS):
-            for p in _py_files(root):
-                if p == models:
-                    continue
-                t = _tree(p)
-                if t is None:
-                    continue
-                for node in ast.walk(t):
-                    if isinstance(node, ast.Attribute) and node.attr == name:
-                        n += 1
-                    elif isinstance(node, ast.keyword) and node.arg == name:
-                        n += 1
-                    elif isinstance(node, ast.Constant) and node.value == name:
-                        n += 1        # 문자열 키로 접근하는 경우(dict·SQL 바인딩)
-        outside[name] = n
+    # models.py 를 뺀 나머지에서의 참조 수 — **한 번 훑어 표를 만들고** 컬럼마다 조회한다.
+    # 종전에는 컬럼 하나마다 세 폴더의 AST 를 통째로 다시 걸었다(컬럼 × 파일 × 노드).
+    # 이 절이 이 도구가 몇 분씩 걸리던 주된 이유였다(2026-09-09).
+    seen: dict[str, int] = {}
+    for root in (SRC, SCRIPTS, TESTS):
+        if not root.exists():
+            continue
+        for p in _py_files(root):
+            if p == models:
+                continue
+            t = _tree(p)
+            if t is None:
+                continue
+            for node in ast.walk(t):
+                if isinstance(node, ast.Attribute):
+                    seen[node.attr] = seen.get(node.attr, 0) + 1
+                elif isinstance(node, ast.keyword) and node.arg:
+                    seen[node.arg] = seen.get(node.arg, 0) + 1
+                elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                    # 문자열 키로 접근하는 경우(dict·SQL 바인딩)
+                    seen[node.value] = seen.get(node.value, 0) + 1
+    outside = {name: seen.get(name, 0) for name in cols}
     dead_cols = sorted((c, cols[c]) for c, n in outside.items() if n == 0)
     for c, t in dead_cols:
         print(f"  {c:<34} {t}")
