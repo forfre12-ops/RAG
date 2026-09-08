@@ -176,7 +176,11 @@ COMMON = [
     ]),
     ("M18", "AI시스템 통신구간 보호", "code", "", [
         ("클라이언트 인증서 검증", ["ssl_verify_client"], ["infra/mtls"]),
-        ("쿠키 보안 속성", ["HttpOnly", "httponly"], ["src/koipa"]),
+        # [2026-09-08 정정] 종전 probe 는 "HttpOnly" 문자열을 찾았고, 그것이 걸린 곳은
+        # _jwt_auth.py:324 의 "이 쿠키는 HttpOnly 가 아니다" 라는 **정정 주석**이었다.
+        # 없는 보호를 있다고 판정해 체크리스트가 발주기관에 허위 주장을 내보냈다.
+        # 실제로 쿠키에 붙는 속성만 검사한다(api/golden.py:778).
+        ("쿠키 교차사이트 전송 제한", ["SameSite=Lax"], ["src/koipa"]),
         ("앱은 루프백만 - 노출은 프록시가", ["${API_BIND:-127.0.0.1}"], ["docker-compose.airgap.yml"]),
     ]),
     ("M19", "과도한 권한 부여 제한", "code", "", [

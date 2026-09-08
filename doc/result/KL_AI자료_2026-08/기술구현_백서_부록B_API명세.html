@@ -271,7 +271,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
             <tr><td class="f-name">Authorization</td><td><code>Bearer &lt;JWT&gt;</code></td><td class="f-req">jwt 모드</td><td>RS256 서명 JWT(AUTH_MODE=jwt|both). <code>sub</code>=actor_id, <code>roles</code> claim 포함</td></tr>
             <tr><td class="f-name">X-Request-ID</td><td>—</td><td></td><td><strong>응답 전용</strong>. 서버가 요청마다 UUID v4를 새로 발급해 응답 헤더로 돌려주고 감사 로그에 남긴다. <strong>요청에 실어 보낸 값은 사용되지 않는다</strong> — 호출자 상관관계 ID를 서버에 전달하려면 <code>external_ref</code>(문서 업로드) 등 본문 필드를 쓸 것</td></tr>
             <tr><td class="f-name">Idempotency-Key</td><td>임의 문자열</td><td></td><td><code>POST·PUT·PATCH</code>에만 적용. 같은 키의 요청이 <strong>처리 중이면 409</strong>, 이미 끝났으면 저장된 응답을 재생한다. 재시도 안전이 필요한 변경성 호출에 붙일 것</td></tr>
-            <tr><td class="f-name">Cookie: koipa_access_token</td><td><code>&lt;JWT&gt;</code></td><td></td><td>같은 오리진 HttpOnly 쿠키. <code>Authorization</code> 헤더가 <strong>없을 때만</strong> 대체로 쓰인다(브라우저 콘솔 경로). 서버 간 연동은 헤더를 쓸 것</td></tr>
+            <tr><td class="f-name">Cookie: koipa_access_token</td><td><code>&lt;JWT&gt;</code></td><td></td><td>같은 오리진 쿠키(<code>SameSite=Lax</code>). 로그인 화면이 심으므로 <strong>HttpOnly 가 아니다</strong> &mdash; 스크립트로 읽힌다. <code>Authorization</code> 헤더가 <strong>없을 때만</strong> 대체로 쓰인다(브라우저 콘솔 경로). 서버 간 연동은 헤더를 쓸 것</td></tr>
             <tr><td class="f-name">Content-Type</td><td><code>application/json</code></td><td class="f-req yes">●</td><td>파일 업로드는 <code>multipart/form-data</code></td></tr>
           </tbody>
         </table>

@@ -111,7 +111,7 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:16%">모드</th><th style="width:30%">자격 전달</th><th>설명</th></tr></thead>
     <tbody>
       <tr><td><code>api_key</code> (기본)</td><td><code>X-API-Key</code> 요청 헤더</td><td>단일 공유 자격을 사용한다. 호출자 역할은 서버 설정으로 고정되며 요청 헤더로 역할을 상향할 수 없다</td></tr>
-      <tr><td><code>jwt</code></td><td><code>Authorization: Bearer</code> 또는 동일 오리진 HttpOnly 쿠키</td><td>RS256 서명을 검증한다. 토큰의 주체(sub)가 감사 로그의 행위자로 기록된다</td></tr>
+      <tr><td><code>jwt</code></td><td><code>Authorization: Bearer</code> 또는 동일 오리진 쿠키(<code>SameSite=Lax</code>)</td><td>RS256 서명을 검증한다. 토큰의 주체(sub)가 감사 로그의 행위자로 기록된다. 쿠키는 로그인 화면이 심으므로 <strong>HttpOnly 가 아니다</strong> &mdash; 서버 간 연동은 헤더를 쓸 것</td></tr>
       <tr><td><code>both</code></td><td>둘 다 허용</td><td>전환기 전용</td></tr>
     </tbody>
   </table>
