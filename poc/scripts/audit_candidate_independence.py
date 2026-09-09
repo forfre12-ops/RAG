@@ -143,6 +143,44 @@ def find_same_source(train: list[dict], pool: list[dict]) -> list[dict]:
     return sorted(hits, key=lambda h: -h["ratio"])
 
 
+def sentence_sharing(train: list[dict], pool: list[dict]) -> dict:
+    """문장 공유 커버리지 — 정형 문구 포함/제외 두 값을 함께 낸다.
+
+    감리 회신 5(5)가 "정형 문구를 제외한 값을 함께 산출한다"고 적은 그 값이다.
+    ⚠ 제외는 **빈도 기준**이라 약하다 — 학습셋에서 3개 문서 이상에 나오는 문장만 정형으로
+      본다. 판례가 적으면 판결문 서식도 1~2개 문서에만 나와 '고유'로 남는다(그 모듈이
+      스스로 적어 둔 한계). 협의 때 이 한계를 함께 말해야 한다.
+    """
+    from koipa.holdout_independence import _shared_sentences  # noqa: PLC0415
+
+    return _shared_sentences(train, pool)
+
+
+def input_fingerprint(train_root: Path, pool: list[dict]) -> dict:
+    """입력 지문 — **이 숫자를 나중에 재현할 수 있게** 남긴다.
+
+    왜(2026-09-09). 감리 회신에 "문장을 공유하는 후보가 20건(1.9%)"이라고 적었는데 오늘
+    같은 도구로 재니 32건(3.0%)이 나왔다. 어느 쪽이 맞는지 **가릴 방법이 없다** — 학습셋도
+    후보 풀도 gitignore 라 그때의 입력이 남아 있지 않기 때문이다.
+
+    그래서 숫자와 함께 입력의 지문을 남긴다. 다음에 값이 달라지면 "자료가 바뀐 것"과
+    "계산이 바뀐 것"을 가를 수 있다.
+    """
+    import hashlib
+
+    files = {}
+    for name in ("train.jsonl", "val.jsonl", "test.jsonl"):
+        f = train_root / name
+        if f.exists():
+            files[name] = hashlib.sha256(f.read_bytes()).hexdigest()[:16]
+    h = hashlib.sha256()
+    for r in sorted(pool, key=lambda x: x["doc_id"]):
+        h.update(r["doc_id"].encode("utf-8"))
+        h.update(hashlib.sha256((r.get("text") or "").encode("utf-8")).digest())
+    return {"train_files": files, "pool_docs": len(pool), "pool_digest": h.hexdigest()[:16]}
+
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--train", default=DEFAULT_TRAIN)
@@ -168,6 +206,21 @@ def main() -> int:
         print(f"    ↔ 학습 {h['train_doc_id']}  [{h['train_label']}·{h['train_source']}]")
         print(f"       공유 {h['shared_sentences']}/{h['candidate_sentences']} 문장 · 비율 {h['ratio']}")
     print(f"\n  같은 원본 의심 {len(hits)}건 / 후보 {len(pool):,}건")
+
+    share = sentence_sharing(train, pool)
+    print()
+    print("  [문장 공유] 같은 원본까지는 아니지만 문장을 나눠 갖는 후보")
+    print(f"    포함        {share['holdout_documents_touched']:,}건 ({share['coverage']*100:.1f}%)")
+    print(f"    정형 제외   {round(share['distinctive_coverage']*len(pool)):,}건 ({share['distinctive_coverage']*100:.1f}%)")
+    print(f"    공유 문장   {share['shared_types']:,}종 (정형 {share['boilerplate_types']:,} · 고유 {share['distinctive_types']:,})")
+    print("    ⚠ 정형 판정은 빈도 기준이라 약하다 — 판례가 적으면 판결문 서식도 고유로 남는다.")
+
+    fp = input_fingerprint(train_root if train_root.is_absolute() else _POC / train_root, pool)
+    print()
+    print("  [입력 지문] 이 숫자를 나중에 재현·대조하기 위한 것")
+    for _k, _v in fp["train_files"].items():
+        print(f"    학습 {_k:<12} {_v}")
+    print(f"    후보 {fp['pool_docs']:,}건 · 본문 지문 {fp['pool_digest']}")
 
     if args.block_eval and hits:
         import datetime as _dt
@@ -207,6 +260,8 @@ def main() -> int:
         out.write_text(json.dumps({
             "train_rows": len(train), "pool_rows": len(pool),
             "same_source": hits,
+            "sentence_sharing": share,
+            "input_fingerprint": fp,
         }, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"  JSON 저장: {out}")
     return 0
