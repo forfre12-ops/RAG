@@ -3,7 +3,9 @@
 동작:
 1) `/classify`를 거쳐 결과 획득 (evidence·factors·warnings 포함)
 2) evidence 토큰을 등급별·요인별로 재집계 (_aggregate_evidence)
-3) 정본 3요건(S·V·M) 곱셈식 점수 분해 + 등급을 제약하는 최저 요소 노출 (_factor_decomposition)
+3) 정본 3요건(S·V·M) 요소값과 **그 값의 출처** 노출 (_factor_decomposition)
+   ⚠ 이 라우터는 "곱셈식으로 등급을 냈다"고 말하지 않는다 — 배포본에서 등급은 분류기가
+     정하고 곱셈 단계는 실측 발동 0건이다. 자세한 이유는 _factor_decomposition 주석 참조.
 4) 경고·판정 경로(rule vs model) 메타 첨부
 
 본 라우터는 검수자 UI(FUN-024)가 "왜 이 등급?"을 사용자에게 표시하기 위해 사용.
@@ -74,7 +76,25 @@ def _method_label(model_version: str | None) -> str:
 
 
 def _factor_decomposition(result: ClassifyResponse) -> dict:
-    """3요건(S·V·M) 점수 분해 — B안 곱셈식이라 최저 요소가 등급을 제약 (검수자 가독성)."""
+    """3요건(S·V·M) 점수 분해 — **등급을 어떻게 정했는지가 아니라 요소값이 무엇인지**를 낸다.
+
+    종전에는 `method="multiplicative(S×V×M)"` 를 그대로 실어 보냈다. 그 문장은 "이 등급은
+    곱셈으로 산출됐다"로 읽히는데 사실이 아니다.
+
+      · 배포본에서 등급은 분류기가 정한다. 곱셈 단계는 실측 발동 0건이다
+        (993건 · 평가셋 4종 · scripts/audit_rule_formula.py — 등급 변경 0).
+      · 표시되는 S·V·M 은 대개 그 **등급에서 역산한 값**이다(svm_levels_for_grade).
+        메타데이터로 접근범위·보안표시가 온 경우에만 M 축이 실측이다.
+
+    그래서 세 가지를 갈라 낸다. 무엇이 근거이고 무엇이 기준인지 섞지 않는다.
+
+        rows            요소값 그대로
+        factors_source  이 값이 근거인가 추정인가(model_estimated | rule_evidenced)
+        reference_rule  정본 판정식 — 이 등급을 만든 **방법이 아니라 기준**이다
+
+    `limiting_factor` 는 요소가 근거일 때만 낸다. 역산값에서 최저 요소를 골라 "이것이
+    등급을 제약했다"고 말하면, 등급에서 나온 값을 등급의 원인이라고 하는 순환이 된다.
+    """
     if not result.evaluation_factors:
         return {}
     f = result.evaluation_factors
@@ -83,13 +103,23 @@ def _factor_decomposition(result: ClassifyResponse) -> dict:
         {"factor": "value", "name": "경제적 유용성(V)", "score": round(float(getattr(f, "value", 0.0) or 0.0), 4)},
         {"factor": "management", "name": "비밀관리성(M)", "score": round(float(getattr(f, "management", 0.0) or 0.0), 4)},
     ]
-    # 곱셈식에서는 가장 낮은 요소가 등급을 제약(0이면 곱=0=공개). 그 요소를 함께 노출.
-    limiting = min(rows, key=lambda r: r["score"]) if rows else None
-    return {
+    source = str(getattr(result, "factors_source", "") or "rule_evidenced")
+    out = {
         "rows": rows,
-        "method": "multiplicative(S×V×M)",
-        "limiting_factor": limiting["factor"] if limiting else None,
+        "factors_source": source,
+        # 기준이지 방법이 아니다. 이름에 그 구분을 담는다.
+        "reference_rule": "정본 판정식 등급 = S×V×M (이 등급의 산출 방법이 아니라 대조 기준)",
+        "decided_by": result.decision_path,
     }
+    if source == "rule_evidenced":
+        limiting = min(rows, key=lambda r: r["score"])
+        out["limiting_factor"] = limiting["factor"]
+    else:
+        out["limiting_factor"] = None
+        out["limiting_factor_note"] = (
+            "요소값이 등급에서 역산된 추정치라 제약 요소를 말할 수 없다"
+        )
+    return out
 
 
 @router.post("/classify/explain", dependencies=[Depends(require_auth)])
