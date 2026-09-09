@@ -395,6 +395,10 @@ def main() -> int:
     # 현행 학습셋을 **그대로 재현**해야 할 때만 올린다(실측 0.495). 올리면 그 값이
     # manifest 에 남아 "무엇을 알고도 통과시켰는지"가 기록된다.
     ap.add_argument("--max-grade-leak", type=float, default=0.0)
+    # [2026-09-09] 등급어가 든 **합성** 행을 아예 뺀다. 재생성 없이 오염만 걷는 길이다
+    # (2026-08-24 방침 "합성 신규 생성에 더 투자하지 않는다" 와 정합). 대가는 학습량 감소이므로
+    # 켜기 전에 이 판을 dry-run 해서 남는 행수·등급분포·판례비중을 보고 정할 것.
+    ap.add_argument("--drop-grade-leak", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -415,6 +419,19 @@ def main() -> int:
                 eval_texts.add(norm_text(t))
     pool = [r for r in pool if norm_text(r["text"]) not in eval_texts]
     n_after_evalcut = len(pool)
+
+    # 2-b) 등급어가 든 합성 행 제거(선택) — 재생성 없이 오염만 걷는 경로.
+    n_dropped_leak = 0
+    if args.drop_grade_leak:
+        from koipa.services.synth_quality import _exposes_grade_token as _exp  # noqa: PLC0415
+        before = len(pool)
+        pool = [
+            r for r in pool
+            if not (document_origin(r) == ORIGIN_SYNTHETIC
+                    and not r.get("is_court")
+                    and _exp(r.get("text") or ""))
+        ]
+        n_dropped_leak = before - len(pool)
 
     # 3) 공개 판결문 → S3 결정 규칙(스탬프)
     relabeled = apply_public_ruling_rule(pool)
@@ -520,6 +537,7 @@ def main() -> int:
         "court_cap": args.court_max_frac,
         "provenance_present": provenance_ok,
         "eval_independence_rows_removed": n_raw - n_after_evalcut,
+        "grade_leak_rows_dropped": n_dropped_leak,
         "PASS": leak_val == 0 and leak_test == 0 and leak_vt == 0 and unresolved_collisions == 0
         and court_frac <= args.court_max_frac + 1e-9 and provenance_ok
         and grade_leak_frac <= args.max_grade_leak + 1e-9,
