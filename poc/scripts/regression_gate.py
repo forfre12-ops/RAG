@@ -138,6 +138,26 @@ def snap_api() -> dict:
     return {"paths": paths, "schemas": schemas}
 
 
+# 판정에 영향을 주면서 **환경변수로 덮이는** 값들. 기준을 뜬 셸과 비교하는 셸이 다르면
+# 코드를 한 줄도 안 건드려도 축 ③ 에 델타가 뜬다 — 유령 회귀다.
+#
+# 실측 2026-09-10: 기준선을 METADATA_FLOOR_ENABLED 없이 떠 놓고 그 변수를 주고 비교하니
+# `metadata_floor_enabled: False → True` 가 회귀 후보 1건으로 잡혔다. 프로파일 불일치는
+# 이미 막고 있었는데(아래 deploy_profile 검사), **개별 플래그는 안 막고 있었다.**
+# 대응이 다르다 — 코드 회귀는 코드를 고치고, 환경 불일치는 조건을 맞춘다.
+_JUDGMENT_ENV = (
+    "METADATA_FLOOR_ENABLED",
+    "AGREEMENT_GATE_ENABLED",
+    "SOURCE_PRIOR_ENABLED",
+    "CLASSIFIER_TEMPERATURE",
+    "CLASSIFIER_ESCALATION_TAU",
+    "REVIEW_CONFIDENCE_THRESHOLD",
+)
+
+# 축 ③ 의 파라미터가 아니라 **비교 가능성**을 적어 두는 자리. 값 비교에서 제외한다.
+_ENV_KEY = "_env_overrides"
+
+
 def snap_settings() -> dict:
     from koipa.config import settings
 
@@ -145,6 +165,7 @@ def snap_settings() -> dict:
     for n in WATCHED_SETTINGS:
         v = getattr(settings, n, None)
         out[n] = v if isinstance(v, (str, int, float, bool, type(None))) else str(v)
+    out[_ENV_KEY] = {k: os.environ[k] for k in _JUDGMENT_ENV if k in os.environ}
     return out
 
 
@@ -312,6 +333,24 @@ def compare(base: dict, now: dict) -> int:
         print("  판정면이 통째로 달라진다. 이 상태의 델타는 회귀가 아니다.")
         print(f"  같은 조건으로 다시 실행할 것:  DEPLOY_PROFILE={_bp} python scripts/regression_gate.py")
         return 2
+
+    # 프로파일이 같아도 **개별 환경변수**가 다르면 같은 일이 벌어진다(실측 2026-09-10:
+    # metadata_floor_enabled False→True 가 회귀 후보로 잡혔다). 프로파일과 같은 대응이다 —
+    # 세지 말고 조건을 맞추라고 말한다.
+    _be = base["settings"].get(_ENV_KEY) or {}
+    _ne = now["settings"].get(_ENV_KEY) or {}
+    if _be != _ne:
+        print("=" * 74)
+        print(" 비교 불가 — 판정에 영향을 주는 환경변수가 다르다")
+        print("=" * 74)
+        for key in sorted(set(_be) | set(_ne)):
+            print(f"  {key:<30} 기준 {_be.get(key, '(없음)')!r}  →  이번 {_ne.get(key, '(없음)')!r}")
+        print("")
+        print("  이 값들은 게이트 발동과 임계를 바꾸므로 판정면이 함께 움직인다.")
+        print("  이 상태의 델타는 코드 회귀가 아니다. 기준과 같은 환경으로 다시 실행할 것:")
+        cmd = " ".join(f"{k}={v}" for k, v in sorted(_be.items())) or "(환경변수 없이)"
+        print(f"    {cmd} python scripts/regression_gate.py")
+        return 2
     print("=" * 74)
     print(" ① 판정면 — 문서별 등급·신뢰도·근거·경고")
     print("=" * 74)
@@ -358,8 +397,11 @@ def compare(base: dict, now: dict) -> int:
     print("\n" + "=" * 74)
     print(" ③ 운영 파라미터")
     print("=" * 74)
+    # _ENV_KEY 는 파라미터가 아니라 **비교 가능성** 기록이다. 위에서 따로 검사했고,
+    # 여기서 또 세면 같은 사실이 회귀 1건으로 둔갑한다.
     diff = [(k, base["settings"].get(k), now["settings"].get(k))
-            for k in base["settings"] if base["settings"].get(k) != now["settings"].get(k)]
+            for k in base["settings"]
+            if k != _ENV_KEY and base["settings"].get(k) != now["settings"].get(k)]
     # 프로파일이 다르면 여기 값 대부분이 함께 움직인다. 그걸 회귀로 세면 코드를 하나도
     # 안 건드려도 "회귀 26건" 이 뜬다(2026-08-27 실측: 기준은 full-train, 실행은 기본값
     # lite-noapi 였다). 코드 문제와 환경 문제는 대응이 다르므로 갈라서 말한다.
