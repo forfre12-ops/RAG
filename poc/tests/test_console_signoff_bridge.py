@@ -233,3 +233,58 @@ def test_dry_run_은_아무것도_쓰지_않는다(svc):
 
     assert out["locked"] == 1 and out["dry_run"] is True
     assert not svc.locked_path.exists()
+
+
+# ── 라이브 readiness 경로 (2026-09-09) ──────────────────────────────────────
+def test_locked_eval_path_has_a_default():
+    """기본값이 비어 있으면 **서명해도 아무 데도 안 보인다.**
+
+    종전 빈 값("")은 "무실데이터 단계의 진실"이라는 뜻이었는데, 실제로는 검수자가
+    서명하고 publish 해도 승격 결과가 배포 게이트·게이지 어디에도 반영되지 않는
+    상태를 만들었다. 이 시험은 그 자리로 되돌아가는 것을 막는다.
+    """
+    from koipa.config import settings
+
+    assert (settings.locked_eval_jsonl or "").strip(), (
+        "locked_eval_jsonl 이 비면 승격이 라이브 경로에 반영되지 않는다 "
+        "(publish_note 로 사유만 남고 게이지는 계속 no_locked_records)."
+    )
+
+
+def test_missing_file_still_tells_the_truth(tmp_path, monkeypatch):
+    """경로가 있어도 **파일이 없으면 '없다'고 말해야 한다.**
+
+    기본값을 채운 대가로 "아직 없는데 있다고 보이는" 상태가 생기면 안 된다.
+    """
+    from koipa.config import settings
+    from koipa.modules.m6_evaluation.locked_readiness import locked_eval_readiness
+
+    monkeypatch.setattr(settings, "locked_eval_jsonl", str(tmp_path / "없는파일.jsonl"))
+    out = locked_eval_readiness()
+    assert out["ready"] is False
+    assert out["reason"] == "no_locked_records"
+    assert out["deploy_locked_gate_passed"] is False
+
+
+def test_publish_lands_in_the_live_path(svc, tmp_path, monkeypatch):
+    """publish=True 가 실제로 라이브 경로에 쓰고, readiness 가 그것을 센다."""
+    import json as _json
+
+    from koipa.config import settings
+    from koipa.modules.m6_evaluation.locked_readiness import locked_eval_readiness
+
+    live = tmp_path / "locked_eval.jsonl"
+    monkeypatch.setattr(settings, "locked_eval_jsonl", str(live))
+
+    svc.decide(doc_id="CAND-001", action="approve", actor_id="지재원관리자")
+    out = svc.promote_decisions_to_locked(publish=True)
+
+    assert out["published"] is True
+    assert out["publish_note"] is None
+    rows = [_json.loads(ln) for ln in live.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    assert [r["doc_id"] for r in rows] == ["CAND-001"]
+
+    # 게이지가 켜진다 — 종전에는 no_locked_records 로 아무것도 안 보였다.
+    r = locked_eval_readiness()
+    assert r["reason"] != "no_locked_records"
+    assert r["per_grade"]["TS"] == 1

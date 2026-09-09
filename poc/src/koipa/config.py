@@ -680,9 +680,23 @@ class Settings(BaseSettings):
     # 감사 강화). 게이트가 통과하면 force 는 no-op 이라 reason 도 불요(force+게이트실패 시에만 요구).
     manual_activate_force_requires_reason: bool = False
     # [번들 D] locked_gold_eval(사람서명 평가정답) 레코드 jsonl 경로 — 운영 검수 readiness 가시화용
-    # (등급별 locked 보유/부족·배포가능 여부). 빈 값(기본)이면 readiness=no_locked_records(무실데이터
-    # 단계의 진실). 파일이 쌓이면 GET /admin/locked-readiness·게이지가 자동으로 켜진다. 읽기 전용.
-    locked_eval_jsonl: str = ""
+    # (등급별 locked 보유/부족·배포가능 여부). 파일이 쌓이면 GET /admin/locked-readiness·게이지가
+    # 자동으로 켜진다. 읽기 전용.
+    #
+    # [2026-09-09] **기본값을 채웠다.** 종전 빈 값("")은 "무실데이터 단계의 진실"이라는
+    # 뜻이었는데, 실제로는 검수자가 서명하고 `publish=true` 로 승격해도 **그 결과가 어디에도
+    # 안 보이는** 상태를 만들었다. 승격 API·CLI 는 이 경로가 비면 반영을 건너뛰고
+    # publish_note 로 사유만 남긴다(golden_build_service.apply_signoff ·
+    # ProxyGoldCandidateService.promote_decisions_to_locked).
+    #
+    # 값이 있어도 **파일이 없으면 빈 목록**이라 readiness 는 그대로 no_locked_records 다
+    # (locked_readiness._load_locked_records: 부재·파싱오류 → []). 즉 이 기본값은 "아직
+    # 없다"를 "없다"로 계속 말하되, 서명이 들어오면 **자동으로 보이게** 한다.
+    #
+    # 경로가 두 승격 경로의 **누적 정본**이다 — 골든 잡 서명(run-스코프 locked_<job>.jsonl)과
+    # 콘솔 검수 승격(locked_console_review.jsonl)이 각자 run 기록을 남기고, publish 시 여기로
+    # dedup 병합된다. 그래서 어느 한쪽 폴더에 두지 않고 gold 코퍼스 옆에 둔다.
+    locked_eval_jsonl: str = "datasets/gold_real/locked_eval.jsonl"
     # 재학습 기본 학습셋 디렉터리 — TrainSpec 의 train/val/test 기본 경로가 여기서 파생된다.
     # 종전 하드코딩 기본값 'datasets/labeled' 는 리포에도 배포본에도 존재한 적이 없어,
     # 콘솔 「3 재학습 트리거」와 hyperparams 없는 POST /train 이 배포 서버에서 즉시 실패했다
