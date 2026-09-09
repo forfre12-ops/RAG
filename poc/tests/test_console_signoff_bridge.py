@@ -288,3 +288,23 @@ def test_publish_lands_in_the_live_path(svc, tmp_path, monkeypatch):
     r = locked_eval_readiness()
     assert r["reason"] != "no_locked_records"
     assert r["per_grade"]["TS"] == 1
+
+
+def test_console_has_a_promotion_button():
+    """검수 화면에서 승격까지 갈 수 있어야 한다.
+
+    승격 경로를 API·CLI 로만 두면 검수자는 자기가 확정한 것이 평가정답이 됐는지
+    화면에서 알 수 없다. 그러면 "확정했는데 왜 안 보이지"가 반복된다.
+
+    ⛔ 화면 문구가 서버 사유 코드를 그대로 찍지 않는지도 함께 본다 — 그건
+       test_console_forbidden_strings 의 기준선(0건)을 깨뜨린다.
+    """
+    from koipa.api.golden import _render_specledger_gold_console_html
+
+    html = _render_specledger_gold_console_html()
+    assert 'id="promote"' in html, "승격 버튼이 없다"
+    assert "평가정답으로 승격" in html
+    # 확정과 승격이 다른 행위라는 사실은 화면에 남아 있어야 한다.
+    assert "그것만으로 평가 정답지가 되지는 않습니다" in html
+    # 서버가 주는 사유 문자열을 그대로 찍지 않는다.
+    assert "publish_note" not in html.replace("r.publish_note", "")

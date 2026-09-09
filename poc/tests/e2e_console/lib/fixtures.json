@@ -1374,5 +1374,23 @@
     ],
     "real_share": 0.8,
     "caveat": "빈 칸이라고 다 채울 것은 아니다. 현실에 없는 조합(예: 공개 보도자료 도메인의 TS)을 억지로 채우면 모델에 없는 규칙을 가르친다. 실문서가 이미 있는 칸은 합성이 급하지 않다."
+  },
+  "POST /golden/candidates/promote": {
+    "candidates": 1067,
+    "promotable": 3,
+    "locked": 3,
+    "rejected": 0,
+    "locked_by_grade": {
+      "TS": 1,
+      "S2": 1,
+      "S3": 1
+    },
+    "rejected_reasons": {},
+    "real_locked": 1,
+    "locked_total": 3,
+    "locked_path": "(서버 경로)",
+    "published": true,
+    "publish_note": null,
+    "dry_run": false
   }
 }
