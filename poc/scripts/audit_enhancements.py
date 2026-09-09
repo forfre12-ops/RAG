@@ -156,9 +156,57 @@ def scan_markers(files: list[Path]) -> tuple[dict, dict, int, int]:
     return dict(fut), dict(mit), scanned, prose_lines
 
 
-def scan_stubs(files: list[Path]) -> tuple[list, int]:
-    """NotImplementedError · 본문이 pass/... 뿐인 함수. 파이썬만 — AST 가 있어야 정확하다."""
-    hits, checked = [], 0
+def _raises_notimplemented(node) -> bool:
+    body = [b for b in node.body if not (
+        isinstance(b, ast.Expr) and isinstance(b.value, ast.Constant)
+        and isinstance(b.value.value, str))]
+    if len(body) != 1 or not isinstance(body[0], ast.Raise):
+        return False
+    exc = body[0].exc
+    if exc is None:
+        return False
+    nm = exc.func if isinstance(exc, ast.Call) else exc
+    return isinstance(nm, ast.Name) and nm.id == "NotImplementedError"
+
+
+def _interface_classes(tree: ast.Module) -> set[str]:
+    """추상 인터페이스로 보이는 클래스 — 고도화 후보가 아니다.
+
+    왜 가르나(2026-09-10 실측). 처음 판은 `OutboxStore.enqueue` 같은 것을 "미구현"으로
+    셌다. 그런데 그 클래스는 ``\"\"\"Outbox 추상. 구현체: InMemory / Redis.\"\"\"`` 이고
+    NotImplementedError 는 **인터페이스 선언**이지 빠뜨린 구현이 아니다. 그대로 세면
+    정상 설계를 결함으로 보고하게 된다.
+
+    판정: ABC/Protocol 을 상속했거나, NotImplementedError 메서드가 **2개 이상**인 클래스.
+    (1개짜리는 진짜 미구현일 수 있어 남긴다 — 놓치는 쪽보다 남기는 쪽이 낫다.)
+    """
+    out: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        bases = set()
+        for b in node.bases:
+            if isinstance(b, ast.Name):
+                bases.add(b.id)
+            elif isinstance(b, ast.Attribute):
+                bases.add(b.attr)
+        if bases & {"ABC", "Protocol", "ABCMeta"}:
+            out.add(node.name)
+            continue
+        n = sum(1 for m in node.body
+                if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and _raises_notimplemented(m))
+        if n >= 2:
+            out.add(node.name)
+    return out
+
+
+def scan_stubs(files: list[Path]) -> tuple[list, int, int]:
+    """NotImplementedError · 본문이 pass/... 뿐인 함수. 파이썬만 — AST 가 있어야 정확하다.
+
+    추상 인터페이스의 메서드는 **빼고** 센다(그 수는 따로 돌려준다).
+    """
+    hits, checked, iface_skipped = [], 0, 0
     for f in files:
         if f.suffix != ".py" or not f.is_file():
             continue
@@ -167,26 +215,40 @@ def scan_stubs(files: list[Path]) -> tuple[list, int]:
         except (OSError, SyntaxError):
             continue
         rel = f.relative_to(_REPO).as_posix()
+        ifaces = _interface_classes(tree)
+        # 클래스 안 메서드는 소속을 알아야 인터페이스인지 가른다.
+        owner: dict[int, str] = {}
+        for cls in ast.walk(tree):
+            if isinstance(cls, ast.ClassDef):
+                for m in cls.body:
+                    if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        owner[id(m)] = cls.name
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             checked += 1
+            in_iface = owner.get(id(node)) in ifaces
             body = [b for b in node.body if not (
                 isinstance(b, ast.Expr) and isinstance(b.value, ast.Constant)
                 and isinstance(b.value.value, str))]      # docstring 제외
             if not body:
-                hits.append((rel, node.lineno, node.name, "본문이 docstring 뿐"))
+                if in_iface:
+                    iface_skipped += 1
+                else:
+                    hits.append((rel, node.lineno, node.name, "본문이 docstring 뿐"))
                 continue
             if len(body) == 1:
-                only = body[0]
-                if isinstance(only, ast.Pass):
-                    hits.append((rel, node.lineno, node.name, "pass 뿐"))
-                elif (isinstance(only, ast.Raise) and only.exc is not None
-                      and isinstance(only.exc, (ast.Call, ast.Name))):
-                    nm = (only.exc.func if isinstance(only.exc, ast.Call) else only.exc)
-                    if isinstance(nm, ast.Name) and nm.id == "NotImplementedError":
+                if isinstance(body[0], ast.Pass):
+                    if in_iface:
+                        iface_skipped += 1
+                    else:
+                        hits.append((rel, node.lineno, node.name, "pass 뿐"))
+                elif _raises_notimplemented(node):
+                    if in_iface:
+                        iface_skipped += 1
+                    else:
                         hits.append((rel, node.lineno, node.name, "NotImplementedError"))
-    return hits, checked
+    return hits, checked, iface_skipped
 
 
 def _section(title: str) -> None:
@@ -203,7 +265,7 @@ def main() -> int:
 
     files = tracked_files()
     fut, mit, scanned, prose_lines = scan_markers(files)
-    stubs, checked_fn = scan_stubs(files)
+    stubs, checked_fn, iface_skipped = scan_stubs(files)
 
     _section("① 미래형 표시 — 소스에 '나중에 한다'고 적힌 자리")
     tot_f = sum(len(v) for v in fut.values())
@@ -225,6 +287,22 @@ def main() -> int:
     by_kind = Counter(k for *_, k in stubs)
     for kind, n in by_kind.most_common():
         print(f"  {kind:24s} {n}건")
+    # 구역별로 나눈다 — 폴더를 손으로 빼면 빠진 줄 모른다(2026-09-08 교훈).
+    # 대신 어디에 있는지를 보여, 읽는 사람이 무게를 스스로 판단하게 한다.
+    print(chr(10) + "  구역별:")
+
+    def _area(rel: str) -> str:
+        if "/tests/" in rel:
+            return "tests (시험용 가짜 객체 — 결함 아님)"
+        if "/alembic/" in rel:
+            return "alembic (되돌릴 수 없는 마이그레이션 — 의도)"
+        if "/scripts/" in rel:
+            return "scripts"
+        if "/src/" in rel:
+            return "src (진짜 후보)"
+        return "기타"
+    for area, n in Counter(_area(r) for r, *_ in stubs).most_common():
+        print(f"    {area:44s} {n}건")
     for rel, ln, name, kind in stubs[:a.top]:
         print(f"    {rel}:{ln}  {name}  ({kind})")
     if len(stubs) > a.top:
@@ -252,6 +330,7 @@ def main() -> int:
             "scanned_code_files": scanned,
             "prose_lines": prose_lines,
             "checked_functions": checked_fn,
+            "interface_methods_excluded": iface_skipped,
             "future_markers": {k: len(v) for k, v in fut.items()},
             "future_total": tot_f,
             "stubs": [{"file": r, "line": l, "name": n, "kind": k} for r, l, n, k in stubs],
