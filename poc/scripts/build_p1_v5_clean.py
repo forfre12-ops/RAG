@@ -164,6 +164,18 @@ def _base_record(r: dict, *, origin_dataset: str, label: str) -> dict:
         "rule_grade": r.get("rule_grade"),
         "review_status": r.get("review_status"),
         "origin_dataset": origin_dataset,
+        # [2026-09-09] 문서유형·제목을 **버리지 않는다.**
+        #
+        # 감리가 지적한 "문서종류만 알면 등급이 정해진다"를 학습셋에서 재려면 이 칸이
+        # 있어야 한다. 원본에는 있었다 — rag_corpus_v2/*.json 은 document_type·title 을
+        # 720건 전수로 들고 있는데, 조립이 text/label/domain 만 옮기고 나머지를 버렸다.
+        # 그래서 measure_shortcut_bias 가 학습셋에 대고 "해당 필드가 기록되어 있지 않아
+        # 재지 못했다"를 냈고, 감리 회신에도 "아직 확인하지 못하였습니다"로 나갔다.
+        #
+        # 없는 출처(labeled_oss_v1 등)는 빈 문자열이다 — 그 사실 자체가 '못 잰 구간'을
+        # 드러내야 하므로 추측해서 채우지 않는다.
+        "document_type": (r.get("document_type") or "").strip(),
+        "title": (r.get("title") or "").strip(),
     }
 
 
@@ -186,6 +198,8 @@ def load_rag(corpus_dir: Path) -> tuple[list[dict], int]:
             skipped += 1
             continue
         rec = {"text": body, "label": label, "domain": d.get("domain", ""),
+               # 원본이 들고 있는 문서유형·제목을 그대로 넘긴다(_base_record 주석 참조).
+               "document_type": d.get("document_type", ""), "title": d.get("title", ""),
                "source": "rag_corpus_v2", "label_source": "rag_corpus_v2",
                # [2026-09-05] doc_id·출처를 찍는다. 종전에는 둘 다 비어 배포본 학습셋
                # 840행이 "어디서 왔는지 물을 수 없는" 상태였다. 파일명이 곧 신원이다.
@@ -475,6 +489,23 @@ def main() -> int:
 
     gates = {
         "cross_split_exact_overlap": {"train_val": leak_val, "train_test": leak_test, "val_test": leak_vt},
+        # [2026-09-09] 문서유형이 채워진 비율. **못 재는 구간을 빌드 때 보이게 한다.**
+        # 지금 원천 넷 중 document_type 을 들고 있는 것은 rag_corpus_v2 하나뿐이라
+        # 커버리지 상한이 29% 다(labeled_oss_v1·gold_real·bilingual_en 은 상류에 그 칸이
+        # 없다). 본문에서 추론해 채우지 않는다 — 추측으로 채우면 "문서종류만 알면 등급이
+        # 정해지는가"라는 감리 질문에 추측으로 답하게 된다.
+        # 회신 3(2)가 약속한 데이터 재구성 때 생성기가 이 칸을 남기면 올라간다
+        # (generator.SynthDoc 에 document_type 이 이미 있다).
+        "document_type_coverage": {
+            "rows_with_type": sum(1 for r in pool if r.get("document_type")),
+            "rows": len(pool),
+            "fraction": round(
+                sum(1 for r in pool if r.get("document_type")) / max(1, len(pool)), 4
+            ),
+            "by_origin_dataset": dict(sorted(Counter(
+                r.get("origin_dataset") for r in pool if r.get("document_type")
+            ).items())),
+        },
         "grade_term_exposure": {
             "synthetic_rows": len(_synth_pool),
             "leaky_rows": len(_leaky),
