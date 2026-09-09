@@ -97,6 +97,15 @@ def review_queue(
             "기존 호출은 동작이 같다. status=staging 과 함께 주면 확정 대기만 조회한다."
         ),
     ),
+    order: str = Query(
+        "fifo",
+        pattern="^(fifo|risk)$",
+        description=(
+            "정렬. fifo=오래된 것 먼저(기본, 종전 동작). "
+            "risk=미탐을 잡을 확률이 높은 것 먼저 — 낮은 등급·낮은 신뢰도 순, "
+            "동률이면 오래된 것 먼저(기아 방지)."
+        ),
+    ),
     auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
 ):
     """검수 대기(승인 대기) 분류 목록 — DB에 쌓인 needs_review 를 서버측에서 조회(FUN-024).
@@ -112,7 +121,12 @@ def review_queue(
     # FastAPI 가 값을 채우지 않아 Query 기본값 객체가 그대로 들어온다. 그 객체는 truthy 라
     # bool 로 캐스팅하면 확정 대기가 켜져 버린다 — 명시적으로 True 일 때만 켠다.
     statuses = resolve_queue_statuses(status, include_staging=include_staging is True)
-    items, total, warnings = list_review_queue(limit=limit, offset=offset, statuses=statuses)
+    # order 도 include_staging 과 같은 이유로 문자열인지 확인한다 — 직접 호출 시에는
+    # FastAPI 가 값을 안 채워 Query 기본값 객체가 그대로 들어온다.
+    order_value = order if isinstance(order, str) else "fifo"
+    items, total, warnings = list_review_queue(
+        limit=limit, offset=offset, statuses=statuses, order=order_value
+    )
     return ReviewQueueResponse(items=items, total=total, limit=limit, offset=offset, warnings=warnings)
 
 

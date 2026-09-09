@@ -130,16 +130,40 @@ def resolve_queue_statuses(
     return (*base, _STAGING_STATUS)
 
 
+ORDER_FIFO = "fifo"
+ORDER_RISK = "risk"
+
+
 def list_review_queue(
     limit: int = 50,
     offset: int = 0,
     statuses: tuple[str, ...] = _REVIEW_STATUSES,
+    order: str = ORDER_FIFO,
 ) -> tuple[list, int, list[str]]:
     """검수 대기(needs_review/needs_second_review) 분류를 DB에서 조회 — 승인 대기 목록(FUN-024).
 
-    admin 콘솔의 세션-only 큐가 못 보던 'DB에 쌓인 needs_review'를 서버측에서 반환한다. FIFO
-    (오래된 것 먼저)로 정렬해 백로그가 고이지 않게 한다. 문서 soft-delete(deleted_at) 제외.
-    DB 미가용/오류 → ([], 0, [warning]) best-effort — 빈 큐(정상 0건)와 조회실패를 warning 으로 구분.
+    admin 콘솔의 세션-only 큐가 못 보던 'DB에 쌓인 needs_review'를 서버측에서 반환한다.
+    문서 soft-delete(deleted_at) 제외. DB 미가용/오류 → ([], 0, [warning]) best-effort —
+    빈 큐(정상 0건)와 조회실패를 warning 으로 구분.
+
+    정렬 두 가지. 기본은 종전과 같은 `fifo` 다(동작 보존).
+
+        fifo  오래된 것 먼저. 백로그가 고이지 않는다.
+        risk  **미탐을 잡을 확률이 높은 것 먼저.**
+
+    왜 risk 가 필요한가. 사람 검수 시간이 가장 비싼 자원인데 지금은 도착 순서로 쓰고 있다.
+    계약 핵심목표는 "미탐 최소화"이고, 미탐은 **비밀문서를 낮은 등급으로 본 것**이다.
+    그러므로 같은 한 시간을 쓸 때 잡히는 미탐이 많은 순서는 이렇다.
+
+        ① 예측 등급이 낮은 것 먼저 (level_order 내림차순 — S3 → S2 → S1 → TS)
+           S3 로 본 것이 실은 TS 면 치명적 미탐이다. 반대로 TS 로 본 것은 이미 최고
+           등급이라 검수해도 미탐이 잡히지 않는다 — 내려갈 수만 있다.
+        ② 같은 등급이면 신뢰도가 낮은 것 먼저 (경계에 가까운 것)
+        ③ 그래도 같으면 오래된 것 먼저 — 기아 방지. risk 정렬에서도 FIFO 가 마지막
+           기준으로 남아 있어야 낡은 항목이 영원히 안 뜨는 일이 없다.
+
+    정렬은 반드시 limit/offset **앞에** 적용된다(SQL). 가져온 페이지만 파이썬에서 다시
+    정렬하면 '첫 페이지 안에서만 위험순'이 되어 큐 전체로는 아무 효과가 없다.
 
     Returns (items, total, warnings). items = ReviewQueueItem 리스트, total = 페이지네이션 전 전체.
     """
@@ -168,14 +192,26 @@ def list_review_queue(
                     .where(*cond)
                 ).scalar_one()
             )
-            rows = db.execute(
+            stmt = (
                 select(Classification, Document.filename, Document.text_preview)
                 .join(Document, Classification.doc_id == Document.doc_id)
                 .where(*cond)
-                .order_by(Classification.classified_at.asc())  # FIFO
-                .limit(limit)
-                .offset(offset)
-            ).all()
+            )
+            if str(order or "").strip().lower() == ORDER_RISK:
+                # level_order 는 TS=1 … S3=4 이므로 **내림차순이 낮은 등급 먼저**다.
+                # 등급 코드가 아니라 level_order 로 정렬하는 이유: 등급 집합은 DB 에서
+                # 바뀔 수 있고(GradeRegistry), 코드 문자열 정렬은 그때 조용히 틀어진다.
+                stmt = stmt.join(
+                    ClassificationLevel,
+                    Classification.predicted_level_id == ClassificationLevel.level_id,
+                ).order_by(
+                    ClassificationLevel.level_order.desc(),
+                    Classification.confidence.asc(),
+                    Classification.classified_at.asc(),   # 기아 방지 — 마지막 기준은 FIFO
+                )
+            else:
+                stmt = stmt.order_by(Classification.classified_at.asc())  # FIFO
+            rows = db.execute(stmt.limit(limit).offset(offset)).all()
             for cls, filename, preview in rows:
                 assessment = cls.automation_assessment or {}
                 items.append(

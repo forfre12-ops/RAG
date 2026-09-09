@@ -57,7 +57,7 @@ def test_endpoint_maps_service_output(monkeypatch):
     )
     monkeypatch.setattr(
         confirm_api, "list_review_queue",
-        lambda limit, offset, statuses: ([sample], 7, []),
+        lambda limit, offset, statuses, order="fifo": ([sample], 7, []),
     )
     resp = confirm_api.review_queue(limit=10, offset=5, status="pending", auth={"mode": "api_key"})
     assert resp.total == 7 and resp.limit == 10 and resp.offset == 5
@@ -68,7 +68,7 @@ def test_endpoint_maps_service_output(monkeypatch):
 def test_endpoint_surfaces_warning(monkeypatch):
     monkeypatch.setattr(
         confirm_api, "list_review_queue",
-        lambda limit, offset, statuses: ([], 0, ["db unavailable: OperationalError"]),
+        lambda limit, offset, statuses, order="fifo": ([], 0, ["db unavailable: OperationalError"]),
     )
     resp = confirm_api.review_queue(limit=50, offset=0, status="pending", auth={"mode": "api_key"})
     assert resp.items == [] and resp.total == 0
@@ -78,8 +78,9 @@ def test_endpoint_surfaces_warning(monkeypatch):
 def test_endpoint_passes_resolved_statuses(monkeypatch):
     seen = {}
 
-    def _capture(limit, offset, statuses):
+    def _capture(limit, offset, statuses, order="fifo"):
         seen["statuses"] = statuses
+        seen["order"] = order
         return [], 0, []
 
     monkeypatch.setattr(confirm_api, "list_review_queue", _capture)
