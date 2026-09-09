@@ -422,6 +422,20 @@ class ClassifyService:
                     "predicted grade — routed to human review"
                 )
 
+            # [metadata-management-underclass, 2026-09-09] 메타데이터로 확인된 M 을 넣어 정본
+            # 공식을 돌리면 예측보다 **높은** 등급이 나오는 경우 — pipeline 이 남기는 신호.
+            # 실측: access_scope=approved_only(M=2) 문서가 요소 (2,2,2) 를 달고 등급 S1 로
+            # 자동확정됐다. 정본 공식에서 S1 은 (2,2,0) 하나뿐이므로 M 이 확인된 문서는 S1 일
+            # 수 없다. 등급은 바꾸지 않고 자동확정만 막는다 — 하향이 없으므로 FNR-safe.
+            if status != "needs_review" and any(
+                "metadata-management-underclass" in w for w in warnings_acc
+            ):
+                status = "needs_review"
+                warnings_acc.append(
+                    "metadata-management-underclass: confirmed management level implies a higher"
+                    " grade than predicted — routed to human review (grade unchanged, FNR-safe)"
+                )
+
             # [ICD 규약값 적합성] 규약 밖의 값은 **거부하지 않고 드러낸다.** 422 로 막으면
             # 그 문서가 아예 분류되지 않아 더 나쁘다. 그러나 조용히 무시해서도 안 된다 —
             # 실측 2026-08-14: ICD §3.1 의 source_type="public" 을 배포본이 인식하지
@@ -628,7 +642,12 @@ class ClassifyService:
             return f"rule-override (룰 점수가 임계를 넘어 모델 {model} 를 {final} 로 안전 상향)"
         if "metadata-floor" in w:
             return f"metadata-floor (ICD 보안표기로 {model}→{final} 상향)"
-        if "cap-conflict" in w or "metadata-access-conflict" in w or "metadata-management-conflict" in w:
+        if (
+            "cap-conflict" in w
+            or "metadata-access-conflict" in w
+            or "metadata-management-conflict" in w
+            or "metadata-management-underclass" in w
+        ):
             return f"escalation (신호 충돌 → 검수 라우팅; 룰 {rule} · 모델 {model})"
         if "source-prior" in w:
             return f"source-cap (공개 출처 → {final}로 하향; 모델 {model})"
@@ -1292,6 +1311,10 @@ class ClassifyService:
                 _pm.METADATA_FLOOR_APPLIED_TOTAL.labels(action="access_conflict").inc()
             if "metadata-management-conflict" in joined:
                 _pm.METADATA_FLOOR_APPLIED_TOTAL.labels(action="management_conflict").inc()
+            if "metadata-management-underclass" in joined:
+                _pm.METADATA_FLOOR_APPLIED_TOTAL.labels(action="management_underclass").inc()
+            if "metadata-management-overclass" in joined:
+                _pm.METADATA_FLOOR_APPLIED_TOTAL.labels(action="management_overclass").inc()
             if "source-prior:" in joined:
                 _pm.SOURCE_PRIOR_APPLIED_TOTAL.labels(action="capped").inc()
             if "cap-conflict" in joined:

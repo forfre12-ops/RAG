@@ -100,6 +100,7 @@ _S2_STRONG_RISK_RE = re.compile(
 
 
 from koipa.modules.m3_labeling.rule_engine import (  # noqa: E402
+    grade_from_svm as _grade_from_svm,
     management_from_metadata_dict as _management_from_metadata_dict,
 )
 
@@ -923,6 +924,44 @@ class InferencePipeline:
                     if m_state == "proven_absent" and _ORD.get(cur, 99) < _ORD["S2"]:
                         result.warnings = list(result.warnings) + [
                             f"metadata-management-conflict: access_scope=all_employees(M=0)인데 예측 {cur} → 검수 라우팅 (ICD §3.3)"
+                        ]
+
+                    # [요소↔등급 대조] 위에서 채운 M 은 **실측**인데 같은 벡터의 S·V 는 등급에서
+                    # 역산한 값이다(svm_levels_for_grade). 둘을 한 벡터로 내보내면 정본 공식과
+                    # 어긋난 조합이 그대로 화면에 뜬다.
+                    #
+                    # 실측 2026-09-09(v-fe4b386b · METADATA_FLOOR_ENABLED=true, 같은 본문에
+                    # 메타데이터만 교체):
+                    #     access_scope=designated    → 요소 (2,2,1) · 등급 S1   공식은 TS
+                    #     access_scope=approved_only → 요소 (2,2,2) · 등급 S1   공식은 TS
+                    # 즉 **관리성이 확인된 문서가 S1 로 자동확정**되고 있었다. 정본 공식에서
+                    # S1 은 (2,2,0) 하나뿐이라 M 이 확인된 순간 그 문서는 S1 일 수 없다.
+                    # 아무 신호도 없었으므로 무음 미탐이다(계약 핵심목표 "미탐 최소화" 위반).
+                    #
+                    # 등급은 여전히 바꾸지 않는다(위 ⚠ 참조 — 등급 우선·요소 후행 구조라 M 을
+                    # 등급에 바로 물리면 하향 경로가 열린다). 대신 **방향을 갈라 신호를 낸다**:
+                    #     공식 > 서빙  미탐 방향 → 검수 라우팅(자동확정만 차단, 등급 무변경)
+                    #     공식 < 서빙  과대 방향 → 표시만(무음 하향은 하지 않는다)
+                    try:
+                        svm_grade = _grade_from_svm(
+                            int(float(getattr(result.factors, "secrecy", 0) or 0)),
+                            int(float(getattr(result.factors, "value", 0) or 0)),
+                            new_m,
+                        )
+                    except (TypeError, ValueError) as exc:
+                        # 요소값을 못 읽으면 대조 자체를 건너뛴다 — 없는 근거로 검수를
+                        # 만들지 않는다(위 cur_m 폴백과 같은 규율).
+                        logger.warning("요소↔등급 대조를 건너뛴다(요소값 판독 실패): %s", exc)
+                        svm_grade = cur
+                    if _ORD.get(svm_grade, 99) < _ORD.get(cur, 99):
+                        result.warnings = list(result.warnings) + [
+                            f"metadata-management-underclass: 요소 (S,V,M={new_m}) 의 정본 공식은"
+                            f" {svm_grade} 인데 예측 {cur} → 검수 라우팅 (미탐 방향 · 등급 미변경)"
+                        ]
+                    elif _ORD.get(svm_grade, 99) > _ORD.get(cur, 99):
+                        result.warnings = list(result.warnings) + [
+                            f"metadata-management-overclass: 요소 (S,V,M={new_m}) 의 정본 공식은"
+                            f" {svm_grade} 인데 예측 {cur} (과대 방향 · 하향하지 않음)"
                         ]
         except Exception:  # noqa: BLE001 — 메타데이터 처리 오류는 분류를 막지 않음(fail-safe)
             # metadata-floor 상향/access-conflict 라우팅이 예외로 미적용 → 비밀이 낮은 등급을

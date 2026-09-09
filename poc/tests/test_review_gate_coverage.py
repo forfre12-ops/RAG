@@ -34,6 +34,8 @@ GATE_TESTS: dict[str, str] = {
     # 2026-09-06 신규 — 이 파일이 지킨다
     "body_below_classifiable_threshold": "test_review_gate_coverage.py",
     "metadata-management-conflict": "test_review_gate_coverage.py",
+    # 2026-09-09 신규 — 확인된 M 이 예측보다 높은 등급을 가리키는 경우(무음 미탐).
+    "metadata-management-underclass": "test_metadata_management_underclass.py",
 }
 
 

@@ -368,7 +368,10 @@ SAME_DOC_RESURFACE_TOTAL = Counter(
 METADATA_FLOOR_APPLIED_TOTAL = Counter(
     "koipa_metadata_floor_applied_total",
     "ICD metadata-floor gate firings (security_marking raised grade / access_scope or management conflict routed to review)",
+    # management_underclass = 확인된 M 으로 정본 공식을 돌리면 예측보다 높은 등급이 나온 경우
+    # (무음 미탐 후보 · 검수 라우팅). management_overclass 는 그 반대로 표시만 하는 경우.
     ["action"],  # raised | access_conflict | management_conflict
+                 # | management_underclass | management_overclass
     registry=registry,
 )
 # source-prior(비공지성) 게이트 발동: 공개출처 등급 cap / cap-conflict 검수 라우팅.
