@@ -377,6 +377,10 @@ def main() -> int:
     ap.add_argument("--val-frac", type=float, default=0.10)
     ap.add_argument("--test-frac", type=float, default=0.10)
     ap.add_argument("--out-dir", default="datasets/labeled_p1_v5_clean")
+    # 합성 출처에서 허용할 등급어 노출 비율. 기본 0 = 한 건도 허용하지 않는다.
+    # 현행 학습셋을 **그대로 재현**해야 할 때만 올린다(실측 0.495). 올리면 그 값이
+    # manifest 에 남아 "무엇을 알고도 통과시켰는지"가 기록된다.
+    ap.add_argument("--max-grade-leak", type=float, default=0.0)
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -436,8 +440,48 @@ def main() -> int:
         1 for r in pool
         if r.get("is_court") and document_origin(r) == ORIGIN_SYNTHETIC
     )
+    # [2026-09-09] **등급어 노출 게이트 — 조립 단계에 없었다.**
+    #
+    # 생성 직후에는 게이트가 돈다(services/synth_quality.screen_batch). 그런데 학습셋
+    # 조립은 원천 풀에서 그대로 끌어오기만 해서, 게이트가 생기기 전(2026-09-05 한국어
+    # 표현 대응 이전)에 만들어진 문서가 검사 없이 들어왔다.
+    #
+    # 실측 2026-09-09, 현행 배포 학습셋(labeled_p1_v5_clean 2,554행)에 지금 게이트를
+    # 그대로 돌린 결과 — **1,264행(49.5%)이 본문에 등급을 말한다**:
+    #
+    #     rag_corpus_v2   519/720 (72%)   "본 문서는 [가상기업A]의 1급 비밀로 분류된…"
+    #     synthetic       656/1,417(46%)  "1급 비밀: [가상기업A]의 핵심 영업비밀 보호 방안"
+    #     bilingual_en     85/120 (71%)   "…classified at the S3 grade…"
+    #
+    # 모델에게 답을 적어 준 것이다. 합성만으로 학습한 모델이 실문서에 일반화되지 않는
+    # 것(교차 F1 0.26)의 유력한 설명이기도 하다 — 실문서에는 그 말이 없다.
+    #
+    # ⚠ 실문서는 대상이 아니다. 판결문·금융보고서에 찍힌 "대외비"는 지워야 할 누출이
+    #   아니라 **비밀관리성(M)의 근거**다(generator.py:127 주석). 그래서 합성 출처만
+    #   본다 — is_court 인 행은 document_origin 이 synthetic 이라도 실문서로 취급한다
+    #   (상류가 출처를 잘못 적은 351행이 있다. 바로 위 origin_text_mismatch 참조).
+    from koipa.services.synth_quality import _exposes_grade_token  # noqa: PLC0415
+
+    _synth_pool = [
+        r for r in pool
+        if document_origin(r) == ORIGIN_SYNTHETIC and not r.get("is_court")
+    ]
+    _leaky = [r for r in _synth_pool if _exposes_grade_token(r.get("text") or "")]
+    grade_leak_frac = len(_leaky) / max(1, len(_synth_pool))
+    grade_leak_by_source = dict(sorted(
+        Counter(r.get("source") or "(미기록)" for r in _leaky).items(),
+        key=lambda kv: -kv[1],
+    ))
+
     gates = {
         "cross_split_exact_overlap": {"train_val": leak_val, "train_test": leak_test, "val_test": leak_vt},
+        "grade_term_exposure": {
+            "synthetic_rows": len(_synth_pool),
+            "leaky_rows": len(_leaky),
+            "fraction": round(grade_leak_frac, 4),
+            "max_allowed": args.max_grade_leak,
+            "by_source": grade_leak_by_source,
+        },
         "origin_text_mismatch": origin_text_mismatch,
         "unresolved_label_collisions": unresolved_collisions,  # 0이어야 통과(동일텍스트=단일라벨)
         "rows_with_collision_audit_stamp": sum(1 for r in pool if r.get("label_collision")),  # 정보용(해소완료 감사추적)
@@ -446,7 +490,8 @@ def main() -> int:
         "provenance_present": provenance_ok,
         "eval_independence_rows_removed": n_raw - n_after_evalcut,
         "PASS": leak_val == 0 and leak_test == 0 and leak_vt == 0 and unresolved_collisions == 0
-        and court_frac <= args.court_max_frac + 1e-9 and provenance_ok,
+        and court_frac <= args.court_max_frac + 1e-9 and provenance_ok
+        and grade_leak_frac <= args.max_grade_leak + 1e-9,
     }
 
     manifest = {
