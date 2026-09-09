@@ -29,9 +29,49 @@ tier 레코드 자체가 없어 서명해도 tier_of 가 볼 행이 없었다.
 """
 from __future__ import annotations
 
+import json
+import logging
+from pathlib import Path
 from typing import Any, Iterable
 
 from koipa.golden_signoff import Signoff
+
+logger = logging.getLogger(__name__)
+
+# 평가정답으로 **편입하면 안 되는** 문서 목록. 학습셋과 같은 원본인 후보 등이 들어간다
+# (scripts/audit_candidate_independence.py --block-eval 이 채운다).
+#
+# 왜 '검수 제외'가 아니라 '승격 차단'인가(2026-09-09). 처음엔 콘솔 원장에 exclude(검수
+# 대상 아님)를 기록했는데, 그 문서 하나가 **KL 에 이미 전달한 검수 배치 120건** 안에
+# 있었고 그 배치는 등급 균형(30/30/30/30)이라 S3 가 29 로 깨졌다
+# (tests/test_review_batch_filter.py 가 잡았다).
+#
+# 문제를 다시 보면 갈린다 — 그 문서를 **검수하는 것은 유효**하다(사람이 등급을 판단하는
+# 데 아무 지장이 없다). 안 되는 것은 그 결과를 **평가정답으로 쓰는 것**이다. 학습에 쓴
+# 문서로 성능을 재면 그 수치가 부풀려진다. 그래서 검수는 두고 승격만 막는다.
+#
+# 목록을 evidence/ 에 두는 이유: datasets/·reports/ 는 gitignore 라 증적이 안 남는다.
+# "왜 이 문서가 평가정답에서 빠졌나"는 감리에서 받는 질문이고, 답이 커밋돼 있어야 한다.
+_EXCLUSIONS = Path(__file__).resolve().parents[2] / "evidence" / "eval_independence_exclusions.jsonl"
+
+
+def eval_blocked_doc_ids(path: Path | None = None) -> set[str]:
+    """평가정답 편입이 막힌 doc_id 집합. 파일이 없으면 빈 집합(막는 것이 없다)."""
+    p = path or _EXCLUSIONS
+    if not p.exists():
+        return set()
+    out: set[str] = set()
+    for line in p.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        doc_id = str(row.get("doc_id") or "").strip()
+        if doc_id:
+            out.add(doc_id)
+    return out
 
 # 등급을 확정한 결정만 서명이 된다. 보류·폐기·재검토·범위밖은 등급을 확정하지 않으므로
 # (decide() 가 그 전이에서 final_grade 를 비운다) 승격 대상이 아니다.
@@ -97,8 +137,13 @@ def build_promotion_inputs(
     """
     records: list[dict] = []
     signoffs: list[Signoff] = []
+    blocked = eval_blocked_doc_ids()
     for candidate in candidates:
         if not is_promotable(candidate):
+            continue
+        if str(candidate.get("doc_id")) in blocked:
+            # 검수는 유효하지만 평가정답으로는 못 쓴다(위 _EXCLUSIONS 주석 참조).
+            logger.info("평가정답 편입 차단 — 독립성 목록에 있음: doc_id=%s", candidate.get("doc_id"))
             continue
         decision = _decision_of(candidate)
         grade = str(candidate["final_grade"])

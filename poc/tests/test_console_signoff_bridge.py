@@ -308,3 +308,43 @@ def test_console_has_a_promotion_button():
     assert "그것만으로 평가 정답지가 되지는 않습니다" in html
     # 서버가 주는 사유 문자열을 그대로 찍지 않는다.
     assert "publish_note" not in html.replace("r.publish_note", "")
+
+
+# ── 평가 독립성 차단 (2026-09-09) ───────────────────────────────────────────
+def test_blocked_document_is_reviewable_but_never_becomes_eval_truth(svc, tmp_path, monkeypatch):
+    """학습셋과 같은 원본인 문서 — **검수는 되고 평가정답은 안 된다.**
+
+    처음엔 콘솔 원장에 exclude(검수 대상 아님)를 기록했는데, 그중 하나가 KL 에 이미
+    전달한 검수 배치 120건 안에 있어 등급 균형(30/30/30/30)을 깨뜨렸다
+    (test_review_batch_filter 가 잡았다). 검수하는 것 자체는 유효하다 — 안 되는 것은
+    그 결과로 성능을 재는 것이다.
+    """
+    import koipa.console_signoff as cs
+
+    blocklist = tmp_path / "blocked.jsonl"
+    blocklist.write_text(
+        json.dumps({"doc_id": "CAND-001", "reason": "학습셋과 같은 원본"}, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cs, "_EXCLUSIONS", blocklist)
+
+    svc.decide(doc_id="CAND-001", action="approve", actor_id="지재원관리자")
+    svc.decide(doc_id="CAND-002", action="approve", actor_id="지재원관리자")
+
+    # 검수는 정상이다 — 등급이 확정된다.
+    assert svc.get_candidate("CAND-001")["final_grade"] == "TS"
+
+    out = svc.promote_decisions_to_locked()
+    assert out["locked"] == 1, "차단된 문서가 평가정답이 됐다"
+    assert {r["doc_id"] for r in _locked(svc)} == {"CAND-002"}
+
+
+def test_missing_blocklist_blocks_nothing(svc, tmp_path, monkeypatch):
+    """목록 파일이 없으면 아무것도 막지 않는다 — 게이트가 조용히 전부를 막으면 안 된다."""
+    import koipa.console_signoff as cs
+
+    monkeypatch.setattr(cs, "_EXCLUSIONS", tmp_path / "없는파일.jsonl")
+    assert cs.eval_blocked_doc_ids() == set()
+
+    svc.decide(doc_id="CAND-001", action="approve", actor_id="지재원관리자")
+    assert svc.promote_decisions_to_locked()["locked"] == 1

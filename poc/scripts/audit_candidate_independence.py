@@ -17,18 +17,24 @@
   같은 기준으로 **직접 전수 계산한다.** 2026-09-09 실측에서는 마침 3건이라 둘이 같았는데,
   그 우연에 기대면 다음에 10건이 나올 때 7건을 놓친다.
 
-■ 제외는 '폐기'가 아니다
+■ 막는 것은 '검수'가 아니라 '평가정답 편입'이다
 
-  --exclude 는 콘솔 원장에 `exclude`(검수 대상 아님)를 기록한다. 등급을 정하지도, 문서를
-  버리지도 않고 **이번 검수 범위에서만** 뺀다. 되돌릴 수 있다(콘솔의 「재검토로 되돌림」).
+  처음엔 콘솔 원장에 exclude(검수 대상 아님)를 기록했다. 그런데 그중 하나가 **KL 에 이미
+  전달한 검수 배치 120건** 안에 있었고 그 배치는 등급 균형(30/30/30/30)이라 S3 가 29 로
+  깨졌다(tests/test_review_batch_filter.py 가 잡았다).
 
-  기록되는 결정자는 사람이 아니라 도구 이름이다. 데이터 위생 조치이지 검수 판단이 아니라
-  사람 이름을 남기면 안 된다. 그 이름은 golden_tiers.is_human_reviewer 가 거부하므로
-  **이 결정은 평가정답으로 승격되지 않는다** — 의도한 대로다.
+  문제를 다시 보면 갈린다 — 그 문서를 **검수하는 것은 유효하다**(사람이 등급을 판단하는
+  데 지장이 없다). 안 되는 것은 그 결과를 **평가정답으로 쓰는 것**이다. 학습에 쓴 문서로
+  성능을 재면 그 수치가 부풀려진다.
+
+  그래서 --block-eval 은 검수를 건드리지 않고 `evidence/eval_independence_exclusions.jsonl`
+  에 사유와 함께 기록한다. console_signoff.build_promotion_inputs 가 그 목록을 읽어 승격
+  단계에서 거른다. 목록을 evidence/ 에 두는 이유는 datasets/·reports/ 가 gitignore 라
+  증적이 안 남기 때문이다 — "왜 이 문서가 평가정답에서 빠졌나"는 감리에서 받는 질문이다.
 
 사용:
     python scripts/audit_candidate_independence.py                      # 찾기만
-    python scripts/audit_candidate_independence.py --exclude            # 찾고 범위에서 뺀다
+    python scripts/audit_candidate_independence.py --block-eval         # 찾고 평가정답 편입을 막는다
     python scripts/audit_candidate_independence.py --json reports/x.json
 """
 from __future__ import annotations
@@ -51,9 +57,8 @@ _POC = _HERE.parent
 if str(_POC / "src") not in sys.path:
     sys.path.insert(0, str(_POC / "src"))
 
-# 이 도구가 원장에 남기는 결정자. 사람이 아님이 드러나야 하고, is_human_reviewer 가
-# 거부하는 이름이어야 한다(그래서 이 결정은 평가정답이 될 수 없다).
-AUDIT_ACTOR = "ai_assist:independence-audit"
+# 차단 목록 — console_signoff.eval_blocked_doc_ids 가 읽는 자리와 같아야 한다.
+EXCLUSIONS = _POC / "evidence" / "eval_independence_exclusions.jsonl"
 
 DEFAULT_TRAIN = "datasets/labeled_p1_v5_clean"
 DEFAULT_POOL = "datasets/proxy_gold/single_document_candidates"
@@ -142,8 +147,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--train", default=DEFAULT_TRAIN)
     ap.add_argument("--pool", default=DEFAULT_POOL)
-    ap.add_argument("--exclude", action="store_true",
-                    help="찾은 후보를 콘솔 원장에 '검수 대상 아님'으로 기록한다(되돌릴 수 있다)")
+    ap.add_argument("--block-eval", action="store_true",
+                    help="찾은 후보의 평가정답 편입을 막는다(검수는 그대로 둔다)")
     ap.add_argument("--json", help="결과를 이 경로에 저장")
     args = ap.parse_args()
 
@@ -164,26 +169,37 @@ def main() -> int:
         print(f"       공유 {h['shared_sentences']}/{h['candidate_sentences']} 문장 · 비율 {h['ratio']}")
     print(f"\n  같은 원본 의심 {len(hits)}건 / 후보 {len(pool):,}건")
 
-    if args.exclude and hits:
-        from koipa.services.proxy_gold_candidate_service import (  # noqa: PLC0415
-            ProxyGoldCandidateService,
-        )
+    if args.block_eval and hits:
+        import datetime as _dt
 
-        svc = ProxyGoldCandidateService(pool_root if pool_root.is_absolute() else _POC / pool_root)
-        done = 0
-        for h in hits:
-            reason = (
-                f"학습셋과 같은 원본으로 판정 — 학습 {h['train_doc_id']} 과 "
-                f"{h['shared_sentences']}/{h['candidate_sentences']} 문장 공유(비율 {h['ratio']}). "
-                "평가 독립성을 위해 이번 검수 범위에서 제외한다."
-            )
-            try:
-                svc.decide(doc_id=h["candidate_doc_id"], action="exclude",
-                           reason=reason, actor_id=AUDIT_ACTOR)
-                done += 1
-            except Exception as exc:  # noqa: BLE001
-                print(f"  ! 제외 실패 {h['candidate_doc_id']}: {type(exc).__name__}: {exc}")
-        print(f"  검수 범위에서 제외 {done}건 (되돌리기: 콘솔의 「재검토로 되돌림」)")
+        EXCLUSIONS.parent.mkdir(parents=True, exist_ok=True)
+        already = set()
+        if EXCLUSIONS.exists():
+            for line in EXCLUSIONS.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    try:
+                        already.add(json.loads(line).get("doc_id"))
+                    except json.JSONDecodeError:
+                        continue
+        added = 0
+        with EXCLUSIONS.open("a", encoding="utf-8", newline="\n") as fh:
+            for h in hits:
+                if h["candidate_doc_id"] in already:
+                    continue
+                fh.write(json.dumps({
+                    "doc_id": h["candidate_doc_id"],
+                    "reason": "학습셋과 같은 원본",
+                    "train_doc_id": h["train_doc_id"],
+                    "shared_sentences": h["shared_sentences"],
+                    "candidate_sentences": h["candidate_sentences"],
+                    "ratio": h["ratio"],
+                    "tool": "audit_candidate_independence.py",
+                    "at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+                }, ensure_ascii=False, sort_keys=True) + "\n")
+                added += 1
+        print(f"  평가정답 편입 차단 {added}건 추가 (이미 있던 것 {len(hits) - added}건)")
+        print(f"  목록: {EXCLUSIONS}")
+        print("  ⚠ 검수는 그대로다 — 이 문서들은 콘솔에 계속 뜨고 등급을 확정할 수 있다.")
 
     if args.json:
         out = Path(args.json)
