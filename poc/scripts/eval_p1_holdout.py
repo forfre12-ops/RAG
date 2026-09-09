@@ -54,7 +54,22 @@ def main() -> int:
     ap.add_argument("--model-dir", required=True)
     ap.add_argument("--holdout", default="datasets/gold_real/holdout_eval.clean.jsonl")  # clean=train 누출 제거(dirty 109건 중 67건=61%가 train_subset 중복 → 암기 부풀림)
     ap.add_argument("--report", default="reports/p1_holdout_eval.json")
+    # [2026-09-09] 봉인 규약. 감리 회신 5(6) "평가셋 사전 봉인 → 1회 개봉 측정 → 재봉인".
+    # 봉인된 적 없는 셋은 그대로 통과하므로 기존 사용법은 바뀌지 않는다 — 봉인은 선언한
+    # 것에만 걸린다(koipa.eval_seal 머리말).
+    ap.add_argument("--owner", default="", help="측정 담당자 — 봉인된 셋을 잴 때 원장에 남는다")
+    ap.add_argument("--ignore-seal", action="store_true",
+                    help="봉인 게이트를 건너뛴다. 블라인드가 아닌 예비 측정에만 쓰고, "
+                         "그렇게 얻은 수치는 블라인드 결과로 보고하지 말 것")
     args = ap.parse_args()
+
+    if not args.ignore_seal:
+        from koipa.eval_seal import SealViolation, require_measurable  # noqa: PLC0415
+        try:
+            require_measurable(args.holdout, owner=args.owner, note="eval_p1_holdout")
+        except SealViolation as exc:
+            print(f"[봉인] {exc}")
+            return 2
 
     rows = [
         json.loads(l)
