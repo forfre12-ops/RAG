@@ -1126,3 +1126,32 @@ def nightly_incremental_retrain_tick() -> dict:
         payload["triggered"] = "ENQUEUE_FAILED"
 
     return payload
+
+
+@celery_app.task(
+    name="koipa.index_document_vector",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=10,
+)
+def index_document_vector(self: Any, doc_id: str, force: bool = False) -> dict:
+    """문서 대표 벡터를 색인한다 — 유사 문서 조회의 재료를 만든다.
+
+    큐를 타는 이유는 비용이다. 실측(2026-09-09, KURE-v1 CPU 6스레드) 청크당 0.51초,
+    100쪽 문서면 약 2분이다. 업로드 응답에 그만큼을 얹으면 검수 화면이 멈춘다.
+
+    **실패해도 업로드·분류·검수는 그대로다.** 유사 문서 조회는 참고 기능이고, 벡터는
+    본문에서 언제든 다시 만들 수 있는 파생물이다. 그래서 재시도 두 번 뒤에도 안 되면
+    예외를 올려 celery 가 기록하게 두되, 호출부(인제스트)는 이 태스크의 성패를 기다리지
+    않는다. 나중에 다시 색인하려면 같은 태스크를 force=True 로 부르면 된다.
+
+    payload 에 본문을 싣지 않고 doc_id 만 보낸다 — 워커가 DB 에서 청크를 읽는다.
+    큐에 30MB 본문이 흐르지 않게, 그리고 색인 시점의 최신 청크를 쓰게.
+    """
+    from koipa.services.document_vector_service import index_document  # noqa: PLC0415
+
+    try:
+        return index_document(doc_id, force=force)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("문서 벡터 색인 실패 — doc_id=%s err=%s", doc_id, exc)
+        raise self.retry(exc=exc, countdown=10 * (self.request.retries + 1)) from exc

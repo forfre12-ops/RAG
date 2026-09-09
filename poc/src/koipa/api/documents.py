@@ -533,3 +533,75 @@ async def analyze_document(
         detail="검수 필요(needs_review)" if eff_status == "needs_review" else "자동 확정(staging)",
     ))
     return resp
+
+
+# ── 유사 문서 조회 ──────────────────────────────────────────────────────────
+# [2026-09-09] 고객사 요청으로 되살린 기능. 2026-09-04(319069b9)에 RAG 를 걷으면서 함께
+# 지웠던 자리인데, 그때 것과 다르다 — 질의응답(/answer)은 되살리지 않고 **문서 하나와
+# 비슷한 문서를 찾는 것**만 만든다.
+#
+# 벡터와 등급이 같은 PostgreSQL 안에 있어 한 쿼리로 끝난다. 그 한 쿼리로 끝내려고
+# MariaDB + 별도 Vector DB 대신 PostgreSQL + pgvector 로 되돌린 것이다.
+
+class SimilarDocumentItem(BaseModel):
+    doc_id: str
+    filename: str
+    similarity: float = Field(description="1 - 코사인거리. 1에 가까울수록 비슷하다")
+    grade: Optional[str] = Field(default=None, description="확정 등급 코드(TS/S1/S2/S3). 미검수면 null")
+    is_verified: bool = Field(description="사람이 확정한 등급인가")
+    verified_at: Optional[str] = None
+
+
+class SimilarDocumentsResponse(BaseModel):
+    doc_id: str
+    indexed: bool = Field(description="기준 문서가 색인돼 있는가. false 면 items 는 비어 있다")
+    items: list[SimilarDocumentItem]
+
+
+@router.get(
+    "/documents/{doc_id}/similar",
+    response_model=SimilarDocumentsResponse,
+    summary="유사 문서 조회 (확정 등급 포함)",
+)
+def similar_documents(
+    doc_id: str,
+    k: int = 5,
+    verified_only: bool = False,
+) -> SimilarDocumentsResponse:
+    """이 문서와 비슷한 문서를 등급과 함께 돌려준다.
+
+    verified_only=true 면 **사람이 확정한 등급이 있는 문서만** 돌려준다. 화면이
+    "비슷한 문서는 이 등급을 받았습니다"로 읽히는 자리에서는 이쪽을 써야 한다 —
+    기계가 매긴 등급을 사람 판단의 근거처럼 보여주면 안 된다.
+
+    기준 문서가 아직 색인되지 않았으면 indexed=false 와 빈 목록이다. **오류가 아니다** —
+    업로드 직후에는 색인이 큐에 있고(청크당 0.51초), 코퍼스가 비어 있는 초기에는 비교할
+    상대가 없다.
+    """
+    from koipa.adapters.vectorstore import DocumentVectorStore  # noqa: PLC0415
+
+    k = max(1, min(int(k), 50))
+    store = DocumentVectorStore()
+    try:
+        indexed = store.exists(doc_id)
+        hits = store.similar(doc_id, k=k, verified_only=verified_only) if indexed else []
+    except Exception as exc:  # noqa: BLE001
+        # pgvector 미설치·표 없음 등 — 유사문서는 참고 기능이라 500 대신 사유를 남기고
+        # 빈 결과를 준다. 분류·검수 화면이 이 실패로 멈추면 안 된다.
+        raise HTTPException(
+            status_code=503,
+            detail=f"유사 문서 조회를 할 수 없습니다: {type(exc).__name__}. "
+                   "pgvector 확장과 alembic 판(f8a9b0c1d2e3)이 적용됐는지 확인하십시오.",
+        ) from exc
+    return SimilarDocumentsResponse(
+        doc_id=str(doc_id),
+        indexed=indexed,
+        items=[
+            SimilarDocumentItem(
+                doc_id=h.doc_id, filename=h.filename,
+                similarity=round(h.similarity, 4),
+                grade=h.grade, is_verified=h.is_verified, verified_at=h.verified_at,
+            )
+            for h in hits
+        ],
+    )

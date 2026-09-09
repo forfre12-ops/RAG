@@ -23,10 +23,8 @@ dependencies = [
   # DB · 큐 · 스토리지
   "sqlalchemy>=2.0",
   "psycopg[binary]>=3.2",
-  # [2026-09] 로컬 개발 DB 를 MariaDB 로 전환하면서 추가. models.py 는 두 dialect 모두
-  # 포터블하게 썼다(Uuid·JSON·.with_variant() — 223 은 아직 psycopg/PostgreSQL 그대로).
-  "pymysql>=1.2.0",              # MariaDB/MySQL 드라이버(MIT) — 폐쇄망 번들에서 유일하게
-                                  # Linux wheel 이 있는 후보(mariadb·mysqlclient 는 없음).
+  # [2026-09-09] pymysql 을 뺐다 — MariaDB 를 버리고 PostgreSQL + pgvector 로 되돌렸다
+  # (고객사 요청). 9/5 에 추가했던 드라이버이고, 이제 닿는 경로가 없다.
   "alembic>=1.13",
   "celery[redis]>=5.4",
   "redis>=5.0",

@@ -302,6 +302,17 @@ class DocumentIngestionService:
         except Exception:  # noqa: BLE001
             pass
 
+        # [2026-09-09] 유사 문서 조회용 벡터 색인을 **큐로** 넘긴다.
+        #
+        # 여기서 부르는 이유는 순서다 — _persist 안에서 발사하면 워커가 아직 커밋되지 않은
+        # 청크를 읽으러 갈 수 있다. 트랜잭션이 끝난 뒤(persisted=True)에만 보낸다.
+        #
+        # 동기로 하지 않는 이유는 비용이다: 실측 청크당 0.51초, 100쪽이면 약 2분.
+        # 실패해도 여기서 흡수한다 — 벡터는 본문에서 다시 만들 수 있는 파생물이고,
+        # 유사 문서가 안 뜨는 것이 업로드가 실패하는 것보다 낫다.
+        if persisted and doc_id and pre and pre.chunks:
+            self._enqueue_vector_index(str(doc_id))
+
         return IngestResult(
             doc_id=doc_id,
             filename=filename,
@@ -327,6 +338,33 @@ class DocumentIngestionService:
     # ------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------
+
+    @staticmethod
+    def _enqueue_vector_index(doc_id: str) -> None:
+        """유사문서 색인을 워커로 보낸다. 브로커가 없으면 **아무것도 하지 않는다.**
+
+        시험·단일프로세스 환경에서는 브로커가 없다. 그때 in-process 로 동기 실행하면
+        업로드 시험 하나가 임베딩 2분을 기다리게 된다 — 분류 경로가 같은 이유로
+        `_celery_dispatch_available()` 을 쓰고 있어 그 판정을 그대로 빌린다.
+
+        색인이 안 걸린 문서는 유사 문서 결과에 안 나올 뿐이다. 나중에 채우려면
+        `koipa.index_document_vector` 를 그 doc_id 로 부르면 된다.
+        """
+        try:
+            from koipa.services.async_classify_service import (  # noqa: PLC0415
+                _celery_dispatch_available,
+            )
+
+            if not _celery_dispatch_available():
+                logger.debug("문서 벡터 색인 미발사(브로커 없음): doc_id=%s", doc_id)
+                return
+            from koipa.workers.tasks import index_document_vector  # noqa: PLC0415
+
+            index_document_vector.delay(doc_id)
+            logger.info("문서 벡터 색인 큐 적재: doc_id=%s", doc_id)
+        except Exception as exc:  # noqa: BLE001
+            # 색인 발사 실패가 업로드를 실패로 만들면 안 된다.
+            logger.warning("문서 벡터 색인 발사 실패(업로드는 정상): doc_id=%s err=%s", doc_id, exc)
 
     @staticmethod
     def _safe_key_name(filename: str, fallback: str) -> str:

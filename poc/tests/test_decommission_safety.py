@@ -74,7 +74,8 @@ def test_volume_list_matches_deployment_composes():
     이 시험이 먼저 깨진다.
     """
     declared: set[str] = set()
-    for name in ("docker-compose.airgap.yml", "docker-compose.airgap.mariadb.yml"):
+    # [2026-09-09] MariaDB 오버레이를 지웠다 — 배포 compose 는 airgap.yml 하나다.
+    for name in ("docker-compose.airgap.yml",):
         path = _POC / name
         if not path.exists():
             continue

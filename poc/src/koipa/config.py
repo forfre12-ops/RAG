@@ -229,10 +229,17 @@ class Settings(BaseSettings):
 
     # --- 인프라 ---
     # 디폴트는 localhost dev DB. 운영은 DATABASE_URL env 필수.
-    # [2026-09-05] 기본 DB 를 MariaDB 로 넘겼다(자세한 것은 .env.example 머리말).
-    # 기존 배포는 DATABASE_URL 을 명시하고 있어 영향받지 않는다(223 실측 확인).
-    # PostgreSQL 로 되돌리려면 이 값만 바꾸면 된다 — 코드 변경 0.
-    database_url: str = "mariadb+pymysql://koipa:koipa_dev@localhost:13306/koipa"
+    #
+    # [2026-09-09] **MariaDB 를 버리고 PostgreSQL + pgvector 로 되돌렸다**(고객사 요청).
+    # 9/5 에 MariaDB 로 넘겼던 이유는 "KL 포털이 쓰는 DB 가 MariaDB" 였는데, 고객사가
+    # PostgreSQL 을 요구해 그 전제가 없어졌다. 되돌리는 대가는 작았다 — MariaDB 는
+    # 덮어쓴 것이 아니라 **곁에 붙인 것**이라(alembic 독립 branch·compose 오버레이),
+    # PostgreSQL 계열이 그대로 살아 있었다.
+    #
+    # 유사문서 조회를 다시 넣으려면 벡터 저장소가 필요한데, MariaDB 10.11 에는 벡터
+    # 타입이 없다(실측 2026-09-09: `ERROR 4161 Unknown data type: 'VECTOR'`. 11.7+ 는
+    # 지원하나 납품 정본이 10.11 이었다). PostgreSQL 은 pgvector 로 그 자리를 채운다.
+    database_url: str = "postgresql+psycopg://koipa:koipa_dev@localhost:5432/koipa"
     redis_url: str = "redis://localhost:6379/0"
 
     minio_endpoint: str = "localhost:9000"

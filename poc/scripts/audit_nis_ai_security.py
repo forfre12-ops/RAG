@@ -111,7 +111,7 @@ COMMON = [
     ]),
     ("M02", "신뢰할 수 있는 출처의 AI모델 · 라이브러리 활용", "code", "", [
         ("의존성 잠금(해시 고정)", ["uv.lock"], ["poc-ci.yml", ".github"]),
-        ("컨테이너 이미지 digest 고정", ["@sha256:"], ["docker-compose.airgap.mariadb.yml"]),
+        ("컨테이너 이미지 digest 고정", ["@sha256:"], ["docker-compose.yml"]),
         ("라이선스 대장", ["dump_licenses"], ["scripts"]),
     ]),
     ("M03", "데이터 검사 (오염 · 비인가 민감정보)", "code", "", [

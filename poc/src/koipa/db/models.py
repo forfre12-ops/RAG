@@ -27,7 +27,6 @@ import datetime as dt
 import uuid
 
 from sqlalchemy import (
-    JSON,
     Identity,
     BigInteger,
     Boolean,
@@ -54,13 +53,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from koipa.db.session import Base
 
-# [2026-09] MariaDB 이식 타입. PostgreSQL 은 그대로(_JSON_PORTABLE·ARRAY·INET 네이티브), 다른
-# dialect(MariaDB/MySQL)에서는 .with_variant() 로 등록한 대체 타입을 쓴다. 223 은 아직
-# PostgreSQL 이므로 기존 저장 형식·질의를 그대로 유지해야 한다 — 타입을 갈아엎지 않고
-# dialect 별로 렌더링만 바꾼다.
-_JSON_PORTABLE = JSONB().with_variant(JSON(), "mariadb").with_variant(JSON(), "mysql")
-_ARRAY_TEXT_PORTABLE = ARRAY(Text).with_variant(JSON(), "mariadb").with_variant(JSON(), "mysql")
-_INET_PORTABLE = INET().with_variant(String(45), "mariadb").with_variant(String(45), "mysql")
+# [2026-09-09] MariaDB 를 버리고 PostgreSQL 로 되돌리면서 .with_variant() 대체 타입을
+# 걷었다 — 렌더링이 갈릴 dialect 가 없다. 별칭은 그대로 둔다(15곳이 이 이름을 쓴다).
+# 다시 다른 dialect 를 태워야 하면 여기 한 줄에 .with_variant() 를 붙이면 된다.
+_JSON_PORTABLE = JSONB()
+_ARRAY_TEXT_PORTABLE = ARRAY(Text)
+_INET_PORTABLE = INET()
 
 
 # tenant 제거: 격리는 KL 포털 전담 (2026-06-24 멀티테넌트 전면 제거 결정).

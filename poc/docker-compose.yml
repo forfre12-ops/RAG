@@ -1,9 +1,10 @@
 name: koipa-poc
 
 services:
-  # [2026-09-05] 기본 DB 가 MariaDB 로 넘어가면서 postgres 는 **opt-in** 이 됐다.
-  # 223 등 기존 배포는 DATABASE_URL 을 명시하고 있어 그대로 PostgreSQL 로 돈다
-  # (실측 확인). 되돌리려면 아래 api/worker/beat 의 DATABASE_URL 만 바꾸면 된다.
+  # [2026-09-09] **기본 DB 로 되돌렸다 — MariaDB 를 버렸다**(고객사가 PostgreSQL 요구).
+  # 9/5 에 MariaDB 로 넘긴 이유는 "KL 포털이 쓰는 DB 가 MariaDB" 였는데 그 전제가 없어졌다.
+  # 이미지가 pgvector 판인 것이 중요하다 — 유사문서 조회의 벡터 저장소가 여기 들어간다
+  # (MariaDB 10.11 에는 벡터 타입이 없다. 실측 `ERROR 4161 Unknown data type: 'VECTOR'`).
   postgres:
     # [공급망] digest 고정 — 태그는 가변이라 같은 pg16 이 다른 바이트를 가리킬 수 있다.
     # 갱신 시: docker pull <tag> 후 `docker images --digests` 값을 옮겨 적고 doc/14 재평가.
@@ -20,35 +21,6 @@ services:
       - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U koipa"]
-      interval: 5s
-      retries: 10
-
-  # [2026-09-05] **기본 DB**. 이 값은 **dev 스택에만** 닿는다 — 운영 배포
-  # (base + prod + dual/gpu)는 prod.yml 의 `environment: !override` 가 여기 environment 를
-  # 통째로 덮고 DATABASE_URL 을 env_file(.env.jjw 등)에서 받는다. 실증:
-  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.dual.yml config
-  #   → env_file 의 postgresql+psycopg 가 그대로 나온다(2026-09-05 확인).
-  # 223 실서버도 ~/poc/.env.jjw 에 DATABASE_URL 을 명시하고 있어 영향받지 않는다.
-  # KL 포털이 쓰는 DB 가 MariaDB 라 거기에 전용 데이터베이스를
-  # 만들어 쓰기로 했다. 스키마는 독립 alembic 계열이다:
-  #   alembic upgrade mariadb@head   (poc/alembic/versions/f2a3b4c5d6e7_mariadb_baseline.py)
-  # PostgreSQL 계열은 `alembic upgrade postgres@head` 로 따로 선다.
-  mariadb:
-    # [공급망] digest 고정 — poc/src/koipa/db/models.py 가 10.11 에서 검증됐다(active_key
-    # 생성 칼럼·복합 PK AUTO_INCREMENT 등, 커밋 ef294c56·f2a3b4c5d6e7). 올릴 때는
-    # docker pull mariadb:10.11 후 `docker images --digests` 값으로 갱신하고 재검증할 것.
-    image: mariadb:10.11@sha256:ce66c7be32a03aabe7241d0a10993a2db827ef652a35d25727d92a832ac8ef73
-    environment:
-      MARIADB_DATABASE: koipa
-      MARIADB_USER: koipa
-      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-koipa_dev}
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-koipa_dev}
-    volumes:
-      - ../docker-data/mariadb:/var/lib/mysql
-    ports:
-      - "13306:3306"
-    healthcheck:
-      test: ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized"]
       interval: 5s
       retries: 10
 
@@ -101,7 +73,7 @@ services:
       dockerfile: Dockerfile.api
     env_file: .env
     environment:
-      DATABASE_URL: mariadb+pymysql://koipa:${MARIADB_PASSWORD:-koipa_dev}@mariadb:3306/koipa
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
       # [2026-08-24] dev 도 로컬FS 로 통일 (종전 기본값 minio). 실배포 프로파일이 전부 local 이라
       # dev 만 다른 백엔드면 여기서 통과한 것이 배포에서 다르게 도는 경로가 생긴다.
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
@@ -111,7 +83,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
-      mariadb:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_started
@@ -131,7 +103,7 @@ services:
     command: celery -A koipa.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     env_file: .env
     environment:
-      DATABASE_URL: mariadb+pymysql://koipa:${MARIADB_PASSWORD:-koipa_dev}@mariadb:3306/koipa
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
       # [2026-08-24] dev 도 로컬FS 로 통일 (종전 기본값 minio) — api 쪽 주석 참조.
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
@@ -139,7 +111,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
       - redis
-      - mariadb
+      - postgres
     volumes:
       - ./src:/app/src
       - ../docker-data/modelcache:/root/.cache/huggingface
@@ -154,7 +126,7 @@ services:
     command: celery -A koipa.workers.celery_app beat -l info
     env_file: .env
     environment:
-      DATABASE_URL: mariadb+pymysql://koipa:${MARIADB_PASSWORD:-koipa_dev}@mariadb:3306/koipa
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:

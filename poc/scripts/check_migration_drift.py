@@ -12,10 +12,10 @@ verify_infra.check_postgres는 baseline 4개 테이블 존재만 확인하므로
 in-process 비교(외부 alembic CLI 파싱 회피): 프로젝트 alembic/env.py가 settings.database_url과
 Base.metadata를 쓰는 패턴을 그대로 재사용한다.
 
-[2026-09] 계열이 둘이 됐다. MariaDB 전용 베이스라인(f2a3b4c5d6e7, branch_labels=mariadb)이
-PostgreSQL 계열(000000000001~, branch_labels=postgres)과 독립으로 선다. 한 DB 는 자기
-dialect 의 계열 하나만 적용하므로, **접속한 DB 의 dialect 에 해당하는 head 만** 기대값으로
-잡는다. 둘 다 기대하면 PostgreSQL DB 가 MariaDB 판을 안 올렸다고 상시 DRIFT 를 낸다.
+[2026-09-09] MariaDB 계열을 걷어냈다 — 남은 계열은 postgres 하나다. dialect→계열 매핑
+(_DIALECT_BRANCH)은 그대로 둔다: 계열이 다시 갈리면 "접속한 DB 의 dialect 에 해당하는
+head 만 기대값으로 잡는다"는 이 구조가 그때 다시 필요하다. 둘 다 기대하면 한쪽 DB 가
+다른 쪽 판을 안 올렸다고 상시 DRIFT 를 낸다 — 9/7 에 실제로 겪은 자리다.
 """
 
 from __future__ import annotations
@@ -79,7 +79,8 @@ def _db_heads(database_url: str, *, connect_timeout: int) -> list[str]:
 
 
 # dialect → 그 DB 가 적용해야 하는 alembic branch label.
-_DIALECT_BRANCH = {"postgresql": "postgres", "mariadb": "mariadb", "mysql": "mariadb"}
+# [2026-09-09] mariadb 계열을 걷어냈다 — 남은 계열은 postgres 하나다.
+_DIALECT_BRANCH = {"postgresql": "postgres"}
 
 
 def _branch_for_url(database_url: str) -> str | None:

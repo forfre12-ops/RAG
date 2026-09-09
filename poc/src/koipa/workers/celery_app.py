@@ -103,6 +103,9 @@ celery_app.conf.task_routes = {
     "koipa.drift_tick": {"queue": "learning"},
     "koipa.auto_rollback_tick": {"queue": "learning"},
     "koipa.verify_audit_chain_tick": {"queue": "learning"},
+    # [2026-09-09] 문서 벡터 색인 — 유사 문서 조회의 재료. classify 와 격리하는 것이
+    #   요점이다(임베딩은 청크당 0.51초라 분류 큐에 섞이면 검수 화면이 밀린다).
+    "koipa.index_document_vector": {"queue": "index"},
     "koipa.deliver_outbox_tick": {"queue": "index"},  # I/O-bound, classify와 격리
     "koipa.ensure_partitions_tick": {"queue": "index"},  # DDL, 경량 I/O
     "koipa.retention_purge_tick": {"queue": "index"},  # DELETE, 경량 I/O

@@ -25,7 +25,6 @@
 # 사용:
 #   docker compose --env-file .env \
 #     -f infra-config/docker-compose.airgap.yml \
-#     -f infra-config/docker-compose.airgap.mariadb.yml \
 #     -f infra-config/docker-compose.gpu-train.yml up -d worker beat
 #
 # 실측 근거 (211.233.204.32 · NVIDIA L4 24GB · 2026-09-09 · 1,000행·8스레드·5에폭):

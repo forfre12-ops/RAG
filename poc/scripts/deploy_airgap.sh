@@ -193,12 +193,12 @@ fi
 
 # ── 4. 인프라 기동 (postgres·redis) ────────────────────────
 # [2026-09-05] DB 헬시 대기를 엔진 인식으로. 종전에는 `up -d postgres` 후
-# pg_isready 만 기다려, 앱이 MariaDB 를 보게 되면 **엉뚱한 DB 를 확인하고 성공을
+# pg_isready 만 기다려, 앱이 다른 DB 를 보게 되면 **엉뚱한 DB 를 확인하고 성공을
 # 보고**했다. db_probe.sh 가 DATABASE_URL 에서 서비스명·프로브를 정한다.
 . "$SELF/db_probe.sh"
 DB_SVC="$(db_service "$(_env_val DATABASE_URL || echo '')")"
-DB_USER="$(_env_val POSTGRES_USER || _env_val MARIADB_USER || echo koipa)"
-DB_PW="$(_env_val POSTGRES_PASSWORD || _env_val MARIADB_PASSWORD || echo '')"
+DB_USER="$(_env_val POSTGRES_USER || echo koipa)"
+DB_PW="$(_env_val POSTGRES_PASSWORD || echo '')"
 log "4/7  인프라 기동 + ${DB_SVC} 헬시 대기"
 dc_air up -d "$DB_SVC" redis
 if msg=$(db_wait 60 "$DB_SVC" "$DB_USER" "$DB_USER" dc_air "$DB_PW"); then

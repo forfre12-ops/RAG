@@ -35,12 +35,13 @@ fi
 # "alembic check 실패/미지원" 이라는 **틀린 진단**을 냈다(실측). 종료코드는 어차피 1 이라
 # 결과는 같았지만, CI 에서 이 메시지를 보고 고칠 곳을 잘못 찾게 된다.
 # [2026-09-07] **두 사실을 가른다.** 종전에는 아래 두 문구를 같은 것으로 보고 둘 다 drift 로
-# 단정했다. 그런데 계열이 둘이 된 뒤(MariaDB 도입) 한 DB 는 **자기 계열의 head 에만** 있을
-# 수 있어 `alembic check` 가 늘 "Target database is not up to date." 를 낸다 — 정상 상태다.
-# 그 결과 이 검사기가 **영구히 빨간불**이 됐고, 늘 우는 경보는 곧 무시된다.
+# 단정했다. 둘은 다른 사실이고 지시도 달라야 한다.
 #
 #   New upgrade operations detected   ORM 이 DB 보다 앞선다 = 진짜 drift
-#   target database is not up to date DB 가 head 가 아니다 = 미적용(또는 계열이 둘)
+#   target database is not up to date DB 가 head 가 아니다 = 마이그레이션 미적용
+#
+# [2026-09-09] 계열이 둘일 때 쓰던 "못 쟀다(SKIP)" 분기를 걷었다 — MariaDB 를 버려
+# 계열이 postgres 하나뿐이다. 그 분기를 남겨 두면 진짜 미적용을 SKIP 으로 삼켜 버린다.
 if grep -qiE "New upgrade operations detected" "${CHECK_LOG}"; then
   echo "${DRIFT_HINT}"
   echo "${DRIFT_CMD}"
@@ -49,27 +50,9 @@ fi
 
 if grep -qiE "target database is not up to date" "${CHECK_LOG}"; then
   CUR="$(alembic current 2>/dev/null | grep -oE '^[0-9a-f]{12}' | head -1 || true)"
-  if [ -n "${CUR}" ] && alembic heads 2>/dev/null | grep -q "^${CUR}"; then
-    # 자기 계열 head 에 있다 - 계열이 둘이라 나는 소리다.
-    #
-    # ⚠ 이 DB 에서는 **drift 를 잴 수 없다.** autogenerate 도 같은 이유로 막히고
-    #   (--head <계열>@head 를 줘도 alembic 은 모든 head 를 요구한다 - 실측 확인),
-    #   한 DB 는 두 계열 head 에 동시에 있을 수 없다.
-    #
-    #   그래서 **틀린 진단 대신 못 쟀다고 말한다.** 늘 우는 경보는 무시되고, 무시되는
-    #   경보는 없는 것만 못하다. 실제 drift 검사는 **계열이 하나인 DB**에서 돌려야 한다
-    #   (CI 의 PostgreSQL 서비스가 그 자리다).
-    echo "::warning::migration-drift 를 재지 못했다 — 계열이 둘(postgres·mariadb)이라"
-    echo "::warning::  이 DB(현재 ${CUR}, 자기 계열 head)에서는 alembic 이 drift 를 계산하지 못한다."
-    echo "::warning::  실제 검사는 계열 하나만 있는 DB 에서: DATABASE_URL=postgresql://... 로 이 스크립트를 돌릴 것."
-    echo "[migration-drift] SKIP — 잰 축 없음(위 경고 참조)"
-    exit 0
-  else
-    # head 가 아니다 = 마이그레이션 미적용. drift 와 다른 사실이므로 지시도 달라야 한다.
-    echo "::error::마이그레이션 미적용 — DB 가 head 가 아니다(현재: ${CUR:-알수없음})"
-    echo "::error::  실행: alembic upgrade postgres@head  또는  alembic upgrade mariadb@head"
-    exit 1
-  fi
+  echo "::error::마이그레이션 미적용 — DB 가 head 가 아니다(현재: ${CUR:-알수없음})"
+  echo "::error::  실행: alembic upgrade postgres@head"
+  exit 1
 fi
 
 # 'alembic check' 미지원 버전 fallback — autogenerate로 차이 추출

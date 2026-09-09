@@ -154,12 +154,11 @@ _ANY_MODEL_RE = re.compile(
 # 양쪽에서 누락을 fail-closed 검사한다(CI dry-run 이 postgres 누락을 잡도록).
 _REQUIRED_CORE_SERVICES = ("redis", "api", "worker", "beat")
 
-# DB 는 **하나는 반드시** 있어야 하되 어느 쪽인지는 배포마다 다르다.
-# [2026-09-07] 종전에는 postgres 를 필수로 못박아 두어 MariaDB 배포본 번들이 만들어지지
-#   않았다(실측: --compose 로 MariaDB 병합본을 줬더니 "코어 서비스 이미지 누락: postgres").
-#   검사의 의도는 "DB 이미지가 번들에 있어야 한다"이지 "postgres 여야 한다"가 아니다.
-#   둘 다 없으면 여전히 fail-closed 다 — 폐쇄망에서 DB 없이 뜨는 번들은 만들 수 없다.
-_REQUIRED_DB_SERVICES = ("postgres", "mariadb")
+# DB 이미지는 **반드시** 번들에 있어야 한다 — 폐쇄망에서 DB 없이 뜨는 번들은 못 만든다.
+# [2026-09-09] 후보에서 mariadb 를 뺐다(PostgreSQL + pgvector 로 복귀). 목록 형태는
+#   그대로 둔다 — 검사의 의도는 "DB 이미지가 있어야 한다"이지 "postgres 여야 한다"가
+#   아니고, 엔진이 다시 늘면 여기 한 줄만 늘리면 된다.
+_REQUIRED_DB_SERVICES = ("postgres",)
 
 # 관측성 스택 이미지 — infra/observability/docker-compose.observability.airgap.yml 과 태그 동기.
 # best-effort 동봉(핵심 아님): 저장 실패 시 경고만(빌드 실패 아님). 안전 알림(FnrSpike·

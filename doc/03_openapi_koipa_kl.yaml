@@ -788,6 +788,53 @@ paths:
         '422': { description: "빈 파일 또는 actor JSON 오류" }
         '500': { $ref: '#/components/responses/InternalError' }
 
+  /documents/{doc_id}/similar:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [documents]
+      summary: 유사 문서 조회 (확정 등급 포함)
+      description: >-
+        기준 문서와 의미가 비슷한 문서를 확정 등급과 함께 돌려준다. 벡터(pgvector dense·
+        코사인)와 등급(tb_document_labels)이 같은 PostgreSQL 안에 있어 한 쿼리로 끝난다 —
+        별도 Vector DB 는 두지 않는다. 삭제(soft delete)된 문서는 결과에서 빠진다.
+        verified_only=true 는 사람이 확정한 등급이 있는 문서만 돌려준다(기계가 매긴 등급을
+        사람 판단의 근거처럼 보여주지 않기 위한 것). 기준 문서가 아직 색인되지 않았으면
+        indexed=false 와 빈 목록이며 오류가 아니다 — 색인은 업로드 후 워커 큐에서 돈다.
+      parameters:
+        - in: path
+          name: doc_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: k
+          schema: { type: integer, default: 5, minimum: 1, maximum: 50 }
+        - in: query
+          name: verified_only
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 유사 문서 목록(유사도 내림차순)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  doc_id:  { type: string }
+                  indexed: { type: boolean, description: 기준 문서가 색인돼 있는가 }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        doc_id:      { type: string }
+                        filename:    { type: string }
+                        similarity:  { type: number, description: "1 - 코사인거리" }
+                        grade:       { type: string, nullable: true, enum: [TS, S1, S2, S3] }
+                        is_verified: { type: boolean }
+                        verified_at: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { description: "pgvector 확장 또는 alembic 판(f8a9b0c1d2e3) 미적용" }
+
   /documents/analyze:
     post:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다

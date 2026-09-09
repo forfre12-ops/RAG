@@ -54,7 +54,6 @@ _POC = Path(__file__).resolve().parents[1]
 # 볼륨 이름은 compose 가 `<프로젝트>_<이름>` 으로 만든다.
 _VOLUMES = (
     ("pgdata", "PostgreSQL - 문서 메타·분류 이력·감사 로그·벡터(pgvector)"),
-    ("mariadata", "MariaDB - 위와 같은 역할(마리아DB 배포본)"),
     ("redisdata", "Redis - 잡 큐·캐시"),
     ("storagedata", "원본 문서 보관소 (암호문)"),
     ("golden_data", "골든 후보·검수 원장·사람 서명"),

@@ -152,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--container", default=None,
                    help="postgres 컨테이너명(미지정 시 자동탐지; 2스택+면 모호→명시 필요)")
     p.add_argument("--engine", default=None,
-                   help="postgresql | mariadb (미지정 시 DATABASE_URL·실행 컨테이너로 판정)")
+                   help="postgresql (미지정 시 DATABASE_URL·실행 컨테이너로 판정)")
     p.add_argument("--db", default=DEFAULT_DB)
     p.add_argument("--user", default=DEFAULT_USER)
     p.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)

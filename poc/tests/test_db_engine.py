@@ -1,8 +1,9 @@
-"""백업·복구 엔진 판정 — 추측하지 않고, 엔진이 다르면 파일도 갈린다.
+"""백업·복구 엔진 판정 — 추측하지 않는다.
 
-백업·복구가 PostgreSQL 전용이던 것을 두 dialect 로 넓히며 만든 계약이다(2026-09-05).
-실제 덤프·복원 왕복은 두 dialect 라이브에서 확인했다(MariaDB 191KB SQL · PostgreSQL
-334KB custom, 양쪽 복원 후 표식 소멸).
+[2026-09-09] MariaDB 를 버리고 PostgreSQL + pgvector 로 되돌리면서 엔진이 하나가 됐다.
+그래도 이 시험은 남긴다 — **모르는 엔진에 추측해서 덤프하지 않는다**는 계약이 이 모듈의
+값이고, 이제는 "mariadb" 를 달라고 해도 실패해야 한다(조용히 PostgreSQL 을 덤프하면
+운영자가 잘못된 DB 를 백업했다고 믿게 된다).
 """
 
 from __future__ import annotations
@@ -15,15 +16,13 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from db_engine import MARIADB, POSTGRES, detect_engine  # noqa: E402
+from db_engine import ENGINES, POSTGRES, detect_engine  # noqa: E402
 from dr_restore import _only_benign_partition_errors  # noqa: E402
 
 
 def test_explicit_engine_wins():
-    assert detect_engine("mariadb").name == MARIADB
     assert detect_engine("postgresql").name == POSTGRES
     # 별칭도 받는다 — 운영자가 어느 쪽으로 적든 같게 동작해야 한다.
-    assert detect_engine("mysql").name == MARIADB
     assert detect_engine("postgres").name == POSTGRES
 
 
@@ -33,29 +32,39 @@ def test_unknown_engine_raises_instead_of_guessing():
         detect_engine("sqlite")
 
 
-def test_dump_suffix_differs_so_wrong_dump_cannot_be_fed():
-    """엔진이 다르면 덤프 확장자가 갈린다 — 같은 폴더에 섞여도 자기 것만 집는다.
+def test_dropped_engine_fails_loudly_not_silently():
+    """[2026-09-09] 버린 엔진을 달라고 하면 **실패해야 한다.**
 
-    PostgreSQL 은 custom format(*.dump), MariaDB 는 SQL 텍스트(*.sql) 라 서로
-    읽을 수 없다. 잘못된 엔진에 잘못된 덤프를 밀어 넣으면 복구가 아니라 파괴다.
+    조용히 PostgreSQL 로 떨어지면 운영자는 MariaDB 를 백업했다고 믿는다. 그 믿음이
+    깨지는 시점은 복구할 때다 — 그때는 늦다.
     """
-    pg, maria = detect_engine("postgresql"), detect_engine("mariadb")
-    assert pg.dump_suffix != maria.dump_suffix
-    assert {pg.dump_suffix, maria.dump_suffix} == {".dump", ".sql"}
-    assert pg.service != maria.service
+    assert "mariadb" not in ENGINES
+    for name in ("mariadb", "mysql"):
+        with pytest.raises(RuntimeError, match="알 수 없는 엔진"):
+            detect_engine(name)
+
+
+def test_dump_suffix_is_engine_specific():
+    """엔진마다 덤프 확장자가 갈린다 — 잘못된 엔진에 잘못된 덤프를 밀어 넣으면 파괴다.
+
+    지금은 엔진이 하나라 섞일 상대가 없지만, 확장자가 엔진 속성이라는 계약은 남는다.
+    """
+    pg = detect_engine("postgresql")
+    assert pg.dump_suffix == ".dump"      # custom format — SQL 텍스트와 섞이지 않는다
+    assert pg.service == "postgres"
 
 
 def test_password_never_lands_in_argv():
-    """비밀번호는 argv 가 아니라 환경변수로 간다 — ps 로 읽히면 안 된다."""
-    maria = detect_engine("mariadb")
-    argv = maria.dump_argv("c", "koipa", "koipa", "s3cret")
+    """비밀번호는 argv 에 실리지 않는다 — ps 로 읽히면 안 된다."""
+    pg = detect_engine("postgresql")
+    argv = pg.dump_argv("c", "koipa", "koipa", "s3cret")
     assert "s3cret" not in " ".join(argv)
-    assert maria.env("s3cret")["MYSQL_PWD"] == "s3cret"
+    assert "s3cret" not in " ".join(pg.restore_argv("c", "koipa", "koipa", "s3cret"))
 
 
 def test_env_override(monkeypatch):
-    monkeypatch.setenv("KOIPA_DB_ENGINE", "mariadb")
-    assert detect_engine().name == MARIADB
+    monkeypatch.setenv("KOIPA_DB_ENGINE", "postgresql")
+    assert detect_engine().name == POSTGRES
     monkeypatch.delenv("KOIPA_DB_ENGINE", raising=False)
 
 

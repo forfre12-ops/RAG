@@ -1506,14 +1506,8 @@ def s14_store_dr(ctx: ScenarioContext) -> None:
     #
     # ⚠ 어느 DB 를 재야 하는지(폐쇄망 번들의 DB 결정)는 여기서 정하지 않는다. 지금 도는
     #   DATABASE_URL 이 가리키는 쪽을 잰다. 그것이 "이 배포의 DR"이다.
+    # [2026-09-09] MariaDB 컨테이너 분기를 뺐다 — PostgreSQL 로 되돌리면서 대상이 하나다.
     _default_container = "koipa-jjw-postgres-1"
-    try:
-        from koipa.config import settings as _st  # noqa: PLC0415
-
-        if str(getattr(_st, "database_url", "")).startswith(("mariadb", "mysql")):
-            _default_container = "koipa-poc-mariadb-1"
-    except Exception:  # noqa: BLE001
-        pass
     container_name = _os.environ.get("PSH_S14_PG_CONTAINER", _default_container)
 
     def _pg_ok() -> bool:

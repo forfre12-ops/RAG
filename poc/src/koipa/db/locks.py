@@ -1,4 +1,9 @@
-"""전역 직렬화 잠금 — 전용 표의 행 잠금(SELECT ... FOR UPDATE). 두 dialect 동일.
+"""전역 직렬화 잠금 — 전용 표의 행 잠금(SELECT ... FOR UPDATE).
+
+[2026-09-09] MariaDB 를 버리고 PostgreSQL 로 되돌렸지만 **이 설계는 그대로 둔다.**
+행 잠금으로 바꾼 이유가 이식성만은 아니었다 — 아래 실측한 교착(24건 동시 삽입에서
+감사 체인 분기)을 이 방식이 실제로 고쳤다. pg_advisory_xact_lock 으로 되돌리는 것은
+그 수정을 되돌리는 것이라 하지 않는다.
 
 왜 필요한가(2026-09-05). 두 임계영역이 `pg_advisory_xact_lock` 으로만 잠겨 있었고,
 호출부가 `dialect == "postgresql"` 일 때만 실행하거나 예외를 흡수했다. MariaDB 로 옮기면
@@ -51,7 +56,6 @@ MODEL_ACTIVATION = "model_activation"
 # 표 사용을 정적으로 찾을 수 있어야 한다(scripts/audit_unused.py 가 이 문자열을 센다).
 _SELECT_FOR_UPDATE = text("SELECT name FROM tb_advisory_locks WHERE name = :n FOR UPDATE")
 _INSERT_PG = text("INSERT INTO tb_advisory_locks (name) VALUES (:n) ON CONFLICT DO NOTHING")
-_INSERT_MARIA = text("INSERT IGNORE INTO tb_advisory_locks (name) VALUES (:n)")
 
 
 def _ensure_row(db, name: str, dialect: str) -> None:
@@ -60,7 +64,9 @@ def _ensure_row(db, name: str, dialect: str) -> None:
     별도 트랜잭션(savepoint)에서 넣는다 — 두 요청이 동시에 처음 잠그면 한쪽이
     중복키로 실패하는데, 그 실패가 바깥 트랜잭션을 오염시키면 안 된다.
     """
-    stmt = _INSERT_PG if dialect == "postgresql" else _INSERT_MARIA
+    # [2026-09-09] MariaDB 분기(_INSERT_MARIA)를 뺐다 — PostgreSQL 로 되돌리면서
+    # 닿는 경로가 없어졌다. dialect 인자는 호출부 계약 유지를 위해 남긴다.
+    stmt = _INSERT_PG
     try:
         with db.begin_nested():
             db.execute(stmt, {"n": name})
@@ -87,7 +93,7 @@ def advisory_xact_lock(db, name: str) -> bool:
         logger.debug("advisory lock: dialect 확인 실패 — 잠금 없이 진행: %s", exc)
         return False
 
-    if dialect not in ("postgresql", "mariadb", "mysql"):
+    if dialect != "postgresql":
         # SQLite 등 — 단일 프로세스 테스트 경로다. 직렬화 대상이 아니다.
         logger.debug("advisory lock 미지원 dialect(%s) — 잠금 없이 진행", dialect)
         return False
@@ -98,7 +104,7 @@ def advisory_xact_lock(db, name: str) -> bool:
         #   잡고 그 위에 FOR UPDATE 가 배타 잠금(X)을 요구해 **동시 요청끼리 교착**이
         #   났다. 교착은 SQLAlchemyError 로 잡혀 '잠금 미획득'이 되고, 그러면 임계영역이
         #   통째로 열린다 — 24건 동시 삽입에서 감사 체인이 실제로 분기했다(2026-09-05 실측).
-        #   행은 마이그레이션(c5d6e7f8a9b0 · MariaDB 베이스라인)이 심으므로 평상시엔
+        #   행은 마이그레이션(c5d6e7f8a9b0)이 심으므로 평상시엔
         #   이 SELECT 한 번으로 끝난다.
         row = db.execute(_SELECT_FOR_UPDATE, {"n": name}).first()
         if row is not None:

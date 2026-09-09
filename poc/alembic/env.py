@@ -4,14 +4,14 @@
 - 신규 DB: baseline + 모든 후속 revision을 한 번에 적용.
 - 기존 production DB(80d75521b95a stamp 완료 상태): 자동 호환, 후속 revision만 적용.
 
-[2026-09-06] **`alembic upgrade head` 를 그냥 부르지 말 것.** 계열이 둘이라 head 가
-모호하다(MariaDB 도입 이후). 계열을 이름으로 부른다:
+[2026-09-09] **MariaDB 계열을 걷어냈다**(고객사 요청으로 PostgreSQL + pgvector 복귀).
+계열이 하나뿐이라 `alembic upgrade head` 로 충분하지만, 판이 늘어도 흔들리지 않게
+이름으로 부르는 것을 권한다:
 
-    PostgreSQL   alembic upgrade postgres@head
-    MariaDB      alembic upgrade mariadb@head
+    alembic upgrade postgres@head
 
-이 머리말이 한동안 `upgrade head` 라고 적고 있었다 — 개별 마이그레이션 파일에는 올바르게
-적혀 있었는데 여기만 낡았다. 그대로 따라 하면 "Multiple head revisions" 에서 멈춘다.
+9/6~9/9 사이에는 계열이 둘이라 `upgrade head` 가 "Multiple head revisions" 에서
+멈췄다. 지금은 단일 head 다.
 """
 
 from logging.config import fileConfig
@@ -58,7 +58,10 @@ _PARTITION_SUFFIX = re.compile(r"_(?:\d{4}_\d{2}|default)$")
 # pg_store.py)가 raw SQL 로 다루므로 모델 클래스가 없는 것이 정상이다. 선언이 없으니
 # autogenerate 는 "모델에 없는 테이블"로 보고 drop 하려 든다.
 # 실측(2026-08-11): DB 실테이블 67개 중 ORM 미선언은 파티션을 빼면 **이 둘뿐**이다.
-_MIGRATION_ONLY_TABLES = frozenset({"tb_rag_aliases", "tb_rag_vectors"})
+# [2026-09-09] tb_rag_* 두 표는 폐기됐고(a3b4c5d6e7f8), 대신 tb_document_vectors 가 들어왔다.
+#   ORM 밖에 두는 이유는 같다 — `vector(1024)` 타입을 SQLAlchemy 코어로 표현할 수 없다.
+#   ORM 에 없으면 autogenerate 가 "모델에 없는 표"로 보고 DROP 을 만들어 낸다.
+_MIGRATION_ONLY_TABLES = frozenset({"tb_rag_aliases", "tb_rag_vectors", "tb_document_vectors"})
 
 # DB 가 계산하는 생성 컬럼(GENERATED ALWAYS AS ... STORED). ORM 은 의도적으로 선언하지 않는다
 # — 쓰기 대상이 아니기 때문이고, models.py 에도 그렇게 적혀 있다. autogenerate 는 그 의도를

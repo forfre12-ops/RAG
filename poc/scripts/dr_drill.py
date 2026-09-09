@@ -6,7 +6,7 @@
 1. 최신 pg/storage 백업 위치 확인 (폐쇄망 저장소=로컬FS, MinIO 미사용)
 2. staging 컨테이너 기동 (별도 compose project)
 3. dr_restore.py 로 실복구 (DB 복원 + 로컬FS 미러) — fail-closed.
-   [2026-09-05] DB 복원은 PostgreSQL·MariaDB 양쪽을 탄다(scripts/db_engine.py).
+   [2026-09-09] DB 복원 엔진은 PostgreSQL 하나다(scripts/db_engine.py — MariaDB 폐기).
 4. 핵심 read·write 시나리오 5개 검증
 5. 시간 측정 + 리포트 산출
 """

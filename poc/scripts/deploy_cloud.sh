@@ -137,7 +137,7 @@ fi
 
 # ── 2. 인프라 기동 (postgres·redis·minio) ──────────────────
 # [2026-09-05] DB 헬시 대기를 엔진 인식으로. 종전에는 `up -d postgres` 후
-# pg_isready 만 기다려, 앱이 MariaDB 를 보게 되면 **엉뚱한 DB 를 확인하고 성공을
+# pg_isready 만 기다려, 앱이 다른 DB 를 보게 되면 **엉뚱한 DB 를 확인하고 성공을
 # 보고**했다. db_probe.sh 가 DATABASE_URL 에서 서비스명·프로브를 정한다.
 . "$HERE/db_probe.sh"
 DB_SVC="$(db_service "${DATABASE_URL:-}")"

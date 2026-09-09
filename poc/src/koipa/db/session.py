@@ -27,11 +27,11 @@ class Base(DeclarativeBase):
     """모든 ORM 모델의 베이스 클래스."""
 
 
-# [2026-09] MariaDB 전환 — psycopg(libpq)와 PyMySQL 둘 다 connect_timeout 키워드를
-# 그대로 받는다(이름까지 같다). "네트워크로 붙는 dialect" 판정을 한 곳에 둔다 —
-# 아래 두 함수가 각자 접두어 목록을 따로 들고 있으면 하나만 늘렸을 때 나머지가 뒤처진다.
-_NETWORKED_DIALECTS = ("postgresql", "mariadb", "mysql")
-_DEFAULT_PORT = {"postgresql": 5432, "mariadb": 3306, "mysql": 3306}
+# "네트워크로 붙는 dialect" 판정을 한 곳에 둔다 — 아래 두 함수가 각자 접두어 목록을
+# 따로 들고 있으면 하나만 늘렸을 때 나머지가 뒤처진다.
+# [2026-09-09] MariaDB/MySQL 을 뺐다(PostgreSQL 로 복귀). SQLite 는 파일이라 여기 없다.
+_NETWORKED_DIALECTS = ("postgresql",)
+_DEFAULT_PORT = {"postgresql": 5432}
 
 
 def _engine_connect_args() -> dict:

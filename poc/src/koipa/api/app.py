@@ -180,9 +180,11 @@ async def lifespan(app: FastAPI):
     except Exception as exc:  # noqa: BLE001
         logger.warning("structured logging setup skipped: %s", exc)
     # 배포 프로파일 + 적용된 backend 부팅 로그 — 운영 사고 사전 차단
-    # [2026-09-05] db=... 를 추가했다. 지원 DB 가 둘(PostgreSQL·MariaDB)이 되면서
-    # "이 배포가 어느 DB 에 붙었나"가 기동 로그에서 바로 보여야 한다 — 설정이 조용히
-    # 어긋나면 빈 DB 위에서 정상처럼 뜬다. 자격증명은 싣지 않는다(dialect+호스트만).
+    # [2026-09-05] db=... 를 추가했다. "이 배포가 어느 DB 에 붙었나"가 기동 로그에서
+    # 바로 보여야 한다 — 설정이 조용히 어긋나면 빈 DB 위에서 정상처럼 뜬다.
+    # 자격증명은 싣지 않는다(dialect+호스트만).
+    # [2026-09-09] 지원 DB 는 다시 PostgreSQL 하나다(MariaDB 폐기). 그래도 이 줄은
+    # 남긴다 — 빈 DB 오접속은 dialect 가 하나여도 그대로 일어난다.
     try:
         from sqlalchemy.engine import make_url  # noqa: PLC0415
 
