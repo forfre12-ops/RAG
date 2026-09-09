@@ -9,12 +9,24 @@
 등급이 움직이는지 본다. 라벨을 쓰지 않으므로 평가셋 봉인과 무관하다 — 성능을 재는 것이
 아니라 **같은 것을 같게 판단하는가**를 재기 때문이다.
 
-축 — 앞의 셋은 등급이 **변하면 안 된다**. 넷째는 통제군으로, 변하는 것이 정상이다.
+축 — 마지막 하나(통제군)만 변하는 것이 정상이고, 나머지는 등급이 **변하면 안 된다**.
 
+    whitespace           앞뒤 공백·줄바꿈만 붙인다(본문은 손대지 않는다)
     pad_short/pad_long   중립 문장을 덧붙인다(길이 ↑, 내용 불변)
-    whitespace           앞뒤 공백·줄바꿈만 넣는다(완전 무의미)
-    reorder              문장 순서를 뒤집는다(문장 집합 동일)
+    renorm               문장으로 끊었다 **같은 순서로** 다시 잇는다(줄바꿈·공백 정규화)
+    reorder              renorm 과 똑같이 잇되 순서만 뒤집는다
     [통제] source_public  source_type=public → source-prior cap 이 발동해야 정상
+
+⚠ 축을 겹쳐 읽지 말 것 — 이 도구가 한 번 틀린 자리다(2026-09-10). 처음엔 reorder 하나만
+  두었는데 그 변형이 **줄바꿈 제거·마침표 정규화·순서 뒤집기를 한꺼번에** 하고 있었다.
+  v3_final800 에서 58.4% 라는 수가 나왔고 그것을 "문장 순서가 등급을 바꾼다"로 읽을 뻔했다.
+  통제 축을 넣어 갈라 보니 이렇게 나뉘었다(250건 표본).
+
+      renorm  84.4% 불변   <- 순서를 그대로 두고 재조립만 해도 15.6% 가 바뀐다
+      reorder 66.4% 불변   <- 여기서 renorm 을 뺀 나머지가 순서 효과다
+
+  그래서 순서 효과는 `reorder` 수치가 아니라 **reorder 와 renorm 의 차이**로 읽는다.
+  renorm 자체는 줄바꿈·공백 정규화의 효과다 — 실 운영에서 **파서가 바뀌면** 그만큼 흔들린다.
 
 읽는 법. 변화율만 보면 안 된다. **방향**을 함께 본다.
 
@@ -40,6 +52,7 @@ force_utf8_stdio()
 import argparse
 import json
 import os
+import re
 import sys
 import uuid
 from collections import Counter
@@ -96,17 +109,34 @@ def _rows(path: Path, limit: int | None) -> list[str]:
 
 
 def _split_sentences(text: str) -> list[str]:
-    parts = [p.strip() for p in text.replace("\n", " ").split(".") if p.strip()]
-    return [p + "." for p in parts]
+    """문장 단위로 끊는다 — **구분자를 지우지 않는다.**
+
+    처음엔 `.` 로만 끊고 조각마다 `.` 를 도로 붙였는데 두 군데가 틀렸다.
+      · 줄바꿈으로 문장을 나누는 문서(한국어 문서에 흔하다)는 조각이 1개라 reorder 가
+        아무것도 안 바꾸고, 그 문서들은 **측정에서 조용히 빠졌다.**
+      · 마침표가 없던 문서에는 없던 마침표가 생겨 내용이 달라졌다.
+    그래서 마침표·물음표·느낌표 **뒤에서** 끊고 줄바꿈에서도 끊되, 문장부호는 그대로 둔다.
+    """
+    parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+|\n+", text) if p.strip()]
+    return parts or ([text.strip()] if text.strip() else [])
 
 
 def variants(text: str) -> dict[str, tuple[str, dict | None]]:
-    """(변형 이름) → (본문, 메타데이터). 메타데이터가 None 이면 안 보낸다."""
+    """(변형 이름) → (본문, 메타데이터). 메타데이터가 None 이면 안 보낸다.
+
+    축은 **한 번에 하나씩만** 더한다. 겹쳐 놓으면 어느 것이 등급을 움직였는지 못 가른다
+    (모듈 docstring 의 ⚠ 참조 — 실제로 한 번 틀렸다).
+
+        renorm  = 문장 단위로 끊었다 같은 순서로 재결합(줄바꿈·공백 정규화)
+        reorder = renorm 과 똑같이 재결합하되 **순서만** 뒤집는다
+    """
     sentences = _split_sentences(text)
+    renorm = " ".join(sentences) if sentences else text
     return {
+        "whitespace": ("\n\n  " + text + "  \n\n", None),
         "pad_short": (text + " " + _FILLER[0], None),
         "pad_long": (text + " " + " ".join(_FILLER), None),
-        "whitespace": ("\n\n  " + text + "  \n\n", None),
+        "renorm": (renorm, None),
         "reorder": (" ".join(reversed(sentences)) if len(sentences) > 1 else text, None),
         "source_public": (text, {"source_type": "public"}),      # 통제군
     }

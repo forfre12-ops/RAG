@@ -45,9 +45,48 @@ def test_content_preserving_variants_keep_every_sentence(mod):
     text = "첫 문장입니다. 두 번째 문장입니다. 세 번째 문장입니다."
     base = set(mod._split_sentences(text))
     got = mod.variants(text)
-    for axis in ("whitespace", "reorder"):
+    for axis in ("whitespace", "renorm", "reorder"):
         mutated, _ = got[axis]
         assert set(mod._split_sentences(mutated)) == base, f"{axis} 가 내용을 바꿨다"
+
+
+def test_axes_add_one_change_at_a_time(mod):
+    """축을 겹쳐 놓으면 어느 것이 등급을 움직였는지 못 가른다.
+
+    이 도구가 실제로 틀린 자리다(2026-09-10). reorder 하나가 줄바꿈 제거·마침표 정규화·
+    순서 뒤집기를 한꺼번에 하고 있었고, 그 58.4% 를 "문장 순서 효과"로 읽을 뻔했다.
+    통제 축을 갈라 보니 재조립만으로 15.6% 가 움직였다.
+    """
+    for text in (
+        "첫 문장입니다\n두 번째 문장입니다\n세 번째 문장입니다",   # 줄바꿈으로만 나뉜 글
+        "첫 문장입니다. 두 번째 문장입니다. 세 번째 문장입니다.",  # 마침표로 나뉜 글
+    ):
+        sentences = mod._split_sentences(text)
+        assert len(sentences) == 3, f"문장을 못 끊었다 — 이러면 축이 아무것도 안 바꾼다: {text!r}"
+        got = mod.variants(text)
+
+        # 재결합은 없던 문장부호를 만들지 않는다 — 만들면 그건 다른 내용이다.
+        renorm, _ = got["renorm"]
+        assert renorm.count(".") == text.count("."), "재결합이 마침표를 더하거나 지웠다"
+        assert "\n" not in renorm
+
+        # renorm 은 **순서를 그대로 두고** 잇기만 한다. 이것이 reorder 의 통제군이다.
+        # 되짚어 재분해하지 않는다 — 줄바꿈으로만 나뉜 글은 공백으로 이으면 경계가
+        # 사라져 원래 문장 목록을 복원할 수 없다(그건 이 축의 결함이 아니라 성질이다).
+        assert renorm == " ".join(sentences), (
+            "renorm 이 순서를 바꿨다 — 그러면 reorder 와 통제군이 같아져 순서 효과를 못 가른다"
+        )
+
+        # reorder 는 renorm 과 **똑같이** 잇되 순서만 뒤집는다.
+        reorder, _ = got["reorder"]
+        assert reorder == " ".join(reversed(sentences))
+        assert reorder != renorm, "순서를 안 바꿨다면 이 축은 renorm 의 사본이다"
+
+
+def test_reading_guide_warns_against_stacking_axes(mod):
+    """읽는 법이 문서에 없으면 다음 사람이 같은 오독을 한다."""
+    src = _SCRIPT.read_text(encoding="utf-8")
+    assert "reorder 와 renorm 의 차이" in src, "순서 효과를 어떻게 읽는지 적혀 있지 않다"
 
 
 def test_padding_only_adds_and_never_removes(mod):
