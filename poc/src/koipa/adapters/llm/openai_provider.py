@@ -65,12 +65,28 @@ class OpenAIProvider:
         system: str | None = None,
         max_tokens: int = 1024,
         temperature: float = 0.7,
+        json_schema: dict | None = None,
     ) -> LLMResponse:
+        """json_schema 를 주면 response_format 으로 구조화 출력을 요구한다.
+
+        지원하지 않는 모델이면 400 계열로 실패하고 success=False 응답이 되돌아간다 —
+        호출부가 스키마 없이 재호출한다(local_openai_provider 와 같은 계약).
+        """
         start = time.perf_counter()
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
+        kwargs: dict = {}
+        if json_schema:
+            kwargs["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "synthetic_document",
+                    "schema": json_schema,
+                    "strict": True,
+                },
+            }
         try:
             # 작업 #18: 429/5xx/타임아웃/연결 오류에 full-jitter 지수 백오프 재시도.
             resp = retry_with_backoff(
@@ -79,6 +95,7 @@ class OpenAIProvider:
                     messages=messages,
                     max_tokens=max_tokens,
                     temperature=temperature,
+                    **kwargs,
                 ),
                 is_retryable=_is_retryable,
                 max_retries=self._max_retries,
@@ -99,6 +116,7 @@ class OpenAIProvider:
                     cost_usd=estimate_cost_usd(self.model, in_tok, out_tok),
                     latency_ms=int((time.perf_counter() - start) * 1000),
                 ),
+                meta={"json_schema": bool(json_schema)},
             )
         except Exception as exc:  # noqa: BLE001
             return LLMResponse(
@@ -113,7 +131,7 @@ class OpenAIProvider:
                     success=False,
                     error_code=type(exc).__name__,
                 ),
-                meta={"error": str(exc)},
+                meta={"error": str(exc), "json_schema": bool(json_schema)},
             )
 
     def count_tokens(self, text: str) -> int:

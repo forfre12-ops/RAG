@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 import random
 import time
@@ -97,6 +98,23 @@ def retry_with_backoff(
     raise last_exc
 
 
+def accepts_json_schema(provider: object) -> bool:
+    """provider.generate 가 구조화 출력(json_schema) 인자를 받는가.
+
+    프로토콜에 강제하지 않고 **시그니처로 탐지**한다. 이유는 두 가지다.
+      · 시험용 가짜 provider 가 여럿이라 인자를 필수로 만들면 전부 고쳐야 한다.
+      · anthropic 어댑터는 response_format 이 없다 — 인자만 받고 무시하면 호출부가
+        "스키마가 걸렸다"고 잘못 믿는다. 안 받는 것이 정직한 신호다.
+    """
+    generate = getattr(provider, "generate", None)
+    if generate is None:
+        return False
+    try:
+        return "json_schema" in inspect.signature(generate).parameters
+    except (TypeError, ValueError):
+        return False
+
+
 @runtime_checkable
 class LLMProvider(Protocol):
     name: str
@@ -110,6 +128,10 @@ class LLMProvider(Protocol):
         max_tokens: int = 1024,
         temperature: float = 0.7,
     ) -> LLMResponse:
+        """구조화 출력을 지원하는 구현은 여기에 ``json_schema: dict | None`` 을 더 받는다.
+
+        선택 인자라 프로토콜에는 넣지 않는다 — 지원 여부는 accepts_json_schema() 로 본다.
+        """
         ...
 
     def count_tokens(self, text: str) -> int:

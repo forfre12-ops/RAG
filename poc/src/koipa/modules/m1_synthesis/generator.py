@@ -38,12 +38,25 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Optional
 
 from koipa.adapters.llm import build_provider
-from koipa.adapters.llm.base import LLMProvider, UsageRecord
+from koipa.adapters.llm.base import LLMProvider, UsageRecord, accepts_json_schema
+
+
+logger = logging.getLogger(__name__)
+
+
+def _settings():
+    """설정을 호출 시점에 읽는다 — import 시점에 고정하면 시험이 못 바꾼다."""
+    from koipa.config import settings  # noqa: PLC0415
+
+    return settings
+
 
 # Grade enum은 SynthRequest.target_grade에서 .value 처리만 하므로 별도 import 불필요.
 
@@ -211,6 +224,134 @@ body가 {len_max}자에 가까워지면 새 내용 추가를 멈추고 JSON의 �
 - 마지막 표 뒤에는 반드시 결론과 책임 역할·기한·완료 기준이 있는 후속 조치 문단을 둔다.
 - 등급명(비밀, 기밀, TS, S1, S2, S3, 대외비, 극비 등)은 문서 내용에 포함하지 마시오."""
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 구조화 출력 스키마 — 서버가 이 틀 밖의 토큰을 만들지 못하게 한다.
+#
+# 종전에는 SYSTEM_PROMPT 에 "출력은 반드시 다음 JSON 한 객체" 라고 **부탁만** 했고,
+# 모델이 인사말이나 코드펜스를 덧붙이면 _parse 가 실패해 재시도했다(최대 2회 추가 호출).
+# 스키마를 넘길 수 있는 provider 면 그 재시도가 필요 없어진다.
+#
+# ⚠ 프롬프트의 JSON 서술과 이 스키마는 **같은 필드 집합**이어야 한다. 갈라지면 스키마를
+#   받는 서버와 못 받는 서버가 서로 다른 모양을 돌려준다. 시험이 이 일치를 지킨다
+#   (test_synth_structured_output.py).
+SYNTH_DOC_JSON_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "body": {"type": "string"},
+        "document_type": {"type": "string"},
+        "dept_hint": {"type": "string"},
+        "rationale_tags": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["title", "body", "document_type", "dept_hint", "rationale_tags"],
+    "additionalProperties": False,
+}
+
+OUTLINE_JSON_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "document_type": {"type": "string"},
+        "dept_hint": {"type": "string"},
+        "sections": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "heading": {"type": "string"},
+                    "intent": {"type": "string"},
+                },
+                "required": ["heading", "intent"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["title", "document_type", "dept_hint", "sections"],
+    "additionalProperties": False,
+}
+
+CRITIQUE_JSON_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "issues": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["issues"],
+    "additionalProperties": False,
+}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 다단계 생성 프롬프트 — 개요 → 본문 → 자체검토 → 수정
+#
+# 한 번의 호출로 "제목 정하고 목차 짜고 2,000자 본문까지" 를 시키면 뒤로 갈수록 절이
+# 비거나 같은 말이 반복된다. 사람이 초안 없이 최종본을 쓰는 것과 같다.
+#
+# 본문 단계는 **새 템플릿을 쓰지 않는다** — 기존 USER_TEMPLATE_V2 의 [구조·완성도 요구]
+# 칸에 개요를 넣고, 수정 단계는 [재작성 참고](revision_context) 칸에 지적사항을 넣는다.
+# 두 칸 다 이미 SynthRequest 에 있었는데 아무도 채우지 않고 있었다.
+OUTLINE_SYSTEM_PROMPT = """당신은 한국 조직의 사내 문서를 설계하는 문서 기획자다.
+본문을 쓰지 말고, 어떤 절을 어떤 의도로 둘지만 정한다.
+
+[준수]
+- 실재 기업명·인명·연락처 등 PII 금지. 사람은 [공정책임자A] 처럼 역할 식별자만 쓴다.
+- 절은 해당 문서 유형에 실제로 있는 것만 둔다. 장식용 절을 만들지 않는다.
+- 각 절의 의도는 서로 겹치지 않아야 한다. 같은 내용을 두 절에 나누어 담지 않는다.
+- 등급명(TS, S1, S2, S3, 특급기밀, 1급 비밀, 2급, 3급, 대외비, 기밀, 비밀, 극비) 기재 금지.
+- 출력은 다음 JSON 한 객체뿐이며 설명·코드펜스를 붙이지 않는다:
+  {"title": str, "document_type": str, "dept_hint": str,
+   "sections": [{"heading": str, "intent": str}, ...]}"""
+
+OUTLINE_TEMPLATE = """[문서 상황]
+{situation}
+
+[공개 범위]
+{disclosure_scope}
+
+[잠재적 피해 가능성]
+{harm_potential}
+
+[도메인]
+{domain}
+
+[문서 유형 후보]
+{doc_types}
+
+[분량 감각]
+본문 전체가 한국어 {len_min}자 이상 {len_max}자 이내가 되도록 절 수를 정한다.
+절이 너무 많으면 각 절이 비고, 너무 적으면 한 절이 길어진다.
+
+위 상황에 실재할 법한 사내 문서의 절 구성을 JSON 객체로 작성하시오.
+절은 3개 이상 7개 이하로 하고, 각 절의 의도를 한 문장으로 적으시오."""
+
+CRITIQUE_SYSTEM_PROMPT = """당신은 사내 문서를 검토하는 감사 담당자다.
+주어진 문서에서 고쳐야 할 점만 찾아 적는다. 문서를 다시 쓰지 않는다.
+
+[무엇을 찾는가]
+- 절 제목만 있고 내용이 비었거나, 같은 사실을 표현만 바꿔 반복한 곳
+- 수치·날짜·단위의 산술 모순, 시간 순서 모순, 표와 본문의 값 불일치
+- 표의 빈 칸이나 하이픈 placeholder, 표로 끝나고 결론·후속조치가 없는 구성
+- 실재 기업명·인명·주민등록번호·연락처·이메일 등 PII
+- 등급명(TS, S1, S2, S3, 특급기밀, 1급 비밀, 2급, 3급, 대외비, 기밀, 비밀, 극비) 표기
+
+[지적하면 안 되는 것]
+- [공정책임자A]·[검토자B] 같은 대괄호 역할 식별자와 품질관리팀·기획팀 같은 부서명은
+  **작성 규칙이 요구한 표기**다. 실명 대신 쓰라고 지시한 것이므로 PII 가 아니다.
+- [가상기업N] 같은 자리표시자도 마찬가지다.
+
+[준수]
+- 고칠 것이 없으면 빈 배열을 돌려준다. 없는 문제를 만들지 않는다.
+- 각 지적은 어느 절의 무엇을 어떻게 고치라는 것인지 한 문장으로 적는다.
+- 출력은 다음 JSON 한 객체뿐이며 설명·코드펜스를 붙이지 않는다:
+  {"issues": [str, ...]}"""
+
+CRITIQUE_TEMPLATE = """[검토 대상 문서]
+제목: {title}
+
+{body}
+
+위 문서에서 고쳐야 할 점을 JSON 객체로 적으시오. 없으면 issues 를 빈 배열로 두시오."""
+
+
 DOMAIN_DOC_TYPES = {
     "tech": "연구노트, 설계명세, 시험성적서, 알고리즘 설명서",
     "business": "사업계획서, 시장분석, 투자제안서, 파트너십 검토",
@@ -290,8 +431,19 @@ def _prompt_version(*parts: str) -> str:
 
 
 def outline_prompt_version() -> str:
-    """개요 프롬프트 버전 — 현재 개요·본문이 한 호출이라 본문과 같은 값이다."""
-    return body_prompt_version()
+    """개요 프롬프트 버전.
+
+    [2026-09-10] 종전에는 본문 버전을 그대로 돌려줬다 — 개요·본문이 한 호출이었기
+    때문이다. 다단계 생성이 생기면서 개요는 자기 프롬프트를 갖게 됐고, 이제 실제로
+    개요 프롬프트의 해시를 돌려준다. 단계를 쓰지 않은 문서(단발 생성)는 개요 프롬프트를
+    거치지 않았으므로 호출부가 본문 버전만 기록한다(workers/tasks.py).
+    """
+    return _prompt_version(OUTLINE_SYSTEM_PROMPT, OUTLINE_TEMPLATE)
+
+
+def critique_prompt_version() -> str:
+    """자체검토 프롬프트 버전 — 다단계 생성에서만 쓰인다."""
+    return _prompt_version(CRITIQUE_SYSTEM_PROMPT, CRITIQUE_TEMPLATE)
 
 
 def body_prompt_version() -> str:
@@ -338,6 +490,20 @@ def validate_generator_prompt_contract() -> None:
     _require_korean_prompt_text(
         USER_TEMPLATE_V2, field="USER_TEMPLATE_V2", min_hangul=100
     )
+    # 다단계 생성 프롬프트도 같은 무결성 게이트를 받는다 — 인코딩이 깨진 채로 서버에
+    # 나가면 개요 단계가 조용히 쓰레기를 만들고 본문이 그것을 따라 쓴다.
+    _require_korean_prompt_text(
+        OUTLINE_SYSTEM_PROMPT, field="OUTLINE_SYSTEM_PROMPT", min_hangul=50
+    )
+    _require_korean_prompt_text(
+        OUTLINE_TEMPLATE, field="OUTLINE_TEMPLATE", min_hangul=50
+    )
+    _require_korean_prompt_text(
+        CRITIQUE_SYSTEM_PROMPT, field="CRITIQUE_SYSTEM_PROMPT", min_hangul=50
+    )
+    _require_korean_prompt_text(
+        CRITIQUE_TEMPLATE, field="CRITIQUE_TEMPLATE", min_hangul=20
+    )
     for grade, fields in GRADE_SITUATION_PROMPTS.items():
         for prompt_field in ("situation", "disclosure_scope", "harm_potential"):
             _require_korean_prompt_text(
@@ -383,6 +549,10 @@ class SynthRequest:
     # default so legacy/generic callers keep their previous request contract.
     structure_requirements: str = ""
     revision_context: str = ""
+    # [2026-09-10] 다단계 생성(개요→본문→자체검토→수정) 사용 여부.
+    # None = 설정값(settings.synth_multi_step)을 따른다. True/False = 이 요청만 강제.
+    # 켜면 문서 1건당 LLM 호출이 1회에서 3~4회로 는다.
+    multi_step: Optional[bool] = None
 
 
 @dataclass
@@ -406,12 +576,64 @@ class SynthDoc:
     # 원문을 중복 보관하지 않고도 출력 절단/빈 응답/비정상 JSON을 감사할 수 있는
     # 호출별 메타데이터. 내부 JSON 재시도에서 먼저 실패하고 성공한 경우도 보존한다.
     response_audit: list[dict[str, object]] = field(default_factory=list)
+    # [2026-09-10] "single" = 종전과 같은 1회 호출. "multi_step" = 개요→본문→검토→수정.
+    # 어느 쪽으로 만든 문서인지 뒤에서 갈라 재려면 산출물에 남아 있어야 한다.
+    generation_mode: str = "single"
+    # 자체검토가 실제로 무엇을 지적했는지. 빈 리스트는 "지적 없음"이고, 단발 생성이면
+    # 애초에 검토를 안 했으므로 역시 빈 리스트다 — 둘을 가르는 것은 generation_mode 다.
+    critique_issues: list[str] = field(default_factory=list)
 
 
 class SyntheticDocGenerator:
-    def __init__(self, llm: Optional[LLMProvider] = None) -> None:
+    """합성 문서 생성기.
+
+    [2026-09-10] 세 가지가 붙었다. 셋 다 프레임워크 없이 provider 어댑터 위에서 돈다.
+      ① 구조화 출력   서버가 JSON 스키마 밖 토큰을 못 만들게 한다(지원 서버일 때만).
+      ② 병렬 배치     count>1 을 동시에 만든다. 기본값 1 = 종전과 같은 순차 생성.
+      ③ 다단계 생성   개요→본문→자체검토→수정. 기본 꺼짐 = 종전과 같은 1회 호출.
+    """
+
+    # JSON 파싱 실패 시 추가 호출 횟수. 종전과 같은 2회를 유지한다 — 구조화 출력이
+    # 붙었다고 재시도를 늘리면 실패 비용이 조용히 커진다.
+    _MAX_JSON_RETRIES = 2
+
+    def __init__(
+        self,
+        llm: Optional[LLMProvider] = None,
+        *,
+        concurrency: Optional[int] = None,
+        structured_output: Optional[bool] = None,
+        multi_step: Optional[bool] = None,
+    ) -> None:
         validate_generator_prompt_contract()
         self.llm = llm or build_provider()
+        self.concurrency = self._resolve_concurrency(concurrency)
+        # 구조화 출력은 **설정이 켜져 있고 provider 가 인자를 받을 때만** 쓴다.
+        # 둘 중 하나만 봐도 안 된다: 설정만 보면 anthropic 에서 TypeError 가 나고,
+        # provider 만 보면 설정으로 끌 수가 없다.
+        want_structured = (
+            structured_output
+            if structured_output is not None
+            else bool(getattr(_settings(), "synth_structured_output", True))
+        )
+        self.structured_output = bool(want_structured) and accepts_json_schema(self.llm)
+        self.multi_step = (
+            bool(multi_step)
+            if multi_step is not None
+            else bool(getattr(_settings(), "synth_multi_step", False))
+        )
+
+    @staticmethod
+    def _resolve_concurrency(value: Optional[int]) -> int:
+        raw = value if value is not None else getattr(
+            _settings(), "synth_generate_concurrency", 1
+        )
+        try:
+            resolved = int(raw)
+        except (TypeError, ValueError):
+            resolved = 1
+        # 0·음수가 오면 아무것도 만들지 않거나 죽는다 — 조용한 0건 생성을 막는다.
+        return max(1, min(32, resolved))
 
     @staticmethod
     def _record_usage(resp: object) -> None:
@@ -450,6 +672,8 @@ class SyntheticDocGenerator:
         attempt: int,
         max_output_tokens: int,
         parse_ok: bool,
+        step: str = "body",
+        json_schema: bool = False,
     ) -> dict[str, object]:
         """Return non-content diagnostics for one generation response.
 
@@ -495,6 +719,12 @@ class SyntheticDocGenerator:
                 failure_reason = "invalid_json"
         return {
             "attempt": attempt,
+            # 어느 단계의 호출인가(body·outline·critique·revise). 다단계 생성에서 한 문서가
+            # 여러 호출을 쓰므로 단계 표시가 없으면 감사 기록을 되짚을 수 없다.
+            "step": step,
+            # 이 호출에 JSON 스키마를 걸었는가. 실패 후 재시도는 스키마를 떼므로,
+            # "스키마를 걸었더니 실패했다" 와 "떼니 됐다" 가 이 값으로 갈린다.
+            "json_schema": json_schema,
             "parse_ok": parse_ok,
             "failure_reason": failure_reason,
             "finish_reason": finish_reason,
@@ -506,62 +736,98 @@ class SyntheticDocGenerator:
             "output_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
         }
 
-    def generate_one(self, req: SynthRequest) -> SynthDoc:
-        grade_code = (
-            req.target_grade.value
-            if hasattr(req.target_grade, "value")
-            else str(req.target_grade)
-        )
-        req_domain = canonical_domain(req.domain)
+    # ── 프롬프트 조립 ────────────────────────────────────────────────────────
+    def _build_user_prompt(
+        self,
+        req: SynthRequest,
+        grade_code: str,
+        req_domain: str,
+        *,
+        structure_override: str = "",
+        revision_override: str = "",
+        doc_type_override: str = "",
+    ) -> str:
+        """본문 프롬프트 1개를 만든다.
+
+        override 세 개는 다단계 생성이 쓴다 — 개요 단계가 정한 절 구성이
+        [구조·완성도 요구] 칸으로, 자체검토가 낸 지적이 [재작성 참고] 칸으로 들어간다.
+        단발 생성에서는 전부 빈 문자열이라 종전과 같은 프롬프트가 나온다.
+        """
         situation = GRADE_SITUATION_PROMPTS.get(
             grade_code, GRADE_SITUATION_PROMPTS["S3"]
         )
-        structure_requirements = req.structure_requirements.strip() or (
-            "문서 유형에 자연스러운 여러 절과 항목을 사용하고 각 절에는 서로 다른 사실을 담는다."
+        structure_requirements = (
+            structure_override.strip()
+            or req.structure_requirements.strip()
+            or "문서 유형에 자연스러운 여러 절과 항목을 사용하고 각 절에는 서로 다른 사실을 담는다."
         )
-        revision_context = req.revision_context.strip()
+        revision_context = (revision_override or req.revision_context).strip()
         if revision_context:
             revision_context = f"[재작성 참고]\n{revision_context}"
-        user = USER_TEMPLATE_V2.format(
+        doc_types = (
+            doc_type_override.strip()
+            or req.document_type_hint
+            or DOMAIN_DOC_TYPES.get(req_domain, DOMAIN_DOC_TYPES["mixed"])
+        )
+        return USER_TEMPLATE_V2.format(
             situation=req.scenario_context or situation["situation"],
             disclosure_scope=req.disclosure_scope or situation["disclosure_scope"],
             harm_potential=req.harm_potential or situation["harm_potential"],
             domain=req_domain,
-            doc_types=req.document_type_hint
-            or DOMAIN_DOC_TYPES.get(req_domain, DOMAIN_DOC_TYPES["mixed"]),
+            doc_types=doc_types,
             structure_requirements=structure_requirements,
             len_min=req.len_min,
             len_max=req.len_max,
             revision_context=revision_context,
         )
-        # C3-7 (2026-05-30): JSON 파싱 실패 시 최대 2회 재시도. Solar 등 JSON 출력
-        # 안정성 약한 LLM 에서 76.5% → 30% 미만으로 실패율 감소 기대.
-        # 재시도 시 temperature 낮춰 deterministic 시도 + system prompt 강화.
-        max_retries = 2
-        attempt = 0
-        max_output_tokens = max(512, int(req.max_output_tokens))
-        response_audit: list[dict[str, object]] = []
+
+    # ── LLM 호출 1건(JSON 응답) ──────────────────────────────────────────────
+    def _call_json(
+        self,
+        user: str,
+        *,
+        system: str,
+        schema: Optional[dict],
+        max_output_tokens: int,
+        step: str,
+        audit: list[dict[str, object]],
+    ) -> tuple[dict | None, object]:
+        """JSON 한 객체를 받아 낸다. 총 호출 횟수는 최대 1 + _MAX_JSON_RETRIES.
+
+        시도 순서
+          ① 스키마를 걸고 temperature 0.7 — 지원 provider + 설정 켜짐일 때만.
+          ② 스키마를 떼고 temperature 0.3 + "JSON 만" 강화 시스템 프롬프트.
+
+        재시도에서 **스키마를 떼는 것이 핵심**이다. ①이 실패하는 원인 중 하나가
+        "서버가 response_format 을 못 받는다" 이기 때문이다(구형 vLLM·Ollama).
+        스키마를 그대로 두고 재시도하면 같은 이유로 세 번 다 실패한다.
+        """
+        schema_used = bool(schema) and self.structured_output
+        extra = {"json_schema": schema} if schema_used else {}
         resp = self.llm.generate(
             user,
-            system=SYSTEM_PROMPT,
+            system=system,
             temperature=0.7,
             max_tokens=max_output_tokens,
+            **extra,
         )
         self._record_usage(resp)
         parsed = self._parse(resp.text)
-        response_audit.append(
+        audit.append(
             self._response_audit_entry(
                 resp,
-                attempt=attempt + 1,
+                attempt=1,
                 max_output_tokens=max_output_tokens,
                 parse_ok=parsed is not None,
+                step=step,
+                json_schema=schema_used,
             )
         )
-        while parsed is None and attempt < max_retries:
+        attempt = 1
+        while parsed is None and attempt <= self._MAX_JSON_RETRIES:
             attempt += 1
-            # 재시도: temperature 0.3, system prompt 에 "반드시 유효한 JSON 만 출력" 추가
             retry_system = (
-                SYSTEM_PROMPT
+                system
                 + "\n\n[중요] 반드시 유효한 JSON 객체 1개만 출력하세요. 코드블록·설명·주석 모두 금지."
             )
             resp = self.llm.generate(
@@ -572,24 +838,62 @@ class SyntheticDocGenerator:
             )
             self._record_usage(resp)  # 재시도도 실제 LLM 비용 — 누락 없이 기록
             parsed = self._parse(resp.text)
-            response_audit.append(
+            audit.append(
                 self._response_audit_entry(
                     resp,
-                    attempt=attempt + 1,
+                    attempt=attempt,
                     max_output_tokens=max_output_tokens,
                     parse_ok=parsed is not None,
+                    step=step,
+                    json_schema=False,
                 )
             )
+        return parsed, resp
+
+    # ── 단발 생성(종전 경로) ─────────────────────────────────────────────────
+    def _generate_single(
+        self,
+        req: SynthRequest,
+        grade_code: str,
+        req_domain: str,
+        *,
+        structure_override: str = "",
+        revision_override: str = "",
+        doc_type_override: str = "",
+        audit: Optional[list[dict[str, object]]] = None,
+        step: str = "body",
+        generation_mode: str = "single",
+    ) -> SynthDoc:
+        response_audit: list[dict[str, object]] = audit if audit is not None else []
+        max_output_tokens = max(512, int(req.max_output_tokens))
+        user = self._build_user_prompt(
+            req,
+            grade_code,
+            req_domain,
+            structure_override=structure_override,
+            revision_override=revision_override,
+            doc_type_override=doc_type_override,
+        )
+        parsed, resp = self._call_json(
+            user,
+            system=SYSTEM_PROMPT,
+            schema=SYNTH_DOC_JSON_SCHEMA,
+            max_output_tokens=max_output_tokens,
+            step=step,
+            audit=response_audit,
+        )
 
         if parsed is None:
             # noop provider 등은 JSON이 아님 — fallback으로 텍스트 그대로 body 사용.
             # [C16] resp.text가 비면 placeholder(_fallback_body)=noop_fallback(학습 금지 마커),
             # 실 LLM이 비-JSON 텍스트를 주면 llm_nonjson — 둘을 label_source로 구분(grep 식별).
-            raw_text = resp.text or ""
+            raw_text = getattr(resp, "text", "") or ""
             body = raw_text or _fallback_body(grade_code, req_domain)
             label_source = "llm_nonjson" if raw_text else "noop_fallback"
-            doc_types = req.document_type_hint or DOMAIN_DOC_TYPES.get(
-                req_domain, "내부 자료"
+            doc_types = (
+                doc_type_override.strip()
+                or req.document_type_hint
+                or DOMAIN_DOC_TYPES.get(req_domain, "내부 자료")
             )
             title = (
                 f"{doc_types.split(',')[0].strip()} 합성 v{abs(hash(user)) % 10000:04d}"
@@ -605,11 +909,12 @@ class SyntheticDocGenerator:
                 rationale_tags=[grade_code],
                 llm_provider=self.llm.name,
                 llm_model=getattr(self.llm, "model", "") or "",
-                usage=resp.usage,
+                usage=getattr(resp, "usage", None),
                 pii_violations=self._pii_violations(body),
                 parse_error="non-json response",
                 label_source=label_source,
                 response_audit=response_audit,
+                generation_mode=generation_mode,
             )
 
         body = parsed.get("body", "") or ""
@@ -623,13 +928,170 @@ class SyntheticDocGenerator:
             rationale_tags=list(parsed.get("rationale_tags", []) or []),
             llm_provider=self.llm.name,
             llm_model=getattr(self.llm, "model", "") or "",
-            usage=resp.usage,
+            usage=getattr(resp, "usage", None),
             pii_violations=self._pii_violations(body),
             response_audit=response_audit,
+            generation_mode=generation_mode,
         )
 
+    # ── 다단계 생성 ──────────────────────────────────────────────────────────
+    @staticmethod
+    def _outline_sections(parsed: object) -> list[dict]:
+        """개요 응답에서 쓸 수 있는 절 목록만 골라 낸다.
+
+        JSON 파싱이 됐다고 개요가 온 것은 아니다 — noop provider 는 어떤 프롬프트에도
+        같은 문서 JSON(sections 없음)을 돌려준다. 여기서 걸러야 그 응답을 개요로 착각해
+        빈 구조를 본문 프롬프트에 밀어 넣지 않는다.
+        """
+        if not isinstance(parsed, dict):
+            return []
+        sections = parsed.get("sections")
+        if not isinstance(sections, list):
+            return []
+        out = []
+        for item in sections:
+            if not isinstance(item, dict):
+                continue
+            heading = str(item.get("heading", "") or "").strip()
+            if not heading:
+                continue
+            out.append(
+                {"heading": heading, "intent": str(item.get("intent", "") or "").strip()}
+            )
+        return out
+
+    def _generate_multi_step(
+        self, req: SynthRequest, grade_code: str, req_domain: str
+    ) -> SynthDoc:
+        """개요 → 본문 → 자체검토 → (지적이 있으면) 수정.
+
+        어느 단계가 실패하든 **종전 단발 생성으로 내려간다.** 다단계를 켰다고 생성이
+        0건이 되면 안 된다 — 실패는 response_audit 의 step 값으로 남는다.
+        """
+        audit: list[dict[str, object]] = []
+        max_output_tokens = max(512, int(req.max_output_tokens))
+        situation = GRADE_SITUATION_PROMPTS.get(
+            grade_code, GRADE_SITUATION_PROMPTS["S3"]
+        )
+        outline_user = OUTLINE_TEMPLATE.format(
+            situation=req.scenario_context or situation["situation"],
+            disclosure_scope=req.disclosure_scope or situation["disclosure_scope"],
+            harm_potential=req.harm_potential or situation["harm_potential"],
+            domain=req_domain,
+            doc_types=req.document_type_hint
+            or DOMAIN_DOC_TYPES.get(req_domain, DOMAIN_DOC_TYPES["mixed"]),
+            len_min=req.len_min,
+            len_max=req.len_max,
+        )
+        outline_parsed, _ = self._call_json(
+            outline_user,
+            system=OUTLINE_SYSTEM_PROMPT,
+            schema=OUTLINE_JSON_SCHEMA,
+            max_output_tokens=min(max_output_tokens, 1200),
+            step="outline",
+            audit=audit,
+        )
+        sections = self._outline_sections(outline_parsed)
+        if not sections:
+            logger.info(
+                "multi-step: 개요 단계가 쓸 만한 절 구성을 못 냈다 — 단발 생성으로 내려간다"
+            )
+            return self._generate_single(
+                req, grade_code, req_domain, audit=audit, generation_mode="multi_step"
+            )
+
+        structure = (
+            "다음 절 구성을 그대로 따르고 절 제목을 본문에 그대로 쓴다.\n"
+            + "\n".join(
+                f"{i}) {sec['heading']} — {sec['intent']}"
+                for i, sec in enumerate(sections, start=1)
+            )
+        )
+        doc_type_override = ""
+        if isinstance(outline_parsed, dict):
+            doc_type_override = str(
+                outline_parsed.get("document_type", "") or ""
+            ).strip()
+
+        doc = self._generate_single(
+            req,
+            grade_code,
+            req_domain,
+            structure_override=structure,
+            doc_type_override=doc_type_override,
+            audit=audit,
+            step="body",
+            generation_mode="multi_step",
+        )
+        if doc.parse_error or not doc.body:
+            return doc
+
+        critique_parsed, _ = self._call_json(
+            CRITIQUE_TEMPLATE.format(title=doc.title, body=doc.body),
+            system=CRITIQUE_SYSTEM_PROMPT,
+            schema=CRITIQUE_JSON_SCHEMA,
+            max_output_tokens=min(max_output_tokens, 1200),
+            step="critique",
+            audit=audit,
+        )
+        issues: list[str] = []
+        if isinstance(critique_parsed, dict):
+            raw_issues = critique_parsed.get("issues")
+            if isinstance(raw_issues, list):
+                issues = [str(x).strip() for x in raw_issues if str(x).strip()]
+        if not issues:
+            doc.critique_issues = []
+            return doc
+
+        revised = self._generate_single(
+            req,
+            grade_code,
+            req_domain,
+            structure_override=structure,
+            revision_override="\n".join(f"- {issue}" for issue in issues),
+            doc_type_override=doc_type_override,
+            audit=audit,
+            step="revise",
+            generation_mode="multi_step",
+        )
+        # 수정본이 깨졌으면 검토 전 본문을 쓴다 — 검토가 결과를 나쁘게 만들면 안 된다.
+        if revised.parse_error or not revised.body:
+            doc.critique_issues = issues
+            return doc
+        revised.critique_issues = issues
+        return revised
+
+    def generate_one(self, req: SynthRequest) -> SynthDoc:
+        grade_code = (
+            req.target_grade.value
+            if hasattr(req.target_grade, "value")
+            else str(req.target_grade)
+        )
+        req_domain = canonical_domain(req.domain)
+        multi = self.multi_step if req.multi_step is None else bool(req.multi_step)
+        if multi:
+            return self._generate_multi_step(req, grade_code, req_domain)
+        return self._generate_single(req, grade_code, req_domain)
+
     def generate(self, req: SynthRequest) -> list[SynthDoc]:
-        return [self.generate_one(req) for _ in range(req.count)]
+        """count 건을 만든다.
+
+        concurrency 가 1 이면 종전과 완전히 같은 순차 생성이다. 2 이상이면 그만큼을
+        동시에 보낸다 — **순서는 유지된다**(executor.map). 순서가 흔들리면 같은 요청을
+        두 번 돌렸을 때 산출물 비교가 안 된다.
+
+        ⚠ 동시성을 올린다고 늘 빨라지지 않는다. GPU 1장에 모델 서버가 겹쳐 있으면
+        오히려 느려진다(2026-09-10 211 실측: vLLM·Ollama 동거 시 0.78 tokens/sec).
+        올리기 전에 그 서버에서 건당 소요를 먼저 잰다.
+        """
+        count = max(0, int(req.count))
+        if count == 0:
+            return []
+        workers = min(self.concurrency, count)
+        if workers <= 1:
+            return [self.generate_one(req) for _ in range(count)]
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            return list(pool.map(lambda _: self.generate_one(req), range(count)))
 
 
 def _fallback_body(grade_code: str, domain: str) -> str:

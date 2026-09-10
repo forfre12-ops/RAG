@@ -97,7 +97,13 @@ class NoopProvider:
         system: str | None = None,
         max_tokens: int = 1024,
         temperature: float = 0.7,  # noqa: ARG002
+        json_schema: dict | None = None,
     ) -> LLMResponse:
+        """json_schema 는 받되 쓰지 않는다 — 이 provider 의 출력은 이미 고정 JSON 이다.
+
+        인자를 받는 이유는 호출부의 능력 탐지(generate 시그니처에 json_schema 가 있는가)
+        때문이다. 받지 않으면 CI 가 구조화 출력 경로를 한 번도 밟지 않는다.
+        """
         start = time.perf_counter()
         domain = _infer_domain(prompt)
         title = _DOMAIN_TITLES.get(domain, "내부 보고서")
@@ -128,7 +134,11 @@ class NoopProvider:
                 cost_usd=estimate_cost_usd(self.model, in_tok, out_tok),
                 latency_ms=int((time.perf_counter() - start) * 1000),
             ),
-            meta={"deterministic": True, "domain": domain},
+            meta={
+                "deterministic": True,
+                "domain": domain,
+                "json_schema": bool(json_schema),
+            },
         )
 
     def count_tokens(self, text: str) -> int:

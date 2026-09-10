@@ -98,7 +98,19 @@ class LocalOpenAIProvider:
         system: Optional[str] = None,
         max_tokens: int = 1024,
         temperature: float = 0.7,
+        json_schema: Optional[dict] = None,
     ) -> LLMResponse:
+        """json_schema 를 주면 서버에 구조화 출력(response_format)을 요구한다.
+
+        종전에는 프롬프트로 "JSON 만 출력하라"고 부탁만 했고, 모델이 인사말·코드펜스를
+        덧붙이면 호출부가 파싱에 실패해 재시도했다. 스키마를 넘기면 서버(vLLM guided
+        decoding · OpenAI json_schema)가 틀 밖 토큰 자체를 만들지 않는다.
+
+        ⚠ 지원 여부는 **서버 구현·버전**에 달렸다. 지원하지 않으면 400 등으로 실패하는데,
+        이 어댑터는 실패를 예외로 올리지 않고 success=False 응답으로 돌려주므로 호출부가
+        스키마 없이 다시 부를 수 있다(generator 가 그렇게 한다). 어느 쪽이었는지는
+        meta["json_schema"] 로 남는다.
+        """
         start = time.perf_counter()
 
         # Qwen3 thinking 토글
@@ -122,6 +134,18 @@ class LocalOpenAIProvider:
             if "qwen" in self.model.lower():
                 extra["think"] = bool(self.enable_thinking)
 
+            # 구조화 출력 — OpenAI 호환 서버 공통 형식.
+            kwargs: dict = {}
+            if json_schema:
+                kwargs["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "synthetic_document",
+                        "schema": json_schema,
+                        "strict": True,
+                    },
+                }
+
             # 작업 #18: 429/5xx/타임아웃/연결 오류에 full-jitter 지수 백오프 재시도.
             resp = retry_with_backoff(
                 lambda: self._client.chat.completions.create(
@@ -130,6 +154,7 @@ class LocalOpenAIProvider:
                     max_tokens=max_tokens,
                     temperature=temperature,
                     extra_body=extra or None,
+                    **kwargs,
                 ),
                 is_retryable=_is_retryable,
                 max_retries=self._max_retries,
@@ -156,6 +181,7 @@ class LocalOpenAIProvider:
                     "thinking": self.enable_thinking,
                     "endpoint": "local_openai",
                     "finish_reason": finish_reason,
+                    "json_schema": bool(json_schema),
                 },
             )
         except Exception as exc:  # noqa: BLE001
@@ -171,7 +197,7 @@ class LocalOpenAIProvider:
                     success=False,
                     error_code=type(exc).__name__,
                 ),
-                meta={"error": str(exc)},
+                meta={"error": str(exc), "json_schema": bool(json_schema)},
             )
 
     def count_tokens(self, text: str) -> int:

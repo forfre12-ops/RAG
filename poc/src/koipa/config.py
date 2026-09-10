@@ -395,6 +395,21 @@ class Settings(BaseSettings):
     local_llm_api_key: str = "EMPTY"   # vLLM은 EMPTY, Ollama는 ollama, LM Studio는 lm-studio
     local_llm_enable_thinking: bool = False  # Qwen3 /think 지시어
 
+    # ── 합성 생성(M1) 3설정 — 2026-09-10 신설 ─────────────────────────────────
+    # [1] 구조화 출력. 프롬프트로 "JSON 으로 답해라" 부탁하는 대신 서버에 JSON 스키마를
+    #     넘겨 그 틀 밖의 토큰을 못 만들게 한다. 지원하지 않는 서버(구형 vLLM·Ollama,
+    #     anthropic 어댑터)면 자동으로 종전 프롬프트 방식으로 내려간다 — 끌 이유가 없어
+    #     기본 True 다. 실패 시 폴백은 SynthDoc.response_audit 에 남는다.
+    synth_structured_output: bool = True
+    # [2] 배치 동시 생성 수. 1 이면 종전과 완전히 같은 순차 생성이다.
+    #     ⚠ 기본값을 1 로 두는 것은 안전해서가 아니라 **아직 안 재봤기 때문**이다.
+    #     GPU 1장에 vLLM·Ollama 가 겹쳐 있으면(2026-09-10 211 사례) 올릴수록 느려진다.
+    #     올리기 전에 그 서버에서 건당 소요를 재고 값을 정한다.
+    synth_generate_concurrency: int = 1
+    # [3] 다단계 생성(개요→본문→자체검토→수정). False 면 종전과 같은 1회 호출이다.
+    #     켜면 문서 1건당 LLM 호출이 3~4회로 늘어난다 — 비용·시간이 그만큼 는다.
+    synth_multi_step: bool = False
+
     # 하위호환 alias (vllm_*) — 기존 코드·테스트가 참조 중
     vllm_base_url: str = "http://localhost:8001/v1"
     vllm_model: str = "Qwen/Qwen3-14B"
@@ -939,6 +954,17 @@ class Settings(BaseSettings):
     def _check_auth_mode(cls, v: str) -> str:
         if v.lower() not in _VALID_AUTH_MODE:
             raise ValueError(f"auth_mode는 {sorted(_VALID_AUTH_MODE)} 중 하나여야 합니다 (got {v!r}).")
+        return v
+
+    # 동시 생성 수는 서버 부하와 직결된다 — 오타로 0·음수·과대값이 들어가면 기동에서 막는다.
+    # 0/음수면 ThreadPoolExecutor 가 죽거나 아무것도 안 만든다(조용한 0건 생성).
+    @field_validator("synth_generate_concurrency")
+    @classmethod
+    def _check_synth_generate_concurrency(cls, v: int) -> int:
+        if not 1 <= v <= 32:
+            raise ValueError(
+                f"synth_generate_concurrency는 1 이상 32 이하여야 합니다 (got {v})."
+            )
         return v
 
     @field_validator("llm_provider")

@@ -218,7 +218,8 @@ def _persist_synth_samples(
             _pv_body = _pv_outline = _pv_qc = None
             try:
                 from koipa.modules.m1_synthesis.generator import (  # noqa: PLC0415
-                    GRADE_SITUATION_PROMPTS, SYSTEM_PROMPT,
+                    GRADE_SITUATION_PROMPTS, OUTLINE_SYSTEM_PROMPT,
+                    OUTLINE_TEMPLATE, SYSTEM_PROMPT,
                     body_prompt_version, outline_prompt_version,
                 )
 
@@ -235,8 +236,13 @@ def _persist_synth_samples(
                     created_by="worker", notes="내용 해시 자동 등록",
                 )
                 if _pv_outline != _pv_body:
+                    # [2026-09-10] 개요 단계가 자기 프롬프트를 갖게 됐다(다단계 생성).
+                    # 종전에는 두 값이 같아 이 가지가 돌지 않았고, 그래서 template 에
+                    # 본문 프롬프트가 들어가 있어도 티가 안 났다 — 이제 개요 프롬프트를
+                    # 등록한다. 여기에 본문 것을 넣으면 버전 해시와 내용이 어긋난다.
                     synth_repo.upsert_prompt(
-                        _pv_outline, chain_stage="outline", template=_tpl,
+                        _pv_outline, chain_stage="outline",
+                        template=OUTLINE_SYSTEM_PROMPT + "\n\n" + OUTLINE_TEMPLATE,
                         created_by="worker", notes="내용 해시 자동 등록",
                     )
                 synth_repo.upsert_prompt(
@@ -312,7 +318,14 @@ def _persist_synth_samples(
                     parse_error=getattr(d, "parse_error", None),
                     quality_score=_q_score,
                     quality_report=_q_report,
-                    outline_prompt_version=_pv_outline,
+                    # 개요 버전은 **개요 단계를 실제로 거친 문서에만** 남긴다.
+                    # 단발 생성은 개요 프롬프트를 부른 적이 없다 — 값을 채우면
+                    # "이 프롬프트로 만들었다"는 거짓 기록이 된다.
+                    outline_prompt_version=(
+                        _pv_outline
+                        if str(getattr(d, "generation_mode", "single")) == "multi_step"
+                        else None
+                    ),
                     body_prompt_version=_pv_body,
                     qc_prompt_version=_pv_qc,
                 )
@@ -404,6 +417,12 @@ def synthesize_batch(
                     )
                 ) from exc
         gen = SyntheticDocGenerator(llm=_llm)
+        # 어느 설정으로 만들었는지 남긴다. 설정이 꺼져 있는데 켜진 줄 알고 결과를 읽는
+        # 사고를 막는다 — 켜도 무동작인 플래그를 '안전'으로 읽은 전례가 있다(2026-09-10).
+        logger.info(
+            "synth 생성 설정: 구조화출력=%s · 동시성=%d · 다단계=%s (job_id=%s)",
+            gen.structured_output, gen.concurrency, gen.multi_step, job_id,
+        )
         docs = gen.generate(SynthRequest(target_grade=grade, domain=domain, count=count))
         partial = [
             {
