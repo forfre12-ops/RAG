@@ -160,14 +160,18 @@ KPIS: list[KPI] = [
     # full(uvicorn workers)에서는 ≥ 0.5 도달 가능, 합격선 별도 상향 검토 필요
     KPI("S11.5", "S11", "단계 확장성 (scaling efficiency)", "ratio", "ge", 0.15, "last"),
     # PER-002 자원 사용률 상한 — 부하 중 시스템 사용률 피크(max)가 임계 미만이어야 한다.
-    # CPU<90%·MEM<70% (RFP 협의 조절 가능). psutil 부재/미측정이면 harness 가 SKIP 처리
+    # RFP 원문(제안요청서 21쪽 PER-002): "시스템 메모리는 최대 부하 시점에서도 90% 이상 사용되지
+    # 않아야 함" · "시스템 백그라운드 작업을 위하여 CPU는 70% 이하로 사용해야 함"
+    # (보호원과 사업자 협의로 조절 가능). ⚠ 2026-09-11 이전 판은 두 값을 **뒤바꿔** CPU 90 ·
+    # MEM 70 으로 적고 있었다 — CPU 85% 를 통과로, MEM 80% 를 미달로 판정했다.
+    # psutil 부재/미측정이면 harness 가 SKIP 처리
     # (무데이터 false-PASS 아님). dryrun(TestClient)에선 부하가 가벼워 낮게 측정 — 실 판정은
     # full 모드(테스트서버 uvicorn workers) 실측치가 근거.
     # full_only: dryrun 은 TestClient in-process 라 부하가 개발 머신·CI 러너의 다른 작업과
     # 섞인다. 2026-08-16 실측에서 유휴 16코어 노트북조차 peak 100% 를 찍었다 — 이 값으로
     # CI 를 막으면 임계를 올리라는 압력만 생기고, 그러면 실서버의 진짜 초과를 못 잡는다.
-    KPI("S11.6", "S11", "CPU 사용률 peak (PER-002)", "%", "le", 90, "max", core=True, full_only=True),
-    KPI("S11.7", "S11", "MEM 사용률 peak (PER-002)", "%", "le", 70, "max", core=True, full_only=True),
+    KPI("S11.6", "S11", "CPU 사용률 peak (PER-002)", "%", "le", 70, "max", core=True, full_only=True),
+    KPI("S11.7", "S11", "MEM 사용률 peak (PER-002)", "%", "lt", 90, "max", core=True, full_only=True),
 
     # S13(멀티 테넌트 격리) 제거: 격리는 KL 포털 전담 — 단일 고객사 엔진이라 시나리오·KPI 불요.
 
