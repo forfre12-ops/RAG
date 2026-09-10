@@ -581,11 +581,16 @@ def _hwp_tables_via_hwpx_convert(p: Path) -> tuple[str, list, bytes]:
         # blob 을 함께 돌려준다 — 회수 뒤 남은 미회수 셀이 있는지 **같은 바이트로** 다시
         # 대조해야 한다(호출부 참조). 다시 변환하면 비용도 들고 결과가 달라질 수 있다.
         return _tables_to_text(tables), tables, blob
-    except Exception:  # noqa: BLE001 — 변환 실패가 추출 전체를 막지 않는다
+    except Exception as exc:  # noqa: BLE001 — 변환 실패가 추출 전체를 막지 않는다
         # [2026-09-07] 종전 주석은 '이 모듈엔 logger 가 없다' 였는데 지금은 있다(19행).
         #   그 낡은 한 줄 때문에 표 회수 실패가 계속 조용했다. 표 셀에 든 영업비밀이
         #   본문에 없으면 분류기가 못 보고 저등급으로 미탐한다 — 회수가 실패했다는
         #   사실은 남겨야 그 자리를 의심할 수 있다.
+        # [2026-09-10] 그 주석이 적어 둔 것을 실제로 한다. 검수 라우팅은 위쪽 얇은-본문
+        #   가드가 이미 맡으므로(함수 docstring) 여기서는 **왜** 실패했는지만 남긴다 —
+        #   HWP3 는 이 변환이 유일한 표 회수 경로라 원인을 모르면 고칠 수가 없다.
+        logger.warning("HWP→HWPX 변환 표 회수 실패: %s (%s: %s)",
+                       p.name, type(exc).__name__, exc)
         return "", [], b""
 
 
@@ -886,7 +891,11 @@ def _docx_ooxml_extras(p: Path, warnings: list[str]) -> list[str]:
                     if text:
                         extras.append(f"[{name}:textbox]\n{text}")
                         _warn_once(warnings, "docx_textboxes_extracted")
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        # 글상자·머리말 같은 '본문 밖' 텍스트를 일부만 건진 채 조용히 끝났다.
+        # 그 안에 내용이 있으면 본문은 얇지 않은데 실질 내용이 빠진다 —
+        # _guard_thin_body 가 못 잡는 모양이라 여기서 말해야 한다.
+        _warn_once(warnings, f"docx_extras_scan_failed:{type(exc).__name__}")
         return extras
     return extras
 
@@ -937,7 +946,14 @@ def _docx_ooxml_tables(p: Path, warnings: list[str]) -> list[ExtractedTable]:
                                 table_index=len(tables) + 1,
                             )
                         )
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        # [2026-09-10] 종전에는 여기서 **조용히** 그때까지 모은 표만 돌려줬다. 표를 3개 중
+        # 1개만 건지고도 경고가 없어, 표 안에 있던 영업비밀이 본문에 없으면 그대로 낮은
+        # 등급으로 떨어진다(무음 미탐 — 이 파일 ExtractResult.table_coverage 주석이 말하는
+        # 바로 그 경로다). 동작은 그대로 두고 **흔적만** 남긴다. 이 경고가
+        # table_incomplete 를 만들고 검수 라우팅으로 이어진다
+        # (settings.extraction_table_coverage_review 기본 True).
+        _warn_once(warnings, f"docx_table_scan_failed:{type(exc).__name__}")
         return tables
     if tables:
         _warn_once(warnings, "docx_ooxml_tables_extracted")
@@ -961,7 +977,11 @@ def _docx_ooxml_text(p: Path, warnings: list[str]) -> str:
                 text = _xml_text(zf.read(name).decode("utf-8", errors="replace"))
                 if text:
                     lines.extend(text.splitlines())
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        # 빈 문자열을 돌려주면 호출부(1023행)가 "OOXML 보강이 없었다"로 읽고 넘어간다.
+        # 본문을 python-docx 가 이미 뽑아 둔 경우 _guard_thin_body 도 안 걸리므로
+        # 이 실패는 어디에도 안 남았다.
+        _warn_once(warnings, f"docx_ooxml_text_failed:{type(exc).__name__}")
         return ""
     text = "\n".join(line for line in lines if line.strip())
     return text
@@ -1045,7 +1065,10 @@ def _excel_auxiliary_texts(path: str, warnings: list[str]) -> list[str]:
         from openpyxl import load_workbook  # type: ignore
 
         wb = load_workbook(path, read_only=False, data_only=False)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        # 여는 것부터 실패 — 주석·하이퍼링크·수식을 **하나도** 못 본다.
+        # 위 _excel_* 경고들은 zip 목록만 보고 붙으므로 이 실패와 무관하게 남는다.
+        _warn_once(warnings, f"excel_aux_open_failed:{type(exc).__name__}")
         return parts
     try:
         for ws in wb.worksheets:
@@ -1061,7 +1084,10 @@ def _excel_auxiliary_texts(path: str, warnings: list[str]) -> list[str]:
                     if isinstance(cell.value, str) and cell.value.startswith("="):
                         parts.append(f"[excel formula {coord}] {cell.value}")
                         _warn_once(warnings, "excel_formulas_extracted")
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        # 순회 중 끊겼다 — 앞 시트는 건졌고 뒤 시트는 못 봤다. 부분 손실이라
+        # parts 가 비어 있지 않아 "정상"처럼 보인다.
+        _warn_once(warnings, f"excel_aux_scan_failed:{type(exc).__name__}")
         return parts
     finally:
         wb.close()
