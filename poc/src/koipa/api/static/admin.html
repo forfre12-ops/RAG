@@ -2860,7 +2860,7 @@ async function saveGrades(){
     GRADE_ROWS=rows; GRADE_LOADED_CODES=codes;
     syncActiveGrades(codes);
     $('grade-result').innerHTML = d.requires_retraining
-      ? `<div class="warnbox"><b>재학습 필요</b> — version ${esc(d.version)} · 사유: ${esc(d.reason)}<br/>등급 구조가 바뀌었습니다. 배포 모델은 <b>재학습 전까지 기존 라벨</b>로 추론합니다. 「모델」 탭에서 <b>3 재학습 트리거 → 4 모델 서빙·배포</b> 순서로 진행하세요.</div>`
+      ? `<div class="warnbox"><b>재학습 필요</b> — version ${esc(d.version)} · 사유: ${esc(d.reason)}<br/>${d.serving_impact ? `<b>분류기 영향</b> — ${esc(d.serving_impact)}<br/>` : ''}등급 구조가 바뀌었습니다. 지금 떠 있는 서버는 <b>재기동·모델 리로드 전까지</b> 기존 모델로 추론합니다. 「모델」 탭에서 <b>3 재학습 트리거 → 4 모델 서빙·배포</b> 순서로 진행하세요.</div>`
       : `<div class="kv"><div><span>저장됨</span> <b>version ${esc(d.version)}</b></div><div><span>재학습</span> <b>불필요</b></div><div><span>사유</span> <b>${esc(d.reason)}</b></div></div>`;
     $('grade-info').textContent=`저장 완료 · 활성 ${rows.length}개`;
     log(`등급체계 저장: ${codes.join(', ')} · requires_retraining=${d.requires_retraining}`, d.requires_retraining?'info':'ok');
