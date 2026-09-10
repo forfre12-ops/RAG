@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 import uuid
 from typing import Callable, Optional
@@ -33,7 +34,50 @@ from koipa.services.job_store import get_default_store
 logger = logging.getLogger(__name__)
 
 
+# [2026-09-11] 브로커 확인 결과를 잠깐 저장한다 (PER-002 "등록 3초 이내").
+#
+# 종전에는 비동기 요청마다 브로커에 TCP 연결을 새로 시도했다(0.5초 제한). 브로커가 살아 있으면
+# 즉시 붙어 비용이 없지만, **죽어 있으면 요청마다 0.5초**를 기다린 뒤 in-process 로 떨어진다.
+# localhost 가 ::1·127.0.0.1 두 주소로 풀리면 두 번 기다려 약 1초다(실측 1,020~1,080ms, Windows).
+# 등록 여유 3초의 3분의 1을 요청마다 깎아 먹는 셈이다.
+#
+# 결과(가용·불가 둘 다)를 _DISPATCH_TTL_S 동안 재사용한다. 짧게 두는 이유: 브로커가 죽은 직후에도
+# 저장된 값이 '가용'이면 발사가 실패한다 — 그때 호출부는 in-process 로 폴백하고
+# invalidate_dispatch_cache() 로 값을 즉시 버린다. 되살아난 브로커는 늦어도 TTL 뒤에 다시 쓴다.
+# 시험 환경(TESTING/PYTEST) 판정은 저장보다 먼저 한다 — 저장된 값이 시험 사이로 새지 않게.
+_DISPATCH_TTL_S = 10.0
+_dispatch_cache: dict = {"at": None, "value": False}
+_dispatch_lock = threading.Lock()
+
+
+def invalidate_dispatch_cache() -> None:
+    """저장해 둔 브로커 확인 결과를 버린다 — 다음 호출이 다시 확인한다."""
+    with _dispatch_lock:
+        _dispatch_cache["at"] = None
+
+
 def _celery_dispatch_available() -> bool:
+    """브로커로 발사해도 되는가 — 확인 결과를 _DISPATCH_TTL_S 동안 재사용한다.
+
+    판정 조건 자체는 _probe_broker_uncached() 에 있다(시험 환경 · eager · 브로커 연결).
+    """
+    if os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return False
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
+    now = time.monotonic()
+    with _dispatch_lock:
+        at = _dispatch_cache["at"]
+        if at is not None and now - at < _DISPATCH_TTL_S:
+            return bool(_dispatch_cache["value"])
+    value = _probe_broker_uncached()
+    with _dispatch_lock:
+        _dispatch_cache["at"] = time.monotonic()
+        _dispatch_cache["value"] = value
+    return value
+
+
+def _probe_broker_uncached() -> bool:
     """실 Celery 브로커로 task.delay()를 발사해도 안전한지 런타임 감지.
 
     Top-7 배선: submit()이 영구 'queued' 거짓표기·in-process 동기실행에 머물지 않고,
@@ -127,6 +171,8 @@ class AsyncClassifyService:
                     "celery enqueue failed for async classify — falling back to in-process: job_id=%s",
                     job_id, exc_info=True,
                 )
+                # 발사가 실패했으면 저장해 둔 '가용' 판정은 틀린 것이다 — 다음 요청이 다시 확인한다.
+                invalidate_dispatch_cache()
         # PoC/테스트/브로커 미가용: 즉시 in-process 실행 (Celery 발사 대신)
         callback_payload: dict
         try:
