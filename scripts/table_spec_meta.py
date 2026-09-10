@@ -262,7 +262,7 @@ COLS = {
     },
     "tb_training_runs": {
         "run_id": "학습 실행 PK",
-        "model_version": "이 실행이 만든 모델 버전",
+        "model_version_id": "이 실행이 만든 모델 버전(tb_model_versions 참조)",
         "mlflow_run_id": "MLflow 실험 추적 ID",
         "status": "실행 상태 — queued · running · done · failed",
         "started_at": "시작 시각",

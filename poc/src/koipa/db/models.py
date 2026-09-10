@@ -80,7 +80,7 @@ class ClassificationLevel(Base):
     color_hex: Mapped[str | None] = mapped_column(String(7), default="#808080", server_default=text("'#808080'"))
     loss_weight: Mapped[float | None] = mapped_column(Numeric(4, 2), default=1.0, server_default=text("1.0"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     created_by: Mapped[str | None] = mapped_column(String(50))
 
@@ -98,7 +98,7 @@ class EvaluationFactor(Base):
     description: Mapped[str | None] = mapped_column(Text)
     weight: Mapped[float] = mapped_column(Numeric(3, 2), nullable=False, default=0.25, server_default=text("0.25"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -113,7 +113,7 @@ class LevelKeyword(Base):
     weight: Mapped[float | None] = mapped_column(Numeric(3, 2), default=1.0, server_default=text("1.0"))
     source: Mapped[str | None] = mapped_column(String(30), default="manual", server_default=text("'manual'"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
         Index("idx_lk_level_active", "level_id", "is_active"),
@@ -228,7 +228,9 @@ class DocumentLabel(Base):
     level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     labeled_by: Mapped[str] = mapped_column(String(30), nullable=False)
     labeler_id: Mapped[str | None] = mapped_column(String(50))
-    confidence: Mapped[float | None] = mapped_column(Numeric(3, 2))
+    # [2026-09-10] (3,2)→(5,4). 같은 이름의 tb_classifications.confidence 와 정밀도를 맞춘다
+    # (감리 도표 75 · migration 5c1d9e0a7b34).
+    confidence: Mapped[float | None] = mapped_column(Numeric(5, 4))
     total_score: Mapped[float | None] = mapped_column(Numeric(4, 2))
     notes: Mapped[str | None] = mapped_column(Text)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
@@ -309,7 +311,7 @@ class ClassificationEvidence(Base):
     excerpt_start: Mapped[int | None] = mapped_column(Integer)
     excerpt_end: Mapped[int | None] = mapped_column(Integer)
     contribution: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
         Index("idx_ce_classification", "classification_id"),
@@ -348,7 +350,7 @@ class ModelVersion(Base):
     rolled_back_from: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
     rollback_reason: Mapped[str | None] = mapped_column(Text)
     level_snapshot: Mapped[dict | None] = mapped_column(_JSON_PORTABLE)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
         Index("idx_mv_active", "active_key", unique=True),
@@ -360,7 +362,13 @@ class TrainingRun(Base):
     __tablename__ = "tb_training_runs"
 
     run_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    model_version: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
+    # [2026-09-10] DB 칼럼명만 model_version_id 로 바꿨다(migration 5c1d9e0a7b34).
+    # tb_classifications.model_version 은 모델 **라벨 문자열**인데 여기는 tb_model_versions 를
+    # 가리키는 **UUID FK** 라 같은 이름에 뜻·형식이 달랐다. 파이썬 속성명은 그대로 두어
+    # 호출부와 API 응답은 바뀌지 않는다.
+    model_version: Mapped[uuid.UUID | None] = mapped_column(
+        "model_version_id", Uuid(as_uuid=True), ForeignKey("tb_model_versions.version_id")
+    )
     mlflow_run_id: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(20), default="queued", server_default=text("'queued'"))
     started_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
@@ -377,11 +385,12 @@ class TrainingRun(Base):
     trigger_type: Mapped[str | None] = mapped_column(String(30), default="manual", server_default=text("'manual'"))
     trigger_ref: Mapped[str | None] = mapped_column(String(100))
     error_message: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by: Mapped[str | None] = mapped_column(String(50))
 
     __table_args__ = (
-        Index("idx_tr_model", "model_version"),
+        # 인덱스 칼럼은 DB 칼럼명으로 찾는다(파이썬 속성명 model_version 이 아니다).
+        Index("idx_tr_model", "model_version_id"),
         Index("idx_tr_status", "status"),
         Index("idx_tr_date", desc("started_at")),
         # N4 신규 — list_recent_runs() ORDER BY created_at DESC hot path
@@ -470,7 +479,7 @@ class PromptVersion(Base):
     prompt_version: Mapped[str] = mapped_column(String(30), primary_key=True)
     chain_stage: Mapped[str] = mapped_column(String(20), nullable=False)
     template: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by: Mapped[str | None] = mapped_column(String(50))
     notes: Mapped[str | None] = mapped_column(Text)
 
@@ -506,7 +515,7 @@ class SampleDocument(Base):
     reviewed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     rejection_reason: Mapped[str | None] = mapped_column(Text)
 
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
         Index("idx_sd_status", "review_status"),
@@ -636,7 +645,7 @@ class SampleDatasetMembership(Base):
     # 어느 생성 작업에서 나온 문서인가. 단발 호출·옛 행은 NULL.
     synth_job_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True))
     created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
     __table_args__ = (
