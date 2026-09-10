@@ -100,8 +100,10 @@ _S2_STRONG_RISK_RE = re.compile(
 
 
 from koipa.modules.m3_labeling.rule_engine import (  # noqa: E402
+    _ICD_MARKING_TO_M,
     grade_from_svm as _grade_from_svm,
     management_from_metadata_dict as _management_from_metadata_dict,
+    marking_from_document as _marking_from_document,
 )
 
 
@@ -857,11 +859,16 @@ class InferencePipeline:
         # 메타데이터 오류/부재는 silent 폴백(기존 동작 보존). source_prior(하향) 다음에 적용.
         try:
             from koipa.config import settings as _ms  # noqa: PLC0415
-            if getattr(_ms, "metadata_floor_enabled", False) and metadata:
+            # [2026-09-10] `and metadata` 를 뺐다. 종전에는 메타데이터가 아예 없으면 이
+            # 블록이 통째로 안 돌았는데, 아래 **문서에 찍힌 보안표시** 경로는 메타데이터가
+            # 없을 때가 오히려 본무대다(실 공급이 0 건이라 그 경우가 전부다). 메타데이터
+            # 부재 시 mark·scope 는 빈 문자열이 되어 floor·conflict 는 종전처럼 무동작이다.
+            if getattr(_ms, "metadata_floor_enabled", False):
                 from koipa.modules.m3_labeling.seeds import GRADE_ORDER as _ORD  # noqa: PLC0415
+                md = metadata if isinstance(metadata, dict) else {}
                 cur = result.label.value if hasattr(result.label, "value") else str(result.label)
-                mark = str(metadata.get("security_marking", "") or "").strip().lower()
-                scope = str(metadata.get("access_scope", "") or "").strip().lower()
+                mark = str(md.get("security_marking", "") or "").strip().lower()
+                scope = str(md.get("access_scope", "") or "").strip().lower()
                 _MARK = {"top_secret": "TS", "secret": "S1", "confidential": "S2"}
                 if mark in _MARK and _ORD[_MARK[mark]] < _ORD.get(cur, 99):
                     floor_code = _MARK[mark]
@@ -895,7 +902,16 @@ class InferencePipeline:
                 # ⚠ 여기서 등급은 바꾸지 않는다. 배포본은 **등급 우선·요소 후행** 구조라
                 #   (모델이 등급을 내고 요소를 거기 맞춘다) M 을 등급에 바로 물리면 하향
                 #   경로가 열린다. 요소 우선 경로는 v8 서빙 게이트가 담당한다.
-                m_state, m_lv, m_reason = _management_from_metadata_dict(metadata)
+                m_state, m_lv, m_reason = _management_from_metadata_dict(md)
+                if m_state == "unknown":
+                    # [문서에 찍힌 보안표시] 메타데이터가 M 을 안 주면 문서에서 읽는다.
+                    # ICD §3.2 가 규정한 값이고 매핑도 이미 있다 — 없던 것은 읽는 경로뿐이었다.
+                    # 머리말·꼬리말 구간만 본다(본문 언급은 표시가 아니다 · 2026-07-01 과분류).
+                    # 등급은 여기서도 바꾸지 않는다. 메타데이터로 온 표시만 floor 를 갖는다 —
+                    # KL 이 단언한 값과 우리가 읽어낸 값은 근거의 무게가 다르다.
+                    _code, _why = _marking_from_document(text)
+                    if _code:
+                        m_state, m_lv, m_reason = "present", _ICD_MARKING_TO_M[_code], _why
                 if m_state != "unknown" and result.factors is not None:
                     try:
                         cur_m = int(float(getattr(result.factors, "management", 0)))

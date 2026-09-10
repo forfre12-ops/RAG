@@ -224,6 +224,79 @@ def validate_icd_metadata(metadata: object) -> list[str]:
     return warns
 
 
+# ── 보안표시를 문서에서 직접 읽는다 ─────────────────────────────────────────
+# 왜 필요한가. M 의 정본 입력은 ICD §3.2·§3.3 인데 실제 공급이 0 건이다(전 데이터셋
+# 432,820행 · scripts/measure_management_input_gap.py). 그래서 KL 이 아무것도 안 보내도
+# 채울 수 있는 경로를 하나 연다 — **문서에 찍힌 보안표시**다. ICD §3.2 가 이미 규정한
+# 값이고, 매핑(_ICD_MARKING_TO_M)도 이미 있다. 없던 것은 문서에서 읽는 경로뿐이다.
+#
+# ⚠ **본문 전체를 보면 안 된다.** _MANAGEMENT_MARKING_TERMS 를 등급 시드로 승격했다가
+#   S3 문서가 본문에서 "사외비"를 언급했다는 이유로 TS 로 올라간 실측이 있다(2026-07-01).
+#   보안규정 안내문은 대외비를 *설명*하지 *찍혀 있지* 않다. 둘을 가르는 것이 **위치**다.
+#
+# 그래서 머리말·꼬리말 구간만 본다. 추출기가 그 구간을 라벨로 표시해 둔다
+#   [docx section 1 header] · [word/header1.xml:textbox] 등 (m2_preprocess/extractor.py)
+# 라벨이 없는 형식(HWP 는 rhwp 가 평문으로 덤프한다)은 **구간을 모르므로 추측하지 않는다.**
+# 모르는 것을 아는 척하면 위 과분류가 그대로 돌아온다.
+_MARKING_REGION_RE = re.compile(
+    r"^\[(?:docx section \d+ (?:first_page_|even_page_)?(?:header|footer)"
+    r"|word/(?:header|footer)\d*\.xml(?::textbox)?)\]\s*$",
+    re.IGNORECASE,
+)
+_ANY_REGION_RE = re.compile(r"^\[[^\]]{1,80}\]\s*$")
+
+# 표기 어휘 → ICD §3.2 코드. 긴 것부터 본다 — "특급기밀" 이 "기밀" 로 잡히면 등급이 내려간다.
+_MARKING_TEXT_TO_ICD: tuple[tuple[str, str], ...] = (
+    ("특급기밀", "top_secret"), ("극비", "top_secret"),
+    ("eyes-only", "top_secret"), ("eyes only", "top_secret"), ("top secret", "top_secret"),
+    ("1급 비밀", "secret"), ("1급비밀", "secret"), ("기밀", "secret"),
+    ("classified", "secret"), ("confidential", "secret"),
+    ("대외비", "confidential"), ("사외비", "confidential"),
+    ("내부한정", "confidential"), ("사내한정", "confidential"),
+    ("내부 전용", "confidential"), ("사내 전용", "confidential"),
+    ("취급주의", "confidential"), ("restricted", "confidential"),
+    ("internal only", "confidential"),
+)
+
+
+def marking_regions(text: str) -> list[str]:
+    """머리말·꼬리말 구간의 텍스트만 뽑는다. 라벨이 없으면 빈 목록."""
+    if not text:
+        return []
+    out: list[str] = []
+    buf: list[str] = []
+    inside = False
+    for line in text.splitlines():
+        if _ANY_REGION_RE.match(line):
+            if buf:
+                out.append("\n".join(buf))
+                buf = []
+            inside = bool(_MARKING_REGION_RE.match(line))
+            continue
+        if inside and line.strip():
+            buf.append(line)
+    if buf:
+        out.append("\n".join(buf))
+    return out
+
+
+def marking_from_document(text: str) -> tuple[str | None, str]:
+    """문서에 **찍힌** 보안표시 → ICD §3.2 코드. 못 읽으면 (None, 사유).
+
+    반환 코드는 `_ICD_MARKING_TO_M` 의 키와 같으므로 그대로 M 으로 옮길 수 있다.
+    구간 라벨이 없는 형식(HWP 등)은 `(None, "marking_regions_unavailable")` 이다 —
+    '표시가 없다'와 '읽을 수 없다'는 다른 사실이라 호출부가 갈라 쓸 수 있어야 한다.
+    """
+    regions = marking_regions(text)
+    if not regions:
+        return None, "marking_regions_unavailable"
+    blob = "\n".join(regions).lower()
+    for term, code in _MARKING_TEXT_TO_ICD:
+        if term in blob:
+            return code, f"document_marking:{term}"
+    return None, "no_marking_in_regions"
+
+
 def management_from_metadata_dict(metadata: object) -> tuple[str, int | None, str]:
     """classify 요청의 metadata dict 에서 바로 뽑는 편의 함수."""
     if not isinstance(metadata, dict):
