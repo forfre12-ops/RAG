@@ -178,7 +178,7 @@ class KeywordAdminService:
                     from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS  # noqa: PLC0415
 
                     warnings.append(
-                        f"tb_level_keywords is empty — serving rule engine is running on "
+                        f"tad_gm_grd_kywd_mng(등급키워드관리) is empty — serving rule engine is running on "
                         f"{len(KEYWORD_SEEDS)} built-in code seeds. 첫 키워드 추가 시 코드 시드가 "
                         f"DB로 자동 승격됩니다."
                     )
@@ -342,7 +342,7 @@ class KeywordAdminService:
             inserted += 1
         db.flush()
         logger.warning(
-            "keyword admin: DB was empty — promoted %d code seeds to tb_level_keywords "
+            "keyword admin: DB was empty — promoted %d code seeds to tad_gm_grd_kywd_mng "
             "before first admin insert (rule-engine seed cliff guard)",
             inserted,
         )

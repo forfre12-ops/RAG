@@ -134,7 +134,7 @@ COMMON = [
     ]),
     ("M08", "데이터 로깅 · 모니터링 (원시 · 학습데이터)", "code", "", [
         ("감사 체인(변조 탐지)", ["audit_chain"], ["src/koipa/services"]),
-        ("학습 이력 적재", ["tb_training_runs"], ["src/koipa", "scripts"]),
+        ("학습 이력 적재", ["tad_lm_lrn_excn_mng"], ["src/koipa", "scripts"]),
     ]),
     ("M09", "AI시스템 로깅 · 모니터링 (입 · 출력)", "code", "", [
         ("감사 미들웨어", ["AuditMiddleware"], ["src/koipa/api"]),
@@ -212,7 +212,7 @@ COMMON = [
     ]),
     ("M26", "AI모델 복구", "code", "", [
         ("백업 · 복구 도구", ["backup_dr"], ["scripts"]),
-        ("모델 버전 이력", ["tb_model_versions", "model_version"], ["src/koipa"]),
+        ("모델 버전 이력", ["tad_mm_mdl_ver_mng", "model_version"], ["src/koipa"]),
     ]),
     ("M27", "요청속도 제한", "code", "", [
         ("요청 속도 제한기", ["slowapi", "RateLimitExceeded"], ["src/koipa/api"]),

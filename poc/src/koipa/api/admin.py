@@ -520,7 +520,7 @@ def purge_demo_data() -> DemoPurgeResponse:
 
     warnings: list[str] = []
     counts = {"documents": 0, "classifications": 0, "chunks": 0}
-    _sub = "SELECT doc_id FROM tb_documents WHERE created_by = :marker"
+    _sub = "SELECT doc_id FROM tad_dm_doc_mng WHERE creatr_id = :marker"
     _m = {"marker": DEMO_CREATED_BY}
 
     # [SEC-4] blast-radius 안전캡 — 삭제 전에 스코프 규모만 읽는다. 데모 규모를 크게 넘으면
@@ -529,7 +529,7 @@ def purge_demo_data() -> DemoPurgeResponse:
     with session_scope() as db:
         n_scoped = int(
             db.execute(
-                _sql("SELECT count(*) FROM tb_documents WHERE created_by = :marker"), _m
+                _sql("SELECT count(*) FROM tad_dm_doc_mng WHERE creatr_id = :marker"), _m
             ).scalar()
             or 0
         )
@@ -549,11 +549,11 @@ def purge_demo_data() -> DemoPurgeResponse:
 
     # 관계형 물리삭제 — 원자적(하나라도 실패하면 전체 롤백).
     relational = [
-        ("classifications", f"DELETE FROM tb_classifications WHERE doc_id IN ({_sub})"),
-        (None, f"DELETE FROM tb_training_datasets WHERE doc_id IN ({_sub})"),
-        (None, f"DELETE FROM tb_sample_documents WHERE doc_id IN ({_sub})"),
-        ("chunks", f"DELETE FROM tb_chunks WHERE doc_id IN ({_sub})"),
-        ("documents", "DELETE FROM tb_documents WHERE created_by = :marker"),
+        ("classifications", f"DELETE FROM tad_cm_clsf_rslt_mng WHERE doc_id IN ({_sub})"),
+        (None, f"DELETE FROM tad_lm_lrn_datst_mng WHERE doc_id IN ({_sub})"),
+        (None, f"DELETE FROM tad_sm_syn_doc_mng WHERE doc_id IN ({_sub})"),
+        ("chunks", f"DELETE FROM tad_cm_chnk_mng WHERE doc_id IN ({_sub})"),
+        ("documents", "DELETE FROM tad_dm_doc_mng WHERE creatr_id = :marker"),
     ]
     with session_scope() as db:
         for key, stmt in relational:

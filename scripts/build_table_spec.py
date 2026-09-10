@@ -578,6 +578,8 @@ LAYOUT = [
     ("tb_guides", 3, 120),
     ("tb_advisory_locks", 3, 160),
 ]
+# [2026-09-11] 표준 명명 — 위 배치는 옛 물리명으로 적어 두었다. models.py 의 새 이름으로 옮긴다.
+LAYOUT = [(META.RENAMED_TABLES.get(n, n), c, y) for n, c, y in LAYOUT]
 
 
 def build_erd(tables: list[dict]) -> str:

@@ -35,10 +35,12 @@ from koipa.db import session_scope
 logger = logging.getLogger(__name__)
 
 # (부모 테이블, RANGE 파티션 키 컬럼) — baseline_init의 PARTITION BY RANGE 정의와 일치.
+# [2026-09-11] 표준 명명(migration 7b3e9d2a4f10). 자식 이름이 `부모_YYYY_MM` 이라 그 판이
+# 기존 자식도 새 부모 이름으로 바꿔 두었다 — 여기만 바꾸면 이미 있는 월을 다시 만들려다 겹친다.
 PARTITIONED_TABLES: list[tuple[str, str]] = [
-    ("tb_chunks", "created_at"),
-    ("tb_llm_usage", "called_at"),
-    ("tb_audit_log", "occurred_at"),
+    ("tad_cm_chnk_mng", "crt_dt"),
+    ("tad_lm_llm_usqty_mng", "clot_dt"),
+    ("tad_am_adt_log_mng", "ocrn_dt"),
 ]
 
 

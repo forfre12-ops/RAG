@@ -35,13 +35,14 @@ def to_db() -> int:
     try:
         engine = create_engine(settings.database_url, pool_pre_ping=True)
         with engine.begin() as conn:
-            # 실 스키마는 tb_ 접두(db/models.py·alembic baseline). 무접두는 존재하지 않아
-            # seed --db 가 UndefinedTable 로 조용히 exit 2 하던 잠복 버그 — ORM 테이블명과 정합.
+            # 실 스키마 이름은 db/models.py 의 __tablename__ 과 같아야 한다 — 무접두 이름을 쓰던
+            # 시절 seed --db 가 UndefinedTable 로 조용히 exit 2 하던 잠복 버그가 있었다.
+            # [2026-09-11] 표준 명명(7b3e9d2a4f10) — 대응표는 koipa/db/standard_names.py.
             level_map = dict(
-                conn.execute(text("SELECT level_code, level_id FROM tb_classification_levels")).all()
+                conn.execute(text("SELECT grd_cd, grd_sn FROM tad_cm_clsf_grd_mng")).all()
             )
             factor_map = dict(
-                conn.execute(text("SELECT factor_code, factor_id FROM tb_evaluation_factors")).all()
+                conn.execute(text("SELECT rqmt_cd, rqmt_sn FROM tad_em_evl_rqmt_mng")).all()
             )
 
             inserted = 0
@@ -54,7 +55,7 @@ def to_db() -> int:
                 conn.execute(
                     text(
                         """
-                        INSERT INTO tb_level_keywords (level_id, keyword, pattern_type, factor_id, weight, source)
+                        INSERT INTO tad_gm_grd_kywd_mng (grd_sn, kywd_nm, ptn_type_nm, rqmt_sn, wgvl_cfc, src_nm)
                         VALUES (:level_id, :keyword, :pattern_type, :factor_id, :weight, 'seed_v1')
                         """
                     ),

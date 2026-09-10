@@ -71,6 +71,12 @@ LOGICAL = {
     "tb_llm_usage": "LLM 사용량",
     "tb_advisory_locks": "동시성 잠금",
 }
+# [2026-09-11] 표준 명명 — 위 논리명은 옛 물리명으로 적어 두었다. models.py 의 새 이름으로 옮긴다.
+# 대응표 정본은 koipa/db/standard_names.py(migration 7b3e9d2a4f10).
+sys.path.insert(0, str(_ROOT / "src"))
+from koipa.db.standard_names import TABLES as _STD_TABLES  # noqa: E402
+
+LOGICAL = {_STD_TABLES.get(k, (k,))[0]: v for k, v in LOGICAL.items()}
 
 # 외래키 제약은 없으나 논리적으로 참조하는 관계. FK 목록에는 안 잡히지만 관계는 실재한다.
 #

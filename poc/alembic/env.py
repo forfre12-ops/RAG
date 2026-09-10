@@ -49,7 +49,8 @@ target_metadata = Base.metadata
 # CI 는 파티션이 없는 새 DB 라 통과해서 여태 드러나지 않았다. 즉 게이트가 **실환경에서는
 # 쓸 수 없는 상태**였다.
 # 부모 테이블(PARTITIONED_TABLES)은 그대로 비교 대상이라 실제 스키마 드리프트는 계속 잡힌다.
-_PARTITION_PARENTS = ("tb_chunks", "tb_llm_usage", "tb_audit_log")
+# [2026-09-11] 표준 명명(7b3e9d2a4f10) — 부모·자식 이름이 함께 바뀌었다.
+_PARTITION_PARENTS = ("tad_cm_chnk_mng", "tad_lm_llm_usqty_mng", "tad_am_adt_log_mng")
 # 실측(2026-08-11) 자식 테이블 접미사는 월(YYYY_MM)과 catch-all(default) 두 가지뿐이다.
 _PARTITION_SUFFIX = re.compile(r"_(?:\d{4}_\d{2}|default)$")
 
@@ -61,13 +62,15 @@ _PARTITION_SUFFIX = re.compile(r"_(?:\d{4}_\d{2}|default)$")
 # [2026-09-09] tb_rag_* 두 표는 폐기됐고(a3b4c5d6e7f8), 대신 tb_document_vectors 가 들어왔다.
 #   ORM 밖에 두는 이유는 같다 — `vector(1024)` 타입을 SQLAlchemy 코어로 표현할 수 없다.
 #   ORM 에 없으면 autogenerate 가 "모델에 없는 표"로 보고 DROP 을 만들어 낸다.
-_MIGRATION_ONLY_TABLES = frozenset({"tb_rag_aliases", "tb_rag_vectors", "tb_document_vectors"})
+#   [2026-09-11] tb_document_vectors → tad_dm_doc_vctr_mng (표준 명명).
+_MIGRATION_ONLY_TABLES = frozenset({"tb_rag_aliases", "tb_rag_vectors", "tad_dm_doc_vctr_mng"})
 
 # DB 가 계산하는 생성 컬럼(GENERATED ALWAYS AS ... STORED). ORM 은 의도적으로 선언하지 않는다
 # — 쓰기 대상이 아니기 때문이고, models.py 에도 그렇게 적혀 있다. autogenerate 는 그 의도를
 # 알 수 없어 "모델에 없는 컬럼"으로 보고 drop 하려 든다.
 # 실측(2026-08-11): tb_llm_usage.total_tokens = GENERATED ALWAYS AS (input_tokens + output_tokens).
-_GENERATED_COLUMNS = frozenset({("tb_llm_usage", "total_tokens")})
+# [2026-09-11] 표준 명명 후 = tad_lm_llm_usqty_mng.whol_tkn_cnt(전체토큰수).
+_GENERATED_COLUMNS = frozenset({("tad_lm_llm_usqty_mng", "whol_tkn_cnt")})
 
 
 def _is_runtime_partition(name: str) -> bool:

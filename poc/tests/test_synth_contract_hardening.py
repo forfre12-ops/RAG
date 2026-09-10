@@ -117,7 +117,8 @@ def test_dataset_membership_is_append_only():
     """
     from koipa.db.models import SampleDatasetMembership, SampleDocument  # noqa: PLC0415
 
-    cols = {c.name for c in SampleDatasetMembership.__table__.columns}
+    # 파이썬 속성명으로 본다 — DB 칼럼명은 표준 이름(syn_doc_id·datst_ver_nm·syn_job_id)이다.
+    cols = {a.key for a in SampleDatasetMembership.__mapper__.column_attrs}
     assert {"sample_id", "dataset_version", "synth_job_id"} <= cols
     # 덮어쓰던 칼럼은 되돌렸다 — 남겨 두면 표와 어느 쪽이 진실인지 갈린다.
     assert not hasattr(SampleDocument, "added_to_dataset_version")

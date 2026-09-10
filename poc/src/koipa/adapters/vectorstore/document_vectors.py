@@ -91,15 +91,15 @@ class DocumentVectorStore:
             )
         stmt = text(
             """
-            INSERT INTO tb_document_vectors
-                   (doc_id, embedding, model, chunk_count, content_sha256)
+            INSERT INTO tad_dm_doc_vctr_mng
+                   (doc_id, embd_vctr_cn, embd_mdl_nm, chnk_cnt, mtxt_hash_cn)
             VALUES (:doc_id, CAST(:emb AS vector), :model, :n, :sha)
             ON CONFLICT (doc_id) DO UPDATE SET
-                   embedding      = EXCLUDED.embedding,
-                   model          = EXCLUDED.model,
-                   chunk_count    = EXCLUDED.chunk_count,
-                   content_sha256 = EXCLUDED.content_sha256,
-                   created_at     = now()
+                   embd_vctr_cn = EXCLUDED.embd_vctr_cn,
+                   embd_mdl_nm  = EXCLUDED.embd_mdl_nm,
+                   chnk_cnt     = EXCLUDED.chnk_cnt,
+                   mtxt_hash_cn = EXCLUDED.mtxt_hash_cn,
+                   crt_dt       = now()
             """
         )
         with self._engine.begin() as conn:
@@ -113,7 +113,7 @@ class DocumentVectorStore:
         soft delete 정리처럼 문서는 남기고 벡터만 뺄 때 쓴다."""
         with self._engine.begin() as conn:
             conn.execute(
-                text("DELETE FROM tb_document_vectors WHERE doc_id = :d"),
+                text("DELETE FROM tad_dm_doc_vctr_mng WHERE doc_id = :d"),
                 {"d": str(doc_id)},
             )
 
@@ -126,7 +126,7 @@ class DocumentVectorStore:
         """
         with self._engine.connect() as conn:
             row = conn.execute(
-                text("SELECT content_sha256 FROM tb_document_vectors WHERE doc_id = :d"),
+                text("SELECT mtxt_hash_cn FROM tad_dm_doc_vctr_mng WHERE doc_id = :d"),
                 {"d": str(doc_id)},
             ).first()
         if row is None:
@@ -141,13 +141,13 @@ class DocumentVectorStore:
         """
         with self._engine.connect() as conn:
             return conn.execute(
-                text("SELECT 1 FROM tb_document_vectors WHERE doc_id = :d"),
+                text("SELECT 1 FROM tad_dm_doc_vctr_mng WHERE doc_id = :d"),
                 {"d": str(doc_id)},
             ).first() is not None
 
     def count(self) -> int:
         with self._engine.connect() as conn:
-            return int(conn.execute(text("SELECT count(*) FROM tb_document_vectors")).scalar_one())
+            return int(conn.execute(text("SELECT count(*) FROM tad_dm_doc_vctr_mng")).scalar_one())
 
     def similar(self, doc_id: str, *, k: int = 5, verified_only: bool = False) -> list[SimilarDocument]:
         """기준 문서와 비슷한 문서 상위 k건 — 확정 등급을 함께 돌려준다.
@@ -162,19 +162,19 @@ class DocumentVectorStore:
         stmt = text(
             f"""
             SELECT d.doc_id::text          AS doc_id,
-                   d.filename              AS filename,
-                   (v.embedding <=> q.embedding)::float8 AS distance,
-                   cl.level_code           AS grade,
-                   COALESCE(l.is_verified, FALSE) AS is_verified,
-                   l.verified_at           AS verified_at
-              FROM tb_document_vectors v
-              JOIN tb_documents  d  ON d.doc_id = v.doc_id
-              JOIN tb_document_vectors q ON q.doc_id = :doc_id
-              LEFT JOIN tb_document_labels l ON l.doc_id = v.doc_id
-              LEFT JOIN tb_classification_levels cl ON cl.level_id = l.level_id
+                   d.file_nm               AS filename,
+                   (v.embd_vctr_cn <=> q.embd_vctr_cn)::float8 AS distance,
+                   cl.grd_cd               AS grade,
+                   COALESCE(l.vrfc_cmptn_yn, FALSE) AS is_verified,
+                   l.vrfc_dt               AS verified_at
+              FROM tad_dm_doc_vctr_mng v
+              JOIN tad_dm_doc_mng  d  ON d.doc_id = v.doc_id
+              JOIN tad_dm_doc_vctr_mng q ON q.doc_id = :doc_id
+              LEFT JOIN tad_dm_doc_lbl_mng l ON l.doc_id = v.doc_id
+              LEFT JOIN tad_cm_clsf_grd_mng cl ON cl.grd_sn = l.grd_sn
              WHERE v.doc_id <> :doc_id
-               AND d.deleted_at IS NULL        -- soft delete 는 CASCADE 가 안 잡는다
-               {"AND COALESCE(l.is_verified, FALSE) = TRUE" if verified_only else ""}
+               AND d.del_dt IS NULL        -- soft delete 는 CASCADE 가 안 잡는다
+               {"AND COALESCE(l.vrfc_cmptn_yn, FALSE) = TRUE" if verified_only else ""}
              ORDER BY distance
              LIMIT :k
             """

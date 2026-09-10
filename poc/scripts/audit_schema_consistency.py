@@ -16,8 +16,10 @@ NOT NULL 불일치(13건) 등을 지적했다(인쇄 71·72~79쪽). 그런데 �
     R5  논리명 미기술 컬럼
     R6  정의서 밖 테이블 — 마이그레이션이 raw SQL 로 만들어 models.py 에 없는 테이블
 
-논리명 = scripts/table_spec_meta.py 의 설명에서 첫 구분자(' — ' · '. ' · '(' · ',') 앞부분.
-출처 = models.py(build_table_spec.parse_models 로 읽는다) + table_spec_meta + alembic/versions.
+논리명 = koipa/db/standard_names.py 의 칼럼 논리명(표준용어집 용어). [2026-09-11] 표준 명명
+       (migration 7b3e9d2a4f10) 전에는 scripts/table_spec_meta.py 설명의 첫 구분자 앞부분을 썼다
+       — 그 사전은 옛 이름이 키라 새 이름으로는 찾지 못한다(찾지 못하면 전 칼럼이 R5 로 셈).
+출처 = models.py(build_table_spec.parse_models 로 읽는다) + standard_names + alembic/versions.
 
 ⚠ 규칙 위반이 곧 결함은 아니다. 같은 이름이 뜻이 다른 경우(예: weight)는 이름을 바꿀지
   사람이 정한다. 이 도구는 세기만 한다.
@@ -40,8 +42,13 @@ from pathlib import Path
 _POC = Path(__file__).resolve().parents[1]
 _ROOT = _POC.parent
 sys.path.insert(0, str(_ROOT / "scripts"))
+sys.path.insert(0, str(_POC / "src"))
 
 import build_table_spec as B  # noqa: E402
+from koipa.db.standard_names import TABLES as STD_TABLES, logical_names  # noqa: E402
+
+# 옛 표 이름 → 표준 표 이름. 7b3e9d2a4f10 은 이름을 f-문자열 반복문으로 바꿔 정규식으로 못 읽는다.
+_RENAMED = {old: new for old, (new, _) in STD_TABLES.items()}
 
 _SEP = re.compile(r"\s+—\s+|\.\s|\(|,")
 _CREATE = re.compile(r"CREATE TABLE(?: IF NOT EXISTS)?\s+([a-z_][a-z0-9_]*)|op\.create_table\(\s*[\"']([a-z_][a-z0-9_]*)")
@@ -89,6 +96,7 @@ def _alembic_live_tables() -> tuple[set[str], set[str]]:
 
 def audit() -> dict:
     tables = B.parse_models()
+    ln = logical_names()
     by_id_names: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     by_name_ids: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     by_id_types: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
@@ -99,7 +107,7 @@ def audit() -> dict:
         for c in t["cols"]:
             ncols += 1
             cid, where = c["name"], t["name"]
-            name = logical(B.col_desc(where, c))
+            name = ln.get(where, ("", {}))[1].get(cid, "")
             if not name:
                 missing.append(f"{where}.{cid}")
             else:
@@ -113,10 +121,20 @@ def audit() -> dict:
 
     created, dropped = _alembic_live_tables()
     spec = {t["name"] for t in tables}
-    live = (created - dropped) - spec
-    # 월별·기본 파티션 자식(tb_chunks_2026_05 · tb_audit_log_default …)은 부모 테이블의 일부다.
-    # 정의서는 부모를 적으므로 밖에 있는 테이블로 세지 않는다.
     part = re.compile(r"^(.+)_(?:\d{4}_\d{2}|default)$")
+
+    def _now(n: str) -> str:
+        """옛 이름을 표준 이름으로 — 파티션 자식은 부모 접두만 바꾼다(7b3e9d2a4f10 과 같은 규칙)."""
+        if n in _RENAMED:
+            return _RENAMED[n]
+        m = part.match(n)
+        if m and m.group(1) in _RENAMED:
+            return _RENAMED[m.group(1)] + n[len(m.group(1)):]
+        return n
+
+    live = {_now(n) for n in (created - dropped)} - spec
+    # 월별·기본 파티션 자식(tad_cm_chnk_mng_2026_05 · tad_am_adt_log_mng_default …)은 부모
+    # 테이블의 일부다. 정의서는 부모를 적으므로 밖에 있는 테이블로 세지 않는다.
     partitions = sorted(n for n in live if (m := part.match(n)) and m.group(1) in spec)
     outside = sorted(live - set(partitions))
     r = {

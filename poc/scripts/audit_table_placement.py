@@ -161,7 +161,7 @@ def main():
     print()
     print("게이트 뜻 — train/synth/golden 은 모델공장(지재원) 쪽으로 기운다는 신호일 뿐")
     print("           배치를 결정하지는 않는다. runtime 은 어느 노드에서나 돈다.")
-    print("한 표의 근거를 보려면: --table tb_training_runs")
+    print("한 표의 근거를 보려면: --table tad_lm_lrn_excn_mng")
     return 0
 
 

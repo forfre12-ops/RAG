@@ -43,7 +43,8 @@ def check_postgres() -> CheckResult:
     # 실제 스키마 테이블명은 tb_ 접두어다(예: tb_documents). 과거의 'documents'/'classifications'/
     # 'model_versions' 는 존재하지 않는 이름이었고 'tenants' 는 테넌트 전면 제거로 드롭됐다 —
     # 그래서 이 검사가 정상 배포에서도 항상 0/4 로 FAIL 했다(무의미한 alarm).
-    core = ("tb_documents", "tb_classifications", "tb_model_versions", "tb_audit_log")
+    # [2026-09-11] 표준 명명(7b3e9d2a4f10) — 문서·분류결과·모델버전·감사로그 표.
+    core = ("tad_dm_doc_mng", "tad_cm_clsf_rslt_mng", "tad_mm_mdl_ver_mng", "tad_am_adt_log_mng")
     try:
         engine = create_engine(url, pool_pre_ping=True)
         with engine.connect() as conn:

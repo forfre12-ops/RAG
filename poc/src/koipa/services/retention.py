@@ -37,11 +37,11 @@ from koipa.db import session_scope
 logger = logging.getLogger(__name__)
 
 # (표, 시간 칼럼, 보존기간 설정 키) — 시간축 선두 인덱스가 있어야 DELETE 가 스캔을 피한다.
-#   tb_audit_log  idx_audit_occurred (occurred_at, audit_id)
-#   tb_llm_usage  idx_lu_called      (called_at)
+#   tad_am_adt_log_mng    idx_audit_occurred (ocrn_dt, adt_sn)
+#   tad_lm_llm_usqty_mng  idx_lu_called      (clot_dt)
 RETAINED_TABLES: list[tuple[str, str, str]] = [
-    ("tb_audit_log", "occurred_at", "retention_audit_log_days"),
-    ("tb_llm_usage", "called_at", "retention_llm_usage_days"),
+    ("tad_am_adt_log_mng", "ocrn_dt", "retention_audit_log_days"),
+    ("tad_lm_llm_usqty_mng", "clot_dt", "retention_llm_usage_days"),
 ]
 
 

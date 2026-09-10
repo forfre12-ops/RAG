@@ -159,8 +159,9 @@ def run(dry: bool = False) -> int:
         if not ok or not doc_id:
             return 1
 
-        n = _count("SELECT COUNT(*) FROM tb_documents WHERE doc_id = :d", d=_uuid32(doc_id))
-        step("① DB 저장 (tb_documents)", n == 1, "행 %d" % n)
+        # [2026-09-11] 표 이름은 표준 명명(7b3e9d2a4f10) — 대응표는 koipa/db/standard_names.py.
+        n = _count("SELECT COUNT(*) FROM tad_dm_doc_mng WHERE doc_id = :d", d=_uuid32(doc_id))
+        step("① DB 저장 (tad_dm_doc_mng)", n == 1, "행 %d" % n)
 
         # ── ② 분류 ──────────────────────────────────────────────────────
         r = cli.post(
@@ -175,8 +176,8 @@ def run(dry: bool = False) -> int:
         if not ok:
             return 1
 
-        n = _count("SELECT COUNT(*) FROM tb_classifications WHERE doc_id = :d", d=_uuid32(doc_id))
-        step("② DB 저장 (tb_classifications)", n >= 1, "행 %d · status=%s" % (n, cls.get("status")))
+        n = _count("SELECT COUNT(*) FROM tad_cm_clsf_rslt_mng WHERE doc_id = :d", d=_uuid32(doc_id))
+        step("② DB 저장 (tad_cm_clsf_rslt_mng)", n >= 1, "행 %d · status=%s" % (n, cls.get("status")))
 
         # ── ③ 검수 큐 ────────────────────────────────────────────────────
         r = cli.get("/api/v1/review-queue?limit=200", headers=_hdr())
@@ -201,39 +202,37 @@ def run(dry: bool = False) -> int:
         step("④ 최종 확정", ok, "%s %s" % (r.status_code, str(r.text)[:70]))
         if ok:
             n = _count(
-                "SELECT COUNT(*) FROM tb_classifications "
-                "WHERE doc_id = :d AND status = 'confirmed'", d=_uuid32(doc_id))
+                "SELECT COUNT(*) FROM tad_cm_clsf_rslt_mng "
+                "WHERE doc_id = :d AND clsf_stts_nm = 'confirmed'", d=_uuid32(doc_id))
             step("④ DB 반영 (status=confirmed)", n >= 1, "행 %d" % n)
 
         # ── ⑤ 책임 추적 — 두 층을 각각 본다 ─────────────────────────────
         # [2026-09-06 실측] 감사 설계가 2층이다. 한 층만 보고 "안 남았다"고 하면 오판이다
         # (이 하니스가 처음에 그렇게 오판했다).
         #
-        #   tb_audit_log    **요청 단위** 접근 기록(action·actor·success·시각).
-        #                   ⚠ target_id 는 18,598행 중 486행(2.6%)만 채워진다 — action 은
+        #   tad_am_adt_log_mng  **요청 단위** 접근 기록(수행동작·행위자·성공여부·발생일시).
+        #                   ⚠ trgt_id 는 18,598행 중 486행(2.6%)만 채워진다 — 수행동작은
         #                   라우트 접두이고 개체 식별자는 대개 안 적는다. 그래서 "이 문서를
         #                   누가 만졌나"는 이 테이블만으로는 못 답한다.
-        #   tb_corrections  **개체 단위** 확정·교정 기록(classification_id·corrected_by).
-        #
-        # ⚠ 테이블 이름은 단수 `tb_audit_log` 다(복수로 쓰면 ProgrammingError).
+        #   tad_cm_crct_mng     **개체 단위** 확정·교정 기록(clsf_id·clbtr_id).
         try:
             n = _count(
-                "SELECT COUNT(*) FROM tb_corrections c "
-                "JOIN tb_classifications x ON c.classification_id = x.classification_id "
+                "SELECT COUNT(*) FROM tad_cm_crct_mng c "
+                "JOIN tad_cm_clsf_rslt_mng x ON c.clsf_id = x.clsf_id "
                 "WHERE x.doc_id = :d", d=_uuid32(doc_id))
-            step("⑤ 개체 단위 책임추적 (tb_corrections)", n >= 1, "행 %d" % n)
+            step("⑤ 개체 단위 책임추적 (tad_cm_crct_mng)", n >= 1, "행 %d" % n)
         except Exception as exc:  # noqa: BLE001
-            step("⑤ 개체 단위 책임추적 (tb_corrections)", False, "조회 실패 %s" % type(exc).__name__)
+            step("⑤ 개체 단위 책임추적 (tad_cm_crct_mng)", False, "조회 실패 %s" % type(exc).__name__)
 
         try:
             n = _count(
-                "SELECT COUNT(*) FROM tb_audit_log "
-                "WHERE actor_id = :a AND action IN ('documents','classify','confirm')",
+                "SELECT COUNT(*) FROM tad_am_adt_log_mng "
+                "WHERE actr_id = :a AND flfmt_bhvr_cd IN ('documents','classify','confirm')",
                 a="e2e-runner")
-            step("⑤ 요청 단위 접근기록 (tb_audit_log)", n >= 3,
+            step("⑤ 요청 단위 접근기록 (tad_am_adt_log_mng)", n >= 3,
                  "행 %d (documents·classify·confirm)" % n)
         except Exception as exc:  # noqa: BLE001
-            step("⑤ 요청 단위 접근기록 (tb_audit_log)", False, "조회 실패 %s" % type(exc).__name__)
+            step("⑤ 요청 단위 접근기록 (tad_am_adt_log_mng)", False, "조회 실패 %s" % type(exc).__name__)
 
         # ── ⑥ 골든셋 후보 ────────────────────────────────────────────────
         r = cli.get("/api/v1/golden/candidates?limit=5", headers=_hdr())

@@ -53,7 +53,7 @@ def main(argv=None) -> int:
         "--stamp",
         action="store_true",
         help=(
-            "방출한 판 이름을 연결 표(tb_sample_dataset_membership)에 append-only 로 "
+            "방출한 판 이름을 연결 표(tad_sm_syn_datst_cpst_mng 합성데이터셋구성관리)에 append-only 로 "
             "기록한다. '이 문서가 어느 셋들에 들어갔나'를 되짚기 위한 것이며 학습을 "
             "돌리지는 않는다. 칼럼 되쓰기가 아니라 행 추가라 재방출해도 앞선 판이 남는다."
         ),

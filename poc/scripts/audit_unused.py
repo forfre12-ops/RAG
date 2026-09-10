@@ -87,13 +87,18 @@ EXPLAINED_COLS = {
     "model_type": "server_default 'classifier' — 코드가 넣는 값이 하나뿐이고 읽지 않는다(기록용)",
     "split_method": "실 데이터에 값이 있어 보류(2026-08-29 판단 유지)",
 }
+# [2026-09-11] 키는 models.py 의 __tablename__ — 표준 명명(7b3e9d2a4f10) 이후 이름. 옛 이름은 주석.
 EXPLAINED_TABLES = {
-    "tb_evaluation_factors": "판정 요건(S·V·M) 시드 표 — alembic 이 채우고 런타임은 읽기만",
+    # tb_evaluation_factors
+    "tad_em_evl_rqmt_mng": "판정 요건(S·V·M) 시드 표 — alembic 이 채우고 런타임은 읽기만",
     # [2026-09-05] 해소됨 — 워커가 적재 전에 upsert_prompt() 로 등록하고 sample 행이
     # 외래키로 참조한다(쓰기 1 · 읽기 1). 예외 목록에 남겨 두면 이력을 잃으므로 사유만 고친다.
-    "tb_prompt_versions": "합성 프롬프트 버전 — 워커가 등록하고 sample 행이 FK 로 참조(2026-09-05 배선)",
-    "tb_advisory_locks": "잠금 행 — 마이그레이션이 미리 넣고 런타임은 FOR UPDATE 로 잡기만",
-    "tb_document_factor_scores": "쓰기·읽기 0 · 실 DB 0행 — 정의서에서도 뺐다(EXCLUDED_TABLES)",
+    # tb_prompt_versions
+    "tad_pm_prmpt_ver_mng": "합성 프롬프트 버전 — 워커가 등록하고 sample 행이 FK 로 참조(2026-09-05 배선)",
+    # tb_advisory_locks
+    "tad_sy_lck_mng": "잠금 행 — 마이그레이션이 미리 넣고 런타임은 FOR UPDATE 로 잡기만",
+    # tb_document_factor_scores
+    "tad_dm_doc_rqmt_scr_mng": "쓰기·읽기 0 · 실 DB 0행 — 정의서에서도 뺐다(EXCLUDED_TABLES)",
 }
 
 

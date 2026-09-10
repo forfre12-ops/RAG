@@ -156,12 +156,14 @@ class TestCorrectionsConsumed:
         # corrections 테이블에 해당하는 ORM 클래스 찾기 (__tablename__ = 'corrections')
         cls = None
         for name, obj in inspect.getmembers(db_models):
-            if inspect.isclass(obj) and getattr(obj, "__tablename__", None) == "tb_corrections":
+            # [2026-09-11] 표준 명명 — tb_corrections → tad_cm_crct_mng.
+            if inspect.isclass(obj) and getattr(obj, "__tablename__", None) == "tad_cm_crct_mng":
                 cls = obj
                 break
         assert cls is not None, "corrections 테이블 매핑 ORM 클래스 미발견"
 
-        cols = {c.name for c in cls.__table__.columns}
+        # 파이썬 속성명으로 본다 — DB 칼럼명은 표준 이름(rflt_lrn_excn_id·rflt_dt)이다.
+        cols = {a.key for a in cls.__mapper__.column_attrs}
         # doc/19 §4 — consumed_in_run 추적이 정확히 존재
         assert "consumed_in_run" in cols, (
             f"corrections에 consumed_in_run 컬럼 없음. cols={sorted(cols)}"

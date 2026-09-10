@@ -55,8 +55,8 @@ def test_retained_tables_have_time_axis_index():
     from koipa.db.models import Base
 
     expected = {
-        "tb_audit_log": "idx_audit_occurred",
-        "tb_llm_usage": "idx_lu_called",
+        "tad_am_adt_log_mng": "idx_audit_occurred",
+        "tad_lm_llm_usqty_mng": "idx_lu_called",
     }
     for table, col, _key in RETAINED_TABLES:
         t = Base.metadata.tables[table]

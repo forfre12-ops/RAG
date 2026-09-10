@@ -390,3 +390,39 @@ COLS = {
         "registered_at": "등록 시각",
     },
 }
+
+# ── 표준 명명 (2026-09-11) ────────────────────────────────────────────────
+# 위 사전들은 옛 물리명(tb_*)으로 적혀 있다. 사람이 쓴 설명이라 그대로 두고, 생성기가 찾는
+# 이름(models.py 의 표준 물리명)으로 여기서 한 번 옮긴다. 대응표 정본은
+# poc/src/koipa/db/standard_names.py(migration 7b3e9d2a4f10) — 여기서 따로 대응을 들지 않는다.
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "poc" / "src"))
+from koipa.db.standard_names import COLUMNS as _STD_COLS, TABLES as _STD_TABLES  # noqa: E402
+
+RENAMED_TABLES = {old: new for old, (new, _) in _STD_TABLES.items()}
+_RENAMED_COLS = {old: {a: b for a, b, _ in cols} for old, cols in _STD_COLS.items()}
+
+
+def _t(name: str) -> str:
+    return RENAMED_TABLES.get(name, name)
+
+
+def _c(table: str, col: str) -> str:
+    return _RENAMED_COLS.get(table, {}).get(col, col)
+
+
+def _uniform(col: str) -> str:
+    """모든 표에서 같은 표준 이름으로 바뀌는 칼럼만 공통 사전에 옮긴다(description 은 표마다 다르다)."""
+    news = {m[col] for m in _RENAMED_COLS.values() if col in m}
+    return news.pop() if len(news) == 1 else col
+
+
+SOFT_REFS = [(_t(ch), _c(ch, col), _t(pa)) for ch, col, pa in SOFT_REFS]
+EXCLUDED_TABLES = {_t(k): v for k, v in EXCLUDED_TABLES.items()}
+EXCLUDED_COLUMNS = {_t(t): {_c(t, c): v for c, v in cols.items()} for t, cols in EXCLUDED_COLUMNS.items()}
+PLACEMENT = {_t(k): v for k, v in PLACEMENT.items()}
+TABLES = {_t(k): v for k, v in TABLES.items()}
+COMMON = {_uniform(k): v for k, v in COMMON.items()}
+COLS = {_t(t): {_c(t, c): d for c, d in cols.items()} for t, cols in COLS.items()}

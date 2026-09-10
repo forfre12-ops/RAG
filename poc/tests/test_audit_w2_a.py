@@ -283,9 +283,11 @@ def test_mconfirm_latest_confirm_overrides_older_correction():
     class _DB:
         def execute(self, stmt):
             s = str(stmt).lower()
-            if "classification_levels" in s and "corrections" not in s and "classifications" not in s:
+            # [2026-09-11] 표준 명명 — 등급(tad_cm_clsf_grd_mng)·보정(tad_cm_crct_mng)·분류결과
+            # (tad_cm_clsf_rslt_mng). 컴파일된 SQL 의 표 이름으로 가른다.
+            if "tad_cm_clsf_grd_mng" in s and "tad_cm_crct_mng" not in s and "tad_cm_clsf_rslt_mng" not in s:
                 return _Scalars(levels)
-            if "corrections" in s:
+            if "tad_cm_crct_mng" in s:
                 # 최신순 정렬을 흉내 — 실제 쿼리는 corrected_at.desc()
                 ordered = sorted(corrections, key=lambda c: c.corrected_at, reverse=True)
                 return _Scalars(ordered)
@@ -336,9 +338,11 @@ def test_mconfirm_confirm_changes_truth_when_it_differs_from_older():
     class _DB:
         def execute(self, stmt):
             s = str(stmt).lower()
-            if "classification_levels" in s and "corrections" not in s and "classifications" not in s:
+            # [2026-09-11] 표준 명명 — 등급(tad_cm_clsf_grd_mng)·보정(tad_cm_crct_mng)·분류결과
+            # (tad_cm_clsf_rslt_mng). 컴파일된 SQL 의 표 이름으로 가른다.
+            if "tad_cm_clsf_grd_mng" in s and "tad_cm_crct_mng" not in s and "tad_cm_clsf_rslt_mng" not in s:
                 return _Scalars(levels)
-            if "corrections" in s:
+            if "tad_cm_crct_mng" in s:
                 ordered = sorted(corrections, key=lambda c: c.corrected_at, reverse=True)
                 return _Scalars(ordered)
             return _Scalars(classifications)
