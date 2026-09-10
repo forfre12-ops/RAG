@@ -130,6 +130,63 @@ def _only_import_error(handler: ast.ExceptHandler) -> bool:
 
 _METRIC_HINTS = ("prom_metrics", ".inc(", ".labels(", ".observe(", ".set(")
 
+# 변환을 시도하는 것이 곧 검사인 자리 — 파이썬 관용구다.
+#
+# 왜 따로 세는가(2026-09-10 실측). 판정 경로 31건을 전부 열어 보니 13건이 이 모양이었다:
+#
+#     try: return uuid.UUID(value)
+#     except (ValueError, AttributeError): return None
+#     try: Grade(code); return code          # "이 코드가 Grade 에 있나" 를 묻는 것
+#     except ValueError: continue
+#
+# 여기에 로그를 넣으면 정상 동작마다 경고가 찍힌다. 그런데 섞여 있으면 사람이 31건을
+# 한 줄씩 읽어야 하고, 무게가 다른 것이 같은 줄로 보여 무거운 한 건을 놓친다.
+#
+# ⚠ "관용구 = 정상" 이라고 단정하지는 않는다. 구문만으로는 가를 수 없는 짝이 실재한다:
+#
+#     try: self.semantic_threshold = float(env_thr)        # ← 설정을 읽는 변환
+#     except ValueError: self.semantic_threshold = _settings_semantic_threshold()
+#
+# 이것은 모양이 관용구와 같은데 **오타 난 환경변수가 조용히 무시되어 등급이 달라지는**
+# 진짜 결함이었다(rule_engine.py:511, 2026-09-10 수정). 그래서 숨기지 않고 **따로 묶어**
+# 보여 주고, 그 묶음에는 "설정값을 읽는 변환이 섞이면 진짜 결함" 이라는 경고를 붙인다.
+_CONVERSION_EXC = {
+    "ValueError", "TypeError", "AttributeError", "IndexError", "KeyError",
+    "OverflowError", "UnicodeDecodeError", "JSONDecodeError", "json.JSONDecodeError",
+    "StopIteration", "ZeroDivisionError",
+}
+_PROBE_MAX_TRY_SRC = 240   # try 본문이 이보다 길면 '한 값을 변환해 본 것'이 아니다
+
+
+def _handler_exc_names(handler: ast.ExceptHandler) -> list[str]:
+    t = handler.type
+    if t is None:
+        return []                      # bare except — 관용구로 보지 않는다
+    elts = t.elts if isinstance(t, ast.Tuple) else [t]
+    return [ast.unparse(e) for e in elts]
+
+
+def _is_probe(handler: ast.ExceptHandler, try_body: list) -> bool:
+    """'변환을 시도해 본 것' 모양인가 — 좁은 변환 예외 + 폴백 한 줄 + 짧은 try 본문."""
+    names = _handler_exc_names(handler)
+    if not names or not all(n in _CONVERSION_EXC for n in names):
+        return False                   # Exception·bare 를 잡으면 변환 검사가 아니다
+    if len(handler.body) != 1:
+        return False
+    st = handler.body[0]
+    if isinstance(st, (ast.Pass, ast.Continue, ast.Break, ast.Return)):
+        ok = True
+    elif isinstance(st, ast.Assign):
+        ok = True                      # 폴백값 대입 한 줄
+    elif isinstance(st, ast.Expr) and isinstance(st.value, ast.Call):
+        ok = not _is_trace(st)         # labels.append(code) 류. 로그면 애초에 무음이 아니다
+    else:
+        ok = False
+    if not ok:
+        return False
+    src = "\n".join(ast.unparse(s) for s in try_body)
+    return len(src) <= _PROBE_MAX_TRY_SRC and "(" in src
+
 
 def _classify(try_body: list) -> str:
     """try 블록이 무엇을 감쌌는가 — 우선순위를 가르는 것은 이것이다.
@@ -171,7 +228,10 @@ def scan(py: Path) -> list[tuple[int, str, bool]]:
             t = node.type
             label = ast.unparse(t) if t is not None else "bare except"
             # 분류는 **감싼 것**을 보고 정한다 — 핸들러가 아니라 try 본문이다.
-            out.append((node.lineno, label, _only_import_error(node), _classify(tnode.body)))
+            kind = _classify(tnode.body)
+            if kind == "other" and _is_probe(node, tnode.body):
+                kind = "probe"
+            out.append((node.lineno, label, _only_import_error(node), kind))
     return out
 
 
@@ -208,6 +268,9 @@ def main(argv=None) -> int:
     review = [r for r in on_path if r[5] == "other"]
     metric_only = [r for r in on_path if r[5] == "metric"]
     lazy_import = [r for r in on_path if r[5] == "import"]
+    # [2026-09-10] '변환=검사' 관용구. 정상이라고 단정하지 않고 **따로 묶기만** 한다 —
+    # 설정값을 읽는 변환이 이 모양으로 숨는다(_is_probe 주석의 rule_engine 실례).
+    probe = [r for r in on_path if r[5] == "probe"]
 
     print("=" * 74)
     print(" 무음 예외 감사")
@@ -216,6 +279,7 @@ def main(argv=None) -> int:
     print(f"  흔적 없는 핸들러        {len(silent):>5} 개  ({len(silent)/max(total_handlers,1)*100:.1f}%)")
     print(f"    ├ 판정 경로          {len(on_path):>5} 개")
     print(f"    │   ├ 검토 대상      {len(review):>5} 개  <- 등급이 조용히 달라질 수 있는 자리")
+    print(f"    │   ├ 변환=검사      {len(probe):>5} 개     관용구. 대개 정상이나 눈으로 볼 것")
     print(f"    │   ├ 메트릭만       {len(metric_only):>5} 개     증가 실패 — 등급과 무관")
     print(f"    │   └ lazy import   {len(lazy_import):>5} 개     선택 의존성 폴백 — 등급과 무관")
     print(f"    └ 그 밖              {len(silent)-len(on_path):>5} 개")
@@ -225,9 +289,12 @@ def main(argv=None) -> int:
     for d in DECISION_PATH:
         print(f"    {d}")
 
-    # --path 는 **검토 대상만** 보여준다. 메트릭·lazy import 를 섞으면 목록이 길어져
-    # 사람이 안 연다. 전부 보려면 --list 다.
-    show = review if args.path else silent
+    # --path 는 **검토 대상 + 변환=검사**를 보여준다. 메트릭·lazy import 를 섞으면
+    # 목록이 길어져 사람이 안 연다. 전부 보려면 --list 다.
+    #
+    # 변환=검사를 빼지 않고 뒤에 따로 붙이는 이유: 구문만으로는 관용구와 '설정값을 읽는
+    # 변환'을 가를 수 없다. 빼 버리면 진짜 결함이 목록에서 조용히 사라진다.
+    show = (review + probe) if args.path else silent
     if args.list or args.path:
         print("")
         print("-" * 74)
