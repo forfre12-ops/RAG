@@ -71,6 +71,17 @@ def _load_samples_fixture(path: Path, sample_cls) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-dir", default="artifacts/classifier_p1_v5_clean/v-fe4b386b")
+    # [2026-09-10] 요소모델(v8)을 같은 하니스에 물린다. 왜 필요한가 — v8 은 문턱을 풀면
+    # 체계적으로 낮게 본다(실측 reports/FACTOR_THRESHOLD_SWEEP_2026-09-10.json: 자동확정분의
+    # 70.8~91.7% 가 의도등급보다 낮음). "사실이 그대로인데 등급이 내려간다"는 이 모듈의
+    # **순방향 위반** 정의와 같은 것이라, 여기서 재는 것이 맞다.
+    # ⚠ 기본 문턱(0.99)에서는 요소가 거의 전부 unknown → 보수적 완성 → 최고등급이라
+    #   순방향이 **공허 통과**한다(이 모듈 docstring 이 경고하는 바로 그 경우다).
+    #   그래서 kappa 를 낮춰 가며 재야 하고, 역방향을 반드시 같이 본다.
+    ap.add_argument("--factor-model", default="",
+                    help="요소모델 디렉터리. 주면 v5 대신 이 모델로 분류한다")
+    ap.add_argument("--factor-kappa", type=float, default=-1.0, help="미지정=settings 값")
+    ap.add_argument("--factor-tau", type=float, default=-1.0, help="미지정=settings 값")
     ap.add_argument("--provider", default="", help="LLM provider(빈칸=settings.llm_provider). 예: ollama")
     ap.add_argument("--max-anchors", type=int, default=8, help="생성할 고등급 앵커 수(LLM 비용 제어)")
     ap.add_argument("--max-public", type=int, default=20, help="과분류 베이스라인용 공개(S3) 앵커 수")
@@ -121,17 +132,55 @@ def main() -> int:
         provider_name = f"{provider.name}/{getattr(provider, 'model', '?')}"
         n_hi = len(hi)
 
-    model_dir = Path(args.model_dir)
-    if not model_dir.is_absolute():
-        model_dir = _HERE.parent / model_dir
-    pipe = InferencePipeline(model_dir=str(model_dir))
+    if args.factor_model:
+        from koipa.config import settings as _fs  # noqa: PLC0415
+        from koipa.modules.m5_inference.factor_model import (  # noqa: PLC0415
+            apply_serving_gate,
+            get_factor_inference,
+        )
+
+        _kappa = args.factor_kappa if args.factor_kappa >= 0 else _fs.factor_kappa
+        _tau = args.factor_tau if args.factor_tau >= 0 else _fs.factor_tau
+        _fdir = Path(args.factor_model)
+        if not _fdir.is_absolute():
+            _fdir = _HERE.parent / _fdir
+        _inf = get_factor_inference(str(_fdir), base=_fs.factor_model_base,
+                                    max_len=_fs.factor_model_max_len)
+        if not _inf.load():
+            print(f"요소모델 로드 실패: {_inf.load_error}", file=sys.stderr)
+            return 2
+        model_name = f"factor:{_fdir.name} kappa={_kappa} tau={_tau}"
+
+        def predict_rows(rows):
+            # metadata=None · source_is_public=False — 본문만으로 판정한다. 앵커에는 출처
+            # 메타데이터가 없고, 공개 앵커에 layer1 을 태우면 S3 가 공짜로 나와 베이스라인이
+            # 무의미해진다.
+            out = []
+            for r in rows:
+                pred = _inf.predict(r["text"])
+                if pred is None:
+                    out.append({"pred": None})
+                    continue
+                codes, probs = pred
+                fp = apply_serving_gate(codes, probs, metadata=None, tau=_tau, kappa=_kappa)
+                out.append({"pred": fp.serving_grade})
+            return out
+    else:
+        model_dir = Path(args.model_dir)
+        if not model_dir.is_absolute():
+            model_dir = _HERE.parent / model_dir
+        pipe = InferencePipeline(model_dir=str(model_dir))
+        model_name = str(args.model_dir)
+
+        def predict_rows(rows):
+            return predict_via_serving(rows, pipeline=pipe, labels=["TS", "S1", "S2", "S3"])
 
     def classify(samples):
-        """채택된 GeneratedSample 들을 서빙으로 분류 → pred 부착(리스트 of dict)."""
+        """채택된 GeneratedSample 들을 분류 → pred 부착(리스트 of dict)."""
         admitted = [s for s in samples if s.admitted]
         rows = [{"text": s.generated_text, "label": s.anchor_grade} for s in admitted]
-        preds = predict_via_serving(rows, pipeline=pipe, labels=["TS", "S1", "S2", "S3"])
-        return [(s, p["pred"]) for s, p in zip(admitted, preds)]
+        preds = predict_rows(rows)
+        return [(s, p["pred"]) for s, p in zip(admitted, preds) if p["pred"]]
 
     fwd = classify(gen["forward"])
     rev = classify(gen["reverse"])
@@ -143,8 +192,8 @@ def main() -> int:
 
     # 공개(S3) 과분류 베이스라인 — 분류만.
     pub_rows = [{"text": r.text, "label": r.anchor_grade} for r in pub]
-    pub_preds = predict_via_serving(pub_rows, pipeline=pipe, labels=["TS", "S1", "S2", "S3"]) if pub else []
-    public_records = [{"pred": p["pred"]} for p in pub_preds]
+    pub_preds = predict_rows(pub_rows) if pub else []
+    public_records = [{"pred": p["pred"]} for p in pub_preds if p["pred"]]
 
     report = build_metamorphic_report(
         forward_pairs, reverse_pairs=reverse_pairs, public_records=public_records,
@@ -178,7 +227,7 @@ def main() -> int:
     md = [
         "# 메타모픽 최소쌍 회귀 — D (실패만 정보, 통과는 품질 아님)",
         "",
-        f"- model_dir: `{args.model_dir}` · provider: `{provider_name}`",
+        f"- model: `{model_name}` · provider: `{provider_name}`",
         f"- 생성 앵커: 고등급 {n_hi} · 공개(S3) {len(pub)}",
         f"- 사실보존 게이트 채택: forward {admit_fwd}/{len(gen['forward'])} · "
         f"reverse {admit_rev}/{len(gen['reverse'])} (토큰없음 스킵 {gen['skipped_no_tokens']})",
@@ -207,7 +256,7 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(md), encoding="utf-8")
     out.with_suffix(".json").write_text(json.dumps({
-        "model_dir": args.model_dir, "provider": provider_name,
+        "model_dir": model_name, "provider": provider_name,
         "n_high_anchors": n_hi, "n_public": len(pub),
         "admitted": {"forward": admit_fwd, "reverse": admit_rev,
                      "skipped_no_tokens": gen["skipped_no_tokens"],
