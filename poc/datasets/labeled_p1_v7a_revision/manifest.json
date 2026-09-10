@@ -43,5 +43,19 @@
   "TS": 39
  },
  "eval_texts": 3731,
- "seed": 42
+ "seed": 42,
+ "files": {
+  "train.jsonl": {
+   "rows": 2063,
+   "sha256": "0c175e0e426fa2e288e91ea546acb2e5488d7896b3d515d9b05470dca9d99e08"
+  },
+  "val.jsonl": {
+   "rows": 249,
+   "sha256": "328d4e469f35505c8c0cd02ed46f278154988a1f16e73b3360e90367ea38963e"
+  },
+  "test.jsonl": {
+   "rows": 249,
+   "sha256": "2b4d79d1578505636016ace104baa64e42345f4f6859e289395149965f6b816a"
+  }
+ }
 }

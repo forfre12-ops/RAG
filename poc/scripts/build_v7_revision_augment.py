@@ -64,6 +64,15 @@ def _jsonl(p: Path) -> list[dict]:
     return out
 
 
+def _file_sha256(p: Path) -> str:
+    """파일별 SHA-256 — 줄바꿈을 LF 로 맞춘 바이트 기준(= git 저장본 · .gitattributes *.jsonl eol=lf).
+
+    명세에 파일별 해시가 없으면 보안대책 체크리스트 M10 의 계수가 어긋난다 — build_nis_checklist_doc.py 가
+    추적 중인 명세 중 sha256 을 가진 것을 세어 제출 문서에 싣는다(2026-09-11, 이 도구의 첫 산출이 그랬다).
+    """
+    return hashlib.sha256(p.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def _eval_texts() -> list[str]:
     from eval_on_clean_candidates import load_candidates  # noqa: PLC0415
 
@@ -142,7 +151,8 @@ def main(argv=None) -> int:
     out = _POC / a.out
     out.mkdir(parents=True, exist_ok=True)
     new_train = train + added + extra
-    (out / "train.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in new_train), encoding="utf-8")
+    (out / "train.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in new_train),
+                                     encoding="utf-8", newline="\n")
     for s in ("val", "test"):
         shutil.copyfile(BASE / f"{s}.jsonl", out / f"{s}.jsonl")
 
@@ -162,8 +172,10 @@ def main(argv=None) -> int:
         "pool_size": {g: len(v) for g, v in pool.items()},
         "개정_rows_by_label_before": vocab(train), "개정_rows_by_label_after": vocab(new_train),
         "eval_texts": len(ev), "seed": a.seed,
+        "files": {n: {"rows": sum(1 for line in (out / n).read_text(encoding="utf-8").splitlines() if line.strip()),
+                      "sha256": _file_sha256(out / n)} for n in ("train.jsonl", "val.jsonl", "test.jsonl")},
     }
-    (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
+    (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8", newline="\n")
     print(json.dumps(manifest, ensure_ascii=False, indent=1))
     return 0
 

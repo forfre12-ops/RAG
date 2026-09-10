@@ -58,6 +58,14 @@ SCENARIOS = {
 _GRADE_WORDS = re.compile(r"기밀|비밀|극비|대외비|일반\s*공개|[1-3]\s*급|\b(TS|S1|S2|S3)\b")
 
 
+def _file_sha256(p: Path) -> str:
+    """파일별 SHA-256 — 줄바꿈을 LF 로 맞춘 바이트 기준(= git 저장본 · .gitattributes *.jsonl eol=lf).
+
+    명세에 파일별 해시가 없으면 보안대책 체크리스트 M10 의 계수가 어긋난다(build_nis_checklist_doc.py).
+    """
+    return hashlib.sha256(p.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def _refilter(out: Path) -> int:
     """생성하지 않고 이미 만든 samples.jsonl 에 지금의 등급명 필터를 다시 건다.
 
@@ -67,14 +75,15 @@ def _refilter(out: Path) -> int:
     p = out / "samples.jsonl"
     rows = [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
     keep = [r for r in rows if not _GRADE_WORDS.search(r["text"])]
-    p.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in keep), encoding="utf-8")
+    p.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in keep), encoding="utf-8", newline="\n")
     mp = out / "manifest.json"
     manifest = json.loads(mp.read_text(encoding="utf-8")) if mp.exists() else {}
     manifest["refilter"] = {"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "pattern": _GRADE_WORDS.pattern,
                             "before": len(rows), "dropped_grade_words": len(rows) - len(keep)}
     manifest["accepted"] = len(keep)
     manifest["by_domain"] = dict(Counter(r["domain"] for r in keep))
-    mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
+    manifest["files"] = {"samples.jsonl": {"rows": len(keep), "sha256": _file_sha256(p)}}
+    mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8", newline="\n")
     print(json.dumps(manifest, ensure_ascii=False))
     return 0 if keep else 1
 
@@ -132,12 +141,14 @@ def main(argv=None) -> int:
                 "audit_ref": "설계단계 감리 별첨 185(나)", "text_sha256": h,
             })
             print(f"[{len(rows):2d}] {domain} · {doctype} · {len(text)}자", flush=True)
-    (out / "samples.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    (out / "samples.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
+                                       encoding="utf-8", newline="\n")
     manifest = {"created": time.strftime("%Y-%m-%dT%H:%M:%S"), "model": a.model, "requested": a.per_domain * len(SCENARIOS),
                 "accepted": len(rows), "rejected": dict(reasons), "by_domain": dict(Counter(r["domain"] for r in rows)),
                 "elapsed_sec": round(time.time() - t0), "policy": "8/24 합성 중단 방침의 예외 — 2026-09-11 사용자 지시",
-                "not_merged_into_training": True}
-    (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
+                "not_merged_into_training": True,
+                "files": {"samples.jsonl": {"rows": len(rows), "sha256": _file_sha256(out / "samples.jsonl")}}}
+    (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8", newline="\n")
     print(json.dumps(manifest, ensure_ascii=False))
     return 0 if rows else 1
 
