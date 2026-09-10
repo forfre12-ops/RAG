@@ -240,7 +240,8 @@ def validate_icd_metadata(metadata: object) -> list[str]:
 # 모르는 것을 아는 척하면 위 과분류가 그대로 돌아온다.
 _MARKING_REGION_RE = re.compile(
     r"^\[(?:docx section \d+ (?:first_page_|even_page_)?(?:header|footer)"
-    r"|word/(?:header|footer)\d*\.xml(?::textbox)?)\]\s*$",
+    r"|word/(?:header|footer)\d*\.xml(?::textbox)?"
+    r"|hwp page_(?:header|footer))\]\s*$",
     re.IGNORECASE,
 )
 _ANY_REGION_RE = re.compile(r"^\[[^\]]{1,80}\]\s*$")

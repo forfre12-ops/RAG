@@ -455,6 +455,26 @@ def _extract_hwp(p: Path) -> ExtractResult:
 
     warnings: list[str] = []
     tables: list[ExtractedTable] = []
+
+    # [보안표시] 머리말·꼬리말을 **구간 라벨과 함께** 싣는다. 보안 도장(대외비·극비)은
+    # 본문이 아니라 여기 찍히고, 그것이 비밀관리성(M)의 직접 증거다(ICD §3.2).
+    #
+    # 왜 라벨이 필요한가. 본문 어디에나 있는 "대외비"를 표시로 읽으면 보안규정 안내문이
+    # TS 로 올라간다(2026-07-01 실측 과분류). 표시와 언급을 가르는 것은 **위치**이고,
+    # 위치는 라벨로만 전달된다. DOCX 는 이미 `[docx section N header]` 를 싣고 있었는데
+    # HWP 는 rhwp 가 평문으로 덤프해 머리말이 본문과 구분 없이 섞였다 — 그래서 HWP 문서는
+    # 도장이 찍혀 있어도 M 을 못 채웠다.
+    #
+    # rhwp IR(HwpDocument 1.1)이 `furniture.page_headers/page_footers` 로 이미 갈라 준다.
+    # .hwp·.hwpx 둘 다 같은 IR 을 거치므로 한 경로로 해결된다.
+    # ⚠ _append_if_missing 을 쓰지 않는다. 그 함수는 **이미 있는 줄을 건너뛴다.** rhwp 의
+    #   평문 덤프에 머리말 글자가 이미 섞여 있으면 라벨만 붙고 내용은 빠져서, 구간이 비고
+    #   표시가 조용히 사라진다. 여기서는 중복을 감수하고 그대로 싣는다 — 머리말은 짧고,
+    #   잃는 쪽(무음 미탐)이 더 비싸다.
+    _furniture = _hwp_furniture_text(doc, warnings)
+    if _furniture:
+        text = ((text or "").rstrip() + "\n" + _furniture).strip()
+
     is_hwpx = p.suffix.lower() == ".hwpx"
     if is_hwpx:
         # .hwpx 는 원본 zip 의 section XML 에서 셀을 직접 뽑는다(정밀). unhwp 보강 대상 아님.
@@ -669,6 +689,36 @@ def _hwpx_uncaptured_table_cells(hwpx_bytes: bytes, extracted_text: str) -> bool
                 if len(c) >= 2 and _re.sub(r"\s+", "", c) not in norm:
                     return True
     return False
+
+
+def _hwp_furniture_text(doc: object, warnings: list[str]) -> str:
+    """rhwp IR 의 머리말·꼬리말을 구간 라벨과 함께 문자열로 만든다. 없으면 빈 문자열.
+
+    라벨 형식은 DOCX 와 같은 계약이다 — `rule_engine.marking_regions()` 가 이 두 형식을
+    모두 읽는다. 형식을 바꾸면 그 판독이 조용히 죽으므로 시험이 양쪽을 함께 잠근다.
+
+    IR 을 못 얻는 것은 정상 경로다(구 rhwp·파싱 부분 실패). 그때는 **아무것도 싣지 않는다** —
+    없는 머리말을 지어내느니 '읽을 수 없다'로 두는 편이 낫다. 판독부가 그 둘을 갈라 쓴다.
+    """
+    try:
+        furniture = doc.to_ir().furniture  # type: ignore[attr-defined]
+    except Exception as exc:  # noqa: BLE001 — IR 미지원·파싱 실패는 추출을 막지 않는다
+        _warn_once(warnings, "hwp_furniture_unavailable")
+        logger.debug("rhwp IR 머리말 추출 건너뜀: %s: %s", type(exc).__name__, exc)
+        return ""
+
+    parts: list[str] = []
+    for label, blocks in (
+        ("page_header", getattr(furniture, "page_headers", None) or []),
+        ("page_footer", getattr(furniture, "page_footers", None) or []),
+    ):
+        lines = [t for t in (str(getattr(b, "text", "") or "").strip() for b in blocks) if t]
+        if lines:
+            parts.append(f"[hwp {label}]")
+            parts.extend(lines)
+    if parts:
+        _warn_once(warnings, "hwp_furniture_extracted")
+    return "\n".join(parts)
 
 
 def _hwpx_tables(hwpx_bytes: bytes, *, source: str = "hwpx") -> list[ExtractedTable]:

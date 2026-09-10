@@ -198,6 +198,98 @@ def test_body_only_docx_is_not_marked(tmp_path):
     assert code is None, "본문 언급만 있는 문서를 표시로 읽었다"
 
 
+# ── HWP·HWPX — rhwp IR 의 머리말·꼬리말 ──────────────────────────────────────
+#
+# 실파일로는 증명할 수 없다. 저장소의 HWP/HWPX 22개는 furniture.page_headers 가 전부
+# 비어 있다(머리말이 없는 문서다). 그래서 IR **계약**으로 시험한다 — 그 계약은 추측이
+# 아니라 rhwp 스키마(HwpDocument 1.1, ir/_mapper.py)에서 확인한 것이다:
+#   furniture.page_headers / page_footers : list[Block], Block.text 에 문자열.
+
+
+class _Block:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+class _Furniture:
+    def __init__(self, headers=(), footers=()) -> None:
+        self.page_headers = [_Block(t) for t in headers]
+        self.page_footers = [_Block(t) for t in footers]
+
+
+class _IR:
+    def __init__(self, furniture) -> None:
+        self.furniture = furniture
+
+
+class _Doc:
+    def __init__(self, furniture=None, raises=False) -> None:
+        self._f = furniture
+        self._raises = raises
+
+    def to_ir(self):  # noqa: ANN201
+        if self._raises:
+            raise RuntimeError("IR 미지원")
+        return _IR(self._f)
+
+
+def test_hwp_furniture_becomes_a_labelled_region():
+    """HWP 머리말이 **구간 라벨과 함께** 실려야 한다 — 라벨이 없으면 본문과 구분이 안 된다."""
+    from koipa.modules.m2_preprocess.extractor import _hwp_furniture_text
+
+    warnings: list[str] = []
+    text = _hwp_furniture_text(_Doc(_Furniture(headers=["대외비"])), warnings)
+    assert "[hwp page_header]" in text and "대외비" in text
+    assert "hwp_furniture_extracted" in warnings, "실었으면 실었다고 남겨야 추적된다"
+
+    # 그리고 그 라벨을 판독부가 실제로 읽어야 한다 — 두 모듈이 같은 계약을 쓴다.
+    code, why = marking_from_document("본문입니다.\n" + text)
+    assert code == "confidential", f"HWP 머리말 도장을 못 읽었다: {code} ({why})"
+
+
+def test_hwp_footer_is_labelled_too():
+    from koipa.modules.m2_preprocess.extractor import _hwp_furniture_text
+
+    text = _hwp_furniture_text(_Doc(_Furniture(footers=["극비"])), [])
+    assert "[hwp page_footer]" in text
+    assert marking_from_document("본문\n" + text)[0] == "top_secret"
+
+
+def test_hwp_without_furniture_adds_nothing():
+    """머리말이 없으면 아무것도 싣지 않는다 — 빈 라벨은 '구간은 있는데 표시가 없다'로 읽힌다."""
+    from koipa.modules.m2_preprocess.extractor import _hwp_furniture_text
+
+    assert _hwp_furniture_text(_Doc(_Furniture()), []) == ""
+
+
+def test_hwp_ir_failure_is_silent_and_marked_unreadable():
+    """IR 을 못 얻으면 지어내지 않는다 — '읽을 수 없음'으로 남아야 호출부가 갈라 쓴다."""
+    from koipa.modules.m2_preprocess.extractor import _hwp_furniture_text
+
+    warnings: list[str] = []
+    assert _hwp_furniture_text(_Doc(raises=True), warnings) == ""
+    assert "hwp_furniture_unavailable" in warnings
+
+
+def test_header_text_is_not_dropped_when_body_already_contains_it():
+    """**조용한 신호 유실 방지.** rhwp 평문 덤프에 머리말 글자가 이미 섞여 있어도 구간은 살아야 한다.
+
+    _append_if_missing 은 이미 있는 줄을 건너뛴다. 그것으로 붙이면 라벨만 남고 내용이
+    빠져서 구간이 비고, 표시가 경고 없이 사라진다.
+    """
+    from koipa.modules.m2_preprocess.extractor import _append_if_missing, _hwp_furniture_text
+
+    body = "대외비\n공정 조건을 정리했습니다."
+    furniture = _hwp_furniture_text(_Doc(_Furniture(headers=["대외비"])), [])
+
+    naive = _append_if_missing(body, furniture)
+    assert marking_from_document(naive)[0] is None, (
+        "이 시험의 전제가 깨졌다 — _append_if_missing 가 더 이상 줄을 건너뛰지 않는다"
+    )
+    direct = (body.rstrip() + "\n" + furniture).strip()
+    assert marking_from_document(direct)[0] == "confidential"
+
+
 def test_metadata_wins_over_the_document(monkeypatch, _stub_pipeline_db):
     """KL 이 값을 주면 그것이 권위다 — 문서에서 읽은 값이 덮으면 안 된다."""
     import koipa.config as cfg
