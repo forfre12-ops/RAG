@@ -131,6 +131,18 @@ REVISIONS = [
      '한 문서가 여러 판에 들어가면 앞선 판 기록을 잃는다. 행을 더하기만 하는 연결 표로 '
      '바꾸고 <code>UNIQUE(sample_id, dataset_version)</code> 로 중복을 막는다. '
      '<b>자동 학습 편입이 아니라 기록</b>이며, 빌드가 방출한 뒤 남긴다.'),
+    ("8", "2026-09-11", _HEAD_MARKER,
+     '<b>납품 DB 정본을 PostgreSQL 16 + pgvector 로 되돌렸습니다</b>(2026-09-09 결정 · '
+     '<code>38618c2a</code>). 4차에서 MariaDB 로 맞췄던 물리 타입·기본값·인덱스·파티션 표기를 '
+     '현행 PostgreSQL 로 되돌리고 병기 칸을 없앴습니다. MariaDB 10.11 에는 벡터 형식이 없어 '
+     '유사문서 조회를 구현할 수 없었습니다.<br>'
+     '<b>문서 벡터 표를 넣었습니다</b> — 원시 SQL 로 만들어져 ORM 에 없던 탓에 정의서에서 '
+     '빠져 있었습니다(<code>f8a9b0c1d2e3</code>).<br>'
+     '<b>표·칼럼 물리명을 KOIPA 표준용어집 이름으로 바꿨습니다</b>(<code>70e8ef12</code> · '
+     '마이그레이션 <code>7b3e9d2a4f10</code>). 생성 시각 NOT NULL 9개 표, 문서 라벨 확신도 '
+     '<code>NUMERIC(5,4)</code> 통일, 학습실행 모델버전 칼럼명 정리를 반영했습니다'
+     '(<code>a8aa5414</code> · <code>5c1d9e0a7b34</code>).<br>'
+     '월별 RANGE 파티션 3종(감사로그·청크·LLM 사용량)을 실제 DB 대로 다시 적었습니다.'),
 ]
 
 
@@ -177,50 +189,10 @@ def _phys_type(expr: str) -> str:
     return _TYPE_MAP.get(expr, expr)
 
 
-# ── MariaDB 전환 (2026-09-02) ────────────────────────────────────────────────
-#
-# 유사문서 검색을 쓰지 않기로 하면서 pgvector 가 필요 없어졌고, 납품 DB 를 KL 포털이
-# 쓰는 MariaDB 로 맞춘다. 아래는 **현행 PostgreSQL 물리 타입 -> MariaDB 타입** 대응이다.
-#
-# 타입을 그냥 갈아끼우면 안 되는 자리가 셋이라 여기 근거를 남긴다.
-#
-#   TIMESTAMPTZ  MariaDB 에는 시간대를 담는 타입이 없다. DATETIME(6) 에 **UTC 로 저장**하고
-#                시간대 변환은 응용에서 한다. TIMESTAMP 를 쓰면 2038 년 상한에 걸린다.
-#   ARRAY        MariaDB 에는 배열 타입이 없다. 해당 칼럼은 tb_chunks.section_path 하나뿐이고
-#                읽는 쪽이 목록으로만 다루므로 JSON 배열로 담는다.
-#   UUID         MariaDB 10.7+ 의 UUID 타입은 정렬·인덱스 특성이 다르다. 이식성을 위해
-#                CHAR(36) 로 적는다. 저장 효율이 문제가 되면 BINARY(16) 으로 바꿀 수 있다.
-#
-# JSONB -> JSON 은 이름만 같고 성질이 다르다. MariaDB 의 JSON 은 LONGTEXT + 검증 제약이라
-# PostgreSQL JSONB 처럼 색인된 이진 형태가 아니다. JSON 안의 키로 자주 거르는 질의가
-# 있으면 생성 칼럼(generated column) + 인덱스가 필요하다.
-_MARIA_MAP = {
-    "INTEGER": "INT",
-    "BIGINT": "BIGINT",
-    "SMALLINT": "SMALLINT",
-    "REAL": "FLOAT",
-    "BOOLEAN": "TINYINT(1)",
-    "TEXT": "TEXT",
-    "JSONB": "JSON",
-    "INET": "VARCHAR(45)",
-    "UUID": "CHAR(36)",
-    "TIMESTAMPTZ": "DATETIME(6)",
-    "TIMESTAMP": "DATETIME(6)",
-}
-
-
-def _maria_type(pg: str) -> str:
-    """현행 PostgreSQL 물리 타입 문자열 -> MariaDB 타입 문자열."""
-    pg = (pg or "").strip()
-    if not pg:
-        return ""
-    if pg.endswith("[]"):                       # ARRAY -> JSON 배열
-        return "JSON"
-    if pg.startswith("VARCHAR("):
-        return pg
-    if m := re.match(r"NUMERIC\((\d+),(\d+)\)", pg):
-        return f"DECIMAL({m.group(1)},{m.group(2)})"
-    return _MARIA_MAP.get(pg, pg)
+# [2026-09-11] 납품 DB 정본이 PostgreSQL 16 + pgvector 로 되돌아왔다(2026-09-09 · 38618c2a).
+# 2026-09-02 에 넣은 MariaDB 대응(타입·기본값·인덱스 변환표와 생성 칼럼)을 걷었다 —
+# MariaDB 10.11 에는 벡터 형식이 없어 유사문서 조회를 만들 수 없었다(ERROR 4161). 정의서는
+# 이제 models.py 의 PostgreSQL 물리 타입을 그대로 적는다.
 
 def _sql_default(expr: str) -> str:
     """server_default 표현식을 DB 가 보는 기본값 문자열로 정규화한다."""
@@ -238,63 +210,6 @@ def _sql_default(expr: str) -> str:
         return re.sub(r"::[\w ]+$", "", str(lit)).strip()
     return expr
 
-
-# MariaDB 기본값 대응. 타입과 같은 이유로 여기 한 곳에서만 정한다.
-#
-#   now()               CURRENT_TIMESTAMP(6)  — 마이크로초 정밀도를 DATETIME(6) 과 맞춘다
-#   true / false        1 / 0                 — MariaDB BOOLEAN 은 TINYINT(1) 의 별칭이다
-#   gen_random_uuid()   응용 생성              — MariaDB UUID() 는 v1(시간 기반)이라 v4 와
-#                                              성질이 다르다(인덱스 국부성·예측 가능성).
-#                                              DB 기본값으로 바꿔 끼우지 않고 응용이 만든다.
-_MARIA_DEFAULT = {
-    "now()": "CURRENT_TIMESTAMP(6)",
-    "true": "1",
-    "false": "0",
-    "gen_random_uuid()": "(응용 생성)",
-}
-
-
-def _maria_default(pg: str) -> str:
-    pg = (pg or "").strip()
-    if not pg:
-        return ""
-    return _MARIA_DEFAULT.get(pg, pg)
-
-
-# MariaDB 인덱스 대응. PostgreSQL 전용 문법을 쓰는 7개만 여기서 정하고 나머지는 그대로다.
-#
-# 부분 인덱스(WHERE) 는 MariaDB 에 없다. 다섯 중 넷은 성능용이라 복합·일반 인덱스로 충분하고,
-# idx_mv_active 하나만 **불변식**("활성 모델 버전은 항상 1개")을 인덱스로 보증하고 있어
-# 대체 설계가 필요하다.
-#   idx_doc_hash  는 조건을 떼도 같다 — MariaDB 는 UNIQUE 칼럼에 NULL 을 여러 개 허용한다.
-# 두 인덱스는 MariaDB 정본에 두지 않는다.
-#   idx_lk_keyword_trgm  pg_trgm 트라이그램 인덱스에 대응하는 것이 MariaDB 에 없다.
-#                        FULLTEXT+ngram 은 MySQL 번들 파서라 MariaDB 에서 보장되지 않고,
-#                        접두 인덱스는 중간일치를 못 탄다. 현행 병기 칸에만 남긴다.
-#   idx_doc_metadata     JSON 경로 색인에 대응하는 것이 없다. 뽑을 키를 정하면 그때
-#                        생성 칼럼으로 선언하고 인덱스를 건다.
-_MARIA_INDEX = {
-    "idx_lk_keyword_trgm": "(MariaDB 정본에 두지 않습니다 — 대응 인덱스 없음)",
-    "idx_doc_metadata": "(MariaDB 정본에 두지 않습니다 — 대응 인덱스 없음)",
-    "idx_doc_hash":
-        "UNIQUE INDEX idx_doc_hash (file_hash)",
-    "idx_doc_pending":
-        "INDEX idx_doc_pending (processing_status, uploaded_at)",
-    "idx_cls_staging":
-        "INDEX idx_cls_staging (status, classified_at DESC)",
-    "idx_mv_active":
-        "UNIQUE INDEX idx_mv_active (active_key)",
-    "idx_corr_unconsumed":
-        "INDEX idx_corr_unconsumed (consumed_in_run)",
-}
-
-
-def _maria_constraint(pg: str) -> str:
-    """현행 인덱스 표기 -> MariaDB 표기. 바뀌지 않는 것은 그대로 돌려준다."""
-    m = re.search(r"INDEX\s+([a-z_0-9]+)", pg or "")
-    if m and m.group(1) in _MARIA_INDEX:
-        return _MARIA_INDEX[m.group(1)]
-    return pg
 
 def _default_cell(col: dict) -> str:
     """DB 기본값을 우선 보이고, 없을 때만 애플리케이션 기본값을 표시한다."""
@@ -526,27 +441,56 @@ def parse_rag() -> list[dict]:
     return out
 
 
-# 파티션 부모는 ORM 이 표현하지 않는다 — models.py 도크스트링이 명시한 사실을 옮긴다.
-# 월별 RANGE 파티션을 두는 표. [2026-09-03] 셋에서 하나로 줄였다.
-#
-# 실측(223 · 2026-09-03): tb_audit_log 63,697행 / tb_llm_usage 214행 / tb_chunks 193행.
-# 뒤 둘은 파티션 16개를 두고도 파티션당 열 몇 행이라 이득이 없고, MariaDB 로 가면 비용만
-# 는다 — 파티션 키가 **기본키에 포함돼야** 해서 단일 키를 복합키로 바꿔야 하고,
-# tb_chunks 는 tb_classification_evidence.chunk_id 참조까지 영향을 받는다.
-#
-# tb_audit_log 만 남긴다. 보존기간이 지난 파티션을 통째로 DROP 하는 것이 목적이고,
-# 행이 계속 쌓이는 유일한 표다.
-#
-# ⚠ tb_chunks 는 회원사 운영이 시작되면 늘어난다(문서 1건당 청크 수십 개). 운영 규모에서
-#   다시 판단할 것 — 지금 안 두는 것이지 영영 두지 않는다는 뜻이 아니다.
-# [2026-09-05] 비웠다. 커밋 90c0d96a 로 **파티션 없이 가기로** 했고, 실측으로 확인했다.
-#   docker exec koipa-poc-mariadb-1 mariadb -ukoipa koipa -e
-#     "SELECT TABLE_NAME, PARTITION_NAME FROM information_schema.PARTITIONS
-#       WHERE TABLE_SCHEMA='koipa' AND TABLE_NAME IN (...)"
-#   → tb_audit_log · tb_llm_usage · tb_chunks 셋 다 PARTITION_NAME 이 NULL.
-# 대신 시간축 인덱스(b4c5d6e7f8a9)와 보존기간 삭제(services/retention.py)를 쓴다.
-# PostgreSQL 계열 마이그레이션에는 파티션이 남아 있으나 납품 정본은 MariaDB 다.
-PARTITIONS: dict[str, str] = {}
+_MIG_VEC = ROOT / "poc" / "alembic" / "versions" / "f8a9b0c1d2e3_document_vectors.py"
+
+
+def parse_vector_tables() -> list[dict]:
+    """ORM 매핑 없이 원시 SQL 로 만든 표를 마이그레이션 원문에서 읽는다 — 문서 벡터 표.
+
+    [2026-09-11] 유사문서 조회를 되살리며(f8a9b0c1d2e3) 들어온 표인데 models.py 에 없어
+    정의서에서 빠져 있었다(poc/scripts/audit_schema_consistency.py 의 R6 '정의서 밖 표').
+    이름은 표준명(migration 7b3e9d2a4f10 · table_spec_meta._t/_c)으로 옮겨 적는다.
+    """
+    src = _MIG_VEC.read_text(encoding="utf-8")
+    dim = re.search(r"^EMBED_DIM\s*=\s*(\d+)", src, re.M).group(1)
+    m = re.search(r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\n\s*\)\s*\n", src, re.S)
+    old, body = m.group(1), m.group(2).replace("{EMBED_DIM}", dim)
+    body = re.sub(r"--[^\n]*", "", body)
+    cols, pk = [], []
+    for item in [re.sub(r"\s+", " ", x).strip() for x in re.split(r",\s*\n", body)]:
+        if not item:
+            continue
+        name, typ = item.split(" ", 2)[:2]
+        new = META._c(old, name)
+        col = {"attr": new, "name": new, "pytype": "", "type": typ.upper() if "(" not in typ else typ,
+               "notnull": "NOT NULL" in item or "PRIMARY KEY" in item, "pk": "PRIMARY KEY" in item,
+               "unique": False, "fk": None, "ondelete": None, "default": "", "app_default": ""}
+        if fk := re.search(r"REFERENCES (\w+)\((\w+)\)(?: ON DELETE (\w+))?", item):
+            col["fk"] = f"{META._t(fk.group(1))}.{META._c(fk.group(1), fk.group(2))}"
+            col["ondelete"] = fk.group(3)
+        if d := re.search(r"DEFAULT (\S+)", item):
+            col["default"] = d.group(1)
+        if col["pk"]:
+            pk.append(new)
+        cols.append(col)
+    indexes = []
+    for im in re.finditer(rf"CREATE INDEX IF NOT EXISTS (\w+)\s*\"?\s*\"?ON {old}\s*([^\"\)]*\))", src):
+        spec = re.sub(r"\s+", " ", im.group(2)).strip()
+        for oc, _nc, _ko in META._STD_COLS.get(old, ()):
+            spec = re.sub(rf"\b{oc}\b", META._c(old, oc), spec)
+        indexes.append(f"INDEX {im.group(1)} {spec}")
+    return [{"name": META._t(old), "cols": cols, "pk": pk, "indexes": indexes,
+             "uniques": [], "checks": [], "partition": None}]
+
+
+# 월별 RANGE 파티션을 두는 표 — 정본은 poc/src/koipa/services/partitions.py 의 PARTITIONED_TABLES
+# (다가올 달 자식 표를 미리 만드는 코드가 그 목록을 쓴다). 정의서가 따로 목록을 들면 또 어긋난다.
+# [2026-09-11] PostgreSQL 정본 복귀로 되살렸다. 2026-09-05 에 비웠던 것은 MariaDB 정본에서
+# 파티션을 두지 않기로 했기 때문이고, PostgreSQL DB 에는 세 표의 월별·기본 자식 표가 실제로 있다
+# (임시 DB 에서 alembic head 로 올려 tad_*_YYYY_MM · tad_*_default 45개 확인).
+from koipa.services.partitions import PARTITIONED_TABLES as _PG_PARTITIONS  # noqa: E402
+
+PARTITIONS: dict[str, str] = dict(_PG_PARTITIONS)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -577,6 +521,7 @@ LAYOUT = [
     ("tb_audit_log", 3, 80),
     ("tb_guides", 3, 120),
     ("tb_advisory_locks", 3, 160),
+    ("tb_document_vectors", 3, 200),
 ]
 # [2026-09-11] 표준 명명 — 위 배치는 옛 물리명으로 적어 두었다. models.py 의 새 이름으로 옮긴다.
 LAYOUT = [(META.RENAMED_TABLES.get(n, n), c, y) for n, c, y in LAYOUT]
@@ -663,21 +608,6 @@ def build_erd(tables: list[dict]) -> str:
 # ──────────────────────────────────────────────────────────────────────
 # 3. 렌더링
 # ──────────────────────────────────────────────────────────────────────
-
-# MariaDB 정본에만 존재하는 생성 칼럼. 현행 PostgreSQL 에는 없다(부분 인덱스로 대신하므로).
-# 인덱스가 참조하는 칼럼이 표에 없으면 그 인덱스는 만들어지지 않는다 — 실제로
-# idx_mv_active 하나가 '활성 모델 1건' 불변식을 지키는 유일한 장치다.
-GENERATED_COLUMNS = {
-    "tb_model_versions": [{
-        "name": "active_key",
-        "type": "TINYINT(1) GENERATED ALWAYS AS (IF(is_active=1,1,NULL)) VIRTUAL",
-        "legacy": "(없음 — 현행은 부분 인덱스)",
-        "notnull": False, "pk": False, "fk": "", "ondelete": "", "unique": False,
-        "default": "", "identity": False,
-        "desc": "활성일 때만 1, 아니면 NULL. UNIQUE 인덱스 idx_mv_active 가 "
-                "활성 1건만 허용하도록 보증합니다",
-    }],
-}
 
 def _placement_cell(name: str) -> str:
     """배치 칸. 지재원 전용만 표시를 달고 공통은 담백하게 둔다."""
@@ -767,18 +697,18 @@ table.spec td.c-nn{text-align:center;}
     A('  <div class="top">')
     A('    <div class="eyebrow">감리 산출물 · 데이터베이스 정의</div>')
     A('    <h1>테이블정의서 · ERD</h1>')
-    A(f'    <div class="meta">MariaDB 10.11 · InnoDB · utf8mb4 / utf8mb4_bin · '
+    A(f'    <div class="meta">PostgreSQL 16 · pgvector · UTF-8 · '
       f'{len(tables)}테이블 {total_cols}칼럼 · '
       f'등급체계·문서·라벨링·추론·학습·보정·합성·운영 8개 그룹 · {today} 생성</div>')
     A('  </div>')
     # ── 그룹·테이블 목록
     A('<section id="tables-index"><h2><span class="num">01</span> 테이블 목록</h2>')
-    A('<p class="spec-note"><b>물리 타입 전환 규약</b> — '
-      '<code>DATETIME(6)</code> 는 UTC 로 저장하며 시간대 변환은 응용이 수행합니다. '
-      '<code>CHAR(36)</code> UUID 는 소문자 표준형으로만 저장합니다'
-      '(콜레이션이 <code>utf8mb4_bin</code> 이므로 대소문자가 섞이면 다른 값이 됩니다). '
-      '<code>JSON</code> 은 LONGTEXT + 검증 제약이므로 키로 거르는 질의에는 생성 칼럼과 '
-      '인덱스가 필요합니다. 배열은 JSON 배열로 담습니다.</p>')
+    A('<p class="spec-note"><b>물리 타입 규약</b> — '
+      '시각은 <code>TIMESTAMPTZ</code> 로 시간대와 함께 저장합니다. 식별자는 <code>UUID</code> 형입니다. '
+      '<code>JSONB</code> 는 이진 JSON 이라 키로 거르는 질의에 GIN 인덱스를 씁니다. 배열은 '
+      '<code>TEXT[]</code>, 문서 대표 벡터는 pgvector 의 <code>vector(1024)</code> 입니다. '
+      '표·칼럼 물리명은 KOIPA 표준용어집(v1.1) 약어를 따릅니다'
+      '(대응표 정본 <code>poc/src/koipa/db/standard_names.py</code>).</p>')
     A('<div class="tbl-wrap"><table class="spec"><thead><tr>'
       "<th>그룹</th><th>물리명</th><th>논리명</th><th>컬럼</th><th>기본키</th>"
       "<th>배치</th><th>파티션</th></tr></thead><tbody>")
@@ -854,12 +784,11 @@ table.spec td.c-nn{text-align:center;}
               + "</div>")
             A(f'<p class="spec-note">{e(purpose)}</p>')
             A('<div class="tbl-wrap"><table class="spec"><thead><tr>'
-              "<th>컬럼</th><th>물리 타입 (MariaDB)</th>"
-              "<th>현행 (PostgreSQL)</th>"
+              "<th>컬럼</th><th>물리 타입</th>"
               "<th>NULL</th><th>키</th>"
-              "<th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th>"
+              "<th>기본값</th>"
               "<th>설명</th></tr></thead><tbody>")
-            for c in t["cols"] + GENERATED_COLUMNS.get(name, []):
+            for c in t["cols"]:
                 keys = []
                 if c["name"] in t["pk"] or c["pk"]:
                     keys.append('<span class="k-pk">PK</span>')
@@ -876,11 +805,9 @@ table.spec td.c-nn{text-align:center;}
                 else:
                     d = e(d)
                 A(f'<tr><td class="c-name">{c["name"]}</td>'
-                  f'<td class="c-type">{e(c["type"] if c.get("legacy") else _maria_type(c["type"]))}</td>'
-                  f'<td class="c-type">{e(c.get("legacy") or c["type"])}</td>'
+                  f'<td class="c-type">{e(c["type"])}</td>'
                   f'<td class="c-nn">{"●" if c["notnull"] else ""}</td>'
                   f'<td class="c-key">{" ".join(keys)}</td>'
-                  f'<td class="c-type">{"AUTO_INCREMENT" if c.get("identity") else (e(_maria_default(_sql_default(c["default"]))) if c.get("default") else _default_cell(c))}</td>'
                   f'<td class="c-type">{"GENERATED ALWAYS AS IDENTITY" if c.get("identity") else _default_cell(c)}</td>'
                   f"<td>{d}</td></tr>")
             A("</tbody></table></div>")
@@ -893,25 +820,13 @@ table.spec td.c-nn{text-align:center;}
                 lines.append(f"<code>{e(_fmt_constraint(ck))}</code>")
             for ix in t["indexes"]:
                 raw = _fmt_constraint(ix) if ix.startswith(chr(73)+chr(110)+chr(100)+chr(101)+chr(120)+chr(40)) else ix
-                maria = _maria_constraint(raw)
-                if maria != raw:
-                    lines.append(f"<code>{e(maria)}</code><br>"
-                                 f'<span style="color:#71717a">현행 PostgreSQL — '
-                                 f"<code>{e(raw)}</code></span>")
-                else:
-                    lines.append(f"<code>{e(raw)}</code>")
+                lines.append(f"<code>{e(raw)}</code>")
             if part:
                 lines.append(
-                    f"<b>PARTITION</b> <code>PARTITION BY RANGE COLUMNS ({part})</code> — 월별. "
-                    "파티션 키가 기본키에 포함되어야 하므로 기본키는 (기존 키 + 파티션 키) "
-                    "복합키입니다. 마지막 파티션으로 "
-                    "<code>PARTITION pmax VALUES LESS THAN (MAXVALUE)</code> 를 두어 범위 밖 "
-                    "행을 받고, 월별 파티션은 일간 작업이 "
-                    "<code>ALTER TABLE … REORGANIZE PARTITION pmax INTO (…)</code> 로 "
-                    "미리 연장합니다.")
-                lines.append(
-                    f'<span style="color:#71717a">현행 PostgreSQL — '
-                    f"<code>PARTITION BY RANGE ({part})</code></span>")
+                    f"<b>PARTITION</b> <code>PARTITION BY RANGE ({part})</code> — 월별 자식 표"
+                    f"(<code>{name}_YYYY_MM</code>)와 범위 밖 행을 받는 <code>{name}_default</code> 를 둡니다. "
+                    "파티션 키가 기본키에 포함되어야 하므로 기본키는 (기존 키 + 파티션 키) 복합키입니다. "
+                    "다가올 달의 자식 표는 <code>services/partitions.py</code> 가 미리 만듭니다.")
             if lines:
                 A('<p class="spec-idx">' + "<br>".join(lines) + "</p>")
     A("</section>")
@@ -935,7 +850,8 @@ table.spec td.c-nn{text-align:center;}
     A('<section id="scope"><h2><span class="num">06</span> 범위</h2>')
     A('<p class="spec-note">본 시스템이 생성·소유하는 개체만 수록합니다. '
       "KL 원천 문서 저장소·EDMS·회원/권한·자가진단은 외부 시스템이며, 연동 키는 "
-      "<code>tb_documents.external_ref</code> · <code>tb_documents.metadata</code> 입니다.</p>")
+      f"<code>{META._t('tb_documents')}.{META._c('tb_documents', 'external_ref')}</code> · "
+      f"<code>{META._t('tb_documents')}.{META._c('tb_documents', 'metadata')}</code> 입니다.</p>")
     A("</section>")
 
     # ── 개정 이력
@@ -972,7 +888,7 @@ def main() -> int:
     # [2026-09-02] 유사문서 검색을 쓰지 않기로 해 RAG 2표(tb_rag_vectors·tb_rag_aliases)를
     # 정의서에서 뺀다. 두 표는 ORM 매핑이 없고 외래키가 0개라 나머지 19표에 영향이 없다.
     # parse_rag() 는 지우지 않고 남겨 둔다 — 되살릴 때 다시 쓰기 위해서다.
-    tables = parse_models()
+    tables = parse_models() + parse_vector_tables()
 
     # [2026-09-03] 정의서에서 빼는 표·칼럼을 여기서 걷는다.
     # 소스(poc/src)를 고치지 않기로 했으므로 models.py 는 그대로 두고 문서에서만 뺀다.

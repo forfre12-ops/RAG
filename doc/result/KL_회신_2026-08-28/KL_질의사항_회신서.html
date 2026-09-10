@@ -485,6 +485,16 @@ a{color:#0a0a0a}
   <div class="q">RDBMS · Vector DB 테이블 및 칼럼 명세서 제공 요청</div>
 
   <div class="note">
+    <b>[정정 · 2026-09-11] 아래 두 문단은 발송 당시(2026-08-28) 기재 그대로 두며, 현재는 사실이 아닙니다.</b><br>
+    ① 납품 DB 는 <b>PostgreSQL 16 + pgvector</b> 로 되돌아갔습니다(2026-09-09 결정). MariaDB 10.11 에는
+    벡터 형식이 없어 유사문서 조회를 구현할 수 없음을 실측으로 확인했습니다(ERROR 4161 Unknown data type 'VECTOR').<br>
+    ② 유사문서 조회를 다시 채택하여, 문서 대표 벡터를 담는 표(<code>tad_dm_doc_vctr_mng</code> · 1024차원 ·
+    HNSW 코사인 색인)를 <b>같은 PostgreSQL 안에 확장 기능(pgvector)으로</b> 둡니다. 별도의 Vector DB 서버는 없습니다.
+    등급은 이 표에 복제하지 않으며, 등급 판정은 여전히 벡터 검색 없이 완결됩니다.<br>
+    ③ 표·칼럼 물리명은 2026-09-11 KOIPA 표준용어집 이름(tad_*_mng)으로 바뀌었습니다. 정의서는 재생성본을 따르십시오.
+  </div>
+
+  <div class="note">
     <b>Vector DB 는 제공 범위에서 제외되었습니다.</b> 유사문서 조회 기능을 채택하지 않기로 하여
     벡터 저장·검색 표를 두지 않습니다. 등급 판정은 벡터 검색 없이 완결되므로 기능에 영향이 없습니다.
     <br><br>

@@ -974,6 +974,12 @@ paths:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [schema]
       summary: 등급체계 변경 (관리자 권한, 재학습 필요성 응답)
+      description: |
+        [2026-09-10] 서빙 분류기를 멈추게 하는 변경은 저장 전에 거부한다(409).
+        서빙은 모델의 등급 집합이 DB 활성 등급 집합과 다르면 모델 로드를 거부하고 규칙엔진으로
+        내려가므로, 활성 집합을 모델과 다르게 만드는 추가·비활성화는 다음 재기동·리로드부터
+        분류기를 멈춘다. 그래도 저장하려면 force=true 와 force_reason 을 함께 보낸다.
+        이름·설명·색·순서만 바꾸는 저장은 등급 집합이 같아 그대로 적용된다.
       requestBody:
         required: true
         content:
@@ -986,6 +992,14 @@ paths:
                   type: array
                   items: { $ref: '#/components/schemas/GradeDefinition' }
                 actor: { $ref: '#/components/schemas/Actor' }
+                force:
+                  type: boolean
+                  default: false
+                  description: 서빙 모델과 등급 집합이 어긋나는 변경을 그래도 저장할 때만 true
+                force_reason:
+                  type: string
+                  nullable: true
+                  description: force=true 일 때 필수 — 감사에 남는다
       responses:
         '200':
           description: 변경 적용
@@ -997,6 +1011,11 @@ paths:
                   version: { type: string }
                   requires_retraining: { type: boolean }
                   reason: { type: string }
+                  serving_impact:
+                    type: string
+                    description: 이 변경이 서빙 분류기에 주는 영향. 빈 문자열이면 영향 없음
+        '409':
+          description: 서빙 분류기를 멈추게 하는 변경이라 저장하지 않음(force 와 사유 없음). detail 에 영향이 적힌다
 
   /metrics/latest:
     get:
