@@ -388,6 +388,14 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     google_api_key: str = ""
+    # [2026-09-10] 상용 LLM 호출 주소. 비우면 각 SDK 의 공식 API 주소로 간다.
+    # 외부 API 연계용 네트워크 중계서버(요구사항 ECR-001-06)를 거쳐야 하면 여기에 중계서버
+    # 주소를 넣는다. 종전에는 Anthropic·OpenAI 클라이언트가 키만 받고 Gemini 는 구글 주소가
+    # 코드에 박혀 있어, 중계서버가 정해져도 코드를 고치지 않고는 경유시킬 수 없었다.
+    # 로컬 OpenAI 호환 서버(vLLM·Ollama)는 아래 local_llm_base_url 이 따로 맡는다.
+    anthropic_base_url: str = ""
+    openai_base_url: str = ""
+    google_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
     # 로컬 OpenAI 호환 endpoint (vLLM·Ollama·LM Studio·llama.cpp)
     local_llm_base_url: str = "http://localhost:8001/v1"  # vLLM 기본

@@ -49,7 +49,9 @@ class AnthropicProvider:
         key = api_key or settings.anthropic_api_key
         if not key:
             raise RuntimeError("ANTHROPIC_API_KEY not set")
-        self._client = Anthropic(api_key=key)
+        # 중계서버 주소가 설정됐을 때만 넘긴다 — 비어 있으면 SDK 기본(공식 API)과 같다.
+        base_url = getattr(settings, "anthropic_base_url", "") or None
+        self._client = Anthropic(api_key=key, base_url=base_url) if base_url else Anthropic(api_key=key)
         self.model = model or settings.llm_model or "claude-sonnet-4-6"
         self._max_retries = int(getattr(settings, "llm_max_retries", self._DEFAULT_MAX_RETRIES))
         self._base_delay = float(getattr(settings, "llm_retry_base_delay", self._DEFAULT_BASE_DELAY))

@@ -46,7 +46,9 @@ def build_provider(name: str | None = None) -> LLMProvider:
         # (llm_model 기본값=claude-sonnet-4-6이 Gemini 호출에 새는 것 방지).
         _gm = settings.llm_model if "gemini" in (settings.llm_model or "").lower() else "gemini-2.5-pro"
         return LocalOpenAIProvider(
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            # 중계서버(ECR-001-06)를 거치면 settings.google_base_url 로 바꾼다.
+            base_url=(getattr(settings, "google_base_url", "")
+                      or "https://generativelanguage.googleapis.com/v1beta/openai/"),
             api_key=settings.google_api_key or "EMPTY",
             model=_gm,
             provider_label="gemini",
