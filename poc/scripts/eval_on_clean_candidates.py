@@ -116,8 +116,29 @@ def report(name: str, rows: list[dict], preds: list[str]) -> dict:
     print("        " + "".join("%6s" % g for g in GRADES))
     for g in GRADES:
         print("     %-3s " % g + "".join("%6d" % conf[g][p] for p in GRADES))
+    # [2026-09-10] 건별 결과를 함께 돌려준다.
+    #
+    # 왜 필요한가. 종전에는 합계만 남았다(`high_to_s3: 16`). 그런데 "2차의견 게이트가 그
+    # 16건을 잡는가" 를 재려면 **그 16건이 무엇인지** 알아야 한다. 합계만 있으면 도구를
+    # 고치기 전에는 그 질문에 답을 못 한다(2026-09-10 에 실제로 막혔다).
+    #
+    # 본문(text)은 담지 않는다 — 30MB 가 되고, 이 파일은 커밋되는 리포트다.
+    cases = [
+        {
+            "doc_id": r["doc_id"],
+            "origin": r["origin"],
+            "gold": r["label"],
+            "pred": p,
+            "hit": r["label"] == p,
+            # 고등급(TS/S1)을 S3 으로 자동확정할 소지 — 무음 미탐 후보다.
+            "high_to_s3": r["label"] in ("TS", "S1") and p == "S3",
+            "direction": ("under" if _SEV.get(p, 0) < _SEV[r["label"]]
+                          else "over" if _SEV.get(p, 0) > _SEV[r["label"]] else "same"),
+        }
+        for r, p in zip(rows, preds)
+    ]
     return {"name": name, "n": len(rows), "hit": hit, "high_to_s3": hi_s3,
-            "over": over, "under": under, "per_grade": per}
+            "over": over, "under": under, "per_grade": per, "cases": cases}
 
 
 def main(argv=None) -> int:
@@ -125,7 +146,10 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="정리된 골든 후보로 모델 공정 비교")
     ap.add_argument("--model", action="append", default=None, help="모델 디렉터리(여러 번)")
     ap.add_argument("--origin", choices=["all", "synthetic", "public_real"], default="all")
-    ap.add_argument("--report", default="", help="결과 JSON 경로")
+    ap.add_argument("--report", default="", help="요약 JSON 경로(건별 제외 — 커밋되는 파일이다)")
+    ap.add_argument("--cases", default="",
+                    help="건별 JSON 경로(doc_id·정답·예측·방향). 무음 미탐이 어느 문서인지 "
+                         "알아야 게이트 효과를 잴 수 있다")
     a = ap.parse_args(argv)
 
     rows = load_candidates()
@@ -151,9 +175,28 @@ def main(argv=None) -> int:
         preds = [_pred_grade(p) for p in predict_direct(Path(md), rows)]
         out.append(report(Path(md).name or md, rows, preds))
 
+    # 무음 미탐 후보(고등급→S3)의 doc_id 를 화면에 바로 찍는다 — 합계만 보고는
+    # "그 16건이 무엇이냐"에 답할 수 없어 실제로 한 번 막혔다(2026-09-10).
+    for r in out:
+        ids = [c["doc_id"] for c in r["cases"] if c["high_to_s3"]]
+        if ids:
+            print("\n  [%s] 고등급→S3 %d건 doc_id:" % (r["name"], len(ids)))
+            for i in range(0, len(ids), 3):
+                print("     " + "  ".join(ids[i:i + 3]))
+
+    if a.cases:
+        Path(a.cases).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.cases).write_text(
+            json.dumps([{"name": r["name"], "cases": r["cases"]} for r in out],
+                       ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print("\n[cases] %s  (건별 %d행)" % (a.cases, sum(len(r["cases"]) for r in out)))
+
     if a.report:
+        # 요약 리포트에는 건별을 담지 않는다 — 이 파일은 커밋되므로 1,055건 x 모델수 만큼
+        # 불어나면 diff 를 읽을 수 없다. 건별은 --cases 로 따로 뺀다.
+        summary = [{k: v for k, v in r.items() if k != "cases"} for r in out]
         Path(a.report).parent.mkdir(parents=True, exist_ok=True)
-        Path(a.report).write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+        Path(a.report).write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
         print("\n[report] %s" % a.report)
     print("\n  ⚠ 이 수치는 **정확도가 아니라 공정 비교**다 — 정답은 생성 시 의도 등급이고")
     print("     사람 확정은 0건이다. 두 모델을 같은 자로 쟀다는 것까지가 이 도구의 주장이다.")
