@@ -2856,7 +2856,22 @@ async function saveGrades(){
 
   const btn=$('grade-save'); btn.disabled=true; btn.textContent='저장 중…';
   try{
-    const d=await api('PUT','/schema/grades',{grades:rows, actor:actor()});
+    let d;
+    try{
+      d=await api('PUT','/schema/grades',{grades:rows, actor:actor()});
+    }catch(e){
+      // [2026-09-11] 409 = 서빙 분류기를 멈추게 하는 변경이라 서버가 저장 전에 거부했다.
+      // 영향을 보여 주고, 사유를 받으면 force 로 다시 보낸다(모델 롤백과 같은 방식 — 사유는
+      // 감사에 남는다). 이 경로가 없으면 서빙 모델이 있는 서버에서 콘솔로는 등급을 추가·삭제할
+      // 수 없어 FUN-005-01 기능이 화면에서 사라진다.
+      if(e.status!==409) throw e;
+      // 서버 문구 끝의 API 사용법(force=true …)은 화면 사용자에게 필요 없어 뗀다.
+      const impact=String(errDetail(e)||'서빙 분류기에 영향이 있는 변경입니다').replace(/\.?\s*그래도 저장하려면 force.*$/,'');
+      const reason=prompt(`${impact}.\n\n그래도 저장하려면 사유를 입력하세요 (감사에 기록됩니다):`,'');
+      if(reason===null){ $('grade-result').innerHTML=`<div class="warnbox">저장하지 않았습니다 — ${esc(impact)}</div>`; return; }
+      if(!String(reason).trim()){ alert('사유는 필수입니다.'); $('grade-result').innerHTML='<div class="warnbox">저장하지 않았습니다 — 사유가 비어 있습니다</div>'; return; }
+      d=await api('PUT','/schema/grades',{grades:rows, actor:actor(), force:true, force_reason:String(reason).trim()});
+    }
     GRADE_ROWS=rows; GRADE_LOADED_CODES=codes;
     syncActiveGrades(codes);
     $('grade-result').innerHTML = d.requires_retraining

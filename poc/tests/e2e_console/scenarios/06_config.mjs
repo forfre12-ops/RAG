@@ -14,6 +14,22 @@ async function configTab(server, opts = {}) {
   return page;
 }
 
+// 서버(schema_admin_service.assess_grade_change)가 실제로 내는 409 문구와 같은 모양.
+const BLOCKED = "서빙 모델(v-fe4b386b)의 등급 ['S1', 'S2', 'S3', 'TS'] 과 새 활성 등급 ['S1', 'S2', 'TS'] 이 달라, "
+  + '다음 모델 로드(재기동·리로드)부터 분류기가 로드를 거부하고 규칙엔진으로 판정합니다. '
+  + '그래도 저장하려면 force=true 와 force_reason 을 함께 보내십시오.';
+
+async function removeS3AndSaveBlocked(server, opts) {
+  const page = await configTab(server, opts);
+  page.click(page.q('button[onclick="loadGradeEditor()"]'));
+  await page.settle();
+  server.faults.push({ path: '/schema/grades', method: 'PUT', status: 409, once: true, body: { detail: BLOCKED } });
+  page.click(page.q('#grade-body button[onclick="removeGradeRow(3)"]'));
+  page.click('grade-save');
+  await page.settle();
+  return page;
+}
+
 export const scenarios = [
   {
     id: 'config.grades.load-edit-save',
@@ -92,6 +108,57 @@ export const scenarios = [
       // 시험은 문구 고정이 아니라 **뜻**을 본다 — 무엇이 어떻게 되는지.
       check.matches(page.dialogs.map((d) => d.message).join(' '), /비활성될 등급: S3/, '무엇이 사라지는지 되묻는다');
       check.eq((server.lastCall('PUT', '/schema/grades')?.body?.grades || []).length, 3, '3개만 저장된다');
+      return page;
+    },
+  },
+
+  // [2026-09-11] 서버는 서빙 분류기를 멈추게 하는 등급 변경을 저장 전에 409 로 거부한다.
+  // 콘솔은 영향을 보여 주고 사유를 받아 force 로 다시 보내야 한다 — 이 경로가 없으면 서빙
+  // 모델이 있는 서버에서 등급 추가·삭제(FUN-005-①)가 화면에서 불가능해진다.
+  {
+    id: 'config.grades.blocked-then-forced-with-reason',
+    writes: true,
+    title: '분류기를 멈추게 하는 변경이 거부되면 영향을 보여 주고, 사유를 받아 강제 저장한다',
+    async run({ server, check }) {
+      const page = await removeS3AndSaveBlocked(server, { promptAnswer: 'S3 폐지 결정 — 재학습 예정' });
+      const asked = page.dialogs.find((d) => d.kind === 'prompt');
+      check.ok(asked, '사유를 물어본다');
+      check.includes(asked?.message || '', '규칙엔진', '무엇이 멈추는지 보여 준다');
+      check.ok(!(asked?.message || '').includes('force=true'), 'API 사용법 문구는 화면에 내보이지 않는다');
+      check.eq(server.countCalls('PUT', '/schema/grades'), 2, '거부 뒤 한 번 더 보냈다');
+      const call = server.lastCall('PUT', '/schema/grades');
+      check.eq(call?.body?.force, true, '두 번째 요청은 강제 저장이다');
+      check.includes(call?.body?.force_reason || '', 'S3 폐지 결정', '사유가 그대로 실렸다');
+      check.includes(page.html('grade-result'), '재학습 필요', '저장 결과가 보인다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'config.grades.blocked-cancel-saves-nothing',
+    writes: true,
+    title: '거부된 변경에서 사유 입력을 취소하면 다시 보내지 않고, 저장하지 않았다고 말한다',
+    async run({ server, check }) {
+      const page = await removeS3AndSaveBlocked(server, { promptAnswer: null });
+      check.eq(server.countCalls('PUT', '/schema/grades'), 1, '다시 보내지 않았다');
+      check.includes(page.html('grade-result'), '저장하지 않았습니다', '저장하지 않았다고 말한다');
+      check.includes(page.html('grade-result'), '규칙엔진', '왜 저장하지 않았는지 남긴다');
+      check.ok(!page.text('grade-info').includes('저장 완료'), '저장 완료라고 말하지 않는다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'config.grades.blocked-empty-reason-saves-nothing',
+    writes: true,
+    title: '거부된 변경에서 사유를 비우면 다시 보내지 않는다',
+    async run({ server, check }) {
+      const page = await removeS3AndSaveBlocked(server, { promptAnswer: '   ' });
+      check.ok(page.dialogs.some((d) => d.kind === 'alert' && d.message.includes('사유는 필수')), '사유가 필수라고 알린다');
+      check.eq(server.countCalls('PUT', '/schema/grades'), 1, '다시 보내지 않았다');
+      assertNoScriptErrors(check, page);
       return page;
     },
   },
