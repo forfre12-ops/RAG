@@ -151,6 +151,46 @@ def _ref_body(ref: str) -> str:
     return parts[2] if len(parts) == 3 else ref
 
 
+# 같은 조건문에 AND 로 묶인 **동반 설정**. 이게 비면 플래그를 켜도 무동작이다.
+_SETTING_REF = re.compile(r'getattr\(\s*[A-Za-z_][\w.]*\s*,\s*"([a-z_][a-z0-9_]*)"')
+
+
+def companions(ref_line: str, flag: str) -> list[str]:
+    """참조 한 줄에서 그 플래그와 **함께 요구되는** 다른 설정 이름.
+
+    왜 필요한가(2026-09-10 실측). `factor_shadow_enabled` 를 켜고 A/B 를 돌렸는데
+    지연 차이가 0 이었다. "요소모델은 빨라서 괜찮다"로 읽을 뻔했는데 실제로는
+    **경로가 안 돌았다** — 조건이 AND 둘이고 짝이 비어 있었다:
+
+        if getattr(_fs, "factor_shadow_enabled", False) and getattr(_fs, "factor_model_dir", ""):
+
+    `factor_model_dir` 기본값이 `""` 이고 프로파일이 채워 주지 않는다. 첫 판의 이 도구는
+    "핫패스에 붙는다"까지만 말하고 이 짝을 못 봤다. 짝이 비면 켜도 무동작이므로
+    **켜기 전에 먼저 채울 것**을 말해야 한다.
+    """
+    body = _ref_body(ref_line)
+    if " and " not in body and " or " not in body:
+        return []
+    names = [n for n in _SETTING_REF.findall(body) if n != flag]
+    # 순서 유지하며 중복 제거
+    seen, out = set(), []
+    for n in names:
+        if n not in seen:
+            seen.add(n)
+            out.append(n)
+    return out
+
+
+def default_of(name: str) -> str | None:
+    """config.py 의 그 설정 기본값 문자열. 못 찾으면 None."""
+    cfg = (_SRC / "koipa" / "config.py").read_text(encoding="utf-8", errors="replace")
+    m = re.search(rf"^\s*{re.escape(name)}\s*:[^=]*=\s*(.+?)\s*(?:#.*)?$", cfg, re.M)
+    return m.group(1).strip() if m else None
+
+
+_EMPTY = ('""', "''", "None", "False", "[]", "{}", "0")
+
+
 def classify_path(ref: str) -> str:
     """참조 한 줄을 분류한다. 핫패스는 **동작일 때만** 준다 — 보고는 지연을 만들지 않는다."""
     is_control = bool(_CONTROL.search(_ref_body(ref)))
@@ -220,6 +260,21 @@ def main() -> int:
                 print(f"     · {c[:96]}")
         else:
             print("   비용 표현: (주석에 없음 — 없다는 뜻이 아니라 안 적혔다는 뜻)")
+        # 동반 설정 — 비어 있으면 플래그를 켜도 무동작이다.
+        comp: dict[str, str | None] = {}
+        for r in rs:
+            for c in companions(r, flag):
+                comp.setdefault(c, default_of(c))
+        if comp:
+            print("   동반 조건(AND):")
+            for c, dv in comp.items():
+                blank = dv is not None and dv in _EMPTY
+                tag = "  ← 비어 있다. 채우지 않으면 켜도 무동작" if blank else ""
+                print(f"     · {c} = {dv if dv is not None else '(config.py 에서 못 찾음)'}{tag}")
+            if any(dv is not None and dv in _EMPTY for dv in comp.values()):
+                print("   ⛔ 짝이 빈 채로 A/B 를 돌리면 지연 차이 0 이 나오고 그것을 '안전'으로")
+                print("      오독하게 된다(2026-09-10 factor_shadow 에서 실제로 그랬다).")
+
         if where == "핫패스":
             print("   ⚠ 요청 지연에 직접 붙는다 — 켜기 전에 **A/B 로 p95 를 재고** 위 KPI 와 대조할 것.")
         elif where == "배경":
