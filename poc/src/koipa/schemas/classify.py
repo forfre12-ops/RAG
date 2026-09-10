@@ -132,6 +132,15 @@ class ClassifyResponse(BaseModel):
     rule_grade: Optional[str] = None
     model_grade: Optional[str] = None
     decision_path: Optional[str] = None
+    # [후보집합] 비밀관리성(M)을 못 받아 **아직 하나로 정해지지 않은** 등급들. 비어 있으면
+    # 갈릴 것이 없다는 뜻이다(label 이 유일한 답).
+    #
+    # label 을 대체하지 않는다 — 기존 계약을 지키려고 예측값은 그대로 둔다. 다만 정본
+    # 공식에서 S1 은 (2,2,0) 하나뿐이라 S1 과 TS 를 가르는 것은 **오직 M** 인데 그 공급이
+    # 0 건이다(전 데이터셋 432,820행). 그 상태에서 단일 등급만 내보내면 없는 정보를 있는
+    # 척하는 것이 된다. 검수자가 확인해야 할 것이 등급이 아니라 **접근권한**임을 알린다.
+    grade_candidates: list[str] = []
+    grade_candidates_reason: Optional[str] = None
     # 자동확정 위험도 보정 전의 그림자 관측치. 정책을 바꾸지 않고 검수 결과와 연결한다.
     automation_assessment: Optional[AutomationAssessment] = None
 

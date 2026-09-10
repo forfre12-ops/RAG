@@ -608,6 +608,9 @@ class ClassifyService:
                 rule_grade=getattr(pred, "rule_grade", None),
                 model_grade=getattr(pred, "model_grade", None),
                 decision_path=self._decision_path(pred, status, warnings_acc),
+                # [후보집합] M 미확인으로 아직 하나로 정해지지 않은 등급들. label 은 그대로다.
+                grade_candidates=list(getattr(pred, "grade_candidates", None) or []),
+                grade_candidates_reason=getattr(pred, "grade_candidates_reason", None),
                 automation_assessment=automation_assessment,
             )
 

@@ -15,6 +15,9 @@ from koipa.obs.otel import span  # 수동 span — OTel 미설치/미활성 시 
 
 logger = logging.getLogger(__name__)
 
+# _encode_windows 는 배치마다 불린다 — 오버플로 분할 실패를 매 배치 찍으면 로그가 묻힌다.
+_WARNED_OVERFLOW_FALLBACK = False
+
 _PUBLIC_SOURCE_TOKENS = {
     # ── ICD §3.1 이 규정한 source_type enum. **KL 이 실제로 보내는 값이다.**
     # 실측 2026-08-14(인수 팩 A/B 실행): ICD 대로 source_type="public" 을 보냈는데
@@ -228,6 +231,16 @@ class InferenceResult:
     # 판정식으로 설명되지 않는 조합이 뜬다(사용자 지적). 덮기 전 값을 따로 남겨 두 벌을
     # 나란히 보여줄 수 있게 한다. 역산이 없었으면 None(= factors 가 곧 룰 관측값).
     rule_factors: Optional[EvaluationFactors] = None
+    # [후보집합] 비밀관리성(M)을 못 받았을 때 **M 하나로 갈리는 등급들**. 비면 갈릴 것이
+    # 없다는 뜻이다(label 이 유일한 답).
+    #
+    # 왜 필요한가. 정본 공식에서 S1 이 나오는 조합은 (2,2,0) 하나뿐이라 S1 과 TS 를 가르는
+    # 것은 **오직 M** 이다. 그런데 M 공급이 0 건이라(전 데이터셋 432,820행) 배포본은 매번
+    # 둘 중 하나를 찍고 있다 — 없는 정보를 있는 척하는 것이다. 찍은 값은 그대로 두되
+    # (label 계약 보존) 무엇 때문에 갈리는지를 함께 낸다. 검수자가 확인할 것이 등급이
+    # 아니라 **접근권한**임을 알게 된다.
+    grade_candidates: Optional[list[str]] = None
+    grade_candidates_reason: Optional[str] = None
 
 
 _LABELS = [Grade.TS, Grade.S1, Grade.S2, Grade.S3]
@@ -912,6 +925,26 @@ class InferencePipeline:
                     _code, _why = _marking_from_document(text)
                     if _code:
                         m_state, m_lv, m_reason = "present", _ICD_MARKING_TO_M[_code], _why
+                if m_state == "unknown" and result.factors is not None:
+                    # [후보집합] M 을 끝내 못 받았다. 그러면 이 문서의 등급은 **아직 하나로
+                    # 정해지지 않은 것**이다 — 찍은 값을 유일한 답처럼 내보내지 않는다.
+                    # label 은 그대로 둔다(계약 보존). 무엇이 갈림길인지만 함께 낸다.
+                    try:
+                        _s = int(float(getattr(result.factors, "secrecy", 0) or 0))
+                        _v = int(float(getattr(result.factors, "value", 0) or 0))
+                        _cands = sorted(
+                            {_grade_from_svm(_s, _v, _m) for _m in (0, 1, 2)},
+                            key=lambda g: _ORD.get(g, 99),
+                        )
+                    except (TypeError, ValueError):
+                        _cands = []
+                    if len(_cands) > 1:
+                        result.grade_candidates = _cands
+                        result.grade_candidates_reason = (
+                            "비밀관리성(M) 미확인 — 접근범위·보안표시가 없어 "
+                            f"{' 또는 '.join(_cands)} 중 하나로 확정할 수 없습니다. "
+                            "M 이 정해지면 등급이 하나로 정해집니다."
+                        )
                 if m_state != "unknown" and result.factors is not None:
                     try:
                         cur_m = int(float(getattr(result.factors, "management", 0)))
@@ -1383,8 +1416,18 @@ class InferencePipeline:
                 )
                 sample_map = enc.pop("overflow_to_sample_mapping").tolist()
                 return enc, sample_map
-            except Exception:  # noqa: BLE001 — 오버플로 미지원/실패 → truncation 폴백(동작 보존)
-                pass
+            except Exception as exc:  # noqa: BLE001 — 오버플로 미지원/실패 → truncation 폴백(동작 보존)
+                # [무음 예외] 폴백하면 **초과분이 잘린다** — 위 #chunk-trunc 가 적은 그 미탐이
+                # 그대로 되돌아온다. 종전에는 흔적이 없어 "무손실 분할로 돌았다"와 "실패해서
+                # 잘라 먹고 돌았다"를 구분할 수 없었다. 배치마다 불리므로 한 번만 남긴다.
+                global _WARNED_OVERFLOW_FALLBACK
+                if not _WARNED_OVERFLOW_FALLBACK:
+                    _WARNED_OVERFLOW_FALLBACK = True
+                    logger.warning(
+                        "오버플로 윈도우 분할 실패 — truncation 으로 폴백한다. "
+                        "max_seq_len(%s) 초과분이 잘려 그 구간은 미탐될 수 있다 (%s: %s)",
+                        getattr(settings, "max_seq_len", "?"), type(exc).__name__, exc,
+                    )
         enc = self._tokenizer(
             batch, truncation=True, max_length=settings.max_seq_len,
             padding=True, return_tensors="pt",
