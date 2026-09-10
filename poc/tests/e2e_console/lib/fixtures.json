@@ -957,6 +957,14 @@
     "expected_count": 20,
     "estimated_cost_usd": 0.42
   },
+  "GET /synth/jobs/{}": {
+    "synth_job_id": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    "status": "partial",
+    "sample_ids": ["12121212-1212-4121-8121-121212121212"],
+    "persisted": 1,
+    "leakage_gate": {"verdict": "ok", "generated": 2, "admitted": 2, "flagged": [], "metrics": {}},
+    "llm_fallback": {"total": 2, "fallback": 1, "by_source": {"llm_nonjson": 1}}
+  },
   "GET /synth/queue": {
     "total": 2,
     "items": [
@@ -980,6 +988,7 @@
         "quality_score": 0.66,
         "review_status": "pending",
         "preview": "조직 개편 계획 초안 — 대외비.",
+        "label_source": "llm_nonjson",
         "created_at": "2026-08-23T01:41:00Z"
       }
     ]

@@ -145,8 +145,14 @@ export const scenarios = [
       check.includes(page.text('profile-banner'), '지재원', '어느 시스템인지 말한다');
       // [2026-08-24] 문구에서 설정값 이름(noop)을 뺐다 — 화면 문구에 서버 설정 이름을 쓰지
       // 않는다는 기존 판단과 같은 축이다. 시험은 이름이 아니라 **뜻**을 본다.
-      check.matches(page.text('profile-banner'), /판정 LLM.*0건|0건.*판정 LLM/,
-                    '판정 LLM 을 안 쓰면 그 결과가 0건이라고 미리 알린다');
+      // [2026-09-10] 종전 문구 "합성 생성 결과는 0건으로 나옵니다" 는 **사실이 아니었다.**
+      // LLM 이 없어도 자리표시 본문이 만들어져 검수 큐에 쌓인다(생성기 _fallback_body).
+      // 0 이 되는 것은 그 문서가 만드는 **학습 행**이다. 화면이 "결과가 0건"이라고 말하면
+      // 검수 큐에 쌓인 자리표시 문서를 사람이 이상하게 여기지 않는다.
+      check.matches(page.text('profile-banner'), /LLM/,
+                    'LLM 을 쓰지 않는 구성임을 밝힌다');
+      check.matches(page.text('profile-banner'), /학습에 쓰이는 행은 0건/,
+                    '0 이 되는 것이 결과가 아니라 학습 행이라고 말한다');
       // 프로파일 숨김과 탭 숨김을 섞지 않으려고, 각 카드를 자기 탭에서 확인한다.
       for (const el of page.qa('[data-profile="full-train"]')) {
         page.click(page.q(`.tab[data-tab="${el.dataset.pane}"]`));

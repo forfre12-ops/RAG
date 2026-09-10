@@ -270,6 +270,8 @@ class SynthesisService:
                         ),
                         preview=(s.generated_content or "")[:2000],
                         created_at=s.created_at.isoformat() if s.created_at else None,
+                        # 시험 대역은 이 속성을 안 갖고 있을 수 있다 — 없으면 표식 없음.
+                        label_source=getattr(s, "label_source", None),
                     )
                     for s in samples
                 ]
@@ -360,6 +362,7 @@ class SynthesisService:
             sample_ids=sample_ids,
             persisted=rec.get("persisted"),
             leakage_gate=rec.get("leakage_gate"),
+            llm_fallback=rec.get("llm_fallback"),
             error=rec.get("error"),
         )
 

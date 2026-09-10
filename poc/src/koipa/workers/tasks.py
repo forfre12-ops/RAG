@@ -20,6 +20,11 @@ from koipa.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
+# 본문이 LLM 응답이 아닌 것으로 만들어졌다는 표식. 생성기가 찍고
+# (m1_synthesis/generator.py) 학습 편입 게이트가 같은 값을 배제한다
+# (services/synthesis_service.TRAINING_EXCLUDED_LABEL_SOURCES).
+_LLM_FALLBACK_SOURCES = frozenset({"noop_fallback", "llm_nonjson"})
+
 
 def _record_job_done(
     job_id: str | None,
@@ -27,8 +32,14 @@ def _record_job_done(
     results: list[dict],
     completed: int | None = None,
     extra: dict[str, Any] | None = None,
+    status: str = "done",
 ) -> None:
-    """Best-effort JobStore success transition for Celery worker paths."""
+    """Best-effort JobStore terminal transition for Celery worker paths.
+
+    [2026-09-10] status 를 인자로 뺐다. 종전에는 무조건 "done" 이었고, 그래서 합성에서
+    LLM 이 3회 재시도 끝에 실패해도 잡이 성공으로 끝났다 — 화면에서 진짜 성공과 구분이
+    안 됐다. 기본값이 "done" 이라 다른 호출부는 그대로다.
+    """
     if not job_id:
         return
     try:
@@ -37,7 +48,7 @@ def _record_job_done(
         from koipa.services.job_store import get_default_store
 
         fields: dict[str, Any] = {
-            "status": "done",
+            "status": status,
             "completed": len(results) if completed is None else completed,
             "results": results,
         }
@@ -455,12 +466,49 @@ def synthesize_batch(
 
         # [P0#1] 검수큐 적재 — best-effort(예외 미전파: retry→재생성 방지). 루프 마감.
         persisted = _persist_synth_samples(admitted_docs, job_id=job_id, screen=screen)
+
+        # [2026-09-10] LLM 이 실제로 답했는가를 잡 상태에 남긴다.
+        #
+        # 종전에는 LLM 이 3회 재시도 끝에 실패해도 이 자리에서 무조건 done 이었다.
+        # 생성기는 그때 자리표시 본문(noop_fallback)이나 파싱 못 한 원문(llm_nonjson)을
+        # 본문으로 쓰고 검수 큐에 올린다 — 사람이 그것을 검수하게 되는데 화면·API
+        # 어디에도 "실패해서 대체했다"는 말이 없었다(로그에만 있었다).
+        #
+        # 전부 대체본이면 failed, 섞였으면 partial 이다. 만든 문서는 그대로 두고 상태만
+        # 사실대로 적는다 — 지우면 무엇이 잘못됐는지 볼 수 없다.
+        _fb_sources = [
+            str(getattr(d, "label_source", "") or "")
+            for d in docs
+            if getattr(d, "label_source", None) in _LLM_FALLBACK_SOURCES
+        ]
+        _fb_by_source: dict[str, int] = {}
+        for _src in _fb_sources:
+            _fb_by_source[_src] = _fb_by_source.get(_src, 0) + 1
+        if docs and len(_fb_sources) == len(docs):
+            _job_status = "failed"
+        elif _fb_sources:
+            _job_status = "partial"
+        else:
+            _job_status = "done"
+        if _fb_sources:
+            logger.warning(
+                "synth: LLM 응답 실패로 대체본 %d/%d 건 — 잡 상태 %s (job_id=%s · %s)",
+                len(_fb_sources), len(docs), _job_status, job_id, _fb_by_source,
+            )
         _record_job_done(
             job_id,
             results=partial,
             completed=len(partial),
+            status=_job_status,
             extra={
                 "persisted": persisted,
+                # 몇 건이 LLM 응답으로 만들어졌고 몇 건이 대체본인가. 화면이 이 값으로
+                # 경고를 띄운다 — 설정(provider 이름)이 아니라 실제 결과로 말해야 한다.
+                "llm_fallback": {
+                    "total": len(docs),
+                    "fallback": len(_fb_sources),
+                    "by_source": _fb_by_source,
+                },
                 # 게이트 결과를 job 에 남긴다 — 화면·감사에서 "왜 40건 만들었는데
                 # 검수큐엔 12건인가"를 열어보지 않고 알 수 있어야 한다.
                 "leakage_gate": {

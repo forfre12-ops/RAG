@@ -68,6 +68,11 @@ class SyntheticDocItem(BaseModel):
     corrected_grade: Optional[Grade] = None
     preview: Optional[str] = Field(default=None, max_length=2000)
     created_at: Optional[str] = None
+    # [2026-09-10] 본문이 어디서 왔는가. None=LLM 이 정상 응답해 만든 문서.
+    # "noop_fallback"=LLM 없이 만든 자리표시 본문. "llm_nonjson"=LLM 이 JSON 을 못 줘서
+    # 원문을 그대로 본문으로 쓴 것. 뒤 둘은 학습에서 배제되는데(TRAINING_EXCLUDED_
+    # LABEL_SOURCES) **검수자 화면에 그 사실이 없어 본문을 열어야만 알 수 있었다.**
+    label_source: Optional[str] = None
 
 
 class SynthQueueResponse(BaseModel):
@@ -104,6 +109,10 @@ class SynthJobStatus(BaseModel):
     persisted: Optional[int] = None
     # 누출 게이트 결과(판정·생성수·적재수·사유). 없으면 아직 안 돌았거나 옛 잡이다.
     leakage_gate: Optional[dict] = None
+    # [2026-09-10] LLM 이 실제로 답했는가. {"total","fallback","by_source"} 형태.
+    # 종전에는 LLM 이 3회 재시도 끝에 실패해도 잡이 done 이었고 화면·API 어디에도
+    # 표시가 없었다 — 로그에만 있었다. status 와 이 칸을 함께 봐야 사실을 알 수 있다.
+    llm_fallback: Optional[dict] = None
     error: Optional[str] = None
 
 
