@@ -63,6 +63,12 @@ if _requested_mode(sys.argv) == "dryrun":
     # enable_incremental_retrain 일 때만 등록된다(순수 추론 노드엔 없음). 기본 프로파일에서는
     # 404 라 S7.2/S7.3 이 값 없이 SKIP 됐다. dryrun 은 학습 노드 프로파일로 잰다.
     os.environ.setdefault("ENABLE_TRAINING", "1")
+    # S6(합성 생성→검수)은 /synth/generate·/synth/queue 를 부르는데, 합성 라우터는 2026-09-06 부터
+    # enable_training 이 아니라 **자기 스위치** enable_synthetic_generation(기본 False)일 때만
+    # 등록된다(app.py — 지재원 full-train 프로파일만 True). 이 줄이 없어 dryrun 에서 두 경로가
+    # 404 였고, S6.1 은 값 없이 SKIP · S6.4(검수 큐 진입)는 FAIL 로 찍혔다(2026-09-11 실측) —
+    # 제품 결함이 아니라 하니스가 배포 프로필과 같은 스위치를 켜지 않은 것이었다.
+    os.environ.setdefault("ENABLE_SYNTHETIC_GENERATION", "1")
     # PSH 는 TestClient in-process 로 분당 수십 호출이라 slowapi rate-limit(분류 60/min)에 걸린다.
     # 단 이 플래그는 운영 프로파일(poc_mode=full)에서 config 가 fail-clear 로 막는다
     # ("RATE_LIMIT_DISABLED=1 은 운영 모드에서 허용되지 않습니다") — 그래서 dryrun 에서만 켠다.
