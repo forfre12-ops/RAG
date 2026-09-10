@@ -318,7 +318,9 @@ class InferencePipeline:
             )
         self._id2label = cfg_id2label
         self._model.eval()
-        self._device = "cuda" if torch.cuda.is_available() else "cpu"
+        # 장치는 설정이 정한다(기본 cpu). GPU 가 보인다고 옮겨 가지 않는다 — device.py 참조.
+        from koipa.modules.m5_inference.device import serving_device  # noqa: PLC0415
+        self._device = serving_device(torch)
         self._model.to(self._device)
         # [A1] 모델 아티팩트 동봉 temperature.json 자동 로드(보정 자동연결) + 무보정 가시화.
         # 보정 스크립트(calibrate_classifier.py)가 모델 폴더에 {"temperature": T}를 남기면

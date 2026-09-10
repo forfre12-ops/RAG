@@ -40,6 +40,8 @@ _VALID_EMBEDDING_PROVIDER = {"hash", "hf", "huggingface", "kure", "kure-v1", "bg
 _VALID_STORAGE_BACKEND = {"minio", "seaweedfs", "s3", "local"}
 _VALID_POC_MODE = {"dryrun", "full"}
 _VALID_SOURCE_PRIOR_CAP_GRADE = {"S2", "S3"}
+# 서빙 추론 장치(modules/m5_inference/device.py).
+_VALID_CLASSIFIER_DEVICE = {"cpu", "auto", "cuda"}
 
 DEPLOY_PROFILES = ("lite-noapi", "lite-cloud", "onprem-local", "full-train")
 
@@ -459,6 +461,12 @@ class Settings(BaseSettings):
     # temperature를 .env로 주입: CLASSIFIER_TEMPERATURE=1.3 형식. 신뢰도 분포 모니터링은
     # drift_monitor와 연계한다(§9.3).
     classifier_temperature: float = 1.0
+
+    # 서빙 추론 장치 — 분류 모델·요소 모델을 어디에 올리나(cpu | auto | cuda). 기본 cpu:
+    # 설계가 "서빙은 CPU" 다(고객사 배포본이 CPU 전용). auto 는 GPU 가 보이면 GPU.
+    # [2026-09-11] 종전엔 이 칸 없이 GPU 가 보이면 무조건 GPU 였다. 211 워커(학습용 GPU 이미지)의
+    # 비동기 분류가 vLLM 과 GPU 를 나눠 쓰다 99쪽 문서에서 CUDA 메모리 부족으로 실패했다.
+    classifier_device: str = "cpu"
 
     # ── 고객사 야간 무인 재학습 스케줄 (기본 OFF — 수동 트리거) ──────────────────────
     # [정정 2026-08-08] 매일 02:00 무인 발화가 걸려 있었으나 실측이 전제를 부정했다:
@@ -1013,6 +1021,15 @@ class Settings(BaseSettings):
                 f"source_prior_cap_grade는 {sorted(_VALID_SOURCE_PRIOR_CAP_GRADE)} 중 하나여야 합니다 (got {v!r})."
             )
         return v
+
+    @field_validator("classifier_device")
+    @classmethod
+    def _check_classifier_device(cls, v: str) -> str:
+        if str(v).strip().lower() not in _VALID_CLASSIFIER_DEVICE:
+            raise ValueError(
+                f"classifier_device는 {sorted(_VALID_CLASSIFIER_DEVICE)} 중 하나여야 합니다 (got {v!r})."
+            )
+        return str(v).strip().lower()
 
     # 3) 상호관계 — 한 필드만으로 판단 불가한 제약(model_validator, mode='after').
     #    너무 엄격하면 프로파일 적용·부분 .env를 깨므로 '명백한 모순'만 잡는다.

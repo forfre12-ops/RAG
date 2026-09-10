@@ -180,7 +180,8 @@ class FactorInference:
             model = _build_model(self.base, torch, n_classes)
             model.load_state_dict(state)
             model.eval()
-            self._device = "cuda" if torch.cuda.is_available() else "cpu"
+            from koipa.modules.m5_inference.device import serving_device  # noqa: PLC0415
+            self._device = serving_device(torch)
             model.to(self._device)
             self._model = model
             # 요소별 온도가 있으면 싣는다. 없으면 무보정이고 그 사실이 지표에 남는다.
