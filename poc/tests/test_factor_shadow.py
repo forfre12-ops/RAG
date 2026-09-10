@@ -104,11 +104,25 @@ def test_marking_beats_scope_per_icd():
 
 
 # ── 3층: 자동확정 ────────────────────────────────────────────────────────────
-def test_top_grade_is_auto_confirmable_without_confidence():
-    """미탐은 낮게 본 오류이고 TS 는 최상단이라 정의상 미탐이 될 수 없다."""
+def test_top_grade_unsettled_goes_to_review():
+    """[2026-09-10] TS 라도 요소가 미확정이면 자동확정하지 않는다.
+
+    종전 규칙은 "TS 는 정의상 미탐이 될 수 없다"며 무조건 통과시켰다. 미탐이 아닌 것은
+    맞지만 맞다는 뜻은 아니고, 자동확정은 사람이 안 본다는 뜻이라 과분류가 그대로
+    확정된다. 실측 1,055건에서 자동확정 509건이 전부 TS 였고 그 65.8%가 TS 가 아니었다.
+    """
     p = apply_serving_gate((CLS_UNKNOWN, CLS_UNKNOWN, CLS_UNKNOWN), _p(3, 3, 3, conf=0.3))
+    assert p.serving_grade == "TS"          # 보수적 완성은 그대로 — 등급은 안 낮춘다
+    assert p.auto_confirmable is False      # 다만 사람이 본다
+    assert "layer3:needs_review" in p.reasons
+
+
+def test_top_grade_settled_and_confident_is_auto_confirmable():
+    """요소가 다 확정되고 확신이 문턱을 넘으면 TS 도 자동확정된다."""
+    p = apply_serving_gate((CLS_LV2, CLS_LV2, CLS_LV2), _p(2, 2, 2, conf=1.0), tau=0.99)
     assert p.serving_grade == "TS"
     assert p.auto_confirmable is True
+    assert "layer3:top_grade_settled" in p.reasons
 
 
 def test_unsettled_low_grade_goes_to_review():

@@ -259,11 +259,19 @@ def apply_serving_gate(codes, probs, *, metadata=None, tau: float = 0.99,
     grade = grade_from_svm(*[cls_to_worst(c) for c in c3])
     settled = all(c != CLS_UNKNOWN for c in c3)
     conf_ok = (min(max(p) for p in probs) >= tau) if probs else False
-    if grade == "TS":
-        # 3층 — 미탐은 낮게 본 오류이고 TS 는 최상단이라 정의상 미탐이 될 수 없다.
-        auto, why = True, "layer3:top_grade"
-    elif settled and conf_ok:
-        auto, why = True, "layer3:settled_and_confident"
+    # 3층 — 자동확정 자격. 요소가 전부 확정되고 확신이 문턱을 넘을 때만 준다.
+    #
+    # ⚠ [2026-09-10] 종전엔 등급이 TS 면 요소가 미확정이어도 무조건 통과시켰다
+    #   ("미탐은 낮게 본 오류이고 TS 는 최상단이라 정의상 미탐이 될 수 없다").
+    #   미탐이 아니라는 것은 맞지만 **맞다는 뜻은 아니다.** 자동확정은 사람이 안 본다는
+    #   뜻이라 그 문으로 과분류가 그대로 확정된다.
+    #   실측(tmp/sweep_clean_v8_caus.jsonl 1,055건): 자동확정 자격 509건이 전부 TS 였고
+    #   그 라벨은 TS 174 · S1 115 · S2 73 · S3 147 — **65.8%가 TS 가 아니었다.**
+    #   근본 원인은 M 공급 0건이라 요소가 안 채워지는 것이다(3요소 확정 16/1,055 = 1.5%).
+    #   그 공백을 자동확정으로 덮지 않는다.
+    if settled and conf_ok:
+        auto = True
+        why = "layer3:top_grade_settled" if grade == "TS" else "layer3:settled_and_confident"
     else:
         auto, why = False, "layer3:needs_review"
     reasons.append(why)
