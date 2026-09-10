@@ -120,7 +120,9 @@ def audit() -> dict:
         return {k: {kk: sorted(vv) for kk, vv in v.items()} for k, v in d.items() if len(v) > 1}
 
     created, dropped = _alembic_live_tables()
-    spec = {t["name"] for t in tables}
+    # [2026-09-11] 원시 SQL 로만 만든 표(문서 벡터)도 정의서가 싣는다(build_table_spec.parse_vector_tables).
+    # models.py 만 보면 그 표를 늘 '정의서 밖'으로 센다.
+    spec = {t["name"] for t in tables} | {t["name"] for t in B.parse_vector_tables()}
     part = re.compile(r"^(.+)_(?:\d{4}_\d{2}|default)$")
 
     def _now(n: str) -> str:
