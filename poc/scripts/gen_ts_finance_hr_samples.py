@@ -52,7 +52,31 @@ SCENARIOS = {
     ],
 }
 # 등급명 노출 — 본문이 등급을 스스로 말하면 분류기는 본문 대신 그 단어를 배운다.
-_GRADE_WORDS = re.compile(r"특급\s*기밀|극비|1\s*급\s*비밀|2\s*급|3\s*급|대외비|일반\s*공개|\b(TS|S1|S2|S3)\b")
+# [2026-09-11] 첫 판은 완성된 등급명('특급기밀'·'1급비밀')만 봤다. 학습셋(v7a)을 세어 보니 낱말
+# 자체가 등급을 알려준다 — '기밀'이 든 행이 TS 의 69.1%(다른 등급 1.6~6.0%), '비밀'이 S1 의 77.3%,
+# '대외비'가 S2 의 66.4%. 그래서 낱말 단위로 막는다('영업비밀'도 여기에 걸린다).
+_GRADE_WORDS = re.compile(r"기밀|비밀|극비|대외비|일반\s*공개|[1-3]\s*급|\b(TS|S1|S2|S3)\b")
+
+
+def _refilter(out: Path) -> int:
+    """생성하지 않고 이미 만든 samples.jsonl 에 지금의 등급명 필터를 다시 건다.
+
+    첫 판 필터로 받은 24건 중 5건이 '기밀'·'비밀'을 가졌다. 나머지는 고친 필터를 그대로
+    통과하므로 다시 만들지 않는다 — 다시 만들면 걸러낸 것이 아니라 표본이 바뀐다.
+    """
+    p = out / "samples.jsonl"
+    rows = [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
+    keep = [r for r in rows if not _GRADE_WORDS.search(r["text"])]
+    p.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in keep), encoding="utf-8")
+    mp = out / "manifest.json"
+    manifest = json.loads(mp.read_text(encoding="utf-8")) if mp.exists() else {}
+    manifest["refilter"] = {"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "pattern": _GRADE_WORDS.pattern,
+                            "before": len(rows), "dropped_grade_words": len(rows) - len(keep)}
+    manifest["accepted"] = len(keep)
+    manifest["by_domain"] = dict(Counter(r["domain"] for r in keep))
+    mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(json.dumps(manifest, ensure_ascii=False))
+    return 0 if keep else 1
 
 
 def main(argv=None) -> int:
@@ -62,7 +86,10 @@ def main(argv=None) -> int:
     ap.add_argument("--model", default="qwen3:14b")
     ap.add_argument("--base-url", default="http://localhost:11434/v1")
     ap.add_argument("--out", default="datasets/synth_ts_fin_hr_20260911")
+    ap.add_argument("--refilter", action="store_true", help="생성하지 않고 기존 samples.jsonl 에 필터만 다시 건다")
     a = ap.parse_args(argv)
+    if a.refilter:
+        return _refilter(_POC / a.out)
 
     from koipa.adapters.llm.local_openai_provider import LocalOpenAIProvider  # noqa: PLC0415
     from koipa.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator  # noqa: PLC0415
