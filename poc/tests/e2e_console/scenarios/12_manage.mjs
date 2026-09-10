@@ -326,6 +326,81 @@ export const scenarios = [
     },
   },
 
+  // [2026-09-11] 「평가정답으로 승격」은 9/9(e22088da)에 생겼는데 누르는 시험이 0건이었다 —
+  // 픽스처에 응답만 있고 시나리오가 없었다. 콘솔 검수 결정이 평가정답이 되는 유일한 화면 경로다.
+  {
+    id: 'manage.promote.reports-counts',
+    title: '승격을 누르면 게시로 보내고, 몇 건이 평가정답이 됐는지(그중 실문서 몇 건인지) 말한다',
+    needsMock: true,
+    writes: true,
+    async run({ server, check }) {
+      const page = await manage(server);
+      page.click('promote');
+      await page.settle();
+
+      const call = server.lastCall('POST', '/golden/candidates/promote');
+      check.ok(call, '승격 요청이 나갔다');
+      check.eq(call?.body?.publish, true, '배포 판정 경로까지 게시한다');
+      const msg = page.text('promoteMsg');
+      check.includes(msg, '승격 3건', '이번에 승격된 건수');
+      check.includes(msg, '누적 평가정답 3건', '누적 건수');
+      check.includes(msg, '실문서 1건', '그중 실문서 건수 — 합성 서명과 갈라 보인다');
+      check.ok(!msg.includes('반영되지 않았습니다'), '게시됐으면 미반영 경고를 띄우지 않는다');
+      check.eq(page.$('promote')?.disabled, false, '끝나면 버튼이 다시 눌린다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'manage.promote.unpublished-and-rejected-are-said',
+    title: '서명으로 인정되지 않은 결정과 배포 판정 미반영을 숨기지 않는다',
+    needsMock: true,
+    writes: true,
+    async run({ server, check }) {
+      const { FIXTURES } = await import('../lib/server.mjs');
+      server.overrides['POST /golden/candidates/promote'] = {
+        ...FIXTURES['POST /golden/candidates/promote'],
+        locked: 0,
+        rejected: 2,
+        rejected_reasons: { machine_actor: 2 },
+        published: false,
+        publish_note: 'locked_eval_jsonl 이 비어 있다',
+      };
+      const page = await manage(server);
+      page.click('promote');
+      await page.settle();
+
+      const msg = page.text('promoteMsg');
+      check.includes(msg, '승격 0건', '0건도 0건이라고 말한다');
+      check.includes(msg, '서명으로 인정되지 않은 결정 2건', '거부된 결정 수를 말한다');
+      check.includes(msg, '배포 판정에는 아직 반영되지 않았습니다', '게시되지 않았으면 그렇다고 말한다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'manage.promote.failure-visible',
+    title: '승격이 실패하면 오류로 표시하고, 버튼을 다시 살린다',
+    needsMock: true,
+    writes: true,
+    async run({ server, check }) {
+      const page = await manage(server);
+      server.faults.push({
+        path: '/golden/candidates/promote', method: 'POST', status: 500,
+        body: { detail: '평가정답 파일을 쓰지 못했습니다(권한)' },
+      });
+      page.click('promote');
+      await page.settle();
+
+      check.includes(page.text('promoteMsg'), '승격하지 못했습니다', '실패했다고 말한다');
+      check.includes(page.$('promoteMsg')?.className || '', 'error', '오류 표시로 뜬다');
+      check.eq(page.$('promote')?.disabled, false, '버튼이 다시 눌린다');
+      return page;
+    },
+  },
+
   {
     id: 'manage.provenance.partial-record',
     title: '실문서 후보에는 출처 기록 칸이 뜨고, 미완이면 그렇게 표시된다',
