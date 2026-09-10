@@ -40,7 +40,7 @@ DEMO_BASE_URL=http://<서버>:8000  DEMO_API_KEY=<키>  python scripts/demo_e2e_
 | `register_deployed_model.py`<br>`seed_active_model_version.py` | 배포 모델 등록·활성 버전 시드 | [INSTALL](../docs/INSTALL.md) |
 | `seed_keywords.py` | 태깅 키워드 시드 DB 적재 | — |
 | `docker_install_locked.sh` | **Dockerfile 3종이 호출** — `uv.lock` 고정 설치. 직접 실행할 일은 없다 | — |
-| `sql/check_not_null_readiness.sql` | **운영 DB 사전 점검(읽기 전용)** — NOT NULL 승격 전 대상 28컬럼의 NULL 유무 확인 | — |
+| `sql/check_not_null_readiness.sql` | **운영 DB 사전 점검(읽기 전용)** — NOT NULL 승격 전 대상 28컬럼의 NULL 유무 확인. ⚠ 옛 물리명(tb_*)으로 적혀 있어 **표준명 개명(7b3e9d2a4f10) 전 DB 에서만** 돈다 — 마이그레이션을 올리기 전에 돌리는 점검이라 그때는 맞고, 개명 이후 DB 에서는 실패한다 | — |
 
 ---
 

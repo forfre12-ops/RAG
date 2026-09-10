@@ -1213,7 +1213,7 @@ function renderSummary(data) {
   //   확정적으로 읽힌다. 자동확정을 가르는 것도 이 값 단독이 아니다.
   //
   //   ⚠ 지운 것은 **화면뿐**이다. confidence 는 API 응답(openapi_koipa_kl.yaml 에서
-  //   required) · DB(tb_classifications) · 감사로그 · reports 에 그대로 남는다. 감리에서
+  //   required) · DB(tad_cm_clsf_rslt_mng) · 감사로그 · reports 에 그대로 남는다. 감리에서
   //   "왜 이 판정인가" 를 재구성할 근거는 없어지지 않는다.
   const wrap = $("#result-summary");
   wrap.innerHTML = `

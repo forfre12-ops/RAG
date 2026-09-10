@@ -69,11 +69,15 @@ _MAPPING = ("poc/src/koipa/db/standard_names.py", "scripts/table_spec_meta.py",
             "scripts/build_table_spec.py", "poc/scripts/build_erd.py",
             "poc/scripts/audit_old_db_names.py", "poc/scripts/audit_schema_consistency.py")
 _RISKY_KINDS = ("string", "code", "text")
+# 마이그레이션을 올리기 **전** DB 에서 돌리는 점검 — 그때는 옛 이름이 맞다(파일 머리말에 조건을 적었다).
+_PRE_RENAME = ("poc/scripts/sql/check_not_null_readiness.sql",)
 
 
 def _category(rel: str) -> str:
     if rel.startswith("poc/alembic/versions/"):
         return "history"
+    if rel in _PRE_RENAME:
+        return "pre_rename"
     if rel in _MAPPING:
         return "mapping"
     if rel.startswith(("doc/", "poc/doc/", "poc/docs/")) or rel.endswith(".md"):
@@ -183,7 +187,7 @@ def main(argv=None) -> int:
     r = scan()
     print(f"분모: 텍스트 파일 {r['denominator_files']}개 (git ls-files -z) · 옛 표 {len(TABLES)} · "
           f"옛 칼럼(SQL 문장 안, 흔한 단어 제외) {r['changed_cols_checked']}")
-    for cat in ("code", "archive", "data", "mapping", "history", "doc"):
+    for cat in ("code", "pre_rename", "archive", "data", "mapping", "history", "doc"):
         row = {k: v for (c, k), v in r["per_cat"].items() if c == cat}
         files = len({h[0] for h in r["hits"].get(cat, [])})
         print(f"  {cat:8s} 파일 {files:3d} · 줄 {sum(row.values()):4d}  {dict(sorted(row.items()))}")

@@ -485,7 +485,7 @@ SERVING_GATE_FAIL_OPEN_TOTAL = Counter(
 # 검수큐 적재 자체가 0 = 유일 자동화 레버(운영학습)의 입력원이 단절돼 있었다.
 SYNTH_SAMPLE_PERSISTED_TOTAL = Counter(
     "koipa_synth_sample_persisted_total",
-    "Synthetic docs persisted to review queue (tb_sample_documents) by synthesize_batch, by body-source marker",
+    "Synthetic docs persisted to review queue (tad_sm_syn_doc_mng) by synthesize_batch, by body-source marker",
     ["label_source"],  # clean | noop_fallback | llm_nonjson
     registry=registry,
 )

@@ -16,6 +16,11 @@
 --
 -- 참고: 한국지식재산보호원 개발 DB 실측(2026-08-11)은 28컬럼 10,285행 전수 NULL 0 이었다.
 --       그것은 개발 DB 기준이며 운영 DB 를 대신하지 않는다 — 그래서 이 점검이 필요하다.
+--
+-- ⚠ [2026-09-11] 이 파일은 옛 물리명(tb_*)으로 적혀 있다. 표준명 개명(migration 7b3e9d2a4f10,
+--   정본 poc/src/koipa/db/standard_names.py) **전** DB 에서만 돈다. 마이그레이션을 올리기 전에
+--   돌리는 점검이므로 그때는 옛 이름이 맞다 — 5c1d9e0a7b34(created_at NOT NULL 9개 표)도 NULL 행이
+--   있으면 멈추게 돼 있으니, 서버에 올리기 전에 이 점검으로 먼저 센다. 개명 이후 DB 에서는 실패한다.
 
 WITH counts AS (
   SELECT 'tb_audit_log'::text AS tbl, 'success'::text AS col,

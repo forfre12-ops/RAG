@@ -244,7 +244,7 @@ class AuditLogResponse(BaseModel):
     dependencies=_ADMIN_ONLY,
     summary="감사 로그 조회 — 누가 언제 무엇을 했는가",
     description=(
-        "tb_audit_log 를 최근순으로 조회한다. 종전에는 미들웨어가 **쓰기만** 하고 읽는 경로가 "
+        "감사로그관리 표(tad_am_adt_log_mng)를 최근순으로 조회한다. 종전에는 미들웨어가 **쓰기만** 하고 읽는 경로가 "
         "없어(라우트 0건), 35,000행이 쌓여 있어도 화면에서 확인할 방법이 없었다. "
         "action(부분일치)·success·actor_id 로 좁힐 수 있다. "
         "응답의 actorless_ratio 는 행위자 신원이 비어 있는 비율이다 — 공유 API 키 모드에서는 "

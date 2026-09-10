@@ -134,7 +134,7 @@ def review_queue(
     "/review-queue/{classification_id}/evidence",
     summary="검수 1건의 근거 — '왜 이 등급인가' (저장분 조회, 재추론 없음)",
     description=(
-        "분류 시점에 tb_classification_evidence 로 적재된 근거를 그대로 반환한다(FUN-023 근거 "
+        "분류 시점에 분류근거관리 표(tad_cm_clsf_bss_mng)에 적재된 근거를 그대로 반환한다(FUN-023 근거 "
         "출력 · FUN-024 검수자 UI). 재분류하지 않는다 — /classify/explain 은 문서를 다시 "
         "분류하므로 (1) 큐가 가진 300자 미리보기로는 원문과 다른 결과가 나오고 (2) 그 사이 "
         "모델이 바뀌면 화면의 등급과 근거가 어긋난다. 저장분은 그 등급을 실제로 만든 근거다. "
