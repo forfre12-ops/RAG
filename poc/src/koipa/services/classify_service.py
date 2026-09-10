@@ -34,6 +34,9 @@ StageCallback = Callable[[str], None]
 
 logger = logging.getLogger(__name__)
 
+# 섀도 비교 실패는 문서마다 반복된다 — 매 건 찍으면 로그가 묻히므로 한 번만 남긴다.
+_WARNED_FACTOR_SHADOW = False
+
 import re as _re  # noqa: E402
 
 # [FIX-D] 공개특허공보 마스트헤드 탐지 — 서지헤더 3요소가 문서 '머리'에 동시 존재할 때만 True.
@@ -514,8 +517,22 @@ class ClassifyService:
                             + " · conf=" + str(factor_shadow["min_confidence"])
                             + " (계량 전용 — 등급·상태 미변경)"
                         )
-            except Exception:  # noqa: BLE001 — 섀도 실패가 분류를 막지 않는다
+            except Exception as _shadow_exc:  # noqa: BLE001 — 섀도 실패가 분류를 막지 않는다
                 factor_shadow = None
+                # [무음 예외] None 은 "섀도를 안 켰다"와 "켰는데 죽었다"가 같은 값이다.
+                # 그래서 체크포인트 경로가 틀렸거나 모델 적재가 실패해도 조용히 측정만
+                # 사라지고, v8 승격 근거가 비어 가는 것을 아무도 모른다. 등급에는 영향이
+                # 없으므로 **동작은 그대로 두고** 흔적만 남긴다. 응답에 실을지는 별개 결정이다.
+                global _WARNED_FACTOR_SHADOW
+                if not _WARNED_FACTOR_SHADOW:
+                    _WARNED_FACTOR_SHADOW = True
+                    logger.warning(
+                        "factor-shadow 비교 실패 — 이 문서부터 섀도 계량이 비어 있다 "
+                        "(model_dir=%r · %s: %s)",
+                        # settings import 자체가 깨졌으면 _fs 가 없다 — 그 경우도 찍혀야 한다.
+                        getattr(locals().get("_fs"), "factor_model_dir", "?"),
+                        type(_shadow_exc).__name__, _shadow_exc,
+                    )
 
             # [agreement-gate] 등급차등 + 룰·모델 합의 게이트 (opt-in, 기본 off).
             # conf 단독 자동확정은 신뢰성이 측정으로 부정됨(golden500: AUROC 0.58, 자동확정

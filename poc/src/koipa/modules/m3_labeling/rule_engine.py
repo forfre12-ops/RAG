@@ -510,6 +510,14 @@ class LabelRuleEngine:
                 self.semantic_threshold = float(env_thr)
             except ValueError:
                 self.semantic_threshold = _settings_semantic_threshold()
+                # [무음 예외] 숫자가 아닌 값을 넣으면 조용히 settings 값으로 돌아갔다.
+                # 운영자는 환경변수로 문턱을 바꿨다고 믿는데 실제로는 안 바뀐다 —
+                # 오타 하나가 룰 매칭 문턱을 되돌리고 등급이 달라진다. 동작은 그대로 둔다.
+                logger.warning(
+                    "EMB_SEMANTIC_THRESHOLD=%r 이 숫자가 아니라 무시했다 — "
+                    "설정값 %s 로 진행한다",
+                    env_thr, self.semantic_threshold,
+                )
         else:
             self.semantic_threshold = _settings_semantic_threshold()
         # seed.value 임베딩 캐시 — 동일 seed 반복 평가 시 재계산 방지

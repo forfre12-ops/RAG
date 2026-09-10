@@ -5,6 +5,7 @@ extractor.py / normalizer.py / chunker.py 가 단일 책임. 본 모듈은 조�
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -12,6 +13,11 @@ from koipa.modules.m2_preprocess.chunker import Chunk, split_v2
 from koipa.modules.m2_preprocess.extractor import ExtractResult, extract
 from koipa.modules.m2_preprocess.normalizer import normalize, quality_score
 from koipa.modules.m2_preprocess.pii_masker import mask_pii
+
+logger = logging.getLogger(__name__)
+
+# run_text 는 문서마다 불린다 — 설정 읽기 실패를 매 건 찍으면 로그가 묻힌다. 한 번만 남긴다.
+_WARNED_MASK_INPUT = False
 
 
 @dataclass
@@ -49,11 +55,21 @@ class PreprocessPipeline:
                 if pii_masking is not None
                 else bool(getattr(settings, "pii_masking_enabled", True))
             )
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             # pydantic-settings 미설치 시 합리적 기본값
             self.chunk_size = chunk_size or 512
             self.chunk_overlap = chunk_overlap or 64
             self.pii_masking = True if pii_masking is None else pii_masking
+            # [무음 예외] 청크 크기가 설정값과 달라지면 긴 문서가 몇 조각으로 갈리는지가
+            # 바뀌고, 조각마다 나온 점수를 합산하므로 **등급이 달라질 수 있다**. 종전에는
+            # 흔적이 없어 "설정 256 으로 돌았다"와 "못 읽어 512 로 돌았다"를 운영에서
+            # 구분할 방법이 없었다. 미설치 폴백은 의도된 동작이므로 동작은 그대로 둔다.
+            logger.warning(
+                "전처리 설정을 못 읽어 기본값으로 진행 — chunk_size=%s overlap=%s "
+                "pii_masking=%s (%s: %s)",
+                self.chunk_size, self.chunk_overlap, self.pii_masking,
+                type(exc).__name__, exc,
+            )
 
     # ClassifyService.run_text 호환 — 분류기 *입력* 전처리(정규화). 기본 무마스킹.
     def run_text(self, text: str) -> str:
@@ -69,8 +85,18 @@ class PreprocessPipeline:
         try:
             from koipa.config import settings  # noqa: PLC0415
             mask_input = bool(getattr(settings, "pii_mask_classifier_input", False))
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             mask_input = False
+            # [무음 예외] 설정을 못 읽으면 마스킹 없이 원문이 분류기로 들어간다. 그것이
+            # 의도된 기본값이지만(위 docstring 의 #pii-skew), **설정으로 켜 둔 줄 알았는데
+            # 안 켜진 경우**와 구분이 안 됐다. run_text 는 문서마다 불리므로 한 번만 남긴다.
+            global _WARNED_MASK_INPUT
+            if not _WARNED_MASK_INPUT:
+                _WARNED_MASK_INPUT = True
+                logger.warning(
+                    "pii_mask_classifier_input 설정을 못 읽어 마스킹 없이 진행 (%s: %s)",
+                    type(exc).__name__, exc,
+                )
         if mask_input:
             return mask_pii(normalized).text
         return normalized

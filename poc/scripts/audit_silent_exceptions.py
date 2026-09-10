@@ -39,6 +39,7 @@ force_utf8_stdio()
 
 import argparse
 import ast
+import re
 import sys
 from pathlib import Path
 
@@ -67,6 +68,8 @@ def _is_trace(node: ast.AST) -> bool:
     """이 노드가 '흔적을 남기는' 행위인가."""
     if isinstance(node, ast.Raise):
         return True
+    if isinstance(node, ast.Return):
+        return _return_carries_failure(node)
     if not isinstance(node, ast.Expr):
         return False
     call = node.value
@@ -78,6 +81,41 @@ def _is_trace(node: ast.AST) -> bool:
         return False
     low = name.lower()
     return low in _LOG_NAMES or any(h in low for h in _TRACE_HINTS)
+
+
+# 반환값에 실패를 담는 패턴을 흔적으로 인정한다.
+#
+# 왜(2026-09-10 실측). 종전에는 로그·메트릭 **호출**만 흔적으로 봤다. 그래서
+# extractor.py 의 이 코드가 '무음'으로 잡혔다:
+#
+#     return ([], [f"pdf_table_extractor_error:{type(exc).__name__}"])
+#
+# 호출자가 그 warnings 를 받아 검수 라우팅까지 태우는데도 결함으로 셌다. 이미 올바른
+# 자리를 결함으로 세면 목록의 신뢰가 떨어지고, 고칠 자리를 가리게 된다.
+#
+# 키워드(error=·warnings=)와 **위치 인자 문자열**(위 예처럼 튜플 안에 사유를 담는 형태)
+# 둘 다 본다. 실패를 뜻하는 낱말이 들어간 문자열 리터럴이 반환값 어딘가에 있으면 흔적이다.
+_FAIL_KW = ("error", "warning", "warnings", "detail", "reason", "status", "quality")
+_FAIL_WORD = re.compile(r"fail|error|unavailable|missing|incomplete|timeout|denied|invalid")
+
+
+def _return_carries_failure(node: ast.Return) -> bool:
+    if node.value is None:
+        return False
+    for sub in ast.walk(node.value):
+        # error=... · warnings=[...] 처럼 이름 붙은 자리
+        if isinstance(sub, ast.keyword) and sub.arg and sub.arg.lower() in _FAIL_KW:
+            return True
+        # 위치 인자로 사유 문자열을 담는 자리 — 상수든 f-string 이든
+        if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+            if _FAIL_WORD.search(sub.value.lower()):
+                return True
+        if isinstance(sub, ast.JoinedStr):
+            lit = "".join(v.value for v in sub.values
+                          if isinstance(v, ast.Constant) and isinstance(v.value, str))
+            if _FAIL_WORD.search(lit.lower()):
+                return True
+    return False
 
 
 def _only_import_error(handler: ast.ExceptHandler) -> bool:
@@ -127,7 +165,8 @@ def scan(py: Path) -> list[tuple[int, str, bool]]:
         if not isinstance(tnode, ast.Try):
             continue
         for node in tnode.handlers:
-            if any(_is_trace(st) for st in ast.walk(node) if isinstance(st, (ast.Raise, ast.Expr))):
+            if any(_is_trace(st) for st in ast.walk(node)
+                   if isinstance(st, (ast.Raise, ast.Expr, ast.Return))):
                 continue
             t = node.type
             label = ast.unparse(t) if t is not None else "bare except"
