@@ -119,7 +119,11 @@ KPIS: list[KPI] = [
 
     # S6
     KPI("S6.1", "S6", "generate 202 latency", "ms", "le", 500, "p95"),
-    KPI("S6.2", "S6", "라벨 일치도", "ratio", "ge", 0.90, "last", core=True),
+    # full_only(2026-09-11): dryrun 은 noop 공급자로 합성해 본문이 자리표시 더미다. 더미에 룰 라벨러를
+    # 돌리면 등급을 가를 단서가 없어 20건 전부 S2 가 나오고, 4등급 중 하나가 우연히 맞은 25% 가
+    # 매번 FAIL 로 찍혔다(9/6 · 9/11 실측 동일). 구조상 아무것도 재지 못하는 값을 미달로 보고하면
+    # 진짜 미달과 섞인다 — 실 LLM 으로 도는 full 에서만 판정한다. 측정 경로는 그대로다.
+    KPI("S6.2", "S6", "라벨 일치도", "ratio", "ge", 0.90, "last", core=True, full_only=True),
     KPI("S6.3", "S6", "비용/건", "USD", "le", 0.02, "last", requires=["llm"]),
     KPI("S6.4", "S6", "검수 큐 진입", "bool", "ge", True, "bool_all"),
     KPI("S6.5", "S6", "approve 후 dataset 연결", "bool", "ge", True, "bool_all", requires=["pg"]),
