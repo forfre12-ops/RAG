@@ -26,7 +26,19 @@ from pathlib import Path
 _POC = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_POC / "src"))
 
-_TERMINAL = {"done", "completed", "succeeded", "success", "failed", "error", "cancelled", "canceled"}
+# partial = 일부 단계가 폴백으로 끝난 작업 — job_store 가 done·failed 와 함께 종료 상태로 센다.
+# [2026-09-11] 첫 판은 partial 을 빠뜨려 이미 끝난 작업을 제한시간(900초)까지 기다렸고, 그 900초가
+# '비동기 처리시간'으로 찍혔다. 끝난 시각은 async_terminal_ms 로 따로 적는다.
+_TERMINAL = {"done", "partial", "completed", "succeeded", "success", "failed", "error", "cancelled", "canceled"}
+# 응답에서 남길 칸 — 첫 판은 없는 키(grade·chunk_count)를 읽어 등급이 전부 null 로 찍혔다.
+_KEEP = ("label", "model_grade", "rule_grade", "decision_path", "elapsed_ms", "status", "model_version", "warnings")
+
+
+def _pick(body: dict) -> dict:
+    out = {k: body.get(k) for k in _KEEP if k in body}
+    if isinstance(out.get("warnings"), list):
+        out["warnings"] = [str(w)[:200] for w in out["warnings"][:10]]
+    return out
 
 
 def main(argv=None) -> int:
@@ -65,10 +77,7 @@ def main(argv=None) -> int:
             res["sync_ms"] = round((time.perf_counter() - t) * 1000, 1)
             res["sync_status"] = r.status_code
             try:
-                body = r.json()
-                res["sync_keys"] = sorted(body)[:20]
-                res["sync_grade"] = body.get("grade") or body.get("predicted_grade") or body.get("level")
-                res["sync_chunks"] = body.get("chunk_count")
+                res["sync"] = _pick(r.json())
             except ValueError:
                 res["sync_body"] = r.text[:300]
         t = time.perf_counter()
@@ -82,6 +91,7 @@ def main(argv=None) -> int:
         except ValueError:
             res["async_body"] = r.text[:300]
         jid = job.get("job_id")
+        res["job_id"] = jid
         last = None
         while jid and time.perf_counter() - t < a.timeout:
             rj = cli.get(f"/api/v1/classify/jobs/{jid}", headers=_hdr())
@@ -90,11 +100,13 @@ def main(argv=None) -> int:
             except ValueError:
                 last = {"raw": rj.text[:200]}
             if str(last.get("status", "")).lower() in _TERMINAL:
+                res["async_terminal_ms"] = round((time.perf_counter() - t) * 1000, 1)
                 break
             time.sleep(1.0)
         res["async_total_ms"] = round((time.perf_counter() - t) * 1000, 1)
         res["async_final_status"] = (last or {}).get("status")
         if isinstance(last, dict):
+            res["async_error"] = last.get("error")
             # 작업 결과는 results 목록(async_classify_service: results=[result_json])에 담긴다.
             rr = last.get("result") or ((last.get("results") or [None])[0]) or {}
             if isinstance(rr, str):
@@ -102,8 +114,8 @@ def main(argv=None) -> int:
                     rr = json.loads(rr)
                 except ValueError:
                     rr = {}
-            res["async_grade"] = rr.get("grade") or rr.get("predicted_grade") if isinstance(rr, dict) else None
-            res["async_chunks"] = rr.get("chunk_count") if isinstance(rr, dict) else None
+            if isinstance(rr, dict):
+                res["async"] = _pick(rr)
     stop.set()
     th.join(timeout=1)
     if samples:
