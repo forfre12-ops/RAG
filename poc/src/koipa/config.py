@@ -451,8 +451,13 @@ class Settings(BaseSettings):
     # (register_and_gate/rollback이 활성화한 버전)의 model_uri를 우선 로드하고, 없거나 로컬
     # 디렉토리가 아니면 classifier_model_dir(env)로 폴백한다. 이로써 activate/rollback이 실제
     # 서빙 모델을 바꾼다(기존엔 env만 읽어 DB 장부와 서빙이 분리됐음). 활성 버전이 없으면
-    # 기존 동작(env) 그대로라 동작 보존. 모델 전환은 서비스 초기화(재기동) 시점에 반영.
+    # 기존 동작(env) 그대로라 동작 보존. 모델 전환은 기동 시점과 아래 주기 확인 때 반영.
     serving_prefer_active_model: bool = True
+    # [2026-09-11 · NFR-OPS-01] 프로세스마다 활성 모델을 이 간격(초)으로 스스로 확인해, 다른 프로세스가
+    # 활성화·롤백한 모델을 따라간다(ClassifyService._maybe_refresh_model). 종전에는 그 요청을 받은
+    # 프로세스만 갱신돼 나머지 API 워커와 Celery 워커(비동기 분류)가 옛 모델로 판별했다.
+    # 0 이하면 끈다(재기동해야 갱신되는 종전 동작).
+    serving_model_refresh_seconds: float = 30.0
 
     # 서빙 softmax temperature scaling 계수 (pipeline.py 추론 경로).
     # 분류기 softmax는 OOD(학습에 없던 새 문체)에서 과신(overconfident)하는 경향이 있어

@@ -23,8 +23,9 @@ services:
     env_file: !override
       - "${ENV_FILE:-.env.prod}"
     environment: !override
-      # WEB_CONCURRENCY 멀티워커는 프로모션 후 /admin/model/reload 팬아웃 미구현[NFR-OPS-01]이라
-      # 워커별 stale 가능 — 초기엔 1 권장(재기동으로 갱신).
+      # WEB_CONCURRENCY 멀티워커: 모델 활성화·롤백은 처리한 워커만 즉시 갱신하고, 나머지 워커는
+      # serving_model_refresh_seconds(기본 30초) 안에 스스로 따라간다[NFR-OPS-01 · 2026-09-11].
+      # 그 사이 잠깐은 워커마다 모델이 다를 수 있다 — 초기엔 1 권장.
       WEB_CONCURRENCY: "${WEB_CONCURRENCY:-1}"
       EMBEDDING_PROVIDER: hf
       # ⚠ 기본값이 **다른 파일과 달라 색인과 질의가 갈렸다**(실측 2026-08-17, KL 223).

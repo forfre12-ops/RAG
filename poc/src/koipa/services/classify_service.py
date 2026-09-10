@@ -13,6 +13,8 @@ from __future__ import annotations
 import logging
 import os
 import re
+import threading
+import time
 import uuid
 import warnings
 from typing import Callable, Optional
@@ -131,6 +133,50 @@ def _resolve_serving_model_dir() -> Optional[str]:
     return _active_model_dir() or env_dir
 
 
+class _ActiveLookupFailed(Exception):
+    """활성 모델 조회 자체가 실패했다(DB 미가용 등) — '활성 모델 없음'과 다른 사실이다."""
+
+
+def _resolve_serving_model_dir_strict() -> Optional[str]:
+    """_resolve_serving_model_dir 와 같되, DB 조회가 **실패하면 예외**를 낸다.
+
+    주기 확인(ClassifyService._maybe_refresh_model) 전용이다. 비엄격판은 DB 오류를
+    '활성 모델 없음'으로 보고 env 경로로 폴백한다 — 기동 시에는 그게 맞다. 그러나 주기
+    확인에서 그렇게 하면 DB 가 잠깐 끊긴 사이에 **서빙 모델이 env 모델로 넘어간다.**
+    모르면 바꾸지 않는다.
+    """
+    from koipa.config import settings  # noqa: PLC0415
+    env_dir = getattr(settings, "classifier_model_dir", "") or None
+    if os.environ.get("TESTING") or not getattr(settings, "serving_prefer_active_model", True):
+        return env_dir
+    try:
+        from pathlib import Path  # noqa: PLC0415
+
+        from koipa.db import session_scope  # noqa: PLC0415
+        from koipa.repositories import TrainingRepo  # noqa: PLC0415
+        with session_scope() as db:
+            active = TrainingRepo(db).get_active()
+            uri = getattr(active, "model_uri", None) if active else None
+    except Exception as exc:  # noqa: BLE001 — 호출부가 '판단 보류'로 받는다
+        raise _ActiveLookupFailed(f"{type(exc).__name__}: {exc}") from exc
+    if uri:
+        p = Path(str(uri))
+        if p.exists() and p.is_dir():
+            return str(p)
+    return env_dir
+
+
+def _same_model_dir(a: Optional[str], b: Optional[str]) -> bool:
+    """두 모델 경로가 같은가 — 둘 다 비었으면(룰 폴백) 같다."""
+    if not a or not b:
+        return not a and not b
+    return os.path.normcase(os.path.abspath(str(a))) == os.path.normcase(os.path.abspath(str(b)))
+
+
+# reload_model(model_dir=...) 의 '안 줌' 표지 — None 은 '룰 폴백으로 올려라'라는 뜻이라 따로 둔다.
+_UNSET: object = object()
+
+
 class ClassifyService:
     _instance: "ClassifyService | None" = None
 
@@ -142,6 +188,12 @@ class ClassifyService:
         # [C-ver] 활성 ModelVersion이 있으면 그 model_uri를 우선(activate/rollback이 서빙에 반영).
         model_dir = _resolve_serving_model_dir()
         self.inference = InferencePipeline(model_dir=model_dir)
+        # [NFR-OPS-01] 지금 들고 있는 모델 경로 — 주기 확인(_maybe_refresh_model)이 활성 모델과 대조한다.
+        self._serving_dir: Optional[str] = model_dir
+        self._refresh_checked_at: Optional[float] = time.monotonic()
+        self._refresh_lock = threading.Lock()
+        self._refresh_failed_for: set[str] = set()
+        self._refresh_lookup_failing = False
 
     @classmethod
     def get_instance(cls) -> "ClassifyService":
@@ -149,20 +201,90 @@ class ClassifyService:
             cls._instance = cls()
         return cls._instance
 
-    def reload_model(self) -> dict:
+    def reload_model(self, model_dir: object = _UNSET) -> dict:
         """서빙 추론 파이프라인을 **활성 ModelVersion 기준으로 재구성** (런타임 핫리로드).
 
         activate_model_version/rollback 후 프로세스 재기동 없이 새 모델을 서빙에 반영한다
         (싱글톤이라 init 시점 모델을 유지하던 한계 해소). admin 엔드포인트(POST /admin/model/reload)가
         호출. 반환: 재로드 후 model_dir·model_version·로드여부.
         """
-        new_dir = _resolve_serving_model_dir()
+        # model_dir 을 주면 그 경로로 올린다 — 주기 확인이 이미 엄격하게 푼 경로다(여기서 다시 풀면
+        # 그 사이 DB 가 끊겨 env 로 폴백할 수 있다). 안 주면 종전대로 지금 활성 모델을 푼다.
+        new_dir = _resolve_serving_model_dir() if model_dir is _UNSET else model_dir
         self.inference = InferencePipeline(model_dir=new_dir)
+        self._serving_dir = new_dir
         loaded = getattr(self.inference, "_model", None) is not None
         version = (str(self.inference.model_dir.name)
                    if getattr(self.inference, "model_dir", None) else "rule-fallback")
         logger.info("classify model reloaded: dir=%s version=%s loaded=%s", new_dir, version, loaded)
         return {"reloaded": True, "model_dir": new_dir, "model_version": version, "model_loaded": loaded}
+
+    def _maybe_refresh_model(self) -> None:
+        """[NFR-OPS-01] 다른 프로세스가 활성 모델을 바꿨으면 이 프로세스도 따라간다.
+
+        왜 필요한가(2026-09-11). 활성화 · 롤백 · POST /admin/model/reload 는 **그 요청을 받은
+        프로세스 하나**만 새 모델로 다시 올린다(싱글턴). 그래서 API 워커를 늘리면 나머지 워커가,
+        그리고 워커 수와 무관하게 **Celery 워커의 비동기 분류**(tasks.classify_async 도 이
+        싱글턴을 쓴다)가 옛 모델로 계속 판별했다 — 같은 문서가 동기·비동기에서 다른 모델로
+        판정될 수 있었다. 프로세스끼리 알릴 통로를 새로 만드는 대신 **각 프로세스가 활성 모델을
+        주기적으로 스스로 확인**한다. 브로커 · Redis 가 없어도 돈다.
+
+        규칙:
+          - serving_model_refresh_seconds 마다 한 번만 본다(0 이하 = 끔). 확인은 DB 조회 1회다.
+          - 다른 요청이 이미 확인 중이면 기다리지 않고 지나간다 — 분류를 막지 않는다.
+          - DB 조회가 실패하면 **바꾸지 않는다.** 모르는 것을 '활성 모델 없음'으로 읽으면
+            env 모델로 넘어가 버린다.
+          - 다시 올리다 실패하면(등급 매핑 불일치 등 fail-closed 거부) **옛 모델로 계속 판별**하고,
+            같은 대상은 다시 시도하지 않는다(무거운 적재를 30초마다 되풀이하지 않게).
+            재시도는 재기동하거나 POST /admin/model/reload 로 한다.
+        """
+        from koipa.config import settings  # noqa: PLC0415
+
+        try:
+            interval = float(getattr(settings, "serving_model_refresh_seconds", 0) or 0)
+        except (TypeError, ValueError):
+            interval = 0.0
+        if interval <= 0:
+            return
+        last = getattr(self, "_refresh_checked_at", None)
+        if last is not None and time.monotonic() - last < interval:
+            return
+        lock = getattr(self, "_refresh_lock", None)
+        if lock is None:
+            lock = self._refresh_lock = threading.Lock()
+        if not lock.acquire(blocking=False):
+            return
+        try:
+            self._refresh_checked_at = time.monotonic()
+            try:
+                target = _resolve_serving_model_dir_strict()
+            except _ActiveLookupFailed as exc:
+                # 확인 실패가 이어지는 동안 30초마다 찍으면 로그가 묻힌다 — 실패가 시작될 때 한 번.
+                if not getattr(self, "_refresh_lookup_failing", False):
+                    self._refresh_lookup_failing = True
+                    logger.warning("활성 모델 확인 실패 — 지금 모델을 그대로 쓴다 (%s)", exc)
+                return
+            self._refresh_lookup_failing = False
+            current = getattr(self, "_serving_dir", None)
+            if _same_model_dir(target, current):
+                return
+            failed = getattr(self, "_refresh_failed_for", None)
+            if failed is None:
+                failed = self._refresh_failed_for = set()
+            if str(target) in failed:
+                return
+            try:
+                self.reload_model(model_dir=target)
+            except Exception as exc:  # noqa: BLE001 — 재적재 실패가 분류를 막지 않는다(흔적은 남긴다)
+                failed.add(str(target))
+                logger.warning(
+                    "활성 모델이 바뀌었으나 다시 올리지 못했다 — 옛 모델(%s)로 계속 판별한다 "
+                    "(대상 %s · %s: %s)", current, target, type(exc).__name__, exc,
+                )
+                return
+            logger.warning("다른 프로세스가 활성 모델을 바꿨다 — 따라서 다시 올렸다: %s → %s", current, target)
+        finally:
+            lock.release()
 
     def reload_rules(self) -> dict:
         """서빙 룰 엔진을 DB(tb_level_keywords) 기준으로 재구성 — 키워드 CRUD 후 핫리로드 (FUN-023).
@@ -197,6 +319,8 @@ class ClassifyService:
         on_stage: 단계 진입 시 호출되는 콜백. 단계 이름 = stages_emitted 참조.
                   SSE 스트리밍(/classify/stream) 등에서 진척 송신용. 없으면 no-op.
         """
+        # [NFR-OPS-01] 다른 프로세스가 활성 모델을 바꿨으면 먼저 따라간다(주기 확인·비차단).
+        self._maybe_refresh_model()
         # #29: classify 진입 span — 비민감 식별값만(문서 유무·모델버전).
         #      문서 본문 등 민감정보는 절대 부착하지 않는다. OTel 미활성 시 no-op.
         with span(
