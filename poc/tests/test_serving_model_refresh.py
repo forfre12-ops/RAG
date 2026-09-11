@@ -165,6 +165,61 @@ def test_same_model_dir_normalizes():
     assert not cs._same_model_dir("a/b", "a/c")
 
 
+def _pg_ok() -> bool:
+    try:
+        from sqlalchemy import text
+
+        from koipa.db import engine
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def test_follows_active_version_through_real_db(svc, tmp_path, monkeypatch):
+    """ORM 경로(TrainingRepo.get_active)를 **실제 DB** 로 태운다.
+
+    위 시험들은 DB 를 가짜로 바꿔 끼워 조회 뒤의 판단만 본다. 표 이름·스키마가 어긋나면 그
+    시험들은 초록인 채로 실제 조회만 실패한다(2026-09-11 표준명 개명 직후라 특히). 활성 버전을
+    심고 → 엄격 조회가 그 경로를 돌려주는지 → 주기 확인이 실제로 따라가는지까지 한 번에 본다.
+    """
+    if not _pg_ok():
+        pytest.skip("Postgres not reachable")
+    import uuid
+
+    from koipa.config import settings
+    from koipa.db import session_scope
+    from koipa.db.models import ModelVersion
+    from koipa.repositories.training_repo import TrainingRepo
+
+    monkeypatch.delenv("TESTING", raising=False)
+    monkeypatch.setattr(settings, "serving_prefer_active_model", True)
+    monkeypatch.setattr(settings, "classifier_model_dir", "envdir")
+    label = f"refresh-test-{uuid.uuid4().hex[:8]}"
+    with session_scope() as db:
+        prev = TrainingRepo(db).get_active()
+        prev_id = prev.version_id if prev else None
+    try:
+        with session_scope() as db:
+            repo = TrainingRepo(db)
+            mv = repo.register_model_version(
+                version_label=label, base_model="test", metrics={}, model_uri=str(tmp_path))
+            db.flush()
+            repo.activate_model_version(mv.version_id)
+        assert cs._resolve_serving_model_dir_strict() == str(tmp_path)
+        svc._maybe_refresh_model()
+        assert svc._serving_dir == str(tmp_path), "활성 버전을 따라가지 않았다"
+        assert svc.inference.model_dir == Path(str(tmp_path))
+    finally:
+        with session_scope() as db:
+            db.query(ModelVersion).filter(
+                ModelVersion.version_label == label
+            ).delete(synchronize_session=False)
+            if prev_id is not None:
+                TrainingRepo(db).activate_model_version(prev_id)
+
+
 def test_classify_goes_through_refresh(monkeypatch):
     from koipa.schemas.classify import ClassifyRequest
 
