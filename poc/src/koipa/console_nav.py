@@ -39,11 +39,20 @@ CONSOLE_LINKS: tuple[tuple[str, str, str], ...] = (
     #   화면은 살아 있고 주소로 직접 열린다. 223 콘솔은 토큰이 프리필돼 시연 동선에 필요 없다.
 )
 
+# 검수 화면(골든셋 로그인·후보 관리·검수/서명)에서 빼는 메뉴.
+# [2026-09-11] 설계단계 감리 때 KL 이 "골든셋 검증 페이지에서 관리자 콘솔로 접근이 가능한 상태"였다고
+# 알려 왔다 — 검수자가 보는 화면에는 관리자 화면으로 가는 길을 두지 않는다. 권한 자체는 서버가 역할로
+# 막는다(관리자 API 는 admin 전용). 여기서는 길을 없앤다.
+REVIEW_SCREEN_EXCLUDE: tuple[str, ...] = ("admin",)
 
-def nav_links_html(current: str = "", *, css_class: str = "cnav-link") -> str:
-    """화면 간 이동 링크 묶음. `current` 와 같은 키는 현재 화면 표시(링크 아님)."""
+
+def nav_links_html(current: str = "", *, css_class: str = "cnav-link",
+                   exclude: tuple[str, ...] = ()) -> str:
+    """화면 간 이동 링크 묶음. `current` 와 같은 키는 현재 화면 표시(링크 아님). `exclude` 의 키는 뺀다."""
     out = []
     for key, label, href in CONSOLE_LINKS:
+        if key in exclude:
+            continue
         safe = _html.escape(label)
         if key == current:
             out.append(f'<span class="{css_class} is-current" aria-current="page">{safe}</span>')
@@ -61,9 +70,9 @@ NAV_CSS = (
 )
 
 
-def nav_bar_html(current: str = "") -> str:
+def nav_bar_html(current: str = "", *, exclude: tuple[str, ...] = ()) -> str:
     """`<div class="cnav">…</div>` 한 덩어리. 헤더 안에 그대로 넣는다."""
-    return f'<div class="cnav">{nav_links_html(current)}</div>'
+    return f'<div class="cnav">{nav_links_html(current, exclude=exclude)}</div>'
 
 
 # ── 상단 바 ───────────────────────────────────────────────────────────────────
@@ -147,7 +156,8 @@ HEADER_CSS = (
 BRAND_NAME = "한국지식재산보호원"
 
 
-def header_html(product: str, current: str = "", *, trailing: str = "") -> str:
+def header_html(product: str, current: str = "", *, trailing: str = "",
+                exclude: tuple[str, ...] = ()) -> str:
     """화면 다섯 면이 공유하는 상단 바.
 
     `product` 는 화면 이름, `current` 는 CONSOLE_LINKS 의 키(현재 화면 표시),
@@ -180,7 +190,7 @@ def header_html(product: str, current: str = "", *, trailing: str = "") -> str:
         + mark
         + f'<span class="brand">{BRAND_NAME}</span>'
         + name
-        + nav_bar_html(current)
+        + nav_bar_html(current, exclude=exclude)
         + '<span class="spacer"></span>'
         + trailing
         + "</header>"

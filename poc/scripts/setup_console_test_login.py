@@ -64,7 +64,10 @@ def _safe_name(sub: str) -> str:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sub", default="kl-admin-test", help="검수 기록에 남을 계정 ID")
-    ap.add_argument("--roles", default="admin", help="쉼표 구분")
+    ap.add_argument("--roles", default="reviewer",
+                    help="쉼표 구분. 기본 reviewer — 골든셋 검수 · 등급 결정 · 서명만 한다. 관리자 콘솔을 쓸 토큰이면 "
+                         "--roles admin 을 명시한다(2026-09-11 권한 분리 — 검수 화면에서 관리자 콘솔로 넘어갈 수 "
+                         "있다는 감리 지적. 종전 기본 admin 이라 검수자 토큰이 관리자 토큰이었다)")
     ap.add_argument("--days", type=int, default=30)
     ap.add_argument("--until", default="",
                     help="만료일을 날짜로 못 박는다(YYYY-MM-DD, UTC 자정). --days 보다 우선. "

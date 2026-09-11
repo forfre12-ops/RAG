@@ -22,7 +22,10 @@ from pathlib import Path
 import pytest
 
 from koipa.api.golden import _render_console_login_html, _render_specledger_gold_console_html
-from koipa.console_nav import CONSOLE_LINKS, HEADER_CSS, header_html
+from koipa.console_nav import CONSOLE_LINKS, HEADER_CSS, REVIEW_SCREEN_EXCLUDE, header_html
+
+# 검수 화면 — 관리자 콘솔로 가는 메뉴를 두지 않는다(2026-09-11, 설계단계 감리 지적).
+REVIEW_SCREENS = {"signoff", "manage", "login"}
 from koipa.golden_review_html import _nav_html
 
 _POC = Path(__file__).resolve().parents[1]
@@ -108,8 +111,12 @@ def test_every_menu_item_is_in_the_top_bar(name):
     test_menu_labels_match_the_single_source 가 console_nav.CONSOLE_LINKS 와 묶어 둔다.
     """
     head = _header_of(_screens()[name])
-    for label in LABELS:
-        assert label in head, f"{name}: 메뉴 「{label}」 이 상단에 없다"
+    for key, label, _ in CONSOLE_LINKS:
+        if name in REVIEW_SCREENS and key in REVIEW_SCREEN_EXCLUDE:
+            # [2026-09-11] 검수 화면에서 관리자 콘솔로 넘어갈 수 있었다(감리 지적) — 이 메뉴는 없어야 한다.
+            assert label not in head, f"{name}: 검수 화면에 「{label}」 이 있다"
+        else:
+            assert label in head, f"{name}: 메뉴 「{label}」 이 상단에 없다"
 
 
 def test_menu_labels_match_the_single_source():

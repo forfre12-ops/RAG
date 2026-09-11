@@ -23,7 +23,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Sequence
-from koipa.console_nav import BRAND_NAME, HEADER_CSS, NAV_CSS, header_html
+from koipa.console_nav import BRAND_NAME, HEADER_CSS, NAV_CSS, REVIEW_SCREEN_EXCLUDE, header_html
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
 from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
 
@@ -147,7 +147,8 @@ def _nav_html(sub: str, profile: Optional[str], screen: str, sibling: str = "") 
     넘길 키가 없다. 이 화면은 메뉴에 걸 수 없다 — job_id 와 ?t= 토큰이 있어야 열려서 고정
     링크는 403 이다(golden.py:750·780). 남은 3항목은 여기서 전부 살아 있는 링크로 뜬다.
     """
-    return header_html(sub, trailing=sibling + _site_badge_html(profile, screen))
+    # [2026-09-11] 검수·서명 화면에는 관리자 콘솔 링크를 두지 않는다(console_nav.REVIEW_SCREEN_EXCLUDE).
+    return header_html(sub, trailing=sibling + _site_badge_html(profile, screen), exclude=REVIEW_SCREEN_EXCLUDE)
 
 
 def _embed_json(data: object) -> str:
