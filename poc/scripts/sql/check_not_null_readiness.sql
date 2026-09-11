@@ -21,6 +21,10 @@
 --   정본 poc/src/koipa/db/standard_names.py) **전** DB 에서만 돈다. 마이그레이션을 올리기 전에
 --   돌리는 점검이므로 그때는 옛 이름이 맞다 — 5c1d9e0a7b34(created_at NOT NULL 9개 표)도 NULL 행이
 --   있으면 멈추게 돼 있으니, 서버에 올리기 전에 이 점검으로 먼저 센다. 개명 이후 DB 에서는 실패한다.
+-- ⚠ [2026-09-11 정정] 위 문장을 적을 때 이 파일을 개명 전 DB(f8a9b0c1d2e3)에서 돌려 보지 않았다. 돌려 보니
+--   (211 서버) 이미 지워진 칼럼 tb_classifications.rag_used 를 찾다 오류가 나 한 줄도 판정하지 못했고,
+--   5c1d9e0a7b34 가 보는 9개 표 중 tb_sample_dataset_membership.created_at 이 빠져 있었다. 둘 다 고쳤다
+--   (rag_used 줄 삭제 · membership 줄 추가 — 여전히 28칸). 개명 전 판으로 만든 임시 DB 에서 오류 없이 돈다.
 
 WITH counts AS (
   SELECT 'tb_audit_log'::text AS tbl, 'success'::text AS col,
@@ -42,10 +46,6 @@ WITH counts AS (
   SELECT 'tb_classification_levels'::text AS tbl, 'updated_at'::text AS col,
          count(*) FILTER (WHERE updated_at IS NULL) AS null_rows, count(*) AS total_rows
     FROM tb_classification_levels
-  UNION ALL
-  SELECT 'tb_classifications'::text AS tbl, 'rag_used'::text AS col,
-         count(*) FILTER (WHERE rag_used IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classifications
   UNION ALL
   SELECT 'tb_classifications'::text AS tbl, 'status'::text AS col,
          count(*) FILTER (WHERE status IS NULL) AS null_rows, count(*) AS total_rows
@@ -122,6 +122,10 @@ WITH counts AS (
   SELECT 'tb_sample_documents'::text AS tbl, 'created_at'::text AS col,
          count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
     FROM tb_sample_documents
+  UNION ALL
+  SELECT 'tb_sample_dataset_membership'::text AS tbl, 'created_at'::text AS col,
+         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tb_sample_dataset_membership
   UNION ALL
   SELECT 'tb_training_epochs'::text AS tbl, 'logged_at'::text AS col,
          count(*) FILTER (WHERE logged_at IS NULL) AS null_rows, count(*) AS total_rows
@@ -165,10 +169,6 @@ WITH counts AS (
          count(*) FILTER (WHERE updated_at IS NULL) AS null_rows, count(*) AS total_rows
     FROM tb_classification_levels
   UNION ALL
-  SELECT 'tb_classifications'::text AS tbl, 'rag_used'::text AS col,
-         count(*) FILTER (WHERE rag_used IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classifications
-  UNION ALL
   SELECT 'tb_classifications'::text AS tbl, 'status'::text AS col,
          count(*) FILTER (WHERE status IS NULL) AS null_rows, count(*) AS total_rows
     FROM tb_classifications
@@ -244,6 +244,10 @@ WITH counts AS (
   SELECT 'tb_sample_documents'::text AS tbl, 'created_at'::text AS col,
          count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
     FROM tb_sample_documents
+  UNION ALL
+  SELECT 'tb_sample_dataset_membership'::text AS tbl, 'created_at'::text AS col,
+         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tb_sample_dataset_membership
   UNION ALL
   SELECT 'tb_training_epochs'::text AS tbl, 'logged_at'::text AS col,
          count(*) FILTER (WHERE logged_at IS NULL) AS null_rows, count(*) AS total_rows
