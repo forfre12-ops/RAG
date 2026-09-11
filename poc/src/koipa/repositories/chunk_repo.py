@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Iterable, Sequence
+from typing import Iterable
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -115,26 +115,6 @@ class ChunkRepo:
         if rows:
             self.db.flush()
         return [r.chunk_id for r in rows]
-
-    def chunk_ids_by_index(
-        self,
-        doc_id: uuid.UUID | str,
-        indices: Sequence[int],
-    ) -> dict[int, uuid.UUID]:
-        """chunk_index → chunk_id 매핑. Evidence 영속화 시 진짜 chunk_id 조회용."""
-        if not indices:
-            return {}
-        rows = (
-            self.db.execute(
-                select(Chunk.chunk_index, Chunk.chunk_id)
-                .where(
-                    Chunk.doc_id == doc_id,
-                    Chunk.chunk_index.in_(list(indices)),
-                )
-            )
-        ).all()
-        return {int(idx): cid for idx, cid in rows}
-
     # ------------------------------------------------------------
     # Cascade delete
     # ------------------------------------------------------------

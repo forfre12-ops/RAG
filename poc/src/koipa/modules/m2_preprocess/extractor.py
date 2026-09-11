@@ -384,37 +384,6 @@ def _html_to_text(raw: str) -> str:
     text = _re.sub(r"\s*\n\s*", "\n", text).strip()
     return text
 
-
-def _html_tables(raw: str, *, source: str, name_prefix: str) -> list[ExtractedTable]:
-    import html as _html
-    import re as _re
-
-    tables: list[ExtractedTable] = []
-    for tidx, table in enumerate(
-        _re.findall(r"<table\b[^>]*>(.*?)</table>", raw, _re.S | _re.I),
-        start=1,
-    ):
-        rows: list[list[str]] = []
-        for tr in _re.findall(r"<tr\b[^>]*>(.*?)</tr>", table, _re.S | _re.I):
-            cells: list[str] = []
-            for cell in _re.findall(r"<t[dh]\b[^>]*>(.*?)</t[dh]>", tr, _re.S | _re.I):
-                text = _html_to_text(_html.unescape(cell))
-                cells.append(text)
-            cells = _trim_trailing_empty(cells)
-            if _row_has_text(cells):
-                rows.append(cells)
-        if rows:
-            tables.append(
-                ExtractedTable(
-                    source=source,
-                    name=f"{name_prefix} table {tidx}",
-                    rows=rows,
-                    table_index=tidx,
-                )
-            )
-    return tables
-
-
 def _extract_hwp(p: Path) -> ExtractResult:
     """HWP5/HWPX 추출 — rhwp-python(Rust PyO3, HWP5+HWPX 통합 파서, extra ``[hwp]``).
 

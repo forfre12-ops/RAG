@@ -109,7 +109,9 @@ EMBEDDING_FALLBACK_TOTAL = Counter(
 EMBEDDING_CACHE_HIT_TOTAL = Counter(
     "koipa_embedding_cache_hit_total",
     "Embedding cache hits (LRU or redis)",
-    ["layer"],  # lru | redis (cache_layer.py가 방출하는 실 계층 — 'disk'층은 미구현이라 제거)
+    # lru | redis — cache_layer.py 가 방출하는 실제 조회 계층. 'disk' 는 조회 계층이 아니라 LRU 의
+    # 영속본이다(시작 시 _load_disk 로 LRU 에 올린다) — 그 적중은 lru 로 세므로 라벨에서 뺐다.
+    ["layer"],
     registry=registry,
 )
 EMBEDDING_CACHE_MISS_TOTAL = Counter(

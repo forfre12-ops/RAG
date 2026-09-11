@@ -106,17 +106,6 @@ class SeaweedFSStore:
         c = self._ensure()
         c.delete_object(Bucket=bucket, Key=self._norm_key(key))
 
-    def ensure_bucket(self, bucket: str) -> None:
-        c = self._ensure()
-        try:
-            c.head_bucket(Bucket=bucket)
-        except Exception:
-            try:
-                c.create_bucket(Bucket=bucket)
-            except Exception as e:  # noqa: BLE001
-                logger.warning("create_bucket failed: %s", e)
-
-
 def get_storage(provider: Optional[str] = None):
     """settings.storage_backend 기반 팩토리."""
     from koipa.config import settings

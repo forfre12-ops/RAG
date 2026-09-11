@@ -9,7 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, update
 from sqlalchemy.orm import Session
 
 from koipa.db.models import Document
@@ -37,27 +37,6 @@ class DocumentRepo:
         if not include_deleted and doc.deleted_at is not None:
             return None
         return doc
-
-    def list_all(
-        self,
-        *,
-        limit: int = 100,
-        offset: int = 0,
-        include_deleted: bool = False,
-    ) -> list[Document]:
-        """전역 Document 목록 — 최신 업로드 우선.
-
-        tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진, 전역 조회).
-
-        #38: 기본적으로 soft-delete된 행(deleted_at IS NOT NULL)을 제외한다.
-        include_deleted=True면 보존정책 검토/복구용으로 삭제 행도 포함.
-        """
-        stmt = select(Document)
-        if not include_deleted:
-            stmt = stmt.where(Document.deleted_at.is_(None))
-        stmt = stmt.order_by(Document.uploaded_at.desc()).limit(limit).offset(offset)
-        return list(self.db.execute(stmt).scalars().all())
-
     def create(
         self,
         *,

@@ -224,18 +224,6 @@ def _verify_signature(signing_input: bytes, signature: bytes, key: dict) -> None
 
     raise JWTError("no public key material")
 
-
-def require_jwt(authorization: str = Header(...)) -> JWTClaims:
-    """FastAPI Dependency — `Authorization: Bearer <jwt>`."""
-    if not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="missing bearer token")
-    token = authorization[7:].strip()
-    try:
-        return verify_jwt(token)
-    except JWTError as e:
-        raise HTTPException(status_code=401, detail=f"invalid jwt: {e}")
-
-
 # tenant 제거: per-tenant api_key_hash 검증·생성 헬퍼(_check_api_key_hash·
 # hash_api_key) 삭제. 인증은 단일 KL 자격(공유 X-API-Key 또는 서명 JWT)만 사용.
 

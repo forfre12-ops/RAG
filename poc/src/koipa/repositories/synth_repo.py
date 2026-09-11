@@ -218,5 +218,3 @@ class SynthRepo:
             .order_by(SampleDatasetMembership.membership_id)
         ).all()
         return [r[0] for r in rows]
-    def get_prompt(self, version: str) -> PromptVersion | None:
-        return self.db.get(PromptVersion, version)

@@ -1190,7 +1190,7 @@ class ClassifyService:
         try:
             # ── Step 1: classification 영속화 (자체 커밋) ──────────────────────
             # M-classify-tx: classification 을 evidence 와 같은 트랜잭션에 묶으면
-            # add_evidence/add_rag_evidence 실패 시 이미 만든 classification 까지
+            # 근거 적재(add_evidence_from_spans · RAG 근거) 실패 시 이미 만든 classification 까지
             # 롤백돼 '분류는 됐는데 기록은 사라지는' 미탐성 손실이 생긴다. 그래서
             # classification(+chunks)은 여기서 먼저 commit 해 classification_id 를
             # 확보하고, evidence/RAG-evidence 는 아래 Step 2 에서 best-effort 로

@@ -95,32 +95,6 @@ class ClassifyRepo:
         self.db.add(cls)
         self.db.flush()
         return cls
-
-    def add_evidence(
-        self,
-        classification_id: uuid.UUID,
-        *,
-        chunk_id: uuid.UUID,
-        evidence_type: str,
-        excerpt: str,
-        contribution: float,
-        excerpt_start: int | None = None,
-        excerpt_end: int | None = None,
-        factor_id: int | None = None,
-    ) -> ClassificationEvidence:
-        ev = ClassificationEvidence(
-            classification_id=classification_id,
-            chunk_id=chunk_id,
-            evidence_type=evidence_type,
-            excerpt=excerpt,
-            contribution=contribution,
-            excerpt_start=excerpt_start,
-            excerpt_end=excerpt_end,
-            factor_id=factor_id,
-        )
-        self.db.add(ev)
-        return ev
-
     def add_evidence_from_spans(
         self,
         classification_id: uuid.UUID,
@@ -133,7 +107,7 @@ class ClassifyRepo:
         InferencePipeline 결과의 evidence_spans를 그대로 받기 위한 헬퍼.
         chunks 테이블은 파티션이라 chunk_id FK가 없음 — 무결성은 app 레이어 책임.
 
-        §5 (2026-05-29): N+1 라운드트립 제거 — 단건 add_evidence 호출 대신
+        §5 (2026-05-29): N+1 라운드트립 제거 — 단건 add_evidence 호출(호출처 0 이라 2026-09-11 삭제) 대신
         ORM 객체 리스트를 한 번에 add_all. 분류당 evidence 7~11개 환경에서
         DB 라운드트립 50ms→10ms 추정. add_all 미구현 stub session에서는 단건
         폴백으로 호환성 유지.

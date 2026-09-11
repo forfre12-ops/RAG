@@ -104,13 +104,3 @@ class AuditRepo:
                 .limit(limit)
             ).scalars()
         )
-
-    def recent_for_action(self, action: str, *, limit: int = 100) -> list[AuditLog]:
-        return list(
-            self.db.execute(
-                select(AuditLog)
-                .where(AuditLog.action == action)
-                .order_by(AuditLog.occurred_at.desc())
-                .limit(limit)
-            ).scalars()
-        )

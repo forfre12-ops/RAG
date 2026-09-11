@@ -1,8 +1,10 @@
 """Kill-gate — 죽음의 나선/품질붕괴 조건 **모니터** (비파괴: 경보만).
 
 설계 결정(2026-06-29): 발동 시 **자동 중단하지 않는다** — 메트릭(koipa_kill_gate_tripped)
-+ 로그로 경보만 내고 운영자가 판단·조치한다(오작동으로 운영을 멈추는 위험 회피). 자동
-중단(자동확정/재학습 정지)은 추후 opt-in.
++ 로그로 경보만 내고 운영자가 판단·조치한다(오작동으로 운영을 멈추는 위험 회피).
+자동확정 억제는 opt-in 으로 들어가 있다(settings.kill_gate_suppress_autoconfirm, 기본 False —
+켜면 발동 중 고등급 자동확정을 검수로 돌린다 · should_suppress_autoconfirm). 재학습 정지는 아직
+없다(2026-09-11 확인: workers·corrections_rebuild·training 경로에 kill-gate 참조 0건).
 
 발동 조건(하나라도 충족 시 tripped):
   ① TS/S1 미탐 — 고등급 underclass 교정(사람이 비밀을 올린 것) ≥ floor (기본 1=any).

@@ -988,13 +988,6 @@ class ProxyGoldCandidateService:
             "by_final_grade": dict(sorted(
                 Counter(c["final_grade"] for c in candidates if c["final_grade"]).items())),
         }
-
-    def find_by_doc_id(self, doc_id: str) -> dict[str, Any] | None:
-        """정규화한 id 로 후보를 찾는다 — 전달본 id 를 그대로 넣어도 찾히게."""
-        wanted = normalize_doc_id(doc_id)
-        return next((c for c in self._candidates()
-                     if normalize_doc_id(c["doc_id"]) == wanted), None)
-
     def _latest_decisions(self) -> dict[str, dict[str, Any]]:
         if not self.ledger_path.exists():
             return {}

@@ -97,30 +97,6 @@ class DocumentService:
                 actor_role=actor_role,
                 request_id=request_id,
             )
-
-    def soft_delete_document(
-        self,
-        *,
-        doc_id: uuid.UUID | str,
-        actor_id: Optional[str] = None,
-        actor_role: Optional[str] = None,
-        request_id: uuid.UUID | str | None = None,
-        db: Optional[Session] = None,
-    ) -> DeleteDocumentResult:
-        """#38 논리 삭제 편의 진입점 — ``delete_document(..., soft=True)`` 위임.
-
-        기존 ``delete_document`` 시그니처/기본 동작을 건드리지 않고 soft-delete를
-        명시적으로 호출하고 싶은 경로용. 보존정책 준수(데이터 보존 + 조회 차단).
-        """
-        return self.delete_document(
-            doc_id=doc_id,
-            actor_id=actor_id,
-            actor_role=actor_role,
-            request_id=request_id,
-            db=db,
-            soft=True,
-        )
-
     @staticmethod
     def _delete_with_session(
         db: Session,
