@@ -641,11 +641,14 @@ class SampleDatasetMembership(Base):
     __tablename__ = "tad_sm_syn_datst_cpst_mng"
 
     membership_id: Mapped[int] = mapped_column("cpst_sn", BigInteger, primary_key=True, autoincrement=True)
+    # nullable=False 는 동작을 바꾸지 않는다 — 마이그레이션이 이미 NOT NULL 로 만들었고 Mapped 표기도 같다.
+    # 정의서 생성기가 칼럼 인자만 읽어 'NULL 허용'으로 적던 것을 바로잡으려고 명시했다(2026-09-11).
     sample_id: Mapped[uuid.UUID] = mapped_column(
         "syn_doc_id", Uuid(as_uuid=True),
         ForeignKey("tad_sm_syn_doc_mng.syn_doc_id", ondelete="CASCADE"),
+        nullable=False,
     )
-    dataset_version: Mapped[str] = mapped_column("datst_ver_nm", String(64))
+    dataset_version: Mapped[str] = mapped_column("datst_ver_nm", String(64), nullable=False)
     # 어느 생성 작업에서 나온 문서인가. 단발 호출·옛 행은 NULL.
     synth_job_id: Mapped[uuid.UUID | None] = mapped_column("syn_job_id", Uuid(as_uuid=True))
     created_at: Mapped[dt.datetime] = mapped_column(
@@ -672,7 +675,8 @@ class Guide(Base):
     change_summary: Mapped[str | None] = mapped_column("chg_smry_cn", Text)
     doc_type: Mapped[str | None] = mapped_column("doc_knd_nm", String(50))
     filename: Mapped[str | None] = mapped_column("file_nm", String(500))
-    registered_at: Mapped[dt.datetime] = mapped_column("reg_dt", DateTime(timezone=True), server_default=func.now())
+    # nullable=False 는 동작을 바꾸지 않는다(마이그레이션이 NOT NULL · Mapped 표기도 같다) — 정의서 표기를 맞추려고 명시.
+    registered_at: Mapped[dt.datetime] = mapped_column("reg_dt", DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
         # 동시 업로드 시 중복 버전 행 방지(최종 방어선) — GuideRepo.upsert의

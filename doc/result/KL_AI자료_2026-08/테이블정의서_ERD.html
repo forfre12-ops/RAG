@@ -333,7 +333,7 @@ table.spec td.c-nn{text-align:center;}
 <tr><td class="c-name">kywd_nm</td><td class="c-type">VARCHAR(200)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>키워드 문자열</td></tr>
 <tr><td class="c-name">ptn_type_nm</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;exact&#x27;</td><td>매칭 방식 — exact · regex 등</td></tr>
 <tr><td class="c-name">rqmt_sn</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>이 키워드가 근거로 삼는 요건. NULL 이면 요건 무관 <span style="color:#71717a">→ tad_em_evl_rqmt_mng.rqmt_sn ON DELETE RESTRICT</span></td></tr>
-<tr><td class="c-name">wgvl_cfc</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">1.0</td><td>키워드 가중치</td></tr>
+<tr><td class="c-name">wgvl_cfc</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">1.0</td><td>키워드 가중치. NULL 이면 1.0 으로 계산합니다(요건 표의 가중치와 달리 선택값)</td></tr>
 <tr><td class="c-name">src_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;manual&#x27;</td><td>출처 — manual(사람 등록) · seed(초기 시드) 등</td></tr>
 <tr><td class="c-name">actvtn_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">true</td><td>활성 여부. FALSE 면 사전에서 빼되 이력은 남긴다</td></tr>
 <tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
@@ -353,7 +353,7 @@ table.spec td.c-nn{text-align:center;}
 <tr><td class="c-name">orgtxt_path_nm</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>추출 원문 텍스트 저장 위치</td></tr>
 <tr><td class="c-name">nrmlz_txt_path_nm</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>정규화 텍스트 저장 위치</td></tr>
 <tr><td class="c-name">mtxt_prvw_cn</td><td class="c-type">VARCHAR(2000)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>본문 앞부분 미리보기(최대 2,000자)</td></tr>
-<tr><td class="c-name">char_cnt</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>추출 본문 글자 수</td></tr>
+<tr><td class="c-name">char_cnt</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>추출 본문 글자 수. 등록 때 추출 결과가 없으면 NULL(청크 표의 글자 수는 청크마다 반드시 있다)</td></tr>
 <tr><td class="c-name">extr_mth_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;parser&#x27;</td><td>추출 경로 — parser(전자문서 파싱) · ocr</td></tr>
 <tr><td class="c-name">extr_qlty_scr</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>추출 품질 점수(0~1)</td></tr>
 <tr><td class="c-name">ocr_use_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">false</td><td>OCR 사용 여부</td></tr>
@@ -379,7 +379,7 @@ table.spec td.c-nn{text-align:center;}
 <div class="spec-head" id="t-tad_cm_chnk_mng"><h3>tad_cm_chnk_mng</h3><span class="spec-logical">청크</span><span class="spec-badge">RANGE PARTITION · crt_dt</span></div>
 <p class="spec-note">문서를 512 토큰 단위로 자른 조각.</p>
 <div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
-<tr><td class="c-name">chnk_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td>청크 PK</td></tr>
+<tr><td class="c-name">chnk_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td>청크 PK</td></tr>
 <tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>원문 문서. FK 제약 없이 애플리케이션이 정합을 보증합니다</td></tr>
 <tr><td class="c-name">chnk_no</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>문서 내 청크 순번(0-base)</td></tr>
 <tr><td class="c-name">chnk_cn</td><td class="c-type">TEXT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>청크 본문</td></tr>
@@ -399,7 +399,7 @@ table.spec td.c-nn{text-align:center;}
 <tr><td class="c-name">grd_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>확정 등급 <span style="color:#71717a">→ tad_cm_clsf_grd_mng.grd_sn ON DELETE RESTRICT</span></td></tr>
 <tr><td class="c-name">lbl_mnbd_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>라벨 주체 — human · llm · rule</td></tr>
 <tr><td class="c-name">lbl_wrtr_id</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>라벨 작성자 계정 ID</td></tr>
-<tr><td class="c-name">rlbl_scr</td><td class="c-type">NUMERIC(5,4)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>라벨 확신도(0~1)</td></tr>
+<tr><td class="c-name">rlbl_scr</td><td class="c-type">NUMERIC(5,4)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>라벨 확신도(0~1). 확신도가 없는 라벨 출처(사람 확정 등)는 NULL — 분류결과 표의 신뢰점수는 모델이 늘 낸다</td></tr>
 <tr><td class="c-name">tot_scr</td><td class="c-type">NUMERIC(4,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>요건 점수 합계</td></tr>
 <tr><td class="c-name">memo_dtl_cn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>라벨 메모</td></tr>
 <tr><td class="c-name">vrfc_cmptn_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">false</td><td>검증(서명) 완료 여부</td></tr>
@@ -470,7 +470,7 @@ table.spec td.c-nn{text-align:center;}
 <p class="spec-note">학습 잡 1회의 설정·자원·결과.</p>
 <div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
 <tr><td class="c-name">excn_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td>학습 실행 PK</td></tr>
-<tr><td class="c-name">mdl_ver_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>이 실행이 만든 모델 버전(tb_model_versions 참조) <span style="color:#71717a">→ tad_mm_mdl_ver_mng.mdl_ver_id</span></td></tr>
+<tr><td class="c-name">mdl_ver_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>이 실행이 만든 모델 버전(tb_model_versions 참조). 실행을 만들 때는 NULL 이고 학습이 끝나 버전이 등록되면 채운다(진행 중·실패는 NULL) <span style="color:#71717a">→ tad_mm_mdl_ver_mng.mdl_ver_id</span></td></tr>
 <tr><td class="c-name">flw_excn_id</td><td class="c-type">VARCHAR(64)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>MLflow 실험 추적 ID</td></tr>
 <tr><td class="c-name">lrn_excn_stts_cd</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;queued&#x27;</td><td>실행 상태 — queued · running · done · failed</td></tr>
 <tr><td class="c-name">bgng_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>시작 시각</td></tr>
@@ -571,8 +571,8 @@ table.spec td.c-nn{text-align:center;}
 <p class="spec-note">합성 문서 1건이 어느 학습셋 판(dataset_version)에 들어갔는지. 한 문서가 여러 판에 들어가므로 행을 더하기만 하고 고치지 않는다 — 칼럼 하나로 두면 재방출할 때 앞선 판 기록을 잃는다.</p>
 <div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
 <tr><td class="c-name">cpst_sn</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type"></td><td>편입 기록 PK</td></tr>
-<tr><td class="c-name">syn_doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>편입된 합성 문서. tb_sample_documents 참조 <span style="color:#71717a">→ tad_sm_syn_doc_mng.syn_doc_id ON DELETE CASCADE</span></td></tr>
-<tr><td class="c-name">datst_ver_nm</td><td class="c-type">VARCHAR(64)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>학습셋 판 이름. 내용 해시라 같은 승인 집합이면 같은 값이 나온다 — 시각이 아니라 내용으로 판을 가른다</td></tr>
+<tr><td class="c-name">syn_doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>편입된 합성 문서. tb_sample_documents 참조 <span style="color:#71717a">→ tad_sm_syn_doc_mng.syn_doc_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">datst_ver_nm</td><td class="c-type">VARCHAR(64)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>학습셋 판 이름. 내용 해시라 같은 승인 집합이면 같은 값이 나온다 — 시각이 아니라 내용으로 판을 가른다</td></tr>
 <tr><td class="c-name">syn_job_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>그 문서를 만든 생성 작업. 없으면 NULL</td></tr>
 <tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
 </tbody></table></div>
@@ -581,7 +581,7 @@ table.spec td.c-nn{text-align:center;}
 <div class="spec-head" id="t-tad_lm_llm_usqty_mng"><h3>tad_lm_llm_usqty_mng</h3><span class="spec-logical">LLM 사용량</span><span class="spec-badge">RANGE PARTITION · clot_dt</span></div>
 <p class="spec-note">LLM 호출별 토큰·비용·지연.</p>
 <div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
-<tr><td class="c-name">use_rcd_sn</td><td class="c-type">BIGINT</td><td class="c-nn"></td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>사용 기록 PK</td></tr>
+<tr><td class="c-name">use_rcd_sn</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>사용 기록 PK</td></tr>
 <tr><td class="c-name">offr_id</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>LLM 제공자</td></tr>
 <tr><td class="c-name">mdl_nm</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>모델명</td></tr>
 <tr><td class="c-name">clot_prps</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>호출 목적 — 합성 · 라벨링 · 질의응답 등</td></tr>
@@ -601,7 +601,7 @@ table.spec td.c-nn{text-align:center;}
 <div class="spec-head" id="t-tad_am_adt_log_mng"><h3>tad_am_adt_log_mng</h3><span class="spec-logical">감사 로그</span><span class="spec-badge">RANGE PARTITION · ocrn_dt</span></div>
 <p class="spec-note">전 API 호출 기록. 보존기간(기본 730일)이 지난 행은 오래된 달부터 지운다 — 해시 체인이 끊기지 않도록 앞에서부터 이어서 지운다.</p>
 <div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
-<tr><td class="c-name">adt_sn</td><td class="c-type">BIGINT</td><td class="c-nn"></td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>감사 PK. 파티션을 두던 시절 파티션 키를 기본키에 넣어야 해 복합키가 됐고, 파티션을 걷은 뒤에도 복합키는 그대로 둔다 — 바꾸면 기존 행의 키가 흔들린다</td></tr>
+<tr><td class="c-name">adt_sn</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>감사 PK. 파티션을 두던 시절 파티션 키를 기본키에 넣어야 해 복합키가 됐고, 파티션을 걷은 뒤에도 복합키는 그대로 둔다 — 바꾸면 기존 행의 키가 흔들린다</td></tr>
 <tr><td class="c-name">dmnd_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>요청 추적 ID. 같은 요청에서 나온 여러 기록을 잇는다</td></tr>
 <tr><td class="c-name">actr_id</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>행위자 계정 ID</td></tr>
 <tr><td class="c-name">actr_role_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>행위자 역할</td></tr>
@@ -625,8 +625,8 @@ table.spec td.c-nn{text-align:center;}
 <tr><td class="c-name">enfc_dt</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>시행일</td></tr>
 <tr><td class="c-name">chg_smry_cn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>변경 요약</td></tr>
 <tr><td class="c-name">doc_knd_nm</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>문서 종류</td></tr>
-<tr><td class="c-name">file_nm</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>원본 파일명</td></tr>
-<tr><td class="c-name">reg_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">now()</td><td>등록 시각</td></tr>
+<tr><td class="c-name">file_nm</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>원본 파일명. 파일 없이 등록한 가이드 버전은 NULL(요청 스키마에서 선택값)</td></tr>
+<tr><td class="c-name">reg_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>등록 시각</td></tr>
 </tbody></table></div>
 <p class="spec-idx"><b>PK</b> <code>guide_ver_sn</code><br><code>UNIQUE uq_guides_id_version (guide_id, guide_ver_nm)</code><br><code>INDEX idx_guides_guide_id (guide_id)</code><br><code>INDEX idx_guides_registered (reg_dt)</code></p>
 <div class="spec-head" id="t-tad_sy_lck_mng"><h3>tad_sy_lck_mng</h3><span class="spec-logical">동시성 잠금</span></div>
@@ -681,7 +681,8 @@ table.spec td.c-nn{text-align:center;}
 <tr><td>5</td><td>2026-09-05</td><td><code>319069b9 · 90c0d96a · 87a54381</code></td><td><b>4차에서 '소스에 아직 남아 있다'고 적었던 것을 실제로 걷었다</b> — 커밋 <code>319069b9</code> 가 소스·ORM 에서, 마이그레이션 <code>a3b4c5d6e7f8</code> 이 DB 에서 유사문서 조회 칼럼 9개와 검색용 표 2종을 떨궜다. 이제 정의서와 코드가 같은 것을 가리킨다.<br><b>파티션을 걷었다</b> — 223 실서버 30일 실측(<code>tb_audit_log</code> 71,161행 · 30MB · 연 환산 87만행)에서 파티션이 필요한 규모가 아니었고, 오래된 파티션을 떼는 코드가 0건이라 효용의 절반은 애초에 쓰지 않고 있었다. 시간축 인덱스 3개(<code>b4c5d6e7f8a9</code>)와 보존기간 삭제(<code>services/retention.py</code> · 기본 꺼짐)로 대신한다. <code>tb_audit_log</code> 의 복합 기본키는 그대로 둔다.<br><b>표 <code>tb_advisory_locks</code> 를 넣었다</b>(18 → 19표 · 216칼럼) — 감사 해시체인과 모델 활성화의 임계구역을 두 DB 에서 같은 방식으로 잠그기 위한 표다.</td></tr>
 <tr><td>6</td><td>2026-09-05</td><td><code>599f7c54</code></td><td><b>프롬프트 버전·품질 결과 칸이 실제로 채워지기 시작했다.</b> <code>tb_sample_documents</code> 의 <code>*_prompt_version</code> 세 칸은 <code>tb_prompt_versions</code> 를 가리키는 외래키라 행을 먼저 등록해야 하는데 워커가 그 등록을 하지 않아 늘 NULL 이었다(실측: IntegrityError 1452). <code>quality_score</code>·<code>quality_report</code> 도 같은 이유로 비어 있었다 &mdash; 검수자가 "이 문서가 어떤 검사를 통과해 여기 있는가"를 화면에서 알 수 없었다.</td></tr>
 <tr><td>7</td><td>2026-09-05</td><td><code>a3705759 · f2df0dbb</code></td><td><b>표 <code>tb_sample_dataset_membership</code> 를 넣었다</b>(19 → 20표 · 217 → 221칼럼 · FK 24 → 25건) &mdash; 합성 승인본이 어느 학습셋 판에 들어갔는지 기록한다.<br>같은 날 앞선 판에서는 이것을 <code>tb_sample_documents</code> 의 칼럼 하나(<code>added_to_dataset_version</code>)로 넣었다가 **되돌렸다.** 칼럼은 UPDATE 라 한 문서가 여러 판에 들어가면 앞선 판 기록을 잃는다. 행을 더하기만 하는 연결 표로 바꾸고 <code>UNIQUE(sample_id, dataset_version)</code> 로 중복을 막는다. <b>자동 학습 편입이 아니라 기록</b>이며, 빌드가 방출한 뒤 남긴다.</td></tr>
-<tr><td>8</td><td>2026-09-11</td><td><code>da7a699c</code></td><td><b>납품 DB 정본을 PostgreSQL 16 + pgvector 로 되돌렸습니다</b>(2026-09-09 결정 · <code>38618c2a</code>). 4차에서 MariaDB 로 맞췄던 물리 타입·기본값·인덱스·파티션 표기를 현행 PostgreSQL 로 되돌리고 병기 칸을 없앴습니다. MariaDB 10.11 에는 벡터 형식이 없어 유사문서 조회를 구현할 수 없었습니다.<br><b>문서 벡터 표를 넣었습니다</b> — 원시 SQL 로 만들어져 ORM 에 없던 탓에 정의서에서 빠져 있었습니다(<code>f8a9b0c1d2e3</code>).<br><b>표·칼럼 물리명을 KOIPA 표준용어집 이름으로 바꿨습니다</b>(<code>70e8ef12</code> · 마이그레이션 <code>7b3e9d2a4f10</code>). 생성 시각 NOT NULL 9개 표, 문서 라벨 확신도 <code>NUMERIC(5,4)</code> 통일, 학습실행 모델버전 칼럼명 정리를 반영했습니다(<code>a8aa5414</code> · <code>5c1d9e0a7b34</code>).<br>월별 RANGE 파티션 3종(감사로그·청크·LLM 사용량)을 실제 DB 대로 다시 적었습니다.</td></tr>
+<tr><td>8</td><td>2026-09-11</td><td><code>f74968bf</code></td><td><b>납품 DB 정본을 PostgreSQL 16 + pgvector 로 되돌렸습니다</b>(2026-09-09 결정 · <code>38618c2a</code>). 4차에서 MariaDB 로 맞췄던 물리 타입·기본값·인덱스·파티션 표기를 현행 PostgreSQL 로 되돌리고 병기 칸을 없앴습니다. MariaDB 10.11 에는 벡터 형식이 없어 유사문서 조회를 구현할 수 없었습니다.<br><b>문서 벡터 표를 넣었습니다</b> — 원시 SQL 로 만들어져 ORM 에 없던 탓에 정의서에서 빠져 있었습니다(<code>f8a9b0c1d2e3</code>).<br><b>표·칼럼 물리명을 KOIPA 표준용어집 이름으로 바꿨습니다</b>(<code>70e8ef12</code> · 마이그레이션 <code>7b3e9d2a4f10</code>). 생성 시각 NOT NULL 9개 표, 문서 라벨 확신도 <code>NUMERIC(5,4)</code> 통일, 학습실행 모델버전 칼럼명 정리를 반영했습니다(<code>a8aa5414</code> · <code>5c1d9e0a7b34</code>).<br>월별 RANGE 파티션 3종(감사로그·청크·LLM 사용량)을 실제 DB 대로 다시 적었습니다.</td></tr>
+<tr><td>9</td><td>2026-09-11</td><td><code>690eb644</code></td><td><b>NULL 표기를 실제 DB 와 맞췄습니다</b> — 마이그레이션을 끝까지 적용한 PostgreSQL 의 information_schema 와 칼럼 230개를 대조하니 6칼럼이 달랐습니다. 표 단위 기본키(청크·LLM 사용량·감사로그)를 NULL 허용으로 적던 생성기를 고치고, 모델에 NOT NULL 을 적지 않았던 3칼럼(학습셋 편입 이력의 합성문서ID·학습셋 판, 가이드 등록 시각)을 명시해 불일치 0건이 되었습니다(<code>poc/scripts/audit_schema_consistency.py --db-url</code>).<br><b>같은 칼럼ID 인데 표마다 NOT NULL 이 다른 8건에 사유를 적었습니다</b> — 나중에 정해지는 값(추출 전 글자 수, 학습 완료 전 모델 버전)이거나 선택 참조·선택값(요건, 키워드 가중치, 가이드 파일명, 라벨 확신도 등)이어서 설계상 NULL 을 허용합니다. 8건 모두 칼럼 설명에 사유가 있습니다.</td></tr>
 </tbody></table></div>
 </section>
 <div class="foot">테이블정의서 · ERD — 한국지식재산보호원 AI 영업비밀 등급분류 시스템 · 2026-09-11 생성</div>

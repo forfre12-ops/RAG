@@ -15,6 +15,9 @@ NOT NULL 불일치(13건) 등을 지적했다(인쇄 71·72~79쪽). 그런데 �
     R4  컬럼ID 기준 NOT NULL 불일치
     R5  논리명 미기술 컬럼
     R6  정의서 밖 테이블 — 마이그레이션이 raw SQL 로 만들어 models.py 에 없는 테이블
+    R7  정의서 ↔ 실제 DB NOT NULL 불일치 (--db-url 을 줄 때만) — 정의서 생성기는 models.py 글자를 읽으므로
+        마이그레이션을 끝까지 올린 DB 의 information_schema 가 정답이다. [2026-09-11] 처음 대조하니
+        6칼럼이 달랐다(표 단위 PK 를 NULL 허용으로 적는 등).
 
 논리명 = koipa/db/standard_names.py 의 칼럼 논리명(표준용어집 용어). [2026-09-11] 표준 명명
        (migration 7b3e9d2a4f10) 전에는 scripts/table_spec_meta.py 설명의 첫 구분자 앞부분을 썼다
@@ -153,13 +156,39 @@ def audit() -> dict:
     return r
 
 
+def db_nullability_mismatch(url: str) -> list[str]:
+    """정의서(models.py 파서 + 벡터 표)의 NOT NULL 을 실제 DB(information_schema)와 칼럼마다 대조한다."""
+    import psycopg  # noqa: PLC0415
+
+    tables = B.parse_models() + B.parse_vector_tables()
+    with psycopg.connect(url.replace("postgresql+psycopg://", "postgresql://")) as conn:
+        db = {(t, c): n == "NO" for t, c, n in conn.execute(
+            "select table_name, column_name, is_nullable from information_schema.columns "
+            "where table_schema = 'public'")}
+    out: list[str] = []
+    for t in tables:
+        for c in t["cols"]:
+            k = (t["name"], c["name"])
+            if k not in db:
+                out.append(f"{t['name']}.{c['name']}: DB 에 없음")
+            elif db[k] != c["notnull"]:
+                spec = "NOT NULL" if c["notnull"] else "NULL 허용"
+                real = "NOT NULL" if db[k] else "NULL 허용"
+                out.append(f"{t['name']}.{c['name']}: 정의서 {spec} · DB {real}")
+    return out
+
+
 def main(argv=None) -> int:
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description="AI 솔루션 스키마 일관성 계수")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--json", default="")
+    ap.add_argument("--db-url", default="",
+                    help="마이그레이션을 끝까지 올린 PostgreSQL — 주면 정의서 NOT NULL 을 실제 DB 와 대조한다(R7)")
     a = ap.parse_args(argv)
     r = audit()
+    if a.db_url:
+        r["R7_db_nullability"] = db_nullability_mismatch(a.db_url)
     d = r["denominator"]
     print(f"분모: 테이블 {d['tables']}개 · 컬럼 {d['columns']}개 (models.py)")
     labels = {
@@ -170,6 +199,8 @@ def main(argv=None) -> int:
         "R5_missing_name": "R5 논리명 미기술",
         "R6_outside_spec": "R6 정의서 밖 테이블",
     }
+    if "R7_db_nullability" in r:
+        labels["R7_db_nullability"] = "R7 정의서↔실DB NOT NULL 불일치"
     for k, lab in labels.items():
         print(f"  {lab:28s} {len(r[k]):3d}건")
     if a.list:

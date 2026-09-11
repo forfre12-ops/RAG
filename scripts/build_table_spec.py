@@ -131,7 +131,7 @@ REVISIONS = [
      '한 문서가 여러 판에 들어가면 앞선 판 기록을 잃는다. 행을 더하기만 하는 연결 표로 '
      '바꾸고 <code>UNIQUE(sample_id, dataset_version)</code> 로 중복을 막는다. '
      '<b>자동 학습 편입이 아니라 기록</b>이며, 빌드가 방출한 뒤 남긴다.'),
-    ("8", "2026-09-11", _HEAD_MARKER,
+    ("8", "2026-09-11", "f74968bf",
      '<b>납품 DB 정본을 PostgreSQL 16 + pgvector 로 되돌렸습니다</b>(2026-09-09 결정 · '
      '<code>38618c2a</code>). 4차에서 MariaDB 로 맞췄던 물리 타입·기본값·인덱스·파티션 표기를 '
      '현행 PostgreSQL 로 되돌리고 병기 칸을 없앴습니다. MariaDB 10.11 에는 벡터 형식이 없어 '
@@ -143,6 +143,15 @@ REVISIONS = [
      '<code>NUMERIC(5,4)</code> 통일, 학습실행 모델버전 칼럼명 정리를 반영했습니다'
      '(<code>a8aa5414</code> · <code>5c1d9e0a7b34</code>).<br>'
      '월별 RANGE 파티션 3종(감사로그·청크·LLM 사용량)을 실제 DB 대로 다시 적었습니다.'),
+    ("9", "2026-09-11", _HEAD_MARKER,
+     '<b>NULL 표기를 실제 DB 와 맞췄습니다</b> — 마이그레이션을 끝까지 적용한 PostgreSQL 의 '
+     'information_schema 와 칼럼 230개를 대조하니 6칼럼이 달랐습니다. 표 단위 기본키'
+     '(청크·LLM 사용량·감사로그)를 NULL 허용으로 적던 생성기를 고치고, 모델에 NOT NULL 을 적지 않았던 '
+     '3칼럼(학습셋 편입 이력의 합성문서ID·학습셋 판, 가이드 등록 시각)을 명시해 불일치 0건이 되었습니다'
+     '(<code>poc/scripts/audit_schema_consistency.py --db-url</code>).<br>'
+     '<b>같은 칼럼ID 인데 표마다 NOT NULL 이 다른 8건에 사유를 적었습니다</b> — 나중에 정해지는 값'
+     '(추출 전 글자 수, 학습 완료 전 모델 버전)이거나 선택 참조·선택값(요건, 키워드 가중치, 가이드 파일명, '
+     '라벨 확신도 등)이어서 설계상 NULL 을 허용합니다. 8건 모두 칼럼 설명에 사유가 있습니다.'),
 ]
 
 
@@ -365,6 +374,12 @@ def parse_models() -> list[dict]:
                     tbl["indexes"].append(item)
         if not tbl["pk"]:
             tbl["pk"] = [c["name"] for c in tbl["cols"] if c["pk"]]
+        # [2026-09-11] 표 단위 PrimaryKeyConstraint 로만 선언한 PK 칼럼도 NOT NULL 이다(PK 는 NULL 불가).
+        # 칼럼 인자만 보던 때는 이런 칼럼을 'NULL 허용'으로 적었다 — 청크·LLM 사용량·감사로그 PK 3곳이
+        # 실제 DB(information_schema)와 달랐다(scripts/audit_schema_consistency.py --db-url 로 대조).
+        for c in tbl["cols"]:
+            if c["name"] in tbl["pk"]:
+                c["notnull"] = True
         tables.append(tbl)
 
     # FK 로만 선언된 컬럼은 타입이 비어 있다 — 참조 대상에서 채운다.
@@ -731,7 +746,6 @@ table.spec td.c-nn{text-align:center;}
     jjw_only = [n for n in by_name if PL.get(n, ("둘 다", ""))[0] == "지재원"]
     cust_only = [n for n in by_name if PL.get(n, ("둘 다", ""))[0] == "고객사"]
     both = [n for n in by_name if PL.get(n, ("둘 다", ""))[0] not in ("지재원", "고객사")]
-    common = both + cust_only          # 고객사 서버가 만드는 표
     A('<section id="placement"><h2><span class="num">02</span> 서버별 배포 구분</h2>')
     A('<p class="spec-note">서버별로 생성하는 표를 구분합니다.</p>')
     A('<div class="tbl-wrap"><table class="spec"><thead><tr>'
@@ -757,7 +771,7 @@ table.spec td.c-nn{text-align:center;}
 
     # ── ERD
     A('<section id="erd"><h2><span class="num">03</span> ERD 관계도</h2>')
-    A(f'<p class="spec-note">실선은 FK 제약, 점선은 제약 없는 참조입니다.</p>')
+    A('<p class="spec-note">실선은 FK 제약, 점선은 제약 없는 참조입니다.</p>')
     A('<div style="overflow-x:auto;border:1px solid rgba(0,0,0,.12);padding:16px;'
       'margin:14px 0;background:#fafafa;">')
     A(erd)
