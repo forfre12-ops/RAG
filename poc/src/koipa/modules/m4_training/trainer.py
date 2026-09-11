@@ -40,10 +40,14 @@ def _is_identity(arr) -> bool:
         return True
 
 
-def _level_loss_weights():
-    """등급별 손실 가중을 DB(tb_classification_levels.loss_weight)에서 읽는다.
+def _level_loss_weights_with_source():
+    """등급별 손실 가중을 DB(tb_classification_levels.loss_weight)에서 읽고 출처("db" | "default")를 함께 돌려준다.
 
-    반환은 _LABEL_LIST 순서의 numpy 배열이며, 읽지 못한 등급은 1.0 이다.
+    [2026-09-11] 출처를 돌려주는 까닭: 같은 학습셋·같은 시드라도 DB 가 있으면 시드값(TS 3.0 · S1 2.0),
+    없으면 전부 1.0 으로 학습된다. 종전엔 INFO 로그 한 줄뿐이라 산출물만 봐서는 어느 쪽인지 알 수 없었다.
+    train_classifier 가 report.json 의 training_conditions 에 남긴다.
+
+    반환 배열은 _LABEL_LIST 순서의 numpy 배열이며, 읽지 못한 등급은 1.0 이다.
     DB 미가용은 정상 상황으로 본다 — 오프라인 학습·시험에서 전부 1.0 으로 진행한다.
     """
     import logging  # noqa: PLC0415
@@ -52,6 +56,7 @@ def _level_loss_weights():
 
     log = logging.getLogger(__name__)
     out = np.ones(len(_LABEL_LIST), dtype=np.float64)
+    source = "default"
     try:
         from koipa.db import session_scope  # noqa: PLC0415
         from koipa.db.models import ClassificationLevel  # noqa: PLC0415
@@ -68,12 +73,19 @@ def _level_loss_weights():
                 if v > 0:
                     out[_LABEL2ID[code]] = v
                     found[code] = v
+        if found:
+            source = "db"
         if found and not _is_identity(out):
             log.info("등급별 손실 가중 적용(DB): %s", found)
     except Exception as exc:  # noqa: BLE001 — DB 미가용은 정상. 전부 1.0 으로 간다.
         log.info("등급별 손실 가중을 DB 에서 읽지 못해 1.0 으로 진행 (%s: %s)",
                  type(exc).__name__, exc)
-    return out
+    return out, source
+
+
+def _level_loss_weights():
+    """등급별 손실 가중 배열만 돌려준다(하위 호환) — 출처가 필요하면 _level_loss_weights_with_source."""
+    return _level_loss_weights_with_source()[0]
 
 TrainInputMode = Literal["auto", "documents", "pre_chunked"]
 _PRE_CHUNK_FIELDS = ("chunk_id", "source_doc_id", "chunk_label_strength")
@@ -291,6 +303,9 @@ class TrainSpec:
     # 순수 fnr_high를 원하면 명시적으로 "fnr_high"로 설정 가능(권장하지 않음).
     early_stop_metric: str = "fnr_high_balanced"
     seed: int = 42
+    # [2026-09-11] True 면 TrainingArguments(full_determinism=True). 기본 False — set_seed 만으로는 GPU 연산이
+    # 비결정적이라 같은 시드도 결과가 갈렸다(v6 재학습 다섯 판의 미탐 29~206). 켜면 느려질 수 있다.
+    deterministic: bool = False
     experiment_name: str = "koipa-classifier"
     bf16: bool = True           # bf16 가속 (CUDA GPU 필요; GPU 없으면 자동 비활성)
     use_mlflow: bool = True     # MLflow 로깅 (서버 없으면 False 권장)
@@ -320,6 +335,8 @@ class TrainReport:
     claim_scope: str = "legacy_training_report"
     deployable: bool = True
     training_execution_manifest: str | None = None
+    # 학습 조건 — 시드·결정성·등급별 손실 가중과 그 출처(db|default) 등. 같은 학습셋도 이것에 따라 결과가 갈린다.
+    training_conditions: dict = field(default_factory=dict)
 
 
 def _load_jsonl(path: str) -> tuple[list[str], list[int]]:
@@ -867,6 +884,9 @@ def _write_proxy_training_execution(
 
 def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
     spec = spec or TrainSpec()
+    if spec.deterministic:
+        # 결정적 연산(torch.use_deterministic_algorithms)은 cuBLAS 에 이 값이 CUDA 초기화 전에 있기를 요구한다.
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     proxy_materialization = _proxy_materialization_audit(spec)
 
     import torch
@@ -956,7 +976,21 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
     # 보존한다"고 선언했는데, 정작 이 컬럼을 읽는 코드가 없었다(전수조사에서 확인).
     # 관리자가 DB 로 등급 체계를 조정한다는 R3 방침과도 맞으므로 여기서 읽는다.
     # DB 미가용이거나 값이 없으면 전부 1.0 — 기존 동작 그대로다.
-    level_loss_weights = _level_loss_weights()
+    level_loss_weights, level_loss_weights_source = _level_loss_weights_with_source()
+    # [2026-09-11] 이 모델을 어떤 조건으로 학습했는지 산출물(report.json)에 남긴다. 같은 학습셋·같은 시드도
+    # DB 유무(손실 가중)와 GPU 비결정성으로 결과가 갈렸다(v6 재학습 다섯 판의 미탐 29~206).
+    training_conditions = {
+        "seed": spec.seed,
+        "deterministic": spec.deterministic,
+        "level_loss_weights": {c: float(level_loss_weights[i]) for i, c in enumerate(_LABEL_LIST)},
+        "level_loss_weights_source": level_loss_weights_source,
+        "class_weighted": spec.class_weighted,
+        "fnr_cost_multiplier": spec.fnr_cost_multiplier,
+        "epochs": spec.epochs,
+        "batch_size": spec.batch_size,
+        "lr": spec.lr,
+        "max_seq_len": spec.max_seq_len,
+    }
 
     # class weight (불균형 보정) + FNR 비대칭 cost
     if spec.class_weighted:
@@ -1054,6 +1088,7 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         greater_is_better=False,
         logging_steps=spec.logging_steps,
         seed=spec.seed,
+        full_determinism=spec.deterministic,
         bf16=use_bf16,
         report_to=report_to,
         dataloader_num_workers=0,   # Windows deadlock 방지
@@ -1110,6 +1145,7 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
             # was produced.  Only the finalizer can publish a deployment candidate.
             return TrainReport(
                 model_version=f"proxy-candidates-{run.info.run_id[:8]}",
+                training_conditions=training_conditions,
                 accuracy=0.0,
                 precision_macro=0.0,
                 recall_macro=0.0,
@@ -1230,6 +1266,7 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
 
         result = TrainReport(
             model_version=f"v-{run.info.run_id[:8]}",
+            training_conditions=training_conditions,
             accuracy=float(acc),
             precision_macro=float(p),
             recall_macro=float(r),

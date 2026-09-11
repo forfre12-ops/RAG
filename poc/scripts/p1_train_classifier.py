@@ -259,6 +259,8 @@ def main() -> int:
     ap.add_argument("--epochs", type=int, default=5)
     ap.add_argument("--seed", type=int, default=None,
                     help="학습 시드(모델 init·데이터 셔플). 미지정 시 TrainSpec 기본 42.")
+    ap.add_argument("--deterministic", action="store_true",
+                    help="결정적 학습(TrainingArguments full_determinism) — 시드만으로는 GPU 결과가 갈린다. 느려질 수 있다")
     ap.add_argument("--train-path", default=None)
     ap.add_argument(
         "--train-input-mode",
@@ -373,6 +375,8 @@ def main() -> int:
             spec_kwargs["use_mlflow"] = False
         if getattr(args, "no_bf16", False):
             spec_kwargs["bf16"] = False
+        if getattr(args, "deterministic", False):
+            spec_kwargs["deterministic"] = True
         if getattr(args, "max_seq_len", None):
             spec_kwargs["max_seq_len"] = args.max_seq_len
         if args.chunk_expand:
