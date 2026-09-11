@@ -260,7 +260,8 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=None,
                     help="학습 시드(모델 init·데이터 셔플). 미지정 시 TrainSpec 기본 42.")
     ap.add_argument("--deterministic", action="store_true",
-                    help="결정적 학습(TrainingArguments full_determinism) — 시드만으로는 GPU 결과가 갈린다. 느려질 수 있다")
+                    help="결정적 학습(TrainingArguments full_determinism) — 시드만으로는 GPU 결과가 갈린다. "
+                         "느리다: 이 PC(RTX 5070 Ti)에서 단계당 1.1초 대 0.19초 — 약 6배(2026-09-11 실측)")
     ap.add_argument("--train-path", default=None)
     ap.add_argument(
         "--train-input-mode",

@@ -304,7 +304,8 @@ class TrainSpec:
     early_stop_metric: str = "fnr_high_balanced"
     seed: int = 42
     # [2026-09-11] True 면 TrainingArguments(full_determinism=True). 기본 False — set_seed 만으로는 GPU 연산이
-    # 비결정적이라 같은 시드도 결과가 갈렸다(v6 재학습 다섯 판의 미탐 29~206). 켜면 느려질 수 있다.
+    # 비결정적이라 같은 시드도 결과가 갈렸다(v6 재학습 다섯 판의 미탐 29~206). 켜면 느리다 — RTX 5070 Ti 에서
+    # 단계당 1.1초 대 0.19초, 약 6배(2026-09-11 실측).
     deterministic: bool = False
     experiment_name: str = "koipa-classifier"
     bf16: bool = True           # bf16 가속 (CUDA GPU 필요; GPU 없으면 자동 비활성)
