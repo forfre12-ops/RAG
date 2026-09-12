@@ -1,7 +1,7 @@
 -- KL 운영 DB 사전 점검 — NOT NULL 승격 안전성 확인 (읽기 전용)
 --
 -- 배경. ORM 모델은 아래 28개 컬럼을 nullable=False 로 선언하는데 DB 는 NULL 을 허용한다.
--- 즉 **DB 가 모델의 전제를 강제하지 않는다**(tb_audit_log.success 같은 감사 필드 포함).
+-- 즉 **DB 가 모델의 전제를 강제하지 않는다**(감사로그 성공여부 tad_am_adt_log_mng.scs_yn 포함).
 -- 이를 맞추려면 ALTER ... SET NOT NULL 이 필요한데, 대상 컬럼에 NULL 이 한 건이라도 있으면
 -- 마이그레이션이 실패한다. 그래서 **쓰기 전에 먼저 센다.**
 --
@@ -17,127 +17,127 @@
 -- 참고: 한국지식재산보호원 개발 DB 실측(2026-08-11)은 28컬럼 10,285행 전수 NULL 0 이었다.
 --       그것은 개발 DB 기준이며 운영 DB 를 대신하지 않는다 — 그래서 이 점검이 필요하다.
 --
--- ⚠ [2026-09-11] 이 파일은 옛 물리명(tb_*)으로 적혀 있다. 표준명 개명(migration 7b3e9d2a4f10,
---   정본 poc/src/koipa/db/standard_names.py) **전** DB 에서만 돈다. 마이그레이션을 올리기 전에
---   돌리는 점검이므로 그때는 옛 이름이 맞다 — 5c1d9e0a7b34(created_at NOT NULL 9개 표)도 NULL 행이
---   있으면 멈추게 돼 있으니, 서버에 올리기 전에 이 점검으로 먼저 센다. 개명 이후 DB 에서는 실패한다.
--- ⚠ [2026-09-11 정정] 위 문장을 적을 때 이 파일을 개명 전 DB(f8a9b0c1d2e3)에서 돌려 보지 않았다. 돌려 보니
---   (211 서버) 이미 지워진 칼럼 tb_classifications.rag_used 를 찾다 오류가 나 한 줄도 판정하지 못했고,
---   5c1d9e0a7b34 가 보는 9개 표 중 tb_sample_dataset_membership.created_at 이 빠져 있었다. 둘 다 고쳤다
---   (rag_used 줄 삭제 · membership 줄 추가 — 여전히 28칸). 개명 전 판으로 만든 임시 DB 에서 오류 없이 돈다.
+-- ⚠ [2026-09-12] 이 파일은 **표준 물리명**(tad_*_mng · 표준 약어 칼럼)으로 적혀 있다. 대응표 정본은
+--   poc/src/koipa/db/standard_names.py, 개명 판은 migration 7b3e9d2a4f10 이다. 211 과 앞으로의 납품 DB 는
+--   모두 개명 뒤이므로 이 점검도 그쪽을 본다.
+--   **개명 전 DB(f8a9b0c1d2e3 이하)에서 돌려야 하면 옛 이름 판을 git 이력에서 꺼내 쓴다:**
+--       git show 98be2ae0:poc/scripts/sql/check_not_null_readiness.sql
+-- ⚠ [2026-09-11 이력] 옛 이름 판을 실제로 돌려 보기 전에는 두 가지가 틀려 있었다 — 이미 지워진 칼럼
+--   (분류결과 rag_used)을 찾다 오류로 한 줄도 판정하지 못했고, 5c1d9e0a7b34 가 보는 9개 표 중
+--   합성데이터셋구성(멤버십)의 생성일시가 빠져 있었다. 둘 다 고친 뒤 28칸이 됐고, 이 판은 그것을 이어받는다.
 
 WITH counts AS (
-  SELECT 'tb_audit_log'::text AS tbl, 'success'::text AS col,
-         count(*) FILTER (WHERE success IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_audit_log
+  SELECT 'tad_am_adt_log_mng'::text AS tbl, 'scs_yn'::text AS col,
+         count(*) FILTER (WHERE scs_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_am_adt_log_mng
   UNION ALL
-  SELECT 'tb_classification_evidence'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classification_evidence
+  SELECT 'tad_cm_clsf_bss_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_bss_mng
   UNION ALL
-  SELECT 'tb_classification_levels'::text AS tbl, 'is_active'::text AS col,
-         count(*) FILTER (WHERE is_active IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classification_levels
+  SELECT 'tad_cm_clsf_grd_mng'::text AS tbl, 'actvtn_yn'::text AS col,
+         count(*) FILTER (WHERE actvtn_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_grd_mng
   UNION ALL
-  SELECT 'tb_classification_levels'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classification_levels
+  SELECT 'tad_cm_clsf_grd_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_grd_mng
   UNION ALL
-  SELECT 'tb_classification_levels'::text AS tbl, 'updated_at'::text AS col,
-         count(*) FILTER (WHERE updated_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classification_levels
+  SELECT 'tad_cm_clsf_grd_mng'::text AS tbl, 'mdfcn_dt'::text AS col,
+         count(*) FILTER (WHERE mdfcn_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_grd_mng
   UNION ALL
-  SELECT 'tb_classifications'::text AS tbl, 'status'::text AS col,
-         count(*) FILTER (WHERE status IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classifications
+  SELECT 'tad_cm_clsf_rslt_mng'::text AS tbl, 'clsf_stts_nm'::text AS col,
+         count(*) FILTER (WHERE clsf_stts_nm IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_rslt_mng
   UNION ALL
-  SELECT 'tb_classifications'::text AS tbl, 'classified_at'::text AS col,
-         count(*) FILTER (WHERE classified_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classifications
+  SELECT 'tad_cm_clsf_rslt_mng'::text AS tbl, 'clsf_dt'::text AS col,
+         count(*) FILTER (WHERE clsf_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_rslt_mng
   UNION ALL
-  SELECT 'tb_corrections'::text AS tbl, 'corrected_at'::text AS col,
-         count(*) FILTER (WHERE corrected_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_corrections
+  SELECT 'tad_cm_crct_mng'::text AS tbl, 'crct_dt'::text AS col,
+         count(*) FILTER (WHERE crct_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_crct_mng
   UNION ALL
-  SELECT 'tb_document_labels'::text AS tbl, 'is_verified'::text AS col,
-         count(*) FILTER (WHERE is_verified IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_document_labels
+  SELECT 'tad_dm_doc_lbl_mng'::text AS tbl, 'vrfc_cmptn_yn'::text AS col,
+         count(*) FILTER (WHERE vrfc_cmptn_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_lbl_mng
   UNION ALL
-  SELECT 'tb_document_labels'::text AS tbl, 'labeled_at'::text AS col,
-         count(*) FILTER (WHERE labeled_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_document_labels
+  SELECT 'tad_dm_doc_lbl_mng'::text AS tbl, 'lbl_dt'::text AS col,
+         count(*) FILTER (WHERE lbl_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_lbl_mng
   UNION ALL
-  SELECT 'tb_documents'::text AS tbl, 'metadata'::text AS col,
-         count(*) FILTER (WHERE metadata IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_documents
+  SELECT 'tad_dm_doc_mng'::text AS tbl, 'mtdt_dsctn'::text AS col,
+         count(*) FILTER (WHERE mtdt_dsctn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_mng
   UNION ALL
-  SELECT 'tb_documents'::text AS tbl, 'ocr_used'::text AS col,
-         count(*) FILTER (WHERE ocr_used IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_documents
+  SELECT 'tad_dm_doc_mng'::text AS tbl, 'ocr_use_yn'::text AS col,
+         count(*) FILTER (WHERE ocr_use_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_mng
   UNION ALL
-  SELECT 'tb_documents'::text AS tbl, 'processing_status'::text AS col,
-         count(*) FILTER (WHERE processing_status IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_documents
+  SELECT 'tad_dm_doc_mng'::text AS tbl, 'prcs_stts_nm'::text AS col,
+         count(*) FILTER (WHERE prcs_stts_nm IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_mng
   UNION ALL
-  SELECT 'tb_documents'::text AS tbl, 'uploaded_at'::text AS col,
-         count(*) FILTER (WHERE uploaded_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_documents
+  SELECT 'tad_dm_doc_mng'::text AS tbl, 'uld_dt'::text AS col,
+         count(*) FILTER (WHERE uld_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_mng
   UNION ALL
-  SELECT 'tb_evaluation_factors'::text AS tbl, 'is_active'::text AS col,
-         count(*) FILTER (WHERE is_active IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_evaluation_factors
+  SELECT 'tad_em_evl_rqmt_mng'::text AS tbl, 'actvtn_yn'::text AS col,
+         count(*) FILTER (WHERE actvtn_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_em_evl_rqmt_mng
   UNION ALL
-  SELECT 'tb_evaluation_factors'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_evaluation_factors
+  SELECT 'tad_em_evl_rqmt_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_em_evl_rqmt_mng
   UNION ALL
-  SELECT 'tb_evaluation_factors'::text AS tbl, 'updated_at'::text AS col,
-         count(*) FILTER (WHERE updated_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_evaluation_factors
+  SELECT 'tad_em_evl_rqmt_mng'::text AS tbl, 'mdfcn_dt'::text AS col,
+         count(*) FILTER (WHERE mdfcn_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_em_evl_rqmt_mng
   UNION ALL
-  SELECT 'tb_level_keywords'::text AS tbl, 'is_active'::text AS col,
-         count(*) FILTER (WHERE is_active IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_level_keywords
+  SELECT 'tad_gm_grd_kywd_mng'::text AS tbl, 'actvtn_yn'::text AS col,
+         count(*) FILTER (WHERE actvtn_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_gm_grd_kywd_mng
   UNION ALL
-  SELECT 'tb_level_keywords'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_level_keywords
+  SELECT 'tad_gm_grd_kywd_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_gm_grd_kywd_mng
   UNION ALL
-  SELECT 'tb_llm_usage'::text AS tbl, 'success'::text AS col,
-         count(*) FILTER (WHERE success IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_llm_usage
+  SELECT 'tad_lm_llm_usqty_mng'::text AS tbl, 'scs_yn'::text AS col,
+         count(*) FILTER (WHERE scs_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_lm_llm_usqty_mng
   UNION ALL
-  SELECT 'tb_model_versions'::text AS tbl, 'is_active'::text AS col,
-         count(*) FILTER (WHERE is_active IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_model_versions
+  SELECT 'tad_mm_mdl_ver_mng'::text AS tbl, 'actvtn_yn'::text AS col,
+         count(*) FILTER (WHERE actvtn_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_mm_mdl_ver_mng
   UNION ALL
-  SELECT 'tb_model_versions'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_model_versions
+  SELECT 'tad_mm_mdl_ver_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_mm_mdl_ver_mng
   UNION ALL
-  SELECT 'tb_prompt_versions'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_prompt_versions
+  SELECT 'tad_pm_prmpt_ver_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_pm_prmpt_ver_mng
   UNION ALL
-  SELECT 'tb_sample_documents'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_sample_documents
+  SELECT 'tad_sm_syn_doc_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_sm_syn_doc_mng
   UNION ALL
-  SELECT 'tb_sample_dataset_membership'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_sample_dataset_membership
+  SELECT 'tad_sm_syn_datst_cpst_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_sm_syn_datst_cpst_mng
   UNION ALL
-  SELECT 'tb_training_epochs'::text AS tbl, 'logged_at'::text AS col,
-         count(*) FILTER (WHERE logged_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_training_epochs
+  SELECT 'tad_lm_lrn_epoch_mng'::text AS tbl, 'rcd_dt'::text AS col,
+         count(*) FILTER (WHERE rcd_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_lm_lrn_epoch_mng
   UNION ALL
-  SELECT 'tb_training_runs'::text AS tbl, 'status'::text AS col,
-         count(*) FILTER (WHERE status IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_training_runs
+  SELECT 'tad_lm_lrn_excn_mng'::text AS tbl, 'lrn_excn_stts_cd'::text AS col,
+         count(*) FILTER (WHERE lrn_excn_stts_cd IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_lm_lrn_excn_mng
   UNION ALL
-  SELECT 'tb_training_runs'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_training_runs
+  SELECT 'tad_lm_lrn_excn_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_lm_lrn_excn_mng
 )
 SELECT tbl AS "테이블",
        col AS "컬럼",
@@ -149,117 +149,117 @@ SELECT tbl AS "테이블",
 
 -- 한 줄 요약 — 위 표가 길면 이것만 봐도 된다.
 WITH counts AS (
-  SELECT 'tb_audit_log'::text AS tbl, 'success'::text AS col,
-         count(*) FILTER (WHERE success IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_audit_log
+  SELECT 'tad_am_adt_log_mng'::text AS tbl, 'scs_yn'::text AS col,
+         count(*) FILTER (WHERE scs_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_am_adt_log_mng
   UNION ALL
-  SELECT 'tb_classification_evidence'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classification_evidence
+  SELECT 'tad_cm_clsf_bss_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_bss_mng
   UNION ALL
-  SELECT 'tb_classification_levels'::text AS tbl, 'is_active'::text AS col,
-         count(*) FILTER (WHERE is_active IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classification_levels
+  SELECT 'tad_cm_clsf_grd_mng'::text AS tbl, 'actvtn_yn'::text AS col,
+         count(*) FILTER (WHERE actvtn_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_grd_mng
   UNION ALL
-  SELECT 'tb_classification_levels'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classification_levels
+  SELECT 'tad_cm_clsf_grd_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_grd_mng
   UNION ALL
-  SELECT 'tb_classification_levels'::text AS tbl, 'updated_at'::text AS col,
-         count(*) FILTER (WHERE updated_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classification_levels
+  SELECT 'tad_cm_clsf_grd_mng'::text AS tbl, 'mdfcn_dt'::text AS col,
+         count(*) FILTER (WHERE mdfcn_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_grd_mng
   UNION ALL
-  SELECT 'tb_classifications'::text AS tbl, 'status'::text AS col,
-         count(*) FILTER (WHERE status IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classifications
+  SELECT 'tad_cm_clsf_rslt_mng'::text AS tbl, 'clsf_stts_nm'::text AS col,
+         count(*) FILTER (WHERE clsf_stts_nm IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_rslt_mng
   UNION ALL
-  SELECT 'tb_classifications'::text AS tbl, 'classified_at'::text AS col,
-         count(*) FILTER (WHERE classified_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_classifications
+  SELECT 'tad_cm_clsf_rslt_mng'::text AS tbl, 'clsf_dt'::text AS col,
+         count(*) FILTER (WHERE clsf_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_clsf_rslt_mng
   UNION ALL
-  SELECT 'tb_corrections'::text AS tbl, 'corrected_at'::text AS col,
-         count(*) FILTER (WHERE corrected_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_corrections
+  SELECT 'tad_cm_crct_mng'::text AS tbl, 'crct_dt'::text AS col,
+         count(*) FILTER (WHERE crct_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_cm_crct_mng
   UNION ALL
-  SELECT 'tb_document_labels'::text AS tbl, 'is_verified'::text AS col,
-         count(*) FILTER (WHERE is_verified IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_document_labels
+  SELECT 'tad_dm_doc_lbl_mng'::text AS tbl, 'vrfc_cmptn_yn'::text AS col,
+         count(*) FILTER (WHERE vrfc_cmptn_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_lbl_mng
   UNION ALL
-  SELECT 'tb_document_labels'::text AS tbl, 'labeled_at'::text AS col,
-         count(*) FILTER (WHERE labeled_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_document_labels
+  SELECT 'tad_dm_doc_lbl_mng'::text AS tbl, 'lbl_dt'::text AS col,
+         count(*) FILTER (WHERE lbl_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_lbl_mng
   UNION ALL
-  SELECT 'tb_documents'::text AS tbl, 'metadata'::text AS col,
-         count(*) FILTER (WHERE metadata IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_documents
+  SELECT 'tad_dm_doc_mng'::text AS tbl, 'mtdt_dsctn'::text AS col,
+         count(*) FILTER (WHERE mtdt_dsctn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_mng
   UNION ALL
-  SELECT 'tb_documents'::text AS tbl, 'ocr_used'::text AS col,
-         count(*) FILTER (WHERE ocr_used IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_documents
+  SELECT 'tad_dm_doc_mng'::text AS tbl, 'ocr_use_yn'::text AS col,
+         count(*) FILTER (WHERE ocr_use_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_mng
   UNION ALL
-  SELECT 'tb_documents'::text AS tbl, 'processing_status'::text AS col,
-         count(*) FILTER (WHERE processing_status IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_documents
+  SELECT 'tad_dm_doc_mng'::text AS tbl, 'prcs_stts_nm'::text AS col,
+         count(*) FILTER (WHERE prcs_stts_nm IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_mng
   UNION ALL
-  SELECT 'tb_documents'::text AS tbl, 'uploaded_at'::text AS col,
-         count(*) FILTER (WHERE uploaded_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_documents
+  SELECT 'tad_dm_doc_mng'::text AS tbl, 'uld_dt'::text AS col,
+         count(*) FILTER (WHERE uld_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_dm_doc_mng
   UNION ALL
-  SELECT 'tb_evaluation_factors'::text AS tbl, 'is_active'::text AS col,
-         count(*) FILTER (WHERE is_active IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_evaluation_factors
+  SELECT 'tad_em_evl_rqmt_mng'::text AS tbl, 'actvtn_yn'::text AS col,
+         count(*) FILTER (WHERE actvtn_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_em_evl_rqmt_mng
   UNION ALL
-  SELECT 'tb_evaluation_factors'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_evaluation_factors
+  SELECT 'tad_em_evl_rqmt_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_em_evl_rqmt_mng
   UNION ALL
-  SELECT 'tb_evaluation_factors'::text AS tbl, 'updated_at'::text AS col,
-         count(*) FILTER (WHERE updated_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_evaluation_factors
+  SELECT 'tad_em_evl_rqmt_mng'::text AS tbl, 'mdfcn_dt'::text AS col,
+         count(*) FILTER (WHERE mdfcn_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_em_evl_rqmt_mng
   UNION ALL
-  SELECT 'tb_level_keywords'::text AS tbl, 'is_active'::text AS col,
-         count(*) FILTER (WHERE is_active IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_level_keywords
+  SELECT 'tad_gm_grd_kywd_mng'::text AS tbl, 'actvtn_yn'::text AS col,
+         count(*) FILTER (WHERE actvtn_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_gm_grd_kywd_mng
   UNION ALL
-  SELECT 'tb_level_keywords'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_level_keywords
+  SELECT 'tad_gm_grd_kywd_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_gm_grd_kywd_mng
   UNION ALL
-  SELECT 'tb_llm_usage'::text AS tbl, 'success'::text AS col,
-         count(*) FILTER (WHERE success IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_llm_usage
+  SELECT 'tad_lm_llm_usqty_mng'::text AS tbl, 'scs_yn'::text AS col,
+         count(*) FILTER (WHERE scs_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_lm_llm_usqty_mng
   UNION ALL
-  SELECT 'tb_model_versions'::text AS tbl, 'is_active'::text AS col,
-         count(*) FILTER (WHERE is_active IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_model_versions
+  SELECT 'tad_mm_mdl_ver_mng'::text AS tbl, 'actvtn_yn'::text AS col,
+         count(*) FILTER (WHERE actvtn_yn IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_mm_mdl_ver_mng
   UNION ALL
-  SELECT 'tb_model_versions'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_model_versions
+  SELECT 'tad_mm_mdl_ver_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_mm_mdl_ver_mng
   UNION ALL
-  SELECT 'tb_prompt_versions'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_prompt_versions
+  SELECT 'tad_pm_prmpt_ver_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_pm_prmpt_ver_mng
   UNION ALL
-  SELECT 'tb_sample_documents'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_sample_documents
+  SELECT 'tad_sm_syn_doc_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_sm_syn_doc_mng
   UNION ALL
-  SELECT 'tb_sample_dataset_membership'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_sample_dataset_membership
+  SELECT 'tad_sm_syn_datst_cpst_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_sm_syn_datst_cpst_mng
   UNION ALL
-  SELECT 'tb_training_epochs'::text AS tbl, 'logged_at'::text AS col,
-         count(*) FILTER (WHERE logged_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_training_epochs
+  SELECT 'tad_lm_lrn_epoch_mng'::text AS tbl, 'rcd_dt'::text AS col,
+         count(*) FILTER (WHERE rcd_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_lm_lrn_epoch_mng
   UNION ALL
-  SELECT 'tb_training_runs'::text AS tbl, 'status'::text AS col,
-         count(*) FILTER (WHERE status IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_training_runs
+  SELECT 'tad_lm_lrn_excn_mng'::text AS tbl, 'lrn_excn_stts_cd'::text AS col,
+         count(*) FILTER (WHERE lrn_excn_stts_cd IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_lm_lrn_excn_mng
   UNION ALL
-  SELECT 'tb_training_runs'::text AS tbl, 'created_at'::text AS col,
-         count(*) FILTER (WHERE created_at IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tb_training_runs
+  SELECT 'tad_lm_lrn_excn_mng'::text AS tbl, 'crt_dt'::text AS col,
+         count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
+    FROM tad_lm_lrn_excn_mng
 )
 SELECT CASE WHEN sum(null_rows) = 0 THEN 'SAFE' ELSE 'BLOCKED' END AS "결론",
        count(*) AS "점검 컬럼",

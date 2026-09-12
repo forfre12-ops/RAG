@@ -69,8 +69,10 @@ _MAPPING = ("poc/src/koipa/db/standard_names.py", "scripts/table_spec_meta.py",
             "scripts/build_table_spec.py", "poc/scripts/build_erd.py",
             "poc/scripts/audit_old_db_names.py", "poc/scripts/audit_schema_consistency.py")
 _RISKY_KINDS = ("string", "code", "text")
-# 마이그레이션을 올리기 **전** DB 에서 돌리는 점검 — 그때는 옛 이름이 맞다(파일 머리말에 조건을 적었다).
-_PRE_RENAME = ("poc/scripts/sql/check_not_null_readiness.sql",)
+# [2026-09-12] 비웠다. 여기 있던 check_not_null_readiness.sql 은 표준명으로 바꿨다 — 211 과 앞으로의
+# 납품 DB 가 모두 개명 뒤라 정작 필요한 DB 에서 돌지 않았기 때문이다. 개명 전 판은 git 이력에 있다
+# (98be2ae0). 다시 "개명 전 DB 전용" 파일이 생기면 여기에 적어 예외로 둔다.
+_PRE_RENAME: tuple[str, ...] = ()
 
 
 def _category(rel: str) -> str:

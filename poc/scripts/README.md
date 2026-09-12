@@ -40,7 +40,8 @@ DEMO_BASE_URL=http://<서버>:8000  DEMO_API_KEY=<키>  python scripts/demo_e2e_
 | `register_deployed_model.py`<br>`seed_active_model_version.py` | 배포 모델 등록·활성 버전 시드 | [INSTALL](../docs/INSTALL.md) |
 | `seed_keywords.py` | 태깅 키워드 시드 DB 적재 | — |
 | `docker_install_locked.sh` | **Dockerfile 3종이 호출** — `uv.lock` 고정 설치. 직접 실행할 일은 없다 | — |
-| `sql/check_not_null_readiness.sql` | **운영 DB 사전 점검(읽기 전용)** — NOT NULL 승격 전 대상 28컬럼의 NULL 유무 확인. ⚠ 옛 물리명(tb_*)으로 적혀 있어 **표준명 개명(7b3e9d2a4f10) 전 DB 에서만** 돈다 — 마이그레이션을 올리기 전에 돌리는 점검이라 그때는 맞고, 개명 이후 DB 에서는 실패한다 | — |
+| `sql/check_not_null_readiness.sql` | **운영 DB 사전 점검(읽기 전용)** — NOT NULL 승격 전 대상 28컬럼의 NULL 유무 확인. 표준 물리명(tad_*_mng) 기준이라 개명(7b3e9d2a4f10) **이후** DB 에서 돈다. 개명 전 DB 용 옛 이름 판은 `git show 98be2ae0:poc/scripts/sql/check_not_null_readiness.sql` | — |
+| `run_vllm_synth.sh` | **합성용 로컬 LLM(vLLM) 기동** — 211 의 qwen3-vllm 을 되세운다. 2026-09-11 에 이 컨테이너가 지워졌을 때 원래 기동 인자가 어디에도 없어 재구성해야 했다(확인된 값과 재구성한 값은 파일 머리말에 구분해 적었다) | — |
 
 ---
 
