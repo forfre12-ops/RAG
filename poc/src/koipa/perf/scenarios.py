@@ -1043,10 +1043,19 @@ def s11_concurrent_stress(ctx: ScenarioContext) -> None:
     ctx.record("s11_3", throughput_max)
 
     # S11.6/S11.7 PER-002 자원 사용률 peak (samples 있을 때만 — 없으면 harness SKIP)
+    # [2026-09-12] 판정값(peak)은 그대로 두고 근거(n·p95·mean)를 함께 남긴다 — peak 는 50ms
+    # 표본 하나라 예열·동시 부하에 크게 흔들린다(211 실측 35.6% 대 96~100%). 접두가 붙은
+    # 키는 KPI 이름과 겹치지 않아 판정 줄을 만들지 않고 결과 JSON 에만 실린다.
+    from koipa.perf.kpis import resource_evidence  # noqa: PLC0415
+
     if _cpu_samples:
         ctx.record("s11_6", max(_cpu_samples))
+        for _k, _v in resource_evidence(_cpu_samples).items():
+            ctx.record(f"s11_6_{_k}", _v)
     if _mem_samples:
         ctx.record("s11_7", max(_mem_samples))
+        for _k, _v in resource_evidence(_mem_samples).items():
+            ctx.record(f"s11_7_{_k}", _v)
 
     # S11.4 메모리 누수 — 전·후 RSS 차분
     rss_after = _rss_mb()

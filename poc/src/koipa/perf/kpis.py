@@ -38,6 +38,32 @@ class KPI:
     full_only: bool = False
 
 
+def resource_evidence(samples: list[float]) -> dict[str, float]:
+    """자원 사용률 표본 → 판정 근거 요약(n·peak·p95·mean).
+
+    왜 필요한가(2026-09-12). PER-002 의 CPU·MEM 사용률(S11.6·S11.7)은 50ms 표본의 **최댓값
+    하나**로 판정한다. 211 실측에서 같은 코드·같은 서버가 35.6% 와 96~100% 로 갈렸고
+    (예열 여부·측정 시각의 다른 부하), 그 한 값이 통과와 미달을 갈랐다. 판정 기준은 그대로
+    두고 — 기준을 바꾸는 것은 사람이 정할 일이다 — **무엇을 보고 그렇게 판정했는지**를
+    결과 JSON 에 함께 남긴다.
+
+    ⚠ 여기서 돌려주는 값은 KPI 가 아니다. 호출부가 `s11_6_p95` 처럼 접두를 붙여 기록하고,
+      KPI 는 `s11_6` 처럼 이름이 정확히 맞는 키만 읽으므로 판정 줄이 늘지 않는다.
+    ⚠ 표본이 없으면 빈 사전을 준다 — 0.0 을 지어내면 "0% 였다"로 읽힌다.
+    """
+    if not samples:
+        return {}
+    nums = [float(v) for v in samples]
+    return {
+        "n": float(len(nums)),
+        # peak·p95 는 판정에 쓰는 aggregate() 를 그대로 부른다 — 계산 규칙이 갈리면
+        # 판정값과 근거값을 나란히 놓고 볼 수 없다.
+        "peak": aggregate(nums, "max"),
+        "p95": aggregate(nums, "p95"),
+        "mean": statistics.mean(nums),
+    }
+
+
 def aggregate(values: list[float | bool], agg: Aggregator) -> float:
     if not values:
         return 0.0
