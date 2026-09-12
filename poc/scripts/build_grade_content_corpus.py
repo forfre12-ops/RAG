@@ -367,9 +367,12 @@ def main(argv=None) -> int:
 
     out_dir = _POC / a.out
     out_dir.mkdir(parents=True, exist_ok=True)
-    val, train = rows[:a.val], rows[a.val:]
+    # ⚠ val 과 test 를 같은 행으로 쓰면 **모델을 고른 셋으로 성능을 재는 것**이 된다
+    #   (학습기가 val 로 최적 체크포인트를 고르고, 보고서는 test 로 낸다).
+    #   셋을 겹치지 않게 가른다.
+    val, test, train = rows[:a.val], rows[a.val:a.val * 2], rows[a.val * 2:]
     digests = {}
-    for name, part in (("train", train), ("val", val), ("test", val)):
+    for name, part in (("train", train), ("val", val), ("test", test)):
         body = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in part)
         (out_dir / f"{name}.jsonl").write_text(body, encoding="utf-8", newline="\n")
         digests[name] = hashlib.sha256(body.encode("utf-8")).hexdigest()

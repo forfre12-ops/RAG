@@ -276,11 +276,16 @@ def main(argv=None) -> int:
         return 0
 
     rng.shuffle(rows)
+    # ⚠ val 과 test 를 같은 행으로 쓰면 **모델을 고른 셋으로 성능을 재는 것**이 된다.
+    #   셋을 겹치지 않게 가른다(val · test · 나머지 train).
     n_val = a.val or max(1, len(rows) // 5)
+    n_val = min(n_val, max(1, len(rows) // 3))
     out_dir = _POC / a.out
     out_dir.mkdir(parents=True, exist_ok=True)
     digests = {}
-    for name, part in (("train", rows[n_val:]), ("val", rows[:n_val]), ("test", rows[:n_val])):
+    for name, part in (("train", rows[n_val * 2:]),
+                       ("val", rows[:n_val]),
+                       ("test", rows[n_val:n_val * 2])):
         body = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in part)
         (out_dir / f"{name}.jsonl").write_text(body, encoding="utf-8", newline="\n")
         digests[name] = hashlib.sha256(body.encode("utf-8")).hexdigest()

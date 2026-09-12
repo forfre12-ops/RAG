@@ -7,9 +7,9 @@
  "human_confirmed_count": 0,
  "use": "내용을 읽어야 풀리는 과제. 사람 확정 정답 아님 · 실문서 일반화 근거 아님.",
  "sha256": {
-  "train": "408ef2f65115124d485cd7d82c3881d7fa30e7389b46069b6ba06253ba8afcb9",
+  "train": "ff744513e43be6681cc117fceca7dfc0400a0433d467a3a46936f6aca5b25c84",
   "val": "668e1ea4f13f98fb17ab278f2a03e4d5fa499897890b3ec037ebb7901afcea08",
-  "test": "668e1ea4f13f98fb17ab278f2a03e4d5fa499897890b3ec037ebb7901afcea08"
+  "test": "dc6337291ef1e581e417e27224d04c1c46a9b287da432d09647e6c29810d4730"
  },
  "shortcut_audit": {
   "n": 2400,
