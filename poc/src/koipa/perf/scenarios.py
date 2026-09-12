@@ -1488,6 +1488,70 @@ def s18_offline_bundle(ctx: ScenarioContext) -> None:
 
 
 # ----------------------------------------------------------------
+# S19. 대용량 단일 문서 (PER-002 "100쪽 30초")
+# ----------------------------------------------------------------
+
+_S19_PARA = (
+    "본 문서는 사내 검토 기록으로 작성되었다. 대상 공정의 조건과 측정 결과를 함께 정리하고, "
+    "예외가 발생한 구간은 별도 표본으로 분리해 원인을 확인한다. 확정되지 않은 가정은 결론과 "
+    "구분해 적고, 근거가 되는 원시 기록의 위치를 함께 남긴다. "
+)
+_S19_CHARS_PER_PAGE = 1800
+
+
+def s19_large_document(ctx: ScenarioContext) -> None:
+    """쪽수를 늘려 가며 **한 건**의 처리시간을 잰다 — PER-002 의 대용량 조항.
+
+    왜 이 시나리오가 생겼나(2026-09-13). PER-002 는 대용량 문서 처리시간을 요구하는데
+    **하니스에 그것을 재는 지표가 하나도 없었다.** 단일 문서 지연(S1.1·S1.2)은 짧은 문서
+    기준이고, S12 는 여러 건의 처리량이다. 그래서 이 요건은 임시 스크립트로만 재 왔고
+    보고서마다 값이 달랐다.
+
+    재는 값 셋:
+        쪽당 초        쪽수에 거의 비례한다(실측) — 환산의 근거가 된다
+        100쪽 환산 초   요건과 직접 견주는 값
+        30초 안에 몇 쪽  협의할 때 쓰는 값
+
+    ⚠ 쪽수는 글자수로 환산한다(쪽당 1,800자). 실제 문서의 조각 수는 서식에 따라 달라지므로
+      (같은 "100쪽"이 238조각과 354조각으로 갈린 실측이 있다) 이 값은 **글자수 기준**이다.
+    ⚠ 동기 경로는 `analyze_sync_max_chunks` 상한이 있어 큰 문서는 413 이 된다. 그래서
+      분류 API 가 아니라 추론 파이프라인을 직접 부른다 — 재는 대상은 모델 계산 시간이다.
+    """
+    from koipa.config import settings
+
+    model_dir = str(getattr(settings, "classifier_model_dir", "") or "").strip()
+    if not model_dir:
+        ctx.skip("classifier_model_dir 이 비어 있다 — 룰 경로로 재면 0.2초짜리 가짜 값이 나온다")
+        return
+
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
+
+    pipe = InferencePipeline(model_dir=model_dir)
+    if pipe._model is None:
+        ctx.skip("모델이 안 올라왔다 — 이 시나리오는 모델 계산 시간을 재는 것이라 건너뛴다")
+        return
+
+    def _doc(pages: int) -> str:
+        need = pages * _S19_CHARS_PER_PAGE
+        return (_S19_PARA * (need // len(_S19_PARA) + 1))[:need]
+
+    pipe.run(_doc(2))  # 워밍업 — 첫 호출에 적재·커널 준비가 섞인다
+
+    per_page: list[float] = []
+    for pages in (10, 50, 100):
+        started = time.perf_counter()
+        pipe.run(_doc(pages))
+        elapsed = time.perf_counter() - started
+        per_page.append(elapsed / pages)
+        if pages == 100:
+            ctx.record("s19_2", elapsed)
+            ctx.record("s19_3", int(30.0 / (elapsed / pages)))
+    if per_page:
+        ctx.record("s19_1", sum(per_page) / len(per_page))
+        ctx.note("s19_basis", "쪽당 1,800자 환산 · 추론 파이프라인 직접 호출 · 모델 %s" % model_dir.rstrip("/\\").split("/")[-1].split("\\")[-1])
+
+
+# ----------------------------------------------------------------
 # S12. 대용량 일괄 분류 (100/500/1000건)
 # ----------------------------------------------------------------
 
@@ -1691,6 +1755,7 @@ SPECS: list[ScenarioSpec] = [
     ScenarioSpec("S17", "감사 로그 무결성", s17_audit_log, requires=["pg"]),
     ScenarioSpec("S18", "폐쇄망 번들 무결성", s18_offline_bundle),
     ScenarioSpec("S12", "대용량 일괄 분류 (100/500/1000)", s12_large_batch),
+    ScenarioSpec("S19", "대용량 단일 문서 (PER-002)", s19_large_document),
     ScenarioSpec("S14", "저장소 DR 리허설 (PG)", s14_store_dr),
     ScenarioSpec("S15", "백업·복원 라운드트립", s15_backup_restore),
 ]

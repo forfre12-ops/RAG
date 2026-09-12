@@ -236,6 +236,15 @@ KPIS: list[KPI] = [
     KPI("S18.2", "S18", "manifest 결정론", "bool", "ge", True, "bool_all"),
     KPI("S18.3", "S18", "dry-run 시간", "ms", "le", 30000, "max"),
 
+    # S19 대용량 단일 문서 — PER-002 의 대용량 조항. **하니스에 이것을 재는 지표가 없었다**
+    # (2026-09-13 확인). 단일 문서 지연(S1.1·S1.2)은 짧은 문서 기준이고 S12 는 여러 건의
+    # 처리량이다. 그래서 이 요건은 임시 스크립트로만 재 왔고 보고서마다 값이 달랐다.
+    # 합격선은 요건 그대로 건다 — 지금 못 맞추면 **못 맞춘다고 나오는 것이 맞다.**
+    # 실측(2026-09-13): CPU 는 8스레드에서 포화해 100쪽 84.7초 · GPU 는 3.19초.
+    KPI("S19.1", "S19", "쪽당 처리시간", "s/page", "le", 0.3, "last", core=True, full_only=True),
+    KPI("S19.2", "S19", "100쪽 처리시간 (PER-002)", "s", "le", 30, "last", core=True, full_only=True),
+    KPI("S19.3", "S19", "30초 안에 처리 쪽수", "pages", "ge", 100, "last", full_only=True),
+
     # S12 대용량 일괄 분류 (W12 확장)
     KPI("S12.1", "S12", "N=100 throughput", "docs/s", "ge", 5, "last"),
     KPI("S12.2", "S12", "N=500 응답 정상", "bool", "ge", True, "bool_all"),
@@ -294,6 +303,8 @@ _SCENARIO_MODULES: dict[str, tuple[str, ...]] = {
     "S17": ("src/koipa/api/middleware.py", "src/koipa/repositories/audit_repo.py",
             "src/koipa/services/audit_chain.py"),
     "S18": ("scripts/build_offline_bundle.py",),
+    # S19 는 API 를 거치지 않고 추론 파이프라인을 직접 부른다 — 재는 대상이 모델 계산 시간이다.
+    "S19": ("src/koipa/modules/m5_inference", "src/koipa/modules/m2_preprocess"),
 }
 
 
