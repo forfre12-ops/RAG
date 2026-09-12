@@ -83,20 +83,43 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
 
     base = _POC / a.set if not Path(a.set).is_absolute() else Path(a.set)
+    # 셋마다 파일 이름이 다르다(비교셋은 eval.jsonl · 생성 코퍼스는 test.jsonl).
+    # 이름을 하나로 강제하면 같은 자로 못 재게 된다 — 있는 쪽을 쓴다.
+    for name in ("eval.jsonl", "test.jsonl", "val.jsonl"):
+        path = base / name
+        if path.is_file():
+            break
+    else:
+        raise SystemExit(f"{base}: eval.jsonl·test.jsonl·val.jsonl 중 아무것도 없다")
     rows = [json.loads(line) for line in
-            (base / "eval.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+            path.read_text(encoding="utf-8").splitlines() if line.strip()]
     manifest = json.loads((base / "manifest.json").read_text(encoding="utf-8"))
+    print("파일: %s" % path.name)
 
     from koipa.config import settings
     threshold = float(getattr(settings, "review_confidence_threshold", 0.5))
 
-    print("셋: %s · %d건 · sha256 앞16 %s"
-          % (a.set, len(rows), manifest["sha256_eval_jsonl"][:16]))
-    audit = manifest["shortcut_audit"]
-    print("  통제 확인 — 길이 누설 %s%%p · 문구 %.1f%% · 문서종류 %.1f%% (기준선 %.1f%%)"
-          % (audit["length"]["leak_pp"], audit["phrase_single_clue_rate"],
-             audit["document_type_rate"], audit["baseline_rate"]))
-    print("  ⛔ 정답은 생성 시 의도 등급이다(사람 확정 0건) — 정확도로 인용하지 말 것\n")
+    # 지문 필드가 셋마다 다르다 — 하나로 강제하지 않고 있는 쪽을 쓴다.
+    digest = manifest.get("sha256_eval_jsonl") or (manifest.get("sha256") or {}).get(path.stem, "")
+    print("셋: %s · %d건 · sha256 앞16 %s" % (a.set, len(rows), str(digest)[:16] or "(없음)"))
+
+    audit = manifest.get("shortcut_audit") or {}
+    if "axes" in audit:
+        # 새 형식 — 축마다 실측/라벨섞음/차이. **차이**로 읽는다.
+        print("  통제 확인(실측 → 라벨섞음 = 차이):")
+        for name, row in audit["axes"].items():
+            print("    %-14s %5.1f%% → %5.1f%% = %+.1f%%p"
+                  % (name, row["rate"], row["null"], row["excess_pp"]))
+        baseline = audit.get("majority_rate", 25.0)
+    elif audit:
+        # 옛 형식 — 최빈등급 비율과 비교한 값이라 **부풀려져 있다**
+        # ([[permutation-baseline-not-majority-2026-09-12]]). 그대로 믿지 말 것.
+        print("  ⚠ 옛 형식 통제 수치(최빈등급 기준 — 부풀려져 있다): 문서종류 %.1f%% · 문구 %.1f%%"
+              % (audit.get("document_type_rate", 0), audit.get("phrase_single_clue_rate", 0)))
+        baseline = audit.get("baseline_rate", 25.0)
+    else:
+        baseline = 25.0
+    print("  ⛔ 정답은 규칙·생성기가 매긴 라벨이다(사람 확정 0건) — 정확도로 인용하지 말 것\n")
 
     results = []
     for name in a.models:
@@ -105,7 +128,7 @@ def main(argv=None) -> int:
         results.append(rep)
         print("== %s  (%.1f초)" % (rep["model"], rep["seconds"]))
         print("   일치율      %.1f%%   (기준선 %.1f%%)"
-              % (rep["agreement"] * 100, audit["baseline_rate"]))
+              % (rep["agreement"] * 100, baseline))
         print("   미탐률      %.1f%%   %s  (고등급 정답을 더 낮게)"
               % ((rep["underclass_fnr"] or 0) * 100, rep["underclass_n"]))
         print("   무음 미탐   %d건    (미탐인데 conf ≥ %.2f 라 검수로도 안 감)"
@@ -124,7 +147,7 @@ def main(argv=None) -> int:
         target = _POC / a.json
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(
-            {"set": a.set, "sha256": manifest["sha256_eval_jsonl"], "results": results},
+            {"set": a.set, "sha256": digest, "results": results},
             ensure_ascii=False, indent=1), encoding="utf-8")
         print("\n기록: %s" % target)
     return 0

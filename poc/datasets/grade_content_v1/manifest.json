@@ -19,16 +19,35 @@
    "S3": 600,
    "TS": 600
   },
-  "baseline_rate": 25.0,
-  "document_type_rate": 27.7,
-  "theme_rate": 28.1,
+  "majority_rate": 25.0,
+  "axes": {
+   "document_type": {
+    "rate": 27.7,
+    "null": 28.1,
+    "excess_pp": -0.4
+   },
+   "theme": {
+    "rate": 28.1,
+    "null": 28.5,
+    "excess_pp": -0.4
+   },
+   "length": {
+    "rate": 30.2,
+    "null": 29.0,
+    "excess_pp": 1.3
+   },
+   "phrase": {
+    "rate": 78.1,
+    "null": 36.8,
+    "excess_pp": 41.3
+   }
+  },
   "median_chars": {
    "S1": 818,
    "S2": 816,
    "S3": 817,
    "TS": 817
   },
-  "median_ratio": 1.0,
-  "length_only_rate": 30.2
+  "median_ratio": 1.0
  }
 }
