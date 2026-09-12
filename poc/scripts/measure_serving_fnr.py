@@ -57,24 +57,80 @@ ORDER = {g: i for i, g in enumerate(GRADES)}      # TS=0 이 가장 높다
 HIGH = ("TS", "S1")
 
 
+def _normalize_row(row: dict) -> dict:
+    """평가셋마다 다른 필드명을 label/text 로 모은다.
+
+    2026-09-13 실측 — 리포의 평가셋이 최소 세 가지 스키마를 쓴다:
+        holdout_eval*        label · text
+        golden100_labeled_v2 target · body
+        proxy_gold 후보       intended_label · (본문은 별도 .md)
+    별칭을 여기 한 곳에만 둔다. 호출부에서 row.get("label") 을 직접 쓰지 말 것.
+    """
+    out = dict(row)
+    if not out.get("label"):
+        for alias in ("label", "target", "gold", "grade", "intended_label", "target_grade"):
+            if row.get(alias):
+                out["label"] = row[alias]
+                break
+    if not str(out.get("text") or "").strip():
+        for alias in ("text", "body", "content", "document_text"):
+            if str(row.get(alias) or "").strip():
+                out["text"] = row[alias]
+                break
+    return out
+
+
 def _read_jsonl(path: Path) -> list[dict]:
     with path.open("r", encoding="utf-8") as handle:
         return [json.loads(line) for line in handle if line.strip()]
 
 
-def classify(api: str, key: str, doc_id: str, text: str, timeout: int) -> dict | None:
+def classify(api: str, key: str, doc_id: str, text: str, timeout: int,
+             fail_reasons: "Counter | None" = None) -> dict | None:
+    """⚠ 2026-09-13: 종전 판은 **모든 예외를 None 하나로 뭉갰다.** 그 탓에
+    `/classify` 의 분당 60건 한도(@limiter.limit("60/minute"))에 걸린 429 가
+    "요청 실패"로만 세어져, holdout109 109건 중 84건이 조용히 빠진 채
+    **무음 미탐 0건** 이라는 값이 나왔다. 실패 사유를 세고, 429 는 기다렸다 다시 건다.
+    (사유를 뭉치면 고칠 자리를 못 찾는다 — build_grade_content_llm 과 같은 교훈)"""
     body = json.dumps({"doc_id": doc_id, "content": text}, ensure_ascii=False).encode("utf-8")
-    request = urllib.request.Request(
-        f"{api}/api/v1/classify",
-        data=body,
-        headers={"Content-Type": "application/json; charset=utf-8", "X-API-Key": key},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
-        return None
+
+    for attempt in range(6):
+        request = urllib.request.Request(
+            f"{api}/api/v1/classify",
+            data=body,
+            headers={"Content-Type": "application/json; charset=utf-8", "X-API-Key": key},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429:
+                # Retry-After 를 존중한다. 없으면 남은 초를 넉넉히 기다린다.
+                wait = exc.headers.get("Retry-After") if exc.headers else None
+                try:
+                    delay = float(wait) if wait else 0.0
+                except (TypeError, ValueError):
+                    delay = 0.0
+                delay = max(delay, 5.0) if attempt == 0 else max(delay, 15.0)
+                if fail_reasons is not None:
+                    fail_reasons["429 한도초과(대기 후 재시도)"] += 1
+                time.sleep(delay)
+                continue
+            if fail_reasons is not None:
+                fail_reasons[f"HTTP {exc.code}"] += 1
+            return None
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            if fail_reasons is not None:
+                fail_reasons[f"{type(exc).__name__}"] += 1
+            return None
+        except json.JSONDecodeError:
+            if fail_reasons is not None:
+                fail_reasons["응답 JSON 파싱 실패"] += 1
+            return None
+    if fail_reasons is not None:
+        fail_reasons["429 재시도 소진"] += 1
+    return None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -96,6 +152,24 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("API 키가 필요하다 (--api-key 또는 KOIPA_API_KEY)")
 
     rows = _read_jsonl(Path(args.eval))
+
+    # ⚠ 2026-09-13: 평가셋마다 필드명이 다르다. golden100_labeled_v2 는 target/body 이고
+    #   adversarial/golden_100 은 본문 자체가 없는 **시나리오 명세**다. 종전 판은 없는 키를
+    #   말없이 None/"" 으로 읽어 빈 본문 100건을 분류시키고 "실패 0 · 미탐률 0.0%" 를 냈다.
+    #   분모가 0 인 0% 는 "미탐 없음" 이 아니다. 읽는 자리에서 멈춘다.
+    rows = [_normalize_row(r) for r in rows]
+    no_label = sum(1 for r in rows if not r.get("label"))
+    no_text = sum(1 for r in rows if not str(r.get("text") or "").strip())
+    if no_label or no_text:
+        msg = [
+            f"평가셋을 읽지 못했다 — 정답 없는 행 {no_label}/{len(rows)} · 본문 없는 행 {no_text}/{len(rows)}",
+            f"  파일: {args.eval}",
+            f"  발견된 키: {sorted(rows[0].keys()) if rows else chr(40) + chr(41)}",
+            "  이 도구는 label(정답) · text(본문) 을 요구한다. 별칭은 _normalize_row 에 추가할 것.",
+            "  본문이 아예 없는 셋(시나리오 명세 등)은 이 도구의 대상이 아니다.",
+        ]
+        raise SystemExit(chr(10).join(msg))
+
     if args.high_only:
         rows = [r for r in rows if str(r.get("label")) in HIGH]
     if args.limit:
@@ -105,10 +179,11 @@ def main(argv: list[str] | None = None) -> int:
     started = time.time()
     records: list[dict] = []
     failed = 0
+    fail_reasons: Counter = Counter()
     for index, row in enumerate(rows):
         truth = str(row.get("label"))
         result = classify(args.api, key, f"servingfnr-{index:05d}", str(row.get("text") or ""),
-                          args.timeout)
+                          args.timeout, fail_reasons)
         if result is None:
             failed += 1
             continue
@@ -149,6 +224,8 @@ def main(argv: list[str] | None = None) -> int:
         "api": args.api,
         "scored": len(records),
         "failed_requests": failed,
+        # 실패를 숫자 하나로 두면 무엇 때문인지 못 본다 — 429 한도초과가 대표적이다.
+        "failure_reasons": dict(fail_reasons),
         "scoring_path": "FULL serving path via POST /api/v1/classify "
                         "(post-model guards INCLUDED: FNR-safe override, source-prior cap, "
                         "metadata floor, escalation tau, agreement gate)",
@@ -198,6 +275,13 @@ def main(argv: list[str] | None = None) -> int:
             "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records),
             encoding="utf-8",
         )
+    if failed:
+        # 응답을 못 받은 건은 분모에서 조용히 빠진다 — 그 상태의 0건은 "미탐 없음" 이 아니다.
+        print("!" * 76, flush=True)
+        print(f"!! 요청 {failed}건이 실패했다 — 이 수치는 전수가 아니다. 사유 {dict(fail_reasons)}",
+              flush=True)
+        print(f"!! 채점 {len(records)} / 대상 {len(rows)}", flush=True)
+        print("!" * 76, flush=True)
     print(json.dumps({k: v for k, v in report.items() if k != "note"},
                      ensure_ascii=True, indent=2))
     if args.out:
