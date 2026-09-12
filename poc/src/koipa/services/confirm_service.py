@@ -532,7 +532,7 @@ def to_relabel_response(result: RelabelResult) -> RelabelResponse:
 # 화면의 등급과 근거가 어긋난다.
 #
 # 그럴 필요가 없다. 근거는 분류 시점에 이미 저장된다 —
-# tb_classification_evidence(excerpt·contribution·evidence_type·rag_ref), classify_service 가
+# tad_cm_clsf_bss_mng(excerpt·contribution·evidence_type·rag_ref), classify_service 가
 # add_evidence_from_spans 로 기록한다. 실서버 확인: 4건 분류에 13행 적재돼 있었다.
 # 저장분을 읽으면 (1) 재추론 비용 0 (2) 모델 불일치 없음 (3) **그 등급을 실제로 만든 근거**다.
 def load_review_evidence(classification_id) -> dict:

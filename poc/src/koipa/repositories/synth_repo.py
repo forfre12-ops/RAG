@@ -162,7 +162,7 @@ class SynthRepo:
     ) -> int:
         """승인본이 어느 학습셋 판에 들어갔는지 **쌓는다**(append-only).
 
-        [2026-09-05] 앞선 판은 tb_sample_documents 의 칼럼 하나를 UPDATE 했는데,
+        [2026-09-05] 앞선 판은 tad_sm_syn_doc_mng 의 칼럼 하나를 UPDATE 했는데,
         재방출하면 덮어써서 **한 문서가 여러 판에 들어간 이력을 잃었다.**
 
         같은 판에 두 번 넣는 것은 무해하게 건너뛴다(UNIQUE 로 막고 여기서 미리 거른다).

@@ -12,13 +12,13 @@
   + 별도 벡터DB 대신 PG + pgvector 로 되돌렸다). 조회를 두 단계로 쪼개면 그 이점을
   스스로 버리는 셈이라, 조인을 여기 둔다.
 
-  ⛔ 등급을 tb_document_vectors 에 **복제하지 않는다.** 확정 등급은 검수로 바뀌는 값이라
+  ⛔ 등급을 tad_dm_doc_vctr_mng 에 **복제하지 않는다.** 확정 등급은 검수로 바뀌는 값이라
      복제하면 두 값이 갈라지고, 갈라지면 화면이 틀린 등급을 유사 문서 옆에 보여준다.
-     항상 tb_document_labels 를 조인해서 읽는다.
+     항상 tad_dm_doc_lbl_mng 를 조인해서 읽는다.
 
 ■ 삭제
 
-  tb_documents 는 soft delete(`deleted_at`)다. FK ON DELETE CASCADE 는 하드 삭제에만
+  tad_dm_doc_mng 는 soft delete(`deleted_at`)다. FK ON DELETE CASCADE 는 하드 삭제에만
   걸리므로, 조회에 `d.deleted_at IS NULL` 이 **반드시** 들어가야 한다. 빠지면 검수자가
   지운 문서가 유사 문서로 뜨고 그 옆에 등급까지 붙는다.
 
@@ -59,7 +59,7 @@ class SimilarDocument:
 
 
 class DocumentVectorStore:
-    """tb_document_vectors 읽기·쓰기. 지연 연결 — 생성 시 DB 에 붙지 않는다."""
+    """tad_dm_doc_vctr_mng 읽기·쓰기. 지연 연결 — 생성 시 DB 에 붙지 않는다."""
 
     def __init__(self, engine: Any | None = None) -> None:
         if engine is None:

@@ -41,7 +41,7 @@ def _is_identity(arr) -> bool:
 
 
 def _level_loss_weights_with_source():
-    """등급별 손실 가중을 DB(tb_classification_levels.loss_weight)에서 읽고 출처("db" | "default")를 함께 돌려준다.
+    """등급별 손실 가중을 DB(tad_cm_clsf_grd_mng.loss_weight)에서 읽고 출처("db" | "default")를 함께 돌려준다.
 
     [2026-09-11] 출처를 돌려주는 까닭: 같은 학습셋·같은 시드라도 DB 가 있으면 시드값(TS 3.0 · S1 2.0),
     없으면 전부 1.0 으로 학습된다. 종전엔 INFO 로그 한 줄뿐이라 산출물만 봐서는 어느 쪽인지 알 수 없었다.

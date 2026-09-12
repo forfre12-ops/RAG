@@ -1,4 +1,4 @@
-"""LLM 호출 비용 기록 서비스 — DB `tb_llm_usage` 또는 JSONL 누적."""
+"""LLM 호출 비용 기록 서비스 — DB `tad_lm_llm_usqty_mng` 또는 JSONL 누적."""
 
 from __future__ import annotations
 

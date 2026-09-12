@@ -213,7 +213,7 @@ class Chunk(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("chnk_id", "crt_dt"),
-        # 시간축 선두 인덱스 — tb_audit_log 와 같은 사유.
+        # 시간축 선두 인덱스 — tad_am_adt_log_mng 와 같은 사유.
         Index("idx_chunk_created", "crt_dt"),
         Index("idx_chunk_doc", "doc_id", "chnk_no"),
         # init.sql의 PARTITION BY RANGE (created_at)는 ORM이 관리하지 않음.
@@ -232,7 +232,7 @@ class DocumentLabel(Base):
     level_id: Mapped[int] = mapped_column("grd_sn", ForeignKey("tad_cm_clsf_grd_mng.grd_sn", ondelete="RESTRICT"), nullable=False)
     labeled_by: Mapped[str] = mapped_column("lbl_mnbd_nm", String(30), nullable=False)
     labeler_id: Mapped[str | None] = mapped_column("lbl_wrtr_id", String(50))
-    # [2026-09-10] (3,2)→(5,4). 같은 이름의 tb_classifications.confidence 와 정밀도를 맞춘다
+    # [2026-09-10] (3,2)→(5,4). 같은 이름의 tad_cm_clsf_rslt_mng.confidence 와 정밀도를 맞춘다
     # (감리 도표 75 · migration 5c1d9e0a7b34).
     confidence: Mapped[float | None] = mapped_column("rlbl_scr", Numeric(5, 4))
     total_score: Mapped[float | None] = mapped_column("tot_scr", Numeric(4, 2))
@@ -558,7 +558,7 @@ class LlmUsage(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("use_rcd_sn", "clot_dt"),
-        # 시간축 선두 인덱스 — tb_audit_log 와 같은 사유(보존기간 삭제·기간 집계).
+        # 시간축 선두 인덱스 — tad_am_adt_log_mng 와 같은 사유(보존기간 삭제·기간 집계).
         Index("idx_lu_called", "clot_dt"),
         Index("idx_lu_phase", "bllng_se_cd", desc("clot_dt")),
         Index("idx_lu_purpose", "clot_prps"),
@@ -629,7 +629,7 @@ class AdvisoryLock(Base):
 class SampleDatasetMembership(Base):
     """승인 합성본이 어느 학습셋 판에 들어갔는지 — **append-only**.
 
-    [2026-09-05] 앞선 판은 tb_sample_documents 에 칼럼 하나였는데 UPDATE 로 덮어써서
+    [2026-09-05] 앞선 판은 tad_sm_syn_doc_mng 에 칼럼 하나였는데 UPDATE 로 덮어써서
     **한 문서가 여러 판에 들어간 이력을 잃었다.** 재방출 한 번이면 앞선 기록이 사라진다.
 
     같은 표에서 생성 작업 연결도 푼다 — synth_job_id 가 어디에도 없어 "이 작업이 만든

@@ -193,7 +193,7 @@ def _coverage_cell(grade: str, domain: str | None) -> dict | None:
 def _persist_synth_samples(
     docs: list, *, job_id: str | None, screen: dict | None = None
 ) -> int:
-    """[P0#1] 생성 문서를 검수큐(tb_sample_documents)에 적재 — generate→queue→review 루프 마감.
+    """[P0#1] 생성 문서를 검수큐(tad_sm_syn_doc_mng)에 적재 — generate→queue→review 루프 마감.
 
     이전 워커는 list[dict]만 반환하고 SynthRepo.create_sample 을 호출하지 않아, 검수큐가 비어
     운영학습(유일 자동화 레버)의 입력원이 단절돼 있었다. 여기서 각 SynthDoc 을 검수 대기(pending_review)
@@ -223,7 +223,7 @@ def _persist_synth_samples(
             synth_repo = SynthRepo(db)
             level_cache: dict[str, int | None] = {}
 
-            # 프롬프트 버전 — 내용 해시. **세 칸은 tb_prompt_versions 를 가리키는 외래키라
+            # 프롬프트 버전 — 내용 해시. **세 칸은 tad_pm_prmpt_ver_mng 를 가리키는 외래키라
             # 행을 먼저 등록해야 한다**(실측: IntegrityError 1452). 등록에 실패하면 값을
             # 비우고 적재는 계속한다 — 버전 기록 때문에 생성 결과를 잃으면 안 된다.
             _pv_body = _pv_outline = _pv_qc = None
@@ -392,7 +392,7 @@ def synthesize_batch(
     """합성 문서 N건 생성 + 누출 게이트 + 검수큐 적재.
 
     SyntheticDocGenerator 내부도 best-effort지만, 전체 호출 실패 시 retry.
-    생성 성공 시 tb_sample_documents(검수 대기)에 적재해 generate→queue→review 루프를 잇는다(P0#1).
+    생성 성공 시 tad_sm_syn_doc_mng(검수 대기)에 적재해 generate→queue→review 루프를 잇는다(P0#1).
     부분 결과가 있으면 보상 트랜잭션으로 partial 기록.
 
     [2026-09-05 누출 게이트] 적재 **전**에 services/synth_quality.screen_batch 로 잰다.
@@ -836,7 +836,7 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
 
     # 학습·게이트 성공 → 상태 completed (소비 성패와 무관 — 소비는 아래 별도 처리).
     # [2026-08-16] 어느 모델이 나왔는지 학습 작업 기록에 남긴다. 종전에는 이 연결이
-    # 한 방향뿐이라(tb_model_versions.training_run_id 만) `GET /train/jobs` 의
+    # 한 방향뿐이라(tad_mm_mdl_ver_mng.training_run_id 만) `GET /train/jobs` 의
     # model_version 이 항상 null 이었다 - KL 서버에서 재학습이 완주해 v-24c7c02c 가
     # 정상 등록됐는데도 화면에서는 "어떤 모델이 나왔는지" 를 볼 수 없었다.
     _mv = _deploy.get("version_id")

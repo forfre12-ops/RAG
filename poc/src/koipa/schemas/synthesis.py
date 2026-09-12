@@ -94,7 +94,7 @@ class SynthReviewResponse(BaseModel):
     # 아니면 생성 시 목표 등급. 반려면 학습에 들어가지 않으므로 참고값이다.
     applied_grade: Optional[Grade] = None
     # [2026-09-05] 이 문서가 들어간 학습셋 판 **전부**. 종전에는 단일 값 필드였고 늘 비었다 —
-    # 한 문서가 여러 판에 들어갈 수 있으므로 목록이 맞다(tb_sample_dataset_membership).
+    # 한 문서가 여러 판에 들어갈 수 있으므로 목록이 맞다(tad_sm_syn_datst_cpst_mng).
     dataset_versions: list[str] = Field(default_factory=list)
 
 

@@ -69,13 +69,13 @@ class TrainingRepo:
         """학습 완료 기록. **어느 모델이 나왔는지도 같이 남긴다.**
 
         왜(실측 2026-08-16, KL 서버). 재학습이 처음으로 완주해 모델 v-24c7c02c 가 나왔고
-        tb_model_versions 에 정상 등록됐는데, `GET /train/jobs` 응답의 model_version 은
+        tad_mm_mdl_ver_mng 에 정상 등록됐는데, `GET /train/jobs` 응답의 model_version 은
         여전히 null 이었다. DB 를 열어 보니 연결이 **한 방향뿐**이었다.
 
-            tb_model_versions.training_run_id   기록됨   (모델 -> 학습작업)
-            tb_training_runs.model_version      비어 있음 (학습작업 -> 모델)
+            tad_mm_mdl_ver_mng.training_run_id   기록됨   (모델 -> 학습작업)
+            tad_lm_lrn_excn_mng.model_version      비어 있음 (학습작업 -> 모델)
 
-        컬럼은 있는데(FK 로 tb_model_versions 참조) 아무도 채우지 않았다. 그래서 화면과
+        컬럼은 있는데(FK 로 tad_mm_mdl_ver_mng 참조) 아무도 채우지 않았다. 그래서 화면과
         API 에서 "이 학습이 무슨 모델을 만들었는가" 를 볼 수 없었다. 데이터가 없는 게
         아니라 반대편에서 뒤져야만 알 수 있는 상태였다.
 

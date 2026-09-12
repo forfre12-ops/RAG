@@ -789,7 +789,7 @@ class LabelRuleEngine:
         self, text: str, kw: str, pattern_type: str, *, query_vec: Optional[list[float]] = None
     ) -> int:
         if pattern_type == "regex":
-            # 시드는 DB(tb_level_keywords)에서도 오고, 콘솔 §T 가 정규식을 그대로 넣는다.
+            # 시드는 DB(tad_gm_grd_kywd_mng)에서도 오고, 콘솔 §T 가 정규식을 그대로 넣는다.
             # 깨진 정규식 하나가 re.error 로 올라오면 label() 전체가 죽고, 호출부는 그것을
             # fail-open 으로 삼켜(_record_gate_fail_open) FNR-safe 상향·합의 게이트가 통째로
             # 무음 정지한다(실측 2026-08-26). 그 시드 하나만 0 으로 떨구고 나머지는 살린다.

@@ -481,7 +481,7 @@ SERVING_GATE_FAIL_OPEN_TOTAL = Counter(
     registry=registry,
 )
 
-# [P0#1] 합성 검수큐 적재 — synthesize_batch 워커가 생성 문서를 tb_sample_documents 에 적재한 건수.
+# [P0#1] 합성 검수큐 적재 — synthesize_batch 워커가 생성 문서를 tad_sm_syn_doc_mng 에 적재한 건수.
 # label_source 별 노출로 (1) generate→queue→review 운영 루프가 실제로 도는지 (2) noop_fallback/
 # llm_nonjson(학습 편입 금지 마커) 비율을 함께 가시화한다. 이전엔 워커가 list[dict]만 반환해
 # 검수큐 적재 자체가 0 = 유일 자동화 레버(운영학습)의 입력원이 단절돼 있었다.

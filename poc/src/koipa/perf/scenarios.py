@@ -351,7 +351,7 @@ def s3_confirm_relabel(ctx: ScenarioContext) -> None:
     N = 5
     actor = {"user_id": "psh-admin", "role": "admin"}
 
-    # 분류는 **문서가 tb_documents 에 있을 때만** 영속된다(classify_service._try_persist:
+    # 분류는 **문서가 tad_dm_doc_mng 에 있을 때만** 영속된다(classify_service._try_persist:
     # "persistence skipped: doc_id ... not found"). 임의 UUID 를 넣던 이전 판은 그래서
     # 분류가 안 남았고, 뒤이은 confirm·relabel 은 "classification not found in DB — audit
     # only" 로 persisted=False 였다. 실제 적재 경로(POST /documents)로 문서를 만들고 그
@@ -704,7 +704,7 @@ def s6_synth(ctx: ScenarioContext) -> None:
                 )
                 # KPI 이름은 "approve 후 dataset 연결" 이다. 종전에는 HTTP 상태만 봤다 —
                 # 이름이 재지 않는 것을 주장했다. 응답의 dataset_versions 로 실제 연결을
-                # 확인한다(2026-09-05 신설: tb_sample_dataset_membership).
+                # 확인한다(2026-09-05 신설: tad_sm_syn_datst_cpst_mng).
                 linked = False
                 if r_ap.status_code in (200, 201):
                     body = r_ap.json()

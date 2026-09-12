@@ -64,7 +64,7 @@ TRAINING_EXCLUDED_LABEL_SOURCES = frozenset({"noop_fallback", "llm_nonjson"})
 # JSON 을 준다. 그래서 "테스트용 더미"라고 스스로 선언한 산출물이 승인만 되면 학습셋에 들어갔다.
 # 게다가 결정론적이라 같은 본문이 중복으로 들어간다.
 #
-# provider 는 생성 시점에 확정돼 tb_sample_documents.llm_provider 로 보존된다 — 파싱 성공
+# provider 는 생성 시점에 확정돼 tad_sm_syn_doc_mng.llm_provider 로 보존된다 — 파싱 성공
 # 여부와 무관한 축이라 마커의 구멍을 덮는다.
 TRAINING_EXCLUDED_PROVIDERS = frozenset({"noop"})
 

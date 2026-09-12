@@ -287,7 +287,7 @@ class ClassifyService:
             lock.release()
 
     def reload_rules(self) -> dict:
-        """서빙 룰 엔진을 DB(tb_level_keywords) 기준으로 재구성 — 키워드 CRUD 후 핫리로드 (FUN-023).
+        """서빙 룰 엔진을 DB(tad_gm_grd_kywd_mng) 기준으로 재구성 — 키워드 CRUD 후 핫리로드 (FUN-023).
 
         reload_model 과 달리 분류기 가중치는 건드리지 않고 룰 시드만 갱신(경량). 룰 엔진은
         LabelingPipeline 생성 시 build_rule_engine_from_db() 로 한 번 만들어져 이 싱글턴에 캐시되므로,

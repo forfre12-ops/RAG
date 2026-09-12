@@ -414,7 +414,7 @@ def canonical_domain(name: str | None) -> str:
 
 # [2026-09-05] 프롬프트 버전 — 재현·감사 앵커.
 #
-# tb_sample_documents 의 *_prompt_version 세 칸이 늘 비어 있었다. 채울 값이 없었기 때문이다.
+# tad_sm_syn_doc_mng 의 *_prompt_version 세 칸이 늘 비어 있었다. 채울 값이 없었기 때문이다.
 # 프롬프트를 고쳐도 "어느 프롬프트로 만든 문서인가"를 되짚을 수 없었고, 그래서 품질이
 # 갈렸을 때 원인을 프롬프트로 좁힐 수 없었다.
 #

@@ -54,7 +54,8 @@ MODEL_ACTIVATION = "model_activation"
 # 잠금 전용 표(models.py 의 AdvisoryLock). 행은 마이그레이션이 심는다.
 # 표 이름을 f-string 변수로 감싸지 않고 그대로 적는다 — 감사 도구·grep 이 원시 SQL 의
 # 표 사용을 정적으로 찾을 수 있어야 한다(scripts/audit_unused.py 가 이 문자열을 센다).
-# [2026-09-11] 표준 명명(7b3e9d2a4f10): tb_advisory_locks.name → tad_sy_lck_mng.lck_nm.
+# [2026-09-11] 표준 명명(7b3e9d2a4f10): 옛 tb_advisory_locks.name → tad_sy_lck_mng.lck_nm.
+# ⚠ 이 줄은 옛 이름을 일부러 남긴다 — 대응을 적은 문장이라 양쪽이 다 새 이름이면 뜻이 사라진다.
 _SELECT_FOR_UPDATE = text("SELECT lck_nm FROM tad_sy_lck_mng WHERE lck_nm = :n FOR UPDATE")
 _INSERT_PG = text("INSERT INTO tad_sy_lck_mng (lck_nm) VALUES (:n) ON CONFLICT DO NOTHING")
 

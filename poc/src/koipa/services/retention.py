@@ -6,8 +6,8 @@ PostgreSQL 은 월별 RANGE 파티션을 만들어 두었지만 **오래된 파�
 services/partitions.py 머리말), 그 자리를 이 배치가 받는다.
 
 실측(223 실서버 2026-08-06~09-05, 30일):
-    tb_audit_log   71,161행 · 30MB   → 연 환산 약 87만행 · 360MB
-    tb_llm_usage      214행
+    tad_am_adt_log_mng   71,161행 · 30MB   → 연 환산 약 87만행 · 360MB
+    tad_lm_llm_usqty_mng      214행
     구성: dashboard 76.5% · healthz 12.2% · 업무 행위(classify·documents·golden 등) 9% 미만
 
 즉 부피의 대부분은 감시 폴링이 남긴 것이다. 그래서 기본 보존기간을 길게 잡아도(감사 24개월)

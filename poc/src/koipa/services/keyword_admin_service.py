@@ -1,11 +1,11 @@
 """태깅 키워드 관리 서비스 — /admin/keywords CRUD (FUN-023).
 
-목록/추가/수정/비활성(is_active)을 tb_level_keywords(ORM LevelKeyword)에 대해 수행하고,
+목록/추가/수정/비활성(is_active)을 tad_gm_grd_kywd_mng(ORM LevelKeyword)에 대해 수행하고,
 변경 후 서빙 룰엔진을 핫리로드(ClassifyService.reload_rules)해 재기동 없이 반영한다.
 
 설계 정합:
 - ORM만 사용(raw SQL 무접두 테이블명 버그 회피 — seed_keywords.py 잠복버그와 동일 계열 방지).
-- 등급/요소 코드는 활성 tb_classification_levels·tb_evaluation_factors 로 id 해석. 레거시 4요소
+- 등급/요소 코드는 활성 tad_cm_clsf_grd_mng·tad_em_evl_rqmt_mng 로 id 해석. 레거시 4요소
   코드는 to_canonical_factor 로 정본(S·V·M)에 매핑(seeds 300+ 재태깅 없이 정합).
 - 삭제는 소프트(is_active=false) — FK RESTRICT·감사 보존과 정합.
 - DB 미가용: 목록은 best-effort(빈 목록+warning), 변경은 KeywordAdminError(503)로 명시 실패.

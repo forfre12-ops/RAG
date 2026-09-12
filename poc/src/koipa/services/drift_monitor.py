@@ -473,7 +473,7 @@ def fetch_recent_prod_embeddings(*, limit: int = 200) -> list[list[float]]:
     거짓으로 내지 않는다. 드리프트 감지는 요건이 아니고(RTM 에 행 없음) 기본값도
     OFF(settings.drift_detection_enabled=False)라 배포 동작에는 변화가 없다.
 
-    되살리려면 여기에 공급원을 새로 잇는다. tb_chunks 의 최근 본문을 adapters.embedding
+    되살리려면 여기에 공급원을 새로 잇는다. tad_cm_chnk_mng 의 최근 본문을 adapters.embedding
     으로 임베딩하는 것이 가장 가까운 대체다(위 스토어도 '마지막 N개 청크'를 표본으로 썼다).
     임베딩 비용은 config.drift_detection_enabled 주석의 실측(200건 30분)을 참고할 것.
     """

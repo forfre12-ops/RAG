@@ -1,6 +1,6 @@
 """태깅(키워드·표현패턴) 관리 admin 스키마 — /admin/keywords CRUD (FUN-023).
 
-요건: 키워드·표현패턴 태깅 규칙을 유연하게 수정·확장 관리. 데이터 모델(tb_level_keywords)과
+요건: 키워드·표현패턴 태깅 규칙을 유연하게 수정·확장 관리. 데이터 모델(tad_gm_grd_kywd_mng)과
 읽기 경로(load_seeds_from_db → 룰엔진)는 이미 존재하고, 본 스키마는 그 위에 목록/추가/수정/
 비활성(is_active) 관리 API 를 얹는다. 삭제는 하드 삭제 대신 is_active=false(소프트 삭제) —
 FK RESTRICT 및 감사 보존과 정합(schema_admin 등급 비활성과 동일 정책).
@@ -16,7 +16,7 @@ from .common import Actor
 
 # 룰엔진 _count 가 지원하는 매칭 방식(rule_engine.py): exact(부분문자열)·regex·semantic(임베딩).
 _PATTERN_TYPES = r"^(exact|regex|semantic)$"
-# tb_level_keywords.weight = Numeric(3,2) → 최대 9.99.
+# tad_gm_grd_kywd_mng.weight = Numeric(3,2) → 최대 9.99.
 # 하한은 0 이 아니라 0 초과다. weight=0 은 등급 점수에 한 푼도 기여하지 않으면서
 # matched_keywords 에는 남아 has_real_evidence 를 True 로 만든다 — 점수 없는 키워드가
 # 합의 게이트를 발동시킨다(실측 2026-08-26). 비활성은 is_active=false 로 한다.
