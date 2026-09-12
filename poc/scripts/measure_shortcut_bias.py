@@ -35,6 +35,7 @@ import argparse
 import glob
 import json
 import os
+import random
 import statistics
 import sys
 from collections import Counter, defaultdict
@@ -64,6 +65,31 @@ def _cramers_v(table: dict[str, Counter], n: int) -> float:
     return (chi2 / (n * (k - 1))) ** 0.5
 
 
+def _majority_hit(pairs: list[tuple[str, str]]) -> int:
+    table: dict[str, Counter] = defaultdict(Counter)
+    for value, grade in pairs:
+        table[value][grade] += 1
+    return sum(row.most_common(1)[0][1] for row in table.values())
+
+
+def _null_rate(pairs: list[tuple[str, str]], *, trials: int = 200, seed: int = 7) -> float:
+    """**라벨을 섞었을 때** 같은 자가 내는 적중률(%). 이것이 진짜 비교 기준이다.
+
+    ⚠ 2026-09-12 실측: 범주가 많고 표본이 적으면 "칸마다 최빈등급 찍기"는 관계가 전혀
+      없어도 크게 나온다(117건에서 40.2% · 라벨을 섞어도 39.8%). 전체 최빈등급 비율을
+      기준선으로 쓰면 그 부풀림이 통째로 '지름길'로 읽힌다.
+      [[permutation-baseline-not-majority-2026-09-12]]
+    """
+    rng = random.Random(seed)
+    values = [v for v, _g in pairs]
+    grades = [g for _v, g in pairs]
+    total = 0
+    for _ in range(trials):
+        rng.shuffle(grades)
+        total += _majority_hit(list(zip(values, grades)))
+    return total / trials / len(pairs) * 100
+
+
 def _axis_report(name: str, pairs: list[tuple[str, str]]) -> dict | None:
     """(범주값, 등급) 쌍에서 결합도와 최빈등급 적중률을 낸다."""
     pairs = [(str(v), g) for v, g in pairs if g in GRADES and v]
@@ -76,9 +102,10 @@ def _axis_report(name: str, pairs: list[tuple[str, str]]) -> dict | None:
     col = Counter(g for _, g in pairs)
 
     # 축의 값마다 그 안의 최빈등급을 찍었을 때 맞는 건수
-    hit = sum(row.most_common(1)[0][1] for row in table.values())
-    # 비교 기준: 축을 안 보고 전체 최빈등급 하나로 찍는다
+    hit = _majority_hit(pairs)
+    # 옛 기준: 축을 안 보고 전체 최빈등급 하나로 찍는다 — **부풀림을 못 걷는다**
     baseline = col.most_common(1)[0][1]
+    null = _null_rate(pairs)
     return {
         "axis": name,
         "n": n,
@@ -88,6 +115,8 @@ def _axis_report(name: str, pairs: list[tuple[str, str]]) -> dict | None:
         "majority_rate": round(hit / n * 100, 1),
         "baseline_rate": round(baseline / n * 100, 1),
         "lift_pp": round((hit - baseline) / n * 100, 1),
+        "null_rate": round(null, 1),
+        "excess_pp": round(hit / n * 100 - null, 1),
         "per_category": {
             value: {"n": sum(row.values()), "top": row.most_common(1)[0][0],
                     "top_share": round(row.most_common(1)[0][1] / sum(row.values()) * 100)}
@@ -96,16 +125,45 @@ def _axis_report(name: str, pairs: list[tuple[str, str]]) -> dict | None:
     }
 
 
-def _length_report(lengths: dict[str, list[int]]) -> dict | None:
+def _length_bin_hit(pairs: list[tuple[int, str]], bins: int) -> int:
+    ordered = sorted(pairs)
+    hit, size = 0, len(ordered) / bins
+    for i in range(bins):
+        chunk = ordered[int(i * size):int((i + 1) * size)]
+        if chunk:
+            hit += Counter(g for _c, g in chunk).most_common(1)[0][1]
+    return hit
+
+
+def _length_report(lengths: dict[str, list[int]], *, bins: int = 10) -> dict | None:
     rows = {g: v for g, v in lengths.items() if g in GRADES and v}
     if not rows:
         return None
     medians = {g: int(statistics.median(v)) for g, v in rows.items()}
     lo, hi = min(medians.values()), max(medians.values())
+
+    # 중앙값 배수만으로는 분포 겹침을 못 본다 — 길이 구간만 보고 찍는 적중률을 함께 낸다.
+    # 기준선은 여기서도 **라벨 섞기**다.
+    pairs = [(n, g) for g, vals in rows.items() for n in vals]
+    total = len(pairs)
+    real = _length_bin_hit(pairs, bins) / total * 100 if total else 0.0
+    null = 0.0
+    if total >= bins * 2:
+        rng = random.Random(7)
+        sizes = [n for n, _g in pairs]
+        grades = [g for _n, g in pairs]
+        acc = 0
+        for _ in range(200):
+            rng.shuffle(grades)
+            acc += _length_bin_hit(list(zip(sizes, grades)), bins)
+        null = acc / 200 / total * 100
     return {
         "counts": {g: len(v) for g, v in rows.items()},
         "median_chars": medians,
         "max_over_min": round(hi / lo, 2) if lo else None,
+        "length_only_rate": round(real, 1),
+        "null_rate": round(null, 1),
+        "excess_pp": round(real - null, 1),
     }
 
 
@@ -189,8 +247,10 @@ def _print_axis(report: dict | None, title: str) -> None:
     print(f"  Cramer's V                = {report['cramers_v']}")
     print(f"  이 축만 보고 최빈등급 찍기   = {report['majority_hit']}/{report['n']}"
           f" = {report['majority_rate']}%")
-    print(f"  전체 최빈등급 하나로 찍기    = {report['baseline_rate']}%"
-          f"   (차이 {report['lift_pp']}%p)")
+    print(f"  ⭐라벨을 섞었을 때          = {report['null_rate']}%"
+          f"   → **차이 {report['excess_pp']}%p** (이 값으로 판단한다)")
+    print(f"  (참고) 전체 최빈등급만 찍기  = {report['baseline_rate']}%"
+          f"   차이 {report['lift_pp']}%p — 범주 수에 부푼다, 판단에 쓰지 말 것")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -229,6 +289,9 @@ def main(argv: list[str] | None = None) -> int:
                           % (grade, section["length"]["counts"][grade],
                              section["length"]["median_chars"][grade]))
             print(f"  최대/최소 배수 = {section['length']['max_over_min']}")
+            print(f"  길이 구간만 보고 찍기 = {section['length']['length_only_rate']}%"
+                  f" · 라벨 섞으면 {section['length']['null_rate']}%"
+                  f" → **차이 {section['length']['excess_pp']}%p**")
         if args.top:
             _print_top(section, args.top)
         out["dataset"] = section
@@ -265,6 +328,9 @@ def main(argv: list[str] | None = None) -> int:
                           % (grade, section["length"]["counts"][grade],
                              section["length"]["median_chars"][grade]))
             print(f"  최대/최소 배수 = {section['length']['max_over_min']}")
+            print(f"  길이 구간만 보고 찍기 = {section['length']['length_only_rate']}%"
+                  f" · 라벨 섞으면 {section['length']['null_rate']}%"
+                  f" → **차이 {section['length']['excess_pp']}%p**")
         if args.top:
             _print_top(section, args.top)
         out["pool"] = section
