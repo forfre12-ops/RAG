@@ -163,6 +163,23 @@ def _detect_trained_model() -> bool:
         if _serving_model_loaded():
             return True
 
+        # [2026-09-12] 모델 **파일**이 설정된 자리에 실제로 있으면 학습 모델로 본다.
+        # 왜 필요한가: 위 두 검사와 아래 DB 검사만으로는 211 에서 매 회차 False 였다 — 측정
+        # 하니스는 새 프로세스라 인스턴스가 없고(서빙 검사 False), 모델버전 표는 0행이다(DB 검사
+        # False). 그런데 서버는 그 디렉터리로 실제 서빙 중이다(healthz model=loaded). 그래서
+        # 미탐 지표 넷(S1.3·S1.4·S9.2·S9.4)이 한 번도 안 재졌다 — RFP 가 "핵심 성능 목표"라고
+        # 적은 지표다. 서빙이 쓰는 것과 같은 값을 같은 방식으로 본다.
+        # ⚠ 디렉터리만 있고 가중치가 없으면 False — 빈 폴더를 '학습됨'으로 세지 않는다.
+        from pathlib import Path  # noqa: PLC0415
+
+        from koipa.config import settings  # noqa: PLC0415
+
+        model_dir = str(getattr(settings, "classifier_model_dir", "") or "").strip()
+        if model_dir:
+            p = Path(model_dir)
+            if p.is_dir() and (any(p.glob("*.safetensors")) or (p / "pytorch_model.bin").is_file()):
+                return True
+
         from sqlalchemy import select
 
         from koipa.db import session_scope
