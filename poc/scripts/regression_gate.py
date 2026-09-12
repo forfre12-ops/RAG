@@ -298,6 +298,63 @@ def snap_gates() -> dict:
     return out
 
 
+MODEL_DECISION_SETS = {
+    "hardened42": "datasets/gold_real/holdout_eval.hardened.jsonl",
+    "holdout109": "datasets/gold_real/holdout_eval.jsonl",
+}
+
+
+def snap_model_decisions() -> dict:
+    """**모델을 태운** 문서별 판정 — 추론 경로 변경을 잡는 유일한 축.
+
+    [2026-09-13 신설] 종전 축 다섯은 모델 추론 경로를 **하나도 지나가지 않았다**:
+      · `snap_decisions` 는 LabelRuleEngine 만 쓴다(룰 판정)
+      · `snap_gates` 는 `InferencePipeline()` 을 **model_dir 없이** 만든다(룰 폴백)
+      · `snap_model` 은 모델 **파일 해시**만 뜬다 — 예측이 아니다
+    그래서 `_run_model` 안을 고쳐도 게이트는 "회귀 없음"을 찍었다. 실제로 오늘 창 가중치를
+    바꿨을 때 그랬고, 그 변경은 holdout109 판정 2건·v5_clean/test 미탐 1건을 움직였다.
+    초록불을 검증으로 읽으면 안 되는 자리였다([[green-tests-can-mean-untested-path-2026-09-09]]).
+
+    ⚠ 모델이 없으면 **못 쟀다고 적는다.** 조용히 빈 dict 를 남기면 다음 비교가 통과한다.
+    ⚠ 느리다(문서 151건·CPU 수십 초). 그래도 추론 경로를 고칠 때 이 축이 없으면 근거가 없다.
+    """
+    from koipa.config import settings
+
+    raw_dir = str(getattr(settings, "classifier_model_dir", "") or "").strip()
+    if not raw_dir:
+        return {"__measured__": "False",
+                "__why__": "classifier_model_dir 이 비어 있다 — CLASSIFIER_MODEL_DIR 을 주면 잰다"}
+
+    out: dict = {}
+    try:
+        from koipa.modules.m5_inference.pipeline import InferencePipeline
+
+        pipe = InferencePipeline(model_dir=raw_dir)
+        if pipe._model is None:
+            return {"__measured__": "False",
+                    "__why__": "모델이 안 올라왔다 — 룰 폴백으로 도는 값은 이 축의 답이 아니다"}
+        for name, rel in MODEL_DECISION_SETS.items():
+            path = _ROOT / rel
+            if not path.exists():
+                continue
+            rows: dict[str, str] = {}
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                text = (row.get("text") or "").strip()
+                if not text:
+                    continue
+                key = str(row.get("doc_id") or row.get("id") or len(rows))
+                res = pipe.run(text, return_evidence=False)
+                label = res.label.value if hasattr(res.label, "value") else str(res.label)
+                rows[key] = "%s|%.3f" % (label, float(res.confidence))
+            out[name] = rows
+    except Exception as exc:  # noqa: BLE001
+        return {"__measured__": "False", "__why__": "%s: %s" % (type(exc).__name__, exc)}
+    return out
+
+
 def take() -> dict:
     return {
         "decisions": snap_decisions(),
@@ -305,6 +362,7 @@ def take() -> dict:
         "api": snap_api(),
         "settings": snap_settings(),
         "model": snap_model(),
+        "model_decisions": snap_model_decisions(),
     }
 
 
@@ -458,6 +516,39 @@ def compare(base: dict, now: dict) -> int:
                 print("  %s\n      전: %s\n      후: %s" % (k, bg.get(k), ng.get(k)))
         if not gdiff:
             print("  변화 없음 — 탐침 %d건" % len(ng))
+
+    print("\n" + "=" * 74)
+    print(" ⑥ 모델 판정면 (추론 경로)")
+    print("=" * 74)
+    bm = base.get("model_decisions") or {}
+    nm = now.get("model_decisions") or {}
+    if not bm:
+        print("  ⚠ 기준에 이 축이 없다 — --accept 로 기준을 갱신하면 다음부터 잰다.")
+        unmeasured = True
+        skipped_axes.append("모델 판정면")
+    elif nm.get("__measured__") == "False" or bm.get("__measured__") == "False":
+        why = nm.get("__why__") or bm.get("__why__", "사유 불명")
+        print("  ⚠ **재지 못했다** — %s" % why)
+        print("     추론 경로(_run_model)를 고쳤다면 이 축 없이는 근거가 없다.")
+        unmeasured = True
+        skipped_axes.append("모델 판정면")
+    else:
+        measured_axes.append("모델 판정면")
+        mdiff = total = 0
+        for name in sorted(set(bm) | set(nm)):
+            b_rows, n_rows = bm.get(name) or {}, nm.get(name) or {}
+            total += len(set(b_rows) | set(n_rows))
+            changed = [k for k in sorted(set(b_rows) | set(n_rows))
+                       if b_rows.get(k) != n_rows.get(k)]
+            for k in changed[:10]:
+                print("  %s/%s\n      전: %s\n      후: %s"
+                      % (name, k, b_rows.get(k), n_rows.get(k)))
+            if len(changed) > 10:
+                print("  %s: 그 밖 %d건" % (name, len(changed) - 10))
+            mdiff += len(changed)
+        regressions += mdiff
+        if not mdiff:
+            print("  변화 없음 — 문서 %d건" % total)
 
     print("\n" + "=" * 74)
     if regressions:
