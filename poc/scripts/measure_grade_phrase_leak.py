@@ -31,6 +31,7 @@ import argparse
 import collections
 import io
 import json
+import random
 import re
 import sys
 from pathlib import Path
@@ -55,6 +56,39 @@ def sentences(text: str, min_chars: int) -> set[str]:
     return out
 
 
+def _null_single_clue(cand: list[dict], per_doc: list[set[str]], min_docs: int,
+                      *, trials: int = 20, seed: int = 7) -> float:
+    """라벨을 섞고 같은 자로 잰 '단서 하나로 찍기' 적중률(0~1).
+
+    회차를 20 으로 둔다 — 문장 집합이 커서 한 회차가 비싸고, 값이 안정적이다
+    (후보 1,055건에서 20회 범위 29.5~31.6%).
+    """
+    rng = random.Random(seed)
+    labels = [c["label"] for c in cand]
+    n = len(cand)
+    total = 0.0
+    for _ in range(trials):
+        rng.shuffle(labels)
+        by_sentence: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+        for sents, label in zip(per_doc, labels):
+            for s in sents:
+                by_sentence[s][label] += 1
+        best: dict[str, tuple[float, int, str]] = {}
+        for s, dist in by_sentence.items():
+            docs = sum(dist.values())
+            if docs < min_docs:
+                continue
+            grade, top = dist.most_common(1)[0]
+            best[s] = (top / docs, docs, grade)
+        hit = 0
+        for sents, label in zip(per_doc, labels):
+            picks = [best[s] for s in sents if s in best]
+            if picks and max(picks)[2] == label:
+                hit += 1
+        total += hit / n
+    return total / trials
+
+
 def audit(*, min_docs: int, min_chars: int, pool: Path | None = None) -> dict:
     import eval_on_clean_candidates as _src
 
@@ -65,9 +99,11 @@ def audit(*, min_docs: int, min_chars: int, pool: Path | None = None) -> dict:
 
     cand = [c for c in _src.load_candidates() if (c.get("text") or "").strip()]
     n = len(cand)
+    # 문장 집합은 한 번만 자른다 — 라벨 섞기에서 수십 번 다시 자르면 몇 분이 걸린다.
+    per_doc_sentences = [sentences(c["text"], min_chars) for c in cand]
     by_sentence: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
-    for c in cand:
-        for s in sentences(c["text"], min_chars):
+    for c, sents in zip(cand, per_doc_sentences):
+        for s in sents:
             by_sentence[s][c["label"]] += 1
 
     grades = collections.Counter(c["label"] for c in cand)
@@ -100,10 +136,19 @@ def audit(*, min_docs: int, min_chars: int, pool: Path | None = None) -> dict:
         pick = max(cand_rows, key=lambda r: (r["purity"], r["docs"]))
         hit += (pick["top_grade"] == c["label"])
 
+    # ⭐ 진짜 기준선은 **라벨을 섞었을 때** 같은 자가 내는 값이다. 이 추정량은 문서마다
+    #   후보 문장 중 **가장 쏠린 것**을 고르므로, 관계가 없어도 커질 수 있다.
+    #   [[permutation-baseline-not-majority-2026-09-12]]
+    #   ⚠ 실측(후보 1,055건): 실측 91.4% · 섞으면 30.5% → 차이 +60.9%p. 여기서는 부풀림이
+    #     아니라 진짜 누설이었다. 그래도 값은 항상 **차이**로 읽는다.
+    null = _null_single_clue(cand, per_doc_sentences, min_docs) if n else 0.0
+
     return {
         "n_candidates": n,
         "grade_distribution": dict(grades),
         "baseline_majority": round(base, 4),
+        "null_single_clue": round(null, 4),
+        "excess_pp": round((hit / n - null) * 100, 1) if n else 0.0,
         "min_docs": min_docs,
         "min_chars": min_chars,
         "n_repeated_sentences": len(rows),
@@ -132,9 +177,12 @@ def main(argv=None) -> int:
     print("분모: 후보 %d건 · 등급 분포 %s" % (r["n_candidates"], r["grade_distribution"]))
     print("되풀이 문장 %d개(%d개 문서 이상) · 그중 한 등급 전용 %d개"
           % (r["n_repeated_sentences"], r["min_docs"], r["n_exclusive_sentences"]))
-    print("단서 하나로 등급 찍기: %d/%d = %.1f%%  (기준선 %.1f%% — 가장 흔한 등급만 찍기)"
-          % (r["single_clue_hits"], r["n_candidates"],
-             r["single_clue_accuracy"] * 100, r["baseline_majority"] * 100))
+    print("단서 하나로 등급 찍기: %d/%d = %.1f%%"
+          % (r["single_clue_hits"], r["n_candidates"], r["single_clue_accuracy"] * 100))
+    print("  ⭐라벨을 섞었을 때 %.1f%% → **차이 %+.1f%%p** (이 값으로 판단한다)"
+          % (r["null_single_clue"] * 100, r["excess_pp"]))
+    print("  (참고) 가장 흔한 등급만 찍기 %.1f%% — 범주 수·최댓값 고르기에 부푼다"
+          % (r["baseline_majority"] * 100))
     print("\n쏠린 문장 상위 %d개:" % a.top)
     for row in r["top"][:a.top]:
         print("  %5.1f%% %4d건 %-4s %s" % (row["purity"] * 100, row["docs"], row["top_grade"], row["sentence"][:80]))
