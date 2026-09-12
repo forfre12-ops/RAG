@@ -55,10 +55,15 @@ def sentences(text: str, min_chars: int) -> set[str]:
     return out
 
 
-def audit(*, min_docs: int, min_chars: int) -> dict:
-    from eval_on_clean_candidates import load_candidates
+def audit(*, min_docs: int, min_chars: int, pool: Path | None = None) -> dict:
+    import eval_on_clean_candidates as _src
 
-    cand = [c for c in load_candidates() if (c.get("text") or "").strip()]
+    # 다른 풀도 잴 수 있어야 한다 — 생성기를 고친 뒤 **새로 뽑은 것**과 대조하려면
+    # 기존 후보 풀(검수 이력이 붙어 있어 덮어쓰면 안 된다)이 아닌 곳을 가리켜야 한다.
+    if pool is not None:
+        _src.ROOT = pool
+
+    cand = [c for c in _src.load_candidates() if (c.get("text") or "").strip()]
     n = len(cand)
     by_sentence: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     for c in cand:
@@ -117,9 +122,13 @@ def main(argv=None) -> int:
     ap.add_argument("--min-chars", type=int, default=12, help="이보다 짧은 문장은 버린다")
     ap.add_argument("--top", type=int, default=10, help="화면에 보일 상위 문장 수")
     ap.add_argument("--json", default="")
+    ap.add_argument("--pool", default="", help="다른 후보 풀 디렉터리(기본: 골든 후보 풀)")
     a = ap.parse_args(argv)
 
-    r = audit(min_docs=a.min_docs, min_chars=a.min_chars)
+    r = audit(min_docs=a.min_docs, min_chars=a.min_chars,
+              pool=Path(a.pool).resolve() if a.pool else None)
+    if a.pool:
+        print("풀: %s" % a.pool)
     print("분모: 후보 %d건 · 등급 분포 %s" % (r["n_candidates"], r["grade_distribution"]))
     print("되풀이 문장 %d개(%d개 문서 이상) · 그중 한 등급 전용 %d개"
           % (r["n_repeated_sentences"], r["min_docs"], r["n_exclusive_sentences"]))

@@ -107,7 +107,16 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="골든 후보 정답 노출 제거 (비파괴)")
     ap.add_argument("--dry", action="store_true", help="쓰지 않고 결과만 보여준다")
     ap.add_argument("--revert", action="store_true", help="content_revision_path 를 걷어 원복")
+    ap.add_argument("--pool", default="", help="다른 후보 풀 디렉터리(기본: 골든 후보 풀)")
     a = ap.parse_args(argv)
+
+    # 생성기를 고친 뒤 **새로 뽑은 것**을 같은 조건으로 재려면 세척도 그 풀에 걸어야 한다.
+    # 현행 풀의 수치는 세척을 거친 값이라, 세척 안 한 원본과 대조하면 조치 효과가 아니라
+    # 세척 유무를 보게 된다(2026-09-12 실제로 100% 로 나왔다).
+    if a.pool:
+        global ROOT, REV
+        ROOT = Path(a.pool).resolve()
+        REV = ROOT / "revisions"
 
     metas = sorted(ROOT.glob("*.metadata.json"))
     print("=" * 74)
@@ -184,7 +193,11 @@ def main(argv=None) -> int:
             meta["grade_rationale"] = rat
         mp.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print("\n  적용: 정리본 %d건 → %s" % (len(plan), REV.relative_to(_POC).as_posix()))
+    try:
+        where = REV.relative_to(_POC).as_posix()
+    except ValueError:  # --pool 로 리포 밖을 가리킨 경우
+        where = REV.as_posix()
+    print("\n  적용: 정리본 %d건 → %s" % (len(plan), where))
     print("  원본 .md 는 손대지 않았다. --revert 로 되돌린다.")
     return 0
 

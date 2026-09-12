@@ -420,6 +420,54 @@ def _repair_mojibake(text: str) -> str:
     return re.sub(r"\S+", repair_token, text)
 
 
+# 보간 자리마다 조사가 문자열에 박혀 있다 — "{case.issue}가", "{case.subject}과" 처럼.
+# 받침 유무는 채워 넣는 말에 따라 달라지는데 틀에는 한 형태만 적혀 있어서, 후보 본문에
+# "…확인가 확정되지 않은" · "…소재이 외부에" 같은 문장이 실려 나갔다(2026-09-12 발견).
+# 검수자와 감리가 읽는 문서다. 틀을 스무 군데 고치는 대신, 다 찍어낸 뒤 **채워 넣은 말
+# 바로 뒤**의 조사만 받침에 맞춘다 — 본문의 다른 한국어는 건드리지 않는다.
+#
+# 지키는 경계 둘:
+#   ① 채운 말의 끝 글자가 한글일 때만 고친다(제목은 숫자로 끝나 읽는 법이 갈린다)
+#   ② 조사 뒤가 공백일 때만 고친다 — "…{issue}이다/이며" 의 '이'는 조사가 아니라 서술격이다
+_PARTICLE_PAIRS = (("으로", "로"), ("이", "가"), ("은", "는"), ("을", "를"), ("과", "와"))
+
+
+def _has_batchim(ch: str) -> bool | None:
+    """한글 음절의 받침 유무. 한글이 아니면 None(판단하지 않는다)."""
+    code = ord(ch) - 0xAC00
+    if not 0 <= code <= 11171:
+        return None
+    return code % 28 != 0
+
+
+def _fix_particles(text: str, case: Case) -> str:
+    words = sorted(
+        {case.subject, case.issue, case.evidence, case.owner, case.title, case.kind},
+        key=len,
+        reverse=True,
+    )
+    for word in words:
+        if not word:
+            continue
+        batchim = _has_batchim(word[-1])
+        if batchim is None:
+            continue
+        for after_batchim, after_vowel in _PARTICLE_PAIRS:
+            want = after_batchim if batchim else after_vowel
+            # '으로/로' 은 ㄹ 받침이면 '로' 를 쓴다.
+            if after_batchim == "으로" and batchim and (ord(word[-1]) - 0xAC00) % 28 == 8:
+                want = "로"
+            for have in (after_batchim, after_vowel):
+                if have == want:
+                    continue
+                text = re.sub(
+                    re.escape(word + have) + r"(?=\s)",
+                    word + want,
+                    text,
+                )
+    return text
+
+
 def _contextualize_standard_sentences(text: str, case: Case) -> str:
     """Tie otherwise generic review rules back to the specific case facts."""
     seed = sum((index + 1) * ord(char) for index, char in enumerate(case.title))
@@ -453,7 +501,8 @@ def _contextualize_standard_sentences(text: str, case: Case) -> str:
             sentence = sentence.rstrip() + ", " + bridges[(seed + sentence_index) % len(bridges)]
         revised.append(sentence + terminator)
         sentence_index += 1
-    return "".join(revised)
+    # 이 함수가 문서 전체를 받는 유일한 자리다 — 조사 교정도 여기서 건다.
+    return _fix_particles("".join(revised), case)
 
 
 def main() -> int:
