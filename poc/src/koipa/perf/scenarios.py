@@ -860,6 +860,8 @@ def s9_adversarial(ctx: ScenarioContext) -> None:
 
     matches = 0
     total_pairs = 0
+    dropped = 0          # 응답 실패로 빠진 요청
+    ratelimited = 0      # 그중 429(분류 레이트리밋 60/min)
     confidence_diffs: list[float] = []
     ts_total = 0
     ts_fn = 0
@@ -878,6 +880,9 @@ def s9_adversarial(ctx: ScenarioContext) -> None:
                     json={"doc_id": f"psh-s9-{uuid.uuid4().hex[:6]}", "content": v},
                 )
                 if r.status_code != 200:
+                    dropped += 1
+                    if r.status_code == 429:
+                        ratelimited += 1
                     continue
                 b = r.json()
                 labels.append(b.get("label", ""))
@@ -908,8 +913,19 @@ def s9_adversarial(ctx: ScenarioContext) -> None:
                         if st != "needs_review":
                             ts_silent_fn += 1
 
-    consistency = (matches / total_pairs) if total_pairs else 0.0
-    ctx.record("s9_1", consistency)
+    # [2026-09-12] 표본이 없으면 적지 않는다 — 0.0 을 적으면 "변형 일관성 0%" 라는 **미달**로 보고된다.
+    # 211 실측(2026-09-11): 시나리오를 붙여 돌려 분류 레이트리밋(60/min)에 걸리자 요청이 전부 429 였고,
+    # s9_1 이 0.0 = FAIL 로 보고서에 실렸다. 무측정은 SKIP 이 정직한 보고다
+    # (tests/test_perf_kpis_are_measured_not_borrowed.py). 간격은 `PSH_PACE_SEC`(harness.ScenarioRunner.run).
+    if dropped:
+        ctx.record("s9_1_dropped", float(dropped))
+    if ratelimited:
+        ctx.record("s9_1_ratelimited", float(ratelimited))
+        print(f"[PSH][S9] 변형 요청 {ratelimited}건이 레이트리밋(429)으로 빠졌다 — PSH_PACE_SEC 로 간격을 줄 것")
+    if total_pairs:
+        ctx.record("s9_1", matches / total_pairs)
+    else:
+        print("[PSH][S9] 변형 일관성 표본 0 — 기록하지 않는다(하니스가 SKIP 으로 집계)")
 
     if ts_total and ctx.resources.has("trained_model"):
         ctx.record("s9_2", ts_fn / ts_total)
@@ -1172,6 +1188,7 @@ def s10_evidence_fidelity(ctx: ScenarioContext) -> None:
             ("ECHO-TAG 공개 IR 보도자료 분기 실적", "S3"),
         ]
     dropped = 0          # 응답 실패로 평가셋에서 빠진 건수(레이트리밋 등)
+    ratelimited = 0      # 그중 429
     mismatch_label = 0   # 인용에 예측등급 키워드가 없는데 예측등급 자체가 시드와 다른 경우
     mismatch_cite = 0    # 예측등급은 시드와 같은데 인용에 그 등급 신호가 없는 경우
     with make() as cli:
@@ -1189,6 +1206,8 @@ def s10_evidence_fidelity(ctx: ScenarioContext) -> None:
                 # 조용히 빠지면 100건 평가셋이 60건으로 줄어도 보고서엔 안 보인다
                 # (223 실측: 분류 60/min 레이트리밋에 걸려 40건이 이렇게 사라졌다).
                 dropped += 1
+                if r.status_code == 429:
+                    ratelimited += 1
                 continue
             body = r.json()
             label = body.get("label", "")
@@ -1218,8 +1237,13 @@ def s10_evidence_fidelity(ctx: ScenarioContext) -> None:
                     mismatch_cite += 1
 
     if dropped:
+        # [2026-09-12] 로그에만 찍던 것을 결과 JSON 에도 남긴다 — 보고서를 읽는 쪽이
+        # 콘솔 로그를 갖고 있지 않다(rag-d4 제안).
+        ctx.record("s10_dropped", float(dropped))
+        if ratelimited:
+            ctx.record("s10_ratelimited", float(ratelimited))
         print(f"[PSH][S10] 평가셋 {len(cases)}건 중 {dropped}건이 응답 실패로 빠졌다"
-              " — 분류 레이트리밋(60/min) 확인 필요")
+              f"(429 {ratelimited}건) — 간격은 PSH_PACE_SEC")
     if mismatch_label or mismatch_cite:
         print(f"[PSH][S10] label-evidence 불일치 내역 — 판정 차이 {mismatch_label}건 ·"
               f" 인용 결함 {mismatch_cite}건 (인용 결함만이 근거 품질 문제다)")
@@ -1232,6 +1256,9 @@ def s10_evidence_fidelity(ctx: ScenarioContext) -> None:
 def s16_auth_rejection(ctx: ScenarioContext) -> None:
     make = _client_factory()
     payload = {"doc_id": "psh-s16", "content": "권한 거부 시나리오"}
+    # [2026-09-12] 429 로 빠진 요청 수. 레이트리밋은 라우터 앞에서 막는 것이라 인증 판정이 아니다 —
+    # False 로 적으면 "거부가 안 됐다"·"정상 키가 막혔다" 는 거짓 미달이 된다(211 실측 2026-09-11: s16_4 0.0).
+    ratelimited = 0
     latencies: list[float] = []
 
     with make() as cli:
@@ -1243,7 +1270,10 @@ def s16_auth_rejection(ctx: ScenarioContext) -> None:
             json=payload,
         )
         latencies.append((time.perf_counter() - t0) * 1000.0)
-        ctx.record("s16_1", r_bad.status_code == 401)
+        if r_bad.status_code == 429:
+            ratelimited += 1
+        else:
+            ctx.record("s16_1", r_bad.status_code == 401)
 
         # (b) X-API-Key 헤더 누락 → 422 또는 401
         t0 = time.perf_counter()
@@ -1255,7 +1285,10 @@ def s16_auth_rejection(ctx: ScenarioContext) -> None:
             json=payload,
         )
         latencies.append((time.perf_counter() - t0) * 1000.0)
-        ctx.record("s16_2", r_missing.status_code in (401, 422))
+        if r_missing.status_code == 429:
+            ratelimited += 1
+        else:
+            ctx.record("s16_2", r_missing.status_code in (401, 422))
 
         # (c) 정상 컨트롤 → 200/201 (비결정성 방지: 5회 반복 후 다수결)
         # 단발 측정 시 라우터 워밍업·일시 상태로 첫 호출 실패 가능 → ratio_true 집계.
@@ -1263,6 +1296,9 @@ def s16_auth_rejection(ctx: ScenarioContext) -> None:
             t0 = time.perf_counter()
             r_ok = cli.post("/api/v1/classify", headers=_hdr(), json=payload)
             latencies.append((time.perf_counter() - t0) * 1000.0)
+            if r_ok.status_code == 429:
+                ratelimited += 1
+                continue
             ctx.record("s16_4", r_ok.status_code in (200, 201))
 
         # 추가로 p95 측정용 7회 반복 (잘못된 키)
@@ -1274,6 +1310,12 @@ def s16_auth_rejection(ctx: ScenarioContext) -> None:
                 json=payload,
             )
             latencies.append((time.perf_counter() - t0) * 1000.0)
+
+    if ratelimited:
+        # 왜 SKIP 인지 JSON 에서 바로 보이게 남긴다 — 로그를 뒤지지 않도록(rag-d4 제안 2026-09-12).
+        ctx.record("s16_ratelimited", float(ratelimited))
+        print(f"[PSH][S16] 요청 {ratelimited}건이 레이트리밋(429)으로 빠졌다 — 인증 판정에 넣지 않았다"
+              " (간격은 PSH_PACE_SEC)")
 
     for lat in latencies:
         ctx.record("s16_3", lat)
