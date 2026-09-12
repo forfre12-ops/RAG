@@ -30,7 +30,7 @@ from pathlib import Path
 _SRC = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
-from lloydk.golden_tiers import TIER_LOCKED, tier_of  # noqa: E402
+from koipa.golden_tiers import TRAIN_TIERS, tier_of  # noqa: E402
 
 LABELS = {"TS", "S1", "S2", "S3"}
 
@@ -114,7 +114,7 @@ def main() -> int:
     train_gold = [
         {"text": r["text"], "label": r["label"], "source": r.get("label_source", "gold_real"), "doc_id": r.get("doc_id")}
         for r in gold
-        if _norm(r["text"]) not in holdout_keys and tier_of(r) != TIER_LOCKED  # locked=평가정답, 학습 금지(train-on-test 차단)
+        if _norm(r["text"]) not in holdout_keys and tier_of(r) in TRAIN_TIERS  # locked=평가정답·held=격리, 학습 금지(train-on-test·역누수 차단)
     ]
 
     oss_norm = [{**r, "source": r.get("source", "labeled_oss_v1")} for r in oss]
@@ -130,8 +130,11 @@ def main() -> int:
 
     def tier(r: dict) -> str:
         ls = r.get("label_source", "?")
-        if ls in {"public_definitive", "koipa_case_based", "nkt_designated"}:
+        # koipa는 2026-07-03 강등(판례 인용 조작 확인) — legally_grounded 아님(golden_tiers 참조).
+        if ls in {"public_definitive", "nkt_designated"}:
             return "legally_grounded"
+        if ls in {"koipa_case_based", "curated_scenario"}:
+            return "curated_scenario"
         if ls in {"llm_judge_primary", "llm_judge_consensus", "codex_review"}:
             return "llm_judge"
         return ls

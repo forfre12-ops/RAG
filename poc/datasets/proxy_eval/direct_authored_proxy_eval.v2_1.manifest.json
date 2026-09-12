@@ -1,0 +1,15 @@
+{
+  "case_families": 250,
+  "claim_scope": "Proxy-only future evaluation; not customer-real accuracy or Locked Gold.",
+  "grade_counts": {
+    "S1": 250,
+    "S2": 250,
+    "S3": 300,
+    "TS": 200
+  },
+  "no_llm_generation": true,
+  "records": 1000,
+  "records_sha256": "9c1997fa3450243706d9594d317835c766efa1e614302d67459a4db62dac38d0",
+  "schema": "direct-authored-proxy-evaluation-v2",
+  "training_forbidden": true
+}

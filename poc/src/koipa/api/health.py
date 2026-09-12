@@ -1,0 +1,416 @@
+"""헬스체크 엔드포인트 — live / ready / deep 3계층.
+
+  GET /healthz       : 하위호환 단일 엔드포인트 (기존 동작 유지)
+  GET /healthz/live  : 프로세스 생존 여부 (k8s liveness probe)
+  GET /healthz/ready : 서비스 가능 여부 — DB/MinIO/model 준비 상태 (readiness probe)
+  GET /healthz/deep  : 전체 구성요소 상세 진단 (운영 대시보드용)
+
+status 값:
+  ok       : 모든 필수 구성요소 준비 완료
+  degraded : 일부 구성요소 비정상 — 요청 처리는 되지만 정확도/기능 저하 가능
+  down     : 필수 구성요소 실패 — 서비스 불가
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from pathlib import Path
+
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+
+from koipa.config import settings
+# 허용 provider 의 정본은 config 다. schemas/synthesis.py 도 같은 이름을 가져다 쓴다 —
+# 목록을 두 벌 두면 갈린다(그래서 콘솔이 갈렸다).
+from koipa.config import _VALID_LLM_PROVIDER
+
+def _synth_domains_supported() -> list[str]:
+    """합성 생성 폼에 띄울 도메인 — API 가 받는 값을 정본으로 접어 중복을 없앤다.
+
+    생성기는 요청 도메인을 canonical_domain() 으로 접은 뒤 프롬프트를 만든다. 접기 전 이름을
+    그대로 내보내면 semiconductor 와 반도체 가 나란히 떠서 고르는 사람에게는 서로 다른
+    선택지로 보이는데 결과는 같다. 접은 뒤 내보내면 한 줄만 남는다.
+
+    생성기 import 는 여기서 한다 — health 모듈이 LLM 어댑터 사슬을 모듈 로드 시점에
+    끌고 오지 않게 한다(앱은 어차피 합성 라우터를 통해 이미 싣는다).
+    """
+    from koipa.modules.m1_synthesis.generator import canonical_domain  # noqa: PLC0415
+    from koipa.schemas.synthesis import _SYNTH_DOMAINS  # noqa: PLC0415
+
+    return sorted({canonical_domain(d) for d in _SYNTH_DOMAINS})
+
+
+router = APIRouter(tags=["health"])
+_START = time.time()
+
+# app.py lifespan이 _warmup_models 완료 후 True로 설정.
+STARTUP_COMPLETE: bool = False
+
+
+# ────────────────────────────────────────────────
+# 개별 구성요소 probe
+# ──────────────────────────────────────────────
+
+def _check_model() -> dict:
+    model_expected = bool(getattr(settings, "classifier_model_dir", ""))
+    model_dir = getattr(settings, "classifier_model_dir", "")
+    try:
+        from koipa.services.classify_service import ClassifyService  # noqa: PLC0415
+        svc = ClassifyService.get_instance()
+        model_loaded = svc.inference._model is not None
+    except Exception:
+        return {"status": "unknown", "ok": not model_expected, "model_dir": model_dir}
+    if model_loaded:
+        # [calibration-visibility] 무보정(T=1.0) 서빙은 OOD 과신→고등급 무음미탐 위험이라
+        # 운영 점검 대상. ok는 유지(서빙 가능)하되 calibrated/calibration_source를 노출한다.
+        return {
+            "status": "loaded",
+            "ok": True,
+            "model_dir": model_dir,
+            "calibrated": getattr(svc.inference, "calibrated", None),
+            "calibration_source": getattr(svc.inference, "_calibration_source", "unknown"),
+        }
+    if model_expected:
+        return {"status": "degraded", "ok": False, "model_dir": model_dir}
+    return {"status": "rule_fallback", "ok": True, "model_dir": model_dir}
+
+
+def _check_db() -> dict:
+    try:
+        from koipa.db import session_scope  # noqa: PLC0415
+        with session_scope() as db:
+            db.execute(__import__("sqlalchemy").text("SELECT 1"))
+        return {"status": "ok", "ok": True}
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "ok": False, "detail": type(exc).__name__}
+
+
+def _check_storage() -> dict:
+    """M-health-storage: ingestion이 실제로 쓰는 build_storage() 결과를 기준으로 점검.
+
+    기존 버그: storage_backend=local이면 무조건 skip(ok)했지만, backend=minio라도
+    build_storage()가 MinIO 미가용 시 LocalStorage로 *조용히 폴백*한다. 이때 폴백
+    인스턴스는 _client가 없어 list_buckets 점검을 건너뛰고 ok로 통과 →
+    ingestion은 MinIO를 기대하는데 health는 정상이라 보고하는 불일치.
+
+    수정:
+    - 설정상 local 백엔드: 폴백이 아니라 의도된 구성 → skipped(ok).
+    - 설정상 원격(minio/seaweedfs): build_storage() 결과를 확인.
+        * 결과가 local 인스턴스면 = MinIO→Local 폴백 발생 → degraded(ok=False).
+        * 원격 인스턴스면 _client 연결(list_buckets)로 실연결 확인.
+    """
+    backend = getattr(settings, "storage_backend", "local")
+    if backend == "local":
+        return {"status": "skipped", "ok": True, "backend": backend}
+    try:
+        from koipa.adapters.storage import build_storage  # noqa: PLC0415
+        storage = build_storage()
+        resolved = getattr(storage, "name", type(storage).__name__)
+        client = getattr(storage, "_client", None)
+        if client is None:
+            # 원격 백엔드를 기대했지만 _client 없는 인스턴스(LocalStorage 등)로 폴백됨.
+            return {
+                "status": "degraded",
+                "ok": False,
+                "backend": backend,
+                "resolved": resolved,
+                "detail": "remote storage unavailable; fell back to local",
+            }
+        # 원격 클라이언트 — 실제 연결 확인.
+        client.list_buckets()
+        return {"status": "ok", "ok": True, "backend": backend, "resolved": resolved}
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "ok": False, "backend": backend, "detail": type(exc).__name__}
+
+
+def _check_embedder() -> dict:
+    try:
+        from koipa.adapters.embedding import build_embedder  # noqa: PLC0415
+        emb = build_embedder()
+        emb.embed(["probe"])
+        return {"status": "ok", "ok": True}
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "ok": False, "detail": type(exc).__name__}
+
+
+def _check_extractors() -> dict:
+    """[C22] 포맷별 추출기/OCR 외부 의존성 가용성 진단 (best-effort, 실행 없이 탐지).
+
+    추출기는 도구 부재 시 graceful degrade(quality=0.0 + error)라 서비스는 죽지 않지만,
+    그 degrade가 startup/health에 안 떠서 'HWP 표 누락·PDF 스캔 OCR 불가'가 문서 단위
+    무음 실패였다. import-가능성(find_spec)·바이너리 경로만 확인해 가시화한다(.txt/.md는
+    의존 없이 항상 가능). optional이므로 ok=True 고정 — unavailable 목록만 노출.
+    """
+    import importlib.util  # noqa: PLC0415
+    import shutil  # noqa: PLC0415
+
+    def _mod(name: str) -> bool:
+        try:
+            return importlib.util.find_spec(name) is not None
+        except Exception:  # noqa: BLE001
+            return False
+
+    try:
+        from koipa.modules.m2_preprocess.extractor import (  # noqa: PLC0415
+            POPPLER_PATH,
+            TESSERACT_CMD,
+        )
+    except Exception:  # noqa: BLE001
+        POPPLER_PATH, TESSERACT_CMD = None, "tesseract"
+
+    _tess_ok = (shutil.which(TESSERACT_CMD) is not None or Path(TESSERACT_CMD).exists()) and _mod("pytesseract")
+    probes: dict[str, dict] = {
+        "hwp_body(rhwp)": {"available": _mod("rhwp")},
+        # .hwp 표 셀 회수(unhwp/MIT). 미설치면 rhwp 본문만 남아 표 속 등급·원가가
+        # 분류기에 안 보인다 — 조용한 미탐이 되므로 가용성을 노출한다.
+        "hwp_table(unhwp)": {"available": _mod("unhwp")},
+        "xls(xlrd)": {"available": _mod("xlrd")},
+        "xlsx(openpyxl)": {"available": _mod("openpyxl")},
+        "docx(python-docx)": {"available": _mod("docx")},
+        "pptx(python-pptx)": {"available": _mod("pptx")},
+        "pdf_text(pdfminer)": {"available": _mod("pdfminer")},
+        "pdf_table(pdfplumber)": {"available": _mod("pdfplumber")},
+        "pdf_render(fitz/pdf2image)": {"available": _mod("fitz") or _mod("pdf2image")},
+        "pdf_scan(poppler)": {"available": POPPLER_PATH is not None, "path": POPPLER_PATH},
+        "ocr(tesseract)": {"available": bool(_tess_ok), "cmd": TESSERACT_CMD},
+        "doc(antiword)": {"available": shutil.which("antiword") is not None},
+    }
+    unavailable = [k for k, v in probes.items() if not v["available"]]
+    return {
+        "status": "ok" if not unavailable else "degraded",
+        "ok": True,  # optional 의존 — 서비스 가용성 판단엔 미반영(가시화 전용)
+        "unavailable": unavailable,
+        "probes": probes,
+    }
+
+
+def _check_compute() -> dict:
+    """분류 처리량을 좌우하는 CPU·스레드 실효값 진단 — 조용한 3배 감속을 가시화한다.
+
+    [배경 2026-08-02] 구형 .hwp 업로드 시 gunicorn 워커가 강제 재시작되던 증상을 추적하니
+    파서가 아니라 처리량이 원인이었다. 8코어 호스트에서 API 컨테이너가 cgroup 으로 2 CPU 에
+    묶여 1페이지 분류에 12.7초가 걸렸고(--timeout 60 → 6~7페이지에서 사망), 호스트는 부하
+    0.28 로 놀고 있었다. 게다가 torch 는 cgroup 한도를 못 봐 8스레드를 띄워 오버서브스크립션
+    까지 겹쳤다. 둘 다 어디에도 안 떠서 오래 방치됐다 — 그래서 여기에 노출한다.
+
+    ok 는 항상 True(가용성 판단 아님). 실효 CPU 와 스레드가 어긋나면 status=degraded.
+    """
+    import os
+
+    host_cpus = os.cpu_count() or 0
+    quota = None
+    try:  # cgroup v2 — 컨테이너에 실제로 허용된 CPU
+        raw = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        if raw[0] != "max":
+            quota = round(int(raw[0]) / int(raw[1]), 2)
+    except Exception:  # noqa: BLE001
+        pass
+    if quota is None:
+        try:  # cgroup v1
+            q = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read_text())
+            p = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read_text())
+            quota = round(q / p, 2) if q > 0 else None
+        except Exception:  # noqa: BLE001
+            pass
+
+    threads = None
+    try:
+        import torch  # noqa: PLC0415
+
+        threads = torch.get_num_threads()
+    except Exception:  # noqa: BLE001
+        pass
+
+    effective = quota or host_cpus
+    notes: list[str] = []
+    if quota and host_cpus and quota <= host_cpus / 2:
+        notes.append(
+            f"컨테이너가 {quota} CPU 로 제한됨(호스트 {host_cpus}) — 분류 처리량이 그만큼 낮다. "
+            f"단일 배포면 API_CPU_LIMIT 를 올릴 것"
+        )
+    if threads and effective and threads > effective + 0.5:
+        notes.append(
+            f"torch 스레드({threads}) > 실효 CPU({effective}) — 오버서브스크립션. "
+            f"OMP_NUM_THREADS 를 CPU 한도에 맞출 것"
+        )
+    return {
+        "status": "degraded" if notes else "ok",
+        "ok": True,  # 처리량 진단 — 가용성 판단엔 미반영
+        "host_cpus": host_cpus,
+        "container_cpu_limit": quota,
+        "torch_threads": threads,
+        "omp_num_threads": os.environ.get("OMP_NUM_THREADS"),
+        "notes": notes,
+    }
+
+
+def _build_identity() -> dict:
+    """이미지에 구워진 빌드 신원. 미주입이면 unknown(배포 확인 불가 신호)."""
+    import os as _os
+
+    sha = (_os.environ.get("KOIPA_BUILD_SHA") or "").strip() or "unknown"
+    return {
+        "git_sha": sha,
+        "git_sha_short": sha[:12] if sha != "unknown" else "unknown",
+        "built_at": (_os.environ.get("KOIPA_BUILD_AT") or "").strip() or "unknown",
+        "classifier_model_dir": getattr(settings, "classifier_model_dir", "") or "",
+    }
+
+
+def _operational_config() -> dict:
+    return {
+        "classifier_model_dir": getattr(settings, "classifier_model_dir", ""),
+        # [정합 2026-08-09] 검수 라우팅 임계 — 콘솔이 **서버의 실제 값**을 표시하기 위해 노출한다.
+        # 종전에는 콘솔에 0.70 슬라이더가 있었지만 그것은 화면 필터일 뿐이고(API 호출 0건)
+        # 서버 라우팅과 무관했다. 관리자가 값을 내리고 "임계를 조정했다"고 믿을 수 있었다.
+        # 실제 판정은 classify_service._review_confidence_threshold() 가 이 설정을 읽어
+        # confidence < threshold 인 건을 needs_review 로 보낸다.
+        "review_confidence_threshold": float(
+            getattr(settings, "review_confidence_threshold", 0.7)
+        ),
+        # [2026-08-23 등급차등] 예측이 공개등급(최하)일 때만 적용되는 별도 임계. null 이면
+        # 위 값 하나만 쓴다. 둘을 같이 노출하지 않으면 콘솔·감리가 "임계 0.50" 한 줄만 보고
+        # 공개등급도 0.50 으로 통과한다고 오독한다.
+        "review_confidence_threshold_public": (
+            None if getattr(settings, "review_confidence_threshold_public", None) is None
+            else float(settings.review_confidence_threshold_public)
+        ),
+        # 시연 전용 표면이 켜져 있는가. 시연 화면이 상태를 바꾸는 버튼(실시간 반영 시연)을
+        # 이 값으로 감춘다 — 프로덕션(onprem-local·full-train)은 False 다.
+        "demo_console_enabled": bool(getattr(settings, "demo_console_enabled", False)),
+        # [2026-09-05] 보존기간 삭제 설정. 켜져 있으면 오래된 감사로그·LLM 사용량이
+        # 지워진다 — 운영자가 "지금 얼마나 남기고 있나"를 화면에서 확인할 수 있어야 한다.
+        # 파티션을 쓰지 않는 배포에서 표가 무한히 자라는 것을 막는 유일한 장치이기도 하다.
+        "retention": {
+            "enabled": bool(getattr(settings, "retention_enabled", False)),
+            "audit_log_days": int(getattr(settings, "retention_audit_log_days", 0) or 0),
+            "llm_usage_days": int(getattr(settings, "retention_llm_usage_days", 0) or 0),
+        },
+    }
+
+
+def _readiness_snapshot() -> dict:
+    path = Path("reports/operational_readiness.json")
+    if not path.exists():
+        return {"status": "missing", "path": str(path)}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "path": str(path), "detail": type(exc).__name__}
+    blocked = [g for g in payload.get("gates", []) if g.get("status") != "PASS"]
+    return {
+        "status": "ok",
+        "path": str(path),
+        "verdict": payload.get("verdict", "UNKNOWN"),
+        "blocked_gates": [g.get("name") for g in blocked],
+    }
+
+
+# ──────────────────────────────────────────────
+# 엔드포인트
+# ──────────────────────────────────────────────
+
+@router.get("/healthz/live")
+def healthz_live():
+    """k8s liveness probe — 프로세스 생존 여부만 확인. 항상 200."""
+    return {"status": "ok", "uptime_sec": int(time.time() - _START)}
+
+
+@router.get("/healthz/ready")
+def healthz_ready():
+    """k8s readiness probe — 서비스 가능 여부.
+
+    DB / storage / model 모두 준비돼야 ready.
+    하나라도 실패하면 503 반환 — 로드밸런서가 트래픽 차단하도록.
+    """
+    checks = {
+        "model": _check_model(),
+        "db": _check_db(),
+        "storage": _check_storage(),
+        "warmup": {"status": "complete" if STARTUP_COMPLETE else "pending",
+                   "ok": STARTUP_COMPLETE},
+    }
+    all_ok = all(c["ok"] for c in checks.values())
+    status_code = 200 if all_ok else 503
+    # 튜플 반환은 FastAPI가 배열로 직렬화하고 상태는 항상 200이 됨 →
+    # 비정상 시 로드밸런서가 트래픽을 차단하려면 실제 503을 내려야 한다.
+    return JSONResponse(
+        status_code=status_code,
+        content={"status": "ok" if all_ok else "not_ready", "checks": checks},
+    )
+
+
+@router.get("/healthz/deep")
+def healthz_deep():
+    """전체 구성요소 상세 진단 — 운영 대시보드/수동 점검용."""
+    checks = {
+        "model": _check_model(),
+        "db": _check_db(),
+        "storage": _check_storage(),
+        "embedder": _check_embedder(),
+        "extractors": _check_extractors(),
+        "compute": _check_compute(),
+        "warmup": {"status": "complete" if STARTUP_COMPLETE else "pending",
+                   "ok": STARTUP_COMPLETE},
+    }
+    degraded = [k for k, v in checks.items() if not v["ok"]]
+    overall = "ok" if not degraded else ("degraded" if len(degraded) < len(checks) else "down")
+    return {
+        "status": overall,
+        "degraded": degraded,
+        "uptime_sec": int(time.time() - _START),
+        "deploy_profile": getattr(settings, "deploy_profile", "unknown"),
+        "operational_config": _operational_config(),
+        "readiness": _readiness_snapshot(),
+        "checks": checks,
+    }
+
+
+@router.get("/healthz")
+def healthz():
+    """하위호환 단일 엔드포인트 — 기존 /healthz 동작 유지 + 데모 콘솔용 필드."""
+    model_check = _check_model()
+    overall = "ok" if model_check["ok"] else "degraded"
+    operational_config = _operational_config()
+    return {
+        "status": overall,
+        # [빌드 신원] 배포된 이미지가 어느 커밋에서 나왔는가. 이미지 빌드 시
+        # --build-arg KOIPA_BUILD_SHA=$(git rev-parse HEAD) 로 굽는다.
+        # 이것이 없으면 "서버가 그 SHA 를 실제로 실행 중인가" 를 확인할 길이 없고
+        # 릴리스 게이트의 --expect-git-sha 검증도 공중에 뜬다.
+        "build": _build_identity(),
+        # [2026-08-21] 리터럴 "poc" 였다. 같은 응답의 classifier_model_dir 은
+        #   artifacts/classifier_p1_v5_clean/v-fe4b386b 를 답하는데 이 필드만 "poc" 라,
+        #   한 응답 안에서 두 값이 어긋났다. 이 엔드포인트는 규약서
+        #   (doc/03_openapi_koipa_kl.yaml, security:[])에 무인증으로 실려 있어 발주처가
+        #   직접 호출한다 — "지금 무슨 모델이 도느냐" 에 틀린 답을 주면 안 된다.
+        #   모델 디렉터리의 마지막 조각(=버전 라벨)을 쓰고, 없으면 종전 값을 유지한다.
+        "model_version": (
+            str(operational_config["classifier_model_dir"]).replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+            if operational_config.get("classifier_model_dir") else "poc"
+        ),
+        "uptime_sec": int(time.time() - _START),
+        "deploy_profile": getattr(settings, "deploy_profile", "unknown"),
+        "embedding_provider": getattr(settings, "embedding_provider", "unknown"),
+        "llm_provider": getattr(settings, "llm_provider", "unknown"),
+        # [2026-09-05] 이 서버가 **받는** provider 목록. 콘솔의 합성 생성 폼이 제공자
+        #   드롭다운을 손으로 적어 두고 있었고, 그 목록이 서버 정본과 갈렸다 —
+        #   화면에 "온프렘"이라 적힌 vllm_qwen·vllm_exaone 두 개가 정작 서버가 422 로
+        #   거부하는 값이었고, 실제로 되는 ollama·vllm·local_openai·lm_studio 는
+        #   화면에 없었다. 등급 셀렉트가 이미 서버 값으로 채워지는 것과 같은 방식으로
+        #   목록도 서버가 내려준다. 손으로 적은 목록은 또 갈린다.
+        "llm_providers_supported": sorted(_VALID_LLM_PROVIDER),
+        # 합성 생성 폼의 도메인 목록도 같은 이유로 서버가 준다. 화면에 손으로 적혀 있던
+        # 13개는 생성기가 아는 것보다 적어 배터리·화학_제약·소프트웨어·경영정보·기타를
+        # 고를 수 없었다. **정본으로 접은 뒤** 내보낸다 — semiconductor 와 반도체 를
+        # 나란히 띄우면 같은 것이 두 줄로 보인다(고르는 사람에겐 다른 것으로 읽힌다).
+        "synth_domains_supported": _synth_domains_supported(),
+        "classifier_model_dir": operational_config["classifier_model_dir"],
+        "operational_config": operational_config,
+        "readiness": _readiness_snapshot(),
+        "warmup_done": STARTUP_COMPLETE,
+        "checks": {
+            "model": model_check["status"],
+        },
+    }

@@ -18,19 +18,40 @@ DRIFT_HINT='::error::DB-ORM drift 감지 — model 변경 후 alembic revision �
 DRIFT_CMD='::error::  실행: alembic revision --autogenerate -m "<your-change>"'
 
 echo "==[migration-drift]== alembic check (preferred path)"
-if alembic check >"${CHECK_LOG}" 2>&1; then
-  cat "${CHECK_LOG}"
+# [2026-08-11] rc 포착 정정. 종전엔 `if alembic check; then ... fi` 뒤에서 CHECK_RC=$? 를 읽었는데,
+# bash 는 조건이 거짓이고 else 가 없는 if 문의 종료상태를 **0** 으로 준다 → CHECK_RC 가 항상 0 이라
+# 진단 로그가 "rc=0" 으로 찍혔다(실측). 조건 실행 직후에 잡는다.
+CHECK_RC=0
+alembic check >"${CHECK_LOG}" 2>&1 || CHECK_RC=$?
+cat "${CHECK_LOG}"
+if [ "${CHECK_RC}" -eq 0 ]; then
   echo "[migration-drift] PASS — no drift detected by alembic check"
   exit 0
 fi
 
-CHECK_RC=$?
-cat "${CHECK_LOG}"
-
 # alembic check가 명시적으로 drift를 알리면 즉시 fail
-if grep -qE "New upgrade operations detected|target database is not up to date" "${CHECK_LOG}"; then
+# [2026-08-11] -i 추가. alembic 실제 출력은 "Target database is not up to date."(대문자 T)인데
+# 패턴은 소문자 target 이라 매칭되지 않았다 → 원인을 알면서도 autogenerate 폴백으로 흘러가
+# "alembic check 실패/미지원" 이라는 **틀린 진단**을 냈다(실측). 종료코드는 어차피 1 이라
+# 결과는 같았지만, CI 에서 이 메시지를 보고 고칠 곳을 잘못 찾게 된다.
+# [2026-09-07] **두 사실을 가른다.** 종전에는 아래 두 문구를 같은 것으로 보고 둘 다 drift 로
+# 단정했다. 둘은 다른 사실이고 지시도 달라야 한다.
+#
+#   New upgrade operations detected   ORM 이 DB 보다 앞선다 = 진짜 drift
+#   target database is not up to date DB 가 head 가 아니다 = 마이그레이션 미적용
+#
+# [2026-09-09] 계열이 둘일 때 쓰던 "못 쟀다(SKIP)" 분기를 걷었다 — MariaDB 를 버려
+# 계열이 postgres 하나뿐이다. 그 분기를 남겨 두면 진짜 미적용을 SKIP 으로 삼켜 버린다.
+if grep -qiE "New upgrade operations detected" "${CHECK_LOG}"; then
   echo "${DRIFT_HINT}"
   echo "${DRIFT_CMD}"
+  exit 1
+fi
+
+if grep -qiE "target database is not up to date" "${CHECK_LOG}"; then
+  CUR="$(alembic current 2>/dev/null | grep -oE '^[0-9a-f]{12}' | head -1 || true)"
+  echo "::error::마이그레이션 미적용 — DB 가 head 가 아니다(현재: ${CUR:-알수없음})"
+  echo "::error::  실행: alembic upgrade postgres@head"
   exit 1
 fi
 

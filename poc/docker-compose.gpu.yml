@@ -1,0 +1,39 @@
+# docker-compose.gpu.yml — GPU(NVIDIA) 노드 전용 오버레이 (옵인)
+# ─────────────────────────────────────────────────────────────────────────────
+# 왜 분리했나 (2026-08-02):
+#   airgap compose 의 base 에 nvidia device 예약이 박혀 있어, GPU 없는 호스트에서는
+#   `could not select device driver "nvidia" with capabilities: [[gpu]]` 로 **기동 자체가 막혔다**.
+#   본 사업 토폴로지에서 고객사 운영노드는 CPU 전용이므로 기본값이 반대였던 셈이다.
+#   → base 는 CPU, GPU 노드(지재원 학습 공장 등)만 이 파일을 덧붙인다.
+#
+# 사용:
+#   docker compose --env-file .env \
+#     -f infra-config/docker-compose.airgap.yml \
+#     -f infra-config/docker-compose.gpu.yml up -d
+#
+# 전제: 호스트에 NVIDIA 드라이버 + NVIDIA Container Toolkit 설치
+#   docker run --rm --gpus all nvidia/cuda:12.4.0-base nvidia-smi   # 먼저 이게 되어야 한다
+#
+# 주의: 워커 이미지의 torch 는 기본이 CPU 휠이다(Dockerfile.worker 의 ARG TORCH_INDEX).
+#   GPU 로 학습·추론하려면 CUDA 휠로 빌드한 이미지를 써야 한다:
+#     docker build --build-arg TORCH_INDEX=https://download.pytorch.org/whl/cu124 -f Dockerfile.worker .
+#   이 오버레이만 얹고 CPU 휠 이미지를 쓰면 GPU 는 보이지만 연산은 CPU 로 돈다.
+
+services:
+  api:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  worker:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

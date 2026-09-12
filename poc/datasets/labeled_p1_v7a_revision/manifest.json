@@ -1,0 +1,61 @@
+{
+ "base": "datasets\\labeled_p1_v6_court",
+ "base_rows": 1983,
+ "added_vocab_rows": {
+  "TS": 40,
+  "S1": 40
+ },
+ "added_by_source": {
+  "v8": 17,
+  "v8_r13": 16,
+  "v8_r10": 21,
+  "labeled_bpilot": 9,
+  "v8_r12": 6,
+  "_exp_courtremove_train.jsonl": 3,
+  "demo_retrain": 2,
+  "labeled_oss_v1": 4,
+  "golden_runs": 1,
+  "v8_r14": 1
+ },
+ "extra_rows": 0,
+ "extra_sources": [],
+ "train_rows": 2063,
+ "dropped": {
+  "학습·검증·시험셋과 같은 본문": 13419,
+  "평가면과 문장 3개 이상 공유": 1021,
+  "평가면과 같은 본문": 1298,
+  "후보 템플릿 문구": 5
+ },
+ "pool_size": {
+  "S1": 1816,
+  "TS": 2485
+ },
+ "개정_rows_by_label_before": {
+  "S1": 1,
+  "S2": 5,
+  "S3": 163,
+  "TS": 4
+ },
+ "개정_rows_by_label_after": {
+  "S1": 37,
+  "S2": 5,
+  "S3": 163,
+  "TS": 39
+ },
+ "eval_texts": 3731,
+ "seed": 42,
+ "files": {
+  "train.jsonl": {
+   "rows": 2063,
+   "sha256": "0c175e0e426fa2e288e91ea546acb2e5488d7896b3d515d9b05470dca9d99e08"
+  },
+  "val.jsonl": {
+   "rows": 249,
+   "sha256": "328d4e469f35505c8c0cd02ed46f278154988a1f16e73b3360e90367ea38963e"
+  },
+  "test.jsonl": {
+   "rows": 249,
+   "sha256": "2b4d79d1578505636016ace104baa64e42345f4f6859e289395149965f6b816a"
+  }
+ }
+}

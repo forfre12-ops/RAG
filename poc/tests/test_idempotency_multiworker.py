@@ -11,9 +11,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from lloydk.api import prom_metrics as pm
-from lloydk.services import idempotency as idem
-from lloydk.services.idempotency import (
+from koipa.api import prom_metrics as pm
+from koipa.services import idempotency as idem
+from koipa.services.idempotency import (
     _MemoryStore,
     assert_multiworker_idempotency_safe,
     get_idempotency_store,
@@ -59,7 +59,7 @@ def test_invalid_web_concurrency_treated_as_one(monkeypatch):
 # ── 폴백 메트릭 ───────────────────────────────────────────────────────────────
 
 def test_fallback_increments_metric(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     # redis를 도달 불가 포트로 → ping 즉시 거부 → 메모리 폴백.
     monkeypatch.setattr(cfg.settings, "redis_url", "redis://127.0.0.1:1/0", raising=False)
     reset_idempotency_store_for_test()

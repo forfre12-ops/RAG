@@ -14,8 +14,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # #33: 인프라 비의존 순수함수 테스트 — fullstack 오마킹 제거(기본 pytest에서 수집·실행).
-from lloydk.perf.harness import AvailableResources, _detect_trained_model
-from lloydk.perf.kpis import KPIS, aggregate, kpi_by_id, passes
+from koipa.perf.harness import AvailableResources, _detect_trained_model
+from koipa.perf.kpis import KPIS, aggregate, kpi_by_id, passes
 
 
 class TestAggregate:
@@ -82,10 +82,11 @@ class TestKPIRegistry:
         assert "trained_model" in s1_3.requires
         assert "trained_model" in s1_4.requires
 
-    def test_s5_4_requires_pg_and_trained_model(self):
-        s5_4 = kpi_by_id("S5.4")
-        assert "pg" in s5_4.requires            # 벡터 검색이 PG로 이전(ES 제거)
-        assert "trained_model" in s5_4.requires
+    def test_pg_backed_kpi_declares_pg_requirement(self):
+        # [2026-09] 종전 대상이던 S5.4(Recall@5)는 유사문서 검색 폐기로 없어졌다.
+        # 확인하려는 것은 "DB 가 있어야 재는 KPI 에 requires 가 실제로 붙어 있나" 다.
+        s3_3 = kpi_by_id("S3.3")
+        assert "pg" in s3_3.requires
 
 
 class TestAvailableResources:
@@ -101,17 +102,17 @@ class TestAvailableResources:
 
     def test_from_env_snapshot_maps_services(self):
         env = MagicMock()
-        env.services.postgres = "UP"
-        env.services.elasticsearch = "DOWN"
+        # [2026-09-05] postgres → db. 재는 대상은 처음부터 koipa.db.engine(설정된 DB)이었고
+        # 이름만 PostgreSQL 이었다. es·minio 는 이제 재지 않으므로 항상 False 다.
+        env.services.db = "UP"
         env.services.redis = "UP"
-        env.services.minio = "UNKNOWN"
         env.gpu = "N/A"
 
-        with patch("lloydk.perf.harness._detect_trained_model", return_value=False):
+        with patch("koipa.perf.harness._detect_trained_model", return_value=False):
             r = AvailableResources.from_env_snapshot(env, "noop")
         assert r.pg is True
-        assert r.es is False
         assert r.redis is True
+        assert r.es is False, "쓰지 않는 백엔드를 요구하면 영구 SKIP 이 된다"
         assert r.minio is False
         assert r.llm is False  # noop
         assert r.gpu is False  # N/A
@@ -124,33 +125,33 @@ class TestAvailableResources:
         env.services.redis = "DOWN"
         env.services.minio = "DOWN"
         env.gpu = "N/A"
-        with patch("lloydk.perf.harness._detect_trained_model", return_value=False):
+        with patch("koipa.perf.harness._detect_trained_model", return_value=False):
             r = AvailableResources.from_env_snapshot(env, "anthropic")
         assert r.llm is True
 
 
 class TestDetectTrainedModel:
     def test_env_flag_force_true(self, monkeypatch):
-        monkeypatch.setenv("LLOYDK_TRAINED_MODEL", "true")
+        monkeypatch.setenv("KOIPA_TRAINED_MODEL", "true")
         assert _detect_trained_model() is True
 
     def test_env_flag_force_false(self, monkeypatch):
-        monkeypatch.setenv("LLOYDK_TRAINED_MODEL", "false")
+        monkeypatch.setenv("KOIPA_TRAINED_MODEL", "false")
         assert _detect_trained_model() is False
 
     def test_no_env_no_db_returns_false(self, monkeypatch):
         """DB 미가용 + env 미설정 → False (dryrun 환경 안전)."""
-        monkeypatch.delenv("LLOYDK_TRAINED_MODEL", raising=False)
+        monkeypatch.delenv("KOIPA_TRAINED_MODEL", raising=False)
         # session_scope import에서 예외 발생하도록 mock
         with patch(
-            "lloydk.db.session_scope",
+            "koipa.db.session_scope",
             side_effect=RuntimeError("db not available"),
         ):
             assert _detect_trained_model() is False
 
     def test_env_flag_yes_no(self, monkeypatch):
         for v, expected in [("1", True), ("0", False), ("yes", True), ("no", False)]:
-            monkeypatch.setenv("LLOYDK_TRAINED_MODEL", v)
+            monkeypatch.setenv("KOIPA_TRAINED_MODEL", v)
             assert _detect_trained_model() is expected, f"value={v!r}"
 
 
@@ -165,6 +166,6 @@ class TestRequiresSkipsKPI:
 
     def test_satisfied_requires_empty_missing(self):
         r = AvailableResources(pg=True, es=True, trained_model=True)
-        kpi = kpi_by_id("S5.4")  # requires=["pg", "trained_model"]
+        kpi = kpi_by_id("S3.3")  # requires=["pg"]
         missing = [name for name in kpi.requires if not r.has(name)]
         assert missing == []

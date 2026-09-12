@@ -1,4 +1,4 @@
-"""KL ↔ Lloydk 통합 8시나리오 — doc/19 명세 자동화.
+"""KL ↔ Koipa 통합 8시나리오 — doc/19 명세 자동화.
 
 설계:
 - 8 시나리오 (S1~S8) 1:1 매핑된 테스트 클래스
@@ -20,9 +20,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.api.app import app
-from lloydk.config import settings
-from lloydk.db import engine
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.db import engine
 
 pytestmark = pytest.mark.slow
 
@@ -66,7 +66,6 @@ class TestS1SyncClassify:
                 json={
                     "doc_id": str(uuid.uuid4()),
                     "content": "특급기밀 차세대 제품 설계도 핵심 원천기술 — KL 통합 시나리오 S1",
-                    "use_rag": False,
                     "return_evidence": True,
                 },
             )
@@ -188,41 +187,55 @@ class TestS4SchemaGrades:
 # S5. 가이드 문서 업로드 → RAG 인덱싱
 # ============================================================
 
-class TestS5GuideUpload:
-    def test_upload_text_guide_indexes(self):
+class TestS5GuideVersionRegister:
+    """S5 — 가이드 **버전 등록**. 2026-09-05 부로 파일을 받지 않는다.
+
+    종전 계약은 multipart 로 파일을 필수로 받았는데 구현은 그 바이트를 버렸다
+    (services/guide_service.py 머리말이 그렇게 적고 있었다). 발주처 원문이 우리 서버
+    메모리를 한 번 지나는 경로였고 RTM 요건도 아니다.
+    """
+
+    def test_register_version(self):
         gid = f"kl-guide-{uuid.uuid4().hex[:6]}"
-        text_body = "본 가이드는 영업비밀의 등급 분류 기준을 정의한다. " * 30
         with TestClient(app) as cli:
             r = cli.post(
                 "/api/v1/guide/documents",
                 headers=_hdr(),
-                data={
+                json={
                     "guide_id": gid,
                     "version": "v1.0",
                     "effective_date": "2026-06-01",
                     "change_summary": "S5 시나리오 가이드",
-                    "actor": json.dumps(_actor(role="admin")),
+                    "actor": _actor(role="admin"),
                     "doc_type": "guideline",
+                    "filename": "guide.txt",
                 },
-                files={"file": ("guide.txt", io.BytesIO(text_body.encode("utf-8")), "text/plain")},
             )
-        assert r.status_code == 201
+        assert r.status_code == 201, r.text
         body = r.json()
         assert body["guide_id"] == gid
-        assert isinstance(body["indexed"], bool)
-        assert body["embedding_vector_count"] >= 0  # ES 미가용 시 0도 허용
+        assert body["triggers_retraining"] is False
 
-    def test_list_versions_after_upload(self):
+    def test_file_upload_is_refused(self):
+        """파일을 보내면 받지 않는다 — 원문이 서버로 들어오는 경로를 남기지 않는다."""
+        gid = f"kl-file-{uuid.uuid4().hex[:6]}"
+        with TestClient(app) as cli:
+            r = cli.post(
+                "/api/v1/guide/documents",
+                headers=_hdr(),
+                data={"guide_id": gid, "version": "v1.0",
+                      "actor": json.dumps(_actor(role="admin"))},
+                files={"file": ("g.txt", io.BytesIO(b"x" * 100), "text/plain")},
+            )
+        assert r.status_code == 422, r.text
+
+    def test_list_versions_after_register(self):
         gid = f"kl-list-{uuid.uuid4().hex[:6]}"
         with TestClient(app) as cli:
             cli.post(
                 "/api/v1/guide/documents",
                 headers=_hdr(),
-                data={
-                    "guide_id": gid, "version": "v1.0",
-                    "actor": json.dumps(_actor(role="admin")),
-                },
-                files={"file": ("g.txt", io.BytesIO(b"content " * 100), "text/plain")},
+                json={"guide_id": gid, "version": "v1.0", "actor": _actor(role="admin")},
             )
             r = cli.get(f"/api/v1/guide/documents/{gid}", headers=_hdr())
         assert r.status_code == 200
@@ -289,7 +302,7 @@ class TestS7ActiveLearningUrgent:
     @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_underclass_accumulates_then_urgent_active_learning(self):
         """corrections 10건 누적 → evaluate_retraining_need → URGENT_RETRAIN."""
-        from lloydk.modules.m6_evaluation.active_learning import evaluate_retraining_need
+        from koipa.modules.m6_evaluation.active_learning import evaluate_retraining_need
 
         status = evaluate_retraining_need(urgent_underclass_threshold=10)
         assert status.retrain_status in {"OK", "RETRAIN_RECOMMENDED", "URGENT_RETRAIN"}
@@ -329,8 +342,8 @@ class TestCrossCutting:
     @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_kl_scenarios_recorded_in_audit_log(self):
         """KL 시나리오 호출 시 audit_log에 actor_role=kl_backend로 기록되는지."""
-        from lloydk.db import session_scope
-        from lloydk.repositories import AuditRepo
+        from koipa.db import session_scope
+        from koipa.repositories import AuditRepo
 
         unique_actor = f"kl-audit-{uuid.uuid4().hex[:8]}"
         with TestClient(app) as cli:
@@ -349,12 +362,15 @@ class TestCrossCutting:
         assert len(rows) >= 1
         assert any(r.actor_role == "kl_backend" for r in rows)
 
+    # /metrics-prom 은 DB 게이지를 동기 수집하므로 PG 미가용 시 커넥션 타임아웃으로 실패한다.
+    # 같은 클래스의 형제 테스트와 동일하게 가드 — 미기동 환경에서 fail 이 아니라 skip 이어야 한다.
+    @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_prometheus_endpoint_records_kl_calls(self):
-        """KL 시나리오 호출이 lloydk_requests_total에 카운트되는지."""
+        """KL 시나리오 호출이 koipa_requests_total에 카운트되는지."""
         with TestClient(app) as cli:
             cli.get("/api/v1/schema/grades", headers=_hdr())
             r = cli.get("/api/v1/metrics-prom")
         assert r.status_code == 200
         body = r.text
-        # schema/grades 호출이 lloydk_requests_total에 잡혔는지
+        # schema/grades 호출이 koipa_requests_total에 잡혔는지
         assert "/api/v1/schema/grades" in body

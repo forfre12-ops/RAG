@@ -15,7 +15,7 @@ import pytest
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-from lloydk.api._jwt_auth import JWTError, verify_jwt
+from koipa.api._jwt_auth import JWTError, verify_jwt
 
 # 모듈 1회 키쌍(테스트 전용).
 _PRIV = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -39,7 +39,7 @@ def _make_jwt(header: dict, payload: dict, *, priv=_PRIV) -> str:
 @pytest.fixture(autouse=True)
 def _jwt_keys(monkeypatch):
     """단일 PEM 공개키로 검증하도록 설정 + iss/aud 미설정(테스트별로 켬)."""
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "jwt_jwks_path", "", raising=False)
     monkeypatch.setattr(cfg.settings, "jwt_public_key", _PUB_PEM, raising=False)
     monkeypatch.setattr(cfg.settings, "jwt_issuer", "", raising=False)
@@ -95,7 +95,7 @@ def test_future_nbf_rejected():
 
 
 def test_issuer_mismatch_rejected(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "jwt_issuer", "https://kl.example.com", raising=False)
     tok = _make_jwt({"alg": "RS256"}, _valid_payload(iss="https://evil.example.com"))
     with pytest.raises(JWTError, match="issuer mismatch"):
@@ -103,15 +103,15 @@ def test_issuer_mismatch_rejected(monkeypatch):
 
 
 def test_audience_mismatch_rejected(monkeypatch):
-    from lloydk import config as cfg
-    monkeypatch.setattr(cfg.settings, "jwt_audience", "lloydk-api", raising=False)
+    from koipa import config as cfg
+    monkeypatch.setattr(cfg.settings, "jwt_audience", "koipa-api", raising=False)
     tok = _make_jwt({"alg": "RS256"}, _valid_payload(aud="other-service"))
     with pytest.raises(JWTError, match="audience mismatch"):
         verify_jwt(tok)
 
 
 def test_issuer_match_passes(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "jwt_issuer", "https://kl.example.com", raising=False)
     tok = _make_jwt({"alg": "RS256"}, _valid_payload(iss="https://kl.example.com"))
     assert verify_jwt(tok).sub == "kl-user"

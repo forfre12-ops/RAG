@@ -1,7 +1,7 @@
-# 합성 프롬프트 v1.0 — KIPRA 영업비밀 등급별 문서 생성
+# 합성 프롬프트 v1.0 — KOIPA 영업비밀 등급별 문서 생성
 
 본 프롬프트는 FUN-003 합성 데이터 생성기(M1)가 사용하는 등급별 시스템·유저 프롬프트 템플릿이다.
-실제 코드에서는 `src/lloydk/modules/m1_synthesis/generator.py`에 기본값으로 내장되어 있으며,
+실제 코드에서는 `src/koipa/modules/m1_synthesis/generator.py`에 기본값으로 내장되어 있으며,
 본 문서는 검수·튜닝·발주처 협의용 외부화 버전이다.
 
 ---

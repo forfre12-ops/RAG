@@ -22,7 +22,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lloydk.schemas.common import Grade
+from koipa.schemas.common import Grade
 
 
 # ===========================================================================
@@ -31,7 +31,7 @@ from lloydk.schemas.common import Grade
 
 
 def _fresh_pipeline():
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
 
     return InferencePipeline(model_dir=None)
 
@@ -138,7 +138,7 @@ def test_mrenorm_helper_all_zero_scores_assigns_label_full():
 
 def test_mrenorm_override_path_keeps_label_scores_confidence_consistent(monkeypatch):
     """run() FNR-safe override: 모델이 S3 강신호여도 룰 TS override 후 label·argmax·conf 정합."""
-    from lloydk.modules.m5_inference.pipeline import InferenceResult
+    from koipa.modules.m5_inference.pipeline import InferenceResult
 
     pipe = _fresh_pipeline()
     # 모델 경로 진입을 위해 _model을 truthy로 두고 _run_model을 fake로 — S3로 강하게 예측.
@@ -158,7 +158,7 @@ def test_mrenorm_override_path_keeps_label_scores_confidence_consistent(monkeypa
 
     monkeypatch.setattr(pipe.labeling.engine, "label", lambda _t: _RuleRes())
     # source-prior가 cap으로 끼어들지 않도록 metadata 미지정.
-    res = pipe.run(text="원천기술 수식 한 문단", use_rag=False)
+    res = pipe.run(text="원천기술 수식 한 문단")
 
     assert res.label == Grade.TS, "룰 TS override가 적용되어야 함 (fail-SECURE)"
     # label == scores argmax
@@ -171,7 +171,7 @@ def test_mrenorm_override_path_keeps_label_scores_confidence_consistent(monkeypa
 
 def test_mrenorm_source_prior_cap_keeps_consistency(monkeypatch):
     """source-prior cap(공개출처→S3): cap 후 label·argmax·conf 정합 + conf<=0.7."""
-    from lloydk.modules.m5_inference.pipeline import InferenceResult
+    from koipa.modules.m5_inference.pipeline import InferenceResult
 
     pipe = _fresh_pipeline()
     pipe._model = object()
@@ -190,7 +190,7 @@ def test_mrenorm_source_prior_cap_keeps_consistency(monkeypatch):
 
     monkeypatch.setattr(pipe.labeling.engine, "label", lambda _t: _RuleRes())
 
-    res = pipe.run(text="공개 판례 본문", use_rag=False,
+    res = pipe.run(text="공개 판례 본문",
                    metadata={"source": "court_decision"})
 
     assert res.label == Grade.S3, "공개 출처는 S3로 cap (비공지성 게이트)"
@@ -206,7 +206,7 @@ def test_mrenorm_source_prior_cap_keeps_consistency(monkeypatch):
 
 
 def test_mlen_length_mismatch_raises_valueerror():
-    from lloydk.modules.m6_evaluation.metrics import compute_metrics_from_arrays
+    from koipa.modules.m6_evaluation.metrics import compute_metrics_from_arrays
 
     # 이전 계약(조용히 all-zeros)을 새 계약(ValueError)으로 갱신.
     # 사유: 길이 불일치는 데이터/파이프라인 버그인데 FNR=0.0으로 보여 미탐 회귀를
@@ -216,7 +216,7 @@ def test_mlen_length_mismatch_raises_valueerror():
 
 
 def test_mlen_empty_still_na_empty_result():
-    from lloydk.modules.m6_evaluation.metrics import compute_metrics_from_arrays
+    from koipa.modules.m6_evaluation.metrics import compute_metrics_from_arrays
 
     m = compute_metrics_from_arrays([], [])
     assert m.sample_count == 0
@@ -226,7 +226,7 @@ def test_mlen_empty_still_na_empty_result():
 
 
 def test_mlen_valid_pairs_still_compute():
-    from lloydk.modules.m6_evaluation.metrics import compute_metrics_from_arrays
+    from koipa.modules.m6_evaluation.metrics import compute_metrics_from_arrays
 
     m = compute_metrics_from_arrays(["TS", "S1", "S2", "S3"], ["TS", "S1", "S2", "S3"])
     assert m.sample_count == 4
@@ -244,7 +244,7 @@ def test_mconfirm_latest_confirm_overrides_older_correction():
     confirm을 무시하던 옛 로직이면 오래된 교정값을 잡지만, 둘 다 TS이므로 정답=TS여야.
     핵심: confirm correction이 truth 추출에서 누락되면 안 된다."""
     import datetime as _dt
-    from lloydk.modules.m6_evaluation import metrics as metrics_mod
+    from koipa.modules.m6_evaluation import metrics as metrics_mod
 
     # 가벼운 fake correction/classification — DB 없이 _fetch_truth_pred_pairs 로직 검증.
     class _C:
@@ -283,9 +283,11 @@ def test_mconfirm_latest_confirm_overrides_older_correction():
     class _DB:
         def execute(self, stmt):
             s = str(stmt).lower()
-            if "classification_levels" in s and "corrections" not in s and "classifications" not in s:
+            # [2026-09-11] 표준 명명 — 등급(tad_cm_clsf_grd_mng)·보정(tad_cm_crct_mng)·분류결과
+            # (tad_cm_clsf_rslt_mng). 컴파일된 SQL 의 표 이름으로 가른다.
+            if "tad_cm_clsf_grd_mng" in s and "tad_cm_crct_mng" not in s and "tad_cm_clsf_rslt_mng" not in s:
                 return _Scalars(levels)
-            if "corrections" in s:
+            if "tad_cm_crct_mng" in s:
                 # 최신순 정렬을 흉내 — 실제 쿼리는 corrected_at.desc()
                 ordered = sorted(corrections, key=lambda c: c.corrected_at, reverse=True)
                 return _Scalars(ordered)
@@ -299,7 +301,7 @@ def test_mconfirm_confirm_changes_truth_when_it_differs_from_older():
     """더 결정적: 처음 S3→S2(underclass) 후 최신 confirm이 S1을 가리키면 정답=S1.
     옛 로직(confirm 무시)이면 S2를 잡아 정답이 왜곡됐다."""
     import datetime as _dt
-    from lloydk.modules.m6_evaluation import metrics as metrics_mod
+    from koipa.modules.m6_evaluation import metrics as metrics_mod
 
     class _C:
         def __init__(self, cid, direction, level_id, at):
@@ -336,9 +338,11 @@ def test_mconfirm_confirm_changes_truth_when_it_differs_from_older():
     class _DB:
         def execute(self, stmt):
             s = str(stmt).lower()
-            if "classification_levels" in s and "corrections" not in s and "classifications" not in s:
+            # [2026-09-11] 표준 명명 — 등급(tad_cm_clsf_grd_mng)·보정(tad_cm_crct_mng)·분류결과
+            # (tad_cm_clsf_rslt_mng). 컴파일된 SQL 의 표 이름으로 가른다.
+            if "tad_cm_clsf_grd_mng" in s and "tad_cm_crct_mng" not in s and "tad_cm_clsf_rslt_mng" not in s:
                 return _Scalars(levels)
-            if "corrections" in s:
+            if "tad_cm_crct_mng" in s:
                 ordered = sorted(corrections, key=lambda c: c.corrected_at, reverse=True)
                 return _Scalars(ordered)
             return _Scalars(classifications)
@@ -355,7 +359,7 @@ def test_mconfirm_confirm_changes_truth_when_it_differs_from_older():
 def test_mgate_high_severity_alarms_on_single_count_below_rate():
     """TS 100건 중 단 1건이 S2로 미탐(TS→S2 = high). rate=1% < 5%여도 경보돼야 한다.
     옛 로직(high도 rate 게이팅)이면 누락 — 고위험 소량 미탐 은폐 = fail-SECURE 위반."""
-    from lloydk.modules.m6_evaluation import build_confusion_matrix
+    from koipa.modules.m6_evaluation import build_confusion_matrix
 
     y_true = ["TS"] * 100
     y_pred = ["TS"] * 99 + ["S2"]  # TS→S2 (order diff 2 = high)
@@ -367,7 +371,7 @@ def test_mgate_high_severity_alarms_on_single_count_below_rate():
 
 
 def test_mgate_critical_still_alarms_on_single_count():
-    from lloydk.modules.m6_evaluation import build_confusion_matrix
+    from koipa.modules.m6_evaluation import build_confusion_matrix
 
     cm = build_confusion_matrix(["TS"] * 100, ["TS"] * 99 + ["S3"], alarm_rate_threshold=0.05)
     crit = [a for a in cm.alarms if a.severity == "critical"]
@@ -376,7 +380,7 @@ def test_mgate_critical_still_alarms_on_single_count():
 
 def test_mgate_medium_still_rate_gated_to_avoid_noise():
     """medium(order diff 1, 예: TS→S1)은 여전히 rate 게이팅 — 저위험 노이즈 억제 유지."""
-    from lloydk.modules.m6_evaluation import build_confusion_matrix
+    from koipa.modules.m6_evaluation import build_confusion_matrix
 
     cm = build_confusion_matrix(["TS"] * 100, ["TS"] * 99 + ["S1"], alarm_rate_threshold=0.05)
     med = [a for a in cm.alarms if a.severity == "medium"]
@@ -384,7 +388,7 @@ def test_mgate_medium_still_rate_gated_to_avoid_noise():
 
 
 def test_mgate_high_direct_detect_helper():
-    from lloydk.modules.m6_evaluation import detect_underclass_alarms
+    from koipa.modules.m6_evaluation import detect_underclass_alarms
 
     # S1(행) 100건 중 1건만 S3(열)로 미탐 = high (order diff 2). count>=1 경보.
     cm = np.zeros((4, 4), dtype=int)

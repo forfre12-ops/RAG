@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lloydk.modules.m6_evaluation.serving_eval import (
+from koipa.modules.m6_evaluation.serving_eval import (
     evaluate_via_serving,
     predict_via_serving,
 )
-from lloydk.schemas.common import Grade
+from koipa.schemas.common import Grade
 
 
 @dataclass
@@ -21,13 +21,13 @@ class _Res:
 
 
 class _FakePipe:
-    """text→label 매핑으로 run()을 흉내. metadata/use_rag는 무시."""
+    """text→label 매핑으로 run()을 흉내. metadata 는 무시."""
     def __init__(self, mapping, raise_on=None):
         self.mapping = mapping
         self.raise_on = raise_on
         self.calls = 0
 
-    def run(self, text, use_rag=False, metadata=None):
+    def run(self, text, metadata=None):
         self.calls += 1
         if self.raise_on is not None and text == self.raise_on:
             raise RuntimeError("boom")

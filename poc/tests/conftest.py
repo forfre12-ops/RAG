@@ -36,41 +36,63 @@ os.environ["AUDIT_DISABLED"] = "0"
 # matrix는 자기 fixture에서 monkeypatch로 override하므로 영향 없음.
 os.environ.setdefault("ENABLE_TRAINING", "true")
 
+# [2026-09-06] 합성 생성 라우터는 **자기 스위치**로 붙는다(enable_synthetic_generation).
+# 종전에는 enable_training 에 얹혀 있어서, 학습을 끄면 FUN-003 요건 기능이 화면에서도
+# API 에서도 조용히 사라졌다 — 축을 나눴다. 시험 환경은 두 라우터를 다 검증하므로 둘 다 켠다.
+# 프로파일 계약(지재원 열림 · 고객사 닫힘)은 test_synth_router_availability 가 자기
+# 환경변수를 세워 따로 확인하므로 이 기본값에 영향받지 않는다.
+os.environ.setdefault("ENABLE_SYNTHETIC_GENERATION", "true")
+
 # 벡터 백엔드 기본 inmemory — 테스트는 실 PG/ES 불요(이전 es→inmemory 폴백과 동일 효과).
 # 기본을 pg로 바꾼 뒤(§03 ⓑ) pg는 지연연결이라 폴백이 없으므로, 테스트는 명시적 inmemory로.
 # 실 백엔드 테스트(test_default_backend_is_pg 등)는 자체 delenv/setenv로 override.
 os.environ.setdefault("VECTOR_BACKEND", "inmemory")
 
+# 실 임베더 필수(require_real_embedder)는 운영 프로파일(onprem-local·full-train, 커밋된 .env)에서
+# True다. 테스트/CI는 실 HF 모델을 항상 받지 못하므로(model_download 미표시 테스트) hash 폴백이
+# 필요 — 이 프로덕션 하드닝을 중화(poc_mode fail-fast·VECTOR_BACKEND와 동일 패턴). 게이트 자체
+# 검증(test_embedding_fallback_gate)은 monkeypatch로 명시 활성해 독립 검사한다.
+os.environ.setdefault("REQUIRE_REAL_EMBEDDER", "false")
+
+# 실 분류기 필수(require_real_classifier)도 하드닝 프로파일(onprem-local·full-train) 기본 True.
+# 테스트/CI는 학습 가중치 없이 rule-fallback 으로 도는 경우가 많아(무실데이터) 이게 켜지면 warmup
+# 이 차단된다 — REQUIRE_REAL_EMBEDDER 와 동일 패턴으로 중화. 게이트 자체 검증은 전용 테스트가
+# monkeypatch 로 명시 활성해 독립 수행한다(test_classifier_fallback_gate).
+os.environ.setdefault("REQUIRE_REAL_CLASSIFIER", "false")
+
+# 수동 GA 활성 locked-eval 하드블록(deploy_gate_manual_require_locked_eval)은 하드닝 프로파일
+# (onprem-local·full-train) 기본 True. 테스트는 무실데이터(locked_gold_eval 비어있음)라 이게 켜지면
+# 모든 수동 활성이 막힌다 — REQUIRE_REAL_EMBEDDER와 동일하게 중화. 게이트 자체 검증은
+# test_manual_activate.py의 전용 테스트가 monkeypatch로 명시 활성해 독립 수행한다.
+os.environ.setdefault("DEPLOY_GATE_MANUAL_REQUIRE_LOCKED_EVAL", "false")
+
+# force 우회 사유 필수(manual_activate_force_requires_reason)도 하드닝 프로파일 기본 True.
+# 테스트의 기존 force=True(사유 없음) 경로를 깨지 않도록 중화(전용 테스트가 monkeypatch로 검증).
+os.environ.setdefault("MANUAL_ACTIVATE_FORCE_REQUIRES_REASON", "false")
+
 _SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+# conftest 는 tests/ 가 sys.path 에 오르기 **전에** 로드되므로 여기서 직접 넣는다.
+# 이걸 안 하면 아래 _pg_probe 임포트가 ModuleNotFoundError 로 죽는다.
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
 
 def _check_postgres() -> bool:
-    """Postgres 5432 포트 빠른 연결 확인 (0.5초 이내)."""
-    import socket
-    try:
-        sock = socket.create_connection(("localhost", 5432), timeout=0.5)
-        sock.close()
-        return True
-    except OSError:
-        return False
+    """DB 가용성 — 판정은 _pg_probe 한 곳에만 둔다(같은 검사를 복제하지 않는다).
 
+    PostgreSQL·MariaDB 양쪽을 본다(함수 이름은 호출부 호환으로 유지).
+    """
+    from _pg_probe import postgres_available
 
-def _check_es() -> bool:
-    """ES 9200 포트 빠른 연결 확인 (0.5초 이내)."""
-    import socket
-    try:
-        sock = socket.create_connection(("localhost", 9200), timeout=0.5)
-        sock.close()
-        return True
-    except OSError:
-        return False
+    return postgres_available()
 
 
 # 모듈 로드 시점에 한 번만 확인 (세션 전체에서 재사용)
 _PG_AVAILABLE = _check_postgres()
-_ES_AVAILABLE = _check_es()
 
 # pytest marker 기반 자동 skip
 # fullstack: Postgres + ES + 기타 인프라 필요
@@ -84,7 +106,15 @@ def pytest_collection_modifyitems(config, items):
             # TestClient를 쓰는 테스트는 infra 없으면 skip
             markers = [m.name for m in item.iter_markers()]
             if "fullstack" in markers:
-                item.add_marker(pytest.mark.skip(reason="fullstack: postgres not available"))
+                # [2026-09-05] 메시지에 실제 엔드포인트를 싣는다. "postgres not available"
+                # 만 뜨면 MariaDB 기본값에서 DB 가 떠 있는데도 왜 건너뛰는지 알 수 없다
+                # (실측: 그 상태로 fullstack 52건이 조용히 skip 됐다).
+                from _pg_probe import pg_endpoint  # noqa: PLC0415
+
+                _h, _p = pg_endpoint()
+                item.add_marker(pytest.mark.skip(
+                    reason=f"fullstack: DB 접속 불가 {_h}:{_p} (DATABASE_URL 또는 설정 확인)"
+                ))
 
 
 @pytest.fixture(autouse=True)
@@ -93,7 +123,7 @@ def _restore_settings():
 
     각 테스트 전후로 settings의 주요 필드를 저장/복원해 테스트 간 상태 오염을 차단.
     """
-    from lloydk import config as config_mod
+    from koipa import config as config_mod
 
     saved = {
         "api_key": config_mod.settings.api_key,

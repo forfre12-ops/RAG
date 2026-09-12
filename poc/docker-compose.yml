@@ -1,13 +1,18 @@
-name: lloydk-poc
+name: koipa-poc
 
 services:
+  # [2026-09-09] **기본 DB 로 되돌렸다 — MariaDB 를 버렸다**(고객사가 PostgreSQL 요구).
+  # 9/5 에 MariaDB 로 넘긴 이유는 "KL 포털이 쓰는 DB 가 MariaDB" 였는데 그 전제가 없어졌다.
+  # 이미지가 pgvector 판인 것이 중요하다 — 유사문서 조회의 벡터 저장소가 여기 들어간다
+  # (MariaDB 10.11 에는 벡터 타입이 없다. 실측 `ERROR 4161 Unknown data type: 'VECTOR'`).
   postgres:
-    # ES 제거(의사결정_대장 §03 ⓑ) — pgvector dense + ts_rank 하이브리드. (stock pgvector 이미지, pg_bigm 불요)
-    image: pgvector/pgvector:pg16
+    # [공급망] digest 고정 — 태그는 가변이라 같은 pg16 이 다른 바이트를 가리킬 수 있다.
+    # 갱신 시: docker pull <tag> 후 `docker images --digests` 값을 옮겨 적고 doc/14 재평가.
+    image: pgvector/pgvector:pg16@sha256:131dcf7ff6a900545df8e7e092c270aa8c6db2f2c818e408cb45ec21316b74e6
     environment:
-      POSTGRES_DB: lloydk
-      POSTGRES_USER: lloydk
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lloydk_dev}
+      POSTGRES_DB: koipa
+      POSTGRES_USER: koipa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-koipa_dev}
     volumes:
       - ../docker-data/postgres:/var/lib/postgresql/data
       # 2026-05-28: init.sql 자동 부트스트랩 제거 — alembic baseline 단일 경로로 일원화.
@@ -15,26 +20,22 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lloydk"]
+      test: ["CMD-SHELL", "pg_isready -U koipa"]
       interval: 5s
       retries: 10
 
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-lloydk}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
-    volumes:
-      - ../docker-data/minio:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+  # [2026-08-24] minio 서비스를 뺐다. 어디서도 쓰지 않는데 매 배포마다 떠 있었다.
+  #   - 실배포 프로파일은 전부 storage_backend=local 이다(config.py:81 onprem-local · 173 full-train).
+  #   - 223 실측: api/worker env 에 MINIO_* 없음, 컨테이너 /data 에 버킷 0개(.minio.sys 뿐).
+  #   - 제출본도 "MinIO 미사용"으로 적혀 있다(기술구현_백서_v7 §2.1 인프라 표 + 각주).
+  # 그런데도 떴던 이유: deploy_kl_223.sh 가 서비스명 없이 `up -d` 를 부르고 여기 정의가 남아
+  # 있었다. dev 도 로컬FS 로 통일한다 — dev 만 다른 백엔드를 쓰면 재현되지 않는 차이가 생긴다.
+  # S3 호환 스토리지가 필요해지면 어댑터·[minio] extra 가 그대로 있다(코드 변경 0).
 
   redis:
     # BSD-3-Clause 시점(7.2.x)으로 고정 — Redis 7.4+는 RSALv2/SSPL 듀얼 (doc/14 §6.3).
     # 본 사업은 OSS 적합성 위해 BSD 시점 유지. 운영 갱신 시 doc/14 라이선스 재평가.
-    image: redis:7.2-alpine
+    image: redis:7.2-alpine@sha256:dfa18828cbc07b3ae6a95ec7343f6c214fdee2d836197b4be8e9904420762cd8
     command: redis-server --appendonly yes
     volumes:
       - ../docker-data/redis:/data
@@ -45,28 +46,24 @@ services:
     # Phase 4 (5070 Ti 풀가동): vanilla 이미지 → psycopg2-binary 동봉 빌드.
     # Dockerfile.mlflow 가 v2.16.2 베이스에 pip install psycopg2-binary 적용.
     #
-    # Backend는 SQLite 로 변경 (우리 lloydk DB 와 MLflow alembic 충돌 회피).
+    # Backend는 SQLite 로 변경 (우리 koipa DB 와 MLflow alembic 충돌 회피).
     # 운영 환경은 별도 mlflow DB 분리 또는 별도 Postgres 인스턴스 권장.
     build:
       context: ./infra/mlflow
       dockerfile: Dockerfile.mlflow
-    image: lloydk/mlflow:2.16.2-psycopg
+    image: koipa/mlflow:2.16.2-psycopg
     command: >
       mlflow server
       --backend-store-uri sqlite:////mlflow-data/mlflow.db
-      --default-artifact-root s3://mlflow/
+      --default-artifact-root /mlflow-data/artifacts
       --host 0.0.0.0
     volumes:
       - mlflow_data:/mlflow-data
-    environment:
-      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-lloydk}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_started
+    # [2026-08-24] 아티팩트 저장을 s3://mlflow/(minio) 에서 같은 볼륨 안 로컬 경로로 옮겼다.
+    # minio 를 뺄 수 있게 하는 지점이다 — 이 의존을 안 끊으면 mlflow 가 기동하지 못한다.
+    # backend-store 가 이미 같은 볼륨의 SQLite 라 저장 위치가 한곳으로 모이는 셈이다.
+    # [2026-09-05] postgres depends_on 을 뺐다. 이 서비스는 SQLite 를 쓰므로 어느 DB 에도
+    # 의존하지 않는데, 그 의존 때문에 기본 스택에서 쓰지도 않는 postgres 가 함께 떴다.
     ports:
       - "5000:5000"
 
@@ -76,13 +73,10 @@ services:
       dockerfile: Dockerfile.api
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
-      VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
-      # dev 는 minio 서비스를 띄우므로 명시 고정 (config base 기본값은 폐쇄망용 local).
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-lloydk}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
+      # [2026-08-24] dev 도 로컬FS 로 통일 (종전 기본값 minio). 실배포 프로파일이 전부 local 이라
+      # dev 만 다른 백엔드면 여기서 통과한 것이 배포에서 다르게 도는 경로가 생긴다.
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       REDIS_URL: redis://redis:6379/0
       MLFLOW_TRACKING_URI: http://mlflow:5000
       LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
@@ -91,8 +85,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_started
       redis:
         condition: service_started
     volumes:
@@ -108,14 +100,13 @@ services:
       dockerfile: Dockerfile.api
     # -Q 없이 기동하면 default(celery) 큐만 소비 → task_routes로 classify/index/
     # synthesis/learning 큐에 보낸 작업이 영영 소비되지 않는다. 모든 큐를 구독한다.
-    command: celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
+    command: celery -A koipa.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
-      VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
-      # dev 는 minio 서비스를 띄우므로 명시 고정 (config base 기본값은 폐쇄망용 local).
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
+      # [2026-08-24] dev 도 로컬FS 로 통일 (종전 기본값 minio) — api 쪽 주석 참조.
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       MLFLOW_TRACKING_URI: http://mlflow:5000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
@@ -132,10 +123,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    command: celery -A lloydk.workers.celery_app beat -l info
+    command: celery -A koipa.workers.celery_app beat -l info
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
@@ -149,7 +140,7 @@ services:
   # 운영: ./infra/mtls/certs를 PKI/cert-manager 산출물로 교체.
   nginx-mtls:
     profiles: ["mtls"]
-    image: nginx:1.27-alpine
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
     depends_on:
       - api
     ports:

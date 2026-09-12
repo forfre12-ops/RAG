@@ -1,0 +1,159 @@
+"""POST /confirm + /relabel — 관리자 분류 확정 + 능동학습 입력."""
+
+from __future__ import annotations
+
+import logging
+
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query
+
+from koipa.api._rbac import require_role
+from koipa.schemas.confirm import (
+    ConfirmRequest,
+    ConfirmResponse,
+    RelabelRequest,
+    RelabelResponse,
+    ReviewQueueResponse,
+)
+from koipa.services.confirm_service import (
+    ConfirmService,
+    RelabelService,
+    list_review_queue,
+    load_review_evidence,
+    resolve_queue_statuses,
+    to_confirm_response,
+    to_relabel_response,
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["confirm"])
+
+
+def resolve_actor_user_id(client_user_id: str, auth: dict) -> tuple[str, bool]:
+    """corrected_by 로 기록될 actor 신원을 인증 principal 로 확정 — 위조 차단(순수).
+
+    corrected_by(=actor.user_id)는 promotion_service 에서 label_source='human_review' 의
+    labeler_id 로 흘러 평가진실(locked_gold_eval 승급) 경로에 기록된다. 클라이언트가 보낸
+    user_id 를 그대로 쓰면 reviewer 로 인증한 호출자가 actor.user_id='타인' 을 새겨 위조 신원이
+    사람검수 라벨러로 남는다(_is_machine_reviewer 는 머신 접두사만 막아 사람형 위조는 통과).
+
+    정책: jwt sub(서명=위조불가)가 있으면 그것이 권위(override). api_key(공유키)는 개별 신원이
+    없고, 신뢰된 KL 포털이 actor.user_id 로 실 검수자를 전파하는 설계 채널이므로 클라 값을 유지한다
+    (G1 /admin/model/activate 와 동일 원칙: jwt=claims.sub, api_key=신원 없음).
+
+    Returns (effective_user_id, overridden) — overridden=True 면 클라 값과 인증 신원이 달라
+    덮어썼음(위조 시도 또는 클라 버그 신호).
+    """
+    claims = auth.get("claims")
+    authed = getattr(claims, "sub", None) if claims is not None else None
+    if authed:
+        return authed, (authed != client_user_id)
+    return client_user_id, False
+
+
+def _bind_authenticated_actor(actor, auth: dict) -> None:
+    """클라이언트가 보낸 actor.user_id 를 인증 principal 로 바인딩(위조 차단, in-place)."""
+    effective, overridden = resolve_actor_user_id(actor.user_id, auth)
+    if overridden:
+        logger.warning(
+            "actor.user_id 위조 차단: client=%r → 인증 sub=%r (corrected_by 는 인증 신원으로 기록)",
+            actor.user_id, effective,
+        )
+    actor.user_id = effective
+
+
+# 공개 별칭 — 다른 라우터(promotion/documents/guide/synthesis/training/golden)가 동일 신원
+# 바인딩을 재사용한다(#13: body actor.user_id 가 아니라 인증 principal 로 감사 신원 확정).
+bind_authenticated_actor = _bind_authenticated_actor
+
+
+@router.post("/confirm", response_model=ConfirmResponse)
+def confirm(
+    req: ConfirmRequest,
+    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
+):
+    # tenant 제거: 격리는 KL 포털 전담 → 무스코프 확정.
+    # [신원 무결성] corrected_by 가 human_review 라벨러로 흐르므로 클라 자칭이 아닌 인증 신원으로.
+    _bind_authenticated_actor(req.actor, auth)
+    result = ConfirmService().confirm(req)
+    return to_confirm_response(result)
+
+
+@router.get("/review-queue", response_model=ReviewQueueResponse)
+def review_queue(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    status: str = Query(
+        default="pending",
+        description="pending(기본=needs_review+needs_second_review) | needs_review | needs_second_review | all",
+    ),
+    include_staging: bool = Query(
+        default=False,
+        description=(
+            "확정 대기(staging) 포함 여부. 게이트를 통과해 자동확정된 분류로, "
+            "FUN-005 의 '임시저장 → 관리자 최종확정' 대상이다. 기본 False 라 "
+            "기존 호출은 동작이 같다. status=staging 과 함께 주면 확정 대기만 조회한다."
+        ),
+    ),
+    order: str = Query(
+        "fifo",
+        pattern="^(fifo|risk)$",
+        description=(
+            "정렬. fifo=오래된 것 먼저(기본, 종전 동작). "
+            "risk=미탐을 잡을 확률이 높은 것 먼저 — 낮은 등급·낮은 신뢰도 순, "
+            "동률이면 오래된 것 먼저(기아 방지)."
+        ),
+    ),
+    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
+):
+    """검수 대기(승인 대기) 분류 목록 — DB에 쌓인 needs_review 를 서버측에서 조회(FUN-024).
+
+    admin 콘솔의 세션-only 큐를 대체·보강한다: 브라우저 세션과 무관하게 실제 대기 건을 FIFO 로
+    반환해, 검수자가 페이지를 열면 '승인 대기 문서'를 바로 본다. DB 미가용 시 items=[] +
+    warnings(빈 큐와 조회실패 구분). 확정/재라벨은 기존 /confirm·/relabel 로.
+
+    [2026-08-28] include_staging=true 로 확정 대기 목록을 조회한다(FUN-005). 종전에는
+    staging 분류를 목록으로 볼 서버 경로가 아예 없었다.
+    """
+    # `is True` 로 좁히는 이유: 이 함수를 HTTP 를 거치지 않고 직접 호출하면(테스트가 그렇게 한다)
+    # FastAPI 가 값을 채우지 않아 Query 기본값 객체가 그대로 들어온다. 그 객체는 truthy 라
+    # bool 로 캐스팅하면 확정 대기가 켜져 버린다 — 명시적으로 True 일 때만 켠다.
+    statuses = resolve_queue_statuses(status, include_staging=include_staging is True)
+    # order 도 include_staging 과 같은 이유로 문자열인지 확인한다 — 직접 호출 시에는
+    # FastAPI 가 값을 안 채워 Query 기본값 객체가 그대로 들어온다.
+    order_value = order if isinstance(order, str) else "fifo"
+    items, total, warnings = list_review_queue(
+        limit=limit, offset=offset, statuses=statuses, order=order_value
+    )
+    return ReviewQueueResponse(items=items, total=total, limit=limit, offset=offset, warnings=warnings)
+
+
+@router.get(
+    "/review-queue/{classification_id}/evidence",
+    summary="검수 1건의 근거 — '왜 이 등급인가' (저장분 조회, 재추론 없음)",
+    description=(
+        "분류 시점에 분류근거관리 표(tad_cm_clsf_bss_mng)에 적재된 근거를 그대로 반환한다(FUN-023 근거 "
+        "출력 · FUN-024 검수자 UI). 재분류하지 않는다 — /classify/explain 은 문서를 다시 "
+        "분류하므로 (1) 큐가 가진 300자 미리보기로는 원문과 다른 결과가 나오고 (2) 그 사이 "
+        "모델이 바뀌면 화면의 등급과 근거가 어긋난다. 저장분은 그 등급을 실제로 만든 근거다. "
+        "근거가 0건이면 evidence=[] 와 함께 그 사실을 warnings 로 알린다(무음 처리하지 않음)."
+    ),
+)
+def review_item_evidence(
+    classification_id: UUID,
+    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
+) -> dict:
+    return load_review_evidence(classification_id)
+
+
+@router.post("/relabel", response_model=RelabelResponse)
+def relabel(
+    req: RelabelRequest,
+    auth: dict = Depends(require_role("admin", "reviewer")),
+):
+    # tenant 제거: 격리는 KL 포털 전담 → 무스코프 relabel.
+    _bind_authenticated_actor(req.actor, auth)
+    result = RelabelService().relabel(req)
+    return to_relabel_response(result)

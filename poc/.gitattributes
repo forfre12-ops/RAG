@@ -1,0 +1,56 @@
+# poc/ 전용 줄바꿈 규칙 — 리포 루트 .gitattributes 의 사본이 아니라 **필수 보완**이다.
+#
+# 왜 여기에도 있어야 하나 (2026-08-03 리허설 실측):
+#   반출 패키징은 `git archive HEAD:poc` 로 소스를 뽑는다(ship_to_testserver.sh · 번들 빌드).
+#   git archive 에 **트리(HEAD:poc)** 를 주면 그 트리가 아카이브 루트가 되어, 속성 조회도 poc/
+#   기준으로만 이뤄진다 → **리포 루트의 .gitattributes(*.sh eol=lf)가 적용되지 않는다.**
+#   그 결과 Windows 빌드 호스트(core.autocrlf=true)에서 뽑은 아카이브의 .sh 가 CRLF 로 나갔고,
+#   리눅스 타깃에서 `set: pipefail: invalid option name` · `$'\r': command not found` 로
+#   deploy_airgap.sh · verify_install.sh 가 통째로 실행 불가였다(원커맨드 배포 경로 사망).
+#
+# 번들 빌더도 산출물을 LF 로 정규화하지만(이중 방어), 원인은 여기서 끊는다.
+
+* text=auto eol=lf
+
+*.sh     text eol=lf
+*.py     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.toml   text eol=lf
+*.cfg    text eol=lf
+*.ini    text eol=lf
+*.json   text eol=lf
+*.jsonl  text eol=lf
+*.md     text eol=lf
+*.sql    text eol=lf
+Dockerfile*  text eol=lf
+Makefile     text eol=lf
+
+# 바이너리 — 변환 금지
+*.png    binary
+*.jpg    binary
+*.pdf    binary
+*.hwp    binary
+*.hwpx   binary
+*.docx   binary
+*.xlsx   binary
+*.xls    binary
+*.pptx   binary
+*.safetensors binary
+*.bin    binary
+*.tar    binary
+*.gz     binary
+*.whl    binary
+
+# ── 반출 제외 (2026-08-16) ───────────────────────────────────────────────────
+# `git archive` 는 export-ignore 가 붙은 경로를 아카이브에 넣지 않는다.
+# 서버 트리도 번들도 git archive 로 만들기 때문에, 여기 적으면 **저장소에는 남고
+# 서버·납품물에는 안 나간다.**
+#
+# DEPLOY_182_2026-08-15.md 를 뺀 이유 둘:
+#   1) 협력사 이름이 17군데 나온다. 그런데 그건 182 서버에 **실제로 있던 것들의 이름**
+#      (compose 프로젝트 lloydk-jjw · 볼륨 lloydk_hf_cache · 환경변수 LLOYDK_ 접두)이라
+#      바꾸면 "리네임이 남긴 잔재였다" 는 기록 자체가 무의미해진다. 그래서 안 바꾸고 뺀다.
+#   2) 182 서버는 사용 중지 지시(2026-08-16)가 있었다. 운영 문서가 아니라 이력이다.
+# 기록으로서의 가치(같은 지뢰를 다음 사람이 다시 밟지 않게)는 저장소에 그대로 남는다.
+docs/DEPLOY_182_2026-08-15.md  export-ignore

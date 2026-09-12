@@ -17,9 +17,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.api.app import app
-from lloydk.config import settings
-from lloydk.db import engine
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.db import engine
 
 
 def _pg_ok() -> bool:
@@ -55,8 +55,8 @@ def test_healthz_excluded_from_audit():
     with TestClient(app) as cli:
         before_count = None
         if _PG:
-            from lloydk.db import session_scope
-            from lloydk.db.models import AuditLog
+            from koipa.db import session_scope
+            from koipa.db.models import AuditLog
 
             with session_scope() as db:
                 before_count = db.query(AuditLog).filter(AuditLog.action == "healthz").count()
@@ -65,8 +65,8 @@ def test_healthz_excluded_from_audit():
         assert r.status_code == 200
     # PG 가용 시 audit_log에 healthz 항목이 없어야 함은 별도 검증
     if _PG:
-        from lloydk.db import session_scope
-        from lloydk.db.models import AuditLog
+        from koipa.db import session_scope
+        from koipa.db.models import AuditLog
 
         with session_scope() as db:
             after_count = db.query(AuditLog).filter(AuditLog.action == "healthz").count()
@@ -92,8 +92,8 @@ def test_audit_log_recorded_for_classify():
         )
         assert r.status_code == 200
 
-    from lloydk.db import session_scope
-    from lloydk.repositories import AuditRepo
+    from koipa.db import session_scope
+    from koipa.repositories import AuditRepo
     with session_scope() as db:
         rows = AuditRepo(db).recent_for_actor(actor)
     assert len(rows) == 1, "audit_log 1건 기록되어야 함"
@@ -119,8 +119,8 @@ def test_audit_log_records_failure():
         )
         assert r.status_code == 401
 
-    from lloydk.db import session_scope
-    from lloydk.repositories import AuditRepo
+    from koipa.db import session_scope
+    from koipa.repositories import AuditRepo
     with session_scope() as db:
         rows = AuditRepo(db).recent_for_actor(actor)
     assert len(rows) == 1

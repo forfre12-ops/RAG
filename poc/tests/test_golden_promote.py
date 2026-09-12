@@ -1,9 +1,9 @@
-"""lloydk.golden_builder.promote_candidates 게이트 승격 단위 테스트 (G4).
+"""koipa.golden_builder.promote_candidates 게이트 승격 단위 테스트 (G4).
 
 빌더 후보를 기존 gold에 병합할 때 중복·누출·비-gold를 게이트로 차단하는지 검증.
 정본 파일은 건드리지 않고 (병합 리스트, 통계)만 반환한다.
 """
-from lloydk.golden_builder import promote_candidates
+from koipa.golden_builder import promote_candidates
 
 
 def test_promote_adds_new_and_keeps_existing():

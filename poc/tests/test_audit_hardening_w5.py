@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lloydk.modules.m3_labeling.rule_engine import grade_from_svm, svm_levels_for_grade
+from koipa.modules.m3_labeling.rule_engine import grade_from_svm, svm_levels_for_grade
 
 
 # ── B2/A3: svm_levels_for_grade ↔ grade_from_svm 정합 ───────────────────────────
@@ -24,7 +24,7 @@ def test_svm_levels_reconstruct_grade(grade):
 
 def test_rule_factors_consistent_with_final_grade():
     """룰 라벨의 표시 S/V/M 곱이 최종 등급과 정합해야 한다(모순 표기 방지)."""
-    from lloydk.modules.m3_labeling.pipeline import LabelingPipeline
+    from koipa.modules.m3_labeling.pipeline import LabelingPipeline
     p = LabelingPipeline()
     r = p.label("암호 키 관리 보고서. HSM·FIPS 운영. master key root CA. 외부 유출 금지 기밀.")
     g = r.grade.value if hasattr(r.grade, "value") else str(r.grade)
@@ -37,7 +37,7 @@ def test_rule_factors_consistent_with_final_grade():
 
 # ── A4: 방향성 미탐(under-class)만 카운트, 과분류 제외 ──────────────────────────
 def test_fnr_underclass_excludes_overclassification():
-    from lloydk.modules.m6_evaluation.metrics import _fnr_from_cm, _fnr_underclass_from_cm
+    from koipa.modules.m6_evaluation.metrics import _fnr_from_cm, _fnr_underclass_from_cm
     labels = ["TS", "S1", "S2", "S3"]
     # 행=정답, 열=예측. S3 정답행: TS로 2건 과분류(저→고) + S3 8건.
     cm = np.array([
@@ -59,8 +59,8 @@ def test_fnr_underclass_excludes_overclassification():
 
 # ── A1: temperature.json 자동로드 폴백 ─────────────────────────────────────────
 def test_temperature_autoload_fallback():
-    from lloydk.config import settings
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
+    from koipa.config import settings
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
     if abs(float(settings.classifier_temperature) - 1.0) > 1e-9:
         pytest.skip(".env가 classifier_temperature를 명시 → 폴백 경로 비활성")
     pipe = InferencePipeline()  # 모델 없음

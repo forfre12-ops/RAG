@@ -1,0 +1,87 @@
+# lite ÌöåÍ∑Ä Ïã§Ìñâ Î°úÍ∑∏ (CI Í∏∞Î≥∏ Í≤åÏù¥Ìä∏ÏôÄ ÎèôÏùº ÌîÑÎ°úÌååÏùº)
+# Î™ÖÎ†π: pytest -m "not fullstack and not model_download and not slow"
+# commit: 12af840d81e5aa48cad527490d43ba34c6787db2
+# Ïã§ÌñâÏùº: 2026-07-30
+
+........................................................................ [  3%]
+........................................................................ [  7%]
+........................................................................ [ 11%]
+........................................................................ [ 15%]
+........................................................................ [ 19%]
+........................................................................ [ 23%]
+........................................................................ [ 27%]
+.......ssss............................................................. [ 31%]
+...................................................................ss... [ 35%]
+........................................................................ [ 39%]
+........................................................................ [ 42%]
+........................................................................ [ 46%]
+........................................................................ [ 50%]
+........................................................................ [ 54%]
+.........................................ssssssss....................... [ 58%]
+........................................................................ [ 62%]
+..sssssss............................ss................................. [ 66%]
+........................................................................ [ 70%]
+........................................................................ [ 74%]
+........................................................................ [ 78%]
+..........................................................sssssss....... [ 81%]
+........................................................................ [ 85%]
+......s................................................................. [ 89%]
+............................ssssssss.................................... [ 93%]
+............ss.......................................................... [ 97%]
+.............................................                            [100%]
+============================== warnings summary ===============================
+tests/test_audit_b_inference.py::test_h2_empty_text_never_falls_back_to_public_s3
+  C:\Users\tio\AppData\Local\Programs\Python\Python311\Lib\site-packages\opentelemetry\util\_importlib_metadata.py:32: DeprecationWarning: SelectableGroups dict interface is deprecated. Use select.
+    return EntryPoints(ep for group_eps in eps.values() for ep in group_eps)
+
+tests/test_embedding_fallback_gate.py::test_fallback_refused_when_required
+  F:\antigravity\rag\poc\tests\test_embedding_fallback_gate.py:43: RuntimeWarning: [embedding] HF load failed for real-model-beta: HF load failed (simulated). Falling back to HashEmbedding.
+    emb.build_embedder("real-model-beta")  # ∆˙πÈ ∞≈∫Œ = ∏ÌΩ√¿˚ Ω«∆–(fail-secure)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+SKIPPED [1] tests\test_api_routers_w3.py:18: slow API router integration tests excluded from lite collection
+SKIPPED [1] tests\test_audit_middleware.py:14: slow audit middleware integration tests excluded from lite collection
+SKIPPED [1] tests\test_kl_integration.py:18: slow KL integration tests excluded from lite collection
+SKIPPED [1] tests\test_corrections_rebuild.py:197: Postgres not reachable
+SKIPPED [1] tests\test_corrections_rebuild.py:227: Postgres not reachable
+SKIPPED [1] tests\test_corrections_rebuild.py:261: Postgres not reachable
+SKIPPED [1] tests\test_corrections_rebuild.py:305: Postgres not reachable
+SKIPPED [1] tests\test_dual_review.py:181: Postgres not reachable
+SKIPPED [1] tests\test_dual_review.py:233: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:225: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:261: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:287: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:307: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:324: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:343: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:364: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:382: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:65: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:72: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:86: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:106: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:138: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:155: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:189: Postgres not reachable
+SKIPPED [1] tests\test_ocr_scanned_pdf.py:68: could not import 'pdf2image': No module named 'pdf2image'
+SKIPPED [1] tests\test_ocr_scanned_pdf.py:87: could not import 'pdf2image': No module named 'pdf2image'
+SKIPPED [1] tests\test_register_and_gate.py:83: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:99: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:117: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:137: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:158: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:185: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:212: Postgres not reachable
+SKIPPED [1] tests\test_reviewer_trust.py:65: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:466: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:475: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:484: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:494: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:503: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:508: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:511: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:525: Postgres not reachable
+SKIPPED [1] tests\test_synth_worker_persist.py:79: postgres not available (5432)
+SKIPPED [1] tests\test_synth_worker_persist.py:112: postgres not available (5432)
+1804 passed, 44 skipped, 258 deselected, 2 warnings in 934.81s (0:15:34)

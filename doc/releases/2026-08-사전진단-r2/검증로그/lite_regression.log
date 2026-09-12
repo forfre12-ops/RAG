@@ -1,0 +1,71 @@
+# CI 동등 lite 회귀 실행 로그 — 2026-08-02
+# 명령: pytest -q -m "not fullstack and not model_download and not slow"  (= make test-lite)
+# 대상 커밋: 0af6e75  ·  실행 환경: Windows 11 / poc/.venv / PostgreSQL 미기동
+#
+# 결과: 1817 passed · 43 skipped · 259 deselected · 5 failed  (939.19s)
+#
+# [실패 5건 = 코드 기인 아님 — 로컬 venv 의 torch 설치 파손]
+#   .venv/Lib/site-packages/torch/ 에 __init__.py · dist-info · lib/*.dll 이 없어
+#   Python 이 네임스페이스 패키지로 로드한다. 즉 'import torch' 는 성공하나 속이 비어
+#   torch.tensor · torch.nn 이 존재하지 않는다.
+#     - tests/test_audit_w2_a.py  4건 : AttributeError: module 'torch' has no attribute 'tensor'
+#     - tests/test_calibration_temperature.py 1건 : ModuleNotFoundError: No module named 'torch.nn'
+#   → torch 정상 설치 환경(CI Linux)에서 재확인 필요. 리눅스 CI 는 본 5건 포함 green 이력.
+#
+# [skip 43건] PostgreSQL 미기동 등 외부 의존 사유. deselect 259건은 slow/fullstack/model_download 마커.
+# ---------------------------------------------------------------------------
+
+......................s................................................. [  3%]
+........................................................................ [  7%]
+.........................................................FFFF........... [ 11%]
+........................................................................ [ 15%]
+........................................................................ [ 19%]
+...................................................F.................... [ 23%]
+........................................................................ [ 27%]
+.......ssss............................................................. [ 30%]
+...................................................................ss... [ 34%]
+........................................................................ [ 38%]
+........................................................................ [ 42%]
+........................................................................ [ 46%]
+........................................................................ [ 50%]
+........................................................................ [ 54%]
+..........................................................ssssssss...... [ 58%]
+........................................................................ [ 61%]
+...................sssssss.............................................. [ 65%]
+........................................................................ [ 69%]
+........................................................................ [ 73%]
+........................................................................ [ 77%]
+........................................................................ [ 81%]
+...sssssss.............................................................. [ 85%]
+.......................s................................................ [ 88%]
+.............................................ssssssss................... [ 92%]
+.............................ss......................................... [ 96%]
+..............................................................           [100%]
+================================== FAILURES ===================================
+E   AttributeError: module 'torch' has no attribute 'tensor'
+F:\antigravity\rag\poc\tests\test_audit_w2_a.py:52: AttributeError: module 'torch' has no attribute 'tensor'
+E   AttributeError: module 'torch' has no attribute 'tensor'
+F:\antigravity\rag\poc\tests\test_audit_w2_a.py:71: AttributeError: module 'torch' has no attribute 'tensor'
+E   AttributeError: module 'torch' has no attribute 'tensor'
+F:\antigravity\rag\poc\tests\test_audit_w2_a.py:85: AttributeError: module 'torch' has no attribute 'tensor'
+E   AttributeError: module 'torch' has no attribute 'tensor'
+F:\antigravity\rag\poc\tests\test_audit_w2_a.py:96: AttributeError: module 'torch' has no attribute 'tensor'
+E   ModuleNotFoundError: No module named 'torch.nn'
+F:\antigravity\rag\poc\tests\test_calibration_temperature.py:57: ModuleNotFoundError: No module named 'torch.nn'
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  F:\antigravity\rag\poc\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_embedding_fallback_gate.py::test_fallback_refused_when_required
+  F:\antigravity\rag\poc\tests\test_embedding_fallback_gate.py:43: RuntimeWarning: [embedding] HF load failed for real-model-beta: HF load failed (simulated). Falling back to HashEmbedding.
+    emb.build_embedder("real-model-beta")  # ���� �ź� = ������ ����(fail-secure)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_audit_w2_a.py::test_magg_single_secret_chunk_not_diluted_into_missed_detection
+FAILED tests/test_audit_w2_a.py::test_magg_low_grade_behavior_preserved_length_weighted
+FAILED tests/test_audit_w2_a.py::test_magg_is_monotonic_non_decreasing_for_high_grades
+FAILED tests/test_audit_w2_a.py::test_magg_single_chunk_is_identity - Attribu...
+FAILED tests/test_calibration_temperature.py::test_temperature_softens_confidence
+5 failed, 1817 passed, 43 skipped, 259 deselected, 2 warnings in 939.19s (0:15:39)

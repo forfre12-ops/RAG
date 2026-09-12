@@ -1,0 +1,1532 @@
+from __future__ import annotations
+
+import logging
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+from koipa.config import settings
+from koipa.schemas.common import Grade, GradeRegistry
+from koipa.schemas.classify import EvidenceSpan, EvaluationFactors
+from koipa.modules.m2_preprocess import split as _chunk_split
+from koipa.modules.m3_labeling.pipeline import LabelingPipeline
+from koipa.obs.otel import span  # 수동 span — OTel 미설치/미활성 시 완전 no-op
+
+logger = logging.getLogger(__name__)
+
+# _encode_windows 는 배치마다 불린다 — 오버플로 분할 실패를 매 배치 찍으면 로그가 묻힌다.
+_WARNED_OVERFLOW_FALLBACK = False
+
+_PUBLIC_SOURCE_TOKENS = {
+    # ── ICD §3.1 이 규정한 source_type enum. **KL 이 실제로 보내는 값이다.**
+    # 실측 2026-08-14(인수 팩 A/B 실행): ICD 대로 source_type="public" 을 보냈는데
+    # 출처 prior 가 한 번도 걸리지 않았다. 목록에 ICD 값이 하나도 없었기 때문이다 -
+    # 합의된 인터페이스를 구현이 지키지 않고 있었고, KL 시험에서 그대로 터질 자리였다.
+    #
+    #   public              공개 웹·보도·공시·뉴스레터   S=0 (Gate-1)
+    #   registered_patent   등록·공개 특허·실용신안      S=0 (Gate-1)
+    #   academic            학술 발표 논문·학위논문      S=0 (Gate-1)
+    #   internal            사내 비공개                 텍스트로 S 산정 (음성 토큰에 있음)
+    #   external_confidential NDA 하 외부 수령           텍스트로 S 산정 (매치 안 됨)
+    #
+    # "public" 추가가 안전한 이유: 음성 토큰(internal · non-public · nonpublic ·
+    # unpublished · private)이 **먼저** 검사되고, 토큰 분리가 하이픈·언더스코어를
+    # 보존하므로 "non-public" · "external_confidential" 은 한 덩어리로 남아 양성
+    # 목록과 안 겹친다.
+    "public",
+    "registered_patent",
+    "academic",
+    # ── 이하 기존 토큰(내부 파이프라인·데이터셋이 쓰는 표기)
+    "court_decision",
+    "public_disclosure",
+    "published_patent",
+    "\ud310\ub840",  # 판례
+    "\uacf5\uc2dc",  # 공시
+    "\ucc44\uc6a9\uacf5\uace0",  # 채용공고
+    "\ubcf4\ub3c4\uc790\ub8cc",  # 보도자료
+    "\uacf5\uac1c\ud2b9\ud5c8",  # 공개특허
+    "\ub4f1\ub85d\ud2b9\ud5c8",  # 등록특허
+    "\uacf5\uac1c\uacf5\ubcf4",  # 공개공보
+    "\ud2b9\ud5c8\uacf5\ubcf4",  # 특허공보
+}
+_PUBLIC_SOURCE_NEGATIVE_TOKENS = {
+    "draft",
+    "planned",
+    "internal",
+    "private",
+    "unpublished",
+    "nonpublic",
+    "non-public",
+    "\ubbf8\uacf5\uc2dc",  # 미공시
+    "\ubbf8\uacf5\uac1c",  # 미공개
+    "\ube44\uacf5\uac1c",  # 비공개
+    "\ucd08\uc548",  # 초안
+    "\uc608\uc815",  # 예정
+}
+
+# [s2-underclass-risk] S3 예측이 내부·비공개 접근통제 신호를 담고 있으면 **검수로 보낸다**.
+# 등급은 바꾸지 않는다 — 라우팅 전용이라 F1 등 모델 지표에 영향이 없고, 오탐 비용은
+# 검수 부담뿐이다(FNR-safe).
+#
+# ⚠ 한계(실측 2026-08-11, direct_authored_catalog_training.v3_1 2,700행):
+#   "접근을 제한" 825행 = S2 390 · TS 375 · S3 60.
+#   P(문구|S3)=13.3% vs P(문구|TS)=50% · P(문구|S2)=52% → S3 예측의 미달분류 신호로는 유효하다.
+#   다만 세 문구("접근을 제한"·"반출 승인"·"공유 이력")가 **정확히 같은 825행**에 함께 나온다 =
+#   생성기 템플릿 한 벌이다. 즉 이 목록은 합성 코퍼스의 작문 어투에 맞춰져 있고,
+#   회원사 실문서는 다르게 쓴다 — 실환경에서는 거의 발화하지 않을 것으로 본다.
+#   따라서 **합성 평가셋에서 이 게이트가 잡은 건수를 실환경 성능 근거로 제시하지 말 것.**
+#   실문서 확보 후 실제 표현으로 재작성이 필요하다.
+_S2_PUBLIC_NEGATING_RE = re.compile(
+    r"(?:"
+    r"공개\s*자료로\s*관리|공개\s*출처|누구나\s*확인|"
+    r"공개\s*지침|공개\s*규격|공개\s*안내자료|이미\s*배포된|"
+    r"접근\s*제한[^.\n]{0,40}적용하지\s*않|"
+    r"반출\s*(?:통제|승인)[^.\n]{0,40}적용하지\s*않|"
+    r"수신자\s*제한[^.\n]{0,40}적용하지\s*않|"
+    r"비공개\s*조합[^.\n]{0,40}포함하지\s*않|"
+    r"non[-\s]?confidential|publicly available|public source"
+    r")",
+    re.IGNORECASE,
+)
+_S2_STRONG_RISK_RE = re.compile(
+    r"(?:"
+    r"일부\s*내부|공개되지\s*않|비공개\s*운영자료|"
+    r"프로젝트\s*구성원|협력사|고객별\s*일정|"
+    r"자료\s*접근을\s*제한|접근을\s*제한|공유\s*이력|"
+    r"반출\s*승인|권한\s*회수|수신자\s*기록\s*중\s*일부가\s*빠져|"
+    r"전용\s*저장소|internal\s+(?:only|review|plan|memo)|"
+    r"restricted\s+access|confidential"
+    r")",
+    re.IGNORECASE,
+)
+
+
+from koipa.modules.m3_labeling.rule_engine import (  # noqa: E402
+    _ICD_MARKING_TO_M,
+    grade_from_svm as _grade_from_svm,
+    management_from_metadata_dict as _management_from_metadata_dict,
+    marking_from_document as _marking_from_document,
+)
+
+
+def _source_prior_is_public(src: object) -> bool:
+    text = str(src or "").strip().lower()
+    if not text:
+        return False
+    tokens = {
+        t for t in re.split(r"[^0-9a-zA-Z_\uac00-\ud7a3-]+", text)
+        if t
+    }
+    if text in _PUBLIC_SOURCE_NEGATIVE_TOKENS or tokens & _PUBLIC_SOURCE_NEGATIVE_TOKENS:
+        return False
+    if any(t.startswith("\ubbf8") and t[1:] in _PUBLIC_SOURCE_TOKENS for t in tokens):
+        return False
+    return text in _PUBLIC_SOURCE_TOKENS or bool(tokens & _PUBLIC_SOURCE_TOKENS)
+
+
+# [gate fail-open 방향 분류] 게이트가 예외로 미적용됐을 때 어느 방향으로 틀리는지가 조치를 가른다.
+#   fnr_safe_override  상향 미적용 → 모델의 낮은 등급 유지        = 미탐
+#   ts_tie_break       TS 가 S1 로 잔류                            = 미탐
+#   metadata_floor     비밀이 낮은 등급 유지 / 검수라우팅 유실     = 미탐
+#   s2_underclass_risk S3 예측의 미달분류 의심 신호 유실           = 미탐
+#   ─────────────────────────────────────────────────────────────
+#   source_prior_cap   하향 미적용 → 공개출처가 상위등급 유지      = 과분류(안전 방향)
+# 미탐 방향 4개는 경고를 남겨 classify_service 가 needs_review 로 보낸다(등급은 안 바꾼다 —
+# 예외 상황에서 등급을 추측하면 새 오류원이 된다). source_prior_cap 은 안전 방향이라 현행 유지.
+_MISS_DIRECTION_GATES = frozenset(
+    {"fnr_safe_override", "ts_tie_break", "metadata_floor", "s2_underclass_risk"}
+)
+GATE_FAIL_OPEN_WARNING = "gate-fail-open"
+
+# [2026-08-27] 설정 읽기 실패를 삼키고 하드코딩 기본값으로 조용히 진행하던 자리들을
+# 가시화한다. 값이 다르면 판정면이 통째로 움직이는데 아무 신호도 없었다 — 서빙
+# temperature 가 프로파일 값에 덮여 3.0 으로 돌던 드리프트(2026-08-22 정정)가 그 예다.
+# 제어 흐름은 그대로 둔다(폴백 유지). 문서마다 찍히면 로그가 쓸모없어지므로 1회만 남긴다.
+_SETTING_FALLBACK_SEEN: set[str] = set()
+
+
+def _warn_setting_fallback(name: str, fallback, exc: BaseException) -> None:
+    """설정을 못 읽어 폴백을 쓴다는 사실을 프로세스당 한 번 남긴다."""
+    if name in _SETTING_FALLBACK_SEEN:
+        return
+    _SETTING_FALLBACK_SEEN.add(name)
+    logger.warning(
+        "설정 %s 를 읽지 못해 기본값 %r 로 진행한다 — 운영값과 다르면 판정이 달라진다 (%s: %s)",
+        name, fallback, type(exc).__name__, exc,
+    )
+
+
+def _record_gate_fail_open(gate: str, result: "InferenceResult | None" = None) -> None:
+    """[obs] 서빙 파이프라인 게이트가 예외로 fail-open(미적용)했음을 가시화 — best-effort.
+
+    metadata-floor·FNR-safe override 같은 상향/라우팅 게이트가 조용히 실패하면 비밀이 낮은
+    등급을 무음 유지할 수 있다("게이트ON=가시성ON" 위반). classify_service 와 동일한
+    SERVING_GATE_FAIL_OPEN_TOTAL 카운터에 gate 라벨로 기록한다 — 분류 제어흐름은 그대로
+    (예외는 계속 삼켜 fail-safe 유지), 가시성만 추가. 메트릭/로그 실패는 무시.
+
+    ``result`` 를 주면 **미탐 방향 게이트에 한해** 경고를 덧붙여 사람 검수로 보낸다
+    (위 _MISS_DIRECTION_GATES 주석 참조). 등급은 건드리지 않으므로 FNR-safe 이고,
+    비용은 검수 부담뿐이다. 경고 부착 자체가 실패해도 분류는 계속된다.
+    """
+    try:
+        from koipa.api.prom_metrics import SERVING_GATE_FAIL_OPEN_TOTAL  # noqa: PLC0415
+        SERVING_GATE_FAIL_OPEN_TOTAL.labels(gate=gate).inc()
+    except Exception:  # noqa: BLE001
+        pass
+    logger.debug("serving gate fail-open (예외로 미적용): %s", gate)
+    if result is None or gate not in _MISS_DIRECTION_GATES:
+        return
+    try:
+        result.warnings = list(result.warnings) + [
+            f"{GATE_FAIL_OPEN_WARNING}: {gate} 가 예외로 미적용됐다 — 미탐 방향이라 "
+            "등급을 그대로 두고 검수로 보낸다"
+        ]
+    except Exception as exc:  # noqa: BLE001
+        # 이 경고가 붙어야 classify_service 가 needs_review 로 돌린다. 부착이 실패하면
+        # 그 라우팅이 통째로 사라지는데 종전에는 흔적조차 없었다.
+        logger.warning(
+            "gate-fail-open 경고 부착 실패 — %s 의 검수 라우팅 신호가 유실됐다 (%s: %s)",
+            gate, type(exc).__name__, exc,
+        )
+
+
+# ── 요소 경계 게이트 — 만들었다가 측정하고 뺐다 (2026-08-12) ──────────────
+# "룰의 S/V/M 을 한 단계 올려 보고 등급이 높아지면 검수로 보낸다"는 게이트. 두 변형 다 채택 불가:
+#   1단계 탐침  자동확정 40.5%→33.3% · 잡힌 3건 전부 예측이 맞은 건(미탐 개선 0)
+#   2단계 탐침  자동확정 40.5%→16.7% · 미탐 1건은 잡지만 사실상 자동화 해제
+# 진짜 결함은 분기점이 아니라 룰 추출기의 체계적 과소검출이다(별건).
+# 같은 아이디어를 다시 만들지 않도록 남긴다. 근거: docs/V7_RESULT_2026-08-12.md §4
+
+
+def chunk_text(text: str, size: int = 512, overlap: int = 64):
+    """하위호환 wrapper — 새 split()로 위임."""
+    return _chunk_split(text, size=size, overlap=overlap)
+
+
+@dataclass
+class InferenceResult:
+    label: Grade
+    confidence: float
+    scores: dict[str, float]
+    factors: Optional[EvaluationFactors] = None
+    evidence: list[EvidenceSpan] = field(default_factory=list)
+    model_version: str = "poc"
+    warnings: list[str] = field(default_factory=list)
+    # [agreement-gate 재사용] run()이 이미 산출한 **원시 룰등급**(rule_result.grade) — 합의
+    # 게이트가 룰엔진을 두 번 돌리지 않게 노출. label과 별개(label은 모델/청크집계/override
+    # 결과, rule_grade는 단일패스 raw 룰등급). None이면 호출부가 폴백 재계산.
+    rule_grade: Optional[str] = None
+    # [agreement-gate 2026-08-22] 룰이 **실제 한국어 시드**를 매치했는가(has_real_evidence,
+    # 영어 약어 단독 부스트는 제외). None=아직 미계산(호출부가 폴백 재계산), False=룰 무근거
+    # (매치 0개 → grade_scores 전부 0 → default S3) — 이 경우 rule_grade=S3는 "룰이 공개라고
+    # 판단"이 아니라 "룰이 무의견"이므로 합의 게이트가 model_code와 그대로 비교하면 근거 없는
+    # 불일치로 오판한다(RULE_EXTRACTOR_DIAGNOSIS_2026-08-12: OOD 문서 자동확정 0%의 실측 원인).
+    rule_has_evidence: Optional[bool] = None
+    # [transparency] 원시 모델 판정(override/cap/floor 적용 이전 _run_model argmax).
+    # 모델 미로드(rule-fallback) 시 None. label과 별개(label은 최종 결합 결과).
+    model_grade: Optional[str] = None
+    # [2026-08-20] 룰이 **실제로 관측한** S/V/M. `factors` 는 룰과 모델이 갈릴 때 모델 등급에
+    # 맞춰 역산한 값으로 덮이는데(아래 [A3]), 그러면 화면에 "S2·V2·M2 인데 룰은 S1" 처럼
+    # 판정식으로 설명되지 않는 조합이 뜬다(사용자 지적). 덮기 전 값을 따로 남겨 두 벌을
+    # 나란히 보여줄 수 있게 한다. 역산이 없었으면 None(= factors 가 곧 룰 관측값).
+    rule_factors: Optional[EvaluationFactors] = None
+    # [후보집합] 비밀관리성(M)을 못 받았을 때 **M 하나로 갈리는 등급들**. 비면 갈릴 것이
+    # 없다는 뜻이다(label 이 유일한 답).
+    #
+    # 왜 필요한가. 정본 공식에서 S1 이 나오는 조합은 (2,2,0) 하나뿐이라 S1 과 TS 를 가르는
+    # 것은 **오직 M** 이다. 그런데 M 공급이 0 건이라(전 데이터셋 432,820행) 배포본은 매번
+    # 둘 중 하나를 찍고 있다 — 없는 정보를 있는 척하는 것이다. 찍은 값은 그대로 두되
+    # (label 계약 보존) 무엇 때문에 갈리는지를 함께 낸다. 검수자가 확인할 것이 등급이
+    # 아니라 **접근권한**임을 알게 된다.
+    grade_candidates: Optional[list[str]] = None
+    grade_candidates_reason: Optional[str] = None
+
+
+_LABELS = [Grade.TS, Grade.S1, Grade.S2, Grade.S3]
+
+
+def _get_labels() -> list:
+    """GradeRegistry에서 현재 활성 등급 목록 반환.
+
+    DB에 커스텀 등급이 있으면 그것을, 없으면 기본 _LABELS를 반환.
+    Grade enum에 없는 코드는 문자열로 반환 (다른 프로젝트 호환).
+    """
+    codes = GradeRegistry.get_codes()
+    labels = []
+    for code in codes:
+        try:
+            labels.append(Grade(code))
+        except ValueError:
+            labels.append(code)
+    return labels or _LABELS
+
+
+class InferencePipeline:
+    """
+    PoC 추론기.
+    - 학습 가중치가 있으면 transformers 로드, 없으면 M3 라벨링 규칙 기반 점수로 폴백.
+    - 청크 어그리게이션: 청크별 softmax 평균.
+    """
+
+    def __init__(self, model_dir: str | Path | None = None):
+        self.model_dir = Path(model_dir) if model_dir else None
+        self.labeling = LabelingPipeline()
+        self._model = None
+        self._tokenizer = None
+        self._model_temperature: float | None = None  # [A1] 모델 동봉 temperature.json 자동로드값
+        # proxy finalizer가 temperature와 같은 calibration split에서 고정한 운영점.
+        # operating_point.json이 유효하면 모델별 T/τ를 하나의 잠금 계약으로 취급해
+        # 일반 배포 프로파일 기본값(temperature=3, tau=.30)이 덮어쓰지 못하게 한다.
+        self._model_escalation_tau: float | None = None
+        self._locked_operating_point: bool = False
+        self._operating_point_source: str = "settings_or_argmax"
+        self._finalization_attestation: dict | None = None
+        # [calibration-visibility] 서빙 보정 상태 — None=rule-fallback(보정 N/A), True=동봉/주입
+        # 보정 적용, False=무보정(T=1.0) 서빙(무음실패 위험). _apply_bundle_calibration에서 셋.
+        self.calibrated: bool | None = None
+        self._calibration_source: str = "rule-fallback"
+        # GradeRegistry 순서는 **rule-fallback 경로 전용** id→등급 매핑.
+        # 학습 모델이 로드되면 _load_model에서 모델 config.id2label로 덮어쓴다
+        # (softmax 인덱스는 학습 시점 순서에 고정되어 있고 DB level_order와 무관).
+        active = _get_labels()
+        self._id2label: dict[int, object] = dict(enumerate(active))
+        if self.model_dir and self.model_dir.exists():
+            self._load_model()
+
+    def _load_model(self):
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
+        import torch
+        self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir))
+        self._model = AutoModelForSequenceClassification.from_pretrained(str(self.model_dir))
+        # ── id2label은 학습 체크포인트 config에서 가져온다 (fail-closed) ──────────
+        # 학습기(m4_training/trainer.py)는 num_labels 인덱스 0..N을 고정 순서
+        # [TS,S1,S2,S3]에 매핑해 config.id2label에 baked한다. 추론에서 이 순서를
+        # GradeRegistry(DB level_order)로 재구성하면, DB 순서가 다를 때 softmax
+        # 인덱스가 엉뚱한 등급에 매핑되어 '미탐(비밀→공개)'을 일으킨다.
+        # → 반드시 모델 자신의 config.id2label로 매핑하고, 길이·코드집합이
+        #   기대(GradeRegistry 코드집합)와 불일치하면 로드를 거부한다.
+        cfg_id2label = self._id2label_from_config()
+        if cfg_id2label is None:
+            # config 매핑을 신뢰할 수 없으면 모델을 폐기(fail-closed) — rule-fallback로.
+            self._model = None
+            self._tokenizer = None
+            raise ValueError(
+                "model config.id2label is missing/invalid or its code set does not match "
+                "the active grade registry; refusing to load (fail-closed) to avoid "
+                "mis-mapping softmax indices to wrong grades (missed-detection risk)"
+            )
+        self._id2label = cfg_id2label
+        self._model.eval()
+        # 장치는 설정이 정한다(기본 cpu). GPU 가 보인다고 옮겨 가지 않는다 — device.py 참조.
+        from koipa.modules.m5_inference.device import serving_device  # noqa: PLC0415
+        self._device = serving_device(torch)
+        self._model.to(self._device)
+        # [A1] 모델 아티팩트 동봉 temperature.json 자동 로드(보정 자동연결) + 무보정 가시화.
+        # 보정 스크립트(calibrate_classifier.py)가 모델 폴더에 {"temperature": T}를 남기면
+        # 서빙이 자동으로 logit/T 적용. settings.classifier_temperature가 명시(≠1.0)면 그게 우선.
+        self._calibration_source = self._apply_bundle_calibration()
+        self._operating_point_source = self._apply_bundle_operating_point()
+
+    def _apply_bundle_calibration(self) -> str:
+        """모델 dir 동봉 temperature.json을 로드하고 무보정 서빙을 가시화.
+
+        반환(보정 출처): "bundle"=동봉 T 적용 · "env"=classifier_temperature 주입 ·
+        "uncalibrated"=둘 다 없어 T=1.0 무보정 서빙(loud-warn).
+
+        실모델이 로드됐는데 보정이 없으면 OOD 과신으로 softmax conf가 부풀어 conf 게이트(0.7)가
+        보정 안 된 값 위에 서고, 고등급(TS/S1)이 과신 자동확정으로 무음미탐될 수 있다. 종전엔
+        temperature.json 부재가 *완전 무음*이라, 로드 시 1회 loud-warn으로 드러낸다(서빙 T 계산
+        자체는 불변 — _temperature()가 진실 소스, 본 메서드는 가시성·상태표시만 추가).
+        """
+        import json as _json  # noqa: PLC0415
+
+        self._model_temperature = None
+        if self.model_dir is not None:
+            try:
+                _tpath = self.model_dir / "temperature.json"
+                if _tpath.exists():
+                    _t = float(_json.loads(_tpath.read_text(encoding="utf-8")).get("temperature", 0))
+                    if _t > 0:
+                        self._model_temperature = _t
+                        self.calibrated = True
+                        return "bundle"
+                    logger.warning(
+                        "[calibration] %s/temperature.json 의 temperature=%r (<=0) — 무시(무보정 폴백).",
+                        self.model_dir, _t,
+                    )
+            except Exception as _exc:  # noqa: BLE001
+                logger.warning(
+                    "[calibration] %s/temperature.json 읽기 실패: %s — 무보정 폴백.",
+                    self.model_dir, _exc,
+                )
+        # 동봉 보정 없음 — settings.classifier_temperature(≠1.0) 주입이 있으면 그것으로 보정.
+        try:
+            from koipa.config import settings as _settings  # noqa: PLC0415
+            _env_t = float(getattr(_settings, "classifier_temperature", 1.0))
+        except Exception as _exc:  # noqa: BLE001
+            logger.warning("설정에서 온도를 못 읽음 - 보정 없음(T=1.0)으로 진행한다 (%s: %s)", type(_exc).__name__, _exc)
+            _env_t = 1.0
+        if _env_t > 0 and abs(_env_t - 1.0) > 1e-9:
+            self.calibrated = True
+            return "env"
+        # 무보정(T=1.0) 서빙 — 무음실패 위험. loud-warn.
+        self.calibrated = False
+        logger.warning(
+            "[calibration] 활성 모델(%s)에 사용 가능한 temperature.json이 없고 "
+            "classifier_temperature=1.0 — 무보정(T=1.0) 서빙. OOD 과신으로 고등급(TS/S1) "
+            "무음미탐 위험. 학습 후 calibrate_classifier.py로 temperature.json을 동봉하거나 "
+            "CLASSIFIER_TEMPERATURE를 주입하세요.",
+            self.model_dir,
+        )
+        return "uncalibrated"
+
+    def _apply_bundle_operating_point(self) -> str:
+        """Load a jointly attested model-specific escalation operating point.
+
+        ``operating_point.json`` is emitted only after checkpoint selection on
+        validation documents and T/τ fitting on a separate calibration split.
+        When it exists, both the bundled temperature and tau (including an
+        explicit ``null`` meaning argmax) are locked together.  A malformed or
+        cross-temperature artifact is a load error, not a silent settings
+        fallback, because tau is only valid for the probability distribution at
+        the T on which it was selected.
+        """
+        import json as _json  # noqa: PLC0415
+        import math as _math  # noqa: PLC0415
+
+        self._model_escalation_tau = None
+        self._locked_operating_point = False
+        if self.model_dir is None:
+            return "settings_or_argmax"
+        path = self.model_dir / "operating_point.json"
+        if not path.exists():
+            return "settings_or_argmax"
+        # A proxy operating point is valid only with the exact finalized model
+        # payload and aggregation contract that produced it.  Do this before
+        # accepting any calibration value so a copied/stale sidecar cannot alter
+        # production decisions.  The import is deliberately local: the
+        # comparison module mirrors M5 but does not import this runtime module.
+        try:
+            from koipa.proxy_model_comparison import (  # noqa: PLC0415
+                SERVING_INFERENCE_BATCH_SIZE,
+                _verify_finalized_model_bundle,
+                serving_aggregation_contract,
+            )
+
+            finalization = _verify_finalized_model_bundle(self.model_dir)
+            runtime_contract = serving_aggregation_contract(
+                max_length=int(settings.max_seq_len),
+                chunk_overlap=int(settings.chunk_overlap),
+                severe_codes=self._SEVERE_AGG_CODES,
+                forward_batch_size=SERVING_INFERENCE_BATCH_SIZE,
+                apply_bundle_operating_point=True,
+                require_fast_overflow=True,
+            )
+            if (
+                finalization.get("serving_aggregation_contract_sha256")
+                != runtime_contract["contract_sha256"]
+            ):
+                raise ValueError(
+                    "finalized proxy operating point was calibrated for a different "
+                    "M5 aggregation contract"
+                )
+            self._finalization_attestation = finalization
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError(
+                f"cannot verify finalized proxy model bundle {self.model_dir}: {exc}"
+            ) from exc
+        try:
+            payload = _json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError(f"cannot read model operating point {path}: {exc}") from exc
+        if not isinstance(payload, dict):
+            raise ValueError(f"model operating point must be a JSON object: {path}")
+        if (
+            payload.get("schema_version") != "proxy-operating-point-v1"
+            or payload.get("status") != "complete"
+            or payload.get("selection_split") != "calibration_documents"
+            or payload.get("selection_unit") != "document"
+        ):
+            raise ValueError(f"model operating point contract is invalid: {path}")
+        if self._model_temperature is None:
+            raise ValueError(
+                f"model operating point requires a valid bundled temperature.json: {path}"
+            )
+        fitted_temperature = payload.get("temperature")
+        if (
+            isinstance(fitted_temperature, bool)
+            or not isinstance(fitted_temperature, (int, float))
+            or not _math.isfinite(float(fitted_temperature))
+            or float(fitted_temperature) <= 0
+            or not _math.isclose(
+                float(fitted_temperature),
+                float(self._model_temperature),
+                rel_tol=1e-9,
+                abs_tol=1e-12,
+            )
+        ):
+            raise ValueError(
+                f"operating-point temperature does not match temperature.json: {path}"
+            )
+        tau = payload.get("classifier_escalation_tau")
+        if tau is not None:
+            if (
+                isinstance(tau, bool)
+                or not isinstance(tau, (int, float))
+                or not _math.isfinite(float(tau))
+                or not 0.0 < float(tau) < 1.0
+            ):
+                raise ValueError(f"model escalation tau must be null or in (0,1): {path}")
+            self._model_escalation_tau = float(tau)
+        temperature_trace = None
+        try:
+            temperature_payload = _json.loads(
+                (self.model_dir / "temperature.json").read_text(encoding="utf-8")
+            )
+            if (
+                not isinstance(temperature_payload, dict)
+                or temperature_payload.get("schema_version")
+                != "proxy-document-temperature-v1"
+                or temperature_payload.get("status") != "complete"
+                or temperature_payload.get("fit_unit") != "document"
+            ):
+                raise ValueError(
+                    "bundled temperature does not satisfy the finalized proxy contract"
+                )
+            temperature_trace = temperature_payload.get("calibration_trace_sha256")
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError(f"cannot re-read bundled temperature contract: {exc}") from exc
+        operating_trace = payload.get("calibration_trace_sha256")
+        def _is_sha256(value: object) -> bool:
+            return (
+                isinstance(value, str)
+                and len(value) == 64
+                and all(char in "0123456789abcdef" for char in value)
+            )
+
+        if (
+            not _is_sha256(temperature_trace)
+            or operating_trace != temperature_trace
+        ):
+            raise ValueError(
+                f"temperature and operating point are not bound to the same calibration trace: {path}"
+            )
+        for binding_field in (
+            "calibration_input_sha256",
+            "training_run_manifest_sha256",
+        ):
+            temperature_value = temperature_payload.get(binding_field)
+            operating_value = payload.get(binding_field)
+            if (
+                not _is_sha256(temperature_value)
+                or operating_value != temperature_value
+            ):
+                raise ValueError(
+                    "temperature and operating point have different "
+                    f"{binding_field}: {path}"
+                )
+        self._locked_operating_point = True
+        return "bundle_locked"
+
+    def _id2label_from_config(self) -> dict[int, object] | None:
+        """학습 체크포인트 config.id2label → {int index: Grade|str} 매핑.
+
+        검증(fail-closed):
+          - config.id2label가 없으면 None.
+          - 인덱스가 0..N-1 연속이 아니면 None.
+          - 코드 집합이 현재 활성 등급 코드집합과 다르면 None
+            (학습-DB 등급 스키마 mismatch → 인덱스 오매핑 방지).
+        매핑 자체는 config 인덱스를 그대로 보존한다(순서를 재정렬하지 않는다).
+        """
+        cfg = getattr(self._model, "config", None)
+        raw = getattr(cfg, "id2label", None)
+        if not raw or not isinstance(raw, dict):
+            return None
+
+        # config.id2label 키는 int 또는 str("0"..)일 수 있다 — int로 정규화.
+        mapping: dict[int, str] = {}
+        try:
+            for k, v in raw.items():
+                mapping[int(k)] = str(v)
+        except (ValueError, TypeError) as _exc:
+            logger.warning("라벨 매핑(id2label)이 정수 키로 해석되지 않음 - 매핑 미사용 (%s: %s)", type(_exc).__name__, _exc)
+            return None
+
+        n = len(mapping)
+        if n == 0 or sorted(mapping.keys()) != list(range(n)):
+            return None  # 인덱스가 0..N-1 연속이 아님 → 신뢰 불가
+
+        # 코드집합 일치 검증: 학습 체크포인트 등급집합 == 현재 활성 등급집합
+        active_codes = set(GradeRegistry.get_codes())
+        if active_codes and set(mapping.values()) != active_codes:
+            return None
+
+        out: dict[int, object] = {}
+        for idx in range(n):
+            code = mapping[idx]
+            try:
+                out[idx] = Grade(code)
+            except ValueError:
+                out[idx] = code  # 커스텀 등급(다른 프로젝트) 호환 — 문자열 보존
+        return out
+
+    # FNR-safe override: rule engine이 이 점수 이상으로 TS를 잡으면 모델 결과 무시.
+    # 모델이 TS 미학습 도메인(M&A·암호·국방 등)을 S1/S2/S3로 내릴 때 방어.
+    # settings.fnr_rule_ts_threshold로 외부 조정 가능. 기본값 3.0.
+    @property
+    def _FNR_RULE_TS_THRESHOLD(self) -> float:  # type: ignore[override]
+        try:
+            from koipa.config import settings  # noqa: PLC0415
+            return float(settings.fnr_rule_ts_threshold)
+        except Exception as exc:  # noqa: BLE001 — 폴백 유지, 사실만 남긴다
+            _warn_setting_fallback("fnr_rule_ts_threshold", 3.0, exc)
+            return 3.0
+
+    @property
+    def _FNR_RULE_S1_THRESHOLD(self) -> float:
+        try:
+            from koipa.config import settings  # noqa: PLC0415
+            return float(settings.fnr_rule_s1_threshold)
+        except Exception as exc:  # noqa: BLE001 — 폴백 유지, 사실만 남긴다
+            _warn_setting_fallback("fnr_rule_s1_threshold", 2.2, exc)
+            return 2.2
+
+    @property
+    def _FNR_RULE_S2_THRESHOLD(self) -> float:
+        try:
+            from koipa.config import settings  # noqa: PLC0415
+            return float(settings.fnr_rule_s2_threshold)
+        except Exception as exc:  # noqa: BLE001 — 폴백 유지, 사실만 남긴다
+            _warn_setting_fallback("fnr_rule_s2_threshold", 1.6, exc)
+            return 1.6
+
+    @property
+    def _escalation_tau(self) -> float | None:
+        """서빙 escalation τ (C-esc). None=순수 argmax(동작 보존). 0<τ<1만 유효."""
+        # Finalized proxy model은 T와 τ가 동일 calibration trace에 묶여 있다.
+        # 명시적인 null도 '검증된 argmax'이므로 프로파일 기본 tau로 덮지 않는다.
+        if self._locked_operating_point:
+            return self._model_escalation_tau
+        try:
+            from koipa.config import settings  # noqa: PLC0415
+            t = settings.classifier_escalation_tau
+            if t is None:
+                return None
+            t = float(t)
+            if 0.0 < t < 1.0:
+                return t
+        except Exception as exc:  # noqa: BLE001 — 폴백 유지(τ 없음 = 순수 argmax)
+            _warn_setting_fallback("classifier_escalation_tau", None, exc)
+        return None
+
+    def _code_at(self, idx: int) -> str:
+        g = self._id2label[idx]
+        return g.value if hasattr(g, "value") else str(g)
+
+    def _select_pred_idx(self, probs) -> int:
+        """[C-esc] 예측 인덱스 선택 — escalation τ 또는 argmax.
+
+        τ=None: 순수 argmax(기존 동작). τ 설정 시: 가장 심각한 등급(GRADE_ORDER 작은 값)부터
+        검사해 prob ≥ τ 인 첫 등급 채택, 없으면 argmax 폴백. eval_fnr_threshold_sweep와 동일 규칙.
+        probs는 list/torch.Tensor 모두 허용(float 인덱싱). most-severe-wins 집계가 반영된 벡터.
+        """
+        n = len(self._id2label)
+
+        def _argmax() -> int:
+            return max(range(n), key=lambda i: float(probs[i]))
+
+        tau = self._escalation_tau
+        if tau is None:
+            return _argmax()
+        from koipa.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: PLC0415
+        for i in sorted(range(n), key=lambda j: GRADE_ORDER.get(self._code_at(j), 999)):
+            if float(probs[i]) >= tau:
+                return i
+        return _argmax()
+
+    @property
+    def _temperature(self) -> float:
+        """서빙 softmax temperature scaling 계수.
+
+        분류기 softmax는 학습에 없던 새 문체(OOD)에서 과신(overconfident)하는 경향이
+        있어, confidence 게이트(0.7)가 보정 안 된 값 위에 설 수 있다. T>1이면 logit을
+        나눠 분포를 부드럽게 해 과신을 완화(calibration)한다. 기본 1.0 = 무보정(기존
+        동작 보존). 평가에서 측정한 temperature를 settings.classifier_temperature로 주입.
+        """
+        # Finalized proxy model은 operating_point.json이 temperature.json과 같은
+        # calibration trace를 증명한 경우에만 모델별 T를 잠근다. 레거시 모델은
+        # 아래의 기존 env/profile 우선순위를 그대로 유지한다.
+        if self._locked_operating_point and self._model_temperature is not None:
+            return self._model_temperature
+        try:
+            from koipa.config import settings  # noqa: PLC0415
+            t = float(settings.classifier_temperature)
+            if t > 0 and abs(t - 1.0) > 1e-9:
+                return t  # .env로 명시 주입된 값이 최우선
+        except Exception as exc:  # noqa: BLE001 — 폴백 유지(모델 동봉값으로 진행)
+            # 여기가 무음이면 온도 보정이 조용히 달라진다. 2026-08-22 에 프로파일 값이
+            # 모델 동봉 temperature.json(2.03)을 3.0 으로 덮던 드리프트를 고쳤는데,
+            # 그때도 신호가 없어 지표를 뜯어보고서야 알았다.
+            _warn_setting_fallback("classifier_temperature", "모델 동봉값", exc)
+        # [A1] settings 미지정(=1.0)이면 모델 동봉 temperature.json 사용(보정 자동연결).
+        if self._model_temperature and self._model_temperature > 0:
+            return self._model_temperature
+        return 1.0
+
+    def run(
+        self,
+        text: str,
+        metadata: Optional[dict] = None,
+        return_evidence: bool = True,
+    ) -> InferenceResult:
+        _model_raw_grade: Optional[str] = None
+        if self._model is not None:
+            result = self._run_model(text, return_evidence)
+            _model_raw_grade = result.label.value if hasattr(result.label, "value") else str(result.label)
+            # FNR-safe: rule engine이 TS를 강하게 잡는데 모델이 낮은 등급을 줬으면 TS로 올림.
+            if result.label != Grade.TS:
+                try:
+                    rule_res = self.labeling.engine.label(text)
+                    ts_score = rule_res.grade_scores.get("TS", 0.0)
+                    s1_score = rule_res.grade_scores.get("S1", 0.0)
+                    s2_score = rule_res.grade_scores.get("S2", 0.0)
+                    from koipa.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: PLC0415
+
+                    # [2026-08-24] 발동시킨 **임계값**도 함께 들고 나간다.
+                    # 왜: 이 상향은 룰의 최종 등급이 아니라 **등급별 점수**로 결정된다.
+                    # 룰 최종등급이 S2 인 문서에서도 S1 점수가 임계를 넘으면 S1 로 올라간다
+                    # (실측 2026-08-24: grade_scores={TS 0.00, S1 2.35, S2 8.65} · 룰 최종 S2 ·
+                    #  모델 S2 → 최종 S1). 화면이 이유를 설명하려면 어느 등급의 점수가 어느
+                    # 임계를 넘었는지를 알아야 한다 — 종전 경고에는 임계가 없었다.
+                    override_grade = None
+                    override_score = 0.0
+                    override_threshold = 0.0
+                    if ts_score >= self._FNR_RULE_TS_THRESHOLD:
+                        override_grade, override_score = Grade.TS, ts_score
+                        override_threshold = self._FNR_RULE_TS_THRESHOLD
+                    elif s1_score >= self._FNR_RULE_S1_THRESHOLD:
+                        override_grade, override_score = Grade.S1, s1_score
+                        override_threshold = self._FNR_RULE_S1_THRESHOLD
+                    elif s2_score >= self._FNR_RULE_S2_THRESHOLD:
+                        override_grade, override_score = Grade.S2, s2_score
+                        override_threshold = self._FNR_RULE_S2_THRESHOLD
+
+                    if override_grade is not None:
+                        if GRADE_ORDER.get(override_grade.value, 99) < GRADE_ORDER.get(result.label.value, 99):
+                            # [M-renorm] override 등급을 strict argmax로 만들고 재정규화 +
+                            # confidence=scores[label] 재계산 (label/scores/confidence 정합).
+                            new_scores, new_conf = self._enforce_label_consistency(
+                                result.scores, override_grade.value, floor=0.7
+                            )
+                            result = InferenceResult(
+                                label=override_grade,
+                                confidence=new_conf,
+                                scores=new_scores,
+                                factors=result.factors,
+                                evidence=result.evidence,
+                                model_version=result.model_version,
+                                warnings=result.warnings + [
+                                    # 소수 2자리 — 임계와의 차가 0.05 단위로 갈리는데
+                                    # 1자리로 자르면 화면에서 "2.2 >= 2.2" 처럼 보인다.
+                                    f"fnr-safe override: rule {override_grade.value} "
+                                    f"score={override_score:.2f} >= threshold {override_threshold:.2f} "
+                                    f"(model {_model_raw_grade} -> {override_grade.value})"
+                                ],
+                                rule_grade=result.rule_grade,
+                                rule_has_evidence=result.rule_has_evidence,
+            rule_factors=result.rule_factors,
+                            )
+                except Exception:  # noqa: BLE001
+                    # FNR-safe 상향이 예외로 미적용 → 모델의 낮은 등급 유지(무음 미탐 위험). 가시화.
+                    _record_gate_fail_open("fnr_safe_override", result)
+        else:
+            result = self._run_rule_fallback(text, return_evidence)
+
+        # Source-type prior: 판례/공개 문서는 비공지성 실패로 정의상 하향 등급 —
+        # 모델의 상위등급 과분류를 방어. metadata.source_type/source가 공개 소스일 때만 적용.
+        # settings.source_prior_enabled (config 기본 True=운영 활성) 시 발동.
+        # 아래 getattr 2번째 인자(False/"S2")는 속성 자체가 없을 때만 쓰는 방어용
+        # 폴백이지 운영 기본값이 아니다 — 운영 기본은 config.py 기준 활성·S3.
+        #
+        # cap 레벨은 settings.source_prior_cap_grade로 선택 (config 기본 "S3"):
+        #   "S2": TS/S1 예측을 S2로 cap (부분 완화 — S3 과분류는 안 건드림, FNR 위험 작음).
+        #   "S3": TS/S1/S2 예측을 S3로 cap (S3 과분류 완전 완화 — FNR 위험 큼,
+        #         판례 기반 S1/S2 시나리오(koipa_case_based)나 국가핵심기술 고시는 손상).
+        # 주의: 단순 source 매칭이라 '공개 판례지만 정답이 S1/S2'인 케이스를 망칠 수 있음.
+        # 운영 활성화 전 reports/p1_*_source_prior_* 측정으로 F1/FNR trade-off 확인 필수.
+        try:
+            from koipa.config import settings as _s  # noqa: PLC0415
+            if getattr(_s, "source_prior_enabled", False) and metadata:
+                src = metadata.get("source_type", "") or metadata.get("source", "")
+                # 공개 출처 = 비공지성 실패(이미 공개됨) → S3 cap. 공개특허/등록특허/공보는
+                # '공개를 택한' 문서라 doc/32 §3 설계대로 게이트가 S3로 cap해야 한다
+                # (콘텐츠 모델은 기술내용을 고등급으로 보지만 provenance가 공개라 영업비밀 불성립).
+                # 정밀 토큰만 등록 — bare "특허"는 내부 '특허전략' 문서를 오인 cap(FNR)할 수 있어 제외.
+                _PUBLIC_SOURCES = {  # noqa: F841 - legacy token list kept for local context
+                    "court_decision", "판례", "public_disclosure", "공시", "채용공고", "보도자료",
+                    "공개특허", "등록특허", "공개공보", "특허공보", "published_patent",
+                }
+                if _source_prior_is_public(src):
+                    from koipa.modules.m3_labeling.seeds import GRADE_ORDER as _GRADE_ORDER_LOCAL  # noqa: PLC0415
+                    cap_code = (getattr(_s, "source_prior_cap_grade", "S2") or "S2").upper()
+                    if cap_code not in _GRADE_ORDER_LOCAL:
+                        cap_code = "S2"
+                    cap_rank = _GRADE_ORDER_LOCAL[cap_code]
+                    cur_rank = _GRADE_ORDER_LOCAL.get(result.label.value, 99)
+                    if cur_rank < cap_rank:  # 예측이 cap보다 상위(숫자 작음)면 cap으로 하향
+                        pre_cap_code = result.label.value
+                        cap_warnings = [
+                            f"source-prior: {src!r} is public → grade capped at {cap_code}"
+                        ]
+                        # [②·③ 충돌] 출처 cap(하향)이 강한 상향 신호(TS/S1)를 덮으면 자동
+                        # 확정하지 않는다 — cap-conflict 경고를 남겨 classify_service가
+                        # needs_review로 라우팅(진짜 공개문서는 사람 확인, 내부 비밀의 '공개'
+                        # 오태깅은 silent miss로 새지 않게). 출처 cap은 상향 가드를 무인으로 안 덮음.
+                        if pre_cap_code in ("TS", "S1"):
+                            cap_warnings.append(
+                                f"cap-conflict: public-source cap overrode high content grade "
+                                f"{pre_cap_code} → routing to human review (verify provenance)"
+                            )
+                        result.warnings = list(result.warnings) + cap_warnings
+                        # [M-renorm] cap 등급을 strict argmax로 만들고 재정규화. cap은 하향이라
+                        # confidence는 그 의미(불확실성↑)를 보존해 0.7 상한을 추가로 적용.
+                        #
+                        # [2026-08-22 실측 후 되돌림] 이 상한이 자동확정률을 누르고 있는지
+                        # public-300(T0-1, reports/t0_1_public300_source_type_public_no_cap.json)
+                        # 으로 실측했다 — 상한을 빼도 auto_confirm_rate·review_reason_counts가
+                        # **전부 동일**했다(자연 confidence가 이미 전 건 ≤0.7). 즉 이 상한은 이
+                        # 코퍼스에서 한 번도 실제로 작동(binding)한 적이 없다 — 이득 없는 변경을
+                        # 남겨 둘 이유가 없어 원복한다.
+                        new_scores, new_conf = self._enforce_label_consistency(
+                            result.scores, cap_code, floor=0.6
+                        )
+                        # [2026-08-24] cap 뒤 표시 요소 재정합. A3(1326행대)와 같은 방식이다 —
+                        # 새로 만들지 않고 그 패턴을 재사용한다.
+                        #
+                        # 종전에는 factors 를 그대로 통과시켜, 등급은 S3 로 내려가는데 화면의
+                        # S·V·M 은 상위 등급 조합(예: S2·V2·M2)으로 남았다. 검수자가 보면
+                        # 판정식으로 설명이 안 되는 조합이다 — "S3 인데 요소는 S2 조합".
+                        # 관측치는 버리지 않고 rule_factors 로 보존한다(두 벌을 나란히 보여야
+                        # 왜 갈렸는지 읽힌다). 등급·게이트는 건드리지 않는다 — **표시만**이다.
+                        cap_factors = result.factors
+                        cap_rule_factors = result.rule_factors
+                        try:
+                            from koipa.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
+                                grade_from_svm,
+                                svm_levels_for_grade,
+                            )
+                            if cap_factors is not None:
+                                _fs = int(float(getattr(cap_factors, "secrecy", 0)))
+                                _fv = int(float(getattr(cap_factors, "value", 0)))
+                                _fm = int(float(getattr(cap_factors, "management", 0)))
+                                if grade_from_svm(_fs, _fv, _fm) != cap_code:
+                                    if cap_rule_factors is None:
+                                        cap_rule_factors = cap_factors
+                                    _s2, _v2, _m2 = svm_levels_for_grade(cap_code)
+                                    cap_factors = EvaluationFactors.from_factor_scores(
+                                        {"SECRECY": float(_s2), "VALUE": float(_v2),
+                                         "MANAGEMENT": float(_m2)}
+                                    )
+                                    result.warnings = list(result.warnings) + [
+                                        f"factors aligned to capped grade {cap_code} "
+                                        f"(source-prior; observed kept as rule_factors)"
+                                    ]
+                        except Exception as exc:  # noqa: BLE001 — 표시 정합 실패가 판정을 막지 않는다
+                            # 등급은 그대로 두고 **표시할 근거만** 원래 값으로 되돌린다.
+                            # 검수자가 보는 근거가 등급과 어긋난 상태가 되므로, 그 사실은 남긴다.
+                            logger.warning(
+                                "요소 표시 정합 실패 — 원래 요소값으로 되돌린다(등급은 그대로): %s: %s",
+                                type(exc).__name__, exc,
+                            )
+                            cap_factors = result.factors
+                            cap_rule_factors = result.rule_factors
+                        result = InferenceResult(
+                            label=Grade[cap_code],
+                            confidence=min(new_conf, 0.7),
+                            scores=new_scores,
+                            factors=cap_factors,
+                            evidence=result.evidence,
+                            model_version=result.model_version,
+                            warnings=result.warnings,
+                            rule_grade=result.rule_grade,
+                            rule_has_evidence=result.rule_has_evidence,
+                            rule_factors=cap_rule_factors,
+                        )
+        except Exception:  # noqa: BLE001
+            # source-prior cap(하향)이 예외로 미적용 → 공개출처 문서가 상위등급 유지. 가시화.
+            _record_gate_fail_open("source_prior_cap")
+
+        try:
+            result = self._apply_ts_tie_break(result)
+        except Exception:  # noqa: BLE001
+            # 동점 브레이크(상향)가 예외로 미적용 → TS 가 S1 로 남는다. 미탐 방향이라 가시화.
+            _record_gate_fail_open("ts_tie_break", result)
+
+        # [metadata-floor] ICD R6 S/V/M 메타데이터 상향 게이트 (opt-in, 기본 OFF).
+        # 내용 분류기는 비밀관리성(M)·출처(S)를 못 본다 — 인사·재무 비밀이 일상 내부문서(S2)로
+        # 보이는 사각지대(golden500 S1→S2 미탐 7건, 룰·모델 공유)가 그 결과. KL ICD가 주는
+        # 보안표시·접근범위로 그 축을 보완한다(ICD §3·§4):
+        #  (1) security_marking 명시표기 우선(§4.2): 표기 등급이 예측보다 *높으면* 그 등급으로 상향
+        #      floor(안전하게 높은 쪽 — 하향은 안 함, 출처 cap은 위 source_prior가 담당).
+        #  (2) 표기 없고 access_scope가 제한적인데 예측이 낮으면 'metadata-access-conflict' →
+        #      needs_review(§4.4 — 관리수준 높은 문서를 낮게 자동확정하지 않음).
+        # 메타데이터 오류/부재는 silent 폴백(기존 동작 보존). source_prior(하향) 다음에 적용.
+        try:
+            from koipa.config import settings as _ms  # noqa: PLC0415
+            # [2026-09-10] `and metadata` 를 뺐다. 종전에는 메타데이터가 아예 없으면 이
+            # 블록이 통째로 안 돌았는데, 아래 **문서에 찍힌 보안표시** 경로는 메타데이터가
+            # 없을 때가 오히려 본무대다(실 공급이 0 건이라 그 경우가 전부다). 메타데이터
+            # 부재 시 mark·scope 는 빈 문자열이 되어 floor·conflict 는 종전처럼 무동작이다.
+            if getattr(_ms, "metadata_floor_enabled", False):
+                from koipa.modules.m3_labeling.seeds import GRADE_ORDER as _ORD  # noqa: PLC0415
+                md = metadata if isinstance(metadata, dict) else {}
+                cur = result.label.value if hasattr(result.label, "value") else str(result.label)
+                mark = str(md.get("security_marking", "") or "").strip().lower()
+                scope = str(md.get("access_scope", "") or "").strip().lower()
+                _MARK = {"top_secret": "TS", "secret": "S1", "confidential": "S2"}
+                if mark in _MARK and _ORD[_MARK[mark]] < _ORD.get(cur, 99):
+                    floor_code = _MARK[mark]
+                    new_scores, new_conf = self._enforce_label_consistency(
+                        result.scores, floor_code, floor=0.7
+                    )
+                    result = InferenceResult(
+                        label=Grade[floor_code], confidence=new_conf, scores=new_scores,
+                        factors=result.factors, evidence=result.evidence,
+                        model_version=result.model_version,
+                        warnings=result.warnings + [
+                            f"metadata-floor: security_marking={mark} → grade raised {cur}→{floor_code} (ICD §4.2 명시표기 우선)"
+                        ],
+                        rule_grade=result.rule_grade,
+                        rule_has_evidence=result.rule_has_evidence,
+            rule_factors=result.rule_factors,
+                    )
+                elif mark in ("", "none") and scope in ("approved_only", "designated", "department"):
+                    low_thr = "S1" if scope == "approved_only" else "S2"
+                    if _ORD.get(cur, 99) > _ORD[low_thr]:
+                        result.warnings = list(result.warnings) + [
+                            f"metadata-access-conflict: access_scope={scope}(제한 접근)인데 예측 {cur} → 검수 라우팅 (ICD §4.4)"
+                        ]
+
+                # [관리성 요소값] ICD §3.2·§3.3 은 M 매핑을 규정하는데 지금까지 배포본은
+                # 그것을 **등급 floor 로만** 썼고 M 값을 만들지 않았다. 그래서 표시되는
+                # 관리성은 등급에서 역산된 값(svm_levels_for_grade)이었다 — 근거가 아니라
+                # 결과의 재구성이다. 고객사 시스템이 접근권한을 주면 그것이 진짜 근거이므로
+                # 그 값으로 채운다.
+                #
+                # ⚠ 여기서 등급은 바꾸지 않는다. 배포본은 **등급 우선·요소 후행** 구조라
+                #   (모델이 등급을 내고 요소를 거기 맞춘다) M 을 등급에 바로 물리면 하향
+                #   경로가 열린다. 요소 우선 경로는 v8 서빙 게이트가 담당한다.
+                m_state, m_lv, m_reason = _management_from_metadata_dict(md)
+                if m_state == "unknown":
+                    # [문서에 찍힌 보안표시] 메타데이터가 M 을 안 주면 문서에서 읽는다.
+                    # ICD §3.2 가 규정한 값이고 매핑도 이미 있다 — 없던 것은 읽는 경로뿐이었다.
+                    # 머리말·꼬리말 구간만 본다(본문 언급은 표시가 아니다 · 2026-07-01 과분류).
+                    # 등급은 여기서도 바꾸지 않는다. 메타데이터로 온 표시만 floor 를 갖는다 —
+                    # KL 이 단언한 값과 우리가 읽어낸 값은 근거의 무게가 다르다.
+                    _code, _why = _marking_from_document(text)
+                    if _code:
+                        m_state, m_lv, m_reason = "present", _ICD_MARKING_TO_M[_code], _why
+                if m_state == "unknown" and result.factors is not None:
+                    # [후보집합] M 을 끝내 못 받았다. 그러면 이 문서의 등급은 **아직 하나로
+                    # 정해지지 않은 것**이다 — 찍은 값을 유일한 답처럼 내보내지 않는다.
+                    # label 은 그대로 둔다(계약 보존). 무엇이 갈림길인지만 함께 낸다.
+                    try:
+                        _s = int(float(getattr(result.factors, "secrecy", 0) or 0))
+                        _v = int(float(getattr(result.factors, "value", 0) or 0))
+                        _cands = sorted(
+                            {_grade_from_svm(_s, _v, _m) for _m in (0, 1, 2)},
+                            key=lambda g: _ORD.get(g, 99),
+                        )
+                    except (TypeError, ValueError):
+                        _cands = []
+                    if len(_cands) > 1:
+                        result.grade_candidates = _cands
+                        result.grade_candidates_reason = (
+                            "비밀관리성(M) 미확인 — 접근범위·보안표시가 없어 "
+                            f"{' 또는 '.join(_cands)} 중 하나로 확정할 수 없습니다. "
+                            "M 이 정해지면 등급이 하나로 정해집니다."
+                        )
+                if m_state != "unknown" and result.factors is not None:
+                    try:
+                        cur_m = int(float(getattr(result.factors, "management", 0)))
+                    except (TypeError, ValueError) as exc:
+                        # -1 은 "읽지 못했다"는 뜻이고 아래 비교에서 항상 새 값과 다르므로
+                        # 메타데이터 값이 그대로 적용된다(안전한 방향). 다만 요소값이
+                        # 숫자가 아니었다는 사실 자체가 데이터 결함이라 흔적을 남긴다.
+                        logger.warning(
+                            "management 요소값을 숫자로 읽지 못했다(%r) — 메타데이터 값을 "
+                            "그대로 적용한다: %s",
+                            getattr(result.factors, "management", None), exc,
+                        )
+                        cur_m = -1
+                    new_m = 0 if m_state == "proven_absent" else int(m_lv or 0)
+                    if new_m != cur_m:
+                        result.factors = EvaluationFactors.from_factor_scores({
+                            "SECRECY": float(getattr(result.factors, "secrecy", 0) or 0),
+                            "VALUE": float(getattr(result.factors, "value", 0) or 0),
+                            "MANAGEMENT": float(new_m),
+                        })
+                        result.warnings = list(result.warnings) + [
+                            f"metadata-management: {m_reason} → M={new_m} (시스템 확인 · 등급 미변경)"
+                        ]
+                    # 전 임직원 열람이면 비밀관리성 요건 미충족이다. 등급을 무음으로
+                    # 내리지 않고 **검수 신호**로만 낸다 - 하향은 미탐 방향이라 사람이 본다.
+                    if m_state == "proven_absent" and _ORD.get(cur, 99) < _ORD["S2"]:
+                        result.warnings = list(result.warnings) + [
+                            f"metadata-management-conflict: access_scope=all_employees(M=0)인데 예측 {cur} → 검수 라우팅 (ICD §3.3)"
+                        ]
+
+                    # [요소↔등급 대조] 위에서 채운 M 은 **실측**인데 같은 벡터의 S·V 는 등급에서
+                    # 역산한 값이다(svm_levels_for_grade). 둘을 한 벡터로 내보내면 정본 공식과
+                    # 어긋난 조합이 그대로 화면에 뜬다.
+                    #
+                    # 실측 2026-09-09(v-fe4b386b · METADATA_FLOOR_ENABLED=true, 같은 본문에
+                    # 메타데이터만 교체):
+                    #     access_scope=designated    → 요소 (2,2,1) · 등급 S1   공식은 TS
+                    #     access_scope=approved_only → 요소 (2,2,2) · 등급 S1   공식은 TS
+                    # 즉 **관리성이 확인된 문서가 S1 로 자동확정**되고 있었다. 정본 공식에서
+                    # S1 은 (2,2,0) 하나뿐이라 M 이 확인된 순간 그 문서는 S1 일 수 없다.
+                    # 아무 신호도 없었으므로 무음 미탐이다(계약 핵심목표 "미탐 최소화" 위반).
+                    #
+                    # 등급은 여전히 바꾸지 않는다(위 ⚠ 참조 — 등급 우선·요소 후행 구조라 M 을
+                    # 등급에 바로 물리면 하향 경로가 열린다). 대신 **방향을 갈라 신호를 낸다**:
+                    #     공식 > 서빙  미탐 방향 → 검수 라우팅(자동확정만 차단, 등급 무변경)
+                    #     공식 < 서빙  과대 방향 → 표시만(무음 하향은 하지 않는다)
+                    try:
+                        svm_grade = _grade_from_svm(
+                            int(float(getattr(result.factors, "secrecy", 0) or 0)),
+                            int(float(getattr(result.factors, "value", 0) or 0)),
+                            new_m,
+                        )
+                    except (TypeError, ValueError) as exc:
+                        # 요소값을 못 읽으면 대조 자체를 건너뛴다 — 없는 근거로 검수를
+                        # 만들지 않는다(위 cur_m 폴백과 같은 규율).
+                        logger.warning("요소↔등급 대조를 건너뛴다(요소값 판독 실패): %s", exc)
+                        svm_grade = cur
+                    if _ORD.get(svm_grade, 99) < _ORD.get(cur, 99):
+                        result.warnings = list(result.warnings) + [
+                            f"metadata-management-underclass: 요소 (S,V,M={new_m}) 의 정본 공식은"
+                            f" {svm_grade} 인데 예측 {cur} → 검수 라우팅 (미탐 방향 · 등급 미변경)"
+                        ]
+                    elif _ORD.get(svm_grade, 99) > _ORD.get(cur, 99):
+                        result.warnings = list(result.warnings) + [
+                            f"metadata-management-overclass: 요소 (S,V,M={new_m}) 의 정본 공식은"
+                            f" {svm_grade} 인데 예측 {cur} (과대 방향 · 하향하지 않음)"
+                        ]
+        except Exception:  # noqa: BLE001 — 메타데이터 처리 오류는 분류를 막지 않음(fail-safe)
+            # metadata-floor 상향/access-conflict 라우팅이 예외로 미적용 → 비밀이 낮은 등급을
+            # 무음 유지할 수 있다(shipping-ON 게이트). 분류는 계속하되 가시화(운영자 신호).
+            _record_gate_fail_open("metadata_floor", result)
+
+        try:
+            cur = result.label.value if hasattr(result.label, "value") else str(result.label)
+            if cur == "S3" and self._has_s2_underclass_risk(text, metadata):
+                result.warnings = list(result.warnings) + [
+                    "s2-underclass-risk: S3 prediction contains internal/non-public access-control signals"
+                ]
+        except Exception:  # noqa: BLE001
+            _record_gate_fail_open("s2_underclass_risk", result)
+
+        # [transparency] 원시 모델 판정(override/cap/floor 이전)을 최종 결과에 부착 — 룰·모델·최종 대조용.
+        result.model_grade = _model_raw_grade
+        return result
+
+    def _apply_ts_tie_break(self, result: InferenceResult) -> InferenceResult:
+        """TS/S1 동점 브레이크 — 사실상 동점이면 상위 등급(TS)을 택한다.
+
+        **모델 성능이 아니라 post-model 서빙 운영점이다.** source_prior cap ·
+        metadata_floor 와 같은 계층이며, proxy_model_comparison 의
+        ``excluded_post_model_serving_rules`` 에 선언돼 모델 비교 지표에서 제외된다.
+        이 규칙을 켠 상태로 잰 F1 을 "재학습 모델 자체 성능"으로 보고하면 안 된다.
+
+        상향 전용이다 — TS 는 최고 등급이므로 미탐(FNR)을 줄이는 방향이고, 계약
+        핵심목표("미탐 최소화")·veto 설계와 같은 방향이다. 하향(예: S1→S3 클램프)은
+        여기서 하지 않는다: 미탐을 늘리는 방향이라 과분류 지표만 좋아 보이게 만든다.
+
+        기본 OFF(settings.ts_tie_break_enabled). 켜면 배포본 판정이 바뀌는데 그 변화를
+        발주처 평가셋에서 아직 재지 않았다 — 과분류 축과 함께 측정한 뒤 켤 것.
+        """
+        from koipa.config import settings as _s  # noqa: PLC0415
+
+        if not getattr(_s, "ts_tie_break_enabled", False):
+            return result
+
+        label = result.label.value if hasattr(result.label, "value") else str(result.label)
+        if label != "S1":
+            return result
+
+        scores = result.scores or {}
+        ts = float(scores.get("TS", 0.0))
+        s1 = float(scores.get("S1", 0.0))
+
+        min_ts = float(getattr(_s, "ts_tie_break_min_ts_score", 0.05))
+        margin = float(getattr(_s, "ts_tie_break_margin", 0.005))
+        if not (ts > min_ts and ts + margin >= s1):
+            return result
+
+        new_scores, new_conf = self._enforce_label_consistency(
+            scores, "TS", floor=max(ts, s1)
+        )
+        return InferenceResult(
+            label=Grade.TS,
+            confidence=new_conf,
+            scores=new_scores,
+            factors=result.factors,
+            evidence=result.evidence,
+            model_version=result.model_version,
+            warnings=list(result.warnings)
+            + [
+                "ts-tie-break: TS/S1 near-tie resolved to TS "
+                f"(TS={ts:.4f}, S1={s1:.4f}, margin={margin})"
+            ],
+            rule_grade=result.rule_grade,
+            rule_has_evidence=result.rule_has_evidence,
+            rule_factors=result.rule_factors,
+            model_grade=result.model_grade,
+        )
+
+    @staticmethod
+    def _has_s2_underclass_risk(text: str, metadata: Optional[dict]) -> bool:
+        if metadata:
+            src = metadata.get("source_type", "") or metadata.get("source", "")
+            if _source_prior_is_public(src):
+                return False
+            scope = str(metadata.get("access_scope", "") or "").strip().lower()
+            if scope in {"approved_only", "designated", "department"}:
+                return True
+            mark = str(metadata.get("security_marking", "") or "").strip().lower()
+            if mark == "confidential":
+                return True
+        body = text or ""
+        if _S2_PUBLIC_NEGATING_RE.search(body):
+            return False
+        return bool(_S2_STRONG_RISK_RE.search(body))
+
+    @staticmethod
+    def _enforce_label_consistency(
+        scores: dict[str, float], label: str, floor: float
+    ) -> tuple[dict[str, float], float]:
+        """[M-renorm] override/cap 후 scores·argmax·confidence 정합 강제 (fail-SECURE).
+
+        FNR-safe override(고등급 0.7)·source-prior cap(0.6)은 한 등급 score만 max()로
+        바꾸고 재정규화/argmax 재확정을 하지 않아, label은 TS인데 scores argmax는 S3가
+        되는 등 불일치(미탐 은폐)가 가능했다. 여기서:
+
+          1. label의 score를 floor 이상으로 올리되, **반드시 strict argmax**가 되도록
+             다른 모든 등급보다 epsilon만큼 크게 만든다(동률도 label 우선 → 미탐 방지).
+          2. scores 합=1로 재정규화.
+          3. confidence = 재정규화된 scores[label] 반환.
+
+        반환: (정규화된 scores, confidence). scores는 항상 합≈1, argmax==label.
+        """
+        s = {k: max(float(v), 0.0) for k, v in scores.items()}
+        s.setdefault(label, 0.0)
+        # label을 다른 모든 등급보다 엄격히 크게 (strict argmax 보장).
+        others_max = max((v for k, v in s.items() if k != label), default=0.0)
+        eps = 1e-6
+        s[label] = max(s[label], floor, others_max + eps)
+        total = sum(s.values())
+        if total > 0:
+            s = {k: v / total for k, v in s.items()}
+        else:  # 모든 score 0 — label에 전량 부여 (fail-SECURE)
+            s = {k: (1.0 if k == label else 0.0) for k in s}
+        return s, float(s[label])
+
+    def _rule_grade_scores_to_prob(self, grade_scores: dict) -> list[float] | None:
+        """[#23] 룰 등급점수(grade_scores) → self._id2label 인덱스 정렬 확률벡터.
+
+        모델 경로의 청크 집계 헬퍼(_aggregate_chunk_probs/_select_pred_idx)는
+        '인덱스가 등급에 정렬된 prob 벡터'를 입력으로 받는다. 룰 엔진은 등급별
+        원시 점수(grade_scores)를 주므로, 합으로 나눠 [0,1] 확률분포로 변환하고
+        _id2label 인덱스 순서에 맞춰 벡터화한다(softmax 출력과 동일한 형태).
+        모든 점수 0이면 None(해당 청크는 신호 없음 → 집계에서 0벡터로 처리).
+        """
+        total = float(sum(v for v in grade_scores.values() if v and v > 0))
+        if total <= 0:
+            return None
+        vec: list[float] = []
+        for i in range(len(self._id2label)):
+            code = self._code_at(i)
+            vec.append(max(float(grade_scores.get(code, 0.0)), 0.0) / total)
+        return vec
+
+    def _run_rule_fallback(self, text: str, return_evidence: bool) -> InferenceResult:
+        try:
+            from koipa.api.prom_metrics import RULE_FALLBACK_TOTAL  # noqa: PLC0415
+            RULE_FALLBACK_TOTAL.inc()
+        except Exception:  # noqa: BLE001
+            pass
+        # evidence/factors는 전체 문서 기준 룰 라벨링에서 가져온다(표시 정합 보존).
+        lab = self.labeling.label(text)
+        warnings = ["model weights not loaded — using rule-based fallback"]
+        from koipa.modules.m3_labeling.rule_engine import has_real_evidence  # noqa: PLC0415
+        rule_has_evidence = (
+            has_real_evidence(lab.rule_result) if lab.rule_result is not None else None
+        )
+
+        # [sparse-evidence gate] rule confidence(top/total)는 단일·저가중 키워드 1개만 매칭돼도
+        # 한 등급에 전 질량이 몰리면 1.0이 된다. 즉 '단 하나의 약한 매치'가 conf=1.0으로 자동확정돼
+        # 저신뢰 게이트(conf<0.7)를 통과하는 silent FNR이 생긴다(골든셋 TS 5건: TS신호 0인데
+        # S1/S2로 conf=1.0 확정). 절대 룰 점수(ev)가 settings.rule_fallback_min_evidence 미만이면
+        # 경고를 남겨 classify_service가 confidence와 무관하게 needs_review로 라우팅한다.
+        # ev==0(무신호)은 conf=0으로 이미 저신뢰 게이트가 잡으므로 0<ev<floor 구간만 표기한다.
+        try:
+            _min_ev = float(settings.rule_fallback_min_evidence)
+        except Exception as exc:  # noqa: BLE001
+            # [2026-09-06] 종전 폴백은 0.0 이었다. 아래가 `if _min_ev > 0:` 이므로 그 값은
+            # **게이트를 끄는 값**이지 기본값이 아니다(선언된 기본값은 config.py 의 0.9).
+            # 설정 읽기 실패 한 번에 위 주석이 설명하는 미탐 방지 장치가 조용히 사라졌다.
+            # 선언된 기본값으로 떨어지고, 흔적을 남긴다(다른 설정 여섯 곳과 같은 방식).
+            _min_ev = 0.9
+            _warn_setting_fallback("rule_fallback_min_evidence", _min_ev, exc)
+        if _min_ev > 0:
+            _ev_total = sum((lab.rule_result.grade_scores if lab.rule_result else {}).values())
+            if 0.0 < _ev_total < _min_ev:
+                warnings.append(
+                    f"sparse-evidence: rule total score {_ev_total:.2f} < {_min_ev:.2f} "
+                    "— thin single-match basis, routed to human review (FNR-safe)"
+                )
+
+        # [#23] rule-fallback도 모델 경로와 동일하게 청크 most-severe-wins + escalation τ 적용.
+        # 기존엔 전체 문서를 1회 라벨링해 grade_scores를 단순 합 정규화 → lab.grade를 그대로
+        # 라벨로 써서 청크 most-severe(_aggregate_chunk_probs)·τ(_select_pred_idx)를 우회했다.
+        # 모델 미로드 환경(다수 PoC)에서 한 청크에 든 핵심 비밀이 다수의 평범한 청크에 희석돼
+        # 미탐(FNR) 위험이 모델 경로보다 컸다. → 문서를 청크 분할, 청크별 룰 점수를 등급
+        # 확률분포로 변환해 모델 경로의 동일 헬퍼에 태운다(FNR-safe: 미탐↓, 단조 비후퇴).
+        # 실패(예: torch 부재)는 silent 폴백 — 기존 단일패스 동작을 그대로 보존한다.
+        pred = None
+        scores: dict[str, float] | None = None
+        conf: float | None = None
+        try:
+            import torch  # noqa: PLC0415
+
+            chunks = chunk_text(text, settings.max_seq_len * 3, settings.chunk_overlap)
+            chunk_texts = [c.text for c in chunks] or [text]
+            chunk_weights = [max(len(t.strip()), 1) for t in chunk_texts]
+
+            n_labels = len(self._id2label)
+            chunk_vecs: list[list[float]] = []
+            for ct in chunk_texts:
+                gs = self.labeling.engine.label(ct).grade_scores
+                vec = self._rule_grade_scores_to_prob(gs)
+                chunk_vecs.append(vec if vec is not None else [0.0] * n_labels)
+
+            chunk_probs = torch.tensor(chunk_vecs, dtype=torch.float32)
+            # 모델 경로와 동일 집계: 고등급(severe_agg_codes 기본 TS·S1) max-pooling.
+            doc_prob = self._aggregate_chunk_probs(chunk_probs, chunk_weights)
+            total = float(doc_prob.sum())
+            norm = (doc_prob / total) if total > 0 else doc_prob
+            # 모든 청크가 무신호(합=0)면 룰 신호가 없는 것 → 단일패스 폴백으로.
+            if float(norm.sum()) > 0:
+                # [C-esc] τ 설정 시 동일 severity-ordered 규칙으로 라벨 선택, τ=None이면 argmax.
+                pred_idx = self._select_pred_idx(norm)
+                pred = self._id2label[pred_idx]
+                scores = {self._code_at(i): round(float(norm[i]), 4) for i in range(n_labels)}
+                conf = min(max(float(norm[pred_idx]), 0.0), 1.0)
+        except Exception as exc:  # noqa: BLE001 — 청크 집계 실패는 단일패스 폴백으로(동작 보존)
+            # 긴 문서를 청크로 나눠 집계하는 경로가 죽으면 단일패스로 내려간다. 등급은
+            # 나오지만 **다른 방법으로 나온 등급**이다 — 핵심 비밀이 한 문단에 있는 긴
+            # 문서에서 집계 경로가 미탐을 막는 장치라, 얼마나 자주 내려가는지 안 보이면
+            # 미탐 원인을 그 자리로 좁힐 수 없다.
+            logger.warning(
+                "청크 집계 실패 — 단일패스 폴백으로 내려간다: %s: %s",
+                type(exc).__name__, exc,
+            )
+            pred = None
+            scores = None
+            conf = None
+
+        if pred is None or scores is None or conf is None:
+            # 단일패스 폴백 — grade_scores를 합계로 나눠 [0,1] 확률로 변환 (기존 동작 보존).
+            raw = (lab.rule_result.grade_scores if lab.rule_result else {}) or {}
+            total_raw = sum(raw.values())
+            if total_raw > 0:
+                scores = {g.value: round(raw.get(g.value, 0.0) / total_raw, 4) for g in _LABELS}
+            else:
+                scores = {g.value: 0.0 for g in _LABELS}
+            return InferenceResult(
+                label=lab.grade,
+                confidence=lab.confidence,
+                scores=scores,
+                factors=lab.factors,
+                evidence=lab.evidence if return_evidence else [],
+                model_version="rule-fallback-v0",
+                warnings=warnings,
+                rule_grade=getattr(lab.rule_result, "grade", None),
+                rule_has_evidence=rule_has_evidence,
+            )
+
+        # [#23] 청크 집계로 선택한 등급이 단일패스(lab.grade)보다 높으면(승격) 경고를 남겨
+        # 청크 희석 미탐을 방어했음을 표기. 표시 S/V/M factors도 선택 등급에 정합화해
+        # 'S0·V0·M0인데 TS' 같은 모순 표기를 막는다(모델 경로 A3와 동일 의도).
+        lab_code = lab.grade.value if hasattr(lab.grade, "value") else str(lab.grade)
+        pred_code = pred.value if hasattr(pred, "value") else str(pred)
+        factors = lab.factors
+        if pred_code != lab_code:
+            warnings = warnings + [
+                f"chunk severe-agg/escalation: rule grade {lab_code} → {pred_code} "
+                "(most-severe-wins over chunks; FNR-safe)"
+            ]
+            # [FIX-E] 약어-only 승격 백스톱 — 청크 집계가 고등급으로 승격했는데 그 등급의
+            # 근거가 _HIGH_RISK_PATTERNS 영문 약어 부스트(CVD·N2O·EUV 등)뿐이고 한국어
+            # 시드 근거가 전무하면(예: 공개특허 본문의 범용 공정약어) 자동확정을 막고 검수
+            # 라우팅한다. 등급은 절대 내리지 않음(하향 없음·라벨 유지) → FNR-safe. 한국어
+            # 시드(관리표시/공정레시피 등)가 하나라도 있으면 태그를 붙이지 않아 진짜 기밀의
+            # 자동확정을 그대로 보존한다. 전용 태그라 cap-conflict 메트릭/의미와 분리된다.
+            if pred_code in self._SEVERE_AGG_CODES and self._promotion_is_abbrev_only(
+                lab, pred_code
+            ):
+                warnings = warnings + [
+                    f"abbrev-only-escalation: {pred_code} 승격이 영문 약어 부스트에만 근거"
+                    " (한국어 시드 근거 없음) — 자동확정 보류·검수 라우팅 (등급 무변경, FNR-safe)"
+                ]
+            if factors is not None and pred_code in ("TS", "S1", "S2", "S3"):
+                try:
+                    from koipa.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
+                        svm_levels_for_grade,
+                    )
+                    s2, v2, m2 = svm_levels_for_grade(pred_code)
+                    factors = EvaluationFactors.from_factor_scores(
+                        {"SECRECY": float(s2), "VALUE": float(v2), "MANAGEMENT": float(m2)}
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    # 등급은 그대로 두고 **표시할 근거만** 원래 값으로 되돌린다.
+                    # 검수자가 보는 근거가 등급과 어긋난 상태가 되므로, 그 사실은 남긴다.
+                    logger.warning(
+                        "요소 표시 정합 실패 — 원래 요소값으로 되돌린다(등급은 그대로): %s: %s",
+                        type(exc).__name__, exc,
+                    )
+                    factors = lab.factors
+
+        return InferenceResult(
+            label=pred,
+            confidence=conf,
+            scores=scores,
+            factors=factors,
+            evidence=lab.evidence if return_evidence else [],
+            model_version="rule-fallback-v0",
+            warnings=warnings,
+            rule_grade=getattr(lab.rule_result, "grade", None),
+            rule_has_evidence=rule_has_evidence,
+        )
+
+    @staticmethod
+    def _promotion_is_abbrev_only(lab, promoted_code: str) -> bool:
+        """[FIX-E] 승격 등급이 _HIGH_RISK_PATTERNS 약어 부스트에만 근거하는지(한국어 시드 無).
+
+        규약(rule_engine): 시드 매칭은 MatchedKeyword.start is None, 약어 부스트는
+        start=mo.start()가 채워진다(has_real_evidence와 동일 판별자). 승격 등급 코드의
+        매치 중 start is None(=시드)이 하나라도 있으면 '실 근거 있음' → False(자동확정 보존).
+        전부 start 있음(=약어 부스트)이면 True(검수 라우팅 대상). 매치가 없거나 rule_result
+        미가용이면 보수적으로 False(승격 자동확정 유지 — 백스톱이 오히려 FNR을 만들지 않게).
+        """
+        rr = getattr(lab, "rule_result", None)
+        matches = getattr(rr, "matched_keywords", None) if rr is not None else None
+        if not matches:
+            return False
+        promoted = [m for m in matches if getattr(m, "grade", None) == promoted_code]
+        if not promoted:
+            # 문서 전체엔 승격등급 시드가 없음(청크에서만 떴을 수 있음). 이 경우도 약어-only로
+            # 간주해 검수 라우팅(등급은 그대로) — 문서수준 시드 근거가 없으니 자동확정 보류가 안전.
+            return True
+        return all(getattr(m, "start", None) is not None for m in promoted)
+
+    # 청크 어그리게이션에서 most-severe-wins를 적용할 고등급 코드.
+    # 이 등급들의 문서확률은 청크 평균이 아니라 max(가장 강한 청크)로 잡아,
+    # 수식 한 문단 같은 핵심 비밀이 다수의 평범한 청크에 희석되어 미탐되는 것을 막는다.
+    # settings.severe_agg_codes로 조정 가능(기본 TS·S1 — S2·S3는 표준 집계).
+    @property
+    def _SEVERE_AGG_CODES(self) -> tuple:
+        try:
+            from koipa.config import settings  # noqa: PLC0415
+            codes = getattr(settings, "severe_agg_codes", None)
+            return tuple(codes) if codes else ("TS", "S1")
+        except Exception as exc:  # noqa: BLE001 — 설정을 못 읽어도 집계는 돌아야 한다
+            # 어느 등급을 '심각'으로 집계하느냐가 미탐 방지의 축이다. 설정을 못 읽어
+            # 기본값으로 돌아갔다는 사실이 안 보이면, 운영에서 축을 바꿔 두고도
+            # 바뀌지 않은 채 도는 것을 알 수 없다.
+            logger.warning(
+                "severe_agg_codes 설정을 읽지 못해 기본값(TS·S1)으로 집계한다: %s: %s",
+                type(exc).__name__, exc,
+            )
+            return ("TS", "S1")
+
+    def _aggregate_chunk_probs(self, chunk_probs, chunk_weights):
+        """청크별 softmax → 문서 확률 벡터 (most-severe-wins, fail-SECURE).
+
+        [M-agg] 단순 비가중 평균은 핵심 비밀이 담긴 한 청크(예: 수식 한 문단)를
+        다수의 평범한 청크에 희석시켜 미탐을 만든다. 그래서:
+
+          - 저등급(S2/S3 등): 길이 가중 평균 — 일반 동작 보존.
+          - 고등급(TS/S1): 가장 강한 청크의 확률을 반영(max) — 한 청크의 강한
+            비밀 신호가 평균에 묻히지 않게. argmax는 이 보강된 벡터에서 재확정.
+
+        반환 벡터는 비정규(고등급 max 보강으로 합>1 가능)일 수 있다 — 이건 의도적이다.
+        호출부는 이 벡터로 argmax/confidence를 잡으며, confidence는 [0,1]로 clamp한다.
+        """
+        import torch
+
+        if chunk_probs.ndim == 1:
+            chunk_probs = chunk_probs.unsqueeze(0)
+        n_chunks = chunk_probs.shape[0]
+
+        # 길이 가중 평균 (가중치 부재/0합이면 균등 평균으로 폴백).
+        w = None
+        if chunk_weights and len(chunk_weights) == n_chunks:
+            w = torch.tensor(chunk_weights, dtype=chunk_probs.dtype)
+            if float(w.sum()) <= 0:
+                w = None
+        if w is not None:
+            weighted = (chunk_probs * w.unsqueeze(1)).sum(dim=0) / w.sum()
+        else:
+            weighted = chunk_probs.mean(dim=0)
+
+        doc_prob = weighted.clone()
+        # 고등급: max 청크 확률로 보강 (most-severe-wins). 단조 비감소 — 평균보다
+        # 낮아지지 않으므로 미탐 방향으로 후퇴할 수 없다.
+        # [B3 검토 후 보류] 짧은 노이즈 청크 과분류를 막으려 최소길이 필터를 시도했으나,
+        # 짧은 *비밀* 청크(예: "마스터 키: …")도 함께 배제돼 미탐(FNR)을 유발 → 영업비밀
+        # 시스템은 과분류가 안전 방향이므로 필터 미적용. 전체 청크 severe-max 유지(FNR 우선).
+        chunk_max = chunk_probs.max(dim=0).values
+        severe_idx = {
+            i for i, g in self._id2label.items()
+            if (g.value if hasattr(g, "value") else str(g)) in self._SEVERE_AGG_CODES
+        }
+        for i in severe_idx:
+            doc_prob[i] = torch.maximum(doc_prob[i], chunk_max[i])
+        return doc_prob
+
+    def _encode_windows(self, batch: list[str]):
+        """배치를 토큰 윈도우로 인코딩 → (BatchEncoding, sample_mapping).
+
+        [#chunk-trunc] char-청크(≈max_seq_len*3 자)는 max_seq_len(512) 토큰을 넘길 수 있고,
+        truncation=True 만 쓰면 초과분이 '조용히' 잘려(char overlap 로도 못 메우는 gap 밴드 발생)
+        그 구간의 **모델-only 의미 비밀**이 미탐된다(FNR). fast 토크나이저의
+        return_overflowing_tokens 로 초과 청크를 여러 윈도우(각 ≤max_seq_len, stride=chunk_overlap
+        토큰 겹침)로 **무손실** 분할한다. sample_mapping[i]=i번째 윈도우의 원 배치-청크 인덱스
+        (길이 가중치 승계용). slow 토크나이저/미지원/실패 시 기존 truncation(청크당 1윈도우)으로
+        폴백해 동작을 보존한다(무손실은 아니나 회귀 없음 — best-effort 상향).
+        """
+        if getattr(self._tokenizer, "is_fast", False):
+            try:
+                stride = min(int(getattr(settings, "chunk_overlap", 64)), settings.max_seq_len // 4)
+                enc = self._tokenizer(
+                    batch, truncation=True, max_length=settings.max_seq_len,
+                    stride=max(0, stride), return_overflowing_tokens=True,
+                    padding=True, return_tensors="pt",
+                )
+                sample_map = enc.pop("overflow_to_sample_mapping").tolist()
+                return enc, sample_map
+            except Exception as exc:  # noqa: BLE001 — 오버플로 미지원/실패 → truncation 폴백(동작 보존)
+                # [무음 예외] 폴백하면 **초과분이 잘린다** — 위 #chunk-trunc 가 적은 그 미탐이
+                # 그대로 되돌아온다. 종전에는 흔적이 없어 "무손실 분할로 돌았다"와 "실패해서
+                # 잘라 먹고 돌았다"를 구분할 수 없었다. 배치마다 불리므로 한 번만 남긴다.
+                global _WARNED_OVERFLOW_FALLBACK
+                if not _WARNED_OVERFLOW_FALLBACK:
+                    _WARNED_OVERFLOW_FALLBACK = True
+                    logger.warning(
+                        "오버플로 윈도우 분할 실패 — truncation 으로 폴백한다. "
+                        "max_seq_len(%s) 초과분이 잘려 그 구간은 미탐될 수 있다 (%s: %s)",
+                        getattr(settings, "max_seq_len", "?"), type(exc).__name__, exc,
+                    )
+        enc = self._tokenizer(
+            batch, truncation=True, max_length=settings.max_seq_len,
+            padding=True, return_tensors="pt",
+        )
+        return enc, list(range(len(batch)))
+
+    def _run_model(self, text: str, return_evidence: bool) -> InferenceResult:
+        import torch
+        import torch.nn.functional as F
+
+        chunks = chunk_text(text, settings.max_seq_len * 3, settings.chunk_overlap)
+        chunk_texts = [c.text for c in chunks] or [text]
+        # 길이 가중치: 짧은 노이즈 청크가 평균을 흔들지 않도록 char 수로 가중.
+        # 0 길이/공백 청크는 1로 floor (가중치 0이 되어 사라지지 않게).
+        chunk_weights = [max(len(t.strip()), 1) for t in chunk_texts]
+
+        probs = []
+        # win_weights: 오버플로 윈도잉으로 한 청크가 N윈도우로 쪼개지면 각 윈도우가 원 청크의
+        # 길이 가중치를 승계 → chunk_probs 행수와 정합. (severe max-pool은 가중 무관 = FNR 핵심 보존)
+        win_weights: list[int] = []
+        # span은 torch.no_grad() **안쪽**에 둔다 — 전체 forward가 grad 비활성 유지(필수).
+        # 속성은 스칼라·비민감(model_version·청크수·device)만. OTel 미활성 시 no-op.
+        with torch.no_grad():
+            with span(
+                "ml.classifier.forward",
+                model_version=str(self.model_dir.name) if self.model_dir else "model",
+                n_chunks=len(chunk_texts),
+                device=str(self._device),
+            ):
+                for batch_start in range(0, len(chunk_texts), 8):
+                    batch = chunk_texts[batch_start:batch_start + 8]
+                    enc, sample_map = self._encode_windows(batch)
+                    enc = enc.to(self._device)
+                    logits = self._model(**enc).logits
+                    # 서빙 캘리브레이션: T>1이면 분포를 부드럽게 해 OOD 과신 완화. T=1.0=무보정.
+                    temp = self._temperature
+                    if temp != 1.0:
+                        logits = logits / temp
+                    probs.append(F.softmax(logits, dim=-1).cpu())
+                    win_weights.extend(chunk_weights[batch_start + i] for i in sample_map)
+        chunk_probs = torch.cat(probs)  # [n_windows, n_labels]
+        doc_prob = self._aggregate_chunk_probs(chunk_probs, win_weights)
+        # 표시용 scores는 합=1로 재정규화 (모든 인덱스를 같은 상수로 나눠 순서 보존).
+        total = float(doc_prob.sum())
+        norm = (doc_prob / total) if total > 0 else doc_prob
+        # [C-esc] 예측 인덱스: escalation τ(가장 심각한 등급 중 prob≥τ) 또는 argmax(τ=None=동작보존).
+        # most-severe-wins 집계가 반영된 norm에서 확정. τ는 평가 스윕과 동일 규칙(서빙↔평가 정합).
+        pred_idx = self._select_pred_idx(norm)
+        pred = self._id2label[pred_idx]
+        scores = {g.value: float(norm[i]) for i, g in self._id2label.items()}
+        conf = min(max(float(norm[pred_idx]), 0.0), 1.0)
+
+        lab = self.labeling.label(text)  # 보조 evidence/factors
+        # [A3] 모델 등급 ↔ 룰 factors 정합. 룰이 미탐(곱=0/낮음)인데 모델이 고등급이면
+        # 표시 S/V/M을 모델 등급에 정합화(+경고) — 'S0·V0·M0인데 TS' 모순 표기 방지.
+        factors = lab.factors
+        rule_factors: Optional[EvaluationFactors] = None
+        a3_warn: list[str] = []
+        pred_code = pred.value if hasattr(pred, "value") else str(pred)
+        if factors is not None and pred_code in ("TS", "S1", "S2", "S3"):
+            try:
+                from koipa.modules.m3_labeling.rule_engine import grade_from_svm, svm_levels_for_grade  # noqa: PLC0415
+                fsv = int(float(getattr(factors, "secrecy", 0)))
+                fvv = int(float(getattr(factors, "value", 0)))
+                fmv = int(float(getattr(factors, "management", 0)))
+                if grade_from_svm(fsv, fvv, fmv) != pred_code:
+                    # [2026-08-20] 덮기 **전** 값을 남긴다. 종전에는 버려서, 화면에 역산값만
+                    # 남고 "S2·V2·M2 인데 룰은 S1" 처럼 판정식으로 설명이 안 되는 조합이
+                    # 보였다(사용자 지적). 두 벌을 나란히 보여야 왜 갈렸는지 읽힌다.
+                    rule_factors = factors
+                    s2, v2, m2 = svm_levels_for_grade(pred_code)
+                    factors = EvaluationFactors.from_factor_scores(
+                        {"SECRECY": float(s2), "VALUE": float(v2), "MANAGEMENT": float(m2)}
+                    )
+                    a3_warn = [f"factors aligned to model grade {pred_code} (rule under-detected S/V/M)"]
+            except Exception as exc:  # noqa: BLE001
+                # 등급은 그대로 두고 **표시할 근거만** 원래 값으로 되돌린다.
+                # 검수자가 보는 근거가 등급과 어긋난 상태가 되므로, 그 사실은 남긴다.
+                logger.warning(
+                    "요소 표시 정합 실패 — 원래 요소값으로 되돌린다(등급은 그대로): %s: %s",
+                    type(exc).__name__, exc,
+                )
+                factors = lab.factors
+                rule_factors = None
+        from koipa.modules.m3_labeling.rule_engine import has_real_evidence  # noqa: PLC0415
+        return InferenceResult(
+            label=pred,
+            confidence=conf,
+            scores=scores,
+            factors=factors,
+            evidence=lab.evidence if return_evidence else [],
+            model_version=str(self.model_dir.name) if self.model_dir else "model",
+            warnings=a3_warn,
+            rule_grade=getattr(lab.rule_result, "grade", None),
+            rule_has_evidence=(
+                has_real_evidence(lab.rule_result) if lab.rule_result is not None else None
+            ),
+            rule_factors=rule_factors,
+        )
+

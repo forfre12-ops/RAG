@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>API 통신 방안 검토 회신</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:17px;font-weight:800;letter-spacing:-.02em;margin:38px 0 12px}
+h3{font-size:14.5px;font-weight:700;margin:22px 0 6px 18px}
+p{margin:8px 0 8px 18px}
+ul,ol{margin:8px 0 8px 18px;padding-left:20px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);padding:12px 16px;margin:14px 0 14px 18px;font-size:13px}
+pre{background:var(--surf);border:1px solid var(--line);padding:12px 14px;margin:10px 0 10px 18px;font-size:11.5px;font-family:ui-monospace,monospace;overflow-x:auto;line-height:1.55}
+.q{background:var(--mid);border-left:3px solid #a1a1aa;padding:10px 14px;margin:18px 0 10px 18px;font-size:13px;font-weight:700}
+.tw{overflow-x:auto;margin-left:18px}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace;margin-left:18px}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .docinfo{break-inside:avoid;page-break-inside:avoid}
+  /* [2026-08-29] .note 까지 통째로 avoid 하면 긴 안내 상자가 다음 쪽으로 밀리면서
+     앞쪽에 빈 면이 생긴다(인쇄 실측). 상자는 나뉘도록 두되 첫/끝 줄만 붙잡는다. */
+  .note{orphans:3;widows:3}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+.flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
+</style></head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">API 통신 방안 검토 회신</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">감리 산출물</span></div>
+  </div>
+</nav>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">발주처 회신 · 연계 규약</div>
+    <h1>API 통신 방안 검토 회신</h1>
+    <div class="meta">KL 「AI 분류 엔진 연계를 위한 API 예상 통신 방안」 검토 · 협의사항 15건 회신 · 2026-08-28</div>
+  </div>
+
+    <table class="docinfo">
+    <tbody>
+      <tr><th>검토 대상</th><td>「AI 분류 엔진 연계를 위한 API 예상 통신 방안」 (2026-08-28 · 8쪽)</td></tr>
+      <tr><th>회신 요지</th><td><b>REST 직접 연동(1안) 채택 권고.</b> 다만 요청·응답 규격에 조정이 필요합니다</td></tr>
+      <tr><th>근거</th><td>현행 배포 API 스펙(OpenAPI) 직접 조회 · 소스 코드 확인</td></tr>
+      <tr><th>접수일</th><td>2026-08-28</td></tr>
+      <tr><th>최종 개정</th><td>2026-08-29 — 표기 정합 보완 (첨부 구성 · ICD 판 상태 · 칼럼 주석 수치)</td></tr>
+      <tr><th>근거 커밋</th><td><code>d3bcb712</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    본 회신은 귀사 초안을 <b>대체하지 않습니다.</b> 초안의 구조(비동기 요청 + 완료 콜백)는 그대로
+    유효하며, <b>이미 구현되어 있는 부분</b>과 <b>규격을 맞춰야 하는 부분</b>을 갈라 적습니다.
+    협의사항 15건에 대한 당사 의견은 &sect;6 에 표로 정리했습니다.
+  </div>
+
+  <h2>0. 결론 세 줄</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">#</th><th style="width:26%">사안</th><th>회신</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="c">1</td><td>연계 방식</td>
+        <td><b>1안(REST 직접 연동) 채택 권고.</b> 2안(Redis Stream)은 당사에 소비자 구현이 없어
+        신규 개발이 필요하고, 1안이 제공하는 신뢰 전달(재시도·DLQ)을 이미 갖추고 있습니다</td>
+      </tr>
+      <tr>
+        <td class="c">2</td><td>결과 반환 항목</td>
+        <td><b><code>label</code> 만으로는 연동이 성립하지 않습니다.</b>
+        <code>confidence</code> · <code>status</code> · <code>warnings</code> 를 함께 받으셔야 합니다</td>
+      </tr>
+      <tr>
+        <td class="c">3</td><td>요청 절차</td>
+        <td><b>등록 &rarr; 분류 2단계</b>다. 등록을 건너뛰면 200 응답을 받고도 결과가 저장되지 않습니다</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>1. 초안의 표기 오류 &mdash; 확인 요청</h2>
+
+  <p>규약 문서라 먼저 짚는다. 인터페이스 목록과 상세의 메서드가 어긋나 있습니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:12%">항목</th><th style="width:28%">목록(2쪽)</th><th style="width:28%">상세(3~4쪽)</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td>IF-02</td><td><code>POST /classify</code></td><td><code>GET /api/v1/classify</code></td><td>파일 전송이므로 <b>POST</b> 가 맞다</td></tr>
+      <tr><td>IF-03</td><td><code>POST /classify/callback</code></td><td><code>GET /api/v1/classify/callback</code></td><td>본문 전송이므로 <b>POST</b> 가 맞다. 덧붙여 이 경로는 <b>관리시스템이 여는 수신 경로</b>이며 분류 엔진의 라우트가 아니다 — 엔진은 요청 본문의 <code>callback_url</code> 로 결과를 보낸다(&sect;4)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>또한 IF-01 의 경로는 당사 실제 구현과 다릅니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">초안</th><th style="width:26%">실제</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /health</code></td><td><code>GET /api/v1/healthz</code></td><td>루트 <code>/healthz</code> 는 404 다(실측)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="src">참고 &mdash; 준비 상태를 더 정확히 보시려면 <code>GET /api/v1/healthz/ready</code>
+  (의존 구성요소 포함 준비 완료) 또는 <code>GET /api/v1/healthz/deep</code>(심층 점검)을 쓰실 수 있습니다.</p>
+
+  <h2>2. 요청 절차 &mdash; 2단계다</h2>
+
+  <div class="note warn">
+    <b>가장 중요한 조정 사항.</b> 초안은 <code>POST /classify</code> 하나에 파일을 실어 보내는
+    1단계 구조다. 당사 엔진은 <b>문서 등록과 분류가 분리</b>되어 있고, 등록 없이 분류를 호출하면
+    <b>HTTP 200 을 반환하면서도 분류 결과가 저장되지 않습니다.</b> 응답만 보면 정상으로 보이므로
+    현장에서 발견하기 어렵다.
+  </div>
+
+  <h3>2-1. 실제 절차</h3>
+
+  <pre>① 문서 등록
+   POST /api/v1/documents
+   Content-Type: multipart/form-data
+   Authorization: Bearer &lt;토큰&gt;          (또는 동일 오리진 세션 쿠키)
+
+   form-data
+     file          (필수) 원본 파일
+     actor         (필수) Actor JSON 문자열 — 없으면 422
+                   예: {"user_id":"kl-portal","role":"kl_backend"}
+     external_ref  (선택) KL 문서번호. 예: KL-2026-000123
+     security_marking / access_scope   (선택) 상향 게이트 입력
+   → 응답에 doc_id(UUID) 발급 · 원본은 AES-256-GCM 으로 암호화 저장
+
+② 분류 요청
+   POST /api/v1/classify/async
+   Content-Type: application/json
+   Authorization: Bearer &lt;토큰&gt;
+
+   { "doc_id": "3f2a9c14-...",              ← ①이 발급한 UUID
+     "callback_url": "https://portal/…/callback" }
+   ※ content 는 넣지 않습니다. 생략하면 ①에서 저장한 본문을 사용합니다.
+   → job_id 즉시 반환
+
+③ 완료 통보 (엔진 → 관리시스템)
+   POST {callback_url}
+   { "job_id": "...", "status": "done", "results": [ { ... 20필드 ... } ] }</pre>
+
+  <div class="tw">
+<!-- FIG:seq --><svg viewBox="0 0 940 470" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="등록 후 분류를 요청하는 2단계 절차와, 등록을 건너뛴 경우의 경로를 함께 그린 시퀀스 도식"><style>.t{font:12.5px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 13px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.m{font:11.5px ui-monospace,monospace;fill:#0a0a0a}.d{font:11.5px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.bad{font:700 11.5px "Pretendard","Noto Sans KR",sans-serif;fill:#7f1d1d}</style><defs><marker id="ah" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#0a0a0a"/></marker><marker id="ahb" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#7f1d1d"/></marker></defs><rect x="10" y="14" width="220" height="34" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="th" x="120" y="36" text-anchor="middle">관리시스템 (KL 포털)</text><line x1="120" y1="48" x2="120" y2="410" stroke="rgba(0,0,0,.18)" stroke-dasharray="3 4"/><rect x="360" y="14" width="220" height="34" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="th" x="470" y="36" text-anchor="middle">분류 엔진 (Koipa)</text><line x1="470" y1="48" x2="470" y2="410" stroke="rgba(0,0,0,.18)" stroke-dasharray="3 4"/><rect x="710" y="14" width="220" height="34" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="th" x="820" y="36" text-anchor="middle">암호화 저장소</text><line x1="820" y1="48" x2="820" y2="410" stroke="rgba(0,0,0,.18)" stroke-dasharray="3 4"/><rect x="8" y="75" width="22" height="20" fill="#0a0a0a"/><text class="th" x="19" y="89" text-anchor="middle" fill="#fff">1</text><text class="d" x="36" y="89">문서 등록</text><line x1="120" y1="90" x2="470" y2="90" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="82" text-anchor="middle">POST /api/v1/documents</text><text class="d" x="295" y="105" text-anchor="middle">multipart · file + actor(필수)</text><line x1="470" y1="122" x2="820" y2="122" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="645" y="114" text-anchor="middle">원본 저장</text><text class="d" x="645" y="137" text-anchor="middle">AES-256-GCM 암호화</text><line x1="470" y1="154" x2="120" y2="154" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="146" text-anchor="middle">doc_id (UUID) 발급</text><rect x="8" y="191" width="22" height="20" fill="#0a0a0a"/><text class="th" x="19" y="205" text-anchor="middle" fill="#fff">2</text><text class="d" x="36" y="205">분류 요청</text><line x1="120" y1="206" x2="470" y2="206" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="198" text-anchor="middle">POST /api/v1/classify/async</text><text class="d" x="295" y="221" text-anchor="middle">{ doc_id, callback_url } · content 없이</text><line x1="470" y1="238" x2="120" y2="238" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="230" text-anchor="middle">job_id 즉시 반환</text><rect x="8" y="275" width="22" height="20" fill="#0a0a0a"/><text class="th" x="19" y="289" text-anchor="middle" fill="#fff">3</text><text class="d" x="36" y="289">완료 통보</text><line x1="470" y1="290" x2="120" y2="290" stroke="#0a0a0a" marker-end="url(#ah)"/><text class="t" x="295" y="282" text-anchor="middle">POST {callback_url}</text><text class="d" x="295" y="305" text-anchor="middle">결과 20필드 · 재시도·DLQ 포함</text><line x1="8" y1="330" x2="932" y2="330" stroke="rgba(0,0,0,.18)"/><text class="bad" x="8" y="352">등록을 건너뛴 경우 &#8212; 응답은 200 이나 분류 결과가 저장되지 않는다</text><line x1="120" y1="388" x2="470" y2="388" stroke="#7f1d1d" stroke-dasharray="6 4" marker-end="url(#ahb)"/><text class="bad" x="295" y="380" text-anchor="middle">POST /api/v1/classify (doc_id 미등록)</text><text class="d" x="295" y="403" text-anchor="middle">HTTP 200 · 등급도 나온다</text><line x1="470" y1="388" x2="820" y2="388" stroke="#7f1d1d" stroke-dasharray="6 4"/><text class="bad" x="645" y="380" text-anchor="middle">결과 미저장</text><text class="d" x="645" y="403" text-anchor="middle">document_exists 검사에서 영속화를 건너뛴다</text><text class="d" x="36" y="432">&#8226; 분류 결과가 검수 대기 목록 · 판정 이력에 저장되지 않는다 (호출 자체는 감사 로그에 기록된다).</text><text class="d" x="36" y="452">&#8226; <tspan class="m">POST /api/v1/documents/analyze</tspan> (파일 하나로 끝나는 1단계 경로)도 같은 이유로 결과가 저장되지 않는다 &#8212; 시연·진단 전용 경로다.</text></svg><!-- /FIG:seq -->
+  </div>
+  <p class="src">정상 경로(①~③)와 등록을 건너뛴 경로(붉은 점선)를 한 그림에 두었습니다.
+  아래 2-2 가 그 생략이 어디서 걸리는지를 코드로 보여 줍니다.</p>
+
+  <div class="note">
+    <b>인증.</b> 화면이나 요청 본문으로 자격증명을 받지 않습니다. 서버가 같은 오리진
+    세션 쿠키 또는 <code>Authorization</code> 헤더로 신원을 확인하며, 미인증이면 401 을
+    반환합니다. 실제 자격증명은 본 문서를 포함한 어떤 문서에도 기재하지 않고 별도 안전
+    경로로 전달합니다.
+  </div>
+
+  <h3>2-2. 저장이 건너뛰어지는 지점</h3>
+
+  <pre>if not repo.document_exists(doc_uuid):
+    self._inc_persist_failure("no_doc")
+    warns.append(f"persistence skipped: doc_id={doc_uuid} not found")
+    return uuid.uuid4(), warns</pre>
+
+  <p class="src"><code>poc/src/koipa/services/classify_service.py</code></p>
+
+  <p><code>doc_id</code> 가 문서 테이블에 없으면 분류는 수행되지만 <b>이력·조회·검수 대상 목록에
+  남지 않습니다.</b> 경고 문자열 하나만 응답에 붙는다. 따라서 ①을 생략할 수 없습니다.</p>
+
+  <h2>3. 결과 반환 항목 &mdash; 확대 요청</h2>
+
+  <p>초안의 콜백 항목은 5개(<code>doc_id</code> · <code>success</code> · <code>etc</code> ·
+  <code>file_name</code> · <code>label</code>)다. 당사 응답은 <b>20필드</b>이며, 그중
+  <b>검수 라우팅에 반드시 필요한 것</b>이 빠져 있습니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">우선</th><th style="width:24%">필드</th><th>없으면 무엇이 안 되는가</th></tr></thead>
+    <tbody>
+      <tr><td class="c"><b>필수</b></td><td><code>status</code></td><td><b>이 건을 사람이 봐야 하는지</b>를 알 수 없다(<code>needs_review</code>)</td></tr>
+      <tr><td class="c"><b>필수</b></td><td><code>confidence</code></td><td>검수 우선순위를 매길 수 없다(저신뢰 우선 정렬)</td></tr>
+      <tr><td class="c"><b>필수</b></td><td><code>warnings</code></td><td><b>왜</b> 검수로 보냈는지 설명할 수 없습니다</td></tr>
+      <tr><td class="c">권장</td><td><code>evidence</code></td><td>검수자가 근거 없이 본문 전체를 다시 읽어야 합니다</td></tr>
+      <tr><td class="c">권장</td><td><code>rule_grade</code> · <code>model_grade</code></td><td>룰·모델 불일치를 화면에 표시할 수 없습니다</td></tr>
+      <tr><td class="c">권장</td><td><code>model_version</code></td><td>어느 모델이 판정했는지 추적할 수 없다(감사 대응)</td></tr>
+      <tr><td class="c">참고</td><td><code>scores</code> · <code>decision_path</code> · <code>automation_assessment</code></td><td>판정 근거 심층 확인용</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <b>왜 이것이 규격 문제가 아니라 설계 문제인가.</b> 본 시스템의 목표는 정확도가 아니라
+    <b>미탐 최소화</b>이며(RFP 성능요건), 그 목표는 <b>확신이 낮은 건을 사람에게 돌려</b> 달성합니다.
+    등급만 전달되면 모든 건이 자동확정된 것과 같아지고, 검수 라우팅 설계 전체가 작동하지 않습니다.
+  </div>
+
+  <h2>4. 콜백 &mdash; 이미 구현되어 있습니다</h2>
+
+  <p>초안 협의사항의 &ldquo;Callback 실패 처리 · 재시도 기준&rdquo;은 <b>신규 개발 항목이 아닙니다.</b>
+  현행 구현이 다음을 이미 제공합니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">기능</th><th>구현 내용</th></tr></thead>
+    <tbody>
+      <tr><td>콜백 주소 지정</td><td>요청 본문의 <code>callback_url</code> 필드</td></tr>
+      <tr><td>신뢰 전달</td><td>Outbox 패턴 &mdash; 결과를 먼저 적재하고 별도 배송기가 발송합니다</td></tr>
+      <tr><td>재시도</td><td>지수 백오프. 발송 주기 60초</td></tr>
+      <tr><td>영구 실패 처리</td><td>최대 시도 소진 시 <b>DLQ</b> 이동 + 지표 노출(<code>koipa_outbox_dlq_total</code>)</td></tr>
+      <tr><td>SSRF 차단</td><td>루프백·클라우드 메타데이터·사설 대역 주소를 콜백 대상에서 거부</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>따라서 귀사에서는 <b>콜백 수신 엔드포인트만</b> 준비하시면 됩니다.</p>
+
+  <h2>5. Redis Stream 방식(2안)에 대한 의견</h2>
+
+  <div class="note warn">
+    <b>권고하지 않습니다.</b> 기술적으로 불가능해서가 아니라, <b>1안이 이미 제공하는 것을
+    새로 만들어야 하기 때문</b>입니다.
+  </div>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">항목</th><th>현황</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Stream 소비자</td>
+        <td><b>구현되어 있지 않습니다.</b> 당사 Redis 용도는 작업 큐 브로커와 Outbox 저장소이며,
+        Stream 자료구조는 DLQ 한 곳에서만 씁니다. 요청 소비 루프는 신규 개발입니다</td>
+      </tr>
+      <tr>
+        <td>미소비 Timeout 감시</td>
+        <td>초안은 관리시스템 Scheduler 가 미소비 요청을 감시하는 구조인데, <b>1안에서는 불필요</b>하다
+        &mdash; 엔진이 job 상태를 보유하고 콜백으로 통보하며, 조회 엔드포인트도 있습니다</td>
+      </tr>
+      <tr>
+        <td>파일 전달</td>
+        <td>Base64 는 본문을 약 33% 키우고, 공유 mount 는 <b>원본 암호화 저장을 우회</b>한다(&sect;5-1)</td>
+      </tr>
+      <tr>
+        <td>스트림 키 이름</td>
+        <td>초안은 <code>kopia:</code> 접두사를 쓰는데, 당사 시스템 식별자는 전부
+        <b><code>koipa</code></b> 다(패키지·DB·컨테이너·도메인). 채택 시 <code>koipa:</code> 로 통일 요청</td>
+      </tr>
+      <tr>
+        <td>접속 비밀번호</td>
+        <td>초안 5쪽에 실값이 기재되어 있습니다. <b>문서에서 제거</b>하고 별도 안전 경로로 전달하실 것을 요청드립니다</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>5-1. 파일 공유 mount 방식에 대한 별도 의견</h3>
+
+  <p>초안은 &ldquo;같은 환경에서 구동되므로 mount 로 읽을 수 있을 것&rdquo;이라 적고 있습니다.
+  당사 폐쇄망 설계는 <b>원본 문서를 AES-256-GCM 으로 암호화해 저장</b>합니다. 관리시스템이 평문
+  원본 경로를 넘기고 엔진이 그 경로를 직접 읽으면 <b>이 암호화 저장 경로를 지나치게 됩니다.</b>
+  등록 API(<code>POST /api/v1/documents</code>)를 통해 반입하시면 암호화 저장이 보장됩니다.</p>
+
+  <h2>6. 협의사항 15건 &mdash; 당사 의견</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">구분</th><th style="width:22%">협의 항목</th><th>당사 의견</th></tr></thead>
+    <tbody>
+      <tr><td class="c">공통</td><td>연계 방식</td><td><b>REST 직접 연동(1안)</b> 권고 (&sect;5)</td></tr>
+      <tr><td class="c">공통</td><td>인증 방식</td><td>현행 인증 체계를 그대로 사용합니다. 자격증명은 본 문서를 포함한 <b>어떤 문서에도 기재하지 않고</b> 별도 안전 경로로 전달합니다</td></tr>
+      <tr><td class="c">공통</td><td>중복 요청 처리</td><td>동일 파일 재업로드는 파일 해시로 판별해 <b>기존 문서로 연결</b>합니다. 다만 이때 <b>메타·외부 참조는 갱신되지 않습니다</b> &mdash; 메타 변경이 필요하면 별도 갱신 호출이 필요합니다</td></tr>
+      <tr><td class="c">공통</td><td>장애·예외 처리</td><td>당사 API 는 <b>HTTP 상태코드로 분기</b>합니다. 심볼릭 오류코드 체계는 없으므로 상태코드 기준으로 처리 로직을 세워 주시기 바랍니다</td></tr>
+      <tr><td class="c">REST</td><td>파일 업로드 용량</td><td>본문 상한 1,048,576자는 <b>초안과 동일</b>. 멀티파트 상한은 실측 후 확정 회신하겠다</td></tr>
+      <tr><td class="c">REST</td><td>요청 Timeout</td><td>비동기 경로이므로 결과 대기 Timeout 이 불필요합니다. 접수 응답은 즉시 반환됩니다</td></tr>
+      <tr><td class="c">REST</td><td>Callback 실패 처리</td><td><b>이미 구현</b> &mdash; 재시도·DLQ·SSRF 차단 (&sect;4)</td></tr>
+      <tr><td class="c">REST</td><td>추가 전달 항목</td><td><b>&sect;3 의 필수 3필드 수신 요청</b></td></tr>
+      <tr><td class="c">Redis</td><td>접속 정보</td><td rowspan="6" style="vertical-align:top">2안 미채택 권고에 따라 <b>보류</b>. 채택 결정 시 별도 회신하겠습니다. 단 <b>비밀번호 문서 기재 제거</b>와 <b>키 접두사 <code>koipa:</code> 통일</b>은 채택 여부와 무관하게 요청드립니다</td></tr>
+      <tr><td class="c">Redis</td><td>인증</td></tr>
+      <tr><td class="c">Redis</td><td>파일 전달 방식</td></tr>
+      <tr><td class="c">Redis</td><td>파일 공유 환경</td></tr>
+      <tr><td class="c">Redis</td><td>미소비 Timeout</td></tr>
+      <tr><td class="c">Redis</td><td>Scheduler 주기 · Timeout 처리</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>7. 당사가 제안하는 인터페이스</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:10%">번호</th><th style="width:32%">경로</th><th style="width:14%">방향</th><th>용도</th></tr></thead>
+    <tbody>
+      <tr><td>IF-01</td><td><code>GET /api/v1/healthz</code></td><td>관리 &rarr; 엔진</td><td>준비 상태 확인</td></tr>
+      <tr><td>IF-02</td><td><code>POST /api/v1/documents</code></td><td>관리 &rarr; 엔진</td><td><b>문서 등록</b>(multipart) &rarr; <code>doc_id</code></td></tr>
+      <tr><td>IF-03</td><td><code>POST /api/v1/classify/async</code></td><td>관리 &rarr; 엔진</td><td>비동기 분류 요청(<code>callback_url</code> 포함)</td></tr>
+      <tr><td>IF-04</td><td><code>POST {callback_url}</code></td><td>엔진 &rarr; 관리</td><td>완료 통보(결과 본문 포함)</td></tr>
+      <tr><td>IF-05</td><td><code>GET /api/v1/classify/jobs/{job_id}</code></td><td>관리 &rarr; 엔진</td><td>상태 조회(콜백 유실 대비 보조 수단)</td></tr>
+      <tr><td>IF-06</td><td><code>GET /api/v1/classify/{doc_id}</code></td><td>관리 &rarr; 엔진</td><td>문서 단위 결과 조회 &mdash; <b>사람이 확정한 등급 포함</b></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <b>IF-06 에 대한 보충.</b> 사람이 검수로 등급을 확정해도 <code>label</code>(예측 등급)은
+    바뀌지 않습니다. 모델이 무엇이라 했는지와 사람이 무엇으로 정했는지를 <b>두 가지 모두 남기는 설계</b>이기
+    때문입니다. 확정 등급은 별도 필드(<code>confirmed_label</code> · <code>confirmed_by</code> ·
+    <code>confirmed_at</code>)로 제공됩니다.
+  </div>
+
+  <h2>8. 다음 단계 제안</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">#</th><th style="width:30%">항목</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>연계 방식 확정</td><td>1안·2안 중 선택. 당사 권고는 1안</td></tr>
+      <tr><td class="c">2</td><td>결과 수신 항목 확정</td><td>&sect;3 필수 3필드 포함 여부</td></tr>
+      <tr><td class="c">3</td><td>규약서 정본화</td><td>확정 후 당사 <b>「KL 연동 인터페이스 규약서(ICD)」</b>에 반영해 정본으로 관리</td></tr>
+      <tr><td class="c">4</td><td>연동 시험</td><td>시험 시나리오 8건 준비되어 있습니다. 일정 협의 요청</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>9. 개정 이력</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td class="n">2026-08-28</td><td><code>d3bcb712</code></td><td>최초 작성 &mdash; 초안 검토 회신. 표기 오류 3건·설계 조정 3건·협의사항 15건 의견</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">근거 &mdash; 배포 API OpenAPI 조회 · <code>poc/src/koipa/services/classify_service.py</code> · <code>poc/src/koipa/services/outbox.py</code> · <code>poc/src/koipa/services/async_classify_service.py</code> · <code>poc/src/koipa/schemas/classify.py</code> · <code>poc/src/koipa/api/documents.py</code> · <code>doc/result/감리정본/KL연동_인터페이스_규약서_ICD.html</code></div>
+</div>
+</body>
+</html>

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
-from lloydk.schemas.common import Grade
+from koipa.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
+from koipa.schemas.common import Grade
 
 
 @pytest.fixture(autouse=True)
@@ -20,12 +20,12 @@ def _stub_pipeline_db(monkeypatch):
     블록되므로, 게이트 단위 검증에서는 기본 등급 + 스텁 엔진으로 대체한다(실제 라벨링
     경로는 _run_rule_fallback monkeypatch로 우회 — 엔진은 호출되지 않음).
     """
-    from lloydk.schemas import common as _common
+    from koipa.schemas import common as _common
 
     monkeypatch.setattr(
         _common.GradeRegistry, "get_codes", lambda *a, **k: ["TS", "S1", "S2", "S3"]
     )
-    from lloydk.modules.m3_labeling import pipeline as _m3
+    from koipa.modules.m3_labeling import pipeline as _m3
 
     monkeypatch.setattr(_m3, "build_rule_engine_from_db", lambda *a, **k: object())
 
@@ -42,7 +42,7 @@ def _force_ts(pipe, monkeypatch):
 
 @pytest.fixture
 def gate_on(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(cfg.settings, "source_prior_enabled", True, raising=False)
     monkeypatch.setattr(cfg.settings, "source_prior_cap_grade", "S3", raising=False)

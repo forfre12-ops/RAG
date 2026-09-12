@@ -4,8 +4,8 @@ Revision ID: b2c3d4e5f6a7
 Revises: a1b2c3d4e5f6
 Create Date: 2026-06-25
 
-2026-06-24 확정: Lloydk는 단일 고객사 엔진 — per-customer 격리는 KL 포털이
-라우팅으로 전담(상류 보장). Lloydk 내부엔 tenant 경계가 불필요하므로
+2026-06-24 확정: Koipa는 단일 고객사 엔진 — per-customer 격리는 KL 포털이
+라우팅으로 전담(상류 보장). Koipa 내부엔 tenant 경계가 불필요하므로
 tenant_id 컬럼·FK·복합인덱스·UNIQUE 와 tb_tenants 테이블 자체를 제거한다.
 
 제거 대상:

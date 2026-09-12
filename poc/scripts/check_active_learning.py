@@ -32,8 +32,8 @@ DEFAULT_THRESHOLD = 30  # 이 건수 이상이면 재학습 권고
 
 def check_db_corrections(threshold: int) -> dict:
     """DB corrections 테이블 조회."""
-    from lloydk.db import SessionLocal
-    from lloydk.repositories.classify_repo import ClassifyRepo
+    from koipa.db import SessionLocal
+    from koipa.repositories.classify_repo import ClassifyRepo
 
     db = SessionLocal()
     try:
@@ -82,9 +82,9 @@ def check_file_corrections(threshold: int) -> dict:
         "direction_dist": dict(directions),
         "recommend_retrain": len(corrected) >= threshold,
         "retrain_command": (
-            f"python scripts/p1_train_classifier.py --mode full "
-            f"--train-path datasets/labeled_v2_balanced/train.jsonl "
-            f"--no-mlflow --output-dir artifacts/classifier_active_v1"
+            "python scripts/p1_train_classifier.py --mode full "
+            "--train-path datasets/labeled_v2_balanced/train.jsonl "
+            "--no-mlflow --output-dir artifacts/classifier_active_v1"
         ) if len(corrected) >= threshold else None,
     }
 

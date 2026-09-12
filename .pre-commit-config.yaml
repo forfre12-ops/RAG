@@ -1,0 +1,19 @@
+# Git 저장소 뿌리는 rag/이고 Python 프로젝트는 poc/에 있다.
+# `make test-lite`는 현재 3분을 넘어 push 훅으로는 무겁다. 여기서는
+# 의존성·데이터·결정성의 빠른 계약만 보고, 전체 lite 회귀는 별도 실행한다.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (poc/src + poc/tests)
+        entry: python -m ruff check --config poc/pyproject.toml poc/src poc/tests
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: test-fast-contract
+        name: pytest 빠른 계약
+        entry: python -m pytest -q -c poc/pyproject.toml poc/tests/test_hygiene.py poc/tests/test_idempotency.py poc/tests/test_anchor_eval.py poc/tests/test_source_provenance.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

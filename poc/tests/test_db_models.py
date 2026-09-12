@@ -16,8 +16,8 @@ import pytest
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.db import Base, SessionLocal, engine, session_scope
-from lloydk.db.models import (
+from koipa.db import Base, SessionLocal, engine, session_scope
+from koipa.db.models import (
     AuditLog,
     Classification,
     ClassificationEvidence,
@@ -57,26 +57,34 @@ def _require_postgres() -> None:
 
 def test_orm_metadata_has_expected_tables():
     """Sanity: all ORM-mapped parent tables present in Base.metadata."""
-    expected = {                          # ORM __tablename__ 은 tb_ 접두사 규약
-        "tb_classification_levels",
-        "tb_evaluation_factors",
-        "tb_level_keywords",
-        "tb_documents",
-        "tb_chunks",
-        "tb_document_labels",
-        "tb_document_factor_scores",
-        "tb_classifications",
-        "tb_classification_evidence",
-        "tb_model_versions",
-        "tb_training_runs",
-        "tb_training_epochs",
-        "tb_training_datasets",
-        "tb_corrections",
-        "tb_prompt_versions",
-        "tb_sample_documents",
-        "tb_llm_usage",
-        "tb_audit_log",
-        "tb_guides",          # N5: GuideService DB 이전
+    # [2026-09-11] 표준 명명(migration 7b3e9d2a4f10) — tad_<영역>_<단어>_mng. 옛 이름은 주석.
+    expected = {
+        "tad_cm_clsf_grd_mng",        # tb_classification_levels
+        "tad_em_evl_rqmt_mng",        # tb_evaluation_factors
+        "tad_gm_grd_kywd_mng",        # tb_level_keywords
+        "tad_dm_doc_mng",             # tb_documents
+        "tad_cm_chnk_mng",            # tb_chunks
+        "tad_dm_doc_lbl_mng",         # tb_document_labels
+        "tad_dm_doc_rqmt_scr_mng",    # tb_document_factor_scores
+        # [2026-09-05] 승인본 ↔ 학습셋 판 연결(append-only). 칼럼 하나로는 한 문서가
+        # 여러 판에 들어간 이력을 잃는다.
+        "tad_sm_syn_datst_cpst_mng",  # tb_sample_dataset_membership
+        "tad_cm_clsf_rslt_mng",       # tb_classifications
+        "tad_cm_clsf_bss_mng",        # tb_classification_evidence
+        "tad_mm_mdl_ver_mng",         # tb_model_versions
+        "tad_lm_lrn_excn_mng",        # tb_training_runs
+        "tad_lm_lrn_epoch_mng",       # tb_training_epochs
+        "tad_lm_lrn_datst_mng",       # tb_training_datasets
+        "tad_cm_crct_mng",            # tb_corrections
+        "tad_pm_prmpt_ver_mng",       # tb_prompt_versions
+        "tad_sm_syn_doc_mng",         # tb_sample_documents
+        "tad_lm_llm_usqty_mng",       # tb_llm_usage
+        "tad_am_adt_log_mng",         # tb_audit_log
+        "tad_gm_guide_ver_mng",       # tb_guides — N5: GuideService DB 이전
+        # [2026-09-05] 전역 직렬화 잠금 전용 표(db/locks.py). 행 하나가 논리 잠금
+        # 하나이고 데이터를 담지 않는다. pg_advisory_xact_lock 이 MariaDB 에서
+        # 조용히 꺼지던 것을 두 dialect 공통 행 잠금으로 바꾸며 들어왔다.
+        "tad_sy_lck_mng",             # tb_advisory_locks
     }
     actual = set(Base.metadata.tables.keys())
     missing = expected - actual

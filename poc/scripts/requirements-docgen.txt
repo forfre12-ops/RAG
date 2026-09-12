@@ -1,0 +1,14 @@
+# 인수(acceptance) 샘플팩 '생성'용 dev-only 의존성 — 런타임/폐쇄망 번들에는 불필요.
+#
+# 이유: datasets/acceptance_pack/ 의 문서는 미리 렌더돼 '커밋'되므로(airgap 결정적 배송),
+# 배포/번들은 reportlab·xlwt 를 필요로 하지 않는다. 따라서 pyproject.toml/uv.lock(런타임 락,
+# CI deps-lock-check 가 보호)에 넣지 않고 여기 dev-only 로 분리한다 — 락 부풀림·재현성 회귀 방지.
+#
+# 팩을 '재생성'할 때만(전 포맷 = PDF/XLS 포함) 설치:
+#   pip install -r scripts/requirements-docgen.txt   (또는 `make acceptance-pack-deps`)
+#   make acceptance-pack
+# 미설치 시 build_acceptance_pack.py 는 PDF/XLS 를 graceful skip 한다(나머지 포맷은 base dep).
+#
+# 핀 버전 = 커밋된 팩을 렌더한 버전(재현성).
+reportlab==4.5.1
+xlwt==1.3.0

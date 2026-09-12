@@ -12,21 +12,22 @@
 #
 # 이미지 태그는 .env의 IMAGE_TAG로 일괄 전환 (docker load 로 복원된 태그와 일치해야 함).
 
-name: lloydk-airgap
+name: koipa-airgap
 
 services:
   postgres:
     image: ${PGVECTOR_IMAGE:-pgvector/pgvector:pg16}   # ES 제거(§03 ⓑ) — pgvector dense. 폐쇄망: docker load 한 태그
+    restart: unless-stopped   # 호스트 재부팅/데몬 재시작 후 자동 복구(폐쇄망 무인 운영). compose 단축형만 실효.
     environment:
-      POSTGRES_DB: lloydk
-      POSTGRES_USER: lloydk
+      POSTGRES_DB: koipa
+      POSTGRES_USER: koipa
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${PG_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lloydk"]
+      test: ["CMD-SHELL", "pg_isready -U koipa"]
       interval: 5s
       retries: 10
 
@@ -36,22 +37,25 @@ services:
 
   redis:
     image: redis:7.2-alpine
+    restart: unless-stopped
     # appendonly + bgsave 실패 시 쓰기차단 해제(브로커/캐시 용도라 비영속 허용 — 운영 노트 참조)
     command: redis-server --appendonly yes --stop-writes-on-bgsave-error no
     volumes:
       - redisdata:/data
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
 
   # mlflow 제거 — 폐쇄망(고객사) 배포는 추론 전용(enable_training=False)이라 모델 트래킹/레지스트리
-  # 불요. 학습·MLflow 는 지재원(Lloydk) full-train 환경에서만. (mlflow 가 minio 아티팩트 저장에
+  # 불요. 학습·MLflow 는 지재원(Koipa) full-train 환경에서만. (mlflow 가 minio 아티팩트 저장에
   # 의존했으므로 minio 제거와 함께 제거.)
 
   api:
-    image: lloydk-api:${IMAGE_TAG:-1.0.0-rc1}        # docker load 로 복원된 태그
+    image: koipa-api:${IMAGE_TAG:-1.0.0-rc1}        # docker load 로 복원된 태그
+    restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
+      DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD}@postgres:5432/koipa
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       REDIS_URL: redis://redis:6379/0
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS(/app/.storage). MinIO 미사용.
@@ -65,35 +69,66 @@ services:
       HF_HOME: /models/hf
       HF_HUB_OFFLINE: "1"           # 폐쇄망 — 외부 다운로드 차단 (모델은 ../models 에서 로드)
       TRANSFORMERS_OFFLINE: "1"
+      # [NFR-OPS-01] 이미지 기본값은 4워커다. 멀티워커면 모델 핫리로드가 요청이 닿은 워커
+      # 하나만 갱신하고 나머지는 옛 모델을 계속 서빙한다(서비스 인스턴스가 프로세스 싱글톤).
+      # onprem-local 은 야간 증분 재학습이 켜져 있어 승격이 실제로 일어나는 프로파일이라
+      # 이 어긋남이 운영 중에 발생한다. prod.yml 과 같은 이유로 1 로 묶는다.
+      WEB_CONCURRENCY: "${WEB_CONCURRENCY:-1}"
+      # [스레드 정합] torch 는 cgroup CPU 한도를 보지 못한다 — 아래 cpus 한도와 같은 값으로 묶는다.
+      OMP_NUM_THREADS: "${API_CPU_LIMIT:-4}"
+      MKL_NUM_THREADS: "${API_CPU_LIMIT:-4}"
     volumes:
-      - ../models:/models:ro        # 사전 동봉 모델 (분류기 학습본·임베딩·HF 캐시)
+      # [SELinux] `z` 는 공유 라벨(container_file_t) 재지정이다. RHEL·Rocky 계열은 SELinux 가
+      # 기본 enforcing 이라 라벨 없이 bind mount 하면 컨테이너가 이 경로를 못 읽고 **모델 적재가
+      # 실패한다**. api·worker 가 같은 ../models 를 공유하므로 `Z`(전용)가 아니라 `z`(공유)다.
+      # Ubuntu 등 SELinux 가 없는 호스트에서는 무시되므로 양쪽 모두에서 안전하다.
+      - ../models:/models:ro,z      # 사전 동봉 모델 (분류기 학습본·임베딩·HF 캐시)
       - storagedata:/app/.storage   # 로컬FS 문서·원본 보관(WORKDIR=/app, LocalStorage root=.storage)
+      # [골든] 골든 후보·검수 산출물. datasets 는 .dockerignore 라 이미지에 들어 있지 않다 —
+      # 이 볼륨이 없으면 /golden/build 를 실행한 worker 가 자기 컨테이너 FS 에 결과를 쓰고,
+      # 검수 화면을 렌더하는 api 는 경로 자체가 없어 화면이 영원히 빈다. 검수 원장과
+      # 사람 서명 파일도 컨테이너 재생성 시 사라진다. prod·dual 은 이미 고쳐져 있었다.
+      - golden_data:/app/datasets
+      # [학습 산출] 야간 증분 재학습·학습 노드 산출물. 없으면 후보 모델이 워커 임시 레이어에
+      # 남아 api 가 모델 경로를 열지 못한다.
+      - artifacts_out:/app/artifacts_out
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_started }
     ports:
-      - "8000:8000"
+      # [2026-08-02] 하드코딩 8000 이면 이미 8000 을 쓰는 호스트에서 기동이 실패하고, 운영자가
+      # 번들 안 YAML 을 손으로 고쳐야 했다 → .env 로 뺀다(기본값은 종전과 동일).
+      #
+      # [2026-09-08] 바인드 주소를 **루프백 기본**으로 바꾼다. 종전에는 주소를 안 적어
+      # 0.0.0.0 이었고, 앱이 평문 HTTP 로 외부에 직접 붙었다. 2026-08-19 에 223 에서
+      # 실측된 그대로다 — `0.0.0.0:8000->8000/tcp` · 보안 헤더 0개 · /docs 무인증 200 ·
+      # 무인증 login.html 이 admin JWT 를 본문에 노출(KL 망 밖에서 수신됨).
+      # 그때 prod.yml·dual.yml·dr-staging.yml 은 127.0.0.1 로 고쳤는데 **이 폐쇄망
+      # 배포본만 빠져 있었다.** 이제 셋과 같은 형태다.
+      #
+      # 외부 노출은 앱이 아니라 프록시가 한다(nginx-mtls `--profile mtls`, 또는
+      # docker-compose.console-proxy.yml). 프록시 없이 임시로 열어야 하면 .env 에
+      # API_BIND=0.0.0.0 을 **명시**한다 — 노출은 기본값이 아니라 결정이어야 한다.
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/healthz/live"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 90s
-    # GPU (NVIDIA Container Toolkit 필요) — 미보유 환경은 아래 블록 주석 처리 + POC_MODE/임베딩 CPU
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # GPU 는 여기 없다 — 기본 CPU. NVIDIA 노드는 오버레이를 덧붙인다:
+    #   docker compose -f infra-config/docker-compose.airgap.yml -f infra-config/docker-compose.gpu.yml up -d
+    # 종전엔 이 블록이 base 에 있어 GPU 없는 호스트에서 `could not select device driver "nvidia"` 로
+    # 기동 자체가 막혔다(고객사 운영노드는 CPU 전용 — 기본값이 반대였다).
 
   worker:
-    image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
-    command: celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
+    image: koipa-worker:${IMAGE_TAG:-1.0.0-rc1}
+    restart: unless-stopped
+    command: celery -A koipa.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
+      DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS. api 와 동일 storagedata 볼륨 공유.
@@ -106,31 +141,49 @@ services:
       HF_HOME: /models/hf
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
+      # [스레드 정합] api 와 같은 이유 — cgroup 한도를 코드에 알려 준다.
+      OMP_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
+      MKL_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
     volumes:
-      - ../models:/models:ro
+      - ../models:/models:ro,z      # [SELinux] api 와 같은 공유 라벨 — 위 api 블록 주석 참조
       - storagedata:/app/.storage   # api 와 공유 — 로컬FS 문서·원본
+      - golden_data:/app/datasets       # api 와 공유 — 골든 후보·검수 원장(위 api 주석 참조)
+      - artifacts_out:/app/artifacts_out # 재학습 산출물 — api 가 같은 경로로 읽는다
     depends_on:
       - redis
       - postgres
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    healthcheck:
+      # celery worker 응답성 — 브로커 연결 + 워커 프로세스 생존. 응답 없으면 non-zero.
+      # 과거엔 worker/beat 헬스체크가 전 compose에서 부재라 죽은 워커를 오케스트레이터가 몰랐다.
+      test: ["CMD-SHELL", "celery -A koipa.workers.celery_app inspect ping -t 10 >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+    # GPU 예약 없음(기본 CPU) — GPU 노드는 docker-compose.gpu.yml 오버레이 사용. api 주석 참조.
 
   # 주기작업 발행기 — 단일 인스턴스만 (다중 beat = 중복 tick). dev compose엔 누락돼 있었음.
   beat:
-    image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
-    command: celery -A lloydk.workers.celery_app beat -l info
+    image: koipa-worker:${IMAGE_TAG:-1.0.0-rc1}
+    restart: unless-stopped
+    # --schedule 경로 고정 → 헬스체크가 이 파일의 신선도로 beat tick 생존을 판정.
+    command: celery -A koipa.workers.celery_app beat -l info --schedule /tmp/celerybeat-schedule
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
+      DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
     depends_on:
       - redis
       - postgres
+    healthcheck:
+      # beat 생존 — PersistentScheduler 가 tick 마다 갱신하는 schedule 파일의 신선도(10분 내).
+      # 최단 tick(outbox 60s)보다 넉넉한 창. beat 가 멈추면 파일이 낡아 unhealthy.
+      test: ["CMD-SHELL", "find /tmp/celerybeat-schedule -mmin -10 | grep -q . || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   # mTLS 종료 (옵션): docker compose ... --profile mtls up -d nginx-mtls
   nginx-mtls:
@@ -141,10 +194,14 @@ services:
     ports:
       - "443:443"
     volumes:
-      - ./mtls/nginx.mtls.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./mtls/certs:/etc/nginx/mtls:ro
+      # [SELinux] 인증서·설정도 bind mount 라 라벨이 필요하다 — 없으면 nginx 가 기동 직후
+      # "Permission denied" 로 죽는다(RHEL·Rocky enforcing). 위 api 블록 주석 참조.
+      - ./mtls/nginx.mtls.conf:/etc/nginx/conf.d/default.conf:ro,z
+      - ./mtls/certs:/etc/nginx/mtls:ro,z
 
 volumes:
   pgdata:
   redisdata:
   storagedata:     # 로컬FS 문서·원본 보관(api·worker 공유) — minio/mlflowdata 대체
+  golden_data:     # 골든 후보·검수 원장·사람 서명(api·worker 공유). 이미지에 없는 경로다
+  artifacts_out:   # 재학습 산출 모델(api·worker 공유)

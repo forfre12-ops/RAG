@@ -1,0 +1,58 @@
+# 줄바꿈 정규화 — 기여자별 core.autocrlf 차이로 diff 가 오염되던 것을 방지.
+# 텍스트는 저장소에서 LF 로 통일(체크아웃 시 OS 관례 반영). 바이너리는 손대지 않는다.
+# (기존 파일은 자동 재작성하지 않음 — 편집·신규 파일부터 이 정책을 따른다.)
+
+* text=auto eol=lf
+
+# 명시적 텍스트 (안전하게 못 박기)
+*.py     text eol=lf
+*.pyi    text eol=lf
+*.sh     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.toml   text eol=lf
+*.cfg    text eol=lf
+*.ini    text eol=lf
+*.json   text eol=lf
+*.jsonl  text eol=lf
+*.md     text eol=lf
+*.txt    text eol=lf
+*.html   text eol=lf
+*.css    text eol=lf
+*.js     text eol=lf
+*.sql    text eol=lf
+*.lock   text eol=lf
+*.mako   text eol=lf
+Dockerfile*   text eol=lf
+Makefile      text eol=lf
+.env.*        text eol=lf
+
+# 바이너리 (diff/정규화 금지)
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
+*.hwp    binary
+*.hwpx   binary
+*.xls    binary
+*.xlsx   binary
+*.doc    binary
+*.docx   binary
+*.ppt    binary
+*.pptx   binary
+*.zip    binary
+*.tar    binary
+*.gz     binary
+*.woff   binary
+*.woff2  binary
+*.safetensors binary
+*.bin    binary
+*.pt     binary
+
+# ── 감리 동결 번들 (2026-07-30) ────────────────────────────────────
+# 동결본은 '바이트 동일'이 요건이다. INTEGRITY.sha256 은 작업트리 파일의 SHA-256 을
+# 기록하므로, git 이 줄바꿈을 정규화하면 신선한 clone 에서 검증이 반드시 실패한다.
+# → 텍스트 처리 일체 비활성(-text). 정본(doc/result/open/)은 위 정책(eol=lf) 그대로.
+doc/releases/** -text

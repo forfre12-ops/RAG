@@ -1,8 +1,16 @@
 .venv/
+# 학습 실험용 GPU venv(cu128 torch, 4.5GB). 생산 .venv 는 CPU torch 로 두어 운영 런타임
+# (GPU 없음)을 재현한다 — 한 환경에 섞으면 "운영에서 왜 다르지"를 추적할 수 없다.
+# 기존 `.venv/` 패턴은 정확히 그 이름만 걸러서 이 디렉토리를 놓친다. 지우지 말 것.
+.venv-gpu/
 __pycache__/
 *.pyc
 .env
 .env.backup-*
+# deploy_testserver_dual.sh 가 생성하는 스택별 실 시크릿 — 커밋 금지
+.env.jjw
+.env.cust
+.env.cloud
 datasets/raw/
 datasets/corrections/
 datasets/external/
@@ -14,6 +22,10 @@ datasets/synthetic_800/
 datasets/synthetic_qwen3/
 datasets/synthetic_solar/
 artifacts/
+# [2026-08-11] 학습 산출 전용 rw 경로(settings.training_output_dir · 5539b807 에서 artifacts:ro 와
+# 분리하며 신설). artifacts/ 와 성격이 같은데 그때 무시 규칙을 함께 넣지 않았다 —
+# 실측 102GB · model.safetensors 57개가 커밋 후보로 노출돼 있었다(체크포인트 = 재생성물).
+artifacts_out/
 mlruns/
 reports/
 dist/
@@ -21,3 +33,29 @@ migration/
 licenses/
 .ipynb_checkpoints/
 datasets/gold/formats/
+# run-스코프 생성 산출물(스크립트로 재현 — 비결정적 LLM 출력 포함, 정본 아님)
+datasets/constructed_floor_runs/
+datasets/patent_timeaxis/
+datasets/gold_real/*.bak-forged-nkt
+# signoff_slate/ 는 결정적 슬레이트(build_signoff_slate_v1.jsonl)만 tracked.
+# 서명 run 출력 locked_<job_id>.jsonl 은 per-run 산출물 → 무시(정본은 LOCKED_EVAL_JSONL).
+datasets/signoff_slate/locked_*.jsonl
+# 관리자 엑셀 검수 발행/회수본 — 워크북·본문 txt·후보·승격본이 전부 **문서 전문**을 싣는다.
+# 지정 망 외 반출 금지 대상이라 커밋 경로를 아예 막는다(signoff_slate 와 같은 취지).
+# 재현: scripts/export_golden_review_xlsx.py (정본 + 학습코퍼스 해시로 결정적).
+datasets/golden_review/
+# 사람 서명 누적 정본. 검수가 쌓이는 파일이고 문서 전문을 포함한다 → 반출 차단.
+datasets/gold_real/locked_gold_eval.jsonl
+datasets/gold_real/locked_gold_eval.jsonl.lock
+# AI-Hub recipient-approved data and receipts are restricted, local-only inputs.
+# Keep the checked-in schema/template and intake documentation outside these paths.
+datasets/proxy_gold/aihub_runs/
+datasets/proxy_gold/aihub_receipts/
+datasets/proxy_gold/aihub_71813_extracted/
+
+# 콘솔 테스트 로그인 키 — 배포본·리포에 넣지 않는다
+secrets/
+
+# 콘솔 e2e 하니스(jsdom) 의존성 — 리포에 넣지 않는다.
+# 준비: cd poc/tests/e2e_console && npm install  (없으면 파이썬 시험이 skip 된다)
+tests/e2e_console/node_modules/

@@ -1,0 +1,13 @@
+{
+  "case_id": "TS-MFG-017",
+  "intended_label": "TS",
+  "document_origin": "synthetic",
+  "authoring_method": "codex_direct_case_bundle_v1",
+  "documents": [
+    "CR-2026-017_공정변경요청서.md",
+    "VP-2026-017_검증결과보고서.md",
+    "MOM-2026-0716_기술검토회의록.md",
+    "AM-2026-017_조건부승인메모.md"
+  ],
+  "claim_scope": "fictional internal-document realism pilot only; not a real company document and not human-reviewed gold"
+}

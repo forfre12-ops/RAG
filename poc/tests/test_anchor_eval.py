@@ -7,10 +7,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from lloydk.modules.m6_evaluation.anchor_corpus import AnchorSource
-from lloydk.modules.m6_evaluation.anchor_eval import cap_per_cell, run_anchor_cards
-from lloydk.modules.m6_evaluation.deploy_gate import evaluate_deploy_gate
-from lloydk.schemas.common import Grade
+from koipa.modules.m6_evaluation.anchor_corpus import AnchorSource
+from koipa.modules.m6_evaluation.anchor_eval import run_anchor_cards
+from koipa.modules.m6_evaluation.deploy_gate import evaluate_deploy_gate
+from koipa.schemas.common import Grade
 
 
 @dataclass
@@ -25,7 +25,7 @@ class _FakePipe:
         self.mapping = mapping
         self.default = default
 
-    def run(self, text, use_rag=False, metadata=None):
+    def run(self, text, metadata=None):
         for key, g in self.mapping.items():
             if key in text:
                 return _Res(label=g)

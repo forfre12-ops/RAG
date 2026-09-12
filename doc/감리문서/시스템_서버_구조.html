@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>시스템 서버 구조</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+h3{font-size:13px;font-weight:800;margin:20px 0 6px}
+p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+.tw{overflow-x:auto}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .docinfo{break-inside:avoid;page-break-inside:avoid}
+  /* [2026-08-29] .note 까지 통째로 avoid 하면 긴 안내 상자가 다음 쪽으로 밀리면서
+     앞쪽에 빈 면이 생긴다(인쇄 실측). 상자는 나뉘도록 두되 첫/끝 줄만 붙잡는다. */
+  .note{orphans:3;widows:3}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+.flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">시스템 서버 구조</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">감리 산출물</span></div>
+  </div>
+</nav>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">감리 산출물 · 요구·설계</div>
+    <h1>시스템 서버 구조</h1>
+    <div class="meta">배포 프로파일 4 · 컨테이너 구성 · 시험 서버 실측 · 운영 호스트 Rocky Linux 대응 · 2026-08-26</div>
+  </div>
+
+  <table class="docinfo">
+    <tbody>
+      <tr><th>요구사항</th><td>인프라 · 완료보고 제출물(시스템 구성) · <code>SER-004</code> 연계</td></tr>
+      <tr><th>생성 원본</th><td><code>docker-compose.*.yml</code> · <code>Dockerfile.*</code> · <code>koipa/config.py</code> 프로파일</td></tr>
+      <tr><th>실측 대상</th><td>시험 서버 223 — <code>/etc/os-release</code> · <code>nproc</code> · <code>free</code> · <code>nvidia-smi</code> · <code>docker ps/inspect</code></td></tr>
+      <tr><th>짝 문서</th><td><code>시스템_설계도_v4</code> (설계) · <code>폐쇄망_설치_배포_설계서</code> (설치) · <code>운영_런북</code> (운영)</td></tr>
+      <tr><th>설치 자산</th><td><code>poc/scripts/preflight_host.sh</code> · <code>poc/docs/INSTALL.md</code> · <code>poc/docker-compose.airgap.yml</code></td></tr>
+      <tr><th>작성일</th><td>2026-08-26</td></tr>
+      <tr><th>근거 커밋</th><td><code>d3fe51c3</code></td></tr>
+    </tbody>
+  </table>
+
+
+  <div class="note">
+    본 문서는 시스템의 배포 형태와 서버 구성을 기술한다. 값의 출처를 실측과 선언으로 구분해 표기했다.
+    실측은 서버에서 직접 확인한 값이고, 선언은 발주처 사양서 또는 설계 문서가 정한 값이다.
+  </div>
+
+  <h2>1. 배포 형태</h2>
+  <p>배포 모드는 환경변수 <code>KOIPA_DEPLOY_PROFILE</code> 로 전환한다. 프로파일이 안전 게이트, 기능 노출 범위, 저장소 백엔드의 기본값을 결정한다.</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:16%">프로파일</th><th style="width:22%">용도</th><th style="width:18%">학습 기능</th><th>특징</th></tr></thead>
+    <tbody>
+      <tr><td><code>lite-noapi</code></td><td>로컬 개발 · 기본값</td><td class="c off">없음</td><td>외부 의존 없이 기동한다(해시 임베딩, 메모리 내 벡터 저장)</td></tr>
+      <tr><td><code>lite-cloud</code></td><td>오픈망 파일럿</td><td class="c off">없음</td><td>관계형 DB 와 로컬 파일시스템 저장</td></tr>
+      <tr><td><code>onprem-local</code></td><td>고객사 폐쇄망 운영</td><td class="c off">없음<span class="src"> (야간 증분 재학습은 별도 설정)</span></td><td>안전 게이트 적용을 강제한다. 원본 저장 시 암호화가 필수이며, 게이트가 비활성이면 기동을 차단한다</td></tr>
+      <tr><td><code>full-train</code></td><td>지재원 학습 노드 · 시험 서버</td><td class="c ok">있음</td><td>학습·합성 라우터가 추가로 노출된다. 안전 게이트 설정은 <code>onprem-local</code> 과 같다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>2. 컨테이너 구성</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:16%">서비스</th><th style="width:26%">이미지</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><code>api</code></td><td><code>koipa-api</code> (python:3.11-slim)</td><td>HTTP API 제공 및 콘솔 정적 파일 서비스</td></tr>
+      <tr><td><code>worker</code></td><td><code>koipa-worker</code></td><td>Celery 워커. 배치 분류, 골든셋 생성, 학습을 수행한다</td></tr>
+      <tr><td><code>beat</code></td><td><code>koipa-worker</code></td><td>주기 작업 스케줄러. 야간 재학습과 보존기간 삭제를 담당한다</td></tr>
+      <tr><td><code>mariadb</code> / <code>postgres</code></td><td><code>mariadb:10.11</code> / <code>pgvector/pgvector:pg16</code></td><td>관계형 저장소. 납품 정본은 MariaDB, 폐쇄망 번들과 현행 시험서버는 PostgreSQL</td></tr>
+      <tr><td><code>redis</code></td><td><code>redis:7.2-alpine</code></td><td>작업 큐 및 메시지 브로커</td></tr>
+      <tr><td><code>mlflow</code></td><td>MLflow</td><td>학습 실행 추적. 학습 노드에만 배치한다</td></tr>
+      <tr><td><code>nginx-mtls</code></td><td><code>nginx:1.27-alpine</code></td><td>폐쇄망 구성 전용. 상호 TLS 를 종단한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">구성 파일 — <code>docker-compose.dual.yml</code>(시험 이중배포) · <code>docker-compose.prod.yml</code>(운영) · <code>docker-compose.airgap.yml</code>(폐쇄망)</p>
+
+  <h2>3. 시험 서버 실측</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:22%">항목</th><th style="width:34%">실측값</th><th>확인 방법</th></tr></thead>
+    <tbody>
+      <tr><td>운영체제</td><td>Ubuntu 22.04.3 LTS</td><td><code>/etc/os-release</code></td></tr>
+      <tr><td>CPU</td><td class="n">8 코어</td><td><code>nproc</code></td></tr>
+      <tr><td>메모리</td><td class="n">47 GB</td><td><code>free -g</code></td></tr>
+      <tr><td>GPU</td><td>NVIDIA L4 · 23,034 MiB · 드라이버 580.159.04</td><td><code>nvidia-smi</code></td></tr>
+      <tr><td>컨테이너 런타임</td><td>Docker 29.7.2</td><td><code>docker --version</code></td></tr>
+      <tr><td>배포 프로파일</td><td><code>full-train</code></td><td><code>docker inspect koipa-jjw-api-1</code></td></tr>
+      <tr><td>가동 컨테이너</td><td>api · worker · beat · mlflow · postgres(pgvector:pg16) · redis(7.2-alpine) · minio</td><td><code>docker ps</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note">
+    시험 서버에 GPU 가 있으나 배포 이미지에서는 인식되지 않는다. 이미지에 설치된 torch 가 CPU 빌드이기
+    때문이다(<code>TORCH_INDEX</code> 가 CPU 인덱스를 가리킨다). 운영 추론을 CPU 전용으로 하는 설계와
+    일치하며, GPU 성능 측정이 필요한 경우 CUDA 인덱스로 별도 이미지를 빌드한다.
+    가동 컨테이너 목록의 MinIO 는 시험 구성에서만 사용하며 폐쇄망 구성에는 포함하지 않는다(§4).
+  </div>
+
+  <h2>4. 폐쇄망 구성</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:24%">항목</th><th>구성</th></tr></thead>
+    <tbody>
+      <tr><td>이미지 공급</td><td>빌드 컨텍스트 없이 <code>docker load</code> 로 복원한 이미지 태그를 직접 참조한다. 소스와 인터넷 연결이 필요 없다</td></tr>
+      <tr><td>객체 저장소</td><td>객체 저장소를 사용하지 않는다. 로컬 파일시스템에 저장하며 원본은 AES-256-GCM 으로 암호화한다</td></tr>
+      <tr><td>검색 엔진</td><td>두지 않는다. 유사문서 조회를 2026-09-05 미채택으로 걷어 벡터 검색 자체가 없다</td></tr>
+      <tr><td>전송 보안</td><td><code>nginx-mtls</code> 상호 TLS</td></tr>
+      <tr><td>LLM</td><td>기본 미사용. 등급 결정 경로는 LLM 없이 동작한다</td></tr>
+      <tr><td>안전 게이트</td><td>적용을 강제하며, 게이트가 비활성이면 기동하지 않는다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>5. 저장 계층</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:22%">대상</th><th style="width:26%">저장소</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td>구조화 데이터</td><td>PostgreSQL</td><td>테이블 19 개이며 상세는 <code>테이블_정의서</code> 에 있다. 납품 정본(MariaDB)은 파티션을 두지 않는다 — 시간축 인덱스와 보존기간 삭제로 대신한다. 현행 시험서버(PostgreSQL)에는 옛 마이그레이션이 만든 월별 파티션이 남아 있다(실측: tb_audit_log·tb_chunks·tb_llm_usage 각 15개)</td></tr>
+      <tr><td>임베딩</td><td>KURE-v1 (CPU)</td><td>룰 시드 유사도·학습 분포 감시에 쓴다. 저장하지 않는다</td></tr>
+      <tr><td>문서 원본 · 정규화 텍스트</td><td>로컬 파일시스템</td><td>DB 에는 접근 경로만 저장한다. 운영 프로파일에서는 저장 시 암호화가 필수다</td></tr>
+      <tr><td>작업 큐</td><td>Redis</td><td>배치 분류·학습 작업의 큐와 멱등 키 저장에 사용한다</td></tr>
+      <tr><td>모델 아티팩트</td><td>파일시스템 볼륨</td><td>학습 노드는 MLflow 로 실행을 추적한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>6. 노드 역할 분리</h2>
+  <div class="flow">지재원 · 학습 노드                        고객사 · 운영 노드
+  · 프로파일 full-train                    · 프로파일 onprem-local
+  · 학습, 합성, 골든셋 생성, 색인            · 추론, 검수, 확정
+  · GPU 사용                               · CPU 전용, 폐쇄망
+  · /train, /synth 라우터 노출              · 학습 라우터 미등록
+        │                                        ▲
+        └────  모델 배포 번들(docker load + 모델 동봉)  ────┘</div>
+  <p>고객사 노드에서는 야간 증분 재학습만 별도 설정으로 동작하며, 재학습 결과는 후보 등록까지만 수행한다. 서빙 모델로의 자동 전환은 하지 않는다.</p>
+
+
+  <h2>7. 운영 호스트 운영체제</h2>
+  <p>운영 서버는 <b>Rocky Linux</b> 로 설치한다(2026-08-26 발주처 통보). 시험 서버(Ubuntu 22.04.3)와 다르므로
+  구분해 기술한다.</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">판단</th><th>근거</th></tr></thead>
+    <tbody>
+      <tr><td class="ok">배포판 종속 없음</td><td>애플리케이션은 전부 컨테이너에서 동작하고 이미지 내부는 Debian 계열(<code>python:3.11-slim</code>)이다. 호스트가 바뀌어도 컨테이너 내부는 동일하다</td></tr>
+      <tr><td class="ok">패키지 관리자 비의존</td><td><code>install.sh</code> 는 <code>docker load</code> 만 수행한다. apt·dnf 를 호출하지 않는다</td></tr>
+      <tr><td class="ok">호스트 런타임 불요</td><td>파이썬을 포함한 의존성은 이미지에 포함되어 있다. 호스트에 파이썬이 없어도 된다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>7-1. RHEL 계열에서 달라지는 것</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:16%">항목</th><th style="width:34%">무엇이 다른가</th><th>적용한 조치</th></tr></thead>
+    <tbody>
+      <tr><td>SELinux</td><td>기본 <code>enforcing</code>. 라벨 없는 bind mount 는 컨테이너가 읽지 못해 <b>모델 적재가 실패</b>한다</td>
+          <td class="ok">폐쇄망 compose 의 bind mount 3 곳(<code>../models</code> × 2, mtls 설정·인증서)에 <code>:z</code> 공유 라벨을 적용했다. SELinux 가 없는 호스트에서는 무시되므로 양쪽 모두 안전하다</td></tr>
+      <tr><td>컨테이너 런타임</td><td>RHEL 계열 기본은 podman 이다</td>
+          <td class="ok">설치·기동 스크립트를 <b>런타임 중립</b>으로 바꿨다. docker 를 우선 찾고 없으면 podman 으로 진행하며, compose 는 <code>compose</code> 하위명령 → <code>podman-compose</code> → <code>docker-compose</code> 순으로 판별한다. 어느 쪽이 설치되어 있든 동작한다</td></tr>
+      <tr><td>firewalld</td><td>기본 활성. API 포트와 컨테이너 간 통신 규칙이 필요하다</td>
+          <td class="ok">사전 점검 스크립트가 활성 여부와 포트 점유를 확인하고 개방 명령을 안내한다</td></tr>
+      <tr><td>uid · gid</td><td>운영 이미지는 비-root(uid 1000)로 동작한다. 호스트 계정 uid 가 다르면 호스트가 만든 디렉터리를 컨테이너가 쓰지 못한다</td>
+          <td class="ok">사전 점검 스크립트가 설치 사용자 uid 를 컨테이너 uid 와 대조한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>7-2. 설치 전 점검</h3>
+  <p>설치는 발주처가 수행하므로, 현장에서 처음 만나는 실패를 줄이기 위해 읽기 전용 점검 스크립트를 번들에 동봉한다.</p>
+  <div class="flow">bash preflight_host.sh        # 아무것도 설치·변경하지 않는다
+
+  1 운영체제        2 컨테이너 런타임    3 SELinux
+  4 방화벽 · 포트    5 사용자 uid · gid   6 cgroup
+  7 자원(CPU · 메모리 · 디스크)          8 필수 명령        9 시간 동기
+
+  종료 코드 0 = 진행 가능 · 1 = 차단 항목 있음</div>
+  <p class="src">스크립트 <code>poc/scripts/preflight_host.sh</code> · 절차서 <code>docs/INSTALL.md</code> §0-1</p>
+  <div class="note">
+    <b>미검증 고지.</b> 본 구성은 Rocky Linux 에서 설치 시험을 수행한 이력이 없다. 위 조치는 코드·구성 검토와
+    RHEL 계열의 알려진 동작에 근거한 것이며, 실제 설치 전에 동일 버전의 Rocky 에서 리허설을 한 번 수행할 것을 권한다.
+    저장소 전체를 검색한 결과 <code>selinux</code>·<code>podman</code>·<code>dnf</code> 를 다루는 코드는
+    본 조치 이전까지 한 줄도 없었다.
+  </div>
+
+  <h2>8. 미확인 항목</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:28%">항목</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr><td>운영 서버 하드웨어 사양</td><td class="part">설계 문서가 발주처 사양 선언값을 인용한 것으로 실측값이 아니다. 운영 환경이 확정되면 실측값으로 대체해야 한다</td></tr>
+      <tr><td>운영 서버 운영체제</td><td class="ok">운영 서버는 Rocky Linux 로 확정되었다(§7). 본 문서 §3 의 Ubuntu 22.04.3 은 시험 서버 실측값이다. 다만 <b>Rocky 버전과 컨테이너 런타임 종류는 아직 확인하지 않았다</b></td></tr>
+      <tr><td>이중화</td><td>고가용성 구성은 하지 않으며 복구 목표 시간(RTO)을 정한 재해복구 절차로 대응한다. 상세 절차는 <code>운영_런북</code> 에 있다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>9. 개정 이력</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. 시험 서버의 하드웨어·운영체제·GPU 실측값을 반영하고 실측과 선언을 구분해 표기했다. 운영 호스트가 Rocky Linux 로 통보되어 §7 을 신설하고 SELinux 라벨·사전 점검 스크립트를 적용했다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">근거 파일 — <code>poc/docker-compose.airgap.yml</code> · <code>poc/docker-compose.prod.yml</code> · <code>poc/Dockerfile.api.prod</code> · <code>poc/src/koipa/config.py</code></div>
+</div>
+</body>
+</html>

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.modules.m2_preprocess.extractor import ExtractResult, extract
+from koipa.modules.m2_preprocess.extractor import ExtractResult, _pdf_tables_via_pdfplumber, extract
 
 
 @pytest.fixture
@@ -51,14 +51,19 @@ class TestPlainExtraction:
         assert "col1" in result.text
 
     def test_cp949_fallback(self, tmp_path: Path):
-        """utf-8 디코드 실패 시 cp949 fallback."""
+        """utf-8 실패 시 cp949 로 원문을 정확히 복원 (utf-16 모지바케 무음유실 회귀 방지).
+
+        짝수 길이 순한글은 무BOM utf-16 이 예외 없이 임의 코드포인트로 '성공' 디코드하므로,
+        폴백에서 utf-16 을 cp949 보다 먼저 시도하면 원문이 모지바케로 조용히 유실된다(silent FNR).
+        폴백 순서가 cp949 우선(BOM 없을 때)이어야 원문이 그대로 복원된다.
+        """
+        original = "영업비밀"  # 4자 = cp949 8바이트(짝수) → utf-16 우선이면 모지바케로 깨짐
         p = tmp_path / "cp949.txt"
-        # cp949로 인코딩된 텍스트 (한국어)
-        p.write_bytes("한국어 텍스트".encode("cp949"))
+        p.write_bytes(original.encode("cp949"))
         result = extract(p)
-        # cp949 fallback 작동 — text가 비어있지 않거나 빈 문자열 (둘 다 OK)
-        assert isinstance(result, ExtractResult)
         assert result.method == "plain"
+        assert result.text == original, f"cp949 원문 복원 실패(모지바케 유실): {result.text!r}"
+        assert any("cp949" in w for w in (result.warnings or []))
 
 
 class TestUnsupported:
@@ -99,6 +104,47 @@ class TestPdfFallback:
         # quality가 0 (에러) 또는 매우 낮음
         assert result.quality <= 0.5
 
+    def test_pdfplumber_tables_are_structured(self, tmp_path: Path, monkeypatch):
+        import sys
+        from types import SimpleNamespace
+
+        class FakePage:
+            def extract_tables(self):
+                return [[["item", "amount"], ["secret", "12000"]]]
+
+        class FakePdf:
+            pages = [FakePage()]
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        monkeypatch.setitem(sys.modules, "pdfplumber", SimpleNamespace(open=lambda path: FakePdf()))
+
+        p = tmp_path / "table.pdf"
+        p.write_bytes(b"%PDF fake")
+        tables, warnings = _pdf_tables_via_pdfplumber(p)
+        assert warnings == ["pdf_tables_structured"]
+        assert tables[0].rows == [["item", "amount"], ["secret", "12000"]]
+
+    def test_pdf_table_extractor_unavailable_routes_review_signal(self, tmp_path: Path, monkeypatch):
+        import sys
+
+        from tests.test_document_ingestion import _minimal_pdf
+
+        monkeypatch.setitem(sys.modules, "pdfplumber", None)
+
+        p = tmp_path / "text_table_unknown.pdf"
+        p.write_bytes(_minimal_pdf("Trade Secret ALD deposition table"))
+        result = extract(p)
+
+        assert result.method == "parser"
+        assert result.text
+        assert "pdf_table_extractor_unavailable" in result.warnings
+        assert result.table_coverage == "incomplete"
+
 
 class TestDocxFallback:
     def test_docx_nonexistent(self, tmp_path: Path):
@@ -108,6 +154,56 @@ class TestDocxFallback:
         assert isinstance(result, ExtractResult)
         assert result.quality == 0.0
         assert result.error is not None
+
+    def test_docx_table_is_structured(self, tmp_path: Path):
+        docx = pytest.importorskip("docx")
+
+        doc = docx.Document()
+        table = doc.add_table(rows=2, cols=2)
+        table.cell(0, 0).text = "item"
+        table.cell(0, 1).text = "amount"
+        table.cell(1, 0).text = "secret cost"
+        table.cell(1, 1).text = "12000"
+        p = tmp_path / "table.docx"
+        doc.save(str(p))
+
+        result = extract(p)
+        assert result.tables
+        assert result.tables[0].rows == [["item", "amount"], ["secret cost", "12000"]]
+        assert "secret cost | 12000" in result.text
+
+    def test_docx_ooxml_content_control_table_fallback(self, tmp_path: Path, monkeypatch):
+        import zipfile
+
+        import docx
+
+        class FakeDoc:
+            paragraphs = []
+            tables = []
+            sections = []
+
+        monkeypatch.setattr(docx, "Document", lambda path: FakeDoc())
+
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            "<w:body><w:tbl><w:tr>"
+            "<w:tc><w:sdt><w:sdtContent><w:r><w:t>item</w:t></w:r></w:sdtContent></w:sdt></w:tc>"
+            "<w:tc><w:sdt><w:sdtContent><w:r><w:t>amount</w:t></w:r></w:sdtContent></w:sdt></w:tc>"
+            "</w:tr><w:tr>"
+            "<w:tc><w:sdt><w:sdtContent><w:r><w:t>hidden weekly report</w:t></w:r></w:sdtContent></w:sdt></w:tc>"
+            "<w:tc><w:r><w:t>260703</w:t></w:r></w:tc>"
+            "</w:tr></w:tbl></w:body></w:document>"
+        )
+        p = tmp_path / "content_control_table.docx"
+        with zipfile.ZipFile(p, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("word/document.xml", xml)
+
+        result = extract(p)
+        assert "hidden weekly report | 260703" in result.text
+        assert result.tables
+        assert result.tables[0].rows == [["item", "amount"], ["hidden weekly report", "260703"]]
+        assert "docx_ooxml_tables_extracted" in result.warnings
 
 
 class TestHwpFallback:
@@ -152,6 +248,29 @@ class TestExcelExtraction:
         assert "대외비" in result.text           # 2번째 시트도
         assert "|" in result.text                # 표 셀 구분자
 
+    def test_xlsx_table_comments_and_formula_are_preserved(self, tmp_path: Path):
+        from openpyxl import Workbook
+        from openpyxl.comments import Comment
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Data"
+        ws.append(["item", "amount"])
+        ws.append(["secret cost", 12000])
+        ws["A2"].comment = Comment("review this hidden note", "tester")
+        ws["C2"] = "=B2*2"
+        p = tmp_path / "structured.xlsx"
+        wb.save(str(p))
+
+        result = extract(p)
+        assert result.tables
+        assert result.tables[0].sheet == "Data"
+        assert result.tables[0].rows[1][:2] == ["secret cost", "12000"]
+        assert "[excel comment Data!A2] review this hidden note" in result.text
+        assert "[excel formula Data!C2] =B2*2" in result.text
+        assert "excel_comments_extracted" in result.warnings
+        assert "excel_formulas_extracted" in result.warnings
+
     def test_xlsx_corrupt_graceful(self, tmp_path: Path):
         p = tmp_path / "fake.xlsx"
         p.write_bytes(b"not a real xlsx")
@@ -181,6 +300,9 @@ class TestExcelExtraction:
         assert "영업비밀목록" in result.text       # 첫 시트명
         assert "ALD레시피" in result.text          # 셀 값
         assert "협력사" in result.text             # 둘째 시트도
+        # ⚠ 이 문자열은 **브랜드 표기가 아니라 픽스처 내용**이다. sample.xls 는 바이너리라
+        # 2026-08-12 koipa 리네임에서 치환 대상이 아니었고, 그 안의 셀 값은 "로이드케이"
+        # 그대로다. 여기를 기관명으로 바꾸면 픽스처와 어긋나 테스트가 깨진다.
         assert "로이드케이" in result.text
         assert "|" in result.text                  # 표 셀 구분자
 
@@ -263,6 +385,26 @@ class TestPptxExtraction:
         assert "영업비밀 사업계획" in result.text     # 제목 도형
         assert "대외비" in result.text                # 텍스트박스
 
+    def test_pptx_table_is_structured(self, tmp_path: Path):
+        from pptx import Presentation
+        from pptx.util import Inches
+
+        prs = Presentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        shape = slide.shapes.add_table(2, 2, Inches(1), Inches(1), Inches(5), Inches(1))
+        table = shape.table
+        table.cell(0, 0).text = "item"
+        table.cell(0, 1).text = "amount"
+        table.cell(1, 0).text = "prototype"
+        table.cell(1, 1).text = "9000"
+        p = tmp_path / "table.pptx"
+        prs.save(str(p))
+
+        result = extract(p)
+        assert result.tables
+        assert result.tables[0].rows == [["item", "amount"], ["prototype", "9000"]]
+        assert "prototype | 9000" in result.text
+
     def test_pptx_corrupt_graceful(self, tmp_path: Path):
         p = tmp_path / "fake.pptx"
         p.write_bytes(b"not a real pptx")
@@ -317,7 +459,7 @@ class TestPiiMaskingOnTables:
     def test_pii_in_xlsx_cell_is_masked(self, tmp_path: Path):
         from openpyxl import Workbook
 
-        from lloydk.modules.m2_preprocess.pii_masker import mask_pii
+        from koipa.modules.m2_preprocess.pii_masker import mask_pii
 
         wb = Workbook()
         ws = wb.active
@@ -338,7 +480,7 @@ class TestPiiMaskingOnTables:
         from pptx import Presentation
         from pptx.util import Inches
 
-        from lloydk.modules.m2_preprocess.pii_masker import mask_pii
+        from koipa.modules.m2_preprocess.pii_masker import mask_pii
 
         prs = Presentation()
         slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank

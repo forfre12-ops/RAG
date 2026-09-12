@@ -1,0 +1,217 @@
+/* 검수 라우팅 사유를 사람 말로 옮긴다 — 화면 두 곳이 같은 표를 쓰게 하는 단일 출처.
+ *
+ * 왜 파일로 뺐나(2026-08-24). 같은 표가 index.html 인라인 스크립트와 app.js 두 곳에
+ * 따로 있었다. 게이트가 하나 늘 때마다 두 곳을 같이 고쳐야 하는데, 한쪽만 고치면
+ * 화면에 따라 사유가 보였다 안 보였다 한다. 서버 쪽은 이미 한 곳(services/review_reasons.py)
+ * 으로 모아 뒀다 — 화면도 같은 규율을 따른다.
+ *
+ * ⚠ 순서가 의미를 가진다. agreement-gate 를 먼저 본다: 신뢰도가 임계를 넘겨도 이 조건이면
+ *    검수로 간다(실측 2026-08-21, 신뢰도 0.744 인데 룰 S3·모델 TS 불일치로 라우팅).
+ *    신뢰도를 먼저 보면 "신뢰도가 낮아서" 라는 틀린 사유가 화면에 뜬다.
+ *
+ * 모듈이 아니라 평범한 스크립트다 — index.html 의 인라인 스크립트(비모듈)와 app.js(모듈)가
+ * 둘 다 써야 하고, 모듈이면 인라인 쪽에서 import 할 수 없다.
+ */
+(function (global) {
+  "use strict";
+
+  var GATE_REASONS = [
+    [/agreement-gate: model=(\S+) vs rule=(\S+)/,
+      function (m) { return "두 엔진이 갈립니다 — 분류기 " + m[1] + " · 룰 " + m[2] + " (신뢰도만으로는 확정하지 않습니다)"; }],
+    /* 수치를 문구에 넣지 않는다(2026-08-24 지시). 검수자가 알아야 하는 것은 "왜 검수인가"
+       이지 softmax 파생값의 소수점이 아니다. 원 수치는 API 응답·DB·감사로그에 그대로 있다. */
+    [/low-confidence: confidence=[\d.]+ < [\d.]+/,
+      function () { return "판정 근거가 자동 확정 기준에 못 미칩니다"; }],
+    [/document flagged at ingestion/, function () { return "추출 품질이 낮은 문서입니다(스캔·OCR 등)"; }],
+    [/body_below_classifiable_threshold/, function () { return "판정할 본문이 사실상 없습니다"; }],
+    [/cap-conflict/, function () { return "출처 기준 하향과 내용 기준 상향이 충돌합니다"; }],
+    [/sparse-evidence/, function () { return "룰 판정이 약한 근거 하나에 기대고 있습니다"; }],
+    [/abbrev-only-escalation/, function () { return "영문 약어 밀도만으로 높은 등급이 나왔습니다"; }],
+    [/metadata-access-conflict/, function () { return "접근 제한 표기에 비해 내용 예측이 낮습니다"; }],
+    [/metadata-management-conflict/, function () { return "관리성 부재 표기인데 내용 예측이 비공개 등급입니다"; }],
+    [/gate-fail-open/, function () { return "안전 게이트 하나가 적용되지 못했습니다"; }],
+    [/s2-underclass-risk/, function () { return "내부 문서 신호가 있는데 공개 등급으로 예측되었습니다"; }],
+    /* [2026-08-24 사용자 실측] 파일을 올려 분류했는데 사유 자리에 기본 문구
+       ("자동 확정하지 않고 사람 검수로 라우팅")만 떴다. 경고에는 사유가 있었다:
+           extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (table_incomplete, content_dropped)
+       이 게이트는 **업로드 경로 전용**이고(api/documents.py — classify 뒤에 status 를 올린다)
+       이 표에만 빠져 있었다. 서버측 표(services/review_reasons.py:69)에는 진작 있었다.
+       ⚠ 자리는 **맨 끝**이다 — 앞의 게이트가 걸렸으면 그게 원인이고, 이것은 분류가 끝난
+       뒤에 붙는 마지막 관문이다(서버 표와 같은 순서). */
+    /* 탐욕 `.*` 로 **마지막** 괄호를 잡는다. 경고 문구에는 괄호가 둘이다 —
+       앞의 "(표누락/OCR/저품질)" 은 게이트 이름 설명이고, 실제 사유 코드는 맨 끝
+       "(table_incomplete, content_dropped)" 다. 앞을 잡으면 사유가 아니라 게이트 설명이 뜬다. */
+    [/extraction_gate:.*\(([^()]*)\)\s*$/,
+      function (m) { return "본문 추출이 온전하지 않습니다 — " + _extractionReasons(m[1]); }],
+    [/extraction_gate:/, function () { return "본문 추출이 온전하지 않습니다"; }],
+  ];
+
+  /* 추출 게이트 사유 코드 → 사람 말. 코드는 document_ingestion_service.py:118~129 가 만든다.
+     모르는 코드는 **지우지 않고 그대로 붙인다** — 새 코드가 생겼을 때 사유가 조용히
+     사라지는 것보다 영문이라도 보이는 편이 낫다. */
+  var EXTRACTION_REASON_KO = {
+    extract_error: "추출 오류",
+    ocr: "OCR 로 읽은 문서",
+    low_quality: "추출 품질이 낮음",
+    table_incomplete: "표 일부가 안 읽힘",
+    content_dropped: "차트·이미지 등 본문 일부가 빠짐"
+  };
+  function _extractionReasons(codes) {
+    return String(codes || "").split(",").map(function (c) {
+      var k = c.trim();
+      return EXTRACTION_REASON_KO[k] || k;
+    }).filter(Boolean).join(" · ");
+  }
+
+  /* warnings 배열에서 **검수로 보낸 사유** 한 줄을 찾는다. 못 찾으면 빈 문자열.
+     빈 문자열을 부르는 쪽이 "자동 확정하지 않고 사람 검수로 라우팅" 같은 기본 문구로 받는다. */
+  function gateReason(warnings) {
+    var ws = warnings || [];
+    for (var i = 0; i < ws.length; i++) {
+      for (var j = 0; j < GATE_REASONS.length; j++) {
+        var m = String(ws[i]).match(GATE_REASONS[j][0]);
+        if (m) return GATE_REASONS[j][1](m);
+      }
+    }
+    return "";
+  }
+
+  /* ── 안전 규칙이 모델 최고점과 **다른 등급**을 채택했는지 설명한다 ──────────────
+   *
+   * 왜 필요한가(실측 2026-08-24, 사용자 지적). 화면에 「룰·모델 모두 TS 로 일치」 라고
+   * 뜨는데 검수로 갔다. 검수자가 읽으면 앞뒤가 안 맞는다. 실제로는 이랬다:
+   *
+   *     등급별 확률  S1 0.5163 · TS 0.4635 · S2 0.0138 · S3 0.0064
+   *     모델 최고점은 S1 인데 escalation(τ=0.30)이 더 심각한 TS 를 채택했고,
+   *     confidence 는 채택 등급의 확률(0.4635)이라 임계에 못 미쳐 검수로 갔다.
+   *
+   * 즉 "두 엔진이 갈려서" 가 아니라 "올려 잡은 등급이라 확신이 낮아서" 다. 화면이 그걸
+   * 말해 주지 않으면 검수자는 이유를 찾을 수 없다.
+   *
+   * 서버를 바꾸지 않고 응답만으로 판별한다. 두 갈래다 —
+   *   ① warnings 에 `fnr-safe override` 가 있으면 **룰 엔진이 올려 잡은 것**이다.
+   *   ② 없으면 scores 최고점과 최종 등급을 견준다(모델 안 escalation).
+   * ①을 먼저 보는 이유는 아래 OVERRIDE_RE 주석에 적었다 — 그 경우 scores 가 동점이라
+   * ②만으로는 아무 말도 못 한다. 메타데이터 floor · 출처 cap 은 아직 구분하지 않는다.
+   *
+   * ⛔ 확률 수치는 문구에 넣지 않는다 - 화면에서 신뢰도 수치를 빼기로 한 결정과 같은 이유.
+   */
+  var SEVERITY = { TS: 0, S1: 1, S2: 2, S3: 3 };
+
+  /* 룰이 안전 상향한 경우를 warnings 원문에서 찾는다.
+   *
+   * ⚠ scores 로는 못 잡는다(실측 2026-08-24 · 223 build 5c572ad31c11). 서버가 상향할 때
+   *   **채택 등급 점수에 원래 최고점을 그대로 복사**해 두 등급이 동점이 된다:
+   *       S1-재무-고객   TS 0.4780 · S1 0.4780   (모델 S1 → 룰이 TS 로 상향)
+   *       S2-재무-영업   S1 0.4924 · S2 0.4924   (모델 S2 → 룰이 S1 로 상향)
+   *   아래 adjustmentNote 의 최고점 스캔은 동점이면 앞의 키를 잡고, 그것이 최종 등급과
+   *   같아 "설명할 것 없음"으로 조용히 빠졌다. 그래서 이 두 건은 화면에 "판정 근거가
+   *   자동 확정 기준에 못 미칩니다" 한 줄만 뜨고, **왜 확신이 낮은지**(룰이 올려 잡아서)는
+   *   ③ 「결합」 줄에만 남았다 — 검수 사유를 묻는 자리에서는 빠져 있었다.
+   */
+  /* 등급 코드에 붙는 조사. 코드를 소리 내어 읽었을 때 받침이 있는지로 갈린다 —
+     S1(에스원)만 받침 ㄴ 이라 '이·을·으로' 를 쓰고, TS(티에스)·S2(에스투)·S3(에스쓰리)는
+     모음으로 끝나 '가·를·로' 를 쓴다. 종전에는 전부 '가·를·로' 로 붙여 "S1 가 가장
+     높았는데" 처럼 나왔다. */
+  var JOSA = {
+    TS: { i: "가", eul: "를", ro: "로" },
+    S1: { i: "이", eul: "을", ro: "으로" },
+    S2: { i: "가", eul: "를", ro: "로" },
+    S3: { i: "가", eul: "를", ro: "로" }
+  };
+  function _j(code, kind) {
+    var t = JOSA[String(code || "").toUpperCase()];
+    return t ? t[kind] : { i: "가", eul: "를", ro: "로" }[kind];
+  }
+
+  var OVERRIDE_RE = /fnr-safe override: rule \S+ score=[\d.]+ >= threshold [\d.]+ \(model (\S+) -> (\S+)\)/;
+
+  function _ruleOverride(warnings) {
+    var ws = warnings || [];
+    for (var i = 0; i < ws.length; i++) {
+      var m = String(ws[i]).match(OVERRIDE_RE);
+      if (m) return { from: m[1], to: m[2] };
+    }
+    return null;
+  }
+
+  function adjustmentNote(data) {
+    var d = data || {};
+    // ① 룰 엔진이 올려 잡은 경우 — 가장 확실한 근거는 warnings 원문이다.
+    var ov = _ruleOverride(d.warnings);
+    if (ov) {
+      return "룰 엔진이 근거를 잡아 분류기의 " + ov.from + " 판정을 " + ov.to
+        + _j(ov.to, "ro") + " 올렸습니다 — 미탐을 줄이려는 설계입니다. 올려 잡은 등급이라 확신이 낮아 사람이 확인합니다.";
+    }
+    // ② 모델 안에서 안전 규칙(escalation)이 최고점이 아닌 등급을 채택한 경우.
+    //    scores 는 **확률 벡터**이고 model_grade 는 **escalation 을 적용한 뒤** 값이다
+    //    (m5_inference/pipeline.py:595 _select_index — 심각한 등급부터 prob ≥ τ 를 채택).
+    //    그래서 둘이 다를 수 있다. 여기서 말하는 것은 확률 최고점 쪽이다.
+    var scores = d.scores;
+    var label = d.label;
+    if (!scores || !label || typeof scores !== "object") return "";
+    var top = null;
+    for (var k in scores) {
+      if (!Object.prototype.hasOwnProperty.call(scores, k)) continue;
+      if (top === null || Number(scores[k]) > Number(scores[top])) top = k;
+    }
+    if (!top || top === label) return "";
+    // 동점이면 안전 규칙이 개입했다고 단정할 수 없다 — 말하지 않는다.
+    if (Number(scores[top]) === Number(scores[label])) return "";
+    var a = SEVERITY[label], b = SEVERITY[top];
+    if (a === undefined || b === undefined) return "";
+    if (a < b) {
+      return "분류기의 등급별 확률은 " + top + _j(top, "i") + " 가장 높았는데, 안전 규칙이 더 심각한 " + label
+        + _j(label, "eul") + " 채택했습니다 — 미탐을 줄이려는 설계입니다. 올려 잡은 등급이라 확신이 낮아 사람이 확인합니다.";
+    }
+    return "분류기의 등급별 확률은 " + top + _j(top, "i") + " 가장 높았는데, 출처·메타데이터 규칙이 " + label
+      + _j(label, "ro") + " 내려 잡았습니다 — 사람이 확인합니다.";
+  }
+
+  /* ── 게이트 태그 → 사람 말 ─────────────────────────────────────────────
+   *
+   * 위 GATE_REASONS 는 warnings **원문**에서 사유를 찾는다. 그런데 관리자 콘솔의
+   * 「근거」 패널은 원문이 아니라 서버가 이미 하나로 줄여 준 태그를 받는다
+   * (ClassifyResponse.automation_assessment.causal_review_reason —
+   *  services/review_reasons.py 의 REVIEW_GATE_TAGS 중 하나, 또는 'unmapped').
+   * 종전에는 그 태그를 영문 그대로 화면에 찍었다. 표는 여기 한 곳에 둔다.
+   *
+   * ⚠ 서버의 REVIEW_GATE_TAGS 와 키가 일치해야 한다 —
+   *   tests/test_review_reasons.py::test_every_gate_tag_has_korean_text 가 확인한다.
+   *   게이트를 추가·개명하면 그 시험이 먼저 깨진다.
+   */
+  var TAG_TEXT = {
+    "low-confidence": "판정 근거가 자동 확정 기준에 못 미칩니다",
+    "ingestion-degraded": "추출 품질이 낮은 문서입니다(스캔·OCR 등)",
+    "cap-conflict": "출처 기준 하향과 내용 기준 상향이 충돌합니다",
+    "sparse-evidence": "룰 판정이 약한 근거 하나에 기대고 있습니다",
+    "abbrev-only-escalation": "영문 약어 밀도만으로 높은 등급이 나왔습니다",
+    "body-below-threshold": "판정할 본문이 사실상 없습니다",
+    "metadata-access-conflict": "접근 제한 표기에 비해 내용 예측이 낮습니다",
+    "metadata-management-conflict": "관리성 부재 표기인데 내용 예측이 비공개 등급입니다",
+    "icd-metadata-fnr-risk": "연동 메타데이터에 규약 밖 값이 있어 미탐 위험이 있습니다",
+    "s2-underclass-risk": "내부 문서 신호가 있는데 공개 등급으로 예측되었습니다",
+    "gate-fail-open": "안전 게이트 하나가 적용되지 못했습니다",
+    "agreement-gate": "두 엔진(분류기·룰)의 판정이 갈립니다",
+    "llm-secondopinion": "LLM 2차 의견이 더 높은 등급을 제시했습니다",
+    "kill-gate-brake": "품질 경보(kill-gate) 중이라 높은 등급을 자동 확정하지 않습니다",
+    "similarity-escalation": "사람이 검증한 유사 문서가 더 높은 등급입니다",
+    "extraction-gate": "추출 검수 게이트에 걸렸습니다(표 누락·저품질 등)",
+    "unmapped": "서버가 검수로 보냈으나 화면 표가 아직 그 사유를 모릅니다",
+  };
+
+  /* 태그 한 개 → 한 줄. 모르는 태그는 원문을 그대로 돌려준다(조용히 사라지지 않게). */
+  function gateReasonByTag(tag) {
+    var t = String(tag || "");
+    if (!t) return "";
+    return TAG_TEXT[t] || t;
+  }
+
+  /* 추출 게이트 사유 코드 → 사람 말. 업로드 경로의 「파싱 상세」 칩이 같은 표를 쓴다
+     (app.js — 종전에는 서버가 준 영문 코드 table_incomplete·content_dropped 를 그대로
+     찍었다). 위 GATE_REASONS 가 warnings 원문에서 쓰는 것과 **같은 함수**다. */
+  global.KOIPA_EXTRACTION_REASONS = _extractionReasons;
+  global.KOIPA_GATE_REASON = gateReason;
+  global.KOIPA_GATE_REASON_BY_TAG = gateReasonByTag;
+  global.KOIPA_ADJUSTMENT_NOTE = adjustmentNote;
+})(typeof window !== "undefined" ? window : globalThis);

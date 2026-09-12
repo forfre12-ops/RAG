@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>검수 관리자 사용자매뉴얼 — AI 거버넌스 관제콘솔 | Koipa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root{--bg:#ffffff;--bg-surface:#fafafa;--bg-mid:#f4f4f5;--bg-strong:#e4e4e7;--bg-inverse:#09090b;--bg-nav:rgba(255,255,255,.88);--text:#09090b;--text-soft:#52525b;--text-dim:#71717a;--text-faint:#a1a1aa;--border:rgba(0,0,0,.08);--border-mid:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.18);--font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;--font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sidebar:220px;--article-max:960px;--container:1360px;}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:5px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:48px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(27px,4vw,40px);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin:0 0 18px;color:var(--text);text-wrap:balance;}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 28px;max-width:720px;}
+h2{font-size:clamp(18px,2.5vw,23px);font-weight:700;letter-spacing:-.03em;margin:10px 0 12px;color:var(--text);}
+h3{font-size:15px;font-weight:700;margin:24px 0 8px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:36px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:44px 0 18px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout.warn{background:#fffbeb;border-color:#fcd34d;border-left:3px solid #d97706;}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.table-wrap{overflow-x:auto;margin:16px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;} td.nowrap{white-space:nowrap;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.core{background:var(--text);color:var(--bg);} .tag.sup{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.opt{background:transparent;color:var(--text-dim);border:1px solid var(--border-mid);}
+.tag.p1{background:#dc2626;color:#fff;} .tag.p2{background:#d97706;color:#fff;} .tag.p3{background:var(--bg-strong);color:var(--text);}
+.tag.pass{background:#16a34a;color:#fff;} .tag.todo{background:transparent;color:#d97706;border:1px solid #fbbf24;}
+.ph{background:#fffbeb;border:1px solid #fbbf24;color:#92400e;padding:1px 6px;font-family:var(--font-mono);font-size:11px;font-weight:600;}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0;border:1px solid var(--border-mid);margin:18px 0;}
+.kpi{padding:14px 16px;border-right:1px solid var(--border);} .kpi:last-child{border-right:none;}
+.kpi .n{font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--text);} .kpi .l{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:860px){.article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}.toc-aside{display:none;}}
+</style>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="#"><span class="brand-mark"><svg viewBox="0 0 32 32" width="28" height="28" aria-label="Koipa"><rect width="32" height="32" rx="6" fill="#09090b"/><text x="16" y="22" font-family="Geist,sans-serif" font-size="17" font-weight="800" fill="#fff" text-anchor="middle">L</text></svg></span><span class="brand-name">한국지식재산보호원</span><span class="brand-sep">/</span><span class="brand-sub">사용자매뉴얼(검수자)</span></a>
+  <div class="nav-right"><span class="nav-badge">MANUAL</span></div>
+</div></nav>
+<div class="article-layout">
+<article>
+  <div class="meta-row"><span class="badge">DOC-MAN-01</span><span class="badge outline">감리 대응</span><span class="meta-dot">·</span><span class="meta-soft">2026-07-17</span></div>
+  <h1 class="title">검수 관리자 사용자매뉴얼 — AI 거버넌스 관제콘솔</h1>
+  <p class="lede">한국지식재산보호원/지재원 영업비밀 자동 등급분류·RAG 시스템의 거버넌스 관제콘솔(admin.html) 검수 관리자 조작 절차서. 분류 → 검수(확정·재라벨) → 재학습·활성화 → 실시간 관제 → 골든셋 서명의 폐곡선을 화면 단위로 안내한다. 모든 동작은 기존 /api/v1 엔드포인트를 호출하며, 상태 변경 작업은 Safe Mode 해제 후에만 실행된다.</p>
+  <div class="callout inset"><div class="callout-label">범위 · 기준</div><p>본 매뉴얼은 관제콘솔(admin.html)과 골든셋 서명 화면(signoff.html)의 검수 관리자 조작만 다룬다. KL 포털 인증·격리, 회원사 업로드 화면, 파싱 시연(parse_demo.html)은 범위 외다.</p></div>
+  <div class="section-sep" id="sec-01-access"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">접속 · 인증 · Safe Mode</span></div>
+<p>관제콘솔(<code>admin.html</code>)은 API 서버가 서빙하는 단일 화면으로, 분류 → 검수 → 재학습 → 모델 리로드 → 메트릭의 거버넌스 폐곡선을 한 곳에서 조작한다. 모든 버튼은 기존 <code>/api/v1</code> 엔드포인트를 호출한다. 운영 배포 호스트 주소는 <span class="ph">[발주처 입력]</span>.</p>
+<div class="kpi-row"><div class="kpi"><div class="n">5</div><div class="l">거버넌스 폐곡선 단계</div></div><div class="kpi"><div class="n">4</div><div class="l">등급 (TS·S1·S2·S3)</div></div><div class="kpi"><div class="n">4</div><div class="l">Actor 역할</div></div></div>
+<h3>접속 절차</h3>
+<ol><li>브라우저로 관제콘솔(<code>admin.html</code>)에 접속한다. 상단 우측 <b>연결 확인</b> 헬스 표시가 자동 실행된다(<code>GET /healthz</code>).</li><li>「연결 · 인증 컨텍스트」 카드에서 <b>API Base</b>를 확인한다(기본 <code>/api/v1</code>, 다른 호스트면 전체 URL).</li><li><b>X-API-Key</b>에 발급받은 키를 입력한다(값은 화면에 노출되지 않음; 발급 절차 <span class="ph">[발주처 입력]</span>).</li><li><b>Actor Role</b>을 선택한다(검수=<code>reviewer</code>, 재학습·배포=<code>admin</code>).</li><li><b>User ID (actor)</b>에 실계정을 입력한다(교정 라벨러 신원으로 기록됨).</li><li><b>헬스체크 실행</b>을 눌러 상단 헬스 표시가 <b>정상</b>으로 바뀌는지 확인한다.</li></ol>
+<h3>역할별 권한</h3>
+<div class="table-wrap"><table><thead><tr><th>역할</th><th>주요 가능 작업</th><th>근거 엔드포인트</th></tr></thead><tbody><tr><td><code>admin</code></td><td>전 작업 — 확정·재라벨·재학습·모델 활성화·핫리로드·관제 대시보드·골든 서명</td><td>전부</td></tr><tr><td><code>reviewer</code></td><td>검수 큐 조회·확정·재라벨·골든 후보 조회·골든 서명</td><td><code>/confirm</code> <code>/relabel</code> <code>/review-queue</code> <code>/golden/jobs</code> <code>signoff</code></td></tr><tr><td><code>kl_backend</code></td><td>확정·검수 큐·골든 빌드·골든 서명</td><td><code>/confirm</code> <code>/review-queue</code> <code>/golden/build</code> <code>signoff</code></td></tr><tr><td><code>system</code></td><td>골든 빌드·골든 잡 조회</td><td><code>/golden/build</code> <code>/golden/jobs</code></td></tr></tbody></table></div>
+<h3>Safe Mode (쓰기 작업 허용)</h3>
+<div class="callout inset"><div class="callout-label">기본값 = 차단</div><p>「쓰기 작업 허용」 체크박스는 기본 해제 상태다. 체크하지 않으면 확정·재라벨·재학습·모델 활성화·핫리로드 같은 <b>상태 변경 작업이 실행되지 않고</b>, 조회·분류 시연만 수행된다. 상태 변경이 필요한 절차(§03·§04·§06)를 시작하기 전 반드시 체크한다.</p></div>
+<div class="callout warn"><div class="callout-label">운영 배포 시 확인</div><p>개발 기본에서는 <code>X-Actor-Role</code> 헤더가 신뢰된다(<code>api_key_trust_actor_role_header=True</code>). 운영(<code>poc_mode=full</code>)에서는 헤더 자칭을 무시하고 <code>.env</code>의 <code>API_KEY_ROLE</code>로 역할을 고정한다(값: <span class="ph">[발주처 입력]</span>).</p></div>
+<div class="section-sep" id="sec-02-classify"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">문서 분류 실행</span></div>
+<p>「분류 실행」 카드에서 문서를 분류한다(FUN-003 등급분류·005 결과처리). 등급 결정 핫패스는 LLM 없이 인코더 PLM 분류기(FUN-004)가 수행하며, 결과는 S·V·M 3요소와 근거 키워드로 설명된다.</p>
+<h3>단건 분류</h3>
+<ol><li>샘플 선택 드롭다운에서 골든셋 예시(등급별 2건, 총 8건)를 고르거나 <b>doc_id</b>·<b>제목</b>·<b>본문</b>을 직접 입력한다.</li><li><b>분류하기</b>를 누른다(<code>POST /classify</code>).</li><li>결과에서 <b>등급</b>·<b>신뢰도</b>·<b>모델 버전</b>·<b>소요(ms)</b>와 <b>검수 필요/게이트 통과</b> 배지를 확인한다.</li><li><b>S·V·M</b> 3요소 카드와 <b>근거 키워드</b> 칩으로 판단 근거를 확인한다. <b>warnings</b>가 있으면 함께 표시된다.</li></ol>
+<h3>일괄 분류</h3>
+<p><b>골든셋 8건 일괄 분류</b>는 4등급(TS·S1·S2·S3) 8건을 순차 분류해 검수 큐에 적재하고, 기대 등급 일치 수를 요청 로그에 남긴다.</p>
+<h3>등급 체계</h3>
+<div class="table-wrap"><table><thead><tr><th>등급</th><th>명칭</th><th>성격</th></tr></thead><tbody><tr><td><code>TS</code></td><td>특급기밀</td><td>고등급 — 미탐 시 최대 위험</td></tr><tr><td><code>S1</code></td><td>1등급 비밀</td><td>고등급 — 이중검토 대상</td></tr><tr><td><code>S2</code></td><td>2등급 대외비</td><td>중등급</td></tr><tr><td><code>S3</code></td><td>3급 공개</td><td>공개/비기밀</td></tr></tbody></table></div>
+<h3>판정 요소 (S×V×M)</h3>
+<div class="table-wrap"><table><thead><tr><th>요소</th><th>키</th><th>의미</th></tr></thead><tbody><tr><td>S 비공지성</td><td><code>secrecy</code></td><td>외부에 알려지지 않은 정도</td></tr><tr><td>V 경제유용성</td><td><code>value</code></td><td>보유로 얻는 경제적 유용성</td></tr><tr><td>M 비밀관리성</td><td><code>management</code></td><td>비밀로 관리된 노력의 공식성</td></tr></tbody></table></div>
+<div class="callout inset"><div class="callout-label">등급 산식</div><p>S×V×M 곱으로 등급을 정한다 — <b>8=TS · 4=S1 · 1·2=S2 · 0=S3</b>. S(비공지성)가 0이면 무조건 S3다.</p></div>
+<div class="section-sep" id="sec-03-queue"><span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">검수 큐 처리 (확정 · 재라벨)</span></div>
+<p>자동 확정되지 않은 <code>needs_review</code> 분류를 검수자가 확정하거나 재라벨한다(FUN-024·005). 이 루프는 <b>회원사 운영 교정 루프</b>이며, 골든셋 검수·서명(§06)과는 별개다.</p>
+<div class="callout warn"><div class="callout-label">Safe Mode 확인</div><p>확정·재라벨은 상태 변경(쓰기) 작업이다. 시작 전 「연결 · 인증 컨텍스트」의 <b>쓰기 작업 허용</b>을 체크한다. 미체크 시 차단 경고만 뜬다.</p></div>
+<h3>처리 절차</h3>
+<ol><li><b>신뢰도 게이트</b>(기본 0.70)를 확인한다. 신뢰도가 게이트 미만이거나 warnings가 있으면 「검수 필요」로 플래그되고, 이상이면 자동 확정 후보다.</li><li><b>DB 검수 큐 불러오기</b>를 누른다(<code>GET /review-queue</code>). 서버측 <code>needs_review</code> 대기 목록을 FIFO로 조회하며, 브라우저 세션과 무관하게 실제 대기 건을 본다. 상단 <b>rq-info</b>에 대기 건수가 표시된다.</li><li>각 항목의 doc_id·제목·본문 미리보기·현재 등급·신뢰도·상태 배지를 검토한다.</li><li>등급이 타당하면 <b>확정 (현 등급)</b>을 누른다(<code>POST /confirm</code>).</li><li>등급이 틀리면 재라벨 드롭다운에서 올바른 등급(TS·S1·S2·S3)을 고르고 <b>재라벨 전송</b>을 누른다(<code>POST /relabel</code>). 원 등급과 동일하면 확인 대화상자가 뜬다.</li></ol>
+<h3>결과 상태 해석</h3>
+<div class="table-wrap"><table><thead><tr><th>표시</th><th>의미</th><th>조치</th></tr></thead><tbody><tr><td>확정 완료 (confirmation_id)</td><td>정상 영속됨</td><td>없음 — 항목 완료 처리</td></tr><tr><td>2차 검수 필요</td><td>고등급 이중검토 보류 — 1인 확정으로 불충분</td><td>다른 검수자 1인이 추가 검수</td></tr><tr><td>미영속(감사-only) <span class="tag todo">확인</span></td><td>DB 미가용 또는 분류 미존재 — 성공이 아님</td><td>항목이 큐에 유지됨. DB·분류 확인 후 재시도</td></tr><tr><td>재학습 임계 도달</td><td>재라벨 누적 <code>queue_size ≥ threshold</code></td><td>§04 재학습 트리거 권장</td></tr></tbody></table></div>
+<div class="callout inset"><div class="callout-label">이중검토 보류</div><p>고등급(TS/S1) 이중검토가 켜지면 1인의 확정/재라벨은 <code>needs_second_review</code>로 보류되며 '완료'로 표시되지 않는다. 대시보드 <b>이중검토 보류</b> 패널(§05)에서 등급별 건수를 확인해 두 번째 검수자를 배정한다.</p></div>
+<div class="section-sep" id="sec-04-retrain"><span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">재학습 · 모델 활성화 (배포 게이트)</span></div>
+<p>누적 교정을 반영해 재학습하고, 검증된 모델 버전을 배포(활성화)한다. 활성화는 회귀 모델의 무심한 배포를 막는 <b>deploy gate</b>를 거친다.</p>
+<h3>재학습 트리거 (POST /train)</h3>
+<p>재학습 라우터는 <code>enable_training</code>(full-train 프로파일)에서만 활성이다. 비활성 프로파일에서는 404가 정상이다(프로파일 활성화 여부 <span class="ph">[발주처 입력]</span>).</p>
+<ol><li><b>training_type</b>을 선택한다(<code>incremental</code> · <code>full</code> · <code>hyperparam_search</code>).</li><li><b>base_model</b>(<code>kf-deberta-base</code>)과 <b>use_rag</b> 여부를 확인한다.</li><li><b>재학습 제출</b>을 누른다(admin 역할). 잡 ID와 상태 URL이 로그에 남는다.</li><li><b>작업 목록 새로고침</b>으로 잡 상태(<code>queued/running/done/failed</code>)와 <code>model_version</code>·트리거를 확인한다.</li></ol>
+<h3>모델 활성화 · 배포 (POST /admin/model/activate)</h3>
+<ol><li>활성화할 <b>version_label</b>을 입력한다(예: <code>v-dd3abab9</code>).</li><li><b>활성화 (배포)</b>를 누른다. 현재 활성본 대비 <b>deploy gate</b>(고등급 미탐 FNR·F1 회귀)가 적용되고, 하드닝 프로파일에서는 사람서명 <code>locked_gold_eval</code> readiness까지 요구한다.</li><li>결과 배지를 확인한다 — <b>활성화됨</b> / <b>게이트 차단</b>(blocked) / <b>미활성</b>.</li><li>게이트 차단 시 회귀 내용을 확인한다. 정당한 사유가 있을 때만 <b>force (게이트 우회)</b>를 체크하고 재시도한다(확인 대화상자 발생, <code>forced=true</code>로 감사 기록).</li><li>활성화 성공 시 프로세스 재기동 없이 자동 핫리로드된다. 필요하면 <b>활성 모델 핫리로드</b>(<code>POST /admin/model/reload</code>, admin)로 수동 반영한다.</li></ol>
+<div class="callout warn"><div class="callout-label">force 우회 주의</div><p><code>force=true</code>는 deploy gate를 무시하고 <b>고등급 미탐 회귀 모델도 배포</b>한다. 반드시 회귀 지표를 확인한 뒤에만 사용하며, 우회 사실은 감사 체인에 남는다. rollback·자동 배포는 거버넌스 스케줄러·CLI가 담당한다.</p></div>
+<div class="section-sep" id="sec-05-monitor"><span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">실시간 관제 · 대시보드 해석</span></div>
+<p>「실시간 관제」 토글을 켜면 관제 대시보드와 검수 큐를 주기적으로 <b>읽기 전용</b>으로 자동 조회한다. 확정·재라벨·재학습·활성화 같은 쓰기는 폴링하지 않는다(Safe Mode와 무관).</p>
+<h3>자동 갱신 조작</h3>
+<ol><li><b>자동 갱신</b> 드롭다운에서 주기를 선택한다(끄기 · 3 · 5 · 10 · 30초).</li><li>상태 표시를 확인한다 — <b>실시간 갱신 중</b>(녹색) / <b>갱신 오류 · 재시도 중</b>(적색) / <b>정지</b>. 우측에 마지막 갱신 시각이 표시된다.</li><li>수동 조회는 <b>관제 종합 새로고침</b>(<code>GET /admin/dashboard</code>, admin 전용)을 누른다.</li></ol>
+<h3>대시보드 패널 해석</h3>
+<div class="table-wrap"><table><thead><tr><th>패널</th><th>표시 지표</th><th>판단 기준</th></tr></thead><tbody><tr><td>이중검토 보류</td><td>총계 · 등급별 건수</td><td>0=없음, &gt;0=보류 존재 → 두 번째 검수자 배정(§03)</td></tr><tr><td>배포 readiness</td><td>등급별 locked 건수 · 부족 등급</td><td>준비됨 / 미충족 — 등급별 최소 <code>min_per_grade</code> 필요</td></tr><tr><td>재학습 backlog</td><td>미소비 교정 총계 · 과소/과대/측면</td><td>정상 / 재학습 권고(<code>RETRAIN_RECOMMENDED</code>) / 긴급 재학습(<code>URGENT_RETRAIN</code>)</td></tr><tr><td>kill-gate</td><td>STOP/OK · 발동 사유</td><td>OK=정상, STOP=발동 → 자동 배포 중단, 사유 확인</td></tr><tr><td>임베딩 드리프트</td><td>KL divergence · cosine 평균 · 표본수</td><td>정상 / 경보. 표본 0이면 '데이터 없음'(0.0은 실측 아님)</td></tr></tbody></table></div>
+<div class="callout inset"><div class="callout-label">degraded 표기</div><p>각 패널은 독립 best-effort로 로드된다. 일부 소스가 미가용이면 그 패널만 <b>degraded</b>로 표기되며, 대시보드 전체가 500 오류로 죽지 않는다.</p></div>
+<h3>모델 메트릭 (수동 조회)</h3>
+<p>「모델 메트릭 · FNR 게이트」에서 <b>최신 메트릭</b> · <b>이력</b> · <b>혼동행렬</b> · <b>등급체계 조회</b>를 수동으로 조회한다(값은 재학습 때만 변하므로 폴링에서 제외). 정확도 · F1(macro) · FNR 전체 · 등급별 FNR을 확인하며, FNR이 5%를 넘으면 적색으로 강조된다. 혼동행렬은 먼저 <b>최신 메트릭</b>으로 활성 모델 버전을 로드한 뒤 조회한다.</p>
+<div class="section-sep" id="sec-06-golden"><span class="section-sep-num">06</span><span class="section-sep-line"></span><span class="section-sep-title">골든셋 검수 · 서명</span></div>
+<p>골든셋 검수·서명은 <b>지재원 관리자 권위</b>로 골든 후보를 <code>locked_gold_eval</code>(사람서명 평가정답)로 승격하는 절차다. 운영 교정 루프(§03)와 별개이며, 배포 readiness(§05)를 채우는 유일한 경로다. 지정 검수자 <span class="ph">[발주처 입력]</span>.</p>
+<h3>1) 골든 후보 생성</h3>
+<ol><li>「골든셋 후보 빌더」에서 <b>provider</b>(<code>noop</code>/<code>local_openai</code>/<code>vllm_qwen</code>/<code>anthropic</code>/<code>openai</code>), <b>n</b>, <b>require_evidence</b>를 설정한다.</li><li><b>후보 생성 시작</b>을 누른다(<code>POST /golden/build</code>, admin·kl_backend·system). <code>golden_job_id</code>가 발급된다.</li><li><b>상태 조회</b>로 <code>done</code>을 확인하고, <b>리뷰 HTML 열기</b>로 후보를 보기 전용 검토한다(<code>review.html</code>).</li></ol>
+<h3>2) 화면 서명 (signoff.html)</h3>
+<ol><li>서명 화면(<code>/golden/jobs/{job_id}/signoff.html</code>)을 연다.</li><li>상단 서명바에 <b>X-API-Key</b>, <b>역할</b>(reviewer 등), <b>검수자 계정(reviewer_id)</b>=실계정을 입력한다.</li><li>각 후보 카드에서 본문 · 룰/LLM 등급 · 판정 루브릭을 확인하고 <b>승인(등급 유지)</b> / <b>등급변경</b>(드롭다운) / <b>거부</b> 중 하나를 선택한다. 필요 시 <b>메모</b>를 남긴다.</li><li>평가정답을 즉시 반영하려면 <b>라이브 반영(publish)</b>을 체크한다(기본은 미리보기 — 라이브 무변경).</li><li><b>서명 제출</b>을 누른다(<code>POST /golden/jobs/{id}/signoff</code>). 결과에서 <b>locked</b> 승격 건수 · 거부 사유 · <b>readiness</b>를 확인한다.</li></ol>
+<h3>판정 루브릭</h3>
+<div class="callout inset"><div class="callout-label">S×V×M</div><p>8=TS · 4=S1 · 1·2=S2 · 0=S3(S=0이면 S3). <b>S1 vs TS 분기는 M</b> — S2·V2에서 <b>M=0 → S1</b>(관리 미공식화), <b>M≥1 → TS</b>. 확신이 없으면 <b>거부</b>한다(미탐 안전).</p></div>
+<h3>서명 무결성 · 주의</h3>
+<div class="callout warn"><div class="callout-label">TS/S1 이중서명 토글</div><p>「TS/S1 이중서명」을 체크하면 고등급은 독립 2인 서명이 필요해, 이 화면 <b>단일 세션에서는 TS/S1 후보가 전건 거부</b>된다(9월 실서명 배치 경로용). 단일 검수라면 끈다.</p></div>
+<ul><li><b>reviewer_id는 실계정만</b> 허용된다. 머신/플레이스홀더 계정은 403으로 거부된다.</li><li>인증 신원(JWT sub)이 있으면 클라이언트가 보낸 reviewer_id 대신 <b>인증 신원으로 교정</b>된다(위조 차단).</li><li>미결정 후보는 제출에서 제외된다.</li><li>정본 골든셋은 직접 변경되지 않는다. 승격분은 별도 <code>locked_gold_eval</code> 경로에 doc_id 기준으로 누적된다.</li></ul>
+  <div class="footnote">한국지식재산보호원 / 지재원 영업비밀 자동 등급분류 · RAG 시스템 · 검수 관리자 사용자매뉴얼(DOC-MAN-01) · 기준 화면 admin.html · signoff.html · 2026-07-17</div>
+</article>
+<aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
+<a href="#sec-01-access">01 접속 · 인증 · Safe Mode</a>
+<a href="#sec-02-classify">02 문서 분류 실행</a>
+<a href="#sec-03-queue">03 검수 큐 처리 (확정·재라벨)</a>
+<a href="#sec-04-retrain">04 재학습 · 모델 활성화</a>
+<a href="#sec-05-monitor">05 실시간 관제 · 대시보드</a>
+<a href="#sec-06-golden">06 골든셋 검수 · 서명</a>
+</nav></aside>
+</div>
+<footer><strong>한국지식재산보호원</strong> · 검수 관리자 사용자매뉴얼 — AI 거버넌스 관제콘솔 (DOC-MAN-01) · 감리 대응 산출물</footer>
+<script>
+(function(){var links=[].slice.call(document.querySelectorAll('.toc a'));var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+function o(){var y=window.scrollY+90,cur=0;for(var i=0;i<secs.length;i++){if(secs[i]&&secs[i].offsetTop<=y)cur=i;}links.forEach(function(a,i){a.classList.toggle('active',i===cur);});}
+window.addEventListener('scroll',o,{passive:true});o();})();
+</script>
+</body></html>

@@ -76,8 +76,8 @@ SOURCES: dict[str, dict] = {
         "auto_collect": False,
         "consent_required": False,
     },
-    "D3_kipra_guides": {
-        "url": "https://www.kipra.or.kr/ (영업비밀보호센터 자료실)",
+    "D3_koipa_guides": {
+        "url": "https://www.koipa.or.kr/ (영업비밀보호센터 자료실)",
         "alt_urls": [
             "https://www.kotra.or.kr/biz/protect/index.do",  # KOTRA 영업비밀 보호 안내
         ],
@@ -96,7 +96,7 @@ SOURCES: dict[str, dict] = {
         "alt_urls": [
             "https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100",  # 행정문서 OCR
         ],
-        "note": "사전 신청·승인 필요. 사업단(로이드케이) 명의로 신청 동결됨 ([memory] Q5).",
+        "note": "사전 신청·승인 필요. 사업단(한국지식재산보호원) 명의로 신청 동결됨 ([memory] Q5).",
         "license": "AI Hub 이용약관 (출처표시·재배포 제한)",
         "usage": "도메인 어휘 학습 + S2/S3 라벨 후보 + OCR 학습 데이터",
         "expected_docs": 5000,

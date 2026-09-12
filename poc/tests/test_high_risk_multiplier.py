@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from lloydk.modules.m3_labeling.rule_engine import LabelRuleEngine
+from koipa.modules.m3_labeling.rule_engine import LabelRuleEngine
 
 # 범용 약어 2개(EUV→TS w1.6, M&A→TS w1.4) 포함 — 한글 시드 매칭은 피하려 영문 위주.
 _TEXT = "The EUV process and the M&A valuation were reviewed."
@@ -43,3 +43,19 @@ def test_matched_keyword_weight_reflects_multiplier():
     assert euv, "EUV 매치 있어야"
     # 원래 1.6 → 0.5배 = 0.8
     assert abs(euv[0].weight - 0.8) < 1e-6
+
+
+def test_korean_ma_due_diligence_terms_feed_s1_floor():
+    text = (
+        "M&A \uB300\uC0C1 \uAE30\uC5C5 \uC2E4\uC0AC \uC608\uBE44 \uAC80\uD1A0 "
+        "\uBCF4\uACE0\uC11C\n"
+        "\uC7A0\uC815 \uD3C9\uAC00: \uC778\uC218 \uAC00\uACA9 \uBC94\uC704 "
+        "\uBC0F \uC8FC\uC694 \uB9AC\uC2A4\uD06C \uC694\uC18C"
+    )
+    res = LabelRuleEngine().label(text)
+
+    assert res.grade_scores.get("S1", 0.0) >= 2.2
+    assert {m.keyword for m in res.matched_keywords if m.grade == "S1"} >= {
+        "\uAE30\uC5C5 \uC2E4\uC0AC",
+        "\uC778\uC218 \uAC00\uACA9",
+    }

@@ -9,8 +9,8 @@
 from __future__ import annotations
 
 
-from lloydk.perf import scenarios as sc
-from lloydk.perf.harness import AvailableResources, ScenarioContext
+from koipa.perf import scenarios as sc
+from koipa.perf.harness import AvailableResources, ScenarioContext
 
 
 class TestImports:
@@ -77,7 +77,7 @@ class TestHelpers:
 
     def test_api_key_resolves(self):
         """_api_key가 settings.api_key 반환."""
-        from lloydk.config import settings
+        from koipa.config import settings
 
         assert sc._api_key() == settings.api_key
 

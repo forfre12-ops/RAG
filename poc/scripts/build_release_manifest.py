@@ -17,7 +17,9 @@ DEFAULT_FILES = [
     "reports/operational_readiness.json",
     "reports/p1_v3_public_gold_direct.json",
     "reports/p1_v3_llm_gold_direct.json",
-    "reports/p2_gold_kure_es_hybrid_v3.json",
+    # ⚠ 출하 백엔드(pg)의 검색 리포트다. 2026-08-16 까지 여기가 ES 리포트(2026-06-02)
+    #   였다 - 매니페스트가 **출하하지 않는 구성의 수치**를 봉인하고 있었다.
+    "reports/p2_gold_kure_pg_hybrid.json",
     "reports/p1_boundary_report.json",
 ]
 

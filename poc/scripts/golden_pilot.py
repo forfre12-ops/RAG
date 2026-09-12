@@ -22,9 +22,9 @@ from pathlib import Path
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from lloydk.modules.m1_synthesis.generator import SyntheticDocGenerator, SynthRequest  # noqa: E402
-from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: E402
-from lloydk.modules.m3_labeling.pipeline import LabelingPipeline  # noqa: E402
+from koipa.modules.m1_synthesis.generator import SyntheticDocGenerator, SynthRequest  # noqa: E402
+from koipa.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: E402
+from koipa.modules.m3_labeling.pipeline import LabelingPipeline  # noqa: E402
 
 N = int(os.environ.get("PILOT_N", "3"))
 PLAN = [("S1", "finance"), ("S2", "business"), ("S3", "mixed"), ("TS", "semiconductor")]

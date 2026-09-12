@@ -1,0 +1,34 @@
+{
+  "claim_scope": "Proxy-only model selection and regression; not customer-real accuracy evidence or Locked Gold.",
+  "development_documents": 200,
+  "development_families": 80,
+  "development_grade_counts": {
+    "S1": 50,
+    "S2": 50,
+    "S3": 60,
+    "TS": 40
+  },
+  "development_sha256": "c284c5b5d888c4d5489e1e0f3ee64f02fe8ca6c06bd8612bee6fb282a7081f2d",
+  "family_overlap": 0,
+  "final_documents": 800,
+  "final_families": 320,
+  "final_grade_counts": {
+    "S1": 200,
+    "S2": 200,
+    "S3": 240,
+    "TS": 160
+  },
+  "final_sha256": "139e3180a861d781e05fd91e6df3746fd01a81ba519976b1471b126c5f924cb4",
+  "partition_policy": "frozen-proxy-eval-dev200-final800-v1",
+  "schema": "frozen-proxy-eval-split-audit-v1",
+  "source_documents": 1000,
+  "source_grade_counts": {
+    "S1": 250,
+    "S2": 250,
+    "S3": 300,
+    "TS": 200
+  },
+  "source_path": "datasets\\proxy_eval\\direct_authored_proxy_eval.v2_2.jsonl",
+  "source_sha256": "ee7b4ba335f347e6873e5dadee42ef408d06a0f0407cfcc6aa8feeea81c55832",
+  "source_text_sha256": "b48f7f66be58df5ec5bcf9a9fe2ca53f0d4b05dd797c8edc58d7f329637409f5"
+}

@@ -150,7 +150,6 @@ class TestRenderHtml:
                 "pytest_collected": 324,
                 "llm_provider": "noop",
                 "embedding_provider": "hash",
-                "vector_backend": "inmemory",
                 "services": {
                     "postgres": "UP",
                     "elasticsearch": "UP",

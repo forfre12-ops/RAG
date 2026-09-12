@@ -15,14 +15,14 @@ scrape_configs:
         refresh_interval: 15s
         filters:
           - name: label
-            values: ["com.docker.compose.project=lloydk-poc"]
+            values: ["com.docker.compose.project=koipa-poc"]
     relabel_configs:
       - source_labels: ['__meta_docker_container_name']
         regex: '/(.*)'
         target_label: container
       - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
         target_label: service
-      - replacement: lloydk-poc
+      - replacement: koipa-poc
         target_label: cluster
     pipeline_stages:
       - docker: {}

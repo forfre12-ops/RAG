@@ -1,4 +1,4 @@
-"""KEYWORD_SEEDS를 DB `level_keywords` 테이블에 시드.
+"""KEYWORD_SEEDS를 DB `tb_level_keywords` 테이블에 시드.
 
 DB 연결 안 되면 JSON 파일로 dump (수동 적재용).
 """
@@ -14,7 +14,7 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.modules.m3_labeling.seeds import (  # noqa: E402
+from koipa.modules.m3_labeling.seeds import (  # noqa: E402
     FACTOR_SEEDS,
     KEYWORD_SEEDS,
     to_canonical_factor,
@@ -27,7 +27,7 @@ def to_db() -> int:
     try:
         from sqlalchemy import create_engine, text
 
-        from lloydk.config import settings
+        from koipa.config import settings
     except Exception as exc:  # noqa: BLE001
         print(f"[seed] cannot import db deps: {exc}", file=sys.stderr)
         return 1
@@ -35,11 +35,14 @@ def to_db() -> int:
     try:
         engine = create_engine(settings.database_url, pool_pre_ping=True)
         with engine.begin() as conn:
+            # 실 스키마 이름은 db/models.py 의 __tablename__ 과 같아야 한다 — 무접두 이름을 쓰던
+            # 시절 seed --db 가 UndefinedTable 로 조용히 exit 2 하던 잠복 버그가 있었다.
+            # [2026-09-11] 표준 명명(7b3e9d2a4f10) — 대응표는 koipa/db/standard_names.py.
             level_map = dict(
-                conn.execute(text("SELECT level_code, level_id FROM classification_levels")).all()
+                conn.execute(text("SELECT grd_cd, grd_sn FROM tad_cm_clsf_grd_mng")).all()
             )
             factor_map = dict(
-                conn.execute(text("SELECT factor_code, factor_id FROM evaluation_factors")).all()
+                conn.execute(text("SELECT rqmt_cd, rqmt_sn FROM tad_em_evl_rqmt_mng")).all()
             )
 
             inserted = 0
@@ -52,7 +55,7 @@ def to_db() -> int:
                 conn.execute(
                     text(
                         """
-                        INSERT INTO level_keywords (level_id, keyword, pattern_type, factor_id, weight, source)
+                        INSERT INTO tad_gm_grd_kywd_mng (grd_sn, kywd_nm, ptn_type_nm, rqmt_sn, wgvl_cfc, src_nm)
                         VALUES (:level_id, :keyword, :pattern_type, :factor_id, :weight, 'seed_v1')
                         """
                     ),

@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 # 스크립트는 패키지가 아니므로 파일 경로로 로드.
 _SPEC = importlib.util.spec_from_file_location(
     "check_migration_drift",
@@ -13,6 +15,8 @@ _SPEC = importlib.util.spec_from_file_location(
 _mod = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_mod)
 compare_heads = _mod.compare_heads
+_connect_args = _mod._connect_args
+_resolve_connect_timeout = _mod._resolve_connect_timeout
 
 
 def test_no_drift_when_equal():
@@ -39,3 +43,21 @@ def test_empty_db_is_drift():
     r = compare_heads([], ["b1c2d3e4f5a6"])
     assert r["drift"] is True
     assert r["missing"] == ["b1c2d3e4f5a6"]
+
+
+def test_postgres_connections_have_a_bounded_timeout():
+    assert _connect_args("postgresql+psycopg://db.example/app", 5) == {
+        "connect_timeout": 5
+    }
+
+
+def test_non_postgres_or_disabled_timeout_does_not_receive_driver_options():
+    assert _connect_args("sqlite:///local.db", 5) == {}
+    assert _connect_args("postgresql://db.example/app", 0) == {}
+
+
+def test_timeout_defaults_to_settings_but_rejects_an_unbounded_value():
+    assert _resolve_connect_timeout(None, 5) == 5
+    assert _resolve_connect_timeout(2, 5) == 2
+    with pytest.raises(ValueError, match="must be positive"):
+        _resolve_connect_timeout(None, 0)

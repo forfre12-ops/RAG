@@ -17,7 +17,7 @@ sys.path.insert(0, "src")
 from dotenv import load_dotenv
 load_dotenv(".env")
 
-from lloydk.modules.m1_synthesis.generator import SyntheticDocGenerator, SynthRequest
+from koipa.modules.m1_synthesis.generator import SyntheticDocGenerator, SynthRequest
 
 QA_DIR = Path("datasets/rag_corpus_qa")
 QA_DIR.mkdir(parents=True, exist_ok=True)

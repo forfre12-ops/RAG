@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>실제 사용 파일 아키텍처 맵 (내부) | Koipa</title>
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-elevated:#ffffff; --bg-code:#f4f4f4;
+  --bg-nav:rgba(255,255,255,0.80);
+  --text:#0a0a0a; --text-soft:#525252; --text-dim:#737373; --text-faint:#a3a3a3;
+  --border:rgba(0,0,0,0.08); --border-strong:rgba(0,0,0,0.16); --border-soft:rgba(0,0,0,0.05);
+  --accent:#0a0a0a; --accent-blue:rgba(0,0,0,0.04);
+  --pass:#2a2a2a; --fail:#525252; --warn:#737373; --pend:#737373;
+  --radius-sm:6px; --radius:8px; --radius-lg:12px; --radius-pill:999px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04);
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.06);
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-0.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+
+.nav{position:sticky;top:0;z-index:50;background:var(--bg-nav);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:1320px;margin:0 auto;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;white-space:nowrap;min-width:0;line-height:1;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#ffffff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,0.12);overflow:visible;}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:600;font-size:15px;letter-spacing:-0.02em;color:var(--text);}
+.brand-sep{color:var(--text-dim);font-size:14px;margin:0 6px;font-weight:400;}
+.brand-url{font-family:var(--font-mono);font-size:13.5px;font-weight:400;color:var(--text-dim);letter-spacing:0;}
+.nav-search{display:inline-flex;align-items:center;gap:8px;padding:6px 10px 6px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:13px;cursor:pointer;transition:all .15s;min-width:200px;}
+.nav-search:hover{border-color:var(--border-strong);color:var(--text-soft);}
+.nav-actions{display:flex;align-items:center;gap:8px;}
+
+.page{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:0;padding:0 32px;}
+.sidebar{order:2;position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:32px 0 32px 0;border-right:1px solid var(--border);}
+.sidebar::-webkit-scrollbar{width:3px;} .sidebar::-webkit-scrollbar-thumb{background:var(--border-strong);}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);padding:0 24px 10px;font-family:var(--font-mono);}
+.toc-item{display:block;padding:5px 24px;font-size:13px;color:var(--text-dim);text-decoration:none;border-left:2px solid transparent;transition:all .15s;line-height:1.4;}
+.toc-item:hover{color:var(--text);border-left-color:var(--border-strong);}
+.toc-item.active{color:var(--text);border-left-color:var(--text);font-weight:600;}
+
+article{padding:40px 0 120px 40px;min-width:0;}
+
+.meta-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px;font-size:12.5px;}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:var(--radius-pill);background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;font-family:var(--font-mono);}
+.badge.blue{background:#404040;}
+.badge.warn{background:#7a1f1f;}
+.meta-dot{color:var(--text-faint);}
+.meta-soft{color:var(--text-dim);}
+h1.title{font-size:48px;font-weight:800;letter-spacing:-0.04em;line-height:1.07;margin:0 0 20px;color:var(--text);}
+.lede{font-size:18px;font-weight:300;color:var(--text-soft);line-height:1.55;margin:0 0 28px;letter-spacing:-0.012em;max-width:720px;}
+.hero-kpis{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 32px;}
+.hero-kpi{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--text-soft);font-family:var(--font-mono);}
+.hero-kpi b{color:var(--text);font-weight:600;}
+.hero-sep{border:none;border-top:1px solid var(--border-strong);margin:44px 0 52px;}
+
+article h2{font-size:28px;font-weight:700;letter-spacing:-0.028em;line-height:1.2;margin:76px 0 10px;scroll-margin-top:80px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+article h2 .num{font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--text-dim);padding:2px 8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);line-height:1;}
+article h2+.h2-sub{color:var(--text-dim);font-size:15px;margin:0 0 24px;max-width:720px;}
+article h3{font-size:17px;font-weight:600;letter-spacing:-0.018em;margin:32px 0 10px;}
+article h4{font-size:14px;font-weight:600;margin:20px 0 6px;color:var(--text);}
+article p{margin:12px 0;color:var(--text);}
+article ul,article ol{padding-left:22px;}
+article li{margin:6px 0;}
+article a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--border-strong);transition:border-color .15s;}
+article a:hover{border-bottom-color:var(--text);}
+section{position:relative;padding-top:8px;}
+
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;position:relative;overflow:hidden;min-width:0;}
+.card-grid{display:grid;gap:12px;min-width:0;}
+.card-grid>*{min-width:0;}
+.card-grid.col2{grid-template-columns:repeat(2,minmax(0,1fr));}
+.card-grid.col3{grid-template-columns:repeat(3,minmax(0,1fr));}
+.card-grid.col4{grid-template-columns:repeat(4,minmax(0,1fr));}
+.card-label{font-size:10.5px;font-weight:700;letter-spacing:0.06em;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:6px;}
+.card-value{font-size:22px;font-weight:700;letter-spacing:-0.03em;line-height:1.1;margin-bottom:4px;}
+.card-value.sm{font-size:17px;}
+.card-desc{font-size:12.5px;color:var(--text-dim);word-break:keep-all;overflow-wrap:break-word;}
+.card-pass{border-left:3px solid rgba(0,0,0,.25);border-radius:0;}
+.card-fail{border-left:3px solid rgba(0,0,0,.55);border-radius:0;}
+.card-warn{border-left:3px solid rgba(0,0,0,.4);border-radius:0;}
+[class*="card"][style*="border-left"]{border-radius:0 !important;}
+
+.tbl-wrap{overflow-x:auto;margin:16px 0;border-radius:var(--radius-lg);border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+thead{background:var(--bg-surface);}
+th{padding:10px 14px;text-align:left;font-weight:600;font-size:12px;letter-spacing:0.02em;color:var(--text-soft);border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:10px 14px;border-bottom:1px solid var(--border-soft);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--bg-surface);}
+.td-code{font-family:var(--font-mono);font-size:12.5px;}
+.td-pass{color:var(--text);font-weight:600;}
+.td-fail{color:rgba(0,0,0,.5);font-weight:600;}
+.td-center{text-align:center;}
+
+pre{background:var(--bg-code);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:var(--font-mono);font-size:12.5px;line-height:1.6;margin:16px 0;}
+code{font-family:var(--font-mono);font-size:12.5px;background:var(--bg-code);padding:2px 5px;border-radius:4px;border:1px solid var(--border);}
+pre code{background:none;border:none;padding:0;}
+
+.callout{display:flex;gap:12px;padding:14px 16px;border-radius:var(--radius);margin:16px 0;}
+.callout.warn{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.16);border-left:3px solid rgba(0,0,0,.5);border-radius:0;}
+.callout.info{background:rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.1);}
+.callout.pass{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.12);}
+.callout.danger{background:rgba(0,0,0,.05);border:1px solid rgba(0,0,0,.2);border-left:3px solid #7a1f1f;border-radius:0;}
+.callout-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.callout-body{font-size:13.5px;line-height:1.6;}
+
+.appendix-link{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--border);border-radius:var(--radius);font-size:13.5px;color:var(--text);text-decoration:none;transition:all .15s;background:var(--bg-surface);}
+.appendix-link:hover{border-color:var(--border-strong);background:var(--bg);box-shadow:var(--shadow-sm);}
+.appendix-link .al-arrow{color:var(--text-dim);}
+.appendix-links{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0;}
+
+footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size:12.5px;color:var(--text-dim);display:flex;justify-content:space-between;max-width:1380px;margin-left:auto;margin-right:auto;flex-wrap:wrap;gap:8px;}
+
+@media(max-width:1200px){ .nav-search{display:none;} }
+@media(max-width:1024px){ .page{padding:0 24px;} article{padding:36px 0 80px 32px;} .card-grid.col4{grid-template-columns:repeat(2,minmax(0,1fr));} h1.title{font-size:40px;} }
+@media(max-width:900px){
+  .page{grid-template-columns:1fr;padding:0 24px;}
+  .sidebar{display:none;}
+  article{padding:32px 0 80px;}
+  h1.title{font-size:32px;letter-spacing:-0.03em;}
+  article h2{font-size:23px;margin:54px 0 8px;}
+  .lede{font-size:16px;}
+  .card-grid.col3,.card-grid.col4{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:680px){
+  .page{padding:0 16px;}
+  h1.title{font-size:27px;}
+  article h2{font-size:20px;}
+  .card-grid.col2,.card-grid.col3,.card-grid.col4{grid-template-columns:minmax(0,1fr);}
+  pre{font-size:11.5px;}
+  table{font-size:12.5px;}
+  th,td{padding:7px 10px;}
+  footer{flex-direction:column;}
+}
+@media print{ .nav,.sidebar,footer{display:none !important;} .page{grid-template-columns:1fr;padding:0;} article{padding:0;} .card,pre{break-inside:avoid;} }
+</style>
+
+<style>
+/* Legacy report components mapped onto the internal report visual system. */
+article .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:22px 0 28px;}
+article .stat{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;min-width:0;}
+article .stat .k{font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;}
+article .stat .v{font-size:30px;font-weight:800;letter-spacing:-.035em;line-height:1.05;color:var(--text);}
+article .stat.dark{background:var(--text);border-color:var(--text);}
+article .stat.dark .k{color:rgba(255,255,255,.62);} article .stat.dark .v{color:var(--bg);}
+article .stat.g,article .stat.a{border-left:3px solid rgba(0,0,0,.35);border-radius:0;}
+article .rootcauses{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:16px 0 28px;}
+article .rc{background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid rgba(0,0,0,.35);border-radius:0;padding:16px 18px;min-width:0;}
+article .rc .n{font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);}
+article .rc .t{font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.25;margin:5px 0 7px;color:var(--text);}
+article .rc .d{font-size:12.8px;color:var(--text-dim);line-height:1.6;word-break:keep-all;overflow-wrap:break-word;}
+article .done{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin:12px 0;overflow:hidden;}
+article .done .h{background:#fff;border-bottom:1px solid var(--border);padding:10px 16px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);}
+article .done ul{margin:0;padding:13px 18px 14px 34px;} article .done li{font-size:13.2px;line-height:1.65;margin:5px 0;}
+article table.f{width:100%;border-collapse:collapse;font-size:13px;margin:16px 0;border:1px solid var(--border);}
+article table.f th{text-align:left;font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);background:var(--bg-surface);border-bottom:1px solid var(--border);padding:9px 11px;white-space:nowrap;}
+article table.f td{border-bottom:1px solid var(--border-soft);padding:10px 11px;vertical-align:top;}
+article table.f tr:last-child td{border-bottom:none;}
+article table.f tr.grp td{background:var(--text);color:var(--bg);font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:7px 11px;}
+article .sev,article .st{display:inline-block;font-family:var(--font-mono);font-size:10px;font-weight:700;padding:2px 7px;border:1px solid rgba(0,0,0,.28);white-space:nowrap;color:var(--text);background:#fff;}
+article .sev-P1{border-color:#7a1f1f;color:#7a1f1f;} article .sev-P2{border-color:rgba(0,0,0,.55);color:rgba(0,0,0,.72);} article .sev-P3{border-color:rgba(0,0,0,.2);color:var(--text-dim);}
+article .area{font-family:var(--font-mono);font-size:11px;color:var(--text-soft);} article .eff{font-size:10.5px;color:var(--text-faint);}
+article .c-title .ttl{font-weight:700;font-size:13.2px;letter-spacing:-.01em;margin-bottom:4px;}
+article .c-title .prob{color:var(--text-soft);font-size:12.2px;line-height:1.5;margin-bottom:5px;}
+article .c-title .rec{font-size:12.2px;color:var(--text-dim);line-height:1.5;}
+article .c-evid code{display:block;font-size:10.5px;line-height:1.45;word-break:break-all;color:var(--text-soft);}
+article .st-b-fixed{border-color:rgba(0,0,0,.42);background:rgba(0,0,0,.04);} article .st-b-partial{border-color:rgba(0,0,0,.34);background:rgba(0,0,0,.025);} article .st-b-open{border-color:rgba(0,0,0,.18);color:var(--text-dim);}
+article .callout.live{background:var(--text);border-color:var(--text);color:var(--bg);border-radius:var(--radius);}
+article .callout.live .cl{font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.62);margin-bottom:6px;}
+article .callout.live p{color:rgba(255,255,255,.88);margin:0;}
+article .callout.live code{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22);color:#fff;}
+article .callout.live b{color:#fff;}
+article .callout.live .cl{font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;}
+@media(max-width:820px){article .c-evid{display:none;}}
+</style>
+</head>
+
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">·</span>
+      <span class="brand-url">www.koipa.re.kr</span>
+    </a>
+    <div class="nav-actions">
+      <div class="nav-search" role="search" aria-label="Search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        실제 사용 파일 아키텍처 맵
+      </div>
+    </div>
+  </div>
+</header>
+<div class="page">
+  <aside class="sidebar">
+    <div class="toc-title">목차</div>
+    <a class="toc-item active" href="#s00">00 한눈에 — 실행되는 건 3개 프로세스</a>
+    <a class="toc-item" href="#s01">01 실행 진입점 · 부트</a>
+    <a class="toc-item" href="#s02">02 앱 코드 지도 — poc/src/koipa</a>
+    <a class="toc-item" href="#s03">03 분류기 파이프라인 M1~M6</a>
+    <a class="toc-item" href="#s04">04 어댑터 — 활성 vs 대기</a>
+    <a class="toc-item" href="#s05">05 데이터셋 경로</a>
+    <a class="toc-item" href="#s06">06 설치 대상 — 모델 · DB · 저장소</a>
+    <a class="toc-item" href="#s07">07 배포 프로파일</a>
+    <a class="toc-item" href="#s08">08 오프라인 도구 — scripts / make</a>
+  </aside>
+
+  <article id="top">
+    <div class="meta-row">
+      <span class="badge">아키텍처 맵</span>
+      <span class="badge warn">내부용 · 대외공유 금지</span>
+      <span class="meta-dot">·</span>
+      <span class="meta-soft">실제 사용 파일 지도 · poc/ 기준 · 4영역 실측(2026-07-06) · 재검증·정리커밋 반영(2026-07-07)</span>
+    </div>
+
+    <h1 class="title">실제 사용 파일 아키텍처 맵</h1>
+    <p class="lede">이 프로젝트에서 <b>실제로 실행·사용되는 파일</b>이 무엇이고 어떤 역할을 하는지, 그리고 배포 시 <b>어떤 모델·DB를 어디에 설치</b>해야 하는지를 경로·모듈 단위로 정리한다. 앱 코드는 전부 단일 패키지 <code>poc/src/koipa/</code> 안에 있고, 실제 기동되는 것은 <b>3개 프로세스</b>뿐이다. 나머지 파이썬 파일은 이 3개를 구성하는 라이브러리·오프라인 도구·테스트다.</p>
+
+    <div class="hero-kpis">
+      <div class="hero-kpi">추적 파일 <b>789</b></div>
+      <div class="hero-kpi">Python <b>558</b></div>
+      <div class="hero-kpi">앱 코드 <b>178</b> (src)</div>
+      <div class="hero-kpi">스크립트 <b>151</b> · 테스트 <b>207</b></div>
+      <div class="hero-kpi">실행 프로세스 <b>3</b></div>
+    </div>
+    <hr class="hero-sep">
+
+    <div class="callout live">
+      <div class="cl">가장 중요한 한 가지</div>
+      <p>558개 파이썬 파일이 있지만 <b>실제로 돌아가는 것은 API 서버 · Celery 워커 · Celery beat 3개 프로세스</b>뿐이다. 이 3개가 로드하는 앱 코드는 <code>poc/src/koipa/</code>(178개)이고, <code>poc/scripts/</code>(151)는 손으로 돌리는 빌드·평가·릴리스 도구, <code>poc/tests/</code>(207)는 테스트다. 아래 표에는 각 파일에 <b>🟢 LIVE</b>(런타임 서빙 경로) · <b>🔵 BATCH</b>(오프라인 빌드·평가 배선) · <b>⚪ DORMANT</b>(미배선) 태그를 붙였다.</p>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="k">전체 추적 파일</div><div class="v">789</div></div>
+      <div class="stat"><div class="k">앱 코드 (poc/src/koipa)</div><div class="v">178</div></div>
+      <div class="stat g"><div class="k">실행 프로세스</div><div class="v">3</div></div>
+      <div class="stat dark"><div class="k">파이프라인 단계</div><div class="v">M1~M6</div></div>
+    </div>
+
+    <section id="s00">
+      <h2><span class="num">00</span> 한눈에 — 실행되는 건 3개 프로세스</h2>
+      <p class="h2-sub">이 세 줄이 시스템 전체의 실행 표면이다. 나머지 파일은 이 셋을 구성하는 부품이다.</p>
+      <pre><code>① API 서버    uvicorn koipa.api.app:app                          (포트 8000)
+② Celery 워커  celery -A koipa.workers.celery_app worker
+                 -Q classify,index,synthesis,learning,celery
+③ Celery beat  celery -A koipa.workers.celery_app beat            (주기 잡)</code></pre>
+      <div class="rootcauses">
+        <div class="rc"><div class="n">① API</div><div class="t">동기 요청 처리</div><div class="d">분류·확정·설명·관리 엔드포인트. 실서빙 추론(M5)과 전처리(M2)를 직접 호출하는 핫패스. 진입점 <code>api/app.py</code> 하나(별도 main.py 없음).</div></div>
+        <div class="rc"><div class="n">② 워커</div><div class="t">무거운 배치 잡</div><div class="d">비동기 분류·합성·재학습(M4)·골든빌드·드리프트. 큐 5종 구독. 진입점 <code>workers/celery_app.py</code>.</div></div>
+        <div class="rc"><div class="n">③ beat</div><div class="t">스케줄 트리거</div><div class="d">active-learning(30분/일1회)·드리프트·auto-rollback·outbox·partitions 주기 잡. 단일 인스턴스.</div></div>
+      </div>
+    </section>
+
+    <section id="s01">
+      <h2><span class="num">01</span> 실행 진입점 · 부트</h2>
+      <p class="h2-sub">각 프로세스가 어떻게 뜨는지 (로컬 make 타겟 · 컨테이너 CMD).</p>
+      <table class="f">
+        <thead><tr><th style="width:130px">프로세스</th><th style="width:230px">진입 경로</th><th>기동 명령</th></tr></thead>
+        <tbody>
+          <tr><td><b>API (dev)</b></td><td class="td-code">koipa.api.app:app</td><td><code>make api</code> → <code>uvicorn koipa.api.app:app --reload --port 8000</code></td></tr>
+          <tr><td><b>API (prod)</b></td><td class="td-code">Dockerfile.api.prod</td><td><code>gunicorn ... -k uvicorn.workers.UvicornWorker</code> (non-root, graceful)</td></tr>
+          <tr><td><b>워커</b></td><td class="td-code">koipa.workers.celery_app</td><td><code>make worker</code> → <code>celery -A ... worker -Q classify,index,synthesis,learning,celery</code></td></tr>
+          <tr><td><b>beat</b></td><td class="td-code">koipa.workers.celery_app</td><td><code>make beat</code> → <code>celery -A ... beat</code></td></tr>
+          <tr><td><b>PoC 일괄</b></td><td class="td-code">Makefile</td><td><code>make poc-all</code> = p4 → p3 → p2 → p1 → p5</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:13px;color:var(--text-dim);margin:10px 0 0;">큐 라우팅: <code>classify_async→classify</code> · <code>synthesize_batch→synthesis</code> · <code>train_classifier·golden_build·active_learning_tick·drift_tick→learning</code> · <code>deliver_outbox_tick·ensure_partitions_tick→index</code>.</p>
+    </section>
+
+    <section id="s02">
+      <h2><span class="num">02</span> 앱 코드 지도 — <code>poc/src/koipa/</code></h2>
+      <p class="h2-sub">레이어별 파일 수와 역할. 태그: 🟢 LIVE(런타임) · 🔵 BATCH(오프라인 배선) · ⚪ DORMANT(미배선).</p>
+
+      <h3>진입 · 미들웨어 — <code>api/</code> (24) 🟢</h3>
+      <p><code>app.py</code>가 유일 진입점: 라우터 include + 미들웨어(Audit·Idempotency·Prometheus·RateLimit) 부착.</p>
+      <table class="f">
+        <thead><tr><th style="width:280px">경로</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr><td class="td-code">api/app.py</td><td>FastAPI 조립 · 라우터 include · 미들웨어 부착 <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">api/classify.py · classify_stream.py · async_classify.py</td><td>분류 동기/SSE/비동기잡 — <b>핵심 핫패스</b></td></tr>
+          <tr><td class="td-code">api/explain.py</td><td>등급 판정 근거 반환</td></tr>
+          <tr><td class="td-code">api/confirm.py · promotion.py</td><td>확정/보정 · 모델 승격</td></tr>
+          <tr><td class="td-code">api/admin.py</td><td>관제 대시보드 · 모델 activate · RBAC</td></tr>
+          <tr><td class="td-code">api/documents.py · answer.py</td><td>문서 적재 / RAG 질의응답(요건 외 보조)</td></tr>
+          <tr><td class="td-code">api/golden.py · synthesis.py · training.py · guide.py</td><td>골든빌드 · 합성 · 학습 · 가이드</td></tr>
+          <tr><td class="td-code">api/health.py · metrics.py · prom_metrics.py</td><td>헬스 · 메트릭 노출</td></tr>
+          <tr><td class="td-code">api/_jwt_auth.py · _rbac.py · _idempotency_mw.py · rate_limit.py</td><td>인증 · 권한 · 멱등 · 레이트리밋</td></tr>
+        </tbody>
+      </table>
+
+      <h3>비즈니스 로직 — <code>services/</code> (25) 🟢</h3>
+      <p>라우터와 저장소 사이 오케스트레이션.</p>
+      <div class="card-grid col3">
+        <div class="card"><div class="card-label">분류 코어</div><div class="card-desc"><code>classify_service</code> · <code>async_classify_service</code> — M5 추론 오케스트레이션</div></div>
+        <div class="card"><div class="card-label">운영 루프</div><div class="card-desc"><code>confirm_service</code> · <code>promotion_service</code> · <code>training_service</code></div></div>
+        <div class="card"><div class="card-label">무결성</div><div class="card-desc"><code>audit_chain</code>(감사체인) · <code>drift_monitor</code> · <code>outbox</code> · <code>idempotency</code></div></div>
+        <div class="card"><div class="card-label">검색·RAG</div><div class="card-desc"><code>retrieval</code> · <code>rag_answer_service</code></div></div>
+        <div class="card"><div class="card-label">잡·시크릿</div><div class="card-desc"><code>job_store</code>(Redis) · <code>secrets_manager</code></div></div>
+        <div class="card"><div class="card-label">관측</div><div class="card-desc"><code>metrics_service</code> · <code>worker_metrics_bridge</code></div></div>
+      </div>
+
+      <h3>나머지 레이어</h3>
+      <table class="f">
+        <thead><tr><th style="width:150px">디렉토리</th><th style="width:70px">수</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr><td class="td-code">repositories/</td><td>9</td><td>DB 접근 (document·chunk·classify·audit·training·synth·guide·llm_usage) <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">db/</td><td>4</td><td><code>models.py</code> · <code>session.py</code> · <code>listeners.py</code> <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">schemas/</td><td>13</td><td>Pydantic 요청/응답 계약 <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">workers/</td><td>3</td><td><code>celery_app.py</code> · <code>tasks.py</code> <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">obs/</td><td>2</td><td>OpenTelemetry <code>otel.py</code> (+<code>__init__</code>) <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">perf/</td><td>8</td><td>성능 KPI · 회귀 하니스 <span class="sev">BATCH</span></td></tr>
+          <tr><td class="td-code">rag/</td><td>6</td><td>인덱싱 · 검색 · 질의확장 (요건 외, 대체로 휴면) <span class="sev" style="border-color:rgba(0,0,0,.2);color:var(--text-dim);">일부 DORMANT</span></td></tr>
+          <tr><td class="td-code">golden_*.py · hygiene.py</td><td>8</td><td>골든셋 빌더/방어/서명/분할/등급/위생 (최상위) <span class="sev">BATCH</span></td></tr>
+          <tr><td class="td-code">config.py</td><td>1</td><td><b>전 설정 중앙</b> — 모델·DB·경로·배포 프로파일 <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout info">
+        <div class="callout-icon">◆</div>
+        <div class="callout-body"><b>최상위 <code>golden_*.py</code> 6종</b>: <code>golden_builder</code>(후보 조립) · <code>golden_defense</code>(방어축 liveness 감사) · <code>golden_signoff</code>(사람서명 승격) · <code>golden_split</code>(75/25 홀드아웃) · <code>golden_tiers</code>(3-tier 파생) · <code>golden_review_html</code>(검토 HTML) + <code>hygiene</code>(정규화·text_hash·누출탐지 공유 유틸).</div>
+      </div>
+    </section>
+
+    <section id="s03">
+      <h2><span class="num">03</span> 분류기 파이프라인 — <code>modules/</code> (47)</h2>
+      <p class="h2-sub">프로젝트의 심장. 흐름 = <b>합성 → 전처리 → 라벨링 → 학습 → 추론 → 평가</b>. M2·M5 및 M6 일부가 실서빙 핫패스(🟢), 나머지는 오프라인 배선(🔵).</p>
+      <table class="f">
+        <thead><tr><th style="width:120px">모듈</th><th style="width:230px">파일</th><th style="width:60px">태그</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr class="grp"><td colspan="4">M1 — 합성 (학습·평가 코퍼스 씨앗)</td></tr>
+          <tr><td>m1_synthesis</td><td class="td-code">generator.py</td><td><span class="sev">BATCH</span></td><td>LLM로 등급별 합성 문서 생성 (무실데이터 부트스트랩)</td></tr>
+          <tr><td></td><td class="td-code">witness_taxonomy.py</td><td><span class="sev">BATCH</span></td><td>등급-결정 사실(witness) 카탈로그 (법령근거)</td></tr>
+
+          <tr class="grp"><td colspan="4">M2 — 전처리 (추출→정규화→PII→청크) · 서빙 핫패스</td></tr>
+          <tr><td>m2_preprocess</td><td class="td-code">extractor.py</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>HWP/PDF/Word/Excel/PPTX 추출 + Tesseract OCR</td></tr>
+          <tr><td></td><td class="td-code">normalizer · pii_masker · chunker · pipeline</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>한국어 정규화 · PII 마스킹 · 청킹 · 조립</td></tr>
+
+          <tr class="grp"><td colspan="4">M3 — 라벨링 (룰 + LLM 합의)</td></tr>
+          <tr><td>m3_labeling</td><td class="td-code">rule_engine · seeds · pipeline</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>룰 1차 라벨 (키워드 1000+ · FNR-safe 동점 상향)</td></tr>
+          <tr><td></td><td class="td-code">llm_labeler · judge · consensus</td><td><span class="sev">BATCH</span></td><td>LLM fallback · 합의판정 (골든빌드 경로)</td></tr>
+
+          <tr class="grp"><td colspan="4">M4 — 학습 (오프라인)</td></tr>
+          <tr><td>m4_training</td><td class="td-code">trainer.py</td><td><span class="sev">BATCH</span></td><td>KF-DeBERTa 학습 + 온도보정 (워커 잡)</td></tr>
+          <tr><td></td><td class="td-code">rag_indexer</td><td><span class="sev" style="border-color:rgba(0,0,0,.2);color:var(--text-dim);">shim</span></td><td><code>koipa.rag</code>로 가는 하위호환 shim (실코드는 rag/; <code>query_expansion</code> shim은 정리 커밋 8a09199에서 제거)</td></tr>
+
+          <tr class="grp"><td colspan="4">M5 — 추론 (실서빙 핵심)</td></tr>
+          <tr><td>m5_inference</td><td class="td-code">pipeline.py</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td><b>실서빙 추론</b> + 게이트(escalation · FNR-safe · metadata-floor · source-cap)</td></tr>
+
+          <tr class="grp"><td colspan="4">M6 — 평가 · 게이트 · 거버넌스 (25)</td></tr>
+          <tr><td>m6_evaluation</td><td class="td-code">metrics · confusion_matrix · answer_metrics</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>FNR(등급별) · 혼동행렬 · 인용정합</td></tr>
+          <tr><td></td><td class="td-code">deploy_gate · kill_gate · locked_readiness · serving_eval · temperature</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE/</span><span class="sev">B</span></td><td>배포합격선 · 붕괴모니터 · readiness · eval↔serving 정합</td></tr>
+          <tr><td></td><td class="td-code">active_learning · corrections_rebuild · reviewer_trust</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>교정 환류 · 재학습 큐 · 검수 신뢰도</td></tr>
+          <tr><td></td><td class="td-code">eval_cards · anchor_corpus · anchor_eval</td><td><span class="sev">BATCH</span></td><td>앵커 다층평가 (Wilson CI · PASS/FAIL/INCONCLUSIVE)</td></tr>
+          <tr><td></td><td class="td-code">metamorphic · paraphrase_gen · serving_invariants · constructed_floor · federated_eval · judge_reliability · optuna_tuner</td><td><span class="sev">BATCH</span></td><td>메타모픽 회귀 · 연합평가 · witness floor · 튜닝 (스크립트/테스트 전용)</td></tr>
+          <tr><td></td><td class="td-code">calibration.py</td><td><span class="sev" style="border-color:rgba(0,0,0,.2);color:var(--text-dim);">DORMANT</span></td><td>ECE/Brier 런타임 측정 — 현재 임포터 없음</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s04">
+      <h2><span class="num">04</span> 어댑터 — 활성 vs 대기</h2>
+      <p class="h2-sub"><code>adapters/</code>(28)는 포트+구현체 구조로 교체 가능. <b>배포 프로파일(<code>KOIPA_DEPLOY_PROFILE</code>)</b>이 무엇을 켤지 결정한다.</p>
+      <table class="f">
+        <thead><tr><th style="width:130px">종류</th><th>활성 (운영)</th><th>대기 / 옵션</th></tr></thead>
+        <tbody>
+          <tr><td><b>embedding</b></td><td class="td-pass"><code>hf_embedding</code> (KURE-v1)</td><td><code>hash</code>(드라이런) · <code>cache_layer</code></td></tr>
+          <tr><td><b>llm</b></td><td class="td-pass"><code>local_openai</code>/<code>vllm</code>(고객) · <code>anthropic</code>(개발)</td><td><code>openai</code> · <code>noop</code></td></tr>
+          <tr><td><b>vectorstore</b></td><td class="td-pass"><code>pg_store</code> (pgvector)</td><td><code>es_store</code> · <code>inmemory</code></td></tr>
+          <tr><td><b>storage</b></td><td class="td-pass"><code>local_store</code> · <code>encrypted_store</code></td><td><code>minio</code> · <code>seaweedfs</code> (옵션)</td></tr>
+          <tr><td><b>reranker</b></td><td class="td-pass"><code>bge_reranker</code></td><td><code>noop</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s05">
+      <h2><span class="num">05</span> 데이터셋 경로 — <code>poc/datasets/</code></h2>
+      <p class="h2-sub">중요: 런타임 서빙은 데이터셋을 직접 읽지 <b>않고</b> 모델 디렉토리만 로드한다. 데이터셋을 읽는 건 거의 전부 <code>scripts/</code>(빌드·평가 게이트)이며, 런타임 예외는 딱 2개다.</p>
+      <table class="f">
+        <thead><tr><th style="width:320px">경로</th><th style="width:60px">건수</th><th>용도</th></tr></thead>
+        <tbody>
+          <tr class="grp"><td colspan="3">평가 정본 (릴리스 게이트가 소비)</td></tr>
+          <tr><td class="td-code">gold_real/classification_gold.jsonl</td><td>777</td><td>분류 정본. ⚠train-on-test 오염 → F1 0.83은 암기치</td></tr>
+          <tr><td class="td-code">gold_real/holdout_eval.clean.jsonl</td><td>42</td><td><b>디오염 홀드아웃</b> — ★릴리스 판단 진짜 지표(운영 FNR 2.8%)</td></tr>
+          <tr><td class="td-code">gold_real/retrieval_gold.jsonl</td><td>80</td><td>검색 정본 — P2 게이트(KURE hybrid R@5 0.925)</td></tr>
+          <tr><td class="td-code">gold/classification_gold.jsonl</td><td>144</td><td>합성 마스킹 eval (내부일관성만)</td></tr>
+          <tr><td class="td-code">adversarial/golden_100.jsonl</td><td>100</td><td>적대 FNR 회귀 — S9 릴리스 게이트</td></tr>
+          <tr><td class="td-code">metamorphic/anchor_pairs.fixture.jsonl</td><td>18</td><td>최소쌍 픽스처 — 메타모픽 게이트</td></tr>
+          <tr><td class="td-code">acceptance_pack/</td><td>—</td><td>전 포맷 실문서 샘플 — 고객 인수검증(번들 동봉)</td></tr>
+
+          <tr class="grp"><td colspan="3">학습 데이터 (silver)</td></tr>
+          <tr><td class="td-code">labeled_p1_retrain_v4_clean/train.jsonl</td><td>5911</td><td><b>현재 배포모델(v-dd3abab9) 학습입력</b> — KF-DeBERTa clean 베이스 (FNR 0.167 / F1 0.632)</td></tr>
+          <tr><td class="td-code">labeled_oss_v1/{val,test}</td><td>680/687</td><td>in-dist 게이트 (F1 0.774 PASS)</td></tr>
+          <tr><td class="td-code">oss_corpus/</td><td>3754</td><td>P2 검색 대상 코퍼스 (Recall eval)</td></tr>
+
+          <tr class="grp"><td colspan="3">런타임이 읽는 유일한 예외 2건 🟢</td></tr>
+          <tr><td class="td-code">demo_retrain/</td><td>~400</td><td>재학습 데모 (<code>config.retrain_dataset_dir</code>)</td></tr>
+          <tr><td class="td-code">drift_train_centroid.json</td><td>1</td><td>드리프트 센트로이드 (<code>drift_monitor.py</code>)</td></tr>
+
+          <tr class="grp"><td colspan="3">참조 · 금지</td></tr>
+          <tr><td class="td-code">manifests/dataset_v1.0.yaml</td><td>—</td><td>정본 매니페스트 (모든 count/lineage 근거)</td></tr>
+          <tr><td class="td-code">legacy_synthetic/*</td><td>—</td><td>⚠순환오염 — <b>학습·평가 입력 금지(폐기)</b></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s06">
+      <h2><span class="num">06</span> 설치 대상 — 모델 · DB · 저장소</h2>
+      <p class="h2-sub">폐쇄망 GA(<code>onprem-local</code>) 기준, <b>무엇을 어디에 깔아야 하는가</b>. 모든 식별자·경로·env 이름은 소스에서 확인한 실값이다.</p>
+      <table class="f">
+        <thead><tr><th style="width:40px">#</th><th style="width:130px">대상</th><th style="width:230px">이름 / 버전</th><th>경로 · env</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><b>Postgres+pgvector</b></td><td class="td-code">pgvector/pgvector:pg16</td><td>포트 5432 · <code>pgdata:/var/lib/postgresql/data</code> · <code>DATABASE_URL</code>. 부팅 후 <code>alembic upgrade head</code> (vector·pg_bigm 확장)</td></tr>
+          <tr><td>2</td><td><b>Redis</b></td><td class="td-code">redis:7.2-alpine</td><td>포트 6379 · <code>REDIS_URL</code>. Celery 브로커+잡+멱등</td></tr>
+          <tr><td>3</td><td><b>임베딩 모델</b></td><td class="td-code">nlpai-lab/KURE-v1 (폴백 BAAI/bge-m3)</td><td><code>/models</code>(→<code>HF_HOME=/models/hf</code>) 오프라인 동봉 · <code>HF_HUB_OFFLINE=1</code>. CPU/GPU</td></tr>
+          <tr><td>4</td><td><b>리랭커</b></td><td class="td-code">BAAI/bge-reranker-v2-m3</td><td>같은 HF 캐시 · <code>RERANKER_PROVIDER=bge</code></td></tr>
+          <tr><td>5</td><td><b>분류 모델</b></td><td class="td-code">kakaobank/kf-deberta-base + 학습가중치</td><td><code>CLASSIFIER_MODEL_DIR=/models/classifier-trained</code> (safetensors, <b>경로 없으면 startup 실패</b>)</td></tr>
+          <tr><td>6</td><td><b>로컬 LLM</b></td><td class="td-code">Qwen/Qwen3-14B (또는 qwen3:14b)</td><td>vLLM <code>:8001/v1</code> 또는 Ollama <code>:11434/v1</code>. GPU 필요 · <code>LLM_PROVIDER=local_openai|vllm|ollama</code></td></tr>
+          <tr><td>7</td><td><b>문서 저장소</b></td><td class="td-code">로컬 FS (MinIO 미사용)</td><td><code>/app/.storage</code> (api↔worker 공유) · <code>STORAGE_ENCRYPTION_KEY</code>(64-hex)로 AES-256-GCM</td></tr>
+          <tr><td>8</td><td><b>OS 바이너리</b></td><td class="td-code">tesseract(+kor) · poppler · libreoffice</td><td>Dockerfile.api 포함 · GPU 시 NVIDIA Container Toolkit</td></tr>
+        </tbody>
+      </table>
+      <div class="callout info">
+        <div class="callout-icon">◆</div>
+        <div class="callout-body"><b>배포 모델 = <code>v4_clean/v-dd3abab9</code> (clean)</b> — <code>.env.example</code>·<code>.env.prod.example</code>·오프라인 번들(<code>build_offline_bundle</code>)·readiness·adversarial 게이트까지 <b>코드·설정·스크립트 전부가 일관되게</b> 이 경로를 가리킨다 (FNR 0.167 / F1 0.632, cost 미적용 clean 베이스). 옛 <code>v4_step3/v-f9b5cedb</code>는 서빙 기본값으로 참조되는 곳이 없고, 그 학습셋(step3 train.jsonl)은 정리 커밋에서 추적 해제(<code>git rm --cached</code>)됐다.</div>
+      </div>
+      <p style="font-size:13px;color:var(--text-dim);margin:12px 0 0;"><b>개발/클라우드 티어</b>는 6·로컬LLM 대신 <code>ANTHROPIC_API_KEY</code> + <code>claude-sonnet-4-6</code>을 쓴다. <b>필수 시크릿</b>(<code>poc_mode=full</code>): <code>API_KEY</code> · <code>KOIPA_AUDIT_CHAIN_SECRET</code> · <code>STORAGE_ENCRYPTION_KEY</code> + 안전게이트(agreement/metadata_floor/storage_encryption/source_prior/require_real_embedder/deploy_gate_require_locked_eval)가 모두 ON이어야 startup 통과.</p>
+    </section>
+
+    <section id="s07">
+      <h2><span class="num">07</span> 배포 프로파일</h2>
+      <p class="h2-sub"><code>KOIPA_DEPLOY_PROFILE</code> 한 줄이 위 모델·DB·게이트의 on/off를 결정한다 (<code>config.py</code> <code>_PROFILE_DEFAULTS</code>).</p>
+      <table class="f">
+        <thead><tr><th style="width:130px">프로파일</th><th style="width:90px">GPU</th><th>구성</th></tr></thead>
+        <tbody>
+          <tr><td class="td-code">lite-noapi</td><td>없음</td><td>전부 mock: llm=noop · embedding=hash · vector=inmemory · 학습 OFF · dryrun</td></tr>
+          <tr><td class="td-code">lite-cloud</td><td>없음</td><td>외부 LLM: llm=anthropic · embedding=hf · vector=pg · storage=minio · full</td></tr>
+          <tr><td class="td-code"><b>onprem-local</b></td><td>있음</td><td><b>폐쇄망 GA</b>: llm=ollama · embedding=hf · reranker=bge · vector=pg · storage=local · 안전게이트 강제 ON</td></tr>
+          <tr><td class="td-code">full-train</td><td>있음</td><td>풀스펙: llm=anthropic · reranker=bge · vector=pg · storage=local · 학습 ON</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s08">
+      <h2><span class="num">08</span> 오프라인 도구 — <code>scripts/</code> / make</h2>
+      <p class="h2-sub"><code>poc/scripts/</code>(151 = 직속 132 + <code>scripts/archive/</code> 격리 19)는 손으로 돌리는 도구. 일회성·실험 스크립트 19개는 정리 커밋 0b49f76에서 <code>archive/</code>로 격리됐고, 밑줄(<code>_</code>) 접두 파일도 대부분 임시 프로브다. 실제 배선된 make 타겟 체인만 정리한다.</p>
+      <table class="f">
+        <thead><tr><th style="width:150px">목적</th><th>핵심 스크립트 · make 타겟</th></tr></thead>
+        <tbody>
+          <tr><td><b>합성 골든빌드</b></td><td class="td-code">build_synthetic_golden · run_golden_split_signoff · promote_golden_candidates · make_gold_set(gold-set) · make_retrieval_gold(retrieval-gold)</td></tr>
+          <tr><td><b>평가</b></td><td class="td-code">eval_p1_model_gold(p1-eval) · eval_adversarial(adversarial-gate) · eval_trusted_ci(eval-trusted-ci) · build_p1_boundary_report(p1-boundary)</td></tr>
+          <tr><td><b>릴리스 게이트</b></td><td class="td-code">build_operational_readiness(operational-readiness) → adversarial-gate + metamorphic-gate → check_release_gate(release-gate) → build_release_manifest(release-manifest)</td></tr>
+          <tr><td><b>인수 팩</b></td><td class="td-code">build_acceptance_pack(acceptance-pack) · run_acceptance(acceptance-test)</td></tr>
+          <tr><td><b>데이터 위생</b></td><td class="td-code">check_data_quality(check-data/check-leakage) · build_leakage_manifest(leakage-manifest) · check_dataset_manifest(check-manifest)</td></tr>
+          <tr><td><b>검수 루프</b></td><td class="td-code">build_human_review_queue(human-review-queue) · import_review_corrections(import-review) · check_active_learning(active-learning)</td></tr>
+          <tr><td><b>DB · DR</b></td><td class="td-code">check_migration_drift · seed_active_model_version · backup_postgres · dr_drill · dr_restore</td></tr>
+          <tr><td><b>공급망 · 번들</b></td><td class="td-code">dump_licenses(licenses) · render_sbom_html(sbom-publish) · build_offline_bundle(bundle-dry)</td></tr>
+        </tbody>
+      </table>
+      <div class="callout info">
+        <div class="callout-icon">▸</div>
+        <div class="callout-body"><b>릴리스 흐름</b>(RELEASE_CHECKLIST): <code>human-review-queue</code> → <code>import-review</code> → <code>check-manifest</code> → <code>p1-boundary</code> → <code>operational-readiness</code> → <code>release-gate</code> → <code>release-manifest</code> → <code>test-lite / test-fullstack</code>.</div>
+      </div>
+    </section>
+
+  </article>
+</div>
+
+<footer>
+  <strong>실제 사용 파일 아키텍처 맵</strong> — 수행사 내부 · 한국지식재산보호원<br>
+  2026-07-07 재검증 · KL 공유 대상 아님(내부 참조) · 실측 근거: 4영역 병렬 소스 감사 + 정리커밋 6건 반영 · 앱코드 poc/src/koipa 178 · 실행 프로세스 3
+</footer>
+
+<script>
+const items = document.querySelectorAll('.toc-item[href^="#"]');
+const sections = [...items].map(i => document.querySelector(i.getAttribute('href'))).filter(Boolean);
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      items.forEach(i => i.classList.remove('active'));
+      const link = document.querySelector(`.toc-item[href="#${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>

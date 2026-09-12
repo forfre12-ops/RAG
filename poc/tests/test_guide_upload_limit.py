@@ -1,108 +1,51 @@
-"""R3 — Guide upload max_size 한도 검증.
+"""R3 — 가이드 업로드 한도 시험은 **없어졌다**(2026-09-05).
 
-DoS 차단 — 대용량 바이너리 업로드 시 OOM 방지.
+가이드 API 가 파일을 받지 않는다. 종전에는 multipart 로 파일을 필수로 받고 max_upload_mb
+한도까지 검사한 뒤 **버렸다**(services/guide_service.py 머리말: "받되 버린다").
+발주처 원문이 우리 서버 메모리를 한 번 지나는 경로였고 RTM 요건도 아니라 걷었다.
 
-검증:
-- max_upload_mb 한도 이하: 201 Created
-- 한도 초과: 413 Payload Too Large
-- 설정값 변경 시 한도 동적 반영
+한도 검사 자체는 남아 있다 — 분류 대상 문서 업로드(POST /documents)가 그것이고,
+tests/test_document_ingestion.py 가 그 자리를 지킨다. 여기서는 **파일을 안 받는다**는
+것만 확인한다.
 """
-
 from __future__ import annotations
 
 import io
 import json
-import os
+import uuid
 
-import pytest
+from fastapi.testclient import TestClient
 
-pytestmark = pytest.mark.slow
+from koipa.api.app import app
 
-# 테스트 환경 — rate-limit 비활성
-os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
-
-from fastapi.testclient import TestClient  # noqa: E402
-
-from lloydk.api.app import app  # noqa: E402
-from lloydk.config import settings  # noqa: E402
+client = TestClient(app)
+API = "/api/v1"
+_AUTH = {"X-API-Key": "test-key", "X-Actor-Role": "admin"}
 
 
-def _api_key() -> str:
-    return settings.api_key or "test-key"
+def _actor() -> dict:
+    return {"user_id": "guide-admin", "role": "admin"}
 
 
-def _hdr() -> dict:
-    return {
-        "X-API-Key": _api_key(),
-        "X-Actor-Id": "test-uploader",
-        "X-Actor-Role": "kl_backend",
-    }
+def test_file_upload_is_no_longer_accepted():
+    """파일을 보내면 422 — 원문이 서버로 들어오는 경로를 남기지 않는다."""
+    gid = f"g-{uuid.uuid4().hex[:6]}"
+    r = client.post(
+        f"{API}/guide/documents",
+        headers=_AUTH,
+        data={"guide_id": gid, "version": "v1.0", "actor": json.dumps(_actor())},
+        files={"file": ("g.txt", io.BytesIO(b"x" * 4096), "text/plain")},
+    )
+    assert r.status_code == 422, r.text
 
 
-def _make_payload(size_bytes: int) -> bytes:
-    return b"X" * size_bytes
-
-
-@pytest.fixture
-def client():
-    return TestClient(app)
-
-
-@pytest.fixture
-def actor_json() -> str:
-    return json.dumps({"user_id": "test-uploader", "role": "kl_backend"})
-
-
-class TestGuideUploadLimit:
-    def test_under_limit_accepted(self, client, actor_json, monkeypatch):
-        """1MB 본문은 한도(기본 20MB) 이하 — 201 또는 5xx (PG 미가용)."""
-        body = _make_payload(1 * 1024 * 1024)  # 1MB
-        files = {"file": ("test.txt", io.BytesIO(body), "text/plain")}
-        data = {
-            "guide_id": "test-limit-1",
-            "version": "v1.0",
-            "actor": actor_json,
-        }
-        r = client.post("/api/v1/guide/documents", headers=_hdr(), data=data, files=files)
-        # 정상 가이드 업로드: 201 / PG 미가용·일시 장애: 503 / 등급 매핑 등 422
-        assert r.status_code in (201, 422, 500, 503), f"unexpected status {r.status_code}: {r.text[:200]}"
-
-    def test_over_limit_rejected(self, client, actor_json, monkeypatch):
-        """한도 초과 시 413."""
-        # 한도를 1MB로 낮춰서 테스트 (실제 20MB body 만들지 않음 — 메모리 절약)
-        monkeypatch.setattr(settings, "max_upload_mb", 1)
-        body = _make_payload(2 * 1024 * 1024)  # 2MB
-        files = {"file": ("big.txt", io.BytesIO(body), "text/plain")}
-        data = {
-            "guide_id": "test-limit-2",
-            "version": "v1.0",
-            "actor": actor_json,
-        }
-        r = client.post("/api/v1/guide/documents", headers=_hdr(), data=data, files=files)
-        assert r.status_code == 413, f"expected 413, got {r.status_code}: {r.text[:200]}"
-        body_json = r.json()
-        # FastAPI HTTPException 표준 응답
-        detail = body_json.get("detail", "")
-        assert "too large" in detail.lower() or "1mb" in detail.lower(), \
-            f"detail message unclear: {detail}"
-
-    def test_exact_limit_accepted(self, client, actor_json, monkeypatch):
-        """정확히 한도와 같으면 통과."""
-        monkeypatch.setattr(settings, "max_upload_mb", 1)
-        body = _make_payload(1 * 1024 * 1024)  # 정확히 1MB
-        files = {"file": ("exact.txt", io.BytesIO(body), "text/plain")}
-        data = {
-            "guide_id": "test-limit-3",
-            "version": "v1.0",
-            "actor": actor_json,
-        }
-        r = client.post("/api/v1/guide/documents", headers=_hdr(), data=data, files=files)
-        # 413이 아님 — 한도 통과
-        assert r.status_code != 413, f"413 unexpected at exact limit: {r.text[:200]}"
-
-    def test_limit_config_changeable(self, monkeypatch):
-        """settings.max_upload_mb 변경이 즉시 반영."""
-        monkeypatch.setattr(settings, "max_upload_mb", 5)
-        assert settings.max_upload_mb == 5
-        monkeypatch.setattr(settings, "max_upload_mb", 50)
-        assert settings.max_upload_mb == 50
+def test_version_register_needs_no_file():
+    """버전 메타만으로 등록된다 — 한도 검사가 낄 자리가 없다."""
+    gid = f"g-{uuid.uuid4().hex[:6]}"
+    r = client.post(
+        f"{API}/guide/documents",
+        headers=_AUTH,
+        json={"guide_id": gid, "version": "v1.0", "actor": _actor()},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["guide_id"] == gid

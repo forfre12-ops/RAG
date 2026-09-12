@@ -3,7 +3,7 @@
 재설계: conf 제거, 게이트 = 합의(rule==llm) + 실제 근거 span + self-consistency.
 gold_candidate(자동 후보)만 만들고 평가정답은 사람(P3). 구 path A/B/C·conf 게이트는 삭제됨.
 """
-from lloydk.modules.m3_labeling.consensus import evaluate_consensus
+from koipa.modules.m3_labeling.consensus import evaluate_consensus
 
 
 def test_gold_candidate_agreement_with_evidence():

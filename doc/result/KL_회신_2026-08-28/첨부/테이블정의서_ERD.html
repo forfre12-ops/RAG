@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>테이블정의서 · ERD | KOIPA AI 영업비밀 등급분류 시스템</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:17px;font-weight:800;letter-spacing:-.02em;margin:38px 0 12px}
+h3{font-size:14.5px;font-weight:700;margin:22px 0 6px 18px}
+p{margin:8px 0 8px 18px}
+ul,ol{margin:8px 0 8px 18px;padding-left:20px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);padding:12px 16px;margin:14px 0 14px 18px;font-size:13px}
+pre{background:var(--surf);border:1px solid var(--line);padding:12px 14px;margin:10px 0 10px 18px;font-size:11.5px;font-family:ui-monospace,monospace;overflow-x:auto;line-height:1.55}
+.q{background:var(--mid);border-left:3px solid #a1a1aa;padding:10px 14px;margin:18px 0 10px 18px;font-size:13px;font-weight:700}
+.tw{overflow-x:auto;margin-left:18px}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace;margin-left:18px}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .docinfo{break-inside:avoid;page-break-inside:avoid}
+  /* [2026-08-29] .note 까지 통째로 avoid 하면 긴 안내 상자가 다음 쪽으로 밀리면서
+     앞쪽에 빈 면이 생긴다(인쇄 실측). 상자는 나뉘도록 두되 첫/끝 줄만 붙잡는다. */
+  .note{orphans:3;widows:3}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+.flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
+</style>
+<style>
+
+.ts-edge
+.ts-node rect{transition:stroke .12s;}
+.ts-node:hover rect{stroke:#1e293b;stroke-width:2;}
+table.spec{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.spec th{background:#f4f4f5;text-align:left;font-weight:600;font-size:11.5px;
+  padding:6px 8px;border:1px solid #d4d4d8;white-space:nowrap;}
+table.spec td{padding:5px 8px;border:1px solid #e4e4e7;vertical-align:top;}
+table.spec td.c-name{font-family:ui-monospace,monospace;font-size:11.5px;white-space:nowrap;}
+table.spec td.c-type{font-family:ui-monospace,monospace;font-size:11px;color:#3f3f46;white-space:nowrap;}
+table.spec td.c-key{text-align:center;font-size:10.5px;font-weight:700;white-space:nowrap;}
+table.spec td.c-nn{text-align:center;}
+.k-pk{color:#b45309;}.k-fk{color:#1d4ed8;}.k-uq{color:#15803d;}
+.spec-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:26px 0 4px;}
+.spec-head h3{margin:0;font-family:ui-monospace,monospace;}
+.spec-logical{font-size:13px;color:#52525b;}
+.spec-badge{display:inline-block;background:#18181b;color:#fff;font-size:9.5px;font-weight:700;
+  letter-spacing:.04em;padding:2px 7px;border-radius:3px;font-family:ui-monospace,monospace;}
+.spec-note{font-size:12.5px;color:#52525b;margin:2px 0 8px;line-height:1.6;}
+.spec-idx{font-size:11.5px;color:#52525b;margin:6px 0 0;line-height:1.7;}
+.spec-idx code{font-size:11px;}
+
+.tbl-wrap{overflow-x:auto;}
+.num{font-family:ui-monospace,monospace;font-size:10.5px;font-weight:700;color:var(--dim);
+  padding:2px 7px;background:var(--mid);border:1px solid var(--line);margin-right:6px}
+.group-header{display:flex;align-items:center;gap:10px;margin:40px 0 10px}
+.group-header h2{margin:0}
+@media print{
+  table.spec{font-size:8pt}
+  .tbl-wrap{overflow:visible}
+  section{break-inside:auto}
+}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">테이블정의서 · ERD</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">감리 산출물</span></div>
+  </div>
+</nav>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">감리 산출물 · 데이터베이스 정의</div>
+    <h1>테이블정의서 · ERD</h1>
+    <div class="meta">PostgreSQL 16 · pgvector · UTF-8 · 21테이블 227칼럼 · 등급체계·문서·라벨링·추론·학습·보정·합성·운영 8개 그룹 · 2026-09-11 생성</div>
+  </div>
+<section id="tables-index"><h2><span class="num">01</span> 테이블 목록</h2>
+<p class="spec-note"><b>물리 타입 규약</b> — 시각은 <code>TIMESTAMPTZ</code> 로 시간대와 함께 저장합니다. 식별자는 <code>UUID</code> 형입니다. <code>JSONB</code> 는 이진 JSON 이라 키로 거르는 질의에 GIN 인덱스를 씁니다. 배열은 <code>TEXT[]</code>, 문서 대표 벡터는 pgvector 의 <code>vector(1024)</code> 입니다. 표·칼럼 물리명은 KOIPA 표준용어집(v1.1) 약어를 따릅니다(대응표 정본 <code>poc/src/koipa/db/standard_names.py</code>).</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>그룹</th><th>물리명</th><th>논리명</th><th>컬럼</th><th>기본키</th><th>배치</th><th>파티션</th></tr></thead><tbody>
+<tr><td class="c-key">A 등급체계</td><td class="c-name"><a href="#t-tad_cm_clsf_grd_mng">tad_cm_clsf_grd_mng</a></td><td>분류 등급</td><td class="c-nn">11</td><td class="c-type">grd_sn</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">A 등급체계</td><td class="c-name"><a href="#t-tad_em_evl_rqmt_mng">tad_em_evl_rqmt_mng</a></td><td>평가 요건</td><td class="c-nn">8</td><td class="c-type">rqmt_sn</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">A 등급체계</td><td class="c-name"><a href="#t-tad_gm_grd_kywd_mng">tad_gm_grd_kywd_mng</a></td><td>등급 키워드</td><td class="c-nn">9</td><td class="c-type">kywd_sn</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">B 문서</td><td class="c-name"><a href="#t-tad_dm_doc_mng">tad_dm_doc_mng</a></td><td>문서</td><td class="c-nn">20</td><td class="c-type">doc_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">B 문서</td><td class="c-name"><a href="#t-tad_dm_doc_vctr_mng">tad_dm_doc_vctr_mng</a></td><td>문서 벡터</td><td class="c-nn">6</td><td class="c-type">doc_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">B 문서</td><td class="c-name"><a href="#t-tad_cm_chnk_mng">tad_cm_chnk_mng</a></td><td>청크</td><td class="c-nn">10</td><td class="c-type">chnk_id, crt_dt</td><td class="c-key">둘 다</td><td class="c-type">월별 RANGE(crt_dt)</td></tr>
+<tr><td class="c-key">C 라벨링</td><td class="c-name"><a href="#t-tad_dm_doc_lbl_mng">tad_dm_doc_lbl_mng</a></td><td>문서 라벨</td><td class="c-nn">11</td><td class="c-type">doc_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">D 추론</td><td class="c-name"><a href="#t-tad_cm_clsf_rslt_mng">tad_cm_clsf_rslt_mng</a></td><td>분류 결과</td><td class="c-nn">13</td><td class="c-type">clsf_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">D 추론</td><td class="c-name"><a href="#t-tad_cm_clsf_bss_mng">tad_cm_clsf_bss_mng</a></td><td>분류 근거</td><td class="c-nn">10</td><td class="c-type">bss_sn</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">E 학습</td><td class="c-name"><a href="#t-tad_mm_mdl_ver_mng">tad_mm_mdl_ver_mng</a></td><td>모델 버전</td><td class="c-nn">18</td><td class="c-type">mdl_ver_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">E 학습</td><td class="c-name"><a href="#t-tad_lm_lrn_excn_mng">tad_lm_lrn_excn_mng</a></td><td>학습 실행</td><td class="c-nn">20</td><td class="c-type">excn_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">E 학습</td><td class="c-name"><a href="#t-tad_lm_lrn_epoch_mng">tad_lm_lrn_epoch_mng</a></td><td>학습 에폭</td><td class="c-nn">7</td><td class="c-type">excn_id, epoch_sn</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">E 학습</td><td class="c-name"><a href="#t-tad_lm_lrn_datst_mng">tad_lm_lrn_datst_mng</a></td><td>학습 데이터셋</td><td class="c-nn">5</td><td class="c-type">lrn_datst_sn</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">F 보정</td><td class="c-name"><a href="#t-tad_cm_crct_mng">tad_cm_crct_mng</a></td><td>보정</td><td class="c-nn">10</td><td class="c-type">crct_sn</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">G 합성</td><td class="c-name"><a href="#t-tad_pm_prmpt_ver_mng">tad_pm_prmpt_ver_mng</a></td><td>프롬프트 버전</td><td class="c-nn">6</td><td class="c-type">prmpt_ver_nm</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">—</td></tr>
+<tr><td class="c-key">G 합성</td><td class="c-name"><a href="#t-tad_sm_syn_doc_mng">tad_sm_syn_doc_mng</a></td><td>합성 문서</td><td class="c-nn">21</td><td class="c-type">syn_doc_id</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">—</td></tr>
+<tr><td class="c-key">G 합성</td><td class="c-name"><a href="#t-tad_sm_syn_datst_cpst_mng">tad_sm_syn_datst_cpst_mng</a></td><td>학습셋 편입 이력</td><td class="c-nn">5</td><td class="c-type">cpst_sn</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">—</td></tr>
+<tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tad_lm_llm_usqty_mng">tad_lm_llm_usqty_mng</a></td><td>LLM 사용량</td><td class="c-nn">15</td><td class="c-type">use_rcd_sn, clot_dt</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">월별 RANGE(clot_dt)</td></tr>
+<tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tad_am_adt_log_mng">tad_am_adt_log_mng</a></td><td>감사 로그</td><td class="c-nn">13</td><td class="c-type">adt_sn, ocrn_dt</td><td class="c-key">둘 다</td><td class="c-type">월별 RANGE(ocrn_dt)</td></tr>
+<tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tad_gm_guide_ver_mng">tad_gm_guide_ver_mng</a></td><td>가이드 버전</td><td class="c-nn">8</td><td class="c-type">guide_ver_sn</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+<tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tad_sy_lck_mng">tad_sy_lck_mng</a></td><td>동시성 잠금</td><td class="c-nn">1</td><td class="c-type">lck_nm</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
+</tbody></table></div></section>
+<section id="placement"><h2><span class="num">02</span> 서버별 배포 구분</h2>
+<p class="spec-note">서버별로 생성하는 표를 구분합니다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>구분</th><th>표 수</th><th>어느 서버에 만드는가</th><th>표</th></tr></thead><tbody>
+<tr><td class="c-name">둘 다</td><td class="c-nn">17</td><td>지재원 · 고객사 양쪽</td><td class="c-type">tad_am_adt_log_mng, tad_cm_chnk_mng, tad_cm_clsf_bss_mng, tad_cm_clsf_grd_mng, tad_cm_clsf_rslt_mng, tad_cm_crct_mng, tad_dm_doc_lbl_mng, tad_dm_doc_mng, tad_dm_doc_vctr_mng, tad_em_evl_rqmt_mng, tad_gm_grd_kywd_mng, tad_gm_guide_ver_mng, tad_lm_lrn_datst_mng, tad_lm_lrn_epoch_mng, tad_lm_lrn_excn_mng, tad_mm_mdl_ver_mng, tad_sy_lck_mng</td></tr>
+<tr><td class="c-name">지재원만</td><td class="c-nn">4</td><td>지재원 서버에만</td><td class="c-type">tad_lm_llm_usqty_mng, tad_pm_prmpt_ver_mng, tad_sm_syn_datst_cpst_mng, tad_sm_syn_doc_mng</td></tr>
+</tbody></table></div>
+<p class="spec-note" style="margin-top:12px">지재원 21종 · 고객사 17종을 생성합니다.</p>
+</section>
+<section id="erd"><h2><span class="num">03</span> ERD 관계도</h2>
+<p class="spec-note">실선은 FK 제약, 점선은 제약 없는 참조입니다.</p>
+<div style="overflow-x:auto;border:1px solid rgba(0,0,0,.12);padding:16px;margin:14px 0;background:#fafafa;">
+<svg id="erd-root" viewBox="0 0 940 868" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="개체 관계도 — 상자를 클릭하면 그 표의 관계만 표시된다">
+<defs><marker id="erd-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#3f3f46"/></marker><marker id="erd-arrow-on" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/></marker></defs>
+<style>.erd-box{cursor:pointer;outline:none}.erd-box rect{fill:#fff;stroke:#18181b;stroke-width:1.2}.erd-edge{fill:none;stroke:#52525b;stroke-width:1.4;marker-end:url(#erd-arrow)}.erd-edge.logical{stroke-dasharray:6 4}#erd-root:has(.erd-box:hover) .erd-edge,#erd-root:has(.erd-box:focus) .erd-edge{stroke:#e4e4e7;stroke-width:1;marker-end:none}#erd-root:has(.erd-box:hover) .erd-box rect,#erd-root:has(.erd-box:focus) .erd-box rect{stroke:#d4d4d8}#erd-root:has(.erd-box:hover) .erd-box text,#erd-root:has(.erd-box:focus) .erd-box text{fill:#a1a1aa}@media print{#erd-root .erd-edge{stroke:#52525b;stroke-width:1.4}#erd-root .erd-box rect{stroke:#18181b}}#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:hover ~ .erd-edge[data-c="tad_am_adt_log_mng"],#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:hover ~ .erd-edge[data-p="tad_am_adt_log_mng"],#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:focus ~ .erd-edge[data-c="tad_am_adt_log_mng"],#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:focus ~ .erd-edge[data-p="tad_am_adt_log_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:hover rect,#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:hover text,#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:hover ~ .erd-edge[data-c="tad_cm_chnk_mng"],#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:hover ~ .erd-edge[data-p="tad_cm_chnk_mng"],#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:focus ~ .erd-edge[data-c="tad_cm_chnk_mng"],#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:focus ~ .erd-edge[data-p="tad_cm_chnk_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:hover rect,#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:hover text,#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:hover ~ .erd-edge[data-c="tad_cm_clsf_bss_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:hover ~ .erd-edge[data-p="tad_cm_clsf_bss_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:focus ~ .erd-edge[data-c="tad_cm_clsf_bss_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:focus ~ .erd-edge[data-p="tad_cm_clsf_bss_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:hover rect,#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:hover text,#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:hover ~ .erd-edge[data-c="tad_cm_clsf_grd_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:hover ~ .erd-edge[data-p="tad_cm_clsf_grd_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:focus ~ .erd-edge[data-c="tad_cm_clsf_grd_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:focus ~ .erd-edge[data-p="tad_cm_clsf_grd_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:hover rect,#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:hover text,#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:hover ~ .erd-edge[data-c="tad_cm_clsf_rslt_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:hover ~ .erd-edge[data-p="tad_cm_clsf_rslt_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:focus ~ .erd-edge[data-c="tad_cm_clsf_rslt_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:focus ~ .erd-edge[data-p="tad_cm_clsf_rslt_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:hover rect,#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:hover text,#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_cm_crct_mng"]:hover ~ .erd-edge[data-c="tad_cm_crct_mng"],#erd-root .erd-box[data-t="tad_cm_crct_mng"]:hover ~ .erd-edge[data-p="tad_cm_crct_mng"],#erd-root .erd-box[data-t="tad_cm_crct_mng"]:focus ~ .erd-edge[data-c="tad_cm_crct_mng"],#erd-root .erd-box[data-t="tad_cm_crct_mng"]:focus ~ .erd-edge[data-p="tad_cm_crct_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_cm_crct_mng"]:hover rect,#erd-root .erd-box[data-t="tad_cm_crct_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_cm_crct_mng"]:hover text,#erd-root .erd-box[data-t="tad_cm_crct_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:hover ~ .erd-edge[data-c="tad_dm_doc_lbl_mng"],#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:hover ~ .erd-edge[data-p="tad_dm_doc_lbl_mng"],#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:focus ~ .erd-edge[data-c="tad_dm_doc_lbl_mng"],#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:focus ~ .erd-edge[data-p="tad_dm_doc_lbl_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:hover rect,#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:hover text,#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_dm_doc_mng"]:hover ~ .erd-edge[data-c="tad_dm_doc_mng"],#erd-root .erd-box[data-t="tad_dm_doc_mng"]:hover ~ .erd-edge[data-p="tad_dm_doc_mng"],#erd-root .erd-box[data-t="tad_dm_doc_mng"]:focus ~ .erd-edge[data-c="tad_dm_doc_mng"],#erd-root .erd-box[data-t="tad_dm_doc_mng"]:focus ~ .erd-edge[data-p="tad_dm_doc_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_dm_doc_mng"]:hover rect,#erd-root .erd-box[data-t="tad_dm_doc_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_dm_doc_mng"]:hover text,#erd-root .erd-box[data-t="tad_dm_doc_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:hover ~ .erd-edge[data-c="tad_em_evl_rqmt_mng"],#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:hover ~ .erd-edge[data-p="tad_em_evl_rqmt_mng"],#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:focus ~ .erd-edge[data-c="tad_em_evl_rqmt_mng"],#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:focus ~ .erd-edge[data-p="tad_em_evl_rqmt_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:hover rect,#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:hover text,#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:hover ~ .erd-edge[data-c="tad_gm_grd_kywd_mng"],#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:hover ~ .erd-edge[data-p="tad_gm_grd_kywd_mng"],#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:focus ~ .erd-edge[data-c="tad_gm_grd_kywd_mng"],#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:focus ~ .erd-edge[data-p="tad_gm_grd_kywd_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:hover rect,#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:hover text,#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_gm_guide_ver_mng"]:hover ~ .erd-edge[data-c="tad_gm_guide_ver_mng"],#erd-root .erd-box[data-t="tad_gm_guide_ver_mng"]:hover ~ .erd-edge[data-p="tad_gm_guide_ver_mng"],#erd-root .erd-box[data-t="tad_gm_guide_ver_mng"]:focus ~ .erd-edge[data-c="tad_gm_guide_ver_mng"],#erd-root .erd-box[data-t="tad_gm_guide_ver_mng"]:focus ~ .erd-edge[data-p="tad_gm_guide_ver_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_gm_guide_ver_mng"]:hover rect,#erd-root .erd-box[data-t="tad_gm_guide_ver_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_gm_guide_ver_mng"]:hover text,#erd-root .erd-box[data-t="tad_gm_guide_ver_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:hover ~ .erd-edge[data-c="tad_lm_llm_usqty_mng"],#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:hover ~ .erd-edge[data-p="tad_lm_llm_usqty_mng"],#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:focus ~ .erd-edge[data-c="tad_lm_llm_usqty_mng"],#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:focus ~ .erd-edge[data-p="tad_lm_llm_usqty_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:hover rect,#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:hover text,#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_lm_lrn_datst_mng"]:hover ~ .erd-edge[data-c="tad_lm_lrn_datst_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_datst_mng"]:hover ~ .erd-edge[data-p="tad_lm_lrn_datst_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_datst_mng"]:focus ~ .erd-edge[data-c="tad_lm_lrn_datst_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_datst_mng"]:focus ~ .erd-edge[data-p="tad_lm_lrn_datst_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_lm_lrn_datst_mng"]:hover rect,#erd-root .erd-box[data-t="tad_lm_lrn_datst_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_lm_lrn_datst_mng"]:hover text,#erd-root .erd-box[data-t="tad_lm_lrn_datst_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_lm_lrn_epoch_mng"]:hover ~ .erd-edge[data-c="tad_lm_lrn_epoch_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_epoch_mng"]:hover ~ .erd-edge[data-p="tad_lm_lrn_epoch_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_epoch_mng"]:focus ~ .erd-edge[data-c="tad_lm_lrn_epoch_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_epoch_mng"]:focus ~ .erd-edge[data-p="tad_lm_lrn_epoch_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_lm_lrn_epoch_mng"]:hover rect,#erd-root .erd-box[data-t="tad_lm_lrn_epoch_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_lm_lrn_epoch_mng"]:hover text,#erd-root .erd-box[data-t="tad_lm_lrn_epoch_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:hover ~ .erd-edge[data-c="tad_lm_lrn_excn_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:hover ~ .erd-edge[data-p="tad_lm_lrn_excn_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:focus ~ .erd-edge[data-c="tad_lm_lrn_excn_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:focus ~ .erd-edge[data-p="tad_lm_lrn_excn_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:hover rect,#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:hover text,#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:hover ~ .erd-edge[data-c="tad_mm_mdl_ver_mng"],#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:hover ~ .erd-edge[data-p="tad_mm_mdl_ver_mng"],#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:focus ~ .erd-edge[data-c="tad_mm_mdl_ver_mng"],#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:focus ~ .erd-edge[data-p="tad_mm_mdl_ver_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:hover rect,#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:hover text,#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:hover ~ .erd-edge[data-c="tad_pm_prmpt_ver_mng"],#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:hover ~ .erd-edge[data-p="tad_pm_prmpt_ver_mng"],#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:focus ~ .erd-edge[data-c="tad_pm_prmpt_ver_mng"],#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:focus ~ .erd-edge[data-p="tad_pm_prmpt_ver_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:hover rect,#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:hover text,#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:hover ~ .erd-edge[data-c="tad_sm_syn_datst_cpst_mng"],#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:hover ~ .erd-edge[data-p="tad_sm_syn_datst_cpst_mng"],#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:focus ~ .erd-edge[data-c="tad_sm_syn_datst_cpst_mng"],#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:focus ~ .erd-edge[data-p="tad_sm_syn_datst_cpst_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:hover rect,#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:hover text,#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:hover ~ .erd-edge[data-c="tad_sm_syn_doc_mng"],#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:hover ~ .erd-edge[data-p="tad_sm_syn_doc_mng"],#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:focus ~ .erd-edge[data-c="tad_sm_syn_doc_mng"],#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:focus ~ .erd-edge[data-p="tad_sm_syn_doc_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:hover rect,#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:hover text,#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_sy_lck_mng"]:hover ~ .erd-edge[data-c="tad_sy_lck_mng"],#erd-root .erd-box[data-t="tad_sy_lck_mng"]:hover ~ .erd-edge[data-p="tad_sy_lck_mng"],#erd-root .erd-box[data-t="tad_sy_lck_mng"]:focus ~ .erd-edge[data-c="tad_sy_lck_mng"],#erd-root .erd-box[data-t="tad_sy_lck_mng"]:focus ~ .erd-edge[data-p="tad_sy_lck_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_sy_lck_mng"]:hover rect,#erd-root .erd-box[data-t="tad_sy_lck_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_sy_lck_mng"]:hover text,#erd-root .erd-box[data-t="tad_sy_lck_mng"]:focus text{fill:#1e3a8a}</style>
+<g class="erd-box" data-t="tad_am_adt_log_mng" tabindex="0">
+<rect x="26" y="406" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="425" font-size="12.5" font-weight="700" fill="#0a0a0a">감사 로그</text>
+<text class="t2" x="36" y="441" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_am_adt_log_mng · 13칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_cm_chnk_mng" tabindex="0">
+<rect x="366" y="254" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="273" font-size="12.5" font-weight="700" fill="#0a0a0a">문서 청크</text>
+<text class="t2" x="376" y="289" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_cm_chnk_mng · 10칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_cm_clsf_bss_mng" tabindex="0">
+<rect x="706" y="406" width="208" height="46" rx="4"/>
+<text class="t1" x="716" y="425" font-size="12.5" font-weight="700" fill="#0a0a0a">분류 판정 근거</text>
+<text class="t2" x="716" y="441" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_cm_clsf_bss_mng · 10칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_cm_clsf_grd_mng" tabindex="0">
+<rect x="26" y="102" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="121" font-size="12.5" font-weight="700" fill="#0a0a0a">등급 체계</text>
+<text class="t2" x="36" y="137" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_cm_clsf_grd_mng · 11칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_cm_clsf_rslt_mng" tabindex="0">
+<rect x="366" y="178" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="197" font-size="12.5" font-weight="700" fill="#0a0a0a">분류 결과</text>
+<text class="t2" x="376" y="213" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_cm_clsf_rslt_mng · 13칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_cm_crct_mng" tabindex="0">
+<rect x="706" y="330" width="208" height="46" rx="4"/>
+<text class="t1" x="716" y="349" font-size="12.5" font-weight="700" fill="#0a0a0a">검수 교정 이력</text>
+<text class="t2" x="716" y="365" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_cm_crct_mng · 10칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_dm_doc_lbl_mng" tabindex="0">
+<rect x="366" y="330" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="349" font-size="12.5" font-weight="700" fill="#0a0a0a">문서 라벨</text>
+<text class="t2" x="376" y="365" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_dm_doc_lbl_mng · 11칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_dm_doc_mng" tabindex="0">
+<rect x="26" y="178" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="197" font-size="12.5" font-weight="700" fill="#0a0a0a">문서</text>
+<text class="t2" x="36" y="213" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_dm_doc_mng · 20칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_em_evl_rqmt_mng" tabindex="0">
+<rect x="26" y="254" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="273" font-size="12.5" font-weight="700" fill="#0a0a0a">평가요소</text>
+<text class="t2" x="36" y="289" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_em_evl_rqmt_mng · 8칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_gm_grd_kywd_mng" tabindex="0">
+<rect x="366" y="406" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="425" font-size="12.5" font-weight="700" fill="#0a0a0a">등급 키워드</text>
+<text class="t2" x="376" y="441" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_gm_grd_kywd_mng · 9칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_gm_guide_ver_mng" tabindex="0">
+<rect x="26" y="482" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="501" font-size="12.5" font-weight="700" fill="#0a0a0a">가이드 문서</text>
+<text class="t2" x="36" y="517" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_gm_guide_ver_mng · 8칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_lm_llm_usqty_mng" tabindex="0">
+<rect x="26" y="558" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="577" font-size="12.5" font-weight="700" fill="#0a0a0a">LLM 사용량</text>
+<text class="t2" x="36" y="593" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_lm_llm_usqty_mng · 15칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_lm_lrn_datst_mng" tabindex="0">
+<rect x="366" y="482" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="501" font-size="12.5" font-weight="700" fill="#0a0a0a">학습셋 구성</text>
+<text class="t2" x="376" y="517" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_lm_lrn_datst_mng · 5칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_lm_lrn_epoch_mng" tabindex="0">
+<rect x="366" y="558" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="577" font-size="12.5" font-weight="700" fill="#0a0a0a">학습 에폭 지표</text>
+<text class="t2" x="376" y="593" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_lm_lrn_epoch_mng · 7칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_lm_lrn_excn_mng" tabindex="0">
+<rect x="26" y="330" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="349" font-size="12.5" font-weight="700" fill="#0a0a0a">학습 실행</text>
+<text class="t2" x="36" y="365" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_lm_lrn_excn_mng · 20칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_mm_mdl_ver_mng" tabindex="0">
+<rect x="366" y="634" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="653" font-size="12.5" font-weight="700" fill="#0a0a0a">모델 버전</text>
+<text class="t2" x="376" y="669" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_mm_mdl_ver_mng · 18칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_pm_prmpt_ver_mng" tabindex="0">
+<rect x="26" y="26" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="45" font-size="12.5" font-weight="700" fill="#0a0a0a">프롬프트 버전</text>
+<text class="t2" x="36" y="61" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_pm_prmpt_ver_mng · 6칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_sm_syn_datst_cpst_mng" tabindex="0">
+<rect x="26" y="634" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="653" font-size="12.5" font-weight="700" fill="#0a0a0a">tad_sm_syn_datst_cpst_mng</text>
+<text class="t2" x="36" y="669" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_sm_syn_datst_cpst_mng · 5칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_sm_syn_doc_mng" tabindex="0">
+<rect x="366" y="102" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="121" font-size="12.5" font-weight="700" fill="#0a0a0a">합성·샘플 문서</text>
+<text class="t2" x="376" y="137" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_sm_syn_doc_mng · 21칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_sy_lck_mng" tabindex="0">
+<rect x="26" y="710" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="729" font-size="12.5" font-weight="700" fill="#0a0a0a">동시성 잠금</text>
+<text class="t2" x="36" y="745" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_sy_lck_mng · 1칼럼</text>
+</g>
+<path class="erd-edge" data-c="tad_gm_grd_kywd_mng" data-p="tad_cm_clsf_grd_mng" d="M366,424 C300,424 300,112 234,112"><title>등급 키워드.level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_gm_grd_kywd_mng" data-p="tad_em_evl_rqmt_mng" d="M366,434 C300,434 300,272 234,272"><title>등급 키워드.factor_id → 평가요소</title></path>
+<path class="erd-edge" data-c="tad_dm_doc_lbl_mng" data-p="tad_dm_doc_mng" d="M366,348 C300,348 300,188 234,188"><title>문서 라벨.doc_id → 문서</title></path>
+<path class="erd-edge" data-c="tad_dm_doc_lbl_mng" data-p="tad_cm_clsf_grd_mng" d="M366,358 C300,358 300,116 234,116"><title>문서 라벨.level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_cm_clsf_rslt_mng" data-p="tad_dm_doc_mng" d="M366,196 C300,196 300,194 234,194"><title>분류 결과.doc_id → 문서</title></path>
+<path class="erd-edge" data-c="tad_cm_clsf_rslt_mng" data-p="tad_cm_clsf_grd_mng" d="M366,206 C300,206 300,119 234,119"><title>분류 결과.predicted_level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_cm_clsf_bss_mng" data-p="tad_cm_clsf_rslt_mng" d="M706,418 C640,418 640,196 574,196"><title>분류 판정 근거.classification_id → 분류 결과</title></path>
+<path class="erd-edge" data-c="tad_cm_clsf_bss_mng" data-p="tad_em_evl_rqmt_mng" d="M706,429 H638 Q629,429 629,438 V773 Q629,782 620,782 H298 Q289,782 289,773 V292 Q289,282 280,282 H234"><title>분류 판정 근거.factor_id → 평가요소</title></path>
+<path class="erd-edge" data-c="tad_mm_mdl_ver_mng" data-p="tad_mm_mdl_ver_mng" d="M574,647 C614,638 614,676 574,667"><title>모델 버전.rolled_back_from → 모델 버전</title></path>
+<path class="erd-edge" data-c="tad_lm_lrn_epoch_mng" data-p="tad_lm_lrn_excn_mng" d="M366,581 C300,581 300,340 234,340"><title>학습 에폭 지표.run_id → 학습 실행</title></path>
+<path class="erd-edge" data-c="tad_lm_lrn_datst_mng" data-p="tad_lm_lrn_excn_mng" d="M366,494 C300,494 300,349 234,349"><title>학습셋 구성.run_id → 학습 실행</title></path>
+<path class="erd-edge" data-c="tad_lm_lrn_datst_mng" data-p="tad_dm_doc_mng" d="M366,505 C300,505 300,201 234,201"><title>학습셋 구성.doc_id → 문서</title></path>
+<path class="erd-edge" data-c="tad_lm_lrn_datst_mng" data-p="tad_cm_clsf_grd_mng" d="M366,516 C300,516 300,123 234,123"><title>학습셋 구성.level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_cm_crct_mng" data-p="tad_cm_clsf_rslt_mng" d="M706,340 C640,340 640,206 574,206"><title>검수 교정 이력.classification_id → 분류 결과</title></path>
+<path class="erd-edge" data-c="tad_cm_crct_mng" data-p="tad_cm_clsf_grd_mng" d="M706,349 H649 Q640,349 640,358 V788 Q640,797 631,797 H309 Q300,797 300,788 V136 Q300,127 291,127 H234"><title>검수 교정 이력.original_level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_cm_crct_mng" data-p="tad_cm_clsf_grd_mng" d="M706,357 H660 Q651,357 651,366 V803 Q651,812 642,812 H320 Q311,812 311,803 V140 Q311,131 302,131 H234"><title>검수 교정 이력.corrected_level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_cm_crct_mng" data-p="tad_lm_lrn_excn_mng" d="M706,366 H638 Q629,366 629,375 V818 Q629,827 620,827 H298 Q289,827 289,818 V366 Q289,357 280,357 H234"><title>검수 교정 이력.consumed_in_run → 학습 실행</title></path>
+<path class="erd-edge" data-c="tad_sm_syn_doc_mng" data-p="tad_dm_doc_mng" d="M366,112 C300,112 300,208 234,208"><title>합성·샘플 문서.doc_id → 문서</title></path>
+<path class="erd-edge" data-c="tad_sm_syn_doc_mng" data-p="tad_cm_clsf_grd_mng" d="M366,117 C300,117 300,134 234,134"><title>합성·샘플 문서.target_level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_sm_syn_doc_mng" data-p="tad_cm_clsf_grd_mng" d="M366,122 C300,122 300,138 234,138"><title>합성·샘플 문서.corrected_level_id → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_sm_syn_doc_mng" data-p="tad_pm_prmpt_ver_mng" d="M366,128 C300,128 300,38 234,38"><title>합성·샘플 문서.outline_prompt_version → 프롬프트 버전</title></path>
+<path class="erd-edge" data-c="tad_sm_syn_doc_mng" data-p="tad_pm_prmpt_ver_mng" d="M366,133 C300,133 300,49 234,49"><title>합성·샘플 문서.body_prompt_version → 프롬프트 버전</title></path>
+<path class="erd-edge" data-c="tad_sm_syn_doc_mng" data-p="tad_pm_prmpt_ver_mng" d="M366,138 C300,138 300,60 234,60"><title>합성·샘플 문서.qc_prompt_version → 프롬프트 버전</title></path>
+<path class="erd-edge logical" data-c="tad_cm_chnk_mng" data-p="tad_dm_doc_mng" d="M366,277 C300,277 300,214 234,214"><title>문서 청크.doc_id → 문서</title></path>
+<path class="erd-edge logical" data-c="tad_cm_clsf_bss_mng" data-p="tad_cm_chnk_mng" d="M706,440 C640,440 640,277 574,277"><title>분류 판정 근거.chnk_id → 문서 청크</title></path>
+<path class="erd-edge logical" data-c="tad_mm_mdl_ver_mng" data-p="tad_lm_lrn_excn_mng" d="M366,657 C300,657 300,366 234,366"><title>모델 버전.lrn_excn_id → 학습 실행</title></path>
+<text x="26" y="860" font-size="10.5" fill="#71717a">상자에 마우스를 올리거나 클릭하면 그 표에 걸린 관계만 파랗게 남습니다. 다른 곳을 클릭하면 풀립니다.</text>
+</svg>
+</div>
+<p class="spec-note">FK 제약 26건 · 제약 없는 참조 3건 (§05 참조).</p>
+</section>
+<section id="tables"><h2><span class="num">04</span> 테이블별 정의</h2>
+<div class="group-header" id="g-A"><span class="spec-badge">A</span> <b>등급체계</b> — 영업비밀 등급 정의와 판정 요건·키워드 사전.</div>
+<div class="spec-head" id="t-tad_cm_clsf_grd_mng"><h3>tad_cm_clsf_grd_mng</h3><span class="spec-logical">분류 등급</span></div>
+<p class="spec-note">영업비밀 등급(TS·S1·S2·S3) 정의. 등급을 참조하는 모든 테이블의 부모.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">grd_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>등급 PK</td></tr>
+<tr><td class="c-name">grd_cd</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"><span class="k-uq">UQ</span></td><td class="c-type"></td><td>등급 코드 — TS · S1 · S2 · S3</td></tr>
+<tr><td class="c-name">grd_nm</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>등급 표시명</td></tr>
+<tr><td class="c-name">grd_seq</td><td class="c-type">SMALLINT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>정렬 순서. 숫자가 작을수록 상위 등급</td></tr>
+<tr><td class="c-name">clsf_grd_expln</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>등급 정의 문구</td></tr>
+<tr><td class="c-name">colr_cd</td><td class="c-type">VARCHAR(7)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;#808080&#x27;</td><td>화면 표시색</td></tr>
+<tr><td class="c-name">loss_wgvl_cfc</td><td class="c-type">NUMERIC(4,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">1.0</td><td>학습 손실 가중치. 상위 등급 미탐에 더 큰 벌점을 주기 위한 값</td></tr>
+<tr><td class="c-name">actvtn_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">true</td><td>활성 여부. FALSE 는 삭제가 아니라 이력 보존</td></tr>
+<tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
+<tr><td class="c-name">mdfcn_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">now()</td><td>수정 시각</td></tr>
+<tr><td class="c-name">creatr_id</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>생성자 ID</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>grd_sn</code><br><code>INDEX idx_cl_active_order (actvtn_yn, grd_seq)</code></p>
+<div class="spec-head" id="t-tad_em_evl_rqmt_mng"><h3>tad_em_evl_rqmt_mng</h3><span class="spec-logical">평가 요건</span></div>
+<p class="spec-note">등급 판정 요건. 정본은 3요건 — 비공지성(S)·경제적 유용성(V)·비밀관리성(M).</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">rqmt_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>요건 PK</td></tr>
+<tr><td class="c-name">rqmt_cd</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"><span class="k-uq">UQ</span></td><td class="c-type"></td><td>요건 코드 — 정본 SECRECY · VALUE · MANAGEMENT. 레거시 4요소는 is_active=FALSE 로 보존</td></tr>
+<tr><td class="c-name">rqmt_nm</td><td class="c-type">VARCHAR(100)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>요건명 — 비공지성(S) · 경제적 유용성(V) · 비밀관리성(M)</td></tr>
+<tr><td class="c-name">evl_rqmt_expln</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>요건 정의 문구</td></tr>
+<tr><td class="c-name">wgvl_cfc</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">0.25</td><td>미사용. 요건 가중치는 등급 산정에 쓰지 않습니다. 등급은 키워드 룰이 정하며 S×V×M 은 상향 교차 확인용입니다. 하위호환 기본 1.0</td></tr>
+<tr><td class="c-name">actvtn_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">true</td><td>정본 3요건 TRUE · 레거시 4요소 FALSE</td></tr>
+<tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
+<tr><td class="c-name">mdfcn_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">now()</td><td>수정 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>rqmt_sn</code></p>
+<div class="spec-head" id="t-tad_gm_grd_kywd_mng"><h3>tad_gm_grd_kywd_mng</h3><span class="spec-logical">등급 키워드</span></div>
+<p class="spec-note">룰 기반 1차 판정에 쓰는 등급별 키워드 사전.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">kywd_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>키워드 PK</td></tr>
+<tr><td class="c-name">grd_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>이 키워드가 가리키는 등급 <span style="color:#71717a">→ tad_cm_clsf_grd_mng.grd_sn ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">kywd_nm</td><td class="c-type">VARCHAR(200)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>키워드 문자열</td></tr>
+<tr><td class="c-name">ptn_type_nm</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;exact&#x27;</td><td>매칭 방식 — exact · regex 등</td></tr>
+<tr><td class="c-name">rqmt_sn</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>이 키워드가 근거로 삼는 요건. NULL 이면 요건 무관 <span style="color:#71717a">→ tad_em_evl_rqmt_mng.rqmt_sn ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">wgvl_cfc</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">1.0</td><td>키워드 가중치. NULL 이면 1.0 으로 계산합니다(요건 표의 가중치와 달리 선택값)</td></tr>
+<tr><td class="c-name">src_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;manual&#x27;</td><td>출처 — manual(사람 등록) · seed(초기 시드) 등</td></tr>
+<tr><td class="c-name">actvtn_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">true</td><td>활성 여부. FALSE 면 사전에서 빼되 이력은 남긴다</td></tr>
+<tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>kywd_sn</code><br><code>INDEX idx_lk_level_active (grd_sn, actvtn_yn)</code><br><code>INDEX idx_lk_keyword_trgm (kywd_nm) USING gin</code></p>
+<div class="group-header" id="g-B"><span class="spec-badge">B</span> <b>문서</b> — 업로드 원문 메타와 청킹 결과.</div>
+<div class="spec-head" id="t-tad_dm_doc_mng"><h3>tad_dm_doc_mng</h3><span class="spec-logical">문서</span></div>
+<p class="spec-note">업로드 문서의 메타·추출 텍스트 위치·처리 상태. 청크·분류·라벨·학습셋이 모두 참조하는 중심 허브.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td>문서 PK</td></tr>
+<tr><td class="c-name">otsd_rfrnc_no</td><td class="c-type">VARCHAR(100)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>외부 시스템(KL 포털·EDMS) 원천 문서 키. 연동 조인 키</td></tr>
+<tr><td class="c-name">file_nm</td><td class="c-type">VARCHAR(500)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>원본 파일명</td></tr>
+<tr><td class="c-name">orgnl_frmat_nm</td><td class="c-type">VARCHAR(10)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>원본 포맷 — hwp · hwpx · pdf · docx · xlsx · txt 등</td></tr>
+<tr><td class="c-name">file_sz</td><td class="c-type">BIGINT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>원본 파일 크기(바이트)</td></tr>
+<tr><td class="c-name">file_hash_nm</td><td class="c-type">VARCHAR(64)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>원본 SHA-256. 같은 파일 재업로드 판별</td></tr>
+<tr><td class="c-name">mtdt_dsctn</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;{}&#x27;</td><td>문서 속성 JSON. 출처(source_type)·보안표시·접근범위 등 등급 판정 입력을 담습니다</td></tr>
+<tr><td class="c-name">orgtxt_path_nm</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>추출 원문 텍스트 저장 위치</td></tr>
+<tr><td class="c-name">nrmlz_txt_path_nm</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>정규화 텍스트 저장 위치</td></tr>
+<tr><td class="c-name">mtxt_prvw_cn</td><td class="c-type">VARCHAR(2000)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>본문 앞부분 미리보기(최대 2,000자)</td></tr>
+<tr><td class="c-name">char_cnt</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>추출 본문 글자 수. 등록 때 추출 결과가 없으면 NULL(청크 표의 글자 수는 청크마다 반드시 있다)</td></tr>
+<tr><td class="c-name">extr_mth_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;parser&#x27;</td><td>추출 경로 — parser(전자문서 파싱) · ocr</td></tr>
+<tr><td class="c-name">extr_qlty_scr</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>추출 품질 점수(0~1)</td></tr>
+<tr><td class="c-name">ocr_use_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">false</td><td>OCR 사용 여부</td></tr>
+<tr><td class="c-name">prcs_stts_nm</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;pending&#x27;</td><td>처리 상태 — pending · processing · done · failed</td></tr>
+<tr><td class="c-name">err_stts_msg_cn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>처리 실패 사유</td></tr>
+<tr><td class="c-name">uld_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">now()</td><td>업로드 시각</td></tr>
+<tr><td class="c-name">prcs_cmptn_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>처리 완료 시각</td></tr>
+<tr><td class="c-name">creatr_id</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>업로드 주체 ID</td></tr>
+<tr><td class="c-name">del_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>논리 삭제 시각. NULL 이면 활성이며 조회는 NULL 행만 노출합니다</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>doc_id</code><br><code>INDEX idx_doc_status (prcs_stts_nm)</code><br><code>INDEX idx_doc_format (orgnl_frmat_nm)</code><br><code>INDEX idx_doc_uploaded (uld_dt DESC)</code><br><code>UNIQUE INDEX idx_doc_hash (file_hash_nm) WHERE file_hash_nm IS NOT NULL</code><br><code>INDEX idx_doc_metadata (mtdt_dsctn) USING gin</code><br><code>INDEX idx_doc_pending (uld_dt) WHERE prcs_stts_nm = &#x27;pending&#x27;</code></p>
+<div class="spec-head" id="t-tad_dm_doc_vctr_mng"><h3>tad_dm_doc_vctr_mng</h3><span class="spec-logical">문서 벡터</span></div>
+<p class="spec-note">문서 1건의 대표 벡터(청크 임베딩 평균) 1행 — 유사문서 조회용. 등급은 이 표에 복제하지 않고 문서 라벨과 조인해 읽습니다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">doc_id</td><td class="c-type">UUID</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span> <span class="k-fk">FK</span></td><td class="c-type"></td><td>문서 PK 이자 FK — 문서 1건에 벡터 1행 <span style="color:#71717a">→ tad_dm_doc_mng.doc_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">embd_vctr_cn</td><td class="c-type">vector(1024)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>문서 대표 벡터 1024차원(청크 임베딩 평균). HNSW 코사인 인덱스 대상</td></tr>
+<tr><td class="c-name">embd_mdl_nm</td><td class="c-type">TEXT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>벡터를 만든 임베딩 모델 — 모델 교체 시 재색인 대상 선택 기준</td></tr>
+<tr><td class="c-name">chnk_cnt</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">0</td><td>평균에 들어간 청크 수. 0 이면 본문 추출 실패로 보고 색인 실패 처리</td></tr>
+<tr><td class="c-name">mtxt_hash_cn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>본문 해시. 같은 문서 재업로드 시 재색인 필요 여부 판단</td></tr>
+<tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>doc_id</code><br><code>INDEX idx_docvec_embedding USING hnsw (embd_vctr_cn vector_cosine_ops)</code><br><code>INDEX idx_docvec_model (embd_mdl_nm)</code></p>
+<div class="spec-head" id="t-tad_cm_chnk_mng"><h3>tad_cm_chnk_mng</h3><span class="spec-logical">청크</span><span class="spec-badge">RANGE PARTITION · crt_dt</span></div>
+<p class="spec-note">문서를 512 토큰 단위로 자른 조각.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">chnk_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td>청크 PK</td></tr>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>원문 문서. FK 제약 없이 애플리케이션이 정합을 보증합니다</td></tr>
+<tr><td class="c-name">chnk_no</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>문서 내 청크 순번(0-base)</td></tr>
+<tr><td class="c-name">chnk_cn</td><td class="c-type">TEXT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>청크 본문</td></tr>
+<tr><td class="c-name">tkn_cnt</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>토큰 수(최대 512)</td></tr>
+<tr><td class="c-name">char_cnt</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>글자 수</td></tr>
+<tr><td class="c-name">sctn_path_nm</td><td class="c-type">_ARRAY_TEXT_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>계층 섹션 경로 — 예: {3장, 3.1절}</td></tr>
+<tr><td class="c-name">prev_chnk_ovlp_tkn_cnt</td><td class="c-type">SMALLINT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">0</td><td>앞 청크와 겹친 토큰 수(기본 64)</td></tr>
+<tr><td class="c-name">next_chnk_ovlp_tkn_cnt</td><td class="c-type">SMALLINT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">0</td><td>뒤 청크와 겹친 토큰 수(기본 64)</td></tr>
+<tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">now()</td><td>생성 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>chnk_id</code>, <code>crt_dt</code><br><code>INDEX idx_chunk_created (crt_dt)</code><br><code>INDEX idx_chunk_doc (doc_id, chnk_no)</code><br><b>PARTITION</b> <code>PARTITION BY RANGE (crt_dt)</code> — 월별 자식 표(<code>tad_cm_chnk_mng_YYYY_MM</code>)와 범위 밖 행을 받는 <code>tad_cm_chnk_mng_default</code> 를 둡니다. 파티션 키가 기본키에 포함되어야 하므로 기본키는 (기존 키 + 파티션 키) 복합키입니다. 다가올 달의 자식 표는 <code>services/partitions.py</code> 가 미리 만듭니다.</p>
+<div class="group-header" id="g-C"><span class="spec-badge">C</span> <b>라벨링</b> — 문서별 확정 등급과 요건 점수.</div>
+<div class="spec-head" id="t-tad_dm_doc_lbl_mng"><h3>tad_dm_doc_lbl_mng</h3><span class="spec-logical">문서 라벨</span></div>
+<p class="spec-note">문서 1건의 확정 등급 1행. 라벨 주체(사람·LLM·룰)를 함께 기록합니다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span> <span class="k-fk">FK</span></td><td class="c-type"></td><td>대상 문서(PK) <span style="color:#71717a">→ tad_dm_doc_mng.doc_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">grd_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>확정 등급 <span style="color:#71717a">→ tad_cm_clsf_grd_mng.grd_sn ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">lbl_mnbd_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>라벨 주체 — human · llm · rule</td></tr>
+<tr><td class="c-name">lbl_wrtr_id</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>라벨 작성자 계정 ID</td></tr>
+<tr><td class="c-name">rlbl_scr</td><td class="c-type">NUMERIC(5,4)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>라벨 확신도(0~1). 확신도가 없는 라벨 출처(사람 확정 등)는 NULL — 분류결과 표의 신뢰점수는 모델이 늘 낸다</td></tr>
+<tr><td class="c-name">tot_scr</td><td class="c-type">NUMERIC(4,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>요건 점수 합계</td></tr>
+<tr><td class="c-name">memo_dtl_cn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>라벨 메모</td></tr>
+<tr><td class="c-name">vrfc_cmptn_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">false</td><td>검증(서명) 완료 여부</td></tr>
+<tr><td class="c-name">vrfr_id</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>검증자 계정 ID</td></tr>
+<tr><td class="c-name">lbl_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">now()</td><td>라벨 시각</td></tr>
+<tr><td class="c-name">vrfc_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>검증 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>doc_id</code><br><code>INDEX idx_dl_level (grd_sn)</code><br><code>INDEX idx_dl_labeled_by (lbl_mnbd_nm)</code></p>
+<div class="group-header" id="g-D"><span class="spec-badge">D</span> <b>추론</b> — 분류 결과와 그 판단 근거.</div>
+<div class="spec-head" id="t-tad_cm_clsf_rslt_mng"><h3>tad_cm_clsf_rslt_mng</h3><span class="spec-logical">분류 결과</span></div>
+<p class="spec-note">모델 추론 1회의 결과. 등급·확신도·게이트 판정을 남긴다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">clsf_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td>분류 PK</td></tr>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>대상 문서 <span style="color:#71717a">→ tad_dm_doc_mng.doc_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">mdl_ver_nm</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>판정에 쓴 모델 버전 라벨</td></tr>
+<tr><td class="c-name">predc_grd_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>예측 등급 <span style="color:#71717a">→ tad_cm_clsf_grd_mng.grd_sn ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">rlbl_scr</td><td class="c-type">NUMERIC(5,4)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>예측 확신도(0~1). 온도 보정 후 값</td></tr>
+<tr><td class="c-name">nxtrnk_grd_list_cn</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;[]&#x27;</td><td>차순위 등급과 점수 JSON 배열</td></tr>
+<tr><td class="c-name">auto_cfmtn_evl_info_cn</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>자동확정 게이트가 결정 시점에 본 신호 스냅샷 JSON. 이 컬럼 도입 전 행은 NULL</td></tr>
+<tr><td class="c-name">tot_mth_cd</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;hybrid&#x27;</td><td>청크 결과 합산 방식 — hybrid 등</td></tr>
+<tr><td class="c-name">chnk_cnt</td><td class="c-type">SMALLINT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>판정에 사용한 청크 수</td></tr>
+<tr><td class="c-name">clsf_stts_nm</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;staging&#x27;</td><td>현재 상태 — staging · confirmed · needs_review</td></tr>
+<tr><td class="c-name">clsf_frst_stts_nm</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>게이트의 최초 판정을 생성 시점에 동결한 값. 이후 검수·보정이 건드리지 않는다. 도입 전 행은 NULL</td></tr>
+<tr><td class="c-name">infr_req_hr</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>추론 소요 시간(밀리초)</td></tr>
+<tr><td class="c-name">clsf_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">now()</td><td>분류 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>clsf_id</code><br><code>INDEX idx_cls_doc (doc_id, clsf_dt DESC)</code><br><code>INDEX idx_cls_status (clsf_stts_nm)</code><br><code>INDEX idx_cls_initial_status (clsf_frst_stts_nm)</code><br><code>INDEX idx_cls_model_level (mdl_ver_nm, predc_grd_sn, clsf_stts_nm)</code><br><code>INDEX idx_cls_staging (clsf_dt DESC) WHERE clsf_stts_nm = &#x27;staging&#x27;</code><br><code>INDEX idx_cls_classified (clsf_dt)</code></p>
+<div class="spec-head" id="t-tad_cm_clsf_bss_mng"><h3>tad_cm_clsf_bss_mng</h3><span class="spec-logical">분류 근거</span></div>
+<p class="spec-note">분류 1건이 어느 청크의 어느 구간을 근거로 삼았는지.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">bss_sn</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>근거 PK</td></tr>
+<tr><td class="c-name">clsf_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>대상 분류 <span style="color:#71717a">→ tad_cm_clsf_rslt_mng.clsf_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">chnk_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>근거가 된 청크</td></tr>
+<tr><td class="c-name">bss_type_nm</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>근거 종류 — keyword · attention 등</td></tr>
+<tr><td class="c-name">rqmt_sn</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>이 근거가 뒷받침하는 요건. NULL 이면 요건 무관 <span style="color:#71717a">→ tad_em_evl_rqmt_mng.rqmt_sn ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">exct_cn</td><td class="c-type">TEXT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>근거 발췌 원문</td></tr>
+<tr><td class="c-name">exct_bgng_pstn_nm</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>발췌 시작 위치(청크 내 문자 오프셋)</td></tr>
+<tr><td class="c-name">exct_end_pstn_nm</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>발췌 끝 위치</td></tr>
+<tr><td class="c-name">cndg_nvl</td><td class="c-type">NUMERIC(4,3)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>이 근거의 기여도</td></tr>
+<tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>bss_sn</code><br><code>INDEX idx_ce_classification (clsf_id)</code><br><code>INDEX idx_ce_chunk_contrib (chnk_id, cndg_nvl DESC)</code></p>
+<div class="group-header" id="g-E"><span class="spec-badge">E</span> <b>학습</b> — 모델 버전 레지스트리와 학습 실행 이력.</div>
+<div class="spec-head" id="t-tad_mm_mdl_ver_mng"><h3>tad_mm_mdl_ver_mng</h3><span class="spec-logical">모델 버전</span></div>
+<p class="spec-note">학습된 분류기 버전 레지스트리. 활성 버전은 항상 1개.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">mdl_ver_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td>모델 버전 PK</td></tr>
+<tr><td class="c-name">ver_lbl_nm</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"><span class="k-uq">UQ</span></td><td class="c-type"></td><td>버전 라벨 — v-fe4b386b 형식(학습 산출물 해시)</td></tr>
+<tr><td class="c-name">base_mdl_nm</td><td class="c-type">VARCHAR(100)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>기반 사전학습 모델 이름</td></tr>
+<tr><td class="c-name">mdl_type_nm</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;classifier&#x27;</td><td>모델 종류. 코드가 넣는 값은 classifier 하나이며 기본값이다</td></tr>
+<tr><td class="c-name">lrn_cmptn_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>학습 완료 시각</td></tr>
+<tr><td class="c-name">lrn_excn_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>이 모델을 만든 학습 실행 ID</td></tr>
+<tr><td class="c-name">lrn_data_nocs</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>학습 샘플 수</td></tr>
+<tr><td class="c-name">idct_info_cn</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;{}&#x27;</td><td>최종 지표 JSON — F1 · FNR · Recall 등</td></tr>
+<tr><td class="c-name">mdl_strg_path_nm</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>모델 저장 경로</td></tr>
+<tr><td class="c-name">flw_excn_id</td><td class="c-type">VARCHAR(64)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>MLflow 실험 추적 ID</td></tr>
+<tr><td class="c-name">actvtn_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">false</td><td>활성 여부. 생성 칼럼 active_key 의 UNIQUE 제약으로 활성 1건만 허용합니다</td></tr>
+<tr><td class="c-name">actvtn_key</td><td class="c-type">SMALLINT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>is_active 에서 DB 가 계산하는 칼럼 — 활성이면 1, 아니면 NULL. 여기 걸린 UNIQUE 인덱스가 활성 1건 제약을 만든다(UNIQUE 는 NULL 을 여러 개 허용하므로 비활성 행은 제한이 없다). 애플리케이션은 쓰지 않는다</td></tr>
+<tr><td class="c-name">vtlz_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>활성화 시각</td></tr>
+<tr><td class="c-name">dsbl_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>비활성화 시각</td></tr>
+<tr><td class="c-name">rlbk_src_ver_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>자동 롤백 출처 버전(자기 참조) <span style="color:#71717a">→ tad_mm_mdl_ver_mng.mdl_ver_id</span></td></tr>
+<tr><td class="c-name">rlbk_rsn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>롤백 사유</td></tr>
+<tr><td class="c-name">grd_system_hstry_cn</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>학습 시점 등급체계 스냅샷 JSON</td></tr>
+<tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>mdl_ver_id</code><br><code>UNIQUE INDEX idx_mv_active (actvtn_key)</code><br><code>INDEX idx_mv_mlflow (flw_excn_id)</code></p>
+<div class="spec-head" id="t-tad_lm_lrn_excn_mng"><h3>tad_lm_lrn_excn_mng</h3><span class="spec-logical">학습 실행</span></div>
+<p class="spec-note">학습 잡 1회의 설정·자원·결과.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">excn_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td>학습 실행 PK</td></tr>
+<tr><td class="c-name">mdl_ver_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>이 실행이 만든 모델 버전(tb_model_versions 참조). 실행을 만들 때는 NULL 이고 학습이 끝나 버전이 등록되면 채운다(진행 중·실패는 NULL) <span style="color:#71717a">→ tad_mm_mdl_ver_mng.mdl_ver_id</span></td></tr>
+<tr><td class="c-name">flw_excn_id</td><td class="c-type">VARCHAR(64)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>MLflow 실험 추적 ID</td></tr>
+<tr><td class="c-name">lrn_excn_stts_cd</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;queued&#x27;</td><td>실행 상태 — queued · running · done · failed</td></tr>
+<tr><td class="c-name">bgng_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>시작 시각</td></tr>
+<tr><td class="c-name">end_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>종료 시각</td></tr>
+<tr><td class="c-name">req_hr</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>소요 초</td></tr>
+<tr><td class="c-name">whol_sample_cnt</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>전체 샘플 수</td></tr>
+<tr><td class="c-name">lrn_nocs</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>학습 분할 건수</td></tr>
+<tr><td class="c-name">vrfc_nocs</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>검증 분할 건수</td></tr>
+<tr><td class="c-name">test_nocs</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>시험 분할 건수</td></tr>
+<tr><td class="c-name">prttn_mth_cd</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;stratified&#x27;</td><td>분할 방식 — stratified 등</td></tr>
+<tr><td class="c-name">prttn_seed</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>분할 난수 시드. 재현에 필요하다</td></tr>
+<tr><td class="c-name">hprprm_info_cn</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;{}&#x27;</td><td>하이퍼파라미터 JSON — epochs · lr · batch_size 등</td></tr>
+<tr><td class="c-name">last_idct_info_cn</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>최종 지표 JSON. 배포 게이트 판정을 포함합니다</td></tr>
+<tr><td class="c-name">boot_mth_cd</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;manual&#x27;</td><td>기동 방식 — manual · scheduled · active_learning</td></tr>
+<tr><td class="c-name">boot_bss_idntfr_nm</td><td class="c-type">VARCHAR(100)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>기동 근거 식별자</td></tr>
+<tr><td class="c-name">err_stts_msg_cn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>실패 사유. 학습 잡 조회 API 가 이 값을 그대로 내보낸다</td></tr>
+<tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
+<tr><td class="c-name">creatr_id</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>요청자 ID</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>excn_id</code><br><code>INDEX idx_tr_model (mdl_ver_id)</code><br><code>INDEX idx_tr_status (lrn_excn_stts_cd)</code><br><code>INDEX idx_tr_date (bgng_dt DESC)</code><br><code>INDEX idx_tr_created (crt_dt)</code></p>
+<div class="spec-head" id="t-tad_lm_lrn_epoch_mng"><h3>tad_lm_lrn_epoch_mng</h3><span class="spec-logical">학습 에폭</span></div>
+<p class="spec-note">학습 실행 안의 에폭별 손실·지표.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">excn_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span> <span class="k-fk">FK</span></td><td class="c-type"></td><td>대상 학습 실행(복합 PK) <span style="color:#71717a">→ tad_lm_lrn_excn_mng.excn_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">epoch_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type"></td><td>에폭 번호(복합 PK)</td></tr>
+<tr><td class="c-name">lrn_loss_nvl</td><td class="c-type">REAL</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>학습 손실</td></tr>
+<tr><td class="c-name">vrfc_loss_nvl</td><td class="c-type">REAL</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>검증 손실</td></tr>
+<tr><td class="c-name">vrfc_idct_info_cn</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;{}&#x27;</td><td>에폭별 검증 지표 JSON</td></tr>
+<tr><td class="c-name">lrnr</td><td class="c-type">REAL</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>스케줄러 적용 후 실제 학습률</td></tr>
+<tr><td class="c-name">rcd_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">now()</td><td>기록 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>excn_id</code>, <code>epoch_sn</code></p>
+<div class="spec-head" id="t-tad_lm_lrn_datst_mng"><h3>tad_lm_lrn_datst_mng</h3><span class="spec-logical">학습 데이터셋</span></div>
+<p class="spec-note">학습 실행이 어느 문서를 train/val/test 중 무엇으로 썼는지.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">lrn_datst_sn</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>행 PK</td></tr>
+<tr><td class="c-name">excn_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>대상 학습 실행 <span style="color:#71717a">→ tad_lm_lrn_excn_mng.excn_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>학습에 쓴 문서 <span style="color:#71717a">→ tad_dm_doc_mng.doc_id ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">prttn_se_nm</td><td class="c-type">VARCHAR(10)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>분할 구분 — train · val · test</td></tr>
+<tr><td class="c-name">grd_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>학습 시점 라벨 등급 <span style="color:#71717a">→ tad_cm_clsf_grd_mng.grd_sn ON DELETE RESTRICT</span></td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>lrn_datst_sn</code><br><code>UNIQUE tb_training_datasets_run_id_doc_id_key (excn_id, doc_id)</code><br><code>INDEX idx_td_run_split (excn_id, prttn_se_nm)</code><br><code>INDEX idx_td_doc (doc_id)</code></p>
+<div class="group-header" id="g-F"><span class="spec-badge">F</span> <b>보정</b> — 검수자 확정·교정 결과. 운영 재학습의 진실 소스.</div>
+<div class="spec-head" id="t-tad_cm_crct_mng"><h3>tad_cm_crct_mng</h3><span class="spec-logical">보정</span></div>
+<p class="spec-note">검수자의 확정·교정 기록. 재학습에 반영된 행만 소비 표시가 붙는다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">crct_sn</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>보정 PK</td></tr>
+<tr><td class="c-name">clsf_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>대상 분류 <span style="color:#71717a">→ tad_cm_clsf_rslt_mng.clsf_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">orgnl_grd_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>AI 예측 등급 <span style="color:#71717a">→ tad_cm_clsf_grd_mng.grd_sn ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">cfmtn_grd_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>검수자 확정 등급. 확정만 하고 고치지 않았으면 예측 등급과 같다 <span style="color:#71717a">→ tad_cm_clsf_grd_mng.grd_sn ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">crct_ornt_nm</td><td class="c-type">VARCHAR(10)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>보정 방향 — underclass(미탐 보정) · overclass(과분류 보정) · lateral(동위 변경) · confirm(확정)</td></tr>
+<tr><td class="c-name">crct_rsn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>보정 사유</td></tr>
+<tr><td class="c-name">clbtr_id</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>검수자 계정 ID</td></tr>
+<tr><td class="c-name">crct_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">now()</td><td>보정 시각</td></tr>
+<tr><td class="c-name">rflt_lrn_excn_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>이 보정을 반영한 재학습 실행. NULL 이면 미반영 <span style="color:#71717a">→ tad_lm_lrn_excn_mng.excn_id</span></td></tr>
+<tr><td class="c-name">rflt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>재학습 반영 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>crct_sn</code><br><code>UNIQUE uq_corr_cls_level_by (clsf_id, cfmtn_grd_sn, clbtr_id)</code><br><code>INDEX idx_corr_cls (clsf_id)</code><br><code>INDEX idx_corr_direction (crct_ornt_nm)</code><br><code>INDEX idx_corr_at (crct_dt DESC)</code><br><code>INDEX idx_corr_unconsumed (rflt_lrn_excn_id) WHERE rflt_lrn_excn_id IS NULL</code></p>
+<div class="group-header" id="g-G"><span class="spec-badge">G</span> <b>합성</b> — 학습용 합성 문서 생성 이력과 프롬프트 버전.</div>
+<div class="spec-head" id="t-tad_pm_prmpt_ver_mng"><h3>tad_pm_prmpt_ver_mng</h3><span class="spec-logical">프롬프트 버전</span></div>
+<p class="spec-note">합성 문서 생성에 쓴 프롬프트 템플릿 버전.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">prmpt_ver_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type"></td><td>프롬프트 버전 PK</td></tr>
+<tr><td class="c-name">crt_stp_nm</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>생성 단계 — outline · body · qc</td></tr>
+<tr><td class="c-name">tmplt_cn</td><td class="c-type">TEXT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>프롬프트 템플릿 원문</td></tr>
+<tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
+<tr><td class="c-name">creatr_id</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>등록자 ID</td></tr>
+<tr><td class="c-name">prmpt_ver_memo_cn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>메모</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>prmpt_ver_nm</code></p>
+<div class="spec-head" id="t-tad_sm_syn_doc_mng"><h3>tad_sm_syn_doc_mng</h3><span class="spec-logical">합성 문서</span></div>
+<p class="spec-note">LLM 이 생성한 학습용 문서와 그 검수 상태.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">syn_doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">앱 uuid.uuid4</td><td>합성 문서 PK</td></tr>
+<tr><td class="c-name">doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>문서 테이블에 적재됐을 때의 문서 ID. 미적재면 NULL <span style="color:#71717a">→ tad_dm_doc_mng.doc_id</span></td></tr>
+<tr><td class="c-name">goal_grd_sn</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>생성 때 요구한 등급 <span style="color:#71717a">→ tad_cm_clsf_grd_mng.grd_sn ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">cfmtn_grd_sn</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>검수자가 고친 등급. NULL 이면 교정 없음. 학습행 라벨은 이 값을 우선합니다 <span style="color:#71717a">→ tad_cm_clsf_grd_mng.grd_sn ON DELETE RESTRICT</span></td></tr>
+<tr><td class="c-name">doc_knd_nm</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>문서 종류</td></tr>
+<tr><td class="c-name">otln_prmpt_ver_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>개요 생성에 쓴 프롬프트 버전. 프롬프트 **내용 해시**(v2-&lt;sha8&gt;)이며 tb_prompt_versions 를 참조합니다 — 사람이 번호를 올리지 않아도 프롬프트가 바뀌면 값이 바뀝니다 <span style="color:#71717a">→ tad_pm_prmpt_ver_mng.prmpt_ver_nm</span></td></tr>
+<tr><td class="c-name">mtxt_prmpt_ver_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>본문 생성에 쓴 프롬프트 버전. 개요와 한 호출이라 같은 값입니다 <span style="color:#71717a">→ tad_pm_prmpt_ver_mng.prmpt_ver_nm</span></td></tr>
+<tr><td class="c-name">qlty_insp_prmpt_ver_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>품질검사 게이트 판. 현행 검사는 LLM 프롬프트가 아니라 계량 지표라 metric-gate-v1 입니다(등급명 노출·길이 누출·tell 커버) <span style="color:#71717a">→ tad_pm_prmpt_ver_mng.prmpt_ver_nm</span></td></tr>
+<tr><td class="c-name">llm_offr_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>생성 LLM 제공자</td></tr>
+<tr><td class="c-name">llm_mdl_nm</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>생성 LLM 모델명</td></tr>
+<tr><td class="c-name">crt_otln</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>생성된 개요</td></tr>
+<tr><td class="c-name">crt_mtxt_cn</td><td class="c-type">TEXT</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>생성된 본문</td></tr>
+<tr><td class="c-name">qlty_scr</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>품질 게이트 통과 점수. 1.0=코퍼스 지표까지 통과, 0.5=표본이 모자라 코퍼스 지표는 판정하지 않음. 걸린 문서는 애초에 적재되지 않습니다</td></tr>
+<tr><td class="c-name">qlty_insp_rptp_cn</td><td class="c-type">_JSON_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>품질검사 상세 JSON — 게이트 판정과 지표(길이 누출·tell 커버·등급명 노출 건수)</td></tr>
+<tr><td class="c-name">lbl_src_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>본문 출처 마커 — NULL(정상 생성) · noop_fallback(자리표시 본문·학습 편입 금지) · llm_nonjson(비-JSON 응답)</td></tr>
+<tr><td class="c-name">prsng_err_rsn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>생성 응답 파싱 실패 사유</td></tr>
+<tr><td class="c-name">igi_stts_cd</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">&#x27;pending_review&#x27;</td><td>검수 상태 — pending_review · approved · rejected</td></tr>
+<tr><td class="c-name">chckr_id</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>검수자 계정 ID</td></tr>
+<tr><td class="c-name">igi_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>검수 시각</td></tr>
+<tr><td class="c-name">rjct_rsn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>반려 사유</td></tr>
+<tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>syn_doc_id</code><br><code>INDEX idx_sd_status (igi_stts_cd)</code><br><code>INDEX idx_sd_level (goal_grd_sn)</code><br><code>INDEX idx_sd_status_created (igi_stts_cd, crt_dt)</code></p>
+<div class="spec-head" id="t-tad_sm_syn_datst_cpst_mng"><h3>tad_sm_syn_datst_cpst_mng</h3><span class="spec-logical">학습셋 편입 이력</span></div>
+<p class="spec-note">합성 문서 1건이 어느 학습셋 판(dataset_version)에 들어갔는지. 한 문서가 여러 판에 들어가므로 행을 더하기만 하고 고치지 않는다 — 칼럼 하나로 두면 재방출할 때 앞선 판 기록을 잃는다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">cpst_sn</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type"></td><td>편입 기록 PK</td></tr>
+<tr><td class="c-name">syn_doc_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn">●</td><td class="c-key"><span class="k-fk">FK</span></td><td class="c-type"></td><td>편입된 합성 문서. tb_sample_documents 참조 <span style="color:#71717a">→ tad_sm_syn_doc_mng.syn_doc_id ON DELETE CASCADE</span></td></tr>
+<tr><td class="c-name">datst_ver_nm</td><td class="c-type">VARCHAR(64)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>학습셋 판 이름. 내용 해시라 같은 승인 집합이면 같은 값이 나온다 — 시각이 아니라 내용으로 판을 가른다</td></tr>
+<tr><td class="c-name">syn_job_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>그 문서를 만든 생성 작업. 없으면 NULL</td></tr>
+<tr><td class="c-name">crt_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>cpst_sn</code><br><code>INDEX idx_sdm_version (datst_ver_nm)</code><br><code>INDEX idx_sdm_job (syn_job_id)</code></p>
+<div class="group-header" id="g-H"><span class="spec-badge">H</span> <b>운영</b> — 비용·감사·가이드 이력.</div>
+<div class="spec-head" id="t-tad_lm_llm_usqty_mng"><h3>tad_lm_llm_usqty_mng</h3><span class="spec-logical">LLM 사용량</span><span class="spec-badge">RANGE PARTITION · clot_dt</span></div>
+<p class="spec-note">LLM 호출별 토큰·비용·지연.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">use_rcd_sn</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>사용 기록 PK</td></tr>
+<tr><td class="c-name">offr_id</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>LLM 제공자</td></tr>
+<tr><td class="c-name">mdl_nm</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>모델명</td></tr>
+<tr><td class="c-name">clot_prps</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>호출 목적 — 합성 · 라벨링 · 질의응답 등</td></tr>
+<tr><td class="c-name">rfrnc_trgt_type_cd</td><td class="c-type">VARCHAR(20)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>연관 대상 종류</td></tr>
+<tr><td class="c-name">rfrnc_trgt_id</td><td class="c-type">VARCHAR(100)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>연관 대상 식별자</td></tr>
+<tr><td class="c-name">inpt_tkn_cnt</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>입력 토큰 수</td></tr>
+<tr><td class="c-name">otpt_tkn_cnt</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>출력 토큰 수</td></tr>
+<tr><td class="c-name">usd_cst</td><td class="c-type">NUMERIC(10,6)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>비용(USD)</td></tr>
+<tr><td class="c-name">kcur_cst</td><td class="c-type">NUMERIC(12,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>비용(KRW)</td></tr>
+<tr><td class="c-name">bllng_se_cd</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;development&#x27;</td><td>과금 구분 — development · operation</td></tr>
+<tr><td class="c-name">rspns_dly_hr</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>응답 지연(밀리초)</td></tr>
+<tr><td class="c-name">scs_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">true</td><td>호출 성공 여부</td></tr>
+<tr><td class="c-name">err_cd</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>실패 코드</td></tr>
+<tr><td class="c-name">clot_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">now()</td><td>호출 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>use_rcd_sn</code>, <code>clot_dt</code><br><code>INDEX idx_lu_called (clot_dt)</code><br><code>INDEX idx_lu_phase (bllng_se_cd, clot_dt DESC)</code><br><code>INDEX idx_lu_purpose (clot_prps)</code><br><code>INDEX idx_lu_ref (rfrnc_trgt_type_cd, rfrnc_trgt_id)</code><br><b>PARTITION</b> <code>PARTITION BY RANGE (clot_dt)</code> — 월별 자식 표(<code>tad_lm_llm_usqty_mng_YYYY_MM</code>)와 범위 밖 행을 받는 <code>tad_lm_llm_usqty_mng_default</code> 를 둡니다. 파티션 키가 기본키에 포함되어야 하므로 기본키는 (기존 키 + 파티션 키) 복합키입니다. 다가올 달의 자식 표는 <code>services/partitions.py</code> 가 미리 만듭니다.</p>
+<div class="spec-head" id="t-tad_am_adt_log_mng"><h3>tad_am_adt_log_mng</h3><span class="spec-logical">감사 로그</span><span class="spec-badge">RANGE PARTITION · ocrn_dt</span></div>
+<p class="spec-note">전 API 호출 기록. 보존기간(기본 730일)이 지난 행은 오래된 달부터 지운다 — 해시 체인이 끊기지 않도록 앞에서부터 이어서 지운다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">adt_sn</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>감사 PK. 파티션을 두던 시절 파티션 키를 기본키에 넣어야 해 복합키가 됐고, 파티션을 걷은 뒤에도 복합키는 그대로 둔다 — 바꾸면 기존 행의 키가 흔들린다</td></tr>
+<tr><td class="c-name">dmnd_id</td><td class="c-type">Uuid(as_uuid=True)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>요청 추적 ID. 같은 요청에서 나온 여러 기록을 잇는다</td></tr>
+<tr><td class="c-name">actr_id</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>행위자 계정 ID</td></tr>
+<tr><td class="c-name">actr_role_nm</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>행위자 역할</td></tr>
+<tr><td class="c-name">flfmt_bhvr_cd</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>수행한 동작</td></tr>
+<tr><td class="c-name">trgt_type_cd</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>대상 종류</td></tr>
+<tr><td class="c-name">trgt_id</td><td class="c-type">VARCHAR(100)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>대상 식별자</td></tr>
+<tr><td class="c-name">dmnd_mtxt_hash_cn</td><td class="c-type">VARCHAR(64)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>요청 본문 SHA-256. 본문 원문은 남기지 않고 해시만 남긴다</td></tr>
+<tr><td class="c-name">dmnd_ip_addr</td><td class="c-type">_INET_PORTABLE</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>요청 IP(INET 타입)</td></tr>
+<tr><td class="c-name">user_agnt_cn</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>요청 User-Agent</td></tr>
+<tr><td class="c-name">scs_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">true</td><td>처리 성공 여부</td></tr>
+<tr><td class="c-name">err_cd</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>실패 코드</td></tr>
+<tr><td class="c-name">ocrn_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">now()</td><td>발생 시각. 기본키의 뒷자리이자 시간축 인덱스 idx_audit_occurred 의 선두 칼럼이다</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>adt_sn</code>, <code>ocrn_dt</code><br><code>INDEX idx_audit_occurred (ocrn_dt, adt_sn)</code><br><code>INDEX idx_audit_actor (actr_id, ocrn_dt DESC)</code><br><code>INDEX idx_audit_target (trgt_type_cd, trgt_id)</code><br><code>INDEX idx_audit_action (flfmt_bhvr_cd, ocrn_dt DESC)</code><br><b>PARTITION</b> <code>PARTITION BY RANGE (ocrn_dt)</code> — 월별 자식 표(<code>tad_am_adt_log_mng_YYYY_MM</code>)와 범위 밖 행을 받는 <code>tad_am_adt_log_mng_default</code> 를 둡니다. 파티션 키가 기본키에 포함되어야 하므로 기본키는 (기존 키 + 파티션 키) 복합키입니다. 다가올 달의 자식 표는 <code>services/partitions.py</code> 가 미리 만듭니다.</p>
+<div class="spec-head" id="t-tad_gm_guide_ver_mng"><h3>tad_gm_guide_ver_mng</h3><span class="spec-logical">가이드 버전</span></div>
+<p class="spec-note">가이드 문서 업로드 버전 이력.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">guide_ver_sn</td><td class="c-type">BIGINT</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type">GENERATED ALWAYS AS IDENTITY</td><td>행 PK</td></tr>
+<tr><td class="c-name">guide_id</td><td class="c-type">VARCHAR(200)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>가이드 논리 ID</td></tr>
+<tr><td class="c-name">guide_ver_nm</td><td class="c-type">VARCHAR(50)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>가이드 버전. (guide_id, version) 전역 UNIQUE</td></tr>
+<tr><td class="c-name">enfc_dt</td><td class="c-type">VARCHAR(30)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>시행일</td></tr>
+<tr><td class="c-name">chg_smry_cn</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>변경 요약</td></tr>
+<tr><td class="c-name">doc_knd_nm</td><td class="c-type">VARCHAR(50)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>문서 종류</td></tr>
+<tr><td class="c-name">file_nm</td><td class="c-type">VARCHAR(500)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>원본 파일명. 파일 없이 등록한 가이드 버전은 NULL(요청 스키마에서 선택값)</td></tr>
+<tr><td class="c-name">reg_dt</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">now()</td><td>등록 시각</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>guide_ver_sn</code><br><code>UNIQUE uq_guides_id_version (guide_id, guide_ver_nm)</code><br><code>INDEX idx_guides_guide_id (guide_id)</code><br><code>INDEX idx_guides_registered (reg_dt)</code></p>
+<div class="spec-head" id="t-tad_sy_lck_mng"><h3>tad_sy_lck_mng</h3><span class="spec-logical">동시성 잠금</span></div>
+<p class="spec-note">이름 하나에 행 하나. 임계구역에 드는 쪽이 그 행을 SELECT ... FOR UPDATE 로 잡는다. PostgreSQL 의 pg_advisory_xact_lock 과 MariaDB 의 GET_LOCK 은 잠금 수명이 서로 달라(트랜잭션 대 커넥션) 같은 코드로 쓸 수 없어, 두 엔진에서 똑같이 트랜잭션 수명인 행 잠금으로 맞췄다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th><th>기본값</th><th>설명</th></tr></thead><tbody>
+<tr><td class="c-name">lck_nm</td><td class="c-type">VARCHAR(64)</td><td class="c-nn">●</td><td class="c-key"><span class="k-pk">PK</span></td><td class="c-type"></td><td>잠금 이름. 값은 audit_chain(감사 해시체인) · model_activation(모델 활성화) 둘이며 마이그레이션이 미리 넣어 둔다 — 런타임에 만들면 처음 쓰는 둘이 서로의 미커밋 행을 못 봐 같이 들어간다</td></tr>
+</tbody></table></div>
+<p class="spec-idx"><b>PK</b> <code>lck_nm</code></p>
+</section>
+<section id="fk"><h2><span class="num">05</span> 관계 정의</h2>
+<p class="spec-note">FK 제약 26건입니다.</p>
+<div class="tbl-wrap"><table class="spec"><thead><tr><th>자식 테이블</th><th>자식 컬럼</th><th>부모</th><th>ON DELETE</th></tr></thead><tbody>
+<tr><td class="c-name">tad_gm_grd_kywd_mng</td><td class="c-name">grd_sn</td><td class="c-name">tad_cm_clsf_grd_mng.grd_sn</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_gm_grd_kywd_mng</td><td class="c-name">rqmt_sn</td><td class="c-name">tad_em_evl_rqmt_mng.rqmt_sn</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_dm_doc_lbl_mng</td><td class="c-name">doc_id</td><td class="c-name">tad_dm_doc_mng.doc_id</td><td class="c-type">CASCADE</td></tr>
+<tr><td class="c-name">tad_dm_doc_lbl_mng</td><td class="c-name">grd_sn</td><td class="c-name">tad_cm_clsf_grd_mng.grd_sn</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_cm_clsf_rslt_mng</td><td class="c-name">doc_id</td><td class="c-name">tad_dm_doc_mng.doc_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_cm_clsf_rslt_mng</td><td class="c-name">predc_grd_sn</td><td class="c-name">tad_cm_clsf_grd_mng.grd_sn</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_cm_clsf_bss_mng</td><td class="c-name">clsf_id</td><td class="c-name">tad_cm_clsf_rslt_mng.clsf_id</td><td class="c-type">CASCADE</td></tr>
+<tr><td class="c-name">tad_cm_clsf_bss_mng</td><td class="c-name">rqmt_sn</td><td class="c-name">tad_em_evl_rqmt_mng.rqmt_sn</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_mm_mdl_ver_mng</td><td class="c-name">rlbk_src_ver_id</td><td class="c-name">tad_mm_mdl_ver_mng.mdl_ver_id</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tad_lm_lrn_excn_mng</td><td class="c-name">mdl_ver_id</td><td class="c-name">tad_mm_mdl_ver_mng.mdl_ver_id</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tad_lm_lrn_epoch_mng</td><td class="c-name">excn_id</td><td class="c-name">tad_lm_lrn_excn_mng.excn_id</td><td class="c-type">CASCADE</td></tr>
+<tr><td class="c-name">tad_lm_lrn_datst_mng</td><td class="c-name">excn_id</td><td class="c-name">tad_lm_lrn_excn_mng.excn_id</td><td class="c-type">CASCADE</td></tr>
+<tr><td class="c-name">tad_lm_lrn_datst_mng</td><td class="c-name">doc_id</td><td class="c-name">tad_dm_doc_mng.doc_id</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_lm_lrn_datst_mng</td><td class="c-name">grd_sn</td><td class="c-name">tad_cm_clsf_grd_mng.grd_sn</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_cm_crct_mng</td><td class="c-name">clsf_id</td><td class="c-name">tad_cm_clsf_rslt_mng.clsf_id</td><td class="c-type">CASCADE</td></tr>
+<tr><td class="c-name">tad_cm_crct_mng</td><td class="c-name">orgnl_grd_sn</td><td class="c-name">tad_cm_clsf_grd_mng.grd_sn</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_cm_crct_mng</td><td class="c-name">cfmtn_grd_sn</td><td class="c-name">tad_cm_clsf_grd_mng.grd_sn</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_cm_crct_mng</td><td class="c-name">rflt_lrn_excn_id</td><td class="c-name">tad_lm_lrn_excn_mng.excn_id</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tad_sm_syn_doc_mng</td><td class="c-name">doc_id</td><td class="c-name">tad_dm_doc_mng.doc_id</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tad_sm_syn_doc_mng</td><td class="c-name">goal_grd_sn</td><td class="c-name">tad_cm_clsf_grd_mng.grd_sn</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_sm_syn_doc_mng</td><td class="c-name">cfmtn_grd_sn</td><td class="c-name">tad_cm_clsf_grd_mng.grd_sn</td><td class="c-type">RESTRICT</td></tr>
+<tr><td class="c-name">tad_sm_syn_doc_mng</td><td class="c-name">otln_prmpt_ver_nm</td><td class="c-name">tad_pm_prmpt_ver_mng.prmpt_ver_nm</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tad_sm_syn_doc_mng</td><td class="c-name">mtxt_prmpt_ver_nm</td><td class="c-name">tad_pm_prmpt_ver_mng.prmpt_ver_nm</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tad_sm_syn_doc_mng</td><td class="c-name">qlty_insp_prmpt_ver_nm</td><td class="c-name">tad_pm_prmpt_ver_mng.prmpt_ver_nm</td><td class="c-type">NO ACTION</td></tr>
+<tr><td class="c-name">tad_sm_syn_datst_cpst_mng</td><td class="c-name">syn_doc_id</td><td class="c-name">tad_sm_syn_doc_mng.syn_doc_id</td><td class="c-type">CASCADE</td></tr>
+<tr><td class="c-name">tad_dm_doc_vctr_mng</td><td class="c-name">doc_id</td><td class="c-name">tad_dm_doc_mng.doc_id</td><td class="c-type">CASCADE</td></tr>
+</tbody></table></div>
+<p class="spec-note" style="margin-top:12px;"><b>제약 없는 참조 3건</b> — <code>tad_cm_chnk_mng.doc_id → tad_dm_doc_mng</code> · <code>tad_cm_clsf_bss_mng.chnk_id → tad_cm_chnk_mng</code> · <code>tad_mm_mdl_ver_mng.lrn_excn_id → tad_lm_lrn_excn_mng</code>. 애플리케이션이 정합을 보증합니다.</p>
+</section>
+<section id="scope"><h2><span class="num">06</span> 범위</h2>
+<p class="spec-note">본 시스템이 생성·소유하는 개체만 수록합니다. KL 원천 문서 저장소·EDMS·회원/권한·자가진단은 외부 시스템이며, 연동 키는 <code>tad_dm_doc_mng.otsd_rfrnc_no</code> · <code>tad_dm_doc_mng.mtdt_dsctn</code> 입니다.</p>
+</section>
+<section id="revisions"><h2><span class="num">07</span> 개정 이력</h2>
+<div class="tw"><table>
+<thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:18%">근거 커밋</th><th>내용</th></tr></thead><tbody>
+<tr><td>1</td><td>2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. ORM 메타데이터와 마이그레이션 정의에서 생성해 감리 산출물로 편입</td></tr>
+<tr><td>2</td><td>2026-08-29</td><td><code>fca08e04</code></td><td>관계선이 상자에 가려지던 도식을 다시 그리고, 검색용 표 2종을 포함해 21표로 확장. 칼럼 목록이 두 곳에 중복 수록돼 있던 것을 이 문서로 일원화. 표별 인덱스·FK 개수를 §01 에 추가</td></tr>
+<tr><td>3</td><td>2026-08-29</td><td><code>bdb10f13 · b78e46a8</code></td><td>어떤 코드도 읽지 않고 실 데이터도 전부 비어 있던 <b>칼럼 10개를 삭제</b>(249 → 239). 대리키를 <code>SERIAL</code> 에서 표준 <code>GENERATED ALWAYS AS IDENTITY</code> 로 전환</td></tr>
+<tr><td>4</td><td>2026-09-04</td><td><code>3cd3709e</code></td><td><b>유사문서 조회 폐기</b> — 검색용 표 2종(21 → 19표)에 이어 표 1개와 칼럼 9개를 더 뺐다(19표 226칼럼 → <b>18표 214칼럼</b>). <b>⚠ 뺀 것은 소스에 아직 남아 있다</b> — 정의서가 코드보다 앞선 상태이며 소스 정리는 다음 차수다.<br>납품 DB 를 <b>MariaDB 10.11</b> 로 맞췄다. 물리 타입·기본값·인덱스·파티션·채번을 MariaDB 정본으로 적고 현행 PostgreSQL 표기를 대조용으로 병기했다. 스토리지 엔진·문자셋·콜레이션 선언을 머리말에 넣었다.<br>§02 <b>서버별 배포 구분</b>을 신설했다 — 근거는 <code>poc/scripts/audit_table_placement.py</code> 전수 조사. 절 번호가 03 에서 겹치던 것을 바로잡고, 제약 없는 참조 목록과 제외 칼럼을 <code>table_spec_meta.py</code> 한 곳에 두어 도식·캡션·본문이 같은 값을 쓰도록 고쳤습니다</td></tr>
+<tr><td>5</td><td>2026-09-05</td><td><code>319069b9 · 90c0d96a · 87a54381</code></td><td><b>4차에서 '소스에 아직 남아 있다'고 적었던 것을 실제로 걷었다</b> — 커밋 <code>319069b9</code> 가 소스·ORM 에서, 마이그레이션 <code>a3b4c5d6e7f8</code> 이 DB 에서 유사문서 조회 칼럼 9개와 검색용 표 2종을 떨궜다. 이제 정의서와 코드가 같은 것을 가리킨다.<br><b>파티션을 걷었다</b> — 223 실서버 30일 실측(<code>tb_audit_log</code> 71,161행 · 30MB · 연 환산 87만행)에서 파티션이 필요한 규모가 아니었고, 오래된 파티션을 떼는 코드가 0건이라 효용의 절반은 애초에 쓰지 않고 있었다. 시간축 인덱스 3개(<code>b4c5d6e7f8a9</code>)와 보존기간 삭제(<code>services/retention.py</code> · 기본 꺼짐)로 대신한다. <code>tb_audit_log</code> 의 복합 기본키는 그대로 둔다.<br><b>표 <code>tb_advisory_locks</code> 를 넣었다</b>(18 → 19표 · 216칼럼) — 감사 해시체인과 모델 활성화의 임계구역을 두 DB 에서 같은 방식으로 잠그기 위한 표다.</td></tr>
+<tr><td>6</td><td>2026-09-05</td><td><code>599f7c54</code></td><td><b>프롬프트 버전·품질 결과 칸이 실제로 채워지기 시작했다.</b> <code>tb_sample_documents</code> 의 <code>*_prompt_version</code> 세 칸은 <code>tb_prompt_versions</code> 를 가리키는 외래키라 행을 먼저 등록해야 하는데 워커가 그 등록을 하지 않아 늘 NULL 이었다(실측: IntegrityError 1452). <code>quality_score</code>·<code>quality_report</code> 도 같은 이유로 비어 있었다 &mdash; 검수자가 "이 문서가 어떤 검사를 통과해 여기 있는가"를 화면에서 알 수 없었다.</td></tr>
+<tr><td>7</td><td>2026-09-05</td><td><code>a3705759 · f2df0dbb</code></td><td><b>표 <code>tb_sample_dataset_membership</code> 를 넣었다</b>(19 → 20표 · 217 → 221칼럼 · FK 24 → 25건) &mdash; 합성 승인본이 어느 학습셋 판에 들어갔는지 기록한다.<br>같은 날 앞선 판에서는 이것을 <code>tb_sample_documents</code> 의 칼럼 하나(<code>added_to_dataset_version</code>)로 넣었다가 **되돌렸다.** 칼럼은 UPDATE 라 한 문서가 여러 판에 들어가면 앞선 판 기록을 잃는다. 행을 더하기만 하는 연결 표로 바꾸고 <code>UNIQUE(sample_id, dataset_version)</code> 로 중복을 막는다. <b>자동 학습 편입이 아니라 기록</b>이며, 빌드가 방출한 뒤 남긴다.</td></tr>
+<tr><td>8</td><td>2026-09-11</td><td><code>f74968bf</code></td><td><b>납품 DB 정본을 PostgreSQL 16 + pgvector 로 되돌렸습니다</b>(2026-09-09 결정 · <code>38618c2a</code>). 4차에서 MariaDB 로 맞췄던 물리 타입·기본값·인덱스·파티션 표기를 현행 PostgreSQL 로 되돌리고 병기 칸을 없앴습니다. MariaDB 10.11 에는 벡터 형식이 없어 유사문서 조회를 구현할 수 없었습니다.<br><b>문서 벡터 표를 넣었습니다</b> — 원시 SQL 로 만들어져 ORM 에 없던 탓에 정의서에서 빠져 있었습니다(<code>f8a9b0c1d2e3</code>).<br><b>표·칼럼 물리명을 KOIPA 표준용어집 이름으로 바꿨습니다</b>(<code>70e8ef12</code> · 마이그레이션 <code>7b3e9d2a4f10</code>). 생성 시각 NOT NULL 9개 표, 문서 라벨 확신도 <code>NUMERIC(5,4)</code> 통일, 학습실행 모델버전 칼럼명 정리를 반영했습니다(<code>a8aa5414</code> · <code>5c1d9e0a7b34</code>).<br>월별 RANGE 파티션 3종(감사로그·청크·LLM 사용량)을 실제 DB 대로 다시 적었습니다.</td></tr>
+<tr><td>9</td><td>2026-09-11</td><td><code>690eb644</code></td><td><b>NULL 표기를 실제 DB 와 맞췄습니다</b> — 마이그레이션을 끝까지 적용한 PostgreSQL 의 information_schema 와 칼럼 230개를 대조하니 6칼럼이 달랐습니다. 표 단위 기본키(청크·LLM 사용량·감사로그)를 NULL 허용으로 적던 생성기를 고치고, 모델에 NOT NULL 을 적지 않았던 3칼럼(학습셋 편입 이력의 합성문서ID·학습셋 판, 가이드 등록 시각)을 명시해 불일치 0건이 되었습니다(<code>poc/scripts/audit_schema_consistency.py --db-url</code>).<br><b>같은 칼럼ID 인데 표마다 NOT NULL 이 다른 8건에 사유를 적었습니다</b> — 나중에 정해지는 값(추출 전 글자 수, 학습 완료 전 모델 버전)이거나 선택 참조·선택값(요건, 키워드 가중치, 가이드 파일명, 라벨 확신도 등)이어서 설계상 NULL 을 허용합니다. 8건 모두 칼럼 설명에 사유가 있습니다.</td></tr>
+</tbody></table></div>
+</section>
+<div class="foot">테이블정의서 · ERD — 한국지식재산보호원 AI 영업비밀 등급분류 시스템 · 2026-09-11 생성</div>
+</div>
+</body>
+</html>

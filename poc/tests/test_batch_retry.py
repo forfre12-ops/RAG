@@ -1,6 +1,6 @@
 """Batch 부분 실패 처리·재시도·보상 트랜잭션 검증.
 
-대상: lloydk.services.async_classify_service.AsyncClassifyService.submit_batch
+대상: koipa.services.async_classify_service.AsyncClassifyService.submit_batch
 - 건별 isolation: 한 건 실패가 다음 건을 막지 않는다.
 - retry: 지수 백오프로 최대 2회 재시도 (총 3회 시도).
 - 영구 실패 시 failed_doc_ids + errors 기록, 다음 건 계속.
@@ -12,9 +12,9 @@ from __future__ import annotations
 import pytest
 pytestmark = pytest.mark.slow
 
-from lloydk.schemas.classify import ClassifyRequest
-from lloydk.schemas.classify_async import ClassifyBatchRequest
-from lloydk.services.async_classify_service import AsyncClassifyService
+from koipa.schemas.classify import ClassifyRequest
+from koipa.schemas.classify_async import ClassifyBatchRequest
+from koipa.services.async_classify_service import AsyncClassifyService
 
 
 def _docs(n: int) -> ClassifyBatchRequest:
@@ -57,7 +57,7 @@ def _make_service_with_flaky_classify(
 @pytest.fixture(autouse=True)
 def _reset_singleton():
     yield
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.services.classify_service import ClassifyService
     ClassifyService._instance = None
 
 

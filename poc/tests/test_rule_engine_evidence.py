@@ -3,7 +3,7 @@
 이 규약이 깨지면(예: 향후 시드 매칭이 start를 채우면) 합의 게이트의 '실제 근거' 판정이
 조용히 뒤집혀 약어 단독 문서가 gold_candidate가 될 수 있다 → 이 테스트가 알려준다.
 """
-from lloydk.modules.m3_labeling.rule_engine import (
+from koipa.modules.m3_labeling.rule_engine import (
     MatchedKeyword,
     RuleLabelResult,
     has_real_evidence,

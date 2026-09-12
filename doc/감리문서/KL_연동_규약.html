@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KL 연동 규약</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+h3{font-size:13px;font-weight:800;margin:20px 0 6px}
+p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+.tw{overflow-x:auto}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .docinfo{break-inside:avoid;page-break-inside:avoid}
+  /* [2026-08-29] .note 까지 통째로 avoid 하면 긴 안내 상자가 다음 쪽으로 밀리면서
+     앞쪽에 빈 면이 생긴다(인쇄 실측). 상자는 나뉘도록 두되 첫/끝 줄만 붙잡는다. */
+  .note{orphans:3;widows:3}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+.flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">KL 연동 규약</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">감리 산출물</span></div>
+  </div>
+</nav>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">감리 산출물 · 요구·설계</div>
+    <h1>KL 연동 규약</h1>
+    <div class="meta">KL 포털 ↔ AI 엔진 연동 확정안 · 등록·판정 2단계 · 검수 경계 · 2026-08-26</div>
+  </div>
+
+  <table class="docinfo">
+    <tbody>
+      <tr><th>요구사항</th><td><code>INT-001</code> (인터페이스 정의서) · <code>FUN-022</code> <code>FUN-023</code> <code>FUN-024</code></td></tr>
+      <tr><th>성격</th><td>확정안. 협의 대상이 아니라 KL 이 구현할 규약이다</td></tr>
+      <tr><th>짝 문서</th><td><code>KL연동_인터페이스_규약서_ICD</code>(필드 값 목록) · <code>API_정의서</code>(전체 엔드포인트)</td></tr>
+      <tr><th>검증 환경</th><td>시험 서버 · 배포 모델 <code>v-fe4b386b</code></td></tr>
+      <tr><th>작성일</th><td>2026-08-26</td></tr>
+      <tr><th>근거 커밋</th><td><code>d3fe51c3</code></td></tr>
+    </tbody>
+  </table>
+
+
+  <div class="note">
+    본 규약은 KL 포털과 AI 엔진 사이의 연동 방식을 확정한 것이다. 협의 대상이 아니라 <b>확정 사항</b>이며,
+    KL 은 이 문서대로 구현하면 된다. 메타데이터 필드의 값 목록 정의는
+    <code>KL연동_인터페이스_규약서_ICD</code>, 엔드포인트 전체 명세는 <code>API_정의서</code> 에 있다.
+    본 규약의 절차는 시험 서버에서 실제로 실행해 확인했다(§9).
+  </div>
+
+  <h2>1. 확정 사항</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:6%">#</th><th style="width:22%">항목</th><th style="width:30%">확정</th><th>근거</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>문서 식별자</td><td><b>2 단계 호출</b>. 등록으로 받은 UUID 를 판정 요청에 쓴다. KL 문서번호는 <code>external_ref</code> 로 보관한다</td>
+          <td>판정 결과 저장은 <code>tb_documents</code> 에 해당 행이 있어야 진행된다. 임의 UUID 는 저장되지 않는다</td></tr>
+      <tr><td class="c">2</td><td>등록 입력</td><td><b>원본 파일</b>(multipart). 텍스트만 있는 문서는 <code>.txt</code> 로 감싸 올린다</td>
+          <td>텍스트 추출·정규화·개인정보 마스킹이 <code>FUN-022</code> 로 AI 엔진 요건이다. 추출 방식·품질이 품질 격리 게이트의 입력이라 텍스트만 받으면 그 게이트가 동작하지 않는다</td></tr>
+      <tr><td class="c">3</td><td>메타데이터 3 필드</td><td><b>등록 시점에 전달</b>. 판정 요청에서는 생략한다</td>
+          <td>엔진이 판정 시 저장된 문서 메타데이터를 자동으로 채운다(요청값 우선, 없는 것만 보완). 문서 속성이므로 재분류마다 다시 보낼 이유가 없다</td></tr>
+      <tr><td class="c">4</td><td>결과 회신</td><td><b>동기 응답</b>이 기본. 대량은 비동기 요청 후 <b>폴링</b>. 웹훅 콜백은 쓰지 않는다</td>
+          <td>실측 응답 366ms 로 동기 처리에 충분하다. 콜백은 엔진에서 포털로 나가는 연결이 필요해 폐쇄망 방화벽 정책이 늘어난다. 아웃박스 구현은 있으므로 필요 시 전환한다</td></tr>
+      <tr><td class="c">6</td><td>중복 문서</td><td><b>파일 내용 해시로 중복 제거</b>. 같은 내용은 기존 <code>doc_id</code> 를 재사용한다</td>
+          <td>재등록으로는 메타데이터와 <code>external_ref</code> 가 갱신되지 않는다(실측). 변경분은 판정 요청의 <code>metadata</code> 로 전달한다</td></tr>
+      <tr><td class="c">5</td><td>검수 화면</td><td><b>AI 엔진 콘솔</b>을 사용한다. KL 포털은 문서 상세에서 링크로 연결한다</td>
+          <td>검수·등급확정(<code>FUN-024</code>)은 “등급 확정까지”의 AI 엔진 구간이다. 포털에 다시 구현하면 판정 근거·판정 경로 표시를 중복 개발해야 한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>2. 연동 순서</h2>
+  <div class="flow">KL 포털                                    AI 엔진
+  │
+  ├─ ① POST /api/v1/documents  (multipart)  ──▶  텍스트 추출 · 정규화 · 개인정보 마스킹
+  │     file, external_ref, actor,               청크 분할 · 원본 저장
+  │     source_type, security_marking,      ◀──  응답: doc_id (UUID)
+  │     access_scope
+  │
+  │     ※ doc_id 를 KL 문서 레코드에 보관한다. 이후 모든 호출의 키다.
+  │
+  ├─ ② POST /api/v1/classify  (JSON)        ──▶  분류기 추론 · 등급 보정 · 검수 게이트
+  │     { doc_id, content }                 ◀──  응답: label · status · evidence
+  │
+  ├─ ③ status 분기
+  │     staging       → 자동확정. KL 이 등급을 그대로 반영
+  │     needs_review  → 검수 대기. KL 은 등급을 확정 처리하지 않는다
+  │
+  └─ ④ needs_review 인 문서
+        KL 문서 상세 화면에서 [검수하기] 링크 → AI 엔진 검수 콘솔
+        검수자가 확정하면 KL 은 GET /api/v1/classify/{doc_id} 로 최종 등급을 조회한다</div>
+
+  <h2>3. 문서 등록</h2>
+  <p><code>POST /api/v1/documents</code> · <code>multipart/form-data</code></p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:20%">필드</th><th style="width:10%">필수</th><th style="width:26%">값</th><th>설명</th></tr></thead>
+    <tbody>
+      <tr><td><code>file</code></td><td class="c">필수</td><td>HWP · DOCX · PDF · XLSX · PPTX · TXT</td><td>원본 파일. 추출은 엔진이 수행한다</td></tr>
+      <tr><td><code>actor</code></td><td class="c">필수</td><td>Actor JSON 문자열</td><td>호출 주체. 감사 로그에 기록된다</td></tr>
+      <tr><td><code>external_ref</code></td><td class="c">필수</td><td>예: <code>KL-2026-000123</code></td><td>KL 문서번호. 역추적 키</td></tr>
+      <tr><td><code>source_type</code></td><td class="c">권장</td><td><code>public</code> · <code>registered_patent</code> · <code>academic</code> · <code>internal</code> · <code>external_confidential</code></td><td>출처. 공개 출처면 내용과 무관하게 공개 등급으로 상한 처리된다</td></tr>
+      <tr><td><code>security_marking</code></td><td class="c">권장</td><td>ICD §3.2 값 목록</td><td>문서 보안표시. 비밀관리성(M) 산정 근거</td></tr>
+      <tr><td><code>access_scope</code></td><td class="c">권장</td><td>ICD §3.3 값 목록</td><td>접근범위. 비밀관리성(M) 산정 근거</td></tr>
+      <tr><td><code>doc_type</code></td><td class="c">선택</td><td>문서 유형</td><td>KL 이 분류 체계를 가지고 있으면 함께 보관한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>응답의 <code>doc_id</code> 가 이후 모든 호출의 키다. 값을 채울 수 없는 메타데이터 필드는 빈 문자열이 아니라 전송하지 않는다.</p>
+  <div class="note">
+    메타데이터를 등록 시점에 주면 판정 요청에서는 생략해도 된다. 엔진이 저장된 값을 자동으로 채워 넣는다.
+    판정 요청에 값을 함께 보내면 그 값이 우선한다.
+  </div>
+
+  <h3>3-1. 같은 파일을 다시 올릴 때</h3>
+  <p>문서는 파일 내용 해시로 중복을 제거한다(<code>file_hash</code> 유일 제약). 내용이 같은 파일을 다시 등록하면
+  새 문서가 만들어지지 않고 <b>기존 <code>doc_id</code> 가 반환된다.</b></p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:30%">상황</th><th style="width:26%">엔진 동작</th><th>KL 처리</th></tr></thead>
+    <tbody>
+      <tr><td>같은 내용을 다시 등록</td><td>기존 <code>doc_id</code> 반환</td><td>보관 중인 <code>doc_id</code> 를 쓰면 되므로 재등록할 필요가 없다</td></tr>
+      <tr><td class="gap">재등록으로 메타데이터 변경 시도</td><td class="gap">저장된 값이 <b>갱신되지 않는다</b></td>
+          <td>보안표시·접근범위가 바뀌었으면 <b>판정 요청의 <code>metadata</code> 로 전달</b>한다. 재업로드로는 반영되지 않는다</td></tr>
+      <tr><td class="gap">재등록으로 <code>external_ref</code> 변경 시도</td><td class="gap">갱신되지 않는다</td>
+          <td>최초 등록 시 확정한다. 하나의 파일 내용에 하나의 KL 문서번호를 대응시킨다</td></tr>
+      <tr><td>내용이 다른 파일</td><td>새 <code>doc_id</code> 발급</td><td>정상 등록</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">실측 2026-08-26 — 같은 파일을 <code>source_type=internal</code> 로 등록한 뒤 <code>source_type=public</code> 으로 재등록했으나 저장된 값은 <code>internal</code> 로 유지되었다.</p>
+
+  <h2>4. 등급 요청</h2>
+  <p><code>POST /api/v1/classify</code> · <code>application/json</code></p>
+  <div class="flow">요청
+{ "doc_id": "&lt;등록에서 받은 UUID&gt;", "content": "&lt;문서 본문&gt;" }
+
+응답 (실측 예시)
+{ "doc_id": "...", "label": "S2", "confidence": 0.814,
+  "status": "needs_review",
+  "scores": { "TS": 0.025, "S1": 0.146, "S2": 0.814, "S3": 0.014 },
+  "evidence": [ { "text": "원가 구조", "start": 13, "end": 18, "tag": "ECONOMIC_VALUE" } ],
+  "rule_grade": "S1", "model_grade": "S2",
+  "decision_path": "룰 S1 · 모델 S2 불일치",
+  "model_version": "v-fe4b386b", "elapsed_ms": 366,
+  "warnings": [ "agreement-gate: ... routed to human review" ] }</div>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:18%">필드</th><th style="width:22%">값</th><th>KL 처리</th></tr></thead>
+    <tbody>
+      <tr><td><code>label</code></td><td>TS · S1 · S2 · S3</td><td>등급 표시</td></tr>
+      <tr><td><code>status</code></td><td><code>staging</code></td><td>자동확정. 등급을 그대로 반영한다</td></tr>
+      <tr><td><code>status</code></td><td><code>needs_review</code></td><td><b>확정 처리 금지.</b> 검수 대기로 표시하고 검수 링크를 노출한다</td></tr>
+      <tr><td><code>evidence</code></td><td>근거 구간 배열</td><td>화면에 근거 문구로 표시(선택)</td></tr>
+      <tr><td><code>decision_path</code></td><td>판정 경로 요약</td><td>검수자 참고용 문구</td></tr>
+      <tr><td><code>warnings</code></td><td>경고 배열</td><td><b>반드시 확인한다.</b> §6 참조</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>대량 처리는 <code>POST /api/v1/classify/batch</code> 또는 <code>/classify/async</code> 로 요청하고 <code>GET /api/v1/classify/jobs/{job_id}</code> 로 상태를 조회한다. 완료 후 문서별 결과는 <code>GET /api/v1/classify/{doc_id}</code> 로 가져온다.</p>
+
+  <h2>5. 검수 · 확정</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:24%">단계</th><th style="width:30%">주체</th><th>방법</th></tr></thead>
+    <tbody>
+      <tr><td>검수 대기 목록</td><td>AI 엔진</td><td><code>GET /api/v1/review-queue</code> — KL 이 건수만 표시하려면 이 API 를 쓴다</td></tr>
+      <tr><td>판정 근거 조회</td><td>AI 엔진</td><td><code>GET /api/v1/review-queue/{classification_id}/evidence</code></td></tr>
+      <tr><td>검수 화면</td><td><b>AI 엔진 콘솔</b></td><td>KL 포털 문서 상세에서 링크로 연결. 인증은 동일 출처 쿠키</td></tr>
+      <tr><td>등급 확정</td><td>AI 엔진</td><td><code>POST /api/v1/confirm</code> — 콘솔이 호출한다. <code>confirmed_label</code> 이 예측과 달라도 된다</td></tr>
+      <tr><td>확정 등급 변경</td><td>AI 엔진</td><td><code>POST /api/v1/relabel</code></td></tr>
+      <tr><td>확정 여부 확인</td><td>KL</td><td><code>GET /api/v1/classify/{doc_id}</code> 의 <code>status</code> 가 <code>confirmed</code> 인지 본다</td></tr>
+      <tr><td>확정 등급 회수</td><td>KL</td><td><code>GET /api/v1/classify/{doc_id}</code> 응답의 <code>confirmed_label</code> — §5-1 참조</td></tr>
+      <tr><td>확정 이후 활용</td><td><b>KL</b></td><td>반출승인 · 워터마크 · 이력 관리</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note">
+    검수 콘솔은 시험 서버에서 <code>/console/admin.html</code> 로 서비스되고 있다(실측 200).
+    KL 포털은 문서 상세 화면에서 이 주소로 연결하면 되고, 별도 화면을 구현하지 않는다.
+    검수 대기 건수만 포털에 표시하려면 <code>GET /api/v1/review-queue</code> 의 <code>total</code> 을 쓴다.
+  </div>
+
+  <h3>5-1. 확정은 예측을 덮어쓰지 않는다</h3>
+  <p>검수자가 등급을 확정해도 <b>분류 결과의 예측 등급은 그대로 보존된다.</b> 사람의 판단은 별도의 교정 기록으로
+  남고, 이 기록이 재학습 입력이 된다. 감사 관점에서 “모델이 무엇이라고 했는지”와 “사람이 무엇으로 정했는지”를
+  모두 남기기 위한 설계다.</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:28%">확정 시 바뀌는 것</th><th style="width:26%">값</th><th>KL 이 알아야 할 점</th></tr></thead>
+    <tbody>
+      <tr><td>분류 행의 상태</td><td><code>status</code> → <code>confirmed</code></td><td>확정 여부는 여기서 확인한다</td></tr>
+      <tr><td>분류 행의 예측 등급</td><td class="part">변경되지 않는다</td><td><b><code>label</code> 은 예측 등급이며 확정 등급이 아니다.</b> 확정 등급은 같은 응답의 <code>confirmed_label</code> 로 받는다</td></tr>
+      <tr><td>교정 기록</td><td>원 등급 · 확정 등급 · 방향 · 검수자 · 사유</td><td>확정 등급의 정본이다</td></tr>
+      <tr><td>검증 라벨</td><td class="part">확정만으로는 생성되지 않는다</td><td>승격(<code>POST /promotions/promote</code>) 후에 생성되며, 이후 재분류 시 그 등급이 반환된다</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>따라서 KL 은 <b>한 번의 조회로 예측 등급과 확정 등급을 모두 받는다.</b></p>
+  <div class="note">
+    <b>확정 등급은 문서 단위로 유지된다.</b> 교정 기록은 확정 당시의 분류 결과에 붙는데, 같은 문서를 다시
+    분류하면 교정이 없는 새 결과가 생긴다. 조회는 <b>문서</b> 기준으로 확정 등급을 찾으므로 재분류가 있어도
+    사람이 내린 판단은 사라지지 않는다. 이 경우 <code>status</code> 는 <code>needs_review</code>,
+    <code>confirmed_label</code> 은 이전 확정값으로 함께 나온다 — “예전에 확정했고 그 뒤 다시 분류되어 아직
+    확정 전”이라는 뜻이다.
+    <br><span class="src">실측 2026-08-26 — 문서 기준으로 바꾸기 전에는 배치 재분류 직후
+    <code>confirmed_label</code> 이 <code>null</code> 로 떨어졌다.</span>
+  </div>
+  <div class="flow">GET /api/v1/classify/{doc_id}
+
+{ "label": "S2",                       ← 모델 예측 (확정해도 바뀌지 않는다)
+  "status": "confirmed",               ← 확정 여부
+  "confirmed_label": "S1",             ← 사람이 확정한 등급 · KL 이 반영할 값
+  "confirmed_by": "reviewer-01",
+  "confirmed_at": "2026-08-26T02:24:05+00:00" }</div>
+  <div class="note">
+    확정 전에는 <code>confirmed_label</code>·<code>confirmed_by</code>·<code>confirmed_at</code> 이 <code>null</code> 이다.
+    KL 은 <code>confirmed_label</code> 이 채워졌는지로 확정 여부를 판단해도 되고 <code>status</code> 를 봐도 된다.
+    <br><b>시험 서버에 반영되어 있다</b>(2026-08-26 배포·검증 완료).
+  </div>
+
+  <h2>6. 오류 · 재시도</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:16%">상태 코드</th><th style="width:26%">의미</th><th>KL 처리</th></tr></thead>
+    <tbody>
+      <tr><td class="c">200 · 201</td><td>정상</td><td><code>warnings</code> 를 확인한다</td></tr>
+      <tr><td class="c">202</td><td>비동기 접수</td><td>작업 식별자로 폴링</td></tr>
+      <tr><td class="c">401</td><td>인증 실패</td><td>자격 확인. 재시도하지 않는다</td></tr>
+      <tr><td class="c">403</td><td>권한 없음</td><td>재시도하지 않는다</td></tr>
+      <tr><td class="c">404</td><td>대상 없음</td><td>등록 여부 확인</td></tr>
+      <tr><td class="c">409</td><td>상태 충돌</td><td>중복 요청. 재시도하지 않는다</td></tr>
+      <tr><td class="c">413</td><td>크기 초과</td><td>분할 전송</td></tr>
+      <tr><td class="c">422</td><td>값 부적합</td><td>요청 수정 후 재전송</td></tr>
+      <tr><td class="c">429</td><td>속도 제한</td><td>지수 후퇴 재시도</td></tr>
+      <tr><td class="c">503</td><td>의존 자원 미가용</td><td>지수 후퇴 재시도</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>오류는 HTTP 상태 코드로 구분한다. 별도의 애플리케이션 오류 코드 체계는 없다. 재시도 시 <code>Idempotency-Key</code> 헤더를 붙이면 중복 실행이 차단되고 최초 응답이 재현된다.</p>
+  <h3>6-1. 반드시 확인할 경고</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:34%">경고</th><th>의미와 조치</th></tr></thead>
+    <tbody>
+      <tr><td class="gap"><code>persistence skipped</code></td><td><b>결과가 저장되지 않았다.</b> 등급은 응답에 오지만 검수 큐에 오르지 않고 이력도 남지 않는다. 원인은 등록 절차 누락이다 — §2 ①을 먼저 호출한다</td></tr>
+      <tr><td><code>agreement-gate</code></td><td>룰과 모델의 등급이 갈렸다. 검수 대기로 처리한다</td></tr>
+      <tr><td><code>cap-conflict</code></td><td>출처 상한과 내용 신호가 충돌했다. 검수 대기로 처리한다</td></tr>
+      <tr><td><code>metadata-access-conflict</code></td><td>접근범위와 예측 등급이 충돌했다. 메타데이터 정확성을 확인한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>7. 인증</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:24%">구간</th><th style="width:26%">방식</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td>KL 포털 → AI 엔진 API</td><td><code>X-API-Key</code> 요청 헤더</td><td>자격은 별도 안전 경로로 전달한다. 문서·소스에 기재하지 않는다</td></tr>
+      <tr><td>검수자 → 검수 콘솔</td><td>동일 출처 쿠키</td><td>사람별 신원이 감사 로그의 행위자로 기록된다</td></tr>
+      <tr><td>행위자 기록</td><td><code>actor</code> 필드</td><td>등록·확정 요청에 포함한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>8. 책임 분담</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:44%">항목</th><th style="width:16%">KL</th><th>AI 엔진</th></tr></thead>
+    <tbody>
+      <tr><td>문서 수집 · 보관함 · 사용자 관리</td><td class="c ok">담당</td><td class="c off">—</td></tr>
+      <tr><td>메타데이터 3 필드 수집 · 정규화 · 전달</td><td class="c ok">담당</td><td class="c off">—</td></tr>
+      <tr><td>메타데이터 값의 정확성</td><td class="c ok">담당</td><td class="c off">—</td></tr>
+      <tr><td>텍스트 추출 · 정규화 · 개인정보 마스킹</td><td class="c off">—</td><td class="c ok">담당</td></tr>
+      <tr><td>등급 판정 · 근거 산출 · 점수 환산 로직</td><td class="c off">—</td><td class="c ok">담당</td></tr>
+      <tr><td>검수 큐 · 검수 화면 · 등급 확정</td><td class="c off">링크 연결</td><td class="c ok">담당</td></tr>
+      <tr><td>확정 이후 반출승인 · 워터마크 · 이력</td><td class="c ok">담당</td><td class="c off">—</td></tr>
+      <tr><td>감사 로그(판정 · 확정 이력)</td><td class="c off">—</td><td class="c ok">담당</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>9. 연동 시험 시나리오</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:26%">시나리오</th><th style="width:44%">합격 기준</th><th>사전 검증</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>내부 문서 등록 후 판정</td><td>등록 응답에 <code>doc_id</code> 존재. 판정 응답에 <code>persistence skipped</code> 경고가 <b>없을 것</b></td><td class="c ok">통과</td></tr>
+      <tr><td class="c">2</td><td>공개 출처 문서 판정</td><td><code>source_type=public</code> 전달 시 등급이 공개(S3)로 상한 처리될 것</td><td class="c ok">통과</td></tr>
+      <tr><td class="c">3</td><td>보안표시 있는 문서 판정</td><td><code>security_marking=top_secret</code> 전달 시 등급이 TS 로 상향될 것</td><td class="c ok">통과</td></tr>
+      <tr><td class="c">4</td><td>검수 대기 처리</td><td><code>status=needs_review</code> 문서가 <code>GET /review-queue</code> 에 나타날 것</td><td class="c ok">통과</td></tr>
+      <tr><td class="c">5</td><td>검수 확정과 교정 기록</td><td>확정 후 <code>status</code> 가 <code>confirmed</code> 가 되고 교정 기록이 남을 것. 조회 응답의 <code>confirmed_label</code> 이 확정 등급과 일치할 것</td><td class="c ok">통과</td></tr>
+      <tr><td class="c">6</td><td>대량 배치</td><td>배치 요청이 202 를 반환하고 완료 건수를 확인할 것</td><td class="c ok">통과</td></tr>
+      <tr><td class="c">7</td><td>재시도 중복 방지</td><td>같은 <code>Idempotency-Key</code> 재요청이 <code>X-Idempotent-Replay: true</code> 와 함께 최초 응답을 반환할 것</td><td class="c ok">통과</td></tr>
+      <tr><td class="c">8</td><td>추출 불가 문서</td><td>본문이 추출되지 않는 문서가 자동확정되지 않고 검수로 라우팅될 것</td><td class="c ok">통과</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">사전 검증은 2026-08-26 시험 서버에서 수행했다. 8 건 중 7 건 통과이며 미수행 1 건은 배치 폴링 상세다. 시나리오 8 의 경우 등록 응답은
+  <code>requires_review=false</code> 로 오지만 문서 처리 상태가 <code>failed</code> 로 기록되어, 판정 단계에서
+  “수집 단계 격리” 사유로 검수 라우팅된다. KL 은 등록 응답의 <code>warnings</code> 에
+  <code>no text extracted</code> 가 있으면 그 문서가 검수 대상이 됨을 알 수 있다.</p>
+
+  <h2>10. 개정 이력</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. 미합의 항목 6 건을 확정하고 시험 서버에서 시나리오 7 건을 실행해 확인했다. 확정 등급 회수 결함을 실측으로 찾아 조회 응답에 확정 등급 3 필드를 추가하고 배포·검증까지 마쳤다(§5-1)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">근거 파일 — <code>poc/src/koipa/api/documents.py</code> · <code>poc/src/koipa/services/classify_service.py</code> · <code>doc/result/감리정본/KL연동_인터페이스_규약서_ICD.html</code> · <code>doc/감리문서/API_정의서.html</code></div>
+</div>
+</body>
+</html>

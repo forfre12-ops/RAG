@@ -1,0 +1,26 @@
+# Koipa DR 백업(PostgreSQL + 원문 스토리지) — 호스트 systemd oneshot.
+# worker 컨테이너엔 docker 소켓이 없어 Celery beat 로는 백업을 돌릴 수 없다(호스트에서 docker exec 필요).
+# 설치:
+#   sudo cp infra/systemd/koipa-dr-backup.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now koipa-dr-backup.timer
+#   systemctl list-timers koipa-dr-backup.timer     # 다음 실행 확인
+#   journalctl -u koipa-dr-backup -n 50             # 실행/실패 로그(fail-closed → non-zero)
+[Unit]
+Description=Koipa DR 백업(PG + 원문 스토리지, fail-closed)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# ↓ 배포 경로에 맞게 수정. backups/ · reports/ 가 이 디렉터리 밑에 생성된다.
+WorkingDirectory=/opt/koipa/poc
+# 오프사이트 사본을 두려면 끝에 --second-media-dir /mnt/backup-nas 추가.
+ExecStart=/usr/bin/python3 scripts/backup_dr.py
+# docker 소켓 접근 위해 root(또는 docker 그룹 사용자). 파일 소유가 걱정되면 docker 그룹 User 로 교체.
+User=root
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target

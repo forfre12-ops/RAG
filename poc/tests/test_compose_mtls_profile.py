@@ -51,5 +51,9 @@ def test_default_up_excludes_mtls():
                         if not cfg.get("profiles")]
     assert "nginx-mtls" not in default_services
     # 기존 핵심 서비스는 default에 있어야 함 (regression guard)
-    for must in ("postgres", "redis", "minio", "api", "worker"):
+    for must in ("postgres", "redis", "api", "worker"):
         assert must in default_services, f"{must}는 기본 up에서 빠지면 안 됨"
+    # minio 제거(e10e4246) — 앱이 붙지 않는데 매 배포마다 떠 있어서 정의를 지웠다.
+    # 이 단언은 되살아나는 것을 잡는다. S3 호환이 필요해지면 어댑터와 [minio] extra 가
+    # 그대로 있으므로 서비스 정의를 되돌리기 전에 그쪽을 먼저 본다.
+    assert "minio" not in services, "minio 는 배포 스택에서 제거됐다"

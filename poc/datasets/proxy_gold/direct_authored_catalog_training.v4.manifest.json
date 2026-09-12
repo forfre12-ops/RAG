@@ -1,0 +1,23 @@
+{
+  "change_summary": "Appended grade-specific review-style sections to v3.9 while preserving scenario_id and factor_profile_id catalog quotas.",
+  "evaluation_boundary": "v2_2 development used only to identify style-generalization failure; v2_2 final remains unopened",
+  "grade_counts": {
+    "S1": 750,
+    "S2": 750,
+    "S3": 450,
+    "TS": 750
+  },
+  "no_llm_generation": true,
+  "records": 2700,
+  "records_sha256": "fd864bde9186025048e26b8d98084b101fffff9fb3f098c5ac909e917f1c7fd5",
+  "schema": "direct-authored-catalog-training-v4",
+  "source_corpus": "datasets\\proxy_gold\\direct_authored_catalog_training.v3_9.jsonl",
+  "source_manifest_sha256": "2583b59c51357c2f9521192b1e83850412246cb787933c7766bdf2f97aaf85b6",
+  "source_records_sha256": "5759f15269e896a2821543d695c6329d6735821a3471294cecc0bee1275397f8",
+  "text_length": {
+    "max": 3580,
+    "mean": 3322.23,
+    "min": 3152
+  },
+  "training_only": true
+}

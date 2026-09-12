@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>분류 정확도 · 테스트 방식 — AI 파트</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:920px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:12px;background:var(--mid);border:1px solid var(--line);padding:1px 5px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13.5px}
+ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+a{color:#0a0a0a}
+
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:920px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#0a0a0a;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">분류 정확도 · 테스트 방식</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">EVAL</span></div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">KL 감리 대응 · 요청 3</div>
+    <h1>분류 정확도 · 테스트 방식</h1>
+    <div class="meta">등급 판정근거는 <a href="첨부문서/골든셋_분류근거_v5_clean_v-fe4b386b.html">골든셋 분류근거(카드형)</a> 참조 · 2026-08-02</div>
+  </div>
+
+  <div class="note"><b>한눈에 보기 — 세 줄 요약</b>
+    <ul style="margin:8px 0 0">
+      <li><b>무엇을 재나</b> — 1차 목표는 "정확도 %"가 아니라 <b>고등급(TS·S1) 영업비밀을 놓치지 않는 것</b>(미탐 최소화)입니다. RFP 성능요건(PER-002)은 속도·자원 기준이며 정확도 수치 목표는 명시돼 있지 않습니다. 애매하면 <b>등급을 올리거나 사람 검수로 보냅니다</b>(안전 veto).</li>
+      <li><b>결과</b> — 현행 배포본(v5)은 시험셋 42건에서 F1 <b>0.917</b>, 공개 판례 400건 과분류 <b>4%</b>, 고등급 미탐 <b>0</b>입니다(§2).</li>
+      <li><b>어떻게 확인하나</b> — 채점을 모델 원시출력이 아니라 <b>실제 운영과 동일한 경로</b>로 수행하며(§1.3), 셋 구성부터 채점까지 전부 <b>스크립트로 재실행</b>됩니다(§1.4).</li>
+    </ul>
+  </div>
+
+  <h3 style="font-size:13px;font-weight:800;margin:20px 0 8px">이 문서에 나오는 용어</h3>
+  <table>
+    <thead><tr><th style="width:150px">용어</th><th>쉬운 설명</th></tr></thead>
+    <tbody>
+      <tr><td><b>미탐 · FNR</b></td><td>비밀문서를 낮은 등급으로 잘못 본 비율. 본 시스템이 가장 경계하는 오류</td></tr>
+      <tr><td><b>과분류 · FPR</b></td><td>반대로 공개문서를 비밀로 잘못 올린 비율. 늘어나면 검수 부담이 커짐</td></tr>
+      <tr><td><b>F1_macro</b></td><td>4개 등급을 고르게 맞히는 정도(0~1, 높을수록 좋음). 등급별 성적의 평균이라 소수 등급을 놓치면 크게 떨어짐</td></tr>
+      <tr><td><b>recall(재현율)</b></td><td>실제로 그 등급인 문서 중 몇 %를 찾아냈는가</td></tr>
+      <tr><td><b>홀드아웃</b></td><td>학습에 쓰지 않고 시험용으로 떼어둔 문서 묶음. 학습에 쓴 문서로 채점하면 점수가 부풀기 때문</td></tr>
+      <tr><td><b>서빙 경로</b></td><td>실제 운영에서 모델 출력 뒤에 붙는 안전장치 전체(§1.3). 채점도 같은 경로로 수행</td></tr>
+      <tr><td><b>임계값 τ</b></td><td>등급을 올릴지 정하는 기준선. 낮추면 미탐은 줄고 검수량은 늘어남</td></tr>
+    </tbody>
+  </table>
+
+  <h2>1. 테스트 방식</h2>
+
+  <p style="font-size:13.5px">평가는 두 축입니다. <b>① 정확도 측정</b>(경화 42 · 프록시 109 · 공개 판례 400)은 "얼마나 맞히나"를, <b>② 안전 게이트</b>(적대 · 메타모픽)는 "위험한 방향으로 틀리지 않나"를 봅니다.</p>
+
+  <h3 style="font-size:13px;font-weight:800;margin:20px 0 8px">1.1 정확도 측정 셋 — 어떻게 만들었나</h3>
+  <table>
+    <thead><tr><th style="width:110px">평가셋</th><th style="width:190px">데이터 출처</th><th>구성 방법</th><th style="width:170px">채점 기준</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>경화 홀드아웃</b><br>42건<br><span style="font-size:11px;color:#71717a">hardened</span></td>
+        <td>gold_real 홀드아웃 중 <b>학습 누출 제거분</b>(아래 프록시 109에서 중복 67건을 뺀 잔여 42건)</td>
+        <td>① 이중 라벨러(설계자 의도 · LLM 심판)가 <b>합의한 18건</b>은 그대로 채택(trust_tier=anchor).<br>② <b>불일치 24건</b>은 정본 루브릭(<code>rule_engine.grade_from_svm</code> — S 비공지성 × V 경제가치 × M 비밀관리)을 앵커로 <b>3심판 블라인드 재판정</b>. 라벨이 근거를 갖고 바뀐 4건만 adjudicated로 승격.<br>③ 최종 anchor 38 · adjudicated 4 = 42건, 등급분포 TS 12 · S1 14 · S2 9 · S3 7.<br>④ 조립은 결정적(스크립트 재실행 시 동일 산출). LLM '판단'은 재현하지 않고 저장된 판정 기록을 소비합니다.</td>
+        <td>4등급 exact match → <b>F1_macro</b> · 등급별 recall<br><span style="font-size:11px;color:#71717a">진실도 표기 = machine_adjudicated_silver(사람 서명 아님)</span></td>
+      </tr>
+      <tr>
+        <td><b>프록시 홀드아웃</b><br>109건</td>
+        <td>gold_real(실문서 성격 업무문서 · 판례 제거)</td>
+        <td>(label_source × label) <b>층화 분리</b>. 분할 키는 <b>공백 정규화 텍스트</b>라 동일 본문이 학습/평가에 나뉘어 걸치지 않으며, 정렬 순서 고정으로 결정적입니다.<br>구성 후 <b>학습셋(610건) 대조 누출 스크리닝</b>을 수행해 본문 해시가 겹치는 <b>67건</b>(doc_id만 다르고 본문은 동일)을 식별·제거했습니다. 그 잔여 42건이 위 <b>경화 홀드아웃</b>이며, 본 문서의 성능 주장은 경화 42를 기준으로 합니다.</td>
+        <td>서빙 경로 통과 후 F1_macro · <b>방향성 FNR</b>(고등급→저등급 오분류)<br><span style="font-size:11px;color:#71717a">누출 제거 전 값 → 참고치</span></td>
+      </tr>
+      <tr>
+        <td><b>공개 판례 FPR</b><br>400건</td>
+        <td>법원 공개판례(oss_corpus) 중 <b>학습셋 미포함분만</b> — 텍스트 정규화 대조로 배포 모델 학습셋과 교집합 0 확인</td>
+        <td>고정 시드(<code>20260603</code>) 무작위 400건 추출 · <b>부트스트랩 5,000 리샘플</b>로 신뢰구간 산출. 합성·LLM 심판·사람 라벨링이 일절 개입하지 않는 <b>유일한 실데이터 셋</b>입니다.</td>
+        <td>공개된 판례 = 정의상 공개(S3). <b>S3 이외 예측은 전부 과분류(FP)</b>로 계산</td>
+      </tr>
+      <tr>
+        <td><b>clean 홀드아웃</b><br>77건<br><span style="font-size:11px;color:#71717a">튜닝 전용</span></td>
+        <td>누출 제거본 2종 합본 — 평가 홀드아웃 42 + 업무 홀드아웃 35</td>
+        <td>모델 추론을 <b>1회만</b> 수행해 문서별 softmax 전체를 확보한 뒤, 에스컬레이션 임계 τ 그리드를 순수 계산으로 훑어 trade 곡선을 만듭니다(재학습·GPU 불필요).</td>
+        <td>fnr_underclass · high_to_s3 · overclass_s3 · review_burden(검수 큐 부하)<br><span style="font-size:11px;color:#71717a">서빙 파라미터 명세 전용 — 성능 주장에는 쓰지 않음</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size:13px;font-weight:800;margin:20px 0 8px">1.2 안전 게이트 — 위험한 방향의 오류만 본다</h3>
+  <table>
+    <thead><tr><th style="width:110px">게이트</th><th style="width:190px">데이터 출처</th><th>구성 방법</th><th style="width:170px">합격 조건</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>적대 veto</b><br>100건<br><span style="font-size:11px;color:#71717a">golden_100</span></td>
+        <td>정본 가이드 기준으로 작성한 적대 시나리오(짧은 문서 설명 + 정답등급 + 함정 유형)</td>
+        <td>사람이 틀리기 쉬운 <b>함정을 유형별로</b> 심었습니다 — 단어 함정("예비"·"예산서"·"이메일 형식" 때문에 등급을 낮게 보는 경우), 시점 함정(공개 전/후 동일 문서), 출처 혼동(공개 공시를 내부문서로 오인), 공개·비공개 혼합문서.<br>등급분포 TS 22 · S1 30 · S2 13 · S3 35 → <b>고등급 정답 65건</b>이 감시 대상.</td>
+        <td><b>고등급 미탐</b>(정답 TS/S1/S2인데 S3로 예측) 건수 <b>≤ 6</b>.<br>기준선 = 정제 전 step3의 4/65<br><span style="font-size:11px;color:#71717a">이 게이트는 미탐만 봅니다 — 안전 방향 상향은 위반으로 세지 않습니다</span></td>
+      </tr>
+      <tr>
+        <td><b>메타모픽</b><br>변형쌍 18건<br><span style="font-size:11px;color:#71717a">forward 11 · reverse 7<br>앵커 16건</span></td>
+        <td>커밋된 패러프레이즈 픽스처 — <b>라이브 LLM을 호출하지 않아</b> 같은 픽스처·같은 모델이면 항상 같은 리포트</td>
+        <td>앵커 문서를 의미보존 변형(패러프레이즈)·사실제거 변형해 쌍을 만들고, 변형 전후 등급이 어긋나는지 봅니다. 라벨 상속은 결정적 사실보존 게이트로만 판단하며 룰·LLM 심판을 쓰지 않습니다(순환 논증 차단).<br><b>forward</b>(변형 후 등급 하락 = 미탐) · <b>reverse</b>(과분류) · <b>over_class</b>(공개→비밀)를 대칭으로 함께 봅니다.</td>
+        <td>forward 위반율 <b>Wilson 신뢰구간 하한 &gt; 0</b>이면 회귀로 차단.<br>순방향 쌍 <b>5쌍 미만이면 "측정 불가"로 실패</b> 처리(fail-closed) — 리포트를 생성하지 않고 넘어가는 경로를 막습니다.<br><span style="font-size:11px;color:#71717a">규율: 통과는 품질 증거가 아니며 <b>실패만 정보</b>로 취급</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size:13px;font-weight:800;margin:20px 0 8px">1.3 채점 절차 — 모델 원시출력이 아니라 실서빙 경로로 잰다</h3>
+  <p style="font-size:13.5px">평가 문서를 모델에 바로 넣어 <code>argmax</code>를 읽으면 <b>실제 배포 동작과 다른 숫자</b>가 나옵니다. 배포본은 모델 출력 뒤에 안전장치가 붙어 있기 때문입니다. 그래서 모든 채점은 운영과 동일한 <b>InferencePipeline 전 구간</b>을 통과시켜 수행합니다.</p>
+  <table>
+    <thead><tr><th style="width:190px">서빙 경로 단계</th><th>채점에 미치는 영향</th></tr></thead>
+    <tbody>
+      <tr><td>① temperature 보정</td><td>모델 과신을 완화 — 이후 신뢰도 게이트가 보정된 값 위에서 동작</td></tr>
+      <tr><td>② 청크 최고위험 집계</td><td>문서를 나눈 조각 중 <b>가장 심각한 등급</b>을 문서 등급으로 채택(평균이 아님)</td></tr>
+      <tr><td>③ FNR-safe 오버라이드</td><td>미탐 위험 패턴에서 등급을 강제 상향</td></tr>
+      <tr><td>④ 출처 prior 게이트</td><td>이미 공개된 출처(판례·공시)는 S3로 상한 — 과분류 억제</td></tr>
+      <tr><td>⑤ 에스컬레이션 τ</td><td>가장 심각한 등급의 softmax가 τ 이상이면 그 등급으로 승격, 없으면 argmax 폴백</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>왜 이 구분이 중요한가.</b> 같은 모델·같은 셋(프록시 109)이라도 원시 argmax로 재면 방향성 FNR <b>0.167</b>, 실서빙 경로로 재면 <b>0.018</b>로 <b>약 9배</b> 차이납니다. 안전성 수치는 반드시 서빙 경로 기준으로 읽어야 하며, 이 격차가 곧 <b>"미탐을 막는 것은 모델이 아니라 서빙 장치"</b>라는 본 시스템의 설계 요지입니다.</div>
+
+  <h3 style="font-size:13px;font-weight:800;margin:20px 0 8px">1.4 재현 — 감리 시 그대로 실행 가능</h3>
+  <table>
+    <thead><tr><th style="width:230px">대상</th><th>실행 스크립트</th></tr></thead>
+    <tbody>
+      <tr><td>누출 제거(clean본 생성)</td><td><code>scripts/clean_holdout_leakage.py</code></td></tr>
+      <tr><td>라벨 경화(hardened 42 조립)</td><td><code>scripts/harden_eval_labels.py</code></td></tr>
+      <tr><td><strong>§2 ★ 대표값 산출</strong>(경화 42 · F1 0.917)</td><td><code>scripts/gate_p1_candidate.py --candidate &lt;model&gt;</code></td></tr>
+      <tr><td>서빙 경로 τ 감도 분석</td><td><code>scripts/eval_serving_path.py --taus 0,0.25,0.30</code></td></tr>
+      <tr><td>공개 판례 과분류(FPR)</td><td><code>scripts/eval_real_public_fpr.py</code></td></tr>
+      <tr><td>적대 회귀 게이트</td><td><code>scripts/eval_adversarial.py</code></td></tr>
+      <tr><td>메타모픽 릴리스 게이트</td><td><code>scripts/gen_metamorphic_pairs.py</code> → <code>scripts/check_metamorphic_gate.py</code> (<code>make metamorphic-gate</code>)</td></tr>
+      <tr><td>임계 τ 튜닝 곡선</td><td><code>scripts/eval_fnr_threshold_sweep.py</code></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12.5px;color:#71717a">※ 평가 대상 모델은 스크립트에 하드코딩하지 않고 <code>.env</code>의 <code>CLASSIFIER_MODEL_DIR</code> 단일 출처에서 읽습니다 — 문서에 적힌 버전과 실제 채점한 모델이 어긋나는 드리프트를 구조적으로 차단하기 위함입니다.</p>
+
+  <h2>2. 실측 — 어느 숫자가 어느 칸의 값인가</h2>
+
+  <div class="note"><b>먼저 한 줄.</b> 본 묶음의 다른 문서에는 F1 값이 여러 개 나옵니다. 서로 모순이 아니라 <b>평가셋과 모델 세대가 다른 값</b>입니다. 감리 대상으로 보실 <b>단일 대표값은 아래 ★ 한 칸</b>입니다 — <b>현행 배포본 v5_clean · 경화 홀드아웃 42건 · F1_macro 0.917</b>. 나머지는 그 값이 어떻게 나왔는지를 설명하는 비교·이력값입니다.</div>
+  <table>
+    <thead><tr><th style="width:190px">모델</th><th>경화 42</th><th>프록시 109 (서빙)</th><th>공개 판례 400 (과분류)</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>v5_clean</b> <code>v-fe4b386b</code><br><span style="font-size:11px;color:#71717a">현행 배포 · 2026-07-29 승격</span></td>
+        <td><b>★ F1_macro 0.917</b><br>S1 recall 0.857</td>
+        <td>v4와 동등(≈)<br><span style="font-size:11px;color:#71717a">개선 주장 안 함</span></td>
+        <td><b>4%</b><br>고등급 미탐 0</td>
+      </tr>
+      <tr>
+        <td><b>v4_clean</b> <code>v-dd3abab9</code><br><span style="font-size:11px;color:#71717a">직전 · 롤백 타깃</span></td>
+        <td>F1_macro 0.688<br>S1 recall 0.43</td>
+        <td>F1_macro 0.686<br>방향 FNR 0.018 · FNR_TS 0.000<br><span style="font-size:11px;color:#71717a">원시 argmax로는 F1 0.632·FNR 0.167</span></td>
+        <td>79%</td>
+      </tr>
+      <tr>
+        <td><b>step3</b> <code>v-f9b5cedb</code><br><span style="font-size:11px;color:#71717a">정제 전 baseline · <b>배포된 적 없음</b></span></td>
+        <td>—</td>
+        <td>원시 F1 0.362<br>fnr_high 0.798</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><b>이 셋을 읽는 법</b><br><span style="font-size:11px;color:#71717a">반드시 숫자와 같이</span></td>
+        <td>N이 작아 <b>모델 세대 간 비교용</b>. 절대 정확도로 읽지 않습니다.</td>
+        <td>누출 67건을 제거하기 전 값이라 <b>참고치</b>(제거 후가 경화 42).</td>
+        <td>공개→비밀 방향만 봅니다(미탐은 적대 veto와 짝으로 확인). <b>판례 단일 장르</b>라 다른 종류의 공개문서로 일반화하지 않습니다.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size:12.5px;color:#71717a">※ v5는 자동 게이트(경화 홀드아웃 + 공개 판례 FPR + 적대 veto) <b>3축 PASS</b>로 현행 배포본에 승격됐습니다(2026-07-29·commit f5316df). 프록시 109에서는 v5≈v4로 개선을 주장하지 않습니다. 같은 칸에 값이 두 개인 이유(원시 argmax 0.167 ↔ 서빙 경로 0.018)는 §1.3 참조. 위 지표는 기계(합성/공개) 라벨 기준이며 운영 정확도 보증이 아닙니다.</p>
+
+  <div class="note" style="border-left:4px solid #e72d44">
+    <b>2.1 이 셋의 S3는 본문을 읽지 않아도 맞습니다 — macro 평균을 읽을 때의 한정</b>
+    <p style="margin:8px 0 0">경화 42의 <b>등급별 본문 길이</b>를 재보면 S3만 다른 등급과 완전히 떨어져 있습니다(2026-08-12 전수 실측).</p>
+    <table style="margin:10px 0">
+      <thead><tr><th style="width:80px">등급</th><th style="width:60px">건수</th><th>본문 길이(최소~최대)</th></tr></thead>
+      <tbody>
+        <tr><td>TS</td><td>12</td><td>172 ~ 229자</td></tr>
+        <tr><td>S1</td><td>14</td><td>151 ~ 212자</td></tr>
+        <tr><td>S2</td><td>9</td><td>154 ~ 317자</td></tr>
+        <tr><td><b>S3</b></td><td>7</td><td><b>2,323 ~ 3,023자</b> — 나머지와 10배 차이</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:8px 0 0">그래서 <b>글자 수 1,320자라는 임계값 하나로 S3를 42건 전부(100%) 정확히 가릅니다.</b>
+    본문을 한 글자도 읽지 않는 "길이만 보는 분류기"를 같은 셋에 돌리면 F1_macro <b>0.448</b>(정확도 0.429)이 나오고,
+    등급별로는 <b>S3 F1 1.000</b> · TS 0.480 · S1 0.313 · S2 0.000입니다.</p>
+    <p style="margin:8px 0 0"><b>읽는 법.</b> F1_macro 0.917은 네 등급의 평균이며 그중 <b>S3 한 칸은 길이만으로도 만점이 나오는 칸</b>입니다.
+    따라서 이 값을 인용할 때는 <b>등급별 값을 함께</b> 보아야 하고, S3 성적을 "내용을 이해했다"는 근거로 읽지 않습니다.
+    본 셋의 S3는 공개 판례 계열이라 업무문서와 문서 종류 자체가 다른 데서 오는 차이이며, 데이터 결함이라기보다
+    <b>이 셋으로 잴 수 있는 것의 경계</b>입니다. 고등급(TS·S1) 구간은 길이로 갈리지 않으므로(위 표에서 구간이 겹칩니다)
+    본 사업의 1차 목표인 미탐 최소화 판정에는 영향이 없습니다.</p>
+    <p style="margin:8px 0 0;font-size:11.5px">
+    측정 도구: <code>koipa.dataset_leakage</code>(길이-only 1NN · Theil's U · 등급 전용 문장 커버리지).
+    같은 검사를 학습셋·프록시 평가셋에도 적용해 재구성했습니다(학습 길이-only 0.979→0.392, 프록시 평가 0.968→0.300).
+    <b>주의</b>: 등급 전용 문장 커버리지는 판정 문턱이 "그 등급 문서의 5%"라 <b>N=42에서는 신뢰할 수 없습니다</b>
+    (한 번만 나온 문장도 전부 tell로 잡힘). 위 판단은 <b>길이 분포</b>만을 근거로 합니다.</p>
+  </div>
+
+  <h2>3. 다른 문서에서 만나실 숫자</h2>
+  <table>
+    <thead><tr><th style="width:80px">값</th><th style="width:210px">나오는 문서</th><th>정체 — 현행 성능이 아님</th></tr></thead>
+    <tbody>
+      <tr><td><b>F1 0.26</b></td><td>시스템 설계도 v4 · 백서 v7</td><td><b>CAPSTONE 실험 결과(2026-07-01)</b>. "합성 데이터만으로 학습하면 실문서에 일반화되는가"를 검증했고 <b>실패</b>했습니다(실데이터 학습본 0.736 대비 붕괴). <b>이 실패가 "자동화의 유일한 레버는 운영 현장 학습"이라는 설계 근거</b>이므로 일부러 남겨둔 값입니다. 배포 모델 성능이 아닙니다.</td></tr>
+      <tr><td><b>F1 0.63<br>F1 0.83</b></td><td>골든셋 종합</td><td>직전 v4 기준. 0.83은 출처가 등급을 직접 규정하는 라벨(공개·국가중점기술), 0.63은 LLM 심판 실문서 홀드아웃. <b>출처직결 라벨이 쉬운 문제</b>라 높게 나오는 것이며, 두 값의 격차 자체가 "라벨 출처에 따라 난이도가 다르다"는 진단입니다.</td></tr>
+      <tr><td><b>F1 0.362</b></td><td>테스트 전략 · 거버넌스</td><td>판례 오염 <b>정제 전</b> step3 baseline. 정제 효과(0.362 → 0.686)를 보이기 위한 비교 기준이며 <b>배포된 적이 없습니다</b>.</td></tr>
+      <tr><td><b>FNR 0.174<br>→ 0.087</b></td><td>서빙 운영점 파라미터 명세</td><td>clean 77 <b>튜닝 셋</b>에서 임계 τ를 0.30으로 낮췄을 때의 변화량. 노브의 효과 방향을 보는 값이지 성능 주장이 아닙니다.</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>정리.</b> 숫자가 여러 개인 것은 <b>측정을 여러 각도로 했기 때문</b>이며, 각 문서는 자기 값이 어떤 셋·어떤 모델 세대의 것인지 본문에 명시하고 있습니다. 감리 판단이 필요하실 때는 <b>§2 격자의 ★ 칸</b>을 기준으로 보시고, 나머지는 그 값의 도출 과정으로 읽어 주시면 됩니다.</div>
+
+  <h2>4. 등급 판정근거</h2>
+  <p>골든셋 각 건의 판정근거는 <b>카드형 보고서</b>로 제공합니다 — 룰 엔진 등급 · 분류기 등급 · S(비공지)×V(경제가치)×M(비밀관리) 산정 · softmax 신뢰도 분포를 문서별로 노출합니다. <a href="첨부문서/골든셋_분류근거_v5_clean_v-fe4b386b.html">골든셋 분류근거(현행 v5 카드형 · 777건 전수)</a>. 직전 모델(v4 <code>v-dd3abab9</code>) 카드형 보고서는 용량(4.6MB) 때문에 본 묶음에서 제외했으며 <b>요청 시 별도 제공</b>합니다.</p>
+
+  <div class="note"><b>정직한 한계 · 개선 경로.</b> 지재원 단계는 실데이터·현장검수·반출이 0인 <b>합성 부트스트랩</b>이라, 절대 정확도(실세계 %)에는 <b>구조적 천장</b>이 있습니다(사람서명 실문서 평가셋 부재). 따라서 배포 전 "정확도 %"를 단정하지 않으며, 현 지표는 <b>일관성·안전 무회귀</b>의 근거로 해석합니다. <b>진짜 정확도는 발주처 운영 현장의 검수로 실측·개선</b>되며, 그 경로가 <a href="발주처_골든셋_생성갱신_지원.html">발주처 골든셋 생성·갱신(요청 5)</a>입니다.</div>
+
+  <div class="foot">한국지식재산보호원(AI 코어) · 분류 정확도·테스트 방식 · 2026-08-02</div>
+</div>
+</body>
+</html>

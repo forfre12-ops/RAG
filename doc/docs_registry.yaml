@@ -1,0 +1,1020 @@
+schema_version: 1
+updated_at: 2026-08-28
+
+policy:
+  active_public_root: doc/result/감리정본
+  internal_root: doc/internal
+  archive_root: doc/archive
+  release_root: doc/releases
+  registry_owner: engineering
+
+documents:
+  - id: DOC-INDEX-001
+    title: 공개 산출물 인덱스
+    path: doc/result/감리정본/index.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-SUMMARY-001
+    title: AI 파트 한눈에 — 2쪽 요약
+    path: doc/result/감리정본/AI파트_한눈에_요약.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-사전진단
+
+  - id: DOC-WBS-001
+    title: WBS 본개발 작업분해구조
+    path: doc/result/감리정본/WBS_본개발_작업분해구조.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-WBS-002
+    title: WBS 작업 기능해설서
+    path: doc/result/감리정본/WBS_작업_기능해설서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-API-001
+    title: KL 연동 인터페이스 규약서 ICD
+    path: doc/result/감리정본/KL연동_인터페이스_규약서_ICD.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 1.0-draft
+
+  - id: DOC-OPENAPI-001
+    title: KL OpenAPI YAML
+    path: doc/03_openapi_koipa_kl.yaml
+    owner: engineering
+    audience: customer
+    status: current
+    version: 1.0-draft
+
+  - id: DOC-ARCH-001
+    title: 시스템 설계도
+    path: doc/result/감리정본/시스템_설계도_v4.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: v4
+
+  - id: DOC-ARCH-002
+    title: 시스템 역할 배포 DB구조 확인안
+    path: doc/result/감리정본/시스템_역할_배포_DB구조_확인안.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-ARCH-003
+    title: 폐쇄망 설치 배포 설계서
+    path: doc/result/감리정본/폐쇄망_설치_배포_설계서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-SEC-001
+    title: 보안 설계서
+    path: doc/result/감리정본/보안_설계서.html
+    owner: security
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-RUN-001
+    title: 운영 런북
+    path: doc/result/감리정본/운영_런북.html
+    owner: operations
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DATA-001
+    title: 데이터 거버넌스 계획
+    path: doc/result/감리정본/데이터_거버넌스_계획.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DATA-002
+    title: 골든셋 종합
+    path: doc/result/감리정본/골든셋_종합.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DATA-003
+    title: 골든셋 쉬운설명
+    path: doc/result/감리정본/골든셋_쉬운설명.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DATA-004
+    title: 골든셋 합성생성 설계검토
+    path: doc/result/감리정본/골든셋_합성생성_설계검토.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-EVAL-001
+    title: golden100 분류근거 보고서
+    path: doc/result/감리정본/golden100_분류근거_보고서.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-EVAL-002
+    title: golden500 분류근거 보고서
+    # [2026-08-13] 정본 경로에 실체가 없었다 — 원본은 e1a90bc1(2026-08-02)에서 doc/result/open/ 과
+    # 함께 내려갔고 22726467 경로 일괄치환 때 등재만 감리정본/ 으로 따라왔다. 후속 산출물은
+    # DOC-EVAL-001(golden100)·DOC-EVAL-004/005(v5·v4 카드형)이다. ID 는 참조 보존을 위해 남긴다.
+    path: doc/releases/2026-07-감리/참고자료/golden500_분류근거_보고서.html
+    owner: data
+    audience: customer
+    status: superseded
+    version: 2026-07-pilot
+
+  - id: DOC-EVAL-004
+    title: 골든셋 분류근거 보고서 (현행 배포모델 v5_clean v-fe4b386b · 실엔진 카드형)
+    path: doc/result/감리정본/골든셋_분류근거_v5_clean_v-fe4b386b.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-EVAL-005
+    title: 골든셋 분류근거 보고서 (직전 배포모델 v4_clean v-dd3abab9 · 실엔진 카드형)
+    path: doc/result/감리정본/골든셋_분류근거_v4_clean_v-dd3abab9.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-EVAL-003
+    title: 테스트 전략 및 이력
+    path: doc/result/감리정본/테스트_전략_및_이력.html
+    owner: qa
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-REQ-001
+    title: 요구사항 추적표 RTM
+    path: doc/result/감리정본/요구사항_추적표_RTM.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-MODEL-001
+    title: 모델 카드
+    path: doc/result/감리정본/모델_카드.html
+    owner: ml
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DEMO-001
+    title: 시연 콘솔 소개
+    path: doc/result/감리정본/시연_콘솔_소개.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-INTERNAL-001
+    title: 테스트서버 파일럿 플랜
+    path: doc/internal/테스트서버_파일럿_플랜.html
+    owner: pm
+    audience: internal
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-INTERNAL-002
+    title: 배포 관리 하드닝 감사
+    path: doc/internal/배포_관리_하드닝_감사.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-TECH-001
+    title: 기술구현 백서
+    path: doc/result/감리정본/기술구현_백서_v7.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: v7
+
+  - id: DOC-TECH-002
+    title: 기술구현 백서 부록A DB스키마
+    path: doc/result/감리정본/기술구현_백서_부록A_DB스키마.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-TECH-003
+    title: 기술구현 백서 부록B API명세
+    path: doc/result/감리정본/기술구현_백서_부록B_API명세.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-TECH-004
+    title: 기술구현 백서 부록C 지표용어해설
+    path: doc/result/감리정본/기술구현_백서_부록C_지표용어해설.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-CLASSIFIER-001
+    title: 무실데이터 분류기 설계서
+    path: doc/result/감리정본/무실데이터_분류기_설계서.html
+    owner: ml
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-GATE-001
+    title: 분류검수게이트 강화 보고서
+    path: doc/result/감리정본/분류검수게이트_강화_보고서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-SERVING-001
+    title: 서빙 운영점 파라미터 명세
+    path: doc/result/감리정본/서빙_운영점_파라미터_명세.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-HARDENING-001
+    title: 설계검토 하드닝 반영 내역
+    path: doc/result/감리정본/설계검토_하드닝_반영_내역.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DECISION-001
+    title: 발주처 의사결정 안건서
+    path: doc/result/감리정본/발주처_의사결정_안건서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DECISION-002
+    title: 의사결정 대장
+    path: doc/result/감리정본/의사결정_대장.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-GRADE-001
+    title: 영업비밀 등급분류 기준 적용서
+    path: doc/result/감리정본/영업비밀_등급분류_기준_적용서_v2.2.html
+    owner: policy
+    audience: customer
+    status: current
+    version: v2.2
+
+  - id: DOC-SCORE-001
+    title: 점수 채점 방식 쉬운설명
+    path: doc/result/감리정본/점수_채점_방식_쉬운설명.html
+    owner: policy
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-COMPARE-001
+    title: 검색단독 vs 분류기 등급분류 비교
+    path: doc/result/감리정본/검색단독_vs_분류기_등급분류_비교.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-WEEKLY-001
+    title: 7월 1주 주간보고
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 1주 - 260703.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-07-week1
+
+  - id: DOC-WBS-XLSX-001
+    title: 지재원 AI 영업비밀관리시스템 구축 WBS 엑셀
+    path: doc/result/감리정본/[지재원] AI 영업비밀관리시스템 구축 WBS.xlsx
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-ARCH-SUP-001
+    title: 시스템 설계도 v1
+    path: doc/result/감리정본/시스템_설계도.html
+    owner: engineering
+    audience: internal
+    status: superseded
+    version: v1
+
+  - id: DOC-ARCH-SUP-002
+    title: 시스템 설계도 v2
+    path: doc/result/감리정본/시스템_설계도_v2.html
+    owner: engineering
+    audience: internal
+    status: superseded
+    version: v2
+
+  - id: DOC-ARCH-SUP-003
+    title: 시스템 설계도 v3
+    path: doc/result/감리정본/시스템_설계도_v3.html
+    owner: engineering
+    audience: internal
+    status: superseded
+    version: v3
+
+  - id: DOC-GUIDE-001
+    title: 시스템 완전이해 가이드
+    path: doc/result/감리정본/시스템_완전이해_가이드_V3.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: v3
+
+  - id: DOC-INTERNAL-003
+    title: 골든셋 합성생성 설계검토 내부본
+    path: doc/internal/골든셋_합성생성_설계검토.html
+    owner: data
+    audience: internal
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-INTERNAL-004
+    title: 무실데이터 분류기 설계서 내부본
+    path: doc/internal/무실데이터_분류기_설계서.html
+    owner: ml
+    audience: internal
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-INTERNAL-005
+    title: 실제 사용 파일 아키텍처 맵
+    path: doc/internal/실제_사용_파일_아키텍처_맵.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-INTERNAL-006
+    title: 오픈망 테스트서버 배포 가이드
+    path: doc/internal/오픈망_테스트서버_배포_가이드.html
+    owner: operations
+    audience: internal
+    status: current
+    version: 2026-07-pilot
+
+  # --- 감리 정식 산출물 (2026-07-25 등재 정합: 이전 미등재분) ---
+  - id: DOC-PLAN-002
+    title: 산출물 통폐합 제안서
+    path: doc/result/감리정본/산출물_통폐합_제안서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-pilot
+
+  - id: DOC-PLAN-001
+    title: 사업수행계획서
+    path: doc/result/감리정본/사업수행계획서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-QA-001
+    title: 품질보증계획서
+    path: doc/result/감리정본/품질보증계획서.html
+    owner: qa
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-TEST-001
+    title: 시험케이스 및 결과서
+    path: doc/result/감리정본/시험케이스_및_결과서.html
+    owner: qa
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DEFECT-001
+    title: 결함관리대장
+    path: doc/result/감리정본/결함관리대장.html
+    owner: qa
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-SCREEN-001
+    title: 화면설계서
+    path: doc/result/감리정본/화면설계서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-MODULE-001
+    title: 애플리케이션 모듈 명세서
+    path: doc/result/감리정본/애플리케이션_모듈_명세서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DFD-001
+    title: 기능분해도 데이터흐름도
+    path: doc/result/감리정본/기능분해도_데이터흐름도.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-PIA-001
+    title: 개인정보영향평가 적용성 판정서
+    path: doc/result/감리정본/개인정보영향평가_적용성_판정서.html
+    owner: security
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-MIGRATE-001
+    title: 데이터전환 적용제외 근거서
+    path: doc/result/감리정본/데이터전환_적용제외_근거서.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-MANUAL-001
+    title: 사용자매뉴얼 검수관리자
+    path: doc/result/감리정본/사용자매뉴얼_검수관리자.html
+    owner: operations
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-QA-002
+    title: 품질보증 결과서
+    path: doc/result/감리정본/품질보증_결과서.html
+    owner: qa
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-SEC-002
+    title: 소프트웨어 개발보안 적용 내역
+    path: doc/result/감리정본/소프트웨어_개발보안_적용내역.html
+    owner: security
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-WEEKLY-002
+    title: 7월 2주 주간보고
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 2주 - 260710.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-07-week2
+
+  - id: DOC-WEEKLY-003
+    title: 7월 3주 주간보고
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 3주 - 260717.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-07-week3
+
+  - id: DOC-WEEKLY-004
+    title: 7월 4주 주간보고
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 4주 - 260724.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-07-week4
+
+  - id: DOC-WEEKLY-005
+    title: 7월 5주 주간보고
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 5주 - 260731.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-07-week5
+
+  - id: DOC-WEEKLY-006
+    title: 8월 1주 주간보고
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 8월 1주 - 260807.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-08-week1
+
+  - id: DOC-WEEKLY-007
+    title: 8월 2주 주간보고
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 8월 2주 - 260814.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-08-week2
+
+  # ── 감리 산출물(doc/감리문서) — 2026-08 신설 ────────────────────
+  - id: DOC-GAMRI-001
+    title: API 정의서
+    path: doc/감리문서/API_정의서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-08-설계감리
+
+  - id: DOC-GAMRI-003
+    title: ERD 개체관계도
+    path: doc/감리문서/ERD_개체관계도.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-08-설계감리
+
+  - id: DOC-GAMRI-010
+    title: API 통신 방안 검토 회신
+    path: doc/감리문서/KL_API_통신방안_검토회신.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-설계감리
+
+  - id: DOC-GAMRI-007
+    title: KL 연동 규약
+    path: doc/감리문서/KL_연동_규약.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-08-설계감리
+
+  - id: DOC-GAMRI-009
+    title: KL 질의사항 회신서
+    path: doc/감리문서/KL_질의사항_회신서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-설계감리
+
+  - id: DOC-GAMRI-000
+    title: 감리 산출물 대장
+    path: doc/감리문서/감리문서_대장.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-설계감리
+
+  - id: DOC-GAMRI-004
+    title: 등급분류 알고리즘 명세서
+    path: doc/감리문서/등급분류_알고리즘_명세서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-08-설계감리
+
+  - id: DOC-GAMRI-005
+    title: 시스템 서버 구조
+    path: doc/감리문서/시스템_서버_구조.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-08-설계감리
+
+  - id: DOC-GAMRI-006
+    title: 오픈소스 기술스택 명세
+    path: doc/감리문서/오픈소스_기술스택_명세.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-08-설계감리
+
+  - id: DOC-GAMRI-002
+    title: 테이블 정의서
+    path: doc/감리문서/테이블_정의서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-08-설계감리
+
+  - id: DOC-GAMRI-008
+    title: 학습 데이터 입력 경로 명세서
+    path: doc/감리문서/학습_데이터_입력_경로_명세서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-08-설계감리
+
+  # -- KL 제출묶음(doc/result/KL_AI자료_2026-08) --------------------
+  # 2026-08-28 등록. 이 묶음은 sync_kl_bundle.py 가 구성(링크 폐포·범위)을
+  # 검증하고, 등록부는 소유자·상태를 관리한다. 두 축이 다르다.
+  - id: DOC-KL08-001
+    title: AI 영업비밀 관리시스템 구축 사업 - 기능요구사항 - AI 파트 (세부분할)_구현현황_기입
+    path: doc/result/KL_AI자료_2026-08/AI 영업비밀 관리시스템 구축 사업 - 기능요구사항 - AI 파트 (세부분할)_구현현황_기입.xlsx
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-002
+    title: RFP 요구기능(AI 파트) 구현현황
+    path: doc/result/KL_AI자료_2026-08/RFP_구현현황.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-003
+    title: AI 파트 자료 — KL 감리 대응 (2026-08)
+    path: doc/result/KL_AI자료_2026-08/index.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-004
+    title: 골든셋 관리 콘솔 사용 매뉴얼
+    path: doc/result/KL_AI자료_2026-08/골든셋_관리콘솔_사용매뉴얼.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-005
+    title: 골든셋 분류 근거 보고서 — v5_clean · v-fe4b386b (실엔진) | Koipa
+    path: doc/result/KL_AI자료_2026-08/골든셋_분류근거_v5_clean_v-fe4b386b.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-006
+    title: 합성 코퍼스·프록시 평가 종합 — locked 평가와의 구분 | Koipa
+    path: doc/result/KL_AI자료_2026-08/골든셋_종합.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-007
+    title: KOIPA AI 영업비밀관리시스템 — 기술 구현 백서 v7 (프로토타입 검증·모델 선정·개발 방안) | Koipa
+    path: doc/result/KL_AI자료_2026-08/기술구현_백서_v7.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-008
+    title: 부록 A — DB 스키마 | KOIPA AI 기술 구현 백서
+    path: doc/result/KL_AI자료_2026-08/기술구현_백서_부록A_DB스키마.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-009
+    title: 부록 B — API 명세 | KOIPA AI 기술 구현 백서
+    path: doc/result/KL_AI자료_2026-08/기술구현_백서_부록B_API명세.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-010
+    title: 부록 C — 지표·용어 해설 | KOIPA AI 기술 구현 백서
+    path: doc/result/KL_AI자료_2026-08/기술구현_백서_부록C_지표용어해설.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-011
+    title: 기술스택 버전표 — AI 파트
+    path: doc/result/KL_AI자료_2026-08/기술스택_버전표.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-012
+    title: 발주처 모의문서·골든셋 생성·갱신 지원 — AI 파트
+    path: doc/result/KL_AI자료_2026-08/발주처_골든셋_생성갱신_지원.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-013
+    title: 분류 정확도 · 테스트 방식 — AI 파트
+    path: doc/result/KL_AI자료_2026-08/분류_정확도_테스트방식.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-014
+    title: 서빙 운영점·게이트 파라미터 명세 — 온도보정·게이트·신뢰도·융합
+    path: doc/result/KL_AI자료_2026-08/서빙_운영점_파라미터_명세.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-015
+    title: KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 (학습 GPU·추론 CPU·분류기·RDB·안전골조) | Koipa
+    path: doc/result/KL_AI자료_2026-08/시스템_설계도_v4.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-016
+    title: 오픈소스 라이선스 · 다중배포 검토서 — AI 파트
+    path: doc/result/KL_AI자료_2026-08/오픈소스_라이선스_다중배포_검토서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-017
+    title: 테이블정의서 · ERD | KOIPA AI 영업비밀 등급분류 시스템
+    path: doc/result/KL_AI자료_2026-08/테이블정의서_ERD.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-018
+    title: 학습 데이터 확장 판단 근거 — AI 파트
+    path: doc/result/KL_AI자료_2026-08/학습_데이터_확장_판단근거.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음
+
+  - id: DOC-KL08-019
+    title: 골든셋 분류 근거 보고서 — v5_clean · v-fe4b386b (실엔진) | Koipa
+    path: doc/result/KL_AI자료_2026-08/첨부문서/골든셋_분류근거_v5_clean_v-fe4b386b.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음(첨부)
+
+  - id: DOC-KL08-020
+    title: 합성 코퍼스·프록시 평가 종합 — locked 평가와의 구분 | Koipa
+    path: doc/result/KL_AI자료_2026-08/첨부문서/골든셋_종합.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음(첨부)
+
+  - id: DOC-KL08-021
+    title: 기능분해도 · 데이터흐름도 | Koipa
+    path: doc/result/KL_AI자료_2026-08/첨부문서/기능분해도_데이터흐름도.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음(첨부)
+
+  - id: DOC-KL08-022
+    title: KOIPA AI 영업비밀관리시스템 — 기술 구현 백서 v7 (프로토타입 검증·모델 선정·개발 방안) | Koipa
+    path: doc/result/KL_AI자료_2026-08/첨부문서/기술구현_백서_v7.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음(첨부)
+
+  - id: DOC-KL08-023
+    title: 부록 A — DB 스키마 | KOIPA AI 기술 구현 백서
+    path: doc/result/KL_AI자료_2026-08/첨부문서/기술구현_백서_부록A_DB스키마.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음(첨부)
+
+  - id: DOC-KL08-024
+    title: 부록 B — API 명세 | KOIPA AI 기술 구현 백서
+    path: doc/result/KL_AI자료_2026-08/첨부문서/기술구현_백서_부록B_API명세.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음(첨부)
+
+  - id: DOC-KL08-025
+    title: 부록 C — 지표·용어 해설 | KOIPA AI 기술 구현 백서
+    path: doc/result/KL_AI자료_2026-08/첨부문서/기술구현_백서_부록C_지표용어해설.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음(첨부)
+
+  - id: DOC-KL08-026
+    title: 서빙 운영점·게이트 파라미터 명세 — 온도보정·게이트·신뢰도·융합
+    path: doc/result/KL_AI자료_2026-08/첨부문서/서빙_운영점_파라미터_명세.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음(첨부)
+
+  - id: DOC-KL08-027
+    title: KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 (학습 GPU·추론 CPU·분류기·RDB·안전골조) | Koipa
+    path: doc/result/KL_AI자료_2026-08/첨부문서/시스템_설계도_v4.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음(첨부)
+
+  - id: DOC-KL08-028
+    title: 영업비밀 등급분류 기준 적용서 v2.2 | Koipa
+    path: doc/result/KL_AI자료_2026-08/첨부문서/영업비밀_등급분류_기준_적용서_v2.2.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음(첨부)
+
+  - id: DOC-KL08-029
+    title: 요구사항 추적표 (RTM) — 가이드·RFP → 구현 → 검증 | Koipa
+    path: doc/result/KL_AI자료_2026-08/첨부문서/요구사항_추적표_RTM.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-제출묶음(첨부)
+
+  # -- 미등록 잔여분 정리(2026-08-28) --------------------------------
+  - id: DOC-INT-010
+    title: 기능 사용 결정 대장
+    path: doc/internal/기능_사용_결정_대장.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-08
+
+  - id: DOC-INT-011
+    title: 룰 판정식 감사
+    path: doc/internal/룰_판정식_감사.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-08
+
+  - id: DOC-INT-012
+    title: 테스트서버 223 배포 인벤토리
+    path: doc/internal/테스트서버_223_배포_인벤토리.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-08
+
+  - id: DOC-WEEK-035
+    title: 주간보고 2026-08 3주
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 8월 3주 - 260821.docx
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08
+
+  # -- 2026-08-28 접수 요청 회신 --------------------------------
+  - id: DOC-KL08-030
+    title: KL 질의사항 회신서
+    path: doc/result/KL_AI자료_2026-08/KL_질의사항_회신서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-질의회신
+
+  - id: DOC-KL08-031
+    title: API 통신 방안 검토 회신
+    path: doc/result/KL_AI자료_2026-08/KL_API_통신방안_검토회신.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-질의회신
+
+  - id: DOC-KL08-032
+    title: 학습 데이터 입력 경로 명세서 (첨부)
+    path: doc/result/KL_AI자료_2026-08/첨부문서/학습_데이터_입력_경로_명세서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-질의회신
+
+  - id: DOC-KLR-001
+    title: KL_API_통신방안_검토회신
+    path: doc/result/KL_회신_2026-08-28/KL_API_통신방안_검토회신.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-002
+    title: KL_질의사항_회신서
+    path: doc/result/KL_회신_2026-08-28/KL_질의사항_회신서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-003
+    title: index
+    path: doc/result/KL_회신_2026-08-28/index.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-004
+    title: "[AI 영업비밀관리시스템 구축] AI 분류 엔진 연계를 위한 API 예상 통신 방안"
+    path: doc/result/KL_회신_2026-08-28/접수원본/[AI 영업비밀관리시스템 구축] AI 분류 엔진 연계를 위한 API 예상 통신 방안.pdf
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-005
+    title: "[AI 영업비밀관리시스템 구축] 질의사항 정리본"
+    path: doc/result/KL_회신_2026-08-28/접수원본/[AI 영업비밀관리시스템 구축] 질의사항 정리본.pdf
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-007
+    title: 등급분류_알고리즘_명세서
+    path: doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_명세서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-009
+    title: 테이블정의서_ERD
+    path: doc/result/KL_회신_2026-08-28/첨부/테이블정의서_ERD.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-010
+    title: 학습_데이터_입력_경로_명세서
+    path: doc/result/KL_회신_2026-08-28/첨부/학습_데이터_입력_경로_명세서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-INT-013
+    title: 미사용 자산 전수조사
+    path: doc/internal/미사용_자산_전수조사.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-08-29
+
+  - id: DOC-INT-014
+    title: KL서버 배포절차서
+    path: doc/internal/KL서버_배포절차서_1ae9054a.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-08-29
+
+  - id: DOC-GAMRI-011
+    title: DB 대리키 표준화 전환계획
+    path: doc/감리문서/DB_대리키_표준화_전환계획.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-08-29

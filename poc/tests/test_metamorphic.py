@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m6_evaluation.metamorphic import (
+from koipa.modules.m6_evaluation.metamorphic import (
     build_metamorphic_report,
     check_fact_preservation,
 )

@@ -1,10 +1,8 @@
 """기존 labeled_oss_v1/train.jsonl + synthetic_ts_augment 84건 병합."""
 import json
-import sys
+import os
 from pathlib import Path
 
-os._exit if False else None
-import os
 os.chdir(Path(__file__).resolve().parent.parent)
 
 BASE_TRAIN = Path("datasets/labeled_oss_v1/train.jsonl")

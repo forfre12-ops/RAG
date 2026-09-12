@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "commercial_default": "Formats marked true are supported in the default production dependency set. Formats that need optional extras or system binaries must fail closed into review or degraded status when unavailable.",
+    "pdf_tables": "PDF text extraction is default-supported. Structured PDF table extraction is optional via pdf-tables; if the table extractor is unavailable or errors, extraction must emit table_coverage=incomplete so ingestion routes to needs_review.",
+    "hwp_tables": "HWP/HWPX body extraction is supported. Table-loss suspicion must emit table_coverage=incomplete so ingestion routes to needs_review."
+  },
+  "formats": [
+    {
+      "group": "plain",
+      "extensions": ["txt", "md", "log", "csv"],
+      "commercial_default": true,
+      "optional_extras": [],
+      "structured_tables": false,
+      "sheet_level": false,
+      "review_on_partial_table_loss": false
+    },
+    {
+      "group": "hwp",
+      "extensions": ["hwp", "hwpx"],
+      "commercial_default": false,
+      "optional_extras": ["hwp"],
+      "structured_tables": false,
+      "sheet_level": false,
+      "review_on_partial_table_loss": true
+    },
+    {
+      "group": "word",
+      "extensions": ["docx", "doc"],
+      "commercial_default": true,
+      "optional_extras": [],
+      "structured_tables": true,
+      "sheet_level": false,
+      "review_on_partial_table_loss": false
+    },
+    {
+      "group": "excel",
+      "extensions": ["xlsx", "xlsm", "xls"],
+      "commercial_default": true,
+      "optional_extras": ["xls"],
+      "structured_tables": true,
+      "sheet_level": true,
+      "review_on_partial_table_loss": false
+    },
+    {
+      "group": "powerpoint",
+      "extensions": ["pptx", "pptm"],
+      "commercial_default": true,
+      "optional_extras": [],
+      "structured_tables": true,
+      "sheet_level": false,
+      "review_on_partial_table_loss": false
+    },
+    {
+      "group": "pdf",
+      "extensions": ["pdf"],
+      "commercial_default": true,
+      "optional_extras": ["pdf-tables"],
+      "structured_tables": "optional",
+      "sheet_level": false,
+      "review_on_partial_table_loss": true
+    },
+    {
+      "group": "image_ocr",
+      "extensions": ["jpg", "jpeg", "png", "tiff", "tif", "bmp", "webp"],
+      "commercial_default": false,
+      "optional_extras": ["ocr"],
+      "structured_tables": false,
+      "sheet_level": false,
+      "review_on_partial_table_loss": false
+    }
+  ]
+}

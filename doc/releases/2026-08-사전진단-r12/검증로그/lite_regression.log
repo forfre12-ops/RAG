@@ -1,0 +1,96 @@
+# CI 동등 lite 회귀 로그 — 2026-08-02
+# 명령: pytest -q -m "not fullstack and not model_download and not slow"  (= make test-lite)
+# 대상 커밋: 9918160 · 환경: Windows 11 / poc/.venv / PostgreSQL 미기동
+#
+# 결과: 1854 passed · 43 skipped · 262 deselected · 0 failed  (939.98s)
+#
+# 이번 차수 주요 수정 — 100페이지 문서 실측에서 발견한 2건:
+#   · 저장 read-back 이중 루트(P1) — doc_id 분류가 본문 없이 전 문서를 TS 로 내보내던 결함
+#   · 비동기 분류 시간 상한(P2) — classify_async 만 min(설정,120)으로 깎여 대용량 미완주
+#   둘 다 서버 실측으로 재확인(100페이지 462초 · status=done · S3 · scores 4).
+#
+# skip 43건은 PostgreSQL 미기동 등 외부 의존, deselect 262건은 slow/fullstack/model_download 마커.
+# ---------------------------------------------------------------------------
+
+......................s................................................. [  3%]
+........................................................................ [  7%]
+........................................................................ [ 11%]
+........................................................................ [ 15%]
+........................................................................ [ 19%]
+........................................................................ [ 22%]
+........................................................................ [ 26%]
+...........................ssss......................................... [ 30%]
+........................................................................ [ 34%]
+...............ss....................................................... [ 38%]
+........................................................................ [ 41%]
+........................................................................ [ 45%]
+........................................................................ [ 49%]
+........................................................................ [ 53%]
+........................................................................ [ 57%]
+..................ssssssss.............................................. [ 60%]
+...................................................sssssss.............. [ 64%]
+........................................................................ [ 68%]
+........................................................................ [ 72%]
+........................................................................ [ 76%]
+........................................................................ [ 79%]
+...................................sssssss.............................. [ 83%]
+.......................................................s................ [ 87%]
+........................................................................ [ 91%]
+.....ssssssss................................................ss......... [ 95%]
+........................................................................ [ 98%]
+......................                                                   [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  F:\antigravity\rag\poc\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_embedding_fallback_gate.py::test_fallback_refused_when_required
+  F:\antigravity\rag\poc\tests\test_embedding_fallback_gate.py:43: RuntimeWarning: [embedding] HF load failed for real-model-beta: HF load failed (simulated). Falling back to HashEmbedding.
+    emb.build_embedder("real-model-beta")  # ���� �ź� = ������ ����(fail-secure)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+SKIPPED [1] tests\test_api_routers_w3.py:18: slow API router integration tests excluded from lite collection
+SKIPPED [1] tests\test_audit_middleware.py:14: slow audit middleware integration tests excluded from lite collection
+SKIPPED [1] tests\test_kl_integration.py:18: slow KL integration tests excluded from lite collection
+SKIPPED [1] E:\antigravity\rag\poc\tests\test_adapter_llm_smoke.py:27: anthropic ��Ű�� �̼�ġ
+SKIPPED [1] tests\test_corrections_rebuild.py:197: Postgres not reachable
+SKIPPED [1] tests\test_corrections_rebuild.py:227: Postgres not reachable
+SKIPPED [1] tests\test_corrections_rebuild.py:261: Postgres not reachable
+SKIPPED [1] tests\test_corrections_rebuild.py:305: Postgres not reachable
+SKIPPED [1] tests\test_dual_review.py:181: Postgres not reachable
+SKIPPED [1] tests\test_dual_review.py:233: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:225: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:261: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:287: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:307: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:324: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:343: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:364: Postgres not reachable
+SKIPPED [1] tests\test_label_promotion.py:382: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:65: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:72: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:86: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:106: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:138: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:155: Postgres not reachable
+SKIPPED [1] tests\test_manual_activate.py:189: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:83: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:99: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:117: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:137: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:158: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:185: Postgres not reachable
+SKIPPED [1] tests\test_register_and_gate.py:212: Postgres not reachable
+SKIPPED [1] tests\test_reviewer_trust.py:65: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:466: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:475: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:484: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:494: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:503: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:508: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:511: Postgres not reachable
+SKIPPED [1] tests\test_similarity_escalation_gate.py:525: Postgres not reachable
+SKIPPED [1] tests\test_synth_worker_persist.py:79: postgres not available (5432)
+SKIPPED [1] tests\test_synth_worker_persist.py:112: postgres not available (5432)
+1854 passed, 43 skipped, 262 deselected, 2 warnings in 939.98s (0:15:39)

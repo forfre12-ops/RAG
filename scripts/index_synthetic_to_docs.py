@@ -37,8 +37,8 @@ def main() -> int:
     ap.add_argument("--batch", type=int, default=32, help="임베딩 배치 사이즈")
     args = ap.parse_args()
 
-    from lloydk.adapters.embedding import build_embedder  # noqa: PLC0415
-    from lloydk.adapters.vectorstore import build_store  # noqa: PLC0415
+    from koipa.adapters.embedding import build_embedder  # noqa: PLC0415
+    from koipa.adapters.vectorstore import build_store  # noqa: PLC0415
 
     print(f"[index] build_embedder + build_store ...", flush=True)
     embedder = build_embedder()

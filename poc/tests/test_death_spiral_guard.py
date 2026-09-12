@@ -13,9 +13,9 @@ import datetime as dt
 
 import pytest
 
-from lloydk.modules.m6_evaluation import active_learning as al
-from lloydk.modules.m6_evaluation.active_learning import evaluate_retraining_need
-from lloydk.modules.m6_evaluation.corrections_rebuild import _correction_admissible
+from koipa.modules.m6_evaluation import active_learning as al
+from koipa.modules.m6_evaluation.active_learning import evaluate_retraining_need
+from koipa.modules.m6_evaluation.corrections_rebuild import _correction_admissible
 
 
 # ── admission 게이트(순수) ────────────────────────────────────────────────────

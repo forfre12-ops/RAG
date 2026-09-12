@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KL서버 배포절차서 — 0a814bd8</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:17px;font-weight:800;letter-spacing:-.02em;margin:38px 0 12px}
+h3{font-size:14.5px;font-weight:700;margin:22px 0 6px 18px}
+p{margin:8px 0 8px 18px}
+ul,ol{margin:8px 0 8px 18px;padding-left:20px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);padding:12px 16px;margin:14px 0 14px 18px;font-size:13px}
+.tw{overflow-x:auto;margin-left:18px}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace;margin-left:18px}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .docinfo{break-inside:avoid;page-break-inside:avoid}
+  /* [2026-08-29] .note 까지 통째로 avoid 하면 긴 안내 상자가 다음 쪽으로 밀리면서
+     앞쪽에 빈 면이 생긴다(인쇄 실측). 상자는 나뉘도록 두되 첫/끝 줄만 붙잡는다. */
+  .note{orphans:3;widows:3}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+.flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">KL서버 배포절차서</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">내부 문서</span></div>
+  </div>
+</nav>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">내부 문서 · 배포 절차</div>
+    <h1>KL 시험서버(223) 배포절차서</h1>
+    <div class="meta">판 <code>0a814bd8</code> · 현재 배포본 <code>02b660ef</code> 대비 50커밋 · <b>2026-08-29 적용 완료</b></div>
+  </div>
+
+  <table class="docinfo">
+    <tbody>
+      <tr><th>대상 서버</th><td>KL 제공 시험서버 <code>223.130.156.134</code> · PostgreSQL 16.14 · NVIDIA L4</td></tr>
+      <tr><th>배포 판</th><td><code>0a814bd8</code> (브랜치 <code>fix/design-review-hardening</code>)</td></tr>
+      <tr><th>현재 서버 판</th><td><code>02b660ef</code> · alembic <code>f0a1b2c3d4e5</code></td></tr>
+      <tr><th>산출물</th><td><code>poc_src.tar</code> (무압축 · 999파일 · 12.6MB) + <code>poc_src.tar.sha</code></td></tr>
+      <tr><th>적용 시점</th><td><b>설계 감리 종료 후.</b> 감리 기간 중 시험서버를 변경하지 않는다</td></tr>
+      <tr><th>작성일</th><td>2026-08-29</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>이 문서는 실행 기록이 아니라 계획서다.</b> 작성 시점에 배포는 수행하지 않았다.
+    실제 적용 후에는 &sect;7 에 일시·검증 결과를 기재한다.
+  </div>
+
+  <h2>1. 무엇이 바뀌는가</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:22%">영역</th><th style="width:14%">파일</th><th>성격</th></tr></thead>
+    <tbody>
+      <tr><td><code>poc/src</code></td><td class="c">34</td><td><b>판정·게이트·API 를 포함한다. 가장 주의할 구간</b></td></tr>
+      <tr><td><code>poc/alembic</code></td><td class="c">1</td><td>스키마 변경 1건 — 별도 수동 실행(&sect;5)</td></tr>
+      <tr><td><code>poc/tests</code></td><td class="c">13</td><td>실행에 영향 없음</td></tr>
+      <tr><td><code>poc/scripts</code></td><td class="c">13</td><td>도구류</td></tr>
+      <tr><td><code>doc</code></td><td class="c">60</td><td>배포 대상 아님(tar 에 포함하지 않는다)</td></tr>
+      <tr><td>삭제된 파일</td><td class="c">0</td><td>서버에서 <code>rm</code> 할 것이 없다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>1-1. 소스 변경 11 커밋 — 위험도 순</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:16%">커밋</th><th style="width:44%">내용</th><th>배포 후 확인할 것</th></tr></thead>
+    <tbody>
+      <tr><td><code>fea1a7bb</code></td><td>거짓 all-clear 3건·무인증 노출 2건 차단, 화면 선택 배선</td><td>인증 없이 접근되던 경로가 막혔는가</td></tr>
+      <tr><td><code>ea9bd953</code></td><td>이벤트 루프 블로킹·무인증 메트릭·확정 대기 목록</td><td>응답 지연 없는가 · <code>/metrics</code> 인증</td></tr>
+      <tr><td><code>8a2c922b</code></td><td>상용 LLM 반출 게이트를 <code>/answer</code> 에도 적용</td><td>반출 차단 동작</td></tr>
+      <tr><td><code>d7a856ec</code></td><td>무한 재배달·compose 결손·비밀값 권한</td><td>워커 재배달 루프 없는가</td></tr>
+      <tr><td><code>3e309001</code> <code>e9d41d7c</code></td><td>확정 등급을 조회 응답에 추가(<code>confirmed_label</code> 등)</td><td>기존 응답 필드 불변 + 신규 3필드</td></tr>
+      <tr><td><code>465bb7ad</code> <code>05fe50ce</code></td><td>무음 폴백 13곳에 로그 추가</td><td>등급 불변 · 로그만 늘어남</td></tr>
+      <tr><td><code>02b660ef</code>~<code>b78e46a8</code></td><td>룰 게이트 정지 차단 · weight 하한 · 시드 가중치 · IDENTITY</td><td>&sect;6 스모크</td></tr>
+      <tr><td><code>a76c1393</code> <code>f5314dab</code></td><td>loss_weight 적용 · 미사용 자산 감사</td><td>학습 경로(즉시 영향 없음)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <b>이 11 건은 223 에서 검증된 적이 없다.</b> 마이그레이션(&sect;5)은 실데이터로 검증했지만
+    소스 변경은 로컬 시험만 거쳤다. 그래서 &sect;6 스모크를 반드시 수행하고 며칠 관찰한다.
+  </div>
+
+  <h3>1-2. 배포 준비 중 로컬 DB 시험으로 잡은 결함 3건</h3>
+  <p>로컬에 PostgreSQL 을 실제로 띄우고 전체 시험을 돌려 찾았다. 단위 시험만으로는 셋 다
+  드러나지 않았다.</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">결함</th><th style="width:34%">증상</th><th>없었다면</th></tr></thead>
+    <tbody>
+      <tr><td><b>alembic 리비전 번호 충돌</b><br /><code>545b27bf</code></td>
+          <td>SERIAL&rarr;IDENTITY 마이그레이션에 붙인 번호가 <code>pg_rag_vectorstore</code> 가
+          이미 쓰는 번호였다. <code>Cycle is detected in revisions</code></td>
+          <td><b>배포 시 <code>alembic upgrade</code> 가 통째로 실패한다.</b> 같은 id 가 둘이면
+          체인이 순환으로 보여 어떤 마이그레이션도 돌지 않는다</td></tr>
+      <tr><td>규약서 유령 경로 오판<br /><code>545b27bf</code></td>
+          <td><code>/metrics-prom</code> 을 유령으로 잡았다. 규약서 기재가 맞고 시험이 틀렸다 —
+          코드가 <code>include_in_schema=False</code> 로 일부러 감춘 경로다</td>
+          <td>시험이 계속 빨간불이라 &sect;2 판단이 서지 않는다</td></tr>
+      <tr><td><b>시험이 조용히 안 돌던 것</b><br /><code>529c300c</code> <code>0a814bd8</code></td>
+          <td>DB 판정이 세 곳에 복제돼 전부 <code>localhost:5432</code> 하드코딩. <code>make test-full</code>
+          도 <code>DATABASE_URL</code> 없이 돌았다</td>
+          <td><b>fullstack 101 건이 계속 건너뛴다.</b> 그 상태로 초록을 보고 배포했을 것이다</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note">
+    첫 번째가 결정적이다. 단위 시험 3,680 건이 전부 초록이었고 223 트랜잭션 드라이런도
+    통과했다 — 드라이런은 SQL 만 돌렸지 <b>alembic 체인을 타지 않았기</b> 때문이다.
+    배포해서 <code>alembic</code> 을 부르는 순간 터졌을 것이다.
+  </div>
+
+  <h2>2. 배포 전 확인</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:6%">#</th><th style="width:32%">항목</th><th>기준</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>감리 종료</td><td><b>선행 조건.</b> 감리 중에는 적용하지 않는다</td></tr>
+      <tr><td class="c">2</td><td>전체 시험 통과</td><td><b>완료(2026-08-29)</b> — <code>make test-db-up &amp;&amp; make test-full</code> 로 <b>3,781 통과 · 실패 0 · 건너뜀 9</b>. 건너뛴 9건은 DB 무관이다(ES 미가동 2 · sample.hwp 없음 2 · POSIX 전용 2 · anthropic 미설치 1 · 분류기 가중치 미로드 1 · 인라인 스크립트 1)</td></tr>
+      <tr><td class="c">3</td><td>작업 창</td><td>요청이 없는 시간대. 컨테이너 재기동이 있다</td></tr>
+      <tr><td class="c">4</td><td>복구 지점</td><td>DB 백업 + 현재 이미지 태그 확인(스크립트가 <code>:rollback-*</code> 을 남긴다)</td></tr>
+      <tr><td class="c">5</td><td>디스크</td><td>빌드에 여유 필요. 스크립트가 먼저 확인한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>3. 산출물</h2>
+  <pre>git archive HEAD \
+  poc/src poc/scripts poc/tests poc/alembic poc/uv.lock poc/pyproject.toml \
+  poc/Dockerfile.api.prod poc/Dockerfile.worker poc/docker-compose.yml \
+  poc/docker-compose.prod.yml poc/docker-compose.dual.yml \
+  poc/docker-compose.airgap.yml poc/Makefile \
+  -o poc_src.tar
+git rev-parse --short=12 HEAD &gt; poc_src.tar.sha</pre>
+  <p class="src">무압축 POSIX tar · 999파일 · 12.6MB · <code>poc/</code> 접두(스크립트가 <code>--strip-components=1</code> 로 푼다) ·
+  alembic 22파일 포함(새 마이그레이션 c9e1f2a3b4d5 포함 · 옛 중복번호 잔존 0) · SHA <code>0a814bd8baad</code></p>
+
+  <h2>4. 배포 실행</h2>
+  <pre>scp -i ~/.ssh/kipai_testserver poc_src.tar poc_src.tar.sha kopia@223.130.156.134:~/
+ssh -i ~/.ssh/kipai_testserver kopia@223.130.156.134 \
+  'cd ~/poc &amp;&amp; DIRECT_SRC_TAR=$HOME/poc_src.tar bash ~/poc/scripts/deploy_kl_223.sh'</pre>
+
+  <div class="note">
+    <b><code>DIRECT_SRC_TAR</code> 를 빼고 부르면 안 된다.</b> 그러면 스크립트가 GitHub 원격
+    tip 을 받아 <b>현재 판보다 뒤로 롤백</b>된다. 이 환경은 push 가 막혀 있어 원격이 로컬보다
+    뒤에 있다.
+  </div>
+
+  <p>스크립트가 자동으로 처리하는 것 — uv.lock 정합 · 외부 볼륨 이름 · <code>.env</code> 접두 ·
+  워커 메모리 한도 · 학습 산출물 소유권 · 6개 이미지 태그 · 되돌림 태그 생성 · 기동 후 SHA 대조.</p>
+
+  <h2>5. 스키마 마이그레이션 (별도 · 수동)</h2>
+
+  <p>배포 스크립트는 alembic 을 돌리지 않는다. 소스 반영과 스키마 변경을 분리해 두었다.</p>
+
+  <pre>docker exec koipa-jjw-api-1 alembic upgrade head   # -> c9e1f2a3b4d5</pre>
+
+  <p>대상과 검증 결과는 「DB 대리키 표준화 전환계획」에 있다. 요지 — 정수 대리키 9개를
+  <code>SERIAL</code> 에서 표준 <code>GENERATED ALWAYS AS IDENTITY</code> 로 바꾼다.
+  223 실데이터에 트랜잭션으로 걸어 보고 롤백해 검증했다(<code>tb_audit_log</code> 38,502행 포함).</p>
+
+  <h2>6. 배포 후 검증</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:28%">항목</th><th style="width:38%">방법</th><th>기대</th></tr></thead>
+    <tbody>
+      <tr><td>판 반영</td><td>스크립트 8단계 출력</td><td><code>git_sha=0a814bd8baad</code></td></tr>
+      <tr><td>기동</td><td><code>curl /api/v1/healthz</code></td><td><code>200</code></td></tr>
+      <tr><td>API 표면</td><td><code>/api/v1/openapi.json</code> paths 수</td><td>기존 이상(축소되면 이상)</td></tr>
+      <tr><td>콘솔</td><td><code>/console</code></td><td><code>307</code> 또는 화면</td></tr>
+      <tr><td>등급 판정</td><td>문서 1건 업로드 → 분류</td><td>등급·신뢰도·근거 반환</td></tr>
+      <tr><td>확정 등급 필드</td><td>확정 후 <code>GET /classify/{doc_id}</code></td><td><code>confirmed_label</code> 등 3필드</td></tr>
+      <tr><td>룰 게이트</td><td>콘솔에서 잘못된 정규식 등록 시도</td><td><code>400</code> 거부</td></tr>
+      <tr><td>스키마</td><td><code>select attidentity from pg_attribute</code></td><td><code>a</code> 9건(&sect;5 적용 시)</td></tr>
+      <tr><td>워커</td><td><code>docker logs koipa-jjw-worker-1</code></td><td>재배달 루프 없음</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>7. 롤백과 실행 기록</h2>
+  <div class="note">
+    <b>되돌림 태그는 <code>koipa-jjw-*</code> 에 걸린다.</b> 2026-08-29 롤백 때 실제 구동 이미지가
+    <code>koipa-jjw-api</code> 인데 <code>koipa-poc-api</code> 에 태그를 걸어 한 번 헛돌았다.
+    빌드는 <code>koipa-poc-*</code> 로 나오고 스크립트가 프로젝트명으로 다시 태그한다 —
+    <b>되돌릴 때 보는 것은 <code>koipa-jjw-*</code> 쪽이다.</b>
+  </div>
+
+  <p>스크립트가 배포 전 이미지에 <code>:rollback-YYYYMMDDHHMM</code> 태그를 남긴다.
+  소스는 그 태그로 되돌리고, 스키마는 <code>alembic downgrade -1</code> 로 되돌린다.
+  순서는 <b>스키마 먼저, 그다음 이미지</b>다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:16%">일자</th><th style="width:16%">판</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td class="n">2026-08-29 16:16</td><td><code>a07a4b75</code></td>
+          <td><b>기동 실패 · 롤백.</b> <code>fea1a7bb</code> 가 넣은 보안 검사가 223 의 기존 설정을
+          거부했다 — <code>CONSOLE_LOGIN_PREFILL_TOKEN</code> 은 하드닝 배포에서 불가.
+          <code>koipa-jjw-*:rollback-202608290716</code> 로 되돌려 서비스 정상화.
+          <b>DB 는 손대지 않았다</b>(마이그레이션을 소스 배포와 분리해 둔 것이 유효했다)</td></tr>
+      <tr><td class="n">2026-08-29 16:43</td><td><code>0a814bd8</code></td>
+          <td><b>배포 성공.</b> 전용 플래그 <code>CONSOLE_LOGIN_PREFILL_ALLOW_UNSAFE</code> 를 신설해
+          그 검사 하나만 열고 나머지 안전게이트는 강제 유지. 8단계 검증 전부 통과 ·
+          스모크 9항목 통과 · 자동로그인 확인</td></tr>
+      <tr><td class="n">2026-08-29 16:52</td><td><code>c9e1f2a3b4d5</code></td>
+          <td><b>스키마 마이그레이션 성공.</b> <code>f0a1b2c3d4e5</code> &rarr; <code>c9e1f2a3b4d5</code> ·
+          IDENTITY 칼럼 9개 <code>attidentity='a'</code> · SERIAL 잔재 0 ·
+          <code>tb_audit_log</code> 38,853행 보존 · 신규 채번 정상(38856 &rarr; 38857)</td></tr>
+      <tr><td class="n">2026-08-29</td><td><code>1ae9054a</code> &rarr; <code>0a814bd8</code></td><td>판 갱신 — 로컬 DB 시험으로 결함 3건(&sect;1-2)을 고치고 다시 뽑았다. 배포는 하지 않았다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">근거 파일 — <code>poc/scripts/deploy_kl_223.sh</code> ·
+  <code>poc/alembic/versions/c9e1f2a3b4d5_serial_to_identity.py</code> ·
+  <code>doc/감리문서/DB_대리키_표준화_전환계획.html</code> ·
+  <code>doc/internal/테스트서버_223_배포_인벤토리.html</code></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,138 @@
+"""LLM Provider 추상 인터페이스 + 비용 추정."""
+
+from __future__ import annotations
+
+import inspect
+import logging
+import random
+import time
+from dataclasses import dataclass, field
+from typing import Callable, Protocol, TypeVar, runtime_checkable
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+@dataclass
+class UsageRecord:
+    """LLM 호출 1건의 토큰/비용 기록. DB `llm_usage` 적재용."""
+
+    provider: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cost_usd: float
+    latency_ms: int = 0
+    success: bool = True
+    error_code: str | None = None
+
+
+@dataclass
+class LLMResponse:
+    text: str
+    usage: UsageRecord
+    meta: dict = field(default_factory=dict)
+
+
+# USD per 1M tokens (input, output), 2026-06 시점 공개 단가.
+# Opus 4.x는 입력 $5 / 출력 $25 — 과거 $15/$75 표기는 오기였음(비용 3배 과대계상).
+# 기본/권장 모델 claude-opus-4-8 누락 시 estimate_cost_usd 폴백이 cost=0을 기록하므로 명시.
+PRICE_TABLE: dict[str, tuple[float, float]] = {
+    "claude-sonnet-4-6": (3.0, 15.0),
+    "claude-opus-4-8": (5.0, 25.0),
+    "claude-opus-4-7": (5.0, 25.0),
+    "claude-opus-4-6": (5.0, 25.0),
+    "claude-haiku-4-5": (1.0, 5.0),
+    "gpt-4o": (2.5, 10.0),
+    "gpt-4o-mini": (0.15, 0.6),
+    "gemini-2.5-pro": (1.25, 10.0),
+    "Qwen/Qwen3-14B": (0.0, 0.0),
+    "noop": (0.0, 0.0),
+}
+
+
+def estimate_cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
+    in_price, out_price = PRICE_TABLE.get(model, (0.0, 0.0))
+    return (input_tokens / 1_000_000) * in_price + (output_tokens / 1_000_000) * out_price
+
+
+# 작업 #18: provider 간 재시도 비대칭 해소용 공통 헬퍼.
+# anthropic_provider.py의 full-jitter 지수 백오프 패턴을 일반화하여
+# openai/vllm/local_openai에서 재사용한다(429/5xx/타임아웃/연결 오류 재시도).
+def retry_with_backoff(
+    fn: Callable[[], T],
+    *,
+    is_retryable: Callable[[BaseException], bool],
+    max_retries: int = 3,
+    base_delay: float = 0.5,
+    max_delay: float = 8.0,
+    label: str = "llm",
+) -> T:
+    """fn()을 호출하고, 재시도 가능한 예외면 full-jitter 지수 백오프로 재시도.
+
+    - 총 시도 횟수 = 1 + max_retries (0회차 본 호출 + max_retries회 재시도).
+    - 재시도 소진/비재시도성 예외는 마지막 예외를 그대로 raise(호출부가 폴백 처리).
+    - 결정성·테스트 친화: sleep=time.sleep, jitter=random.uniform 표준 사용.
+    """
+    last_exc: BaseException | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            return fn()
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if is_retryable(exc) and attempt < max_retries:
+                # full-jitter: [0, min(base*2^n, cap)) 범위에서 랜덤 대기.
+                cap = min(base_delay * (2 ** attempt), max_delay)
+                delay = random.uniform(0.0, cap)
+                logger.warning(
+                    "%s call failed (%s) — retry %d/%d after %.2fs",
+                    label, type(exc).__name__, attempt + 1, max_retries, delay,
+                )
+                time.sleep(delay)
+                continue
+            # 비재시도성이거나 재시도 소진 — 마지막 예외를 호출부로 전달.
+            raise
+    # 도달 불가(루프는 성공 시 return, 실패 시 raise). 타입 안정성용 방어.
+    assert last_exc is not None
+    raise last_exc
+
+
+def accepts_json_schema(provider: object) -> bool:
+    """provider.generate 가 구조화 출력(json_schema) 인자를 받는가.
+
+    프로토콜에 강제하지 않고 **시그니처로 탐지**한다. 이유는 두 가지다.
+      · 시험용 가짜 provider 가 여럿이라 인자를 필수로 만들면 전부 고쳐야 한다.
+      · anthropic 어댑터는 response_format 이 없다 — 인자만 받고 무시하면 호출부가
+        "스키마가 걸렸다"고 잘못 믿는다. 안 받는 것이 정직한 신호다.
+    """
+    generate = getattr(provider, "generate", None)
+    if generate is None:
+        return False
+    try:
+        return "json_schema" in inspect.signature(generate).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+@runtime_checkable
+class LLMProvider(Protocol):
+    name: str
+    model: str
+
+    def generate(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        max_tokens: int = 1024,
+        temperature: float = 0.7,
+    ) -> LLMResponse:
+        """구조화 출력을 지원하는 구현은 여기에 ``json_schema: dict | None`` 을 더 받는다.
+
+        선택 인자라 프로토콜에는 넣지 않는다 — 지원 여부는 accepts_json_schema() 로 본다.
+        """
+        ...
+
+    def count_tokens(self, text: str) -> int:
+        ...

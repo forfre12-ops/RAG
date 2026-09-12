@@ -1,0 +1,2064 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KOIPA AI 영업비밀 분류 시스템 — 완전 이해 가이드 V3 | Koipa</title>
+<style>
+/* ============================================================
+   Monochrome Design System — NovaX inspired, pure grayscale
+   ============================================================ */
+:root {
+  --bg:           #ffffff;
+  --bg-surface:   #fafafa;
+  --bg-mid:       #f4f4f5;
+  --bg-strong:    #e4e4e7;
+  --bg-inverse:   #09090b;
+  --bg-nav:       rgba(255,255,255,.88);
+  --text:         #09090b;
+  --text-soft:    #52525b;
+  --text-dim:     #71717a;
+  --text-faint:   #a1a1aa;
+  --border:       rgba(0,0,0,.08);
+  --border-mid:   rgba(0,0,0,.12);
+  --border-strong:rgba(0,0,0,.18);
+  --radius-sm:    5px;
+  --radius:       8px;
+  --radius-lg:    12px;
+  --radius-xl:    16px;
+  --radius-pill:  3px;   /* 직선형(사각)·타원/pill 금지 — 디자인 표준 */
+  --shadow-sm:    0 1px 2px rgba(0,0,0,.05);
+  --shadow:       0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.07);
+  --font-sans:    "Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:    "Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sidebar:      220px;
+  --article-max:  860px;
+  --container:    1320px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.75;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img,svg{max-width:100%;}
+ul,ol{padding-left:1.4em;color:var(--text-soft);}
+li{margin-bottom:4px;font-size:14px;line-height:1.65;}
+
+/* ─── NAV ─── */
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);overflow:visible;}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:3px;white-space:nowrap;}
+/* Mobile TOC toggle */
+.toc-toggle{display:none;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg-surface);cursor:pointer;color:var(--text-dim);}
+.toc-toggle svg{width:16px;height:16px;}
+
+/* ─── LAYOUT ─── */
+.page-wrap{max-width:var(--container);margin:0 auto;padding:0 24px;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:52px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+
+/* ─── TOC ─── */
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc::-webkit-scrollbar{width:2px;}
+.toc::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:2px;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;border-radius:var(--radius-sm);transition:all .12s;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.toc-sub{padding-left:20px!important;font-size:11.5px!important;}
+
+/* ─── ARTICLE HEADER ─── */
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:3px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);}
+.meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(32px,5vw,58px);font-weight:800;letter-spacing:-.04em;line-height:1.05;margin:0 0 20px;color:var(--text);}
+.lede{font-size:clamp(15px,2vw,18px);line-height:1.65;color:var(--text-soft);margin:0 0 40px;max-width:640px;}
+
+/* ─── HEADINGS ─── */
+h2{font-size:clamp(22px,3vw,28px);font-weight:700;letter-spacing:-.03em;margin:52px 0 14px;padding-top:4px;color:var(--text);}
+h3{font-size:clamp(17px,2.2vw,20px);font-weight:600;letter-spacing:-.02em;margin:32px 0 10px;color:var(--text);}
+h4{font-size:15px;font-weight:600;margin:20px 0 8px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+p:last-child{margin-bottom:0;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:44px 0;}
+
+/* ─── SECTION SEPARATOR ─── */
+.section-sep{display:flex;align-items:center;gap:14px;margin:52px 0 28px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+
+/* ─── CALLOUTS (monochrome) ─── */
+.callout{border-radius:var(--radius);padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+/* Subtle variants — only shade differs */
+.callout.dark{background:var(--bg-mid);border-color:var(--border-strong);}
+.callout.darker{background:var(--bg-inverse);border-color:var(--bg-inverse);}
+.callout.darker .callout-label,.callout.darker p{color:#e4e4e7;}
+.callout.inset{background:var(--bg-mid);border-color:var(--border-mid);border-left:3px solid var(--text);}
+.callout.inset .callout-label{color:var(--text);}
+.callout ul{margin:6px 0 0;padding-left:1.2em;color:var(--text-soft);}
+.callout li{font-size:13.5px;}
+
+/* ─── TABLES ─── */
+.table-wrap{overflow-x:auto;margin:20px 0;border:1px solid var(--border-mid);border-radius:var(--radius-lg);-webkit-overflow-scrolling:touch;}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:500px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 14px;text-align:left;font-weight:600;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.55;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--bg-surface);}
+td strong{color:var(--text);}
+
+/* ─── CODE ─── */
+code{font-family:var(--font-mono);font-size:12px;background:var(--bg-mid);border:1px solid var(--border-mid);border-radius:var(--radius-sm);padding:1px 5px;color:var(--text);word-break:break-all;}
+pre{background:var(--bg-mid);border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:16px 20px;overflow-x:auto;margin:16px 0;-webkit-overflow-scrolling:touch;}
+pre code{background:none;border:none;padding:0;font-size:12.5px;line-height:1.65;word-break:normal;}
+
+/* ─── STEP CARDS ─── */
+.steps{display:flex;flex-direction:column;margin:24px 0;}
+.step{display:grid;grid-template-columns:48px 1fr;}
+.step-num-col{display:flex;flex-direction:column;align-items:center;}
+.step-circle{width:34px;height:34px;border-radius:3px;background:var(--text);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:13px;flex-shrink:0;font-family:var(--font-mono);}
+.step-circle.outline{background:var(--bg);color:var(--text);border:2px solid var(--border-strong);}
+.step-line{flex:1;width:1px;background:var(--border-strong);margin:6px 0;}
+.step:last-child .step-line{display:none;}
+.step-body{padding:0 0 32px 14px;}
+.step-title{font-size:16px;font-weight:600;margin:3px 0 8px;letter-spacing:-.02em;color:var(--text);}
+.step-body p{font-size:13.5px;margin:0 0 10px;}
+.step-body h4{margin:14px 0 6px;}
+
+/* ─── GRADE CARDS (monochrome) ─── */
+.grade-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:18px 0;}
+.grade-card{border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:18px;transition:box-shadow .18s;}
+.grade-card:hover{box-shadow:var(--shadow);}
+.grade-badge{display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:3px;margin-bottom:8px;letter-spacing:.04em;}
+/* TS — black fill */
+.grade-ts{border-color:var(--border-strong);}
+.grade-ts .grade-badge{background:var(--text);color:var(--bg);}
+/* S1 — dark gray fill */
+.grade-s1{border-color:var(--border-mid);}
+.grade-s1 .grade-badge{background:#3f3f46;color:#fff;}
+/* S2 — medium gray */
+.grade-s2{border-color:var(--border);}
+.grade-s2 .grade-badge{background:#71717a;color:#fff;}
+/* S3 — light gray outlined */
+.grade-s3{border-color:var(--border);}
+.grade-s3 .grade-badge{background:var(--bg-strong);color:var(--text);}
+.grade-name{font-size:14px;font-weight:700;margin-bottom:5px;color:var(--text);}
+.grade-desc{font-size:12.5px;color:var(--text-dim);line-height:1.5;margin-bottom:8px;}
+.grade-examples{font-size:12px;color:var(--text-faint);line-height:1.55;}
+.grade-examples strong{color:var(--text-dim);}
+
+/* ─── FLOW DIAGRAM ─── */
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:18px 0;}
+.flow-box{background:var(--bg-surface);border:1px solid var(--border-mid);border-radius:var(--radius);padding:7px 12px;font-size:12.5px;font-weight:500;text-align:center;white-space:nowrap;}
+.flow-box.fill{background:var(--text);color:var(--bg);border-color:var(--text);}
+.flow-box.mid{background:var(--bg-mid);border-color:var(--border-strong);}
+.flow-arrow{color:var(--text-faint);font-size:16px;flex-shrink:0;}
+
+/* ─── KPI CARDS ─── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0;}
+.kpi-card{border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:18px 16px;background:var(--bg-surface);}
+.kpi-label{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;font-family:var(--font-mono);line-height:1.4;}
+.kpi-value{font-size:clamp(22px,3vw,28px);font-weight:800;letter-spacing:-.04em;color:var(--text);}
+.kpi-value.pass::after{content:" ✓";font-size:14px;font-weight:600;color:var(--text-dim);}
+.kpi-sub{font-size:11.5px;color:var(--text-faint);margin-top:4px;}
+
+/* ─── CASE CARDS ─── */
+.case-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:18px 0;}
+.case-card{border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:16px 18px;}
+.case-title{font-size:13.5px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--text);}
+.case-body{font-size:12.5px;color:var(--text-dim);line-height:1.6;}
+
+/* ─── TAGS (monochrome) ─── */
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;font-family:var(--font-mono);letter-spacing:.05em;white-space:nowrap;}
+/* 4 shades only */
+.tag.filled{background:var(--text);color:var(--bg);}
+.tag.dark{background:#3f3f46;color:#fff;}
+.tag.mid{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.light{background:var(--bg-surface);color:var(--text-dim);border:1px solid var(--border-mid);}
+.tag.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+
+/* ─── OSS GRID ─── */
+.oss-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0;}
+.oss-card{border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;}
+.oss-name{font-size:13.5px;font-weight:600;margin-bottom:3px;color:var(--text);}
+.oss-role{font-size:12px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;}
+.oss-lic{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);}
+
+/* ─── DECISION TREE ─── */
+.decision{background:var(--bg-surface);border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:20px;margin:18px 0;}
+.decision .node{margin:5px 0;display:flex;align-items:flex-start;gap:8px;font-size:13px;line-height:1.55;}
+.decision .indent{margin-left:20px;}
+.decision .cond{color:var(--text);font-weight:700;font-family:var(--font-mono);font-size:12px;flex-shrink:0;}
+.decision .result{color:var(--text-soft);}
+.decision .arrow{color:var(--text-faint);flex-shrink:0;}
+
+/* ─── FOOTNOTE / FOOTER ─── */
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+
+/* ─── MOBILE OVERLAY TOC ─── */
+.toc-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:90;backdrop-filter:blur(2px);}
+.toc-drawer{position:fixed;top:0;right:0;bottom:0;width:min(280px,85vw);background:var(--bg);border-left:1px solid var(--border-strong);z-index:95;overflow-y:auto;padding:20px 16px;transform:translateX(100%);transition:transform .25s ease;}
+.toc-drawer.open{transform:translateX(0);}
+.toc-drawer-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.toc-drawer-title{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);}
+.toc-close{width:30px;height:30px;border:1px solid var(--border-mid);border-radius:var(--radius-sm);background:none;cursor:pointer;display:grid;place-items:center;color:var(--text-dim);}
+.toc-drawer a{display:block;padding:7px 10px;color:var(--text-dim);text-decoration:none;font-size:13px;border-radius:var(--radius-sm);border-left:2px solid transparent;margin-bottom:1px;}
+.toc-drawer a.active,.toc-drawer a:hover{color:var(--text);border-left-color:var(--text);background:var(--bg-surface);}
+.toc-drawer .toc-sub{padding-left:22px!important;font-size:12px!important;}
+
+/* ─── RESPONSIVE ─── */
+/* Tablet ≤ 1024 */
+@media(max-width:1024px){
+  .article-layout{grid-template-columns:1fr;gap:0;padding:28px 20px 80px;}
+  .toc-aside{display:none;}
+  .toc-toggle{display:flex;}
+  .brand-sub{display:none;}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .oss-grid{grid-template-columns:repeat(2,1fr);}
+}
+/* Small tablet ≤ 768 */
+@media(max-width:768px){
+  .nav-inner{padding:11px 16px;}
+  h2{margin-top:40px;}
+  .grade-grid{gap:8px;}
+  .case-grid{grid-template-columns:1fr;}
+  table{min-width:400px;}
+  pre{padding:12px 14px;}
+  .section-sep{margin:40px 0 22px;}
+  .step-body{padding-bottom:24px;}
+  .flow{gap:4px;}
+  .flow-box{padding:6px 10px;font-size:12px;}
+}
+/* Mobile ≤ 480 */
+@media(max-width:480px){
+  .article-layout{padding:20px 16px 64px;}
+  h1.title{font-size:28px;line-height:1.1;}
+  .lede{font-size:14.5px;}
+  .grade-grid{grid-template-columns:1fr;}
+  .kpi-grid{grid-template-columns:1fr 1fr;}
+  .oss-grid{grid-template-columns:1fr;}
+  .kpi-card{padding:14px 12px;}
+  .grade-card{padding:14px;}
+  .case-grid{grid-template-columns:1fr;}
+  .flow{flex-direction:column;align-items:flex-start;}
+  .flow-arrow{transform:rotate(90deg);}
+  .table-wrap{margin:14px -16px;border-radius:0;border-left:none;border-right:none;}
+  .decision{padding:14px;}
+  .callout{padding:12px 14px;}
+  pre{margin:12px -4px;}
+}
+/* Very small ≤ 360 */
+@media(max-width:360px){
+  h1.title{font-size:24px;}
+  .meta-row{gap:5px;}
+  .section-sep-title{display:none;}
+  .kpi-grid{grid-template-columns:1fr;}
+}
+
+/* ─── TLDR ─── */
+.tldr{background:var(--bg-inverse);color:#e4e4e7;border-radius:var(--radius-xl);padding:28px 32px;margin:0 0 40px;}
+.tldr-title{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-family:var(--font-mono);color:#71717a;margin-bottom:14px;}
+.tldr-list{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;list-style:none;padding:0;margin:0;}
+.tldr-list li{font-size:13.5px;line-height:1.55;color:#d4d4d8;display:flex;gap:8px;align-items:flex-start;}
+.tldr-list li::before{content:"→";color:#71717a;flex-shrink:0;font-family:var(--font-mono);font-size:12px;margin-top:2px;}
+.tldr-list strong{color:#ffffff;}
+@media(max-width:600px){.tldr-list{grid-template-columns:1fr;}.tldr{padding:20px 18px;}}
+
+/* ─── WHY AI ─── */
+.why-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0;}
+.why-card{border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:18px;}
+.why-card.bad{background:var(--bg-mid);}
+.why-card.good{background:var(--bg-inverse);color:#e4e4e7;border-color:var(--bg-inverse);}
+.why-card.good p,.why-card.good li{color:#a1a1aa;}
+.why-card.good strong{color:#ffffff;}
+.why-label{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:10px;display:block;}
+.why-card.bad .why-label{color:var(--text-dim);}
+.why-card.good .why-label{color:#71717a;}
+@media(max-width:600px){.why-compare{grid-template-columns:1fr;}}
+
+/* ─── DESIGN REASON ─── */
+.reason-grid{display:grid;grid-template-columns:1fr;gap:0;margin:18px 0;border:1px solid var(--border-mid);border-radius:var(--radius-lg);overflow:hidden;}
+.reason-row{display:grid;grid-template-columns:200px 1fr;border-bottom:1px solid var(--border);background:var(--bg);}
+.reason-row:last-child{border-bottom:none;}
+.reason-row:nth-child(even){background:var(--bg-surface);}
+.reason-q{padding:14px 16px;font-size:13px;font-weight:700;color:var(--text);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:6px;}
+.reason-a{padding:14px 16px;font-size:13px;color:var(--text-soft);line-height:1.6;}
+.reason-a strong{color:var(--text);}
+@media(max-width:640px){
+  .reason-row{grid-template-columns:1fr;}
+  .reason-q{border-right:none;border-bottom:1px solid var(--border);background:var(--bg-mid);}
+}
+
+/* ─── BEFORE/AFTER ─── */
+.ba-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:18px 0;border:1px solid var(--border-mid);border-radius:var(--radius-lg);overflow:hidden;}
+.ba-col{padding:0;}
+.ba-col-header{padding:12px 16px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;font-family:var(--font-mono);}
+.ba-col.before .ba-col-header{background:var(--bg-mid);color:var(--text-dim);border-bottom:1px solid var(--border-mid);}
+.ba-col.after .ba-col-header{background:var(--bg-inverse);color:#71717a;border-bottom:1px solid rgba(255,255,255,.08);}
+.ba-col.after{background:var(--bg-surface);}
+.ba-item{display:flex;gap:10px;padding:11px 16px;border-bottom:1px solid var(--border);font-size:13px;align-items:flex-start;}
+.ba-item:last-child{border-bottom:none;}
+.ba-col.before .ba-item{color:var(--text-dim);}
+.ba-col.after .ba-item{color:var(--text-soft);}
+.ba-col.after .ba-item strong{color:var(--text);}
+.ba-icon{flex-shrink:0;font-size:14px;}
+@media(max-width:600px){.ba-grid{grid-template-columns:1fr;}.ba-col.before{border-bottom:2px solid var(--border-strong);}}
+
+/* ─── P1 vs RAG ─── */
+.feature-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0;}
+.feature-card{border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:20px;background:var(--bg-surface);}
+.feature-badge{font-family:var(--font-mono);font-size:10px;font-weight:700;padding:3px 9px;border-radius:3px;background:var(--text);color:var(--bg);display:inline-block;margin-bottom:10px;letter-spacing:.05em;}
+.feature-name{font-size:16px;font-weight:700;margin-bottom:6px;}
+.feature-io{margin:10px 0;font-size:13px;}
+.feature-io .io-row{display:flex;gap:8px;margin-bottom:4px;align-items:flex-start;}
+.feature-io .io-label{font-family:var(--font-mono);font-size:10.5px;font-weight:700;color:var(--text-faint);min-width:40px;flex-shrink:0;padding-top:2px;}
+@media(max-width:600px){.feature-compare{grid-template-columns:1fr;}}
+
+/* ─── CONFIDENCE GUIDE ─── */
+.conf-guide{margin:18px 0;border:1px solid var(--border-mid);border-radius:var(--radius-lg);overflow:hidden;}
+.conf-row{display:grid;grid-template-columns:130px 1fr 180px;border-bottom:1px solid var(--border);align-items:stretch;}
+.conf-row:last-child{border-bottom:none;}
+.conf-score{padding:12px 14px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text);background:var(--bg-surface);border-right:1px solid var(--border);display:flex;align-items:center;}
+.conf-meaning{padding:12px 14px;font-size:13px;color:var(--text-soft);border-right:1px solid var(--border);}
+.conf-action{padding:12px 14px;font-size:12.5px;font-weight:600;color:var(--text-dim);display:flex;align-items:center;}
+.conf-header .conf-score,.conf-header .conf-meaning,.conf-header .conf-action{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-family:var(--font-mono);color:var(--text-faint);background:var(--bg-mid);}
+@media(max-width:640px){.conf-row{grid-template-columns:1fr;}.conf-score,.conf-meaning{border-right:none;border-bottom:1px solid var(--border);}}
+
+/* ─── SCENARIO ─── */
+.scenario{background:var(--bg-surface);border:1px solid var(--border-mid);border-radius:var(--radius-xl);padding:28px;margin:18px 0;}
+.scenario-title{font-size:13.5px;font-weight:700;margin-bottom:18px;color:var(--text);}
+.scenario-steps{display:flex;flex-direction:column;gap:0;}
+.sc-step{display:grid;grid-template-columns:32px 1fr;gap:0;}
+.sc-num{display:flex;flex-direction:column;align-items:center;}
+.sc-circle{width:28px;height:28px;border-radius:3px;background:var(--bg-strong);color:var(--text);display:grid;place-items:center;font-size:12px;font-weight:700;font-family:var(--font-mono);flex-shrink:0;}
+.sc-line{flex:1;width:1px;background:var(--border-strong);margin:4px 0;}
+.sc-step:last-child .sc-line{display:none;}
+.sc-body{padding:0 0 20px 12px;}
+.sc-who{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-family:var(--font-mono);color:var(--text-faint);margin-bottom:4px;}
+.sc-what{font-size:13.5px;color:var(--text-soft);line-height:1.6;}
+.sc-what strong{color:var(--text);}
+.sc-system{background:var(--bg-inverse);color:#d4d4d8;border-radius:var(--radius);padding:8px 12px;font-size:12.5px;margin-top:6px;font-family:var(--font-mono);}
+
+/* ─── GLOSSARY ─── */
+.glossary{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:18px 0;}
+.gloss-card{border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;}
+.gloss-term{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;font-family:var(--font-mono);}
+.gloss-eng{font-size:11px;color:var(--text-faint);margin-bottom:6px;}
+.gloss-def{font-size:12.5px;color:var(--text-dim);line-height:1.55;}
+.gloss-ex{font-size:11.5px;color:var(--text-faint);margin-top:4px;font-style:italic;}
+@media(max-width:600px){.glossary{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#" class="brand">
+      <div class="brand-mark"><img src="data:image/png;base64,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" alt="Koipa" /></div>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">KOIPA AI 영업비밀 분류 시스템</span>
+    </a>
+    <div class="nav-right">
+      <span class="nav-badge">V3 · 2026-08-02 갱신</span>
+      <button class="toc-toggle" id="tocToggle" aria-label="목차 열기">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="10" y2="12"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- MOBILE TOC DRAWER -->
+<div class="toc-overlay" id="tocOverlay"></div>
+<div class="toc-drawer" id="tocDrawer">
+  <div class="toc-drawer-header">
+    <span class="toc-drawer-title">목차</span>
+    <button class="toc-close" id="tocClose">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8">
+        <line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/>
+      </svg>
+    </button>
+  </div>
+  <a href="#why-ai">00-A. 왜 AI가 필요한가?</a>
+  <a href="#why-design">00-B. 설계가 최선인 이유</a>
+  <a href="#overview">01. 이 시스템이 뭔가?</a>
+  <a href="#grade-system" class="toc-sub">등급 체계 (TS~S3)</a>
+  <a href="#metrics">02. 현재 성능 수치</a>
+  <a href="#infra">03. 서버 구조</a>
+  <a href="#api">04. API 엔드포인트</a>
+  <a href="#workflow">05. 전체 워크플로우</a>
+  <a href="#steps-detail" class="toc-sub">6단계 상세</a>
+  <a href="#models">06. AI 모델 설명</a>
+  <a href="#oss">07. 오픈소스 목록</a>
+  <a href="#criteria">08. 운영 확대 기준</a>
+  <a href="#confidence" class="toc-sub">신뢰도 실무 가이드</a>
+  <a href="#cases">09. 상황별 로직</a>
+  <a href="#scenario">09-B. 실제 사용 시나리오</a>
+  <a href="#db">10. DB 구조</a>
+  <a href="#active-learning" class="toc-sub">능동학습 폐곡선</a>
+  <a href="#monitoring">11. 운영 모니터링</a>
+  <a href="#modules">12. 내부 모듈</a>
+  <a href="#cost">13. API·GPU 운용</a>
+  <a href="#roadmap">14. 남은 과제</a>
+  <a href="#glossary">부록. 용어집</a>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="article-layout">
+<article>
+
+<!-- ─── HEADER ─── -->
+<div class="meta-row">
+  <span class="badge">완전 이해 가이드</span>
+  <span class="meta-dot">·</span>
+  <span class="meta-soft">2026-08-02 갱신</span>
+  <span class="meta-dot">·</span>
+  <span class="meta-soft">현재 소스코드 기준 최신판</span>
+</div>
+<h1 class="title">한 번 읽으면<br/>전부 이해되는<br/>AI 분류 시스템</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
+<p class="lede">
+  이 문서 하나만 읽어도 시스템 전체가 이해됩니다. 서버 구조, 동작 흐름, 각 단계 운영 확대 기준,
+  어떤 모델을 쓰는지, 어떤 상황에서 어떤 로직이 실행되는지 — 모두 담았습니다.
+</p>
+
+<!-- TL;DR -->
+<div class="tldr">
+  <div class="tldr-title">⚡ 핵심만 먼저 — 10줄 요약</div>
+  <ul class="tldr-list">
+    <li><strong>회사 문서에 등급을 자동으로 붙여주는 AI 시스템</strong>입니다.</li>
+    <li>TS(최고기밀) / S1 / S2 / S3 <strong>4단계로 분류</strong>합니다.</li>
+    <li>등급 = <strong>비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</strong> 곱셈 — 한 요건이라도 0이면 공개(S3).</li>
+    <li>문서 업로드 → <strong>2~3초 → 등급 + 판단 근거</strong> 반환.</li>
+    <li>"영업비밀"이란 단어가 없어도 <strong>내용의 의미를 보고 판단</strong>합니다.</li>
+    <li>현행 모델 KF-DeBERTa <strong>v5(v-fe4b386b) — hardened holdout(누출0) F1 0.917 · 공개문서 과분류 0.79→0.04 · 위험미탐 0</strong> (2026-07-29 승격). ※ 홀드아웃 109건의 F1 0.686·FNR 0.018은 직전 배포본 v4(v-dd3abab9)·학습본 42% 누출 참고치.</li>
+    <li>AI가 틀리면 사람이 수정 — <strong>정정은 진단·교정 데이터로 축적</strong>되며, 재학습 반영 방식은 미확정(A 무반출 기본 / B 온사이트 / C 문서반출 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)이고 모델은 상시 재학습하지 않습니다(지재원 자기 골든셋 1차학습 + 드리프트 트리거 단발).</li>
+    <li>인터넷 없는 폐쇄망에서도 <strong>로컬 AI 모델로 완전 동작</strong>합니다.</li>
+    <li>모든 분류 요청이 <strong>감사 로그에 기록</strong>됩니다.</li>
+    <li><strong>AI는 보조, 사람이 최종 판단</strong> — 이 원칙을 시스템이 강제합니다.</li>
+  </ul>
+</div>
+
+<!-- ═══ 00-A ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">00-A</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">왜 AI가 필요한가?</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="why-ai">키워드 검색으로 안 되나요?</h2>
+<p>
+  "영업비밀", "기밀"이라는 단어만 찾으면 되는 거 아닌가요? <strong>안 됩니다.</strong> 이유를 봅시다.
+</p>
+
+<div class="why-compare">
+  <div class="why-card bad">
+    <span class="why-label">❌ 기존 방식 — 키워드·수작업</span>
+    <ul style="margin:0;padding-left:1.2em;font-size:13.5px;">
+      <li><strong>"M&A 실사 보고서"</strong>라는 단어가 없어도 그 내용이면 TS</li>
+      <li><strong>"배터리 전해질 합성 비율"</strong>에 기밀이라고 안 써있어도 TS</li>
+      <li>사람마다 기준이 달라 같은 문서도 담당자에 따라 등급이 다름</li>
+      <li>10,000건 문서를 사람이 분류하면 수개월 소요</li>
+      <li>퇴사나 부서 이동 시 분류 기준이 사라짐</li>
+    </ul>
+  </div>
+  <div class="why-card good">
+    <span class="why-label">✓ AI 방식 — 의미 이해</span>
+    <ul style="margin:0;padding-left:1.2em;font-size:13.5px;">
+      <li>"EUV 노광 에너지 설정값" → <strong>기술적 의미를 보고 TS 판정</strong></li>
+      <li>"우리 회사만 아는 공정 노하우" → <strong>맥락으로 S1 판정</strong></li>
+      <li>같은 기준으로 24시간 일관된 분류</li>
+      <li>10,000건도 수시간 내 처리</li>
+      <li>사람은 AI가 헷갈리는 경계 케이스만 검토</li>
+    </ul>
+  </div>
+</div>
+
+<div class="callout dark">
+  <div class="callout-label">📖 "의미를 본다"는 게 어떻게 가능한가?</div>
+  <p>
+    AI 모델은 수억 개의 한국어 문서를 학습해서 단어들 간의 관계를 수치로 알고 있습니다.
+    "반도체 공정 파라미터"라는 표현이 나오면, 이 문장이 회사 내부에서만 공유되는 핵심 기술 문서와
+    <strong>같은 맥락</strong>이라는 것을 학습을 통해 파악합니다.
+    키워드 검색은 단어가 있는지만 보고, AI는 <strong>문장이 무엇을 의미하는지</strong>를 봅니다.
+  </p>
+</div>
+
+<div class="callout inset">
+  <div class="callout-label">🔍 한 걸음 더 — "검색"과 "분류기"는 일하는 방식이 다릅니다</div>
+  <p>
+    같은 "의미"를 쓰더라도 방식이 갈립니다.
+    <strong>키워드·벡터 검색은 "찾아보기(조회)"</strong>입니다. 새 문서가 들어오면 예전에 본 문서 중
+    <strong>가장 비슷한 것</strong>을 찾아 <strong>그 옆 문서의 등급을 빌려옵니다</strong>.
+    비슷한 예가 있으면 맞지만, 표현이 조금만 바뀌거나 닮은 예가 없으면 엉뚱한 등급을 빌려옵니다.
+  </p>
+  <p style="margin-top:8px;">
+    <strong>분류기는 "문서를 직접 읽기"</strong>입니다. 옆 문서를 빌리지 않고, 문장 속에서
+    <strong>각 단어가 그 맥락에서 무슨 뜻인지</strong>를 따져 직접 등급을 매깁니다 —
+    <strong>경험 많은 검수자가 처음 보는 문서라도 끝까지 읽고 판단하는 것</strong>과 같습니다.
+    그래서 <strong>처음 보는 표현</strong>에도 더 안정적이고, 실측에서도 분류기가 정확도·미탐(FNR) 모두 앞섭니다.
+    (실제로는 분류기가 등급을 결정하고, 키워드 룰은 근거 표시·교차검증으로 함께 씁니다.)
+  </p>
+  <p style="margin-top:8px;font-size:13px;">
+    👉 두 방식을 같은 데이터로 직접 맞붙인 결과는
+    <a href="검색단독_vs_분류기_등급분류_비교.html" style="color:#3b6ea5;font-weight:600;">검색 단독 vs 검색+분류기 등급분류 비교</a>
+    문서에서 자세히 볼 수 있습니다.
+  </p>
+</div>
+
+<!-- ═══ 00-B ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">00-B</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">이 설계가 최선인 이유</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="why-design">왜 이런 구조로 만들었나요?</h2>
+<p>설계마다 이유가 있습니다. "왜 이걸 썼나요?"라는 질문에 대한 답변입니다.</p>
+
+<div class="reason-grid">
+  <div class="reason-row">
+    <div class="reason-q">🤖 왜 KF-DeBERTa?</div>
+    <div class="reason-a">
+      한국어 금융·법률 문서에 최적화된 모델입니다. 영업비밀 문서는 대부분 한국어 법령·계약·기술 문서입니다.
+      <strong>일반 BERT보다 한국어 법률/기술 문맥 이해도가 높아 현행 v5(v-fe4b386b)는 hardened holdout(누출0) F1=0.917 · 위험미탐 0을 달성했습니다.</strong>(F1 0.686·FNR 0.018은 직전 v4(v-dd3abab9)·누출 홀드아웃 109건 참고치)
+      GPT-4를 쓰면 더 정확할 수 있지만, 폐쇄망 불가, 비용 과다, 데이터 외부 전송 문제가 있습니다.
+    </div>
+  </div>
+  <div class="reason-row">
+    <div class="reason-q">🔍 왜 KURE-v1?</div>
+    <div class="reason-a">
+      한국어 의미 검색에서 Recall@5 = 0.808로 BGE-M3(0.790)보다 높습니다.
+      <strong>한국어 특화 임베딩 모델로, 판례·기술 문서에서 의미적 유사도를 더 정확히 계산합니다.</strong>
+      영어 중심인 범용 모델보다 한국어 문서 검색에서 consistently 우수합니다.
+    </div>
+  </div>
+  <div class="reason-row">
+    <div class="reason-q">📦 왜 PostgreSQL pgvector?</div>
+    <div class="reason-a">
+      AI 개발을 맡은 한국지식재산보호원가 검색·벡터 엔진으로 PostgreSQL pgvector를 채택해 시스템에 포함·납품합니다.
+      <strong>의미 검색·키워드 검색·트랜잭션을 하나의 DB에서 처리</strong>하는 것이 핵심 이유입니다.
+      pgvector(의미 dense) + bigram tsvector·ts_rank(어휘)를 PostgreSQL 안에서 RRF로 결합하고, 감사장부·확정/보정 트랜잭션도 같은 DB가 담당합니다.
+      별도 검색엔진(Elasticsearch 등)을 붙이면 서버·JVM·라이선스(RRF=platinum)·이중쓰기 정합 부담이 추가되는데, PG는 어차피 필수라 신규 컴포넌트 0으로 끝납니다.
+      실 PG 풀스택 측정(2026-06-24)으로 하이브리드(85%)가 dense 단독(76%)보다 우수함을 확인했습니다(쿼리가 합성·LLM 생성이라 실 운영쿼리 모니터는 본개발 · 의사결정_대장 §03, ES→PG 단일화).
+    </div>
+  </div>
+  <div class="reason-row">
+    <div class="reason-q">💬 왜 Claude 기본?</div>
+    <div class="reason-a">
+      한국어 이해도와 99.9% SLA가 현재 최선이며, LLM은 선택적 보조 용도입니다.
+      <strong>그러나 환경변수 하나로 GPT-4o, 로컬 Qwen3 등으로 교체 가능하게 설계했습니다.</strong>
+      폐쇄망에서는 Qwen3-14B로 자동 전환됩니다. 벤더 종속 없음.
+    </div>
+  </div>
+  <div class="reason-row">
+    <div class="reason-q">🛡 왜 FNR-safe 오버라이드?</div>
+    <div class="reason-a">
+      AI가 "S3"이라고 해도 규칙 엔진이 "TS 특징이 강하다"고 판단하면 강제로 TS로 올립니다.
+      <strong>보안 도메인에서 미탐(기밀을 공개로 분류) 1건 = 보안 사고입니다.</strong>
+      과탐(공개를 기밀로 분류)은 사람이 수정하면 됩니다. 방향이 다른 비대칭 리스크.
+    </div>
+  </div>
+  <div class="reason-row">
+    <div class="reason-q">💾 왜 Best-effort 저장?</div>
+    <div class="reason-a">
+      DB 저장이 실패해도 분류 응답은 정상으로 반환합니다.
+      <strong>DB 장애가 서비스 장애로 전파되지 않습니다.</strong>
+      영업비밀 분류는 실시간성이 중요하고, 저장 실패는 나중에 재처리할 수 있습니다.
+      실패 시 warnings 필드에 이유를 기록해 투명성을 보장합니다.
+    </div>
+  </div>
+  <div class="reason-row">
+    <div class="reason-q">✂️ 왜 청킹 1200자?</div>
+    <div class="reason-a">
+      oss_corpus 문서 평균 3842자 → 기존 1500자 잘라내기 방식은 중반 이후 내용을 검색할 수 없었습니다.
+      <strong>1200자 × 100자 겹침으로 청킹하면 3754문서 → 약 1.5만 벡터(4.1배), Recall@5 0.624→0.808 달성.</strong>
+      더 작게 쪼개면 문맥이 끊기고, 더 크게 하면 정밀도가 낮아집니다. 실험으로 1200자가 최적임을 확인.
+    </div>
+  </div>
+  <div class="reason-row">
+    <div class="reason-q">🏢 왜 멀티테넌트를 안 쓰나?</div>
+    <div class="reason-a">
+      고객사 간 분리는 <strong>구조</strong>로 끝납니다 — 각 고객사가 <strong>독립 폐쇄망에 따로 배포</strong>되고 고객사 페이지·접근은 <strong>KL(원청) 포털이 일원 관리</strong>하므로, 한 서버가 여러 고객사를 섞어 담는 멀티테넌시 자체가 필요 없습니다.
+      <span style="opacity:.85;">단일 기관 배포 내부의 실제 접근통제(누가 어떤 등급 문서를 보는가)는 <strong>권한(RBAC)·등급 인가</strong>로 처리합니다.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 01 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">01</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">이 시스템이 뭔가요?</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="overview">한 문장으로 설명하면</h2>
+<p>
+  <strong>회사 내부 문서를 AI가 읽고, 영업비밀 등급(TS / S1 / S2 / S3) 4가지 중 하나로 자동 분류해주는 시스템입니다.</strong>
+</p>
+<p>
+  예를 들어 "반도체 공정 레시피 문서"를 시스템에 넣으면, AI가 내용을 분석해서 "이건 최고기밀(TS)입니다"라고 판정합니다.
+  동시에 "왜 그렇게 판단했는지" 근거 구간도 함께 알려줍니다.
+</p>
+
+<div class="callout dark">
+  <div class="callout-label">💡 왜 이게 필요한가?</div>
+  <p>
+    회사마다 수만 건의 문서가 있는데, 사람이 일일이 등급을 매기면 시간도 오래 걸리고 기준도 일관되지 않습니다.
+    AI를 쓰면 <strong>빠르고 일관된 기준</strong>으로 분류할 수 있고, 사람은 AI가 애매하게 판단한 것만 검토하면 됩니다.
+  </p>
+</div>
+
+<h3 id="grade-system">4가지 등급 — TS / S1 / S2 / S3</h3>
+<p>등급이 높을수록 더 민감한 문서입니다. <strong>유출됐을 때 피해가 클수록 높은 등급</strong>을 받습니다.</p>
+
+<div class="grade-grid">
+  <div class="grade-card grade-ts">
+    <div class="grade-badge">TS</div>
+    <div class="grade-name">특급기밀 (Top Secret)</div>
+    <div class="grade-desc">유출되면 회사 존립이 위협받는 최고 기밀. 극소수 임원만 접근 가능.</div>
+    <div class="grade-examples">
+      <strong>예시 ▸</strong> 반도체 EUV 공정 파라미터 · M&A 협상 가격 · 신약 후보물질 합성 경로 · HSM 암호화 마스터 키 · 방위산업 핵심 알고리즘
+    </div>
+  </div>
+  <div class="grade-card grade-s1">
+    <div class="grade-badge">S1</div>
+    <div class="grade-name">1급 비밀 (Secret)</div>
+    <div class="grade-desc">유출되면 경쟁우위 상실 또는 영업비밀 침해가 발생하는 기밀.</div>
+    <div class="grade-examples">
+      <strong>예시 ▸</strong> 제조 공정 노하우 · 원가 구조 분석 · 핵심 고객 데이터베이스 · 미공개 마케팅 전략 · 독자 개발 AI 모델
+    </div>
+  </div>
+  <div class="grade-card grade-s2">
+    <div class="grade-badge">S2</div>
+    <div class="grade-name">2급 대외비 (Confidential)</div>
+    <div class="grade-desc">외부 공개 시 협상력 약화 또는 이미지 손상이 우려되는 내부 자료.</div>
+    <div class="grade-examples">
+      <strong>예시 ▸</strong> 미확정 분기 매출 초안 · 사업 계획 내부 검토안 · 거래처 협상 조건 · 내부 감사 결과 · 임원 인사 계획
+    </div>
+  </div>
+  <div class="grade-card grade-s3">
+    <div class="grade-badge">S3</div>
+    <div class="grade-name">3급 공개 (Restricted)</div>
+    <div class="grade-desc">공개 예정이거나 이미 공개된 정보. 민감도가 낮은 일반 사내 자료.</div>
+    <div class="grade-examples">
+      <strong>예시 ▸</strong> 보도자료 · 채용공고 · 공시 자료 · 회사 소개서 · 이용약관 · 법원 공개 판결문
+    </div>
+  </div>
+</div>
+
+<!-- ─── v2.2 신규: S1 판단 기준 명문화 ─── -->
+<div class="callout inset" style="margin-top:18px;">
+  <div class="callout-label">🔖 S1 판단 기준 명문화 — v2.2 기준</div>
+  <p>
+    <strong>비밀관리성 M=0이어도 비공지성 S=2 · 경제적 유용성 V=2이면 S1 확정.</strong><br/>
+    형식적 관리 체계가 없더라도 내용 자체가 비공개·고가치이면 S1로 판정합니다(부정경쟁방지법 §2.2 실질 해석 기준).
+  </p>
+  <p style="margin-top:8px;font-size:13px;color:var(--text-dim);">전형 유형 6가지:</p>
+  <ul>
+    <li><strong>알고리즘 파라미터</strong> — 내부 미공개 모델 가중치·하이퍼파라미터</li>
+    <li><strong>축적 노하우</strong> — 반복 실험으로 쌓인 공정 최적화 조건</li>
+    <li><strong>비공식 열람 제한 전략</strong> — 공식 DRM 없이 구두·이메일로만 열람 통제된 전략 문서</li>
+    <li><strong>NDA만 있는 문서</strong> — 비밀유지계약서만 존재하고 별도 보안 시스템 없는 계약 조건</li>
+    <li><strong>승인 전 임상 데이터</strong> — 규제기관 제출 전 미공개 임상시험 결과</li>
+    <li><strong>계리 테이블</strong> — 보험·금융사의 내부 손해율·요율 산출 테이블</li>
+  </ul>
+</div>
+
+<h3>등급은 어떻게 정해지나? — 3요건 곱셈 (S × V × M)</h3>
+<p>
+  등급은 점수를 더해서 매기지 않습니다. <strong>부정경쟁방지법의 영업비밀 3요건</strong>을 각각 0·1·2점으로 채점한 뒤
+  <strong>세 점수를 곱해서</strong> 등급을 정합니다. 곱셈이므로 <strong>한 요건이라도 0점이면 곱이 0 → 무조건 공개(S3)</strong>가 됩니다.
+  예를 들어 아무리 가치 있는 정보라도 이미 공개됐다면(비공지성 0) 영업비밀이 아닙니다.
+</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>요건</th><th>0점</th><th>1점</th><th>2점</th></tr></thead>
+  <tbody>
+  <tr><td><strong>S — 비공지성</strong><br/>(외부에 알려지지 않음)</td><td>이미 공개됨</td><td>통상적으로 입수 곤란</td><td>보유자를 통하지 않곤 알 수 없음</td></tr>
+  <tr><td><strong>V — 경제적 유용성</strong><br/>(돈이 되는 가치)</td><td>가치 없음</td><td>비용·노력이 투입됨</td><td>상당한 비용·노력이 투입됨</td></tr>
+  <tr><td><strong>M — 비밀관리성</strong><br/>(접근 제한·관리)</td><td>공개·관리 안 됨</td><td>임직원 일부에게만 공유</td><td>승인된 자만 접근</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="decision">
+  <div class="node"><span class="cond">S × V × M = 8</span><span class="arrow">→</span><span class="result"><strong>TS</strong> (특급기밀, 2×2×2)</span></div>
+  <div class="node"><span class="cond">S × V × M = 4</span><span class="arrow">→</span><span class="result"><strong>S1</strong> (1급 비밀)</span></div>
+  <div class="node"><span class="cond">S × V × M = 1 또는 2</span><span class="arrow">→</span><span class="result"><strong>S2</strong> (2급 대외비)</span></div>
+  <div class="node"><span class="cond">S × V × M = 0</span><span class="arrow">→</span><span class="result"><strong>S3</strong> (공개 — 한 요건이라도 0)</span></div>
+</div>
+
+<div class="callout" style="border-left:3px solid #f59e0b;background:#fffbeb;">
+  <div class="callout-label" style="color:#92400e;">⚠ 가이드 원본 vs v2.2 보정 — 정책 승인 필요</div>
+  <p>위 4단계 매핑은 <strong>발주처 정본 가이드 원본(스캔본 11~12p 직접 대조)</strong> 그대로입니다. v2.2는 골든셋 실증으로 <strong>2곳을 보정</strong>했습니다 — ① <code>S=2·V=2·M=0</code>: 가이드는 곱=0이라 <strong>공개(S3)</strong>지만 v2.2는 <strong>S1</strong>(미탐 방지), ② <code>S=1·V=2·M=2</code> 등 <code>S&lt;2</code>의 곱=4: 가이드는 <strong>1급 비밀</strong>이나 v2.2는 <strong>S2</strong>(과분류 방지). 가이드 예시값을 정정하는 것이라 <strong>"가이드 기본값 + 보정 토글"</strong>로 분리해 정책 승인 후 적용을 권고합니다. A안(Σ5요소 100점)은 경영·재무 판단값 65점을 포함해 AI 산출 불가 → <strong>사람 수기</strong> 자가진단. <em>(상세: 등급분류 기준 적용서 v2.2 §3.7)</em></p>
+</div>
+
+<!-- ─── v2.2 신규: 등급 결정 분기표 ─── -->
+<h3 style="margin-top:28px;">골든셋 실증 기반 — 등급 결정 분기표</h3>
+<p>곱셈 결과만으로 등급이 확정되지 않는 경계 케이스를 처리하는 v2.2 분기 로직입니다. S=2·V=2 조합은 M 값에 따라 TS 또는 S1로 분기됩니다.</p>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>조건</th>
+      <th>세부 분기</th>
+      <th>결정 등급</th>
+      <th>비고</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>S=2 AND V=2</strong></td>
+      <td>M=0</td>
+      <td><span class="tag dark">S1</span></td>
+      <td>비밀관리성 없어도 고비공지·고가치 → S1 확정 (v2.2 명문화)</td>
+    </tr>
+    <tr>
+      <td><strong>S=2 AND V=2</strong></td>
+      <td>M=1</td>
+      <td><span class="tag filled">TS</span></td>
+      <td>접근자 지정만 있어도 최고기밀 수준 충족</td>
+    </tr>
+    <tr>
+      <td><strong>S=2 AND V=2</strong></td>
+      <td>M=2</td>
+      <td><span class="tag filled">TS</span></td>
+      <td>3요건 모두 최고점 → TS (S×V×M = 8)</td>
+    </tr>
+    <tr>
+      <td><strong>그 외</strong></td>
+      <td>S=0 (공개됨)</td>
+      <td><span class="tag mid">S3</span></td>
+      <td>비공지성 0 → 영업비밀 요건 미충족</td>
+    </tr>
+    <tr>
+      <td><strong>그 외</strong></td>
+      <td>S×V×M ≥ 1</td>
+      <td><span class="tag mid">S2</span></td>
+      <td>1~2점대 — 대외비 수준</td>
+    </tr>
+    <tr>
+      <td><strong>그 외</strong></td>
+      <td>S×V×M = 0</td>
+      <td><span class="tag mid">S3</span></td>
+      <td>한 요건이라도 0 → 공개</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ─── v2.2 신규: 도메인별 앵커 표 ─── -->
+<h3 style="margin-top:28px;">골든셋 실증 기반 — 도메인별 S·V·M 앵커 표 (100건 실증)</h3>
+<p>골든셋 100건을 도메인별로 분석해 도출한 S·V·M 점수 앵커입니다. 신규 문서 판정 시 해당 유형과 대조하여 채점 기준으로 활용합니다.</p>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>요건</th>
+      <th>2점 — 앵커 유형</th>
+      <th>1점 — 앵커 유형</th>
+      <th>0점 — 앵커 유형</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>S — 비공지성</strong></td>
+      <td>알고리즘·파라미터, 승인 전 임상 데이터, M&amp;A 협상 조건 — 보유자 경유 없이 입수 불가</td>
+      <td>내부 기획·예산 초안, 진행 중 협상 내용 — 통상적 입수 곤란</td>
+      <td>공개 특허·판례·보도자료·공시 문서 — 외부 공개됨</td>
+    </tr>
+    <tr>
+      <td><strong>V — 경제적 유용성</strong></td>
+      <td>복제 즉각 피해 유형 — 경쟁사 복제 시 즉시 매출·기술 손실 발생 (공정 파라미터·신약 합성경로·계리 테이블)</td>
+      <td>간접 기여 유형 — 비용·시간 절감에 기여하나 단독으로 즉각적 피해는 없음 (마케팅 전략 초안·거래처 협상 조건)</td>
+      <td>공개 동등 유형 — 해당 정보를 공개 경로로 동등하게 획득 가능 (법원 판결문·표준 스펙 문서)</td>
+    </tr>
+    <tr>
+      <td><strong>M — 비밀관리성</strong></td>
+      <td>에어갭·HSM·공식 통제 — 물리 격리 또는 하드웨어 보안 모듈·공식 비밀관리규정 적용</td>
+      <td>접근자 지정 — 열람자 명단 지정, NDA 체결, 접근 로그 존재</td>
+      <td>비공식 제한 — 구두·이메일로만 "내부용"이라고 언급, 공식 통제 수단 없음</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout inset">
+  <div class="callout-label">📖 왜 더하기가 아니라 곱하기인가?</div>
+  <p>
+    예전에는 4가지 요소(경제적가치·비공지성·관리수준·유출영향도)에 가중치를 곱해 100점 만점으로 더하는 방식이었습니다.
+    하지만 가산 방식은 <strong>"이미 공개된 정보(비공지성 0)"인데도 다른 점수가 높으면 기밀로 잘못 매겨질 수 있는</strong> 허점이 있었습니다.
+    그래서 <strong>2026-06-18부터 법 요건 그대로 3요건 곱셈식(B안)으로 전환</strong>했습니다.
+    곱셈은 "세 요건을 모두 충족해야 영업비밀"이라는 법리(부정경쟁방지법 §2.2)를 정확히 반영합니다.
+    옛 4요소는 키워드 시드 태그로만 남아 자동으로 3요건에 접혀 들어갑니다(유출영향도→경제적유용성).
+    코드: <code>rule_engine.py</code>의 <code>grade_from_svm()</code>, <code>SVM_GRADE_MAP={8:TS,4:TS,2:S2,1:S2,0:S3}</code>.
+  </p>
+</div>
+
+<div class="callout inset">
+  <div class="callout-label">⚠️ 설계 철학 — 미탐(FNR)이 더 위험하다</div>
+  <p>
+    분류 오류에는 두 종류가 있습니다: <strong>미탐(기밀을 공개로 잘못 판정)</strong>과 <strong>과탐(공개를 기밀로 과도 판정)</strong>.
+    이 시스템은 <strong>미탐 방지를 최우선</strong>으로 합니다.
+    기밀 문서를 공개로 잘못 판정하면 보안 사고가 됩니다. 공개 문서를 기밀로 잘못 판정하면 사용자가 수정하면 됩니다.
+    AI가 애매하면 더 높은 등급을 부여하도록 설계되어 있습니다(곱셈 등급과 내용 등급이 다르면 더 민감한 쪽 채택 — FNR-safe).
+  </p>
+</div>
+
+<!-- ═══ 02 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">02</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">현재 성능 수치</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="metrics">지금 시스템이 얼마나 잘 동작하나요?</h2>
+<p>아래 수치는 실제 테스트 결과입니다. 숫자가 1에 가까울수록 잘 분류한다는 뜻입니다.</p>
+
+<p style="margin:6px 0 8px;font-size:13px;color:var(--text-dim);"><strong>분류(핵심 요건)</strong>는 F1·미탐율로, <strong>검색(요건 외 부가)</strong>은 Recall@5로 — <u>서로 다른 축</u>입니다. 검색 점수가 분류 등급을 바꾸지 않습니다.</p>
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">🎯 분류 F1 (hardened holdout · 현행 v5)</div>
+    <div class="kpi-value pass">0.917</div>
+    <div class="kpi-sub">핵심 요건 · KF-DeBERTa v-fe4b386b(v5_clean · 2026-07-29 승격) — hardened holdout(누출0·n=42) F1 0.917 · 공개문서 과분류 0.79→0.04 · high→S3 위험미탐 0. 직전 배포본 v4(v-dd3abab9)는 홀드아웃 109(학습본 42% 누출·참고용, 이 셋에선 v5≈v4) F1 0.686 · clean F1≈0.78(백서 v7)</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">🎯 분류 방향성 미탐율 (서빙경로)</div>
+    <div class="kpi-value pass">0.018</div>
+    <div class="kpi-sub">핵심 요건 · 값은 직전 v4 홀드아웃109 서빙경로 방향성 FNR(FNR_TS=0.000 · 원시 대비 9배↓) · 현행 v5는 hardened holdout high→S3 위험미탐 0</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">🔎 검색 Recall@5 <span style="font-size:.8em;color:var(--text-dim);">(요건 외 부가)</span></div>
+    <div class="kpi-value pass">0.808</div>
+    <div class="kpi-sub">부가 기능 · 평가셋 기준 0.808 (운영 합격은 실데이터 재확정)</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">단위 테스트 (pytest)</div>
+    <div class="kpi-value pass">~1,200</div>
+    <div class="kpi-sub">회귀 0건 · GPU E2E 7/7 포함</div>
+  </div>
+</div>
+
+<div class="callout">
+  <div class="callout-label">📖 F1 / Recall@5 가 뭔가요?</div>
+  <p>
+    <strong>F1 점수</strong>는 분류 정확도를 0~1로 나타낸 것입니다. 현행 v5의 0.917은 100건 중 약 92건을 올바르게 분류(hardened holdout 기준; 직전 v4 홀드아웃 109에선 0.686).
+    <br/><strong>Recall@5</strong>는 "관련 문서가 검색 결과 상위 5개 안에 있을 확률"입니다.
+    0.808이면 80.8%의 질문에서 정답 문서를 상위 5개 안에 찾아냄.
+  </p>
+</div>
+
+<div class="callout dark">
+  <div class="callout-label">📊 핵심 발견 — "평가 ↔ 서빙 갭" (실배포 경로로 재측정)</div>
+  <p>
+    같은 모델·같은 홀드아웃 109건이라도 <strong>어떻게 재느냐에 따라 안전성 수치가 9배 차이</strong>가 납니다.
+    모델 출력을 그냥 최댓값으로 읽는 <strong>원시 argmax</strong>로 재면 방향성 미탐율(FNR) <strong>0.167</strong>·F1 0.632이지만,
+    실제 배포되는 <strong>서빙 경로</strong>(보정 + FNR-safe 상향 + 청크 최댓값 집계)를 통과시켜 재면 미탐율 <strong>0.018</strong>·FNR_TS <strong>0.000</strong>·F1 <strong>0.686</strong>이 됩니다.
+    <br/>→ 서빙 경로의 미탐이 약 <strong>9배 낮습니다.</strong> 그래서 우리는 평가도 <strong>실배포 경로 그대로(<code>evaluate_via_serving</code>)</strong> 측정합니다 — 평가 수치가 곧 운영 동작이 되도록.
+  </p>
+</div>
+
+<div class="callout dark">
+  <div class="callout-label">📊 법률 코퍼스 오염 발견·정제 (2026-06-19)</div>
+  <p>
+    초기 학습셋 5,911건을 점검하니 <strong>3,320건(56%)이 판례·심결</strong>이었고, 그중 <strong>2,210건(67%)이 공개된 법원 문서를 고등급(TS/S1/S2)으로 잘못 라벨</strong>한 오염이었습니다.
+    공개 문서는 정의상 영업비밀이 아닌데 고등급으로 학습되면 모델이 "공개=비밀"로 잘못 배웁니다.
+    <strong>법률 문서를 제외하고 재학습(2,591건)</strong>하니: 정제 test 정확도 <strong>78% → 93%</strong>(+15%p),
+    비즈니스 홀드아웃 <strong>67% → 76%</strong>(+9%p), 고등급 미탐율(FNR) <strong>21% → 8%</strong>(−13%p)로 모두 개선됐습니다.
+    (참고: 정제 전 OSS 공개데이터 벤치마크에서 보였던 F1 0.848은 이 오염을 포함한 수치라 현행 운영값과 다릅니다.)
+  </p>
+</div>
+
+<h3>도입 전 vs 도입 후</h3>
+<div class="ba-grid">
+  <div class="ba-col before">
+    <div class="ba-col-header">도입 전 — 수작업</div>
+    <div class="ba-item"><span class="ba-icon">😰</span><span>담당자마다 분류 기준이 달라 동일 문서도 등급이 제각각</span></div>
+    <div class="ba-item"><span class="ba-icon">⏱️</span><span>문서 1건 분류에 5~20분 소요. 10,000건 = 수개월</span></div>
+    <div class="ba-item"><span class="ba-icon">🔍</span><span>"영업비밀"이란 단어가 없으면 놓침</span></div>
+    <div class="ba-item"><span class="ba-icon">👤</span><span>담당자 퇴사 시 분류 기준·지식 소실</span></div>
+    <div class="ba-item"><span class="ba-icon">📋</span><span>누가 어떤 문서를 열람했는지 추적 어려움</span></div>
+    <div class="ba-item"><span class="ba-icon">😓</span><span>경계 케이스(S1인지 S2인지) 결정에 시간 낭비</span></div>
+  </div>
+  <div class="ba-col after">
+    <div class="ba-col-header">도입 후 — AI 보조</div>
+    <div class="ba-item"><span class="ba-icon">✓</span><div><strong>동일 기준</strong>으로 24시간 일관된 분류</div></div>
+    <div class="ba-item"><span class="ba-icon">✓</span><div>문서 1건 분류에 <strong>2~3초</strong>. 10,000건도 수시간 내</div></div>
+    <div class="ba-item"><span class="ba-icon">✓</span><div>단어 없이도 <strong>내용의 의미로 판단</strong></div></div>
+    <div class="ba-item"><span class="ba-icon">✓</span><div>분류 기준이 <strong>모델에 내재화</strong>되어 인력 변화에 무관</div></div>
+    <div class="ba-item"><span class="ba-icon">✓</span><div>모든 요청 <strong>감사 로그 자동 기록</strong></div></div>
+    <div class="ba-item"><span class="ba-icon">✓</span><div>사람은 AI 신뢰도 낮은 <strong>경계 케이스만 검토</strong></div></div>
+  </div>
+</div>
+
+<!-- ═══ 03 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">03</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">서버 구조</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="infra">서버는 어떻게 생겼나요?</h2>
+<p>
+  이 시스템은 <strong>7가지 서비스</strong>로 구성됩니다. 각각 독립된 컨테이너(Docker)로 실행되며, 함께 동작합니다.
+</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>서비스</th><th>기술</th><th>포트</th><th>역할</th></tr></thead>
+<tbody>
+<tr><td><strong>API 서버</strong></td><td>FastAPI (Python)</td><td>8000</td><td>모든 HTTP 요청을 받아서 처리하는 메인 서버</td></tr>
+<tr><td><strong>Worker</strong></td><td>Celery + Redis</td><td>—</td><td>시간이 오래 걸리는 작업을 백그라운드에서 처리</td></tr>
+<tr><td><strong>PostgreSQL + pgvector</strong></td><td>PostgreSQL 16 (pgvector)</td><td>5432</td><td>문서·분류결과·사용자정보 관계형 저장 + AI 벡터(pgvector dense)·키워드(ts_rank) 하이브리드 검색 — DB 통합</td></tr>
+<tr><td><strong>로컬 스토리지</strong></td><td>파일시스템(file://)</td><td>—</td><td>원본 문서 파일(HWP, PDF 등) 저장 — AES-256-GCM 암호화 (MinIO 미사용)</td></tr>
+<tr><td><strong>Redis</strong></td><td>Redis 7.2</td><td>6379</td><td>임베딩 결과 캐시, Celery 작업 큐</td></tr>
+<tr><td><strong>MLflow</strong> (지재원 전용)</td><td>MLflow 2.16</td><td>—</td><td>모델 학습 추적 — <strong>지재원에서만</strong>, 고객사 번들 미포함</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout">
+  <div class="callout-label">📖 컨테이너(Docker)가 뭔가요?</div>
+  <p>각 서비스를 독립된 "상자(컨테이너)" 안에 넣어서 실행하는 방식입니다.
+    어떤 컴퓨터에서도 동일하게 동작합니다. <code>docker compose up</code> 명령 하나로 7개 서비스가 모두 시작됩니다.</p>
+</div>
+
+<h3>환경별 배포 방식</h3>
+<div class="case-grid">
+  <div class="case-card">
+    <div class="case-title"><span class="tag mid">일반망</span> 클라우드 API 사용</div>
+    <div class="case-body">LLM(Claude Sonnet 4.6)을 외부 API로 호출합니다. <code>LLM_PROVIDER=anthropic</code> 설정. <strong>일반망 개발·합성 데이터 생성 보조용</strong>이며, 폐쇄망 비밀 분류 본경로는 <strong>분류기+룰(LLM-free·CPU)</strong>입니다(§14 참조).</div>
+  </div>
+  <div class="case-card">
+    <div class="case-title"><span class="tag filled">폐쇄망</span> 로컬 모델 사용</div>
+    <div class="case-body">인터넷 연결이 안 되는 환경. Qwen3-14B를 Ollama로 로컬 실행. <code>LLM_PROVIDER=local_openai</code> 설정. GPU(권장: RTX 5070 Ti 이상)가 필요합니다.</div>
+  </div>
+</div>
+
+<!-- ═══ 04 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">04</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">API 엔드포인트</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="api">어떤 기능을 API로 쓸 수 있나요?</h2>
+<p>모든 요청은 <code>X-API-Key</code> 헤더에 인증 키를 담아야 합니다.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>엔드포인트</th><th>방식</th><th>역할</th></tr></thead>
+<tbody>
+<tr><td><code>POST /api/v1/classify</code></td><td>동기</td><td>문서를 즉시 분류하고 결과 반환 (2~3초)</td></tr>
+<tr><td><code>POST /api/v1/classify/stream</code></td><td>SSE 스트리밍</td><td>분류 진행 단계를 실시간으로 전송</td></tr>
+<tr><td><code>POST /api/v1/classify/async</code></td><td>비동기 202</td><td>백그라운드에서 분류. 대용량 배치 처리</td></tr>
+<tr><td><code>POST /api/v1/classify/batch</code></td><td>비동기 202</td><td>여러 문서를 한 번에 분류 요청 (최대 1,000건)</td></tr>
+<tr><td><code>POST /api/v1/documents</code></td><td>동기</td><td>HWP/PDF/DOCX 파일 업로드 및 등록 (최대 20MB)</td></tr>
+<tr><td><code>POST /api/v1/relabel</code></td><td>동기</td><td>분류 재라벨 — 사람 정정(correction)을 능동학습 입력으로 등록</td></tr>
+<tr><td><code>POST /api/v1/confirm</code></td><td>동기</td><td>분류 결과를 검증 라벨로 확정</td></tr>
+<tr><td><code>POST /api/v1/train</code></td><td>동기 (admin)</td><td>재학습 트리거 — 정정 데이터로 모델 다시 학습 (10회/시간) <span style="color:var(--text-dim);">※ 환류=재학습 정책 미확정·기본 A안 무반출(<a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)</span></td></tr>
+<tr><td><code>POST /api/v1/admin/model/reload</code></td><td>동기 (admin)</td><td>모델 핫리로드 — 프로세스 재기동 없이 새 모델로 교체</td></tr>
+<tr><td><code>PUT /api/v1/schema/grades</code></td><td>동기 (admin)</td><td>등급 체계 변경 (조회는 <code>GET</code>)</td></tr>
+<tr><td><code>GET /api/v1/healthz</code></td><td>동기</td><td>시스템 상태 확인 (공개)</td></tr>
+<tr><td><code>GET /api/v1/metrics</code></td><td>동기</td><td>Prometheus 형식 성능 지표 (공개)</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>인증 방식</h3>
+<div class="case-grid">
+  <div class="case-card">
+    <div class="case-title"><span class="tag mid">API Key</span> 가장 간단한 방식</div>
+    <div class="case-body">헤더에 <code>X-API-Key: your-key</code>를 담아 요청. 연동 주체·역할마다 별도 키를 발급. 키는 bcrypt 해시로 DB에 저장.</div>
+  </div>
+  <div class="case-card">
+    <div class="case-title"><span class="tag dark">JWT 토큰</span> 더 강력한 보안</div>
+    <div class="case-body"><code>Authorization: Bearer &lt;token&gt;</code> 방식. RS256 알고리즘만 허용(HS256 거부). 만료 시간 강제 적용. 역할(admin, reviewer, system)이 토큰에 포함.</div>
+  </div>
+</div>
+
+<div class="callout inset">
+  <div class="callout-label">🔒 객체 수준 권한 — 남의 문서 ID로 훔쳐보기(IDOR) 차단</div>
+  <p>
+    인증만 통과하면 끝이 아닙니다. 요청은 <strong>인증된 신원의 권한·열람등급에 결속</strong>되어,
+    권한·등급을 벗어난 문서를 본문에 끼워 넣으면 <code>403</code>으로 거부됩니다.
+    또한 <strong>문서 조회·검증 라벨·분류 이력 등 모든 doc 단위 조회가 호출자의 권한·등급으로 스코프</strong>되어,
+    남의 <code>doc_id</code>를 끼워 넣어 본문이나 분류 결과를 열람하는 객체 수준 인가 우회(IDOR/BOLA)가 막힙니다.
+    감사 로그의 행위자(actor)·역할도 위조 가능한 헤더가 아니라 <strong>인증 컨텍스트에서 도출</strong>합니다.
+    (앱 레이어에서 강제.)
+  </p>
+</div>
+
+<!-- ═══ 05 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">05</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">전체 워크플로우</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="workflow">문서를 넣으면 무슨 일이 일어나나요?</h2>
+<p>문서를 API로 전송하면 아래 6단계를 거쳐서 분류 결과가 나옵니다.</p>
+
+<!-- 한눈에 보기: 두 워크플로 (업로드 / 재학습) -->
+<div style="margin:18px 0;border:1px solid var(--border,#d8dee6);border-radius:3px;overflow:hidden;">
+  <div style="background:var(--accent,#3b6ea5);color:#fff;padding:10px 16px;font-weight:700;font-size:15px;">한눈에 보기 — 6개 모듈이 두 흐름에 나뉘어 동작</div>
+  <div style="padding:12px 16px 14px;font-size:13.5px;line-height:1.6;">
+    <p style="margin:4px 0 12px;color:var(--text-dim);">M1~M6 모듈은 ① 문서를 분류할 때와 ② 모델을 재학습할 때 서로 다르게 등장합니다.</p>
+
+    <div style="margin-bottom:14px;padding:10px 12px;border-left:3px solid var(--accent,#3b6ea5);background:rgba(59,110,165,0.06);">
+      <b>① 문서 업로드시 — 실시간 분류 (모델 사용)</b><br>
+      <code>M2 전처리</code> <span style="color:var(--text-faint);">→</span> <code>M5 추론</code> <span style="color:var(--text-dim);">(내부에 M3 규칙엔진 FNR-safe)</span> <span style="color:var(--text-faint);">→</span> <b>관리자 최종확정</b><br>
+      <span style="color:var(--text-dim);font-size:12.5px;">텍스트 추출·청킹 → AI 분류(+규칙 안전망) → 임시저장 → 사람 확정. <b>M1·M4·M6은 안 씀</b>(이미 학습된 모델을 쓰기만).</span>
+    </div>
+
+    <div style="margin-bottom:6px;padding:10px 12px;border-left:3px solid var(--text-faint,#9aa5b1);background:rgba(0,0,0,0.03);">
+      <b>② 재학습시 — 능동학습 폐곡선 (모델 개선)</b><br>
+      <code>M1 합성</code> <span style="color:var(--text-faint);">→</span> <code>M3 라벨링</code> <span style="color:var(--text-faint);">→</span> <code>M4 학습</code> <span style="color:var(--text-faint);">→</span> <code>M6 평가·게이트</code> <span style="color:var(--text-faint);">→</span> <b>배포(핫리로드)</b> <span style="color:var(--text-faint);">→</span> <code>M5</code><br>
+      <span style="color:var(--text-dim);font-size:12.5px;">관리자 확정이 쌓이면 admission gate → exact-match 선례·검수 우선순위에 먼저 반영한다. 재파인튜닝은 locked 충분량·shadow 검증·사람 승인 전까지 기본 OFF다.</span>
+    </div>
+
+    <p style="margin:12px 0 2px;padding-top:10px;border-top:1px dashed var(--border,#d8dee6);color:var(--text-dim);">
+      <b>두 흐름을 잇는 다리</b> — ①의 끝 "관리자 최종확정·정정"이 유일한 진짜 데이터가 됩니다. 다만 기본 운영은 재학습이 아니라 <b>확정 포착·exact-match 선례·검수 라우팅</b>입니다. <span style="color:var(--text-dim);">※ 고객 원문은 무반출이고, 재학습/kNN 전파는 locked 충분량·shadow 검증·별도 승인 이후에만 엽니다.</span>
+    </p>
+  </div>
+</div>
+
+<div class="flow">
+  <div class="flow-box fill">① 수신·인증</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box mid">② 텍스트 추출</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box mid">③ 청킹</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box fill">④ AI 분류</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box mid">⑤ DB 저장</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box mid">⑥ 결과 반환</div>
+</div>
+
+<div class="steps" id="steps-detail">
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-num-col">
+      <div class="step-circle">1</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-title">문서 수신 &amp; 인증 확인</div>
+      <p>FastAPI가 먼저 <strong>API Key 또는 JWT 토큰</strong>이 올바른지 검증합니다. 인증 실패 시 <code>401</code> 즉시 반환.</p>
+      <div class="callout dark">
+        <div class="callout-label">⚡ DB 검증 라벨 확인 (추론 스킵)</div>
+        <p>이미 사람이 검증한 라벨(<code>is_verified=True</code>)이 있으면 AI 추론 없이 그 라벨을 바로 반환합니다. AuditLog에 <code>verified_label_applied</code> 이벤트가 기록됩니다.</p>
+      </div>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>상황</th><th>동작</th></tr></thead>
+        <tbody>
+        <tr><td>인증 실패</td><td>401 반환, 처리 종료</td></tr>
+        <tr><td>내용 없음 + 문서 ID 없음</td><td>400 반환, 처리 종료</td></tr>
+        <tr><td>검증된 라벨 있음</td><td>AI 추론 스킵, 즉시 반환</td></tr>
+        <tr><td>정상</td><td>다음 단계 진행</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-num-col">
+      <div class="step-circle">2</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-title">텍스트 추출 &amp; 정규화 (PreprocessPipeline)</div>
+      <p>HWP, PDF, DOCX 등 다양한 파일 형식에서 순수 텍스트를 추출합니다. 이후 AI가 잘 이해할 수 있도록 정리합니다.</p>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>파일 형식</th><th>라이브러리</th><th>특징</th></tr></thead>
+        <tbody>
+        <tr><td>HWP/HWPX</td><td>rhwp-python</td><td>기존 대비 62배 빠른 한글 파일 파서</td></tr>
+        <tr><td>PDF</td><td>pdfminer.six</td><td>MIT 라이선스 (무료, 상업 이용 가능)</td></tr>
+        <tr><td>DOCX</td><td>python-docx</td><td>Microsoft Word 포맷</td></tr>
+        <tr><td>TXT</td><td>내장 처리</td><td>그대로 사용</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>추출 후 <strong>PII 마스킹</strong>: 주민번호·전화번호·이메일을 <code>[PII]</code>로 치환 (<code>pii_masking_enabled=True</code> 설정 시).</p>
+      <div class="callout">
+        <div class="callout-label">✓ 운영 확대 기준</div>
+        <p>누락률 ≤ 5%, 품질 점수 ≥ 0.7. 기준 미달 시 <code>warnings</code>에 경고 추가 (처리는 계속됨).</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="step-num-col">
+      <div class="step-circle">3</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-title">청킹 — 긴 문서를 조각으로 나누기</div>
+      <p>AI 모델에는 한 번에 입력할 수 있는 텍스트 길이 제한이 있어, 긴 문서는 <strong>청크(chunk)</strong>라는 작은 조각으로 나눕니다.</p>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>파라미터</th><th>기본값</th><th>의미</th></tr></thead>
+        <tbody>
+        <tr><td>chunk_size (분류용)</td><td>512 토큰</td><td>모델 입력 최대 크기 (한글 약 1~2글자 = 1토큰)</td></tr>
+        <tr><td>chunk_size (검색용)</td><td>1200자</td><td>검색 정확도를 위해 더 크게 설정 — Recall@5=0.808 (평가셋 기준)</td></tr>
+        <tr><td>overlap</td><td>64 토큰 / 100자</td><td>앞뒤 청크가 겹치는 부분 (문맥 연속성 보존)</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p><strong>청킹 효과:</strong> oss_corpus 3,754개 문서 → 약 1.5만 개 벡터 (4.1배). 검색 포인트가 늘어나 Recall이 0.624 → 0.808로 향상됐습니다.</p>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step">
+    <div class="step-num-col">
+      <div class="step-circle">4</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-title">AI 분류 추론 (InferencePipeline) — 핵심 단계</div>
+      <p>텍스트를 AI 모델에 넣어서 <strong>TS/S1/S2/S3 중 하나와 신뢰도 점수</strong>를 얻습니다.</p>
+
+      <h4>경로 A: ML 모델이 있을 때 (운영 모드)</h4>
+      <p>KF-DeBERTa-base 모델을 사용합니다. 텍스트를 입력하면 각 등급별 확률 점수가 나오고, 가장 높은 점수의 등급이 최종 예측값이 됩니다.</p>
+
+      <h4>경로 B: ML 모델이 없을 때 (폴백 모드)</h4>
+      <p>키워드 기반 규칙 엔진이 대신 분류합니다. 약 400개의 키워드 목록에서 텍스트에 등장하는 키워드와 가중치를 계산해서 등급을 결정합니다.</p>
+
+      <div class="callout inset">
+        <div class="callout-label">🛡 FNR-safe 오버라이드 — 미탐 방지 안전장치</div>
+        <p>ML 모델이 낮은 등급(예: S3)을 예측해도, 규칙 엔진이 "이건 TS 특징이 강하다"고 판단하면 <strong>더 높은 등급으로 강제 상향</strong>됩니다.</p>
+        <ul>
+          <li>규칙 엔진 TS 점수 ≥ 3.0 → TS로 상향 (<code>fnr_rule_ts_threshold</code>)</li>
+          <li>규칙 엔진 S1 점수 ≥ 2.2 → S1로 상향 (<code>fnr_rule_s1_threshold</code>)</li>
+          <li>규칙 엔진 S2 점수 ≥ 1.6 → S2로 상향 (<code>fnr_rule_s2_threshold</code>)</li>
+        </ul>
+        <p>이 덕분에 프록시 holdout에서 서빙 경로 <strong>방향성 미탐율(FNR) = 0.018, FNR_TS = 0.000</strong>으로 관찰됐습니다(운영 보증 아님, 홀드아웃 109건).</p>
+      </div>
+
+      <div class="callout inset">
+        <div class="callout-label">⚖ 출처 게이트 + 청크 집계 — 상·하향 양방향 보정</div>
+        <ul>
+          <li><strong>청크 집계(max-pooling):</strong> 긴 문서를 토막내 분류할 때 고급 비밀(TS·S1)은 평균이 아니라 <strong>가장 강한 토막</strong>을 따릅니다 — 한 단락의 비밀이 평균에 묻혀 미탐되지 않게(S2·S3는 표준 평균).</li>
+          <li><strong>출처 게이트(비공지성, 기본 ON):</strong> 공개 출처(판례·공시·공개특허 등)는 내용과 무관하게 <strong>S3로 하향(cap)</strong> — 이미 공개된 건 영업비밀이 아니므로(부정경쟁방지법 §2.2). 실데이터 과분류 0.85→0.002.</li>
+          <li><strong>메타데이터 floor 게이트(<code>metadata_floor_enabled</code>, opt-in·기본 OFF):</strong> 출처 하향의 <strong>상향 대칭</strong> — KL ICD R6 보안표시(<code>top_secret→TS</code>·<code>secret→S1</code>·<code>confidential→S2</code>)가 예측보다 높으면 그 등급으로 <strong>상향 floor</strong>하고(명시표기 우선·하향 안 함), 접근범위가 제한적인데 예측이 낮으면 검수로 라우팅합니다.</li>
+          <li><strong>충돌 시 사람에게(cap-conflict):</strong> 출처 하향이 고급 비밀 신호를 덮으면 자동 확정하지 않고 <code>needs_review</code>로 보냅니다 — 내부 비밀이 '공개'로 오태깅돼 새는 것을 막기 위함.</li>
+        </ul>
+      </div>
+
+      <h4>분류 결과에 포함되는 정보</h4>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>필드</th><th>예시</th><th>설명</th></tr></thead>
+        <tbody>
+        <tr><td><code>label</code></td><td>TS</td><td>최종 예측 등급</td></tr>
+        <tr><td><code>confidence</code></td><td>0.932</td><td>확신도 (0~1)</td></tr>
+        <tr><td><code>scores</code></td><td>{TS:0.93, S1:0.04, S2:0.02, S3:0.01}</td><td>각 등급별 확률</td></tr>
+        <tr><td><code>evaluation_factors</code></td><td>{secrecy:2, value:2, management:2}</td><td>3요건 점수 (각 0·1·2) — 곱이 등급</td></tr>
+        <tr><td><code>evidence</code></td><td>[{start:122, end:180, factor:"SECRECY"}]</td><td>판단 근거 텍스트 구간</td></tr>
+        <tr><td><code>model_version</code></td><td>v-fe4b386b</td><td>사용된 모델 버전</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h4>3요건 점수 (S × V × M)</h4>
+      <p>각 요건을 0·1·2점으로 채점한 뒤 <strong>세 점수를 곱해</strong> 등급을 정합니다(8→TS · 4→S1 · 1·2→S2 · 0→S3). 한 요건이라도 0이면 공개(S3).</p>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>요건</th><th>코드 키</th><th>의미</th><th>점수</th></tr></thead>
+        <tbody>
+        <tr><td>비공지성 (S)</td><td>SECRECY</td><td>외부에 알려지지 않은 정보인가?</td><td>0·1·2</td></tr>
+        <tr><td>경제적 유용성 (V)</td><td>VALUE</td><td>돈이 되는 가치·투입된 비용·노력이 있는가?</td><td>0·1·2</td></tr>
+        <tr><td>비밀관리성 (M)</td><td>MANAGEMENT</td><td>접근을 제한하고 비밀로 관리하고 있는가?</td><td>0·1·2</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="font-size:13px;color:var(--text-dim);">※ 옛 4요소(경제적가치·비공지성·관리수준·유출영향도)는 키워드 시드 태그로만 남아 자동으로 3요건에 접혀 들어갑니다(유출영향도→경제적유용성). 점수·등급은 100% 곱셈식으로 산정됩니다.</p>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step">
+    <div class="step-num-col">
+      <div class="step-circle">5</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-title">DB 저장 (Best-effort)</div>
+      <p>분류 결과를 PostgreSQL에 저장합니다. <strong>"Best-effort"</strong>란 저장에 실패해도 응답은 정상적으로 반환한다는 뜻입니다. DB 장애가 있어도 분류 서비스가 중단되지 않습니다.</p>
+      <p>저장 항목: <strong>tb_classifications</strong> (예측 등급, 신뢰도, 모델), <strong>tb_classification_evidence</strong> (근거 구간), <strong>tb_chunks</strong> (텍스트 조각), <strong>tb_audit_log</strong> (감사 기록)</p>
+      <p><strong>원본 파일</strong>은 로컬 파일시스템에 <strong>at-rest 암호화(AES-256-GCM)</strong>로 보관하고, 분류·검색 경로에는 <strong>PII 마스킹된 텍스트만</strong> 사용합니다(원본·마스킹본 분리 — 원본은 증빙용).</p>
+    </div>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="step">
+    <div class="step-num-col">
+      <div class="step-circle">6</div>
+    </div>
+    <div class="step-body">
+      <div class="step-title">결과 반환</div>
+      <p>최종 <code>ClassifyResponse</code> JSON을 클라이언트에게 반환합니다.</p>
+      <pre><code>{
+  "inference_id": "uuid-여기에-들어옴",
+  "doc_id": "문서-아이디",
+  "label": "TS",
+  "confidence": 0.932,
+  "scores": {"TS": 0.932, "S1": 0.041, "S2": 0.018, "S3": 0.009},
+  "evaluation_factors": {
+    "secrecy": 2,
+    "value": 2,
+    "management": 2
+  },
+  "svm_product": 8,
+  "evidence": [
+    {"start": 122, "end": 180,
+     "text": "EUV 리소그래피 공정 파라미터",
+     "factor": "SECRECY", "weight": 0.91}
+  ],
+  "model_version": "v-fe4b386b",
+  "status": "staging",
+  "warnings": []
+}</code></pre>
+    </div>
+  </div>
+
+</div><!-- /steps -->
+
+<!-- ═══ 07 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">06</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">사용하는 AI 모델</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="models">어떤 AI 모델을 쓰나요?</h2>
+
+<h3>① 분류 모델 — KF-DeBERTa-base</h3>
+<p>카카오뱅크에서 금융 도메인 한국어 텍스트로 사전학습한 DeBERTa-v3-base 기반 모델입니다.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>항목</th><th>값</th></tr></thead>
+  <tbody>
+  <tr><td>모델 ID</td><td><code>kakaobank/kf-deberta-base</code></td></tr>
+  <tr><td>활성 버전</td><td><code>v-fe4b386b</code> (classifier_p1_v5_clean · v5로 승격 2026-07-29 · gate_p1_candidate 3축 PASS, 커밋 f5316df). 직전 배포본/롤백 타깃 <code>v-dd3abab9</code>(classifier_p1_retrain_v4_clean · labeled_clean_nolegal 2,591건 학습). step3/<code>v-f9b5cedb</code>는 정제 전 비교 baseline</td></tr>
+  <tr><td>파라미터 수</td><td>약 1억 1천만 개</td></tr>
+  <tr><td>출력</td><td>TS/S1/S2/S3 확률 4개 + 최고 확률 등급</td></tr>
+  <tr><td>학습 데이터</td><td>labeled_clean_nolegal 2,591건 (법률 코퍼스 오염 정제본)</td></tr>
+  <tr><td>홀드아웃 F1 (서빙경로)</td><td>0.686 · 방향성 FNR 0.018 · FNR_TS 0.000 · Acc 0.706 (109건)</td></tr>
+  <tr><td>⚠ 지표 주의</td><td>위 0.686/0.018 및 누출제거 clean F1≈0.78·정확도 77%·FNR 6.6%(백서 v7)는 <strong>직전 배포본/롤백 타깃 v4(<code>v-dd3abab9</code>)</strong> 측정값(<code>reports/fnr_threshold_sweep</code>·<code>b1_multiplier_sweep_clean</code>)이다. <strong>현행 활성 v5(<code>v-fe4b386b</code>) 헤드라인</strong>은 hardened holdout(n=42) <strong>F1_macro 0.917·high→S3 위험미탐 0·S1 recall 0.857</strong>, clean holdout(n=42) <strong>acc 0.929·TS 11/11</strong>, 공개문서(n=400) <strong>과분류 0.79→0.04</strong>. 단 <strong>홀드아웃 109는 학습본과 본문 42% 중복(누출)</strong>이라 안전성을 과대평가하며 <strong>이 셋에선 v5≈v4(개선 주장 안 함)</strong>. <strong>모든 수치는 합성 골든셋(OOD) 기준 — 운영 locked 확정 전 정식 아님.</strong></td></tr>
+  <tr><td>추론 속도</td><td>CPU 싱글 문서 p50 약 10ms</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout">
+  <div class="callout-label">📖 등급별 성능 (홀드아웃 109건)</div>
+  <p>
+    TS는 미탐을 막는 게 최우선이라 재현율(Recall)을 높게 잡았습니다:
+    <strong>TS</strong> 정밀도 0.533 / 재현율 0.941 · <strong>S1</strong> 0.667 / 0.316 · <strong>S2</strong> 0.600 / 0.600 · <strong>S3</strong> 0.850 / 0.791.
+    TS 재현율이 높다는 건 진짜 특급기밀을 거의 놓치지 않는다는 뜻입니다(미탐 0).
+  </p>
+</div>
+
+<div class="callout dark">
+  <div class="callout-label">📦 정답셋(골든셋) — 현행 gold_real 777건</div>
+  <p>
+    모델 성능을 채점하는 기준 정답지(골든셋)는 현행 <strong>gold_real 777건</strong>입니다.
+    초기 후보셋 <strong>golden500</strong>(TS/S1/S2/S3 각 125건 균형(25%)·S/V/M 곱 등급이 정답과 <strong>500/500 정합</strong>·반도체(EUV)·방위사업·M&A·AI·바이오약물·보안 6종, 각 600~1,000자)과 golden100은 <strong>구 후보셋으로 현행 777로 대체·폐기</strong>됐습니다.
+    한 등급에 쏠리면 점수가 부풀 수 있어 등급 분포는 고르게 유지합니다.
+    (초기 파일럿은 52건이었고, 그중 67%가 전문가 검수가 필요한 경계 케이스였습니다.)
+    모든 골든셋 수치는 합성·LLM 라벨 기준이며 사람서명 locked 확정 전입니다.
+  </p>
+</div>
+
+<div class="callout">
+  <div class="callout-label">📖 DeBERTa가 뭔가요?</div>
+  <p>Microsoft가 만든 BERT 계열 언어 모델입니다. "disentangled attention"이라는 기술로 단어의 위치와 내용을 분리해서 처리하기 때문에 기존 BERT보다 문맥 이해 능력이 높습니다. KF 버전은 금융/법률 한국어에 최적화되어 있습니다.</p>
+</div>
+
+<h3>② 임베딩 모델 — KURE-v1 / BGE-M3</h3>
+<p>텍스트를 숫자 벡터로 변환하는 모델입니다. "의미가 비슷한 텍스트는 비슷한 벡터를 갖는다"는 원리로 검색합니다.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>모델</th><th>언어</th><th>벡터 차원</th><th>성능</th></tr></thead>
+  <tbody>
+  <tr><td><strong>KURE-v1</strong> (기본)</td><td>한국어 특화</td><td>1024</td><td>hybrid Recall@5 = 0.808 (평가셋 기준)</td></tr>
+  <tr><td><strong>BGE-M3</strong> (폴백)</td><td>다국어</td><td>1024</td><td>hybrid Recall@5 = 0.790</td></tr>
+  <tr><td><strong>HashEmbedding</strong> (테스트)</td><td>해시 기반</td><td>1024</td><td>CI/테스트 전용 (의미 없음)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>③ 언어 모델 (LLM)</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>모델</th><th>환경</th><th>특징</th></tr></thead>
+  <tbody>
+  <tr><td><strong>Claude Sonnet 4.6</strong></td><td>일반망</td><td>최고 품질. 한국어 우수. 99.9% SLA. API 비용 발생.</td></tr>
+  <tr><td><strong>Qwen3-14B Q4</strong></td><td>폐쇄망</td><td>로컬 실행. GPU 필요. 인터넷 불필요. 양자화로 메모리 절약.</td></tr>
+  <tr><td><strong>GPT-4o</strong></td><td>선택사항</td><td><code>LLM_PROVIDER=openai</code>로 전환 가능</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ═══ 08 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">07</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">사용 오픈소스</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="oss">어떤 오픈소스를 사용하나요?</h2>
+
+<div class="oss-grid">
+  <div class="oss-card"><div class="oss-name">FastAPI</div><div class="oss-role">메인 웹 프레임워크 (API 서버)</div><div class="oss-lic">MIT · Python</div></div>
+  <div class="oss-card"><div class="oss-name">Celery</div><div class="oss-role">비동기 태스크 큐 (백그라운드 처리)</div><div class="oss-lic">BSD-3 · Python</div></div>
+  <div class="oss-card"><div class="oss-name">PostgreSQL 16</div><div class="oss-role">관계형 데이터베이스</div><div class="oss-lic">PostgreSQL</div></div>
+  <div class="oss-card"><div class="oss-name">pgvector</div><div class="oss-role">PostgreSQL 벡터 DB + 하이브리드(dense+ts_rank)</div><div class="oss-lic">PostgreSQL License</div></div>
+  <div class="oss-card"><div class="oss-name">Redis 7.2</div><div class="oss-role">인메모리 캐시 + Celery Broker</div><div class="oss-lic">BSD-3</div></div>
+  <div class="oss-card"><div class="oss-name">MLflow 2.16</div><div class="oss-role">모델 학습 실험 추적 관리</div><div class="oss-lic">Apache 2.0</div></div>
+  <div class="oss-card"><div class="oss-name">HuggingFace Transformers</div><div class="oss-role">ML 모델 로딩/추론</div><div class="oss-lic">Apache 2.0</div></div>
+  <div class="oss-card"><div class="oss-name">PyTorch 2.3+</div><div class="oss-role">딥러닝 프레임워크 (GPU 가속)</div><div class="oss-lic">BSD-3</div></div>
+  <div class="oss-card"><div class="oss-name">sentence-transformers</div><div class="oss-role">문장 임베딩 (KURE-v1, BGE-M3)</div><div class="oss-lic">Apache 2.0</div></div>
+  <div class="oss-card"><div class="oss-name">SQLAlchemy 2.0</div><div class="oss-role">ORM (Python ↔ PostgreSQL)</div><div class="oss-lic">MIT</div></div>
+  <div class="oss-card"><div class="oss-name">Alembic</div><div class="oss-role">DB 스키마 마이그레이션</div><div class="oss-lic">MIT</div></div>
+  <div class="oss-card"><div class="oss-name">rhwp-python</div><div class="oss-role">HWP/HWPX 파일 파서 (62배 빠름)</div><div class="oss-lic">MIT</div></div>
+  <div class="oss-card"><div class="oss-name">pdfminer.six</div><div class="oss-role">PDF 텍스트 추출</div><div class="oss-lic">MIT</div></div>
+  <div class="oss-card"><div class="oss-name">anthropic-sdk</div><div class="oss-role">Claude API 클라이언트</div><div class="oss-lic">MIT</div></div>
+  <div class="oss-card"><div class="oss-name">Ollama</div><div class="oss-role">로컬 LLM 실행 (폐쇄망용)</div><div class="oss-lic">MIT</div></div>
+  <div class="oss-card"><div class="oss-name">prometheus-client</div><div class="oss-role">성능 지표 수집/노출</div><div class="oss-lic">Apache 2.0</div></div>
+  <div class="oss-card"><div class="oss-name">slowapi</div><div class="oss-role">API 속도 제한 (Rate Limiting)</div><div class="oss-lic">MIT</div></div>
+</div>
+
+<!-- ═══ 09 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">08</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">운영 확대 기준</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="criteria">어떤 기준을 만족해야 운영 확대가 가능한가요?</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>구분</th><th>운영 기준</th><th>현재 값</th><th>상태</th></tr></thead>
+  <tbody>
+  <tr><td><strong>분류 — F1 헤드라인 (현행 v5)</strong></td><td>F1-macro 측정</td><td>0.917 <span style="color:var(--text-dim);font-size:.85em;">· hardened holdout(누출0) · 직전 v4 홀드아웃109 0.686·원시 argmax 0.632</span></td><td><span class="tag mid">측정</span></td></tr>
+  <tr><td><strong>분류 — 방향성 FNR (서빙경로)</strong></td><td>고등급 미탐 최소화</td><td>0.018 <span style="color:var(--text-dim);font-size:.85em;">· FNR_TS 0.000 · 원시 0.167</span></td><td><span class="tag mid">프록시</span></td></tr>
+  <tr><td><strong>법률 정제 효과 (test 정확도)</strong></td><td>오염 제거 후 향상</td><td>93% <span style="color:var(--text-dim);font-size:.85em;">· 정제 전 78%</span></td><td><span class="tag mid">개선</span></td></tr>
+  <tr><td><strong>단위 테스트 (pytest)</strong></td><td>전통과 · 회귀 0</td><td>약 1,200건</td><td><span class="tag mid">프록시</span></td></tr>
+  <tr><td><strong>실 GPU E2E (능동학습 폐곡선)</strong></td><td>7/7 (정정→학습→배포→리로드; 메커니즘 실증, 환류 정책 미확정)</td><td>7/7</td><td><span class="tag mid">프록시</span></td></tr>
+  <tr><td><strong>운영 성능 F1 (실문서)</strong></td><td>운영 관리자 확정 locked 기준 측정 필요</td><td>N/A</td><td><span class="tag light">보류</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3 id="confidence">신뢰도(confidence)로 실무에서 어떻게 판단하나요?</h3>
+<p>AI 분류 결과에는 항상 <strong>신뢰도 수치</strong>가 붙습니다. 이 숫자를 보고 사람이 얼마나 개입할지 결정합니다.</p>
+
+<div class="conf-guide">
+  <div class="conf-row conf-header">
+    <div class="conf-score">신뢰도</div>
+    <div class="conf-meaning">의미</div>
+    <div class="conf-action">실무 대응</div>
+  </div>
+  <div class="conf-row">
+    <div class="conf-score">0.95 이상</div>
+    <div class="conf-meaning">softmax 파생 점수가 높음. 다만 높은 confidence가 정확을 보장하지는 않으므로(OOD 과신), 자동확정 여부는 이 수치 단독이 아니라 합의 게이트로 판단합니다.</div>
+    <div class="conf-action">예측이 <strong>공개(S3)</strong>이거나 <strong>룰등급==모델등급(합의)</strong>일 때만 자동확정 — 그 외 고등급은 사람 검토로 라우팅</div>
+  </div>
+  <div class="conf-row">
+    <div class="conf-score">0.80~0.95</div>
+    <div class="conf-meaning">AI가 높은 확신으로 판단. 대부분 정확하지만 일부 모호한 경우 포함 가능.</div>
+    <div class="conf-action">표시는 하되 중요 문서는 확인 권장</div>
+  </div>
+  <div class="conf-row">
+    <div class="conf-score">0.70~0.80</div>
+    <div class="conf-meaning">AI가 판단했지만 확신이 낮음. 경계 케이스이거나 혼합된 내용을 포함.</div>
+    <div class="conf-action">사람 검토 필요 — 등급 조정 여부 확인</div>
+  </div>
+  <div class="conf-row">
+    <div class="conf-score">0.70 미만</div>
+    <div class="conf-meaning">AI가 잘 판단하지 못함. 문서 형식이 특이하거나 학습 데이터에 없는 유형.</div>
+    <div class="conf-action">반드시 사람 검토 — AI 결과는 참고만</div>
+  </div>
+</div>
+
+<div class="callout dark">
+  <div class="callout-label">⚡ 신규 — 저신뢰 자동 검수 라우팅 (needs_review)</div>
+  <p>
+    이제 신뢰도가 임계값(<code>review_confidence_threshold = 0.7</code>) 미만이면 시스템이 자동으로
+    응답 <code>status</code>를 <strong>"needs_review"</strong>로 표시하고 <code>warnings</code>에 검수 권고를 남깁니다.
+    <strong>거부(reject)가 아니라 표시</strong>입니다 — 고위험 미탐(FNR)을 막기 위해 결과는 그대로 반환하되 사람 검토로 라우팅합니다.
+    검수 큐는 신뢰도가 같을 때 <strong>저신뢰 항목을 먼저</strong> 보여주도록 정렬됩니다.
+  </p>
+</div>
+
+<div class="callout dark">
+  <div class="callout-label">⚡ 신규 — 자동확정/검수는 confidence 단독이 아니라 다단 게이트로 결정 (희소근거 룰-폴백 기본 ON · 합의/메타 base 기본 OFF)</div>
+  <p>
+    confidence는 분류기가 학습한 신뢰도가 아니라 <strong>softmax 파생값</strong>이라 OOD(학습 분포 밖)에서 과신하며 정답/오답 판별력이 낮습니다(구 후보셋 골든500 AUROC 0.58; 현행 정본 골든셋은 gold_real 777).
+    그래서 자동확정은 confidence 임계(기본 0.7) 단독이 아니라 아래 게이트들로 판단합니다. <strong>모두 opt-in이며 기본은 OFF</strong>라 켜기 전에는 기존 동작이 그대로입니다.
+  </p>
+  <ul>
+    <li><strong>① 희소근거 게이트(<code>rule_fallback_min_evidence</code>)</strong> — 단일 약한 키워드만으로 conf=1.0이 되는 룰-폴백 자동확정을 차단합니다(golden100 무성 TS 미탐 5→0).</li>
+    <li><strong>② 합의 게이트(<code>agreement_gate_enabled</code>)</strong> — 자동확정은 예측이 <strong>공개등급(S3)</strong>이거나 <strong>룰등급==모델등급</strong>일 때만 허용하고, 그 외 불일치는 사람 검수로 보냅니다(자동확정 정밀도 63→81%, 고등급 TS/S1 미탐 46→8). TS/S1 자동확정분은 표본감사합니다.</li>
+    <li><strong>③ 메타데이터 floor 게이트(<code>metadata_floor_enabled</code>)</strong> — KL ICD R6의 <strong>보안표시·접근범위</strong>로, 내용 분류기가 못 보는 비밀관리성(M)·출처(S)를 보완합니다. 출처 게이트(공개출처→S3 하향)의 <strong>상향 대칭</strong>으로, ① 보안표시(<code>top_secret→TS</code>·<code>secret→S1</code>·<code>confidential→S2</code>)가 예측보다 높으면 그 등급으로 <strong>상향 floor</strong>(명시표기 우선·하향은 하지 않음), ② 접근범위가 제한적(<code>approved_only/designated/department</code>)인데 예측이 낮으면 검수로 라우팅합니다. 인사·재무 S1 사각지대를 재학습 전 결정론적으로 차단합니다(KL 마킹 신뢰 전제).</li>
+  </ul>
+  <p style="margin-top:8px;">
+    합의 게이트 적용 시 재생성 기준(<strong>구 후보셋</strong> — 현행 정본은 gold_real 777) — golden100: 자동확정 35 / 검수 65 (미탐 0), golden500: 자동확정 189 / 검수 311 (TS·S1 미탐 8).
+    모든 수치는 합성 골든셋(OOD) 기준이며 운영 human_review/locked 확정 전에는 운영 FNR/정확도 수치가 아닙니다.
+  </p>
+</div>
+
+<div class="callout">
+  <div class="callout-label">⚠️ 중요: TS/S1은 신뢰도에 관계없이 상향 유지</div>
+  <p>신뢰도가 낮더라도 <strong>TS 또는 S1로 판정된 경우 함부로 내리지 마세요.</strong>
+  시스템은 FNR-safe 원칙으로 설계됐습니다 — 기밀이 아닌 것을 기밀로 올리는 건 괜찮지만,
+  기밀을 내리는 건 위험합니다. 내릴 때는 반드시 근거가 명확해야 합니다.</p>
+</div>
+
+<div class="callout dark">
+  <div class="callout-label">⚙️ 운영점 — 미탐 강제 0이 필요하면 escalation τ</div>
+  <p>
+    기본 운영점은 <strong>τ = None (그냥 argmax)</strong>입니다 — 서빙 경로가 이미 미탐율 0.018 · FNR_TS 0을 달성해 추가 조정이 불필요하기 때문입니다.
+    발주처가 "고등급 미탐 절대 0"을 요구하면 선택적으로 <strong>τ = 0.35</strong>를 켜서 TS·S1 미탐을 모두 0으로 강제할 수 있습니다(대신 F1 약 −2.8%p).
+    너무 낮게(τ ≤ 0.25) 잡으면 과분류가 급증해 검수 부담이 커지므로 비권장(F1 −8%p)입니다.
+  </p>
+</div>
+
+<h3>검증 피라미드 — 어떻게 믿을 수 있나?</h3>
+<p>테스트는 가짜 통과를 막기 위해 여러 층으로 쌓았습니다. 위로 갈수록 실제 운영에 가깝습니다.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>층</th><th>범위</th><th>결과</th><th>의미</th></tr></thead>
+  <tbody>
+  <tr><td>① 단위 테스트</td><td>pytest 전체</td><td>약 1,200건</td><td>로직 단위 정합 · 회귀 0</td></tr>
+  <tr><td>② DB 연동</td><td>실 PostgreSQL</td><td>20/20</td><td>저장·조회 경로 검증</td></tr>
+  <tr><td>③ 풀스택</td><td>PostgreSQL + pgvector</td><td>103/103</td><td>분류·검색 통합 동작</td></tr>
+  <tr><td>④ 실 GPU E2E</td><td>능동학습 폐곡선 전 과정</td><td>7/7</td><td>정정→재학습→배포→핫리로드 실증</td></tr>
+  <tr><td>⑤ 라이브 API 데모</td><td>실서버 호출</td><td>통과</td><td>PDF→S1(0.997)→confirm/relabel→재학습 큐</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ═══ 10 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">09</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">상황별 로직</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="cases">어떤 상황에서 어떻게 동작하나요?</h2>
+
+<h3>분류 요청 처리 결정 트리</h3>
+<div class="decision">
+  <div class="node"><span class="cond">IF</span><span class="result">인증 실패</span><span class="arrow">→ 401 즉시 반환</span></div>
+  <div class="node indent"><span class="cond">ELSE IF</span><span class="result">content 없음 AND doc_id 없음</span><span class="arrow">→ 400 반환</span></div>
+  <div class="node indent"><span class="cond">ELSE IF</span><span class="result">DB에 검증된 라벨 있음</span><span class="arrow">→ 즉시 반환 + AuditLog 기록 (AI 추론 스킵)</span></div>
+  <div class="node indent"><span class="cond">ELSE IF</span><span class="result">ML 모델 로드됨</span><span class="arrow">→ KF-DeBERTa 추론 실행</span></div>
+  <div class="node" style="margin-left:48px"><span class="cond">AND IF</span><span class="result">규칙엔진 TS 점수 ≥ 3.0 AND 규칙등급 &gt; 모델등급</span><span class="arrow">→ TS로 강제 상향</span></div>
+  <div class="node indent"><span class="cond">ELSE</span><span class="result">ML 모델 없음</span><span class="arrow">→ 규칙 엔진 단독 분류</span></div>
+</div>
+
+<h3>주요 케이스별 처리</h3>
+<div class="case-grid">
+  <div class="case-card">
+    <div class="case-title"><span class="tag filled">폐쇄망</span> 인터넷 없음</div>
+    <div class="case-body"><code>LLM_PROVIDER=local_openai</code>, <code>LOCAL_LLM_MODEL=qwen3:14b</code>로 설정. Ollama가 로컬에서 Qwen3-14B를 실행. 처음 실행 시 모델 파일 사전 다운로드 필요.</div>
+  </div>
+  <div class="case-card">
+    <div class="case-title"><span class="tag dark">DB 장애</span> PostgreSQL 연결 실패</div>
+    <div class="case-body">분류 결과는 정상 반환됩니다 (Best-effort 원칙). 응답의 <code>warnings</code> 필드에 "persist_failed" 메시지 추가. <code>inference_id</code>가 새 UUID이면 DB 저장 실패를 의미.</div>
+  </div>
+  <div class="case-card">
+    <div class="case-title"><span class="tag mid">대용량</span> 10,000자 이상 문서</div>
+    <div class="case-body">분류: 256 토큰으로 잘라서 처리. 앞부분 기준으로 분류.
+    RAG 검색: 1200자 청크로 분할해서 모든 부분 인덱싱 → 전체 내용 검색 가능.</div>
+  </div>
+  <div class="case-card">
+    <div class="case-title"><span class="tag outline">배치</span> 대량 문서 처리</div>
+    <div class="case-body"><code>POST /classify/batch</code>로 최대 1,000건 동시 요청. Celery Worker가 백그라운드 처리. 즉시 <code>202 Accepted</code> 반환, <code>GET /classify/{doc_id}</code>로 결과 조회.</div>
+  </div>
+  <div class="case-card">
+    <div class="case-title"><span class="tag mid">사람 검수</span> AI가 틀렸을 때</div>
+    <div class="case-body"><code>make import-review INPUT=tb_corrections.csv</code>로 사람이 수정한 라벨을 <code>tb_document_labels</code> 테이블에 저장. 이후 동일 문서 분류 시 AI 추론 없이 검증 라벨 반환.</div>
+  </div>
+  <div class="case-card">
+    <div class="case-title"><span class="tag light">판례 문서</span> 공개 법원 자료</div>
+    <div class="case-body">판례는 공개 문서이므로 정의상 S3. <code>SOURCE_PRIOR_ENABLED=true</code> + <code>metadata.source="판례"</code>로 요청하면, 모델이 TS/S1을 예측해도 S2 이하로 자동 제한됩니다.</div>
+  </div>
+</div>
+
+<!-- ═══ 10-B ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">09-B</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">실제 사용 시나리오</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="scenario">실제로 어떻게 쓰이나요?</h2>
+<p>반도체 회사의 연구원 <strong>김철수</strong>가 새 공정 레시피 문서를 작성한 날의 이야기입니다.</p>
+
+<div class="scenario">
+  <div class="scenario-title">📋 시나리오 A — 새 문서 등록 (분류 기능)</div>
+  <div class="scenario-steps">
+    <div class="sc-step">
+      <div class="sc-num"><div class="sc-circle">1</div><div class="sc-line"></div></div>
+      <div class="sc-body">
+        <div class="sc-who">김철수 (연구원)</div>
+        <div class="sc-what">EUV 리소그래피 공정 파라미터 문서를 작성 완료. 사내 문서 시스템에 업로드 버튼을 누름.</div>
+      </div>
+    </div>
+    <div class="sc-step">
+      <div class="sc-num"><div class="sc-circle">2</div><div class="sc-line"></div></div>
+      <div class="sc-body">
+        <div class="sc-who">시스템</div>
+        <div class="sc-what">파일을 받아서 텍스트를 추출하고 AI에게 분류를 요청합니다. <strong>2.3초 후</strong> 결과 반환.</div>
+        <div class="sc-system">→ label: "TS" | confidence: 0.971 | evidence: "EUV 노광 에너지 설정값 (line 47~52)"</div>
+      </div>
+    </div>
+    <div class="sc-step">
+      <div class="sc-num"><div class="sc-circle">3</div><div class="sc-line"></div></div>
+      <div class="sc-body">
+        <div class="sc-who">김철수 화면에 표시됨</div>
+        <div class="sc-what"><strong>TS (특급기밀)</strong>으로 분류됨. 신뢰도 97.1%. 판단 근거: "EUV 노광 에너지 설정값 포함 — 국가핵심기술 해당". 확인 버튼 누름.</div>
+      </div>
+    </div>
+    <div class="sc-step">
+      <div class="sc-num"><div class="sc-circle">4</div><div class="sc-line"></div></div>
+      <div class="sc-body">
+        <div class="sc-who">시스템</div>
+        <div class="sc-what">TS 등급 문서로 등록. 접근 권한이 자동으로 임원 + 연구 책임자로 제한됨. 감사 로그에 "김철수가 TS 문서를 등록" 기록.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="scenario" style="margin-top:14px;">
+  <div class="scenario-title">✏️ 시나리오 B — AI 오류 수정 (사람 검토)</div>
+  <div class="scenario-steps">
+    <div class="sc-step">
+      <div class="sc-num"><div class="sc-circle">1</div><div class="sc-line"></div></div>
+      <div class="sc-body">
+        <div class="sc-who">박보안 (보안팀)</div>
+        <div class="sc-what">AI가 내부 협상 전략 문서를 <strong>S2</strong>로 분류한 것을 발견. 실제로는 S1이라고 판단.</div>
+      </div>
+    </div>
+    <div class="sc-step">
+      <div class="sc-num"><div class="sc-circle">2</div><div class="sc-line"></div></div>
+      <div class="sc-body">
+        <div class="sc-who">박보안</div>
+        <div class="sc-what">"S1로 변경" 버튼 클릭. 이유 입력: "협상 상대방에 노출 시 핵심 조건 파악 가능 — S1 해당"</div>
+      </div>
+    </div>
+    <div class="sc-step">
+      <div class="sc-num"><div class="sc-circle">3</div><div class="sc-line"></div></div>
+      <div class="sc-body">
+        <div class="sc-who">시스템</div>
+        <div class="sc-what">수정 내용이 <code>tb_document_labels</code> 테이블에 저장됨. <strong>이후 동일 문서를 분류 요청하면 AI 추론 없이 S1 즉시 반환.</strong> 감사 로그에 "박보안이 S2→S1 수정" 기록.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 11 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">10</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">데이터베이스 구조</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="db">데이터는 어떻게 저장되나요?</h2>
+<p>PostgreSQL에 <strong>약 20개 테이블</strong>이 있습니다. 핵심 흐름만 설명합니다. (고객사별 폐쇄망 분리배포로 격리, 대용량 테이블은 시간 기준 RANGE 파티션.)</p>
+
+<div style="margin:18px 0;display:flex;flex-direction:column;gap:8px;">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <div class="flow-box fill">documents</div>
+    <span style="font-size:12.5px;color:var(--text-dim);">문서 원본 정보 (doc_id, 파일명, 저장 경로)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
+    <span style="color:var(--text-faint);">↳</span>
+    <div class="flow-box mid">tb_chunks</div>
+    <span style="font-size:12.5px;color:var(--text-dim);">텍스트 청크 (순번, 내용, 크기)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
+    <span style="color:var(--text-faint);">↳</span>
+    <div class="flow-box fill">tb_classifications</div>
+    <span style="font-size:12.5px;color:var(--text-dim);">분류 결과 (예측 등급, 신뢰도, 모델 버전)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding-left:40px;flex-wrap:wrap;">
+    <span style="color:var(--text-faint);">↳</span>
+    <div class="flow-box">tb_classification_evidence</div>
+    <span style="font-size:12.5px;color:var(--text-dim);">근거 구간 (텍스트 위치, 평가요소, 가중치)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
+    <span style="color:var(--text-faint);">↳</span>
+    <div class="flow-box mid">tb_document_labels</div>
+    <span style="font-size:12.5px;color:var(--text-dim);">사람이 검증한 라벨 (is_verified=True면 AI 우선)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
+    <span style="color:var(--text-faint);">↳</span>
+    <div class="flow-box">tb_corrections</div>
+    <span style="font-size:12.5px;color:var(--text-dim);">사람 정정 이력 (원래 등급→수정 등급)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
+    <span style="color:var(--text-faint);">↳</span>
+    <div class="flow-box mid">tb_model_versions</div>
+    <span style="font-size:12.5px;color:var(--text-dim);">모델 버전 이력 (활성 1개만, 롤백 정보 포함)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
+    <span style="color:var(--text-faint);">↳</span>
+    <div class="flow-box mid">tb_training_runs</div>
+    <span style="font-size:12.5px;color:var(--text-dim);">재학습 실행 기록 (어떤 정정을 소비했는지)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
+    <span style="color:var(--text-faint);">↳</span>
+    <div class="flow-box">tb_audit_log</div>
+    <span style="font-size:12.5px;color:var(--text-dim);">모든 요청의 감사 기록 (누가, 언제, 무엇을 · 항상 기록)</span>
+  </div>
+</div>
+
+<div class="callout inset">
+  <div class="callout-label">🔁 스키마가 3요건 곱셈으로 바뀐 점 (alembic 마이그레이션)</div>
+  <ul>
+    <li><strong>evaluation_factors</strong>: 정본 3요건(SECRECY·VALUE·MANAGEMENT)만 활성. 옛 4요소는 비활성으로 보존. 곱셈식이라 가중치(weight)는 미사용.</li>
+    <li><strong>tb_document_factor_scores</strong>: 점수 제약을 <strong>0~5 → 0~2</strong>로 변경(각 요건 0·1·2). 가중치 합계=1.0 검사 트리거 제거.</li>
+    <li><strong>tb_model_versions</strong>: 롤백 추적용 <code>rolled_back_from</code>·<code>rollback_reason</code> 추가. 활성 버전은 항상 1개만(부분 유니크 인덱스).</li>
+    <li><strong>tb_corrections</strong>: 능동학습 소비 추적용 <code>consumed_in_run</code>·<code>consumed_at</code> 추가. 미소비 정정만 빠르게 찾는 부분 인덱스가 재학습 핫패스.</li>
+  </ul>
+</div>
+
+<!-- ═══ 11-B ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">10-B</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">능동학습 폐곡선</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="active-learning">AI가 틀리면 어떻게 스스로 좋아지나요?</h2>
+<p>
+  사람이 고친 내용이 그냥 기록에만 남는 게 아니라, <strong>다시 학습 → 새 모델 배포 → 즉시 교체</strong>까지 한 바퀴 도는 닫힌 고리(폐곡선)로 연결돼 있습니다.
+  이 전 과정을 실 GPU에서 끝까지(7/7) 통과시켜 실제로 도는 것을 확인했습니다. <span style="color:var(--text-dim);">단, 이 폐곡선은 단일 배포 내부 메커니즘이고 모델은 상시 재학습하지 않습니다 — 상시 재학습이 아니라 locked 충분량·shadow 검증·별도 승인 후 단발 후보입니다. 고객 교정·원문은 무반출이며 기본은 exact-match 선례·집계 진단만 사용합니다.</span>
+</p>
+
+<div class="flow">
+  <div class="flow-box fill">① 분류</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box mid">② 검수자 교정</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box mid">③ 교정 재빌드</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box mid">④ 재학습</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box mid">⑤ 배포 게이트</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box fill">⑥ 핫리로드</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box mid">⑦ 자동 롤백 점검</div>
+</div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>단계</th><th>무엇을 하나</th><th>안전장치</th></tr></thead>
+  <tbody>
+  <tr><td><strong>교정 재빌드</strong></td><td>아직 학습에 안 쓴 정정(correction)만 모아 {텍스트, 라벨}로 재구성</td><td>val/test 홀드아웃은 증강하지 않음(지표 신뢰성). 반영된 정정만 소비, 미반영분은 무손실 보존.</td></tr>
+  <tr><td><strong>재학습</strong></td><td>정제된 학습셋에 정정을 병합해 KF-DeBERTa 다시 학습</td><td>train 데이터에만 병합(평가셋 오염 방지)</td></tr>
+  <tr><td><strong>배포 게이트</strong></td><td>새 모델이 기존보다 나쁘면 배포 거부(fail-closed)</td><td>고등급 미탐(fnr_high)이 기준치 초과거나 F1이 떨어지면 거부</td></tr>
+  <tr><td><strong>버전 등록·활성</strong></td><td>항상 이력으로 등록, 활성화는 게이트 통과 + 설정 ON일 때만</td><td>기본은 자동 활성 OFF(보수적) — 사람이 확인 후 켬</td></tr>
+  <tr><td><strong>모델 핫리로드</strong></td><td><code>POST /admin/model/reload</code>로 활성 모델을 즉시 교체</td><td><strong>프로세스 재기동 불필요</strong> — 서비스 무중단</td></tr>
+  <tr><td><strong>자동 롤백</strong></td><td>매시간 라이브 운영 데이터의 미탐율을 점검, 악화 시 직전 버전으로 복귀</td><td>기본은 판정·로깅만(자동 복귀 OFF) — 안전 우선</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout">
+  <div class="callout-label">📖 재학습은 언제 자동으로 트리거되나?</div>
+  <p>
+    백그라운드 작업이 정기적으로 점검합니다: 고등급 미탐이나 정정 누적은 먼저 <strong>운영 알림·검수 강화·shadow 재학습 후보</strong>로 큐에 올립니다. 실제 모델 활성은 locked readiness gate, holdout guard, 사람 승인 전까지 기본 OFF입니다.
+    검수자별 신뢰도(과거 합의 일치율)도 추적해서, 고등급 문서는 신뢰도 높은 검수자의 단일 서명 게이트에 활용할 수 있습니다.
+  </p>
+</div>
+
+<!-- ═══ 12 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">11</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">운영 모니터링</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="monitoring">운영 중 어떻게 모니터링하나요?</h2>
+
+<h3>시스템 상태 확인</h3>
+<pre><code>GET /api/v1/healthz
+
+{
+  "status": "healthy",
+  "model": {"status": "loaded", "version": "v-fe4b386b"},
+  "postgres": {"ok": true},
+  "vectorstore": {"ok": true},
+  "redis": {"ok": true}
+}</code></pre>
+
+<h3>성능 지표 (Prometheus)</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>지표명</th><th>의미</th></tr></thead>
+  <tbody>
+  <tr><td><code>koipa_requests_total</code></td><td>총 요청 수 (method, endpoint, status 레이블)</td></tr>
+  <tr><td><code>koipa_request_duration_seconds</code></td><td>요청 처리 시간 분포</td></tr>
+  <tr><td><code>koipa_embedding_fallback_total</code></td><td>임베딩 모델 폴백 횟수</td></tr>
+  <tr><td><code>koipa_classify_persist_failure_total</code></td><td>DB 저장 실패 횟수</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>운영 무결성 가드 (신규)</h3>
+<p>운영 환경에서 "조용히 망가지는" 상황을 사전에 차단하는 안전장치들이 추가됐습니다.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>가드</th><th>역할</th></tr></thead>
+  <tbody>
+  <tr><td><strong>감사 로그 강제 (AUDIT_DISABLED 차단)</strong></td><td>운영 모드에서 <code>AUDIT_DISABLED=1</code>로 감사 로그를 끄려 하면 기동 단계에서 즉시 실패(fail-fast)합니다. 감사 로그 부재 = 보안 사고·법적 추적 불가이므로 <code>RATE_LIMIT_DISABLED</code>와 동급으로 막습니다.</td></tr>
+  <tr><td><strong>마이그레이션 drift 체크</strong></td><td><code>scripts/check_migration_drift.py</code>가 운영 DB에 실제 적용된 리비전과 코드상의 최신(head) 스키마를 비교합니다. DB와 코드 스키마가 어긋나면 경고 — 배포 전 점검.</td></tr>
+  <tr><td><strong>CI 정답지 게이트 (check-gold)</strong></td><td>CI(<code>poc-ci.yml</code>)가 <code>make check-gold</code>로 정답지 누수(gold_real 유출)·합성 마커·금지 source를 검사하고, 위반 시 빌드를 FAIL(exit 1) 시킵니다.</td></tr>
+  <tr><td><strong>검수 사인오프 보증</strong></td><td>사람 검수 결과를 가져올 때(<code>import-review</code>) 검수자 ID가 비어 있거나 placeholder면 거부 — 누가 검수했는지 항상 추적 가능.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ═══ 13 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">12</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">내부 모듈 구조</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="modules">코드가 어떻게 구성되어 있나요?</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>모듈</th><th>경로</th><th>역할</th><th>핵심 클래스</th></tr></thead>
+  <tbody>
+  <tr><td><strong>M1 합성</strong></td><td><code>m1_synthesis/</code></td><td>AI 학습용 합성 문서 생성</td><td>SyntheticDocGenerator</td></tr>
+  <tr><td><strong>M2 전처리</strong></td><td><code>m2_preprocess/</code></td><td>추출→정규화→청킹→PII 마스킹</td><td>PreprocessPipeline</td></tr>
+  <tr><td><strong>M3 라벨링</strong></td><td><code>m3_labeling/</code></td><td>키워드 기반 1차 등급 판정</td><td>LabelingPipeline, RuleEngine</td></tr>
+  <tr><td><strong>M4 학습</strong></td><td><code>m4_training/</code></td><td>KF-DeBERTa 파인튜닝</td><td>train_classifier, TrainSpec</td></tr>
+  <tr><td><strong>M5 추론</strong></td><td><code>m5_inference/</code></td><td>ML 모델 추론 + FNR-safe 오버라이드</td><td>InferencePipeline</td></tr>
+  <tr><td><strong>M6 평가</strong></td><td><code>m6_evaluation/</code></td><td>분류 성능 측정, 혼동행렬</td><td>retrieval_metrics</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>어댑터 패턴 — 환경변수 하나로 교체 가능</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>어댑터</th><th>옵션</th><th>환경변수</th></tr></thead>
+  <tbody>
+  <tr><td>LLM</td><td>anthropic / openai / local_openai / noop</td><td><code>LLM_PROVIDER</code></td></tr>
+  <tr><td>임베딩</td><td>hf (KURE/BGE) / hash (테스트)</td><td><code>EMBEDDING_PROVIDER</code></td></tr>
+  <tr><td>벡터 DB</td><td>pg (pgvector, 기본) / inmemory</td><td><code>VECTOR_BACKEND</code></td></tr>
+  <tr><td>Reranker</td><td>bge / noop</td><td><code>RERANKER_PROVIDER</code></td></tr>
+  <tr><td>파일 스토리지</td><td>local (file://, 폐쇄망 기본)</td><td><code>STORAGE_BACKEND</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ═══ 14 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">13</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">비용 시나리오</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="cost">API와 GPU는 각각 어디에 쓰나요?</h2>
+<p><strong>추론(운영)은 CPU, 학습은 GPU</strong>입니다. 민감 데이터를 다루는 추론(분류·임베딩)은 폐쇄망 <strong>CPU</strong>에서 처리하고(LLM-free 핫패스), 상용 LLM(Claude 등)은 데이터 반출이 허용되는 <strong>공개·개발용으로만</strong> 씁니다. 분류기 학습·골든셋 생성은 지재원 <strong>A100 80GB ×1 GPU 서버</strong>에서 수행하며, 고객사 운영노드는 <strong>GPU 없이 CPU 전용</strong>(야간 CPU 증분재학습 포함)입니다.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>기능</th><th>실행 위치</th><th>비고</th></tr></thead>
+  <tbody>
+  <tr><td>문서 분류 (KF-DeBERTa)</td><td><span class="tag mid">CPU</span></td><td>핵심 요건 · LLM-free 핫패스 · 무GPU(≈333ms/건)</td></tr>
+  <tr><td>임베딩·검색 (KURE-v1)</td><td><span class="tag mid">CPU</span></td><td>온프렘 인덱싱·검색(CPU로 충분)</td></tr>
+  <tr><td>분류기 학습 (재학습 시)</td><td><span class="tag filled">GPU (지재원)</span></td><td>지재원 A100 80GB 서버에서 학습 · 고객사 야간 증분재학습은 CPU</td></tr>
+  <tr><td>상용 LLM (Claude)</td><td><span class="tag mid">공개데이터만</span></td><td>골든·합성 생성 보조 · <strong>비밀 본문 미투입</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout inset">
+  <div class="callout-label">🔒 추론=CPU · 학습=GPU(지재원 A100 80GB)</div>
+  <p>영업비밀은 <strong>데이터 외부 반출이 금지</strong>되어, 폐쇄망 운영에서는 상용 LLM·클라우드를 <strong>비밀 분류 본경로에 쓸 수 없습니다</strong>. 그래서 비밀 분류는 학습된 <strong>분류기+룰로 CPU에서 처리</strong>(LLM-free)하고, 임베딩·검색도 CPU로 충분합니다 — <strong>고객사 운영노드는 GPU 없이 동작</strong>. 분류기 학습·골든셋 생성은 지재원 <strong>A100 80GB GPU 서버</strong>에서 수행하며 추론엔 GPU가 불필요합니다. 상용 LLM은 공개·합성 데이터 가공에만 활용합니다. (상세 용량·비용은 본개발에서 별도 제시)</p>
+</div>
+
+<!-- ═══ 15 ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">14</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">남은 과제 &amp; 로드맵</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="roadmap">지금 뭐가 없나요?</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>항목</th><th>현황</th><th>해결 방법</th><th>우선순위</th></tr></thead>
+  <tbody>
+  <tr><td><strong>운영 확정 라벨</strong></td><td>locked F1=N/A (관리자 확정 전)</td><td>운영 관리자 확정은 고객 망 내 <code>tb_corrections</code>에 남기고 admission gate를 거친다. 기본 반영은 exact-match 선례·검수 라우팅·집계 진단이며, 재학습은 locked readiness 이후 별도 승인</td><td><span class="tag filled">최우선</span></td></tr>
+  <tr><td><strong>P2 청킹 — RAG 검색 인덱스 <span style="font-size:.85em;font-weight:400;color:var(--text-dim);">(요건 외 부가)</span></strong></td><td>테스트 0.808, 운영 인덱스 미청킹</td><td><code>index_rag_corpus.py --chunk-size 1200</code> 재인덱싱</td><td><span class="tag outline">부가</span></td></tr>
+  <tr><td><strong>가이드 정본 v2</strong></td><td><strong>해결</strong> — 발주처 정본 가이드 v2 수령·반영 완료(2026-06-18)</td><td>완료 · 향후 발주처 갱신본 도착 시 패치(선택)</td><td><span class="tag mid">해결</span></td></tr>
+  <tr><td><strong>법률 코퍼스 정제</strong></td><td><strong>해결</strong> — 오염 56% 제거 후 test 78→93%, FNR 21→8%</td><td>완료 · 잔여: 출처불명 제3문체</td><td><span class="tag mid">해결</span></td></tr>
+  <tr><td><strong>능동학습 자동화</strong></td><td><strong>배선 해결</strong>(엔지니어링) — 정정→재학습→배포게이트→핫리로드→자동롤백 폐곡선 GPU E2E 7/7. 단 <b>환류=재학습 운영 채택·학습 위치는 미확정</b>(A 무반출 권고/B 온사이트/C 반출)</td><td>배선 완료 · 자동 활성/롤백 기본 OFF(보수적) · 운영 정책 미확정</td><td><span class="tag mid">해결</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ═══ GLOSSARY ═══ -->
+<div class="section-sep">
+  <span class="section-sep-num">부록</span>
+  <span class="section-sep-line"></span>
+  <span class="section-sep-title">용어집 — 모르는 단어 여기서 확인</span>
+  <span class="section-sep-line"></span>
+</div>
+
+<h2 id="glossary">헷갈리는 용어 한눈에 보기</h2>
+<p>이 문서에서 나오는 기술 용어를 처음 보는 분을 위한 사전입니다.</p>
+
+<div class="glossary">
+  <div class="gloss-card">
+    <div class="gloss-term">AI 모델</div>
+    <div class="gloss-eng">Artificial Intelligence Model</div>
+    <div class="gloss-def">수백만~수억 개의 문서를 읽고 학습해서 패턴을 파악한 수학 함수. 텍스트를 넣으면 학습된 패턴으로 예측값을 반환합니다.</div>
+    <div class="gloss-ex">예: KF-DeBERTa는 한국어 금융/법률 문서로 학습된 분류 모델</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">S × V × M 곱셈 등급</div>
+    <div class="gloss-eng">Secrecy × Value × Management</div>
+    <div class="gloss-def">영업비밀 3요건(비공지성·경제적 유용성·비밀관리성)을 각 0·1·2점으로 채점한 뒤 곱해서 등급을 정하는 방식. 8→TS, 4→S1, 1·2→S2, 0→S3. 한 요건이라도 0이면 곱이 0이라 공개(S3).</div>
+    <div class="gloss-ex">예: S2 × V2 × M2 = 8 → TS / S0(이미 공개) × … = 0 → S3</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">능동학습 폐곡선</div>
+    <div class="gloss-eng">Active Learning Closed Loop</div>
+    <div class="gloss-def">사람이 고친 정정을 모아 모델을 다시 학습하고, 검증을 통과하면 프로세스 재기동 없이 즉시 교체(핫리로드)한 뒤, 운영 중 성능이 나빠지면 직전 버전으로 되돌리는(롤백) 닫힌 고리.</div>
+    <div class="gloss-ex">예: 정정 50건 누적 → 재학습 → 배포 게이트 통과 → 핫리로드</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">임베딩 / 벡터</div>
+    <div class="gloss-eng">Embedding / Vector</div>
+    <div class="gloss-def">텍스트를 1024개의 숫자 배열로 변환한 것. "반도체 공정"과 "칩 제조 레시피"는 다른 단어지만 비슷한 숫자 배열을 가져서 검색이 됩니다.</div>
+    <div class="gloss-ex">예: "영업비밀" → [0.23, -0.87, 0.45, ...] 1024개 숫자</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">토큰</div>
+    <div class="gloss-eng">Token</div>
+    <div class="gloss-def">AI 모델이 텍스트를 처리하는 최소 단위. 한국어는 보통 1~2글자가 1토큰. AI 모델마다 한 번에 처리할 수 있는 토큰 수 제한이 있습니다.</div>
+    <div class="gloss-ex">예: "반도체 공정" = 약 4~5토큰. 256토큰 = 약 512~1024글자</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">파인튜닝</div>
+    <div class="gloss-eng">Fine-tuning</div>
+    <div class="gloss-def">이미 학습된 AI 모델에 우리 도메인 데이터로 추가 학습을 시키는 것. 범용 모델을 영업비밀 분류에 특화시키는 과정.</div>
+    <div class="gloss-ex">예: KF-DeBERTa (범용) + 약 2,591건 영업비밀 데이터(정제 학습셋) → 분류 특화 모델</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">사전학습</div>
+    <div class="gloss-eng">Pre-training</div>
+    <div class="gloss-def">AI 모델이 처음 만들어질 때 대량의 텍스트로 언어의 기초를 배우는 단계. 우리가 직접 하지 않고 모델 제공사(카카오뱅크 등)가 미리 해둔 것을 받아서 씁니다.</div>
+    <div class="gloss-ex">예: KF-DeBERTa는 카카오뱅크가 금융 문서 수억 건으로 사전학습</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">RAG</div>
+    <div class="gloss-eng">Retrieval-Augmented Generation</div>
+    <div class="gloss-def">관련 문서를 검색(Retrieval)해 근거 후보로 활용하는 방식. 본 시스템에서는 검수 보조용 검색 인덱스(청킹)로만 활용하며, 분류 등급 판정에는 사용하지 않습니다.</div>
+    <div class="gloss-ex">예: 질의 → 관련 규정 문서 상위 5개 검색(하이브리드)</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">F1 점수</div>
+    <div class="gloss-eng">F1 Score</div>
+    <div class="gloss-def">분류 정확도를 0~1로 표현한 수치. 정밀도(맞다고 한 것 중 실제로 맞은 비율)와 재현율(실제 맞는 것 중 찾아낸 비율)의 조화 평균. F1_macro는 4등급 F1의 단순 평균.</div>
+    <div class="gloss-ex">예: 현행 v5 F1=0.917(hardened holdout) · 직전 v4 프록시 holdout 서빙경로 0.686 — 모두 운영 정확도 보증 아님</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">FNR (미탐율)</div>
+    <div class="gloss-eng">False Negative Rate</div>
+    <div class="gloss-def">실제 TS/S1인 문서를 낮은 등급으로 잘못 분류하는 비율(미탐). 보안 시스템에서 가장 위험한 오류 유형. <strong>방향성 FNR</strong>은 고등급→저등급 방향만 셈(과분류는 제외)하는 핵심 KPI. 프록시 holdout 서빙경로 0.018·FNR_TS 0.000(운영 보증 아님).</div>
+    <div class="gloss-ex">예: TS 문서를 S3로 분류 = FNR 발생 = 보안 사고</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">Confidence (신뢰도)</div>
+    <div class="gloss-eng">Confidence Score</div>
+    <div class="gloss-def">logits→온도→softmax→청크집계→정규화로 만든 <strong>softmax 파생 점수</strong>(0~1)이며, 보정된 정답확률이 아닙니다. OOD에서 과신하고(구 후보셋 골든500 ECE 0.18, 정답/오답 AUROC 0.58) 높은 confidence가 정확을 보장하지 않습니다. 그래서 자동확정은 confidence 단독이 아니라 합의 게이트로 판단합니다.</div>
+    <div class="gloss-ex">예: confidence=0.932은 softmax 파생 점수가 0.932라는 뜻이며 "정답일 확률 93.2%"가 아닙니다.</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">청킹</div>
+    <div class="gloss-eng">Chunking</div>
+    <div class="gloss-def">긴 문서를 AI가 처리할 수 있는 작은 조각으로 나누는 작업. 조각들이 겹치는 부분(overlap)을 두어 문맥이 끊기지 않도록 합니다.</div>
+    <div class="gloss-ex">예: 10,000자 문서 → 1200자 청크 약 9개 (100자씩 겹침)</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">Hybrid 검색</div>
+    <div class="gloss-eng">Hybrid Search</div>
+    <div class="gloss-def">키워드가 일치하는 문서를 찾는 어휘 방식(PG ts_rank) + 의미가 비슷한 문서를 찾는 Dense 방식(pgvector)을 RRF로 결합. 두 방식의 장점을 합쳐 검색 정확도를 높입니다.</div>
+    <div class="gloss-ex">예: "반도체 EUV" 검색 → 어휘(ts_rank)로 정확한 용어 + Dense로 유사 개념 모두 검색</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">BM25</div>
+    <div class="gloss-eng">Best Match 25</div>
+    <div class="gloss-def">키워드가 문서에 얼마나 자주, 적절히 나타나는지 점수를 매기는 알고리즘. 구글 같은 검색 엔진이 수십 년간 사용해온 방식.</div>
+    <div class="gloss-ex">예: "M&A"라는 단어가 포함된 문서를 정확히 찾을 때 효과적</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">멀티테넌트</div>
+    <div class="gloss-eng">Multi-tenant</div>
+    <div class="gloss-def">여러 회사가 한 서버를 공유하며 데이터가 격리되는 구조. <strong>본 시스템은 미채택</strong> — 고객사마다 독립 폐쇄망에 분리 배포하므로 한 서버가 여러 고객사를 담지 않습니다.</div>
+    <div class="gloss-ex">예: 본 시스템은 고객사마다 별도 배포 → 멀티테넌시 불요</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">API</div>
+    <div class="gloss-eng">Application Programming Interface</div>
+    <div class="gloss-def">프로그램끼리 소통하는 규칙과 창구. 클라이언트 프로그램이 HTTP 요청을 보내면 시스템이 처리하고 결과를 반환하는 방식.</div>
+    <div class="gloss-ex">예: 문서 관리 시스템이 분류 API를 호출 → 등급 받아서 자동 저장</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">컨테이너 (Docker)</div>
+    <div class="gloss-eng">Container</div>
+    <div class="gloss-def">각 서비스를 독립된 "상자" 안에서 실행하는 방식. 상자 안에 필요한 모든 프로그램이 들어있어 어느 컴퓨터에서도 동일하게 실행됩니다.</div>
+    <div class="gloss-ex">예: PostgreSQL, Redis, API 서버 각각 별도 컨테이너로 실행</div>
+  </div>
+  <div class="gloss-card">
+    <div class="gloss-term">LLM</div>
+    <div class="gloss-eng">Large Language Model</div>
+    <div class="gloss-def">수천억 개의 파라미터로 이루어진 대형 AI 언어 모델. 문장을 이해하고 생성하는 능력이 탁월합니다. Claude, GPT-4, Qwen3 등이 여기 속합니다.</div>
+    <div class="gloss-ex">예: Claude Sonnet 4.6 · Qwen3-14B · GPT-4o</div>
+  </div>
+</div>
+
+<hr/>
+
+<div class="footnote">
+  <p><strong>이 문서는 현재 소스코드 기준으로 작성되었습니다.</strong>
+  최종 갱신: 2026-08-02.
+  모든 수치는 실제 테스트 실행 결과입니다 — 추정치 없음.</p>
+</div>
+
+</article>
+
+<!-- DESKTOP TOC -->
+<aside class="toc-aside">
+  <nav class="toc" id="desktopToc">
+    <div class="toc-title">목차</div>
+    <a href="#overview">01. 이 시스템이 뭔가?</a>
+    <a href="#grade-system" class="toc-sub">등급 체계 (TS~S3)</a>
+    <a href="#metrics">02. 현재 성능 수치</a>
+    <a href="#infra">03. 서버 구조</a>
+    <a href="#api">04. API 엔드포인트</a>
+    <a href="#workflow">05. 전체 워크플로우</a>
+    <a href="#steps-detail" class="toc-sub">6단계 상세</a>
+    <a href="#models">06. AI 모델 설명</a>
+    <a href="#oss">07. 사용 오픈소스</a>
+    <a href="#criteria">08. 운영 확대 기준</a>
+    <a href="#cases">09. 상황별 로직</a>
+    <a href="#db">10. DB 구조</a>
+    <a href="#active-learning" class="toc-sub">능동학습 폐곡선</a>
+    <a href="#monitoring">11. 운영 모니터링</a>
+    <a href="#modules">12. 내부 모듈</a>
+    <a href="#cost">13. API·GPU 운용</a>
+    <a href="#roadmap">14. 남은 과제</a>
+  </nav>
+</aside>
+
+</div><!-- /article-layout -->
+
+<footer>
+  <strong>Koipa · KOIPA AI 영업비밀 분류 시스템</strong> · 완전 이해 가이드 V3 · 2026-08-02 갱신<br/>
+  현재 소스코드 기준 최신판 · Monochrome · Fully Responsive
+</footer>
+
+<script>
+// ─── TOC active highlight ───
+const allTocLinks = document.querySelectorAll('.toc a, .toc-drawer a');
+const headings = document.querySelectorAll('h2[id], h3[id]');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if(e.isIntersecting){
+      allTocLinks.forEach(a => a.classList.remove('active'));
+      document.querySelectorAll(`.toc a[href="#${e.target.id}"], .toc-drawer a[href="#${e.target.id}"]`)
+        .forEach(a => a.classList.add('active'));
+    }
+  });
+}, { rootMargin: '-15% 0px -70% 0px' });
+headings.forEach(h => observer.observe(h));
+
+// ─── Mobile drawer ───
+const toggle = document.getElementById('tocToggle');
+const drawer = document.getElementById('tocDrawer');
+const overlay = document.getElementById('tocOverlay');
+const closeBtn = document.getElementById('tocClose');
+
+function openDrawer(){
+  drawer.classList.add('open');
+  overlay.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+function closeDrawer(){
+  drawer.classList.remove('open');
+  overlay.style.display = 'none';
+  document.body.style.overflow = '';
+}
+toggle.addEventListener('click', openDrawer);
+overlay.addEventListener('click', closeDrawer);
+closeBtn.addEventListener('click', closeDrawer);
+drawer.querySelectorAll('a').forEach(a => a.addEventListener('click', closeDrawer));
+</script>
+</body>
+</html>
