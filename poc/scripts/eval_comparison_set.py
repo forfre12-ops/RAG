@@ -36,6 +36,49 @@ GRADES = ("TS", "S1", "S2", "S3")
 SEVERITY = {"S3": 0, "S2": 1, "S1": 2, "TS": 3}
 
 
+def training_style(model_dir: Path, rows: list[dict], max_len: int = 512) -> dict:
+    """**학습기가 재던 방식**으로 잰다 — 본문을 max_len 에서 잘라 한 번 통과시킨다.
+
+    왜 따로 재는가(2026-09-13 실측). 같은 모델·같은 589건인데 학습 보고서는 97.8%,
+    서빙 경로는 84.9% 였다. 13점 차이는 **재는 방식**에서 온다:
+
+        학습기   본문을 512토큰에서 자르고 한 번 통과 → argmax
+        서빙     창을 나눠 각각 통과 → 길이 가중 평균 → 보정 → argmax
+
+    그 셋의 **55.9%가 512토큰을 넘었다**(중앙값 518). 모델은 잘린 앞부분만 보고 배웠는데
+    서빙은 뒷부분 점수까지 평균에 섞는다. 기존 평가셋도 같다 — holdout109 56.0% ·
+    labeled_p1_v5_clean/test 46.9% 가 창을 넘는다.
+
+    ⇒ **학습 보고서의 F1 은 배포 시스템이 내는 값이 아니다.** 둘을 함께 내지 않으면
+       어느 쪽을 인용했는지 알 수 없다. 그래서 이 도구는 두 값을 나란히 낸다.
+    """
+    import torch
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+    tok = AutoTokenizer.from_pretrained(str(model_dir))
+    mdl = AutoModelForSequenceClassification.from_pretrained(str(model_dir)).eval()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    mdl = mdl.to(device)
+    id2label = {int(k): v for k, v in mdl.config.id2label.items()}
+
+    hit = over = 0
+    with torch.no_grad():
+        for start in range(0, len(rows), 16):
+            batch = rows[start:start + 16]
+            texts = [r["text"] for r in batch]
+            over += sum(1 for t in texts
+                        if len(tok(t, add_special_tokens=False)["input_ids"]) > max_len - 2)
+            enc = tok(texts, truncation=True, max_length=max_len,
+                      padding=True, return_tensors="pt").to(device)
+            for row, pred in zip(batch, mdl(**enc).logits.argmax(-1).tolist()):
+                hit += (id2label[pred] == row["label"])
+    return {
+        "agreement": round(hit / len(rows), 4),
+        "over_window": over,
+        "over_window_pct": round(over / len(rows) * 100, 1),
+    }
+
+
 def evaluate(model_dir: Path, rows: list[dict], auto_confirm_threshold: float) -> dict:
     from eval_p1_model_gold import predict_api_like
 
@@ -80,6 +123,8 @@ def main(argv=None) -> int:
     ap.add_argument("models", nargs="+", help="모델 디렉터리(하나 이상)")
     ap.add_argument("--set", default="datasets/eval_comparison_v1")
     ap.add_argument("--json", default="")
+    ap.add_argument("--no-training-style", action="store_true",
+                    help="학습 방식 대조를 건너뛴다(빠르게 볼 때만)")
     a = ap.parse_args(argv)
 
     base = _POC / a.set if not Path(a.set).is_absolute() else Path(a.set)
@@ -133,7 +178,15 @@ def main(argv=None) -> int:
               % ((rep["underclass_fnr"] or 0) * 100, rep["underclass_n"]))
         print("   무음 미탐   %d건    (미탐인데 conf ≥ %.2f 라 검수로도 안 감)"
               % (rep["silent_miss"], threshold))
-        print("   등급별      %s\n" % rep["per_grade"])
+        print("   등급별      %s" % rep["per_grade"])
+        if not a.no_training_style:
+            ts = training_style(model_dir, rows)
+            rep["training_style"] = ts
+            print("   ⭐학습 방식  %.1f%%   (512에서 잘라 한 번 — 창 초과 %d건 %.1f%%)"
+                  % (ts["agreement"] * 100, ts["over_window"], ts["over_window_pct"]))
+            print("     → 서빙과 차이 %+.1f%%p. **학습 보고서 F1 은 배포 시스템 값이 아니다**"
+                  % ((ts["agreement"] - rep["agreement"]) * 100))
+        print()
 
     if len(results) > 1:
         first, last = results[0], results[-1]
