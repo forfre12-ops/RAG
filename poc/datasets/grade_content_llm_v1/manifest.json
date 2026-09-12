@@ -1,0 +1,33 @@
+{
+ "built_at": "2026-09-12",
+ "provider": "ollama",
+ "model": "qwen3:14b",
+ "seed": 20260912,
+ "label_source": "rule_from_content_svm (grade_from_svm)",
+ "human_confirmed_count": 0,
+ "use": "내용을 읽어야 풀리는 과제. 사람 확정 정답 아님 · 실문서 일반화 근거 아님.",
+ "sha256": {
+  "train": "d25d4d2fc6c973b0e592b78623ef33531c2d406d9c2b7e4eea1e1a43ea06179c",
+  "val": "a6a12e367ee8144cdb5423881eed8433d038234e5e4cf2c6cc8da5f944587dbe",
+  "test": "a6a12e367ee8144cdb5423881eed8433d038234e5e4cf2c6cc8da5f944587dbe"
+ },
+ "shortcut_audit": {
+  "n": 117,
+  "by_grade": {
+   "S1": 29,
+   "S2": 30,
+   "S3": 28,
+   "TS": 30
+  },
+  "baseline_rate": 25.6,
+  "document_type_rate": 40.2,
+  "theme_rate": 38.5,
+  "length_only_rate": 42.7,
+  "median_chars": {
+   "S1": 946,
+   "S2": 913,
+   "S3": 894,
+   "TS": 945
+  }
+ }
+}

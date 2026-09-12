@@ -225,40 +225,121 @@ def build(n: int, seed: int) -> list[dict]:
     return rows
 
 
-def audit(rows: list[dict]) -> dict:
-    """지름길 세 축을 잰다 — 만들었다고 끝이 아니라 재서 확인한다."""
-    n = len(rows)
-    counts = collections.Counter(r["label"] for r in rows)
-    base = max(counts.values()) / n
-
-    def axis(key: str) -> float:
-        table: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
-        for r in rows:
-            table[r[key]][r["label"]] += 1
-        return sum(c.most_common(1)[0][1] for c in table.values()) / n * 100
-
-    lengths = collections.defaultdict(list)
+def category_rate(rows: list[dict], key: str) -> float:
+    """어떤 축의 값만 보고 그 안의 최빈등급을 찍었을 때의 적중률(%)."""
+    table: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     for r in rows:
-        lengths[r["label"]].append(len(r["text"]))
-    med = {g: sorted(v)[len(v) // 2] for g, v in lengths.items()}
+        table[r[key]][r["label"]] += 1
+    return sum(c.most_common(1)[0][1] for c in table.values()) / len(rows) * 100
 
-    # 길이 구간만 보고 최빈등급 찍기 — 중앙값 배수만으로는 분포 겹침을 못 본다.
+
+def length_rate(rows: list[dict], bins: int = 10) -> float:
+    """길이 구간만 보고 최빈등급을 찍었을 때의 적중률(%)."""
     ordered = sorted((len(r["text"]), r["label"]) for r in rows)
-    bins, hit = 10, 0
-    size = len(ordered) / bins
+    hit, size = 0, len(ordered) / bins
     for i in range(bins):
         chunk = ordered[int(i * size):int((i + 1) * size)]
         if chunk:
             hit += collections.Counter(g for _c, g in chunk).most_common(1)[0][1]
+    return hit / len(rows) * 100
+
+
+def phrase_rate(rows: list[dict], *, min_docs: int = 10, min_chars: int = 12) -> float:
+    """되풀이되는 문장 하나를 단서로 삼아 최빈등급을 찍었을 때의 적중률(%).
+
+    이 축을 빼면 안 된다 — 2026-09-12 에 **두 번** 여기서 데였다(등급별 고정 문구 ·
+    LLM 이 수준마다 쓰는 상투구). 문서종류·길이가 깨끗해도 이 축만으로 등급이 갈릴 수 있다.
+    """
+    from measure_grade_phrase_leak import sentences  # noqa: PLC0415
+
+    by_sentence: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    per_doc: list[set[str]] = []
+    for row in rows:
+        sents = sentences(row["text"], min_chars)
+        per_doc.append(sents)
+        for s in sents:
+            by_sentence[s][row["label"]] += 1
+
+    best: dict[str, tuple[float, str]] = {}
+    for sentence, dist in by_sentence.items():
+        total = sum(dist.values())
+        if total < min_docs:
+            continue
+        grade, cnt = dist.most_common(1)[0]
+        best[sentence] = (cnt / total, grade)
+
+    hit = 0
+    for row, sents in zip(rows, per_doc):
+        picks = [best[s] for s in sents if s in best]
+        if picks and max(picks)[1] == row["label"]:
+            hit += 1
+    return hit / len(rows) * 100
+
+
+def null_rate(rows: list[dict], fn, *, trials: int = 200, seed: int = 7) -> float:
+    """**라벨을 섞었을 때** 같은 자가 내는 값. 이것이 진짜 비교 기준이다.
+
+    ⚠ "가장 흔한 등급 비율"을 기준선으로 쓰면 안 된다. 범주가 많고 표본이 적으면
+      최빈등급 찍기는 **아무 관계가 없어도** 크게 나온다 — 칸마다 몇 건 없으면
+      그 안의 최빈값이 저절로 과반이 된다.
+      실제로 2026-09-12 에 117건짜리 판에서 문서종류 40.2% 가 나와 지름길인 줄 알았는데,
+      라벨을 섞어도 39.7% 였다(차이 +0.5%p = 사실상 없음). 헛경보를 낼 뻔했다.
+    """
+    rng = random.Random(seed)
+    labels = [r["label"] for r in rows]
+    shuffled = [dict(r) for r in rows]
+    total = 0.0
+    for _ in range(trials):
+        rng.shuffle(labels)
+        for row, label in zip(shuffled, labels):
+            row["label"] = label
+        total += fn(shuffled)
+    return total / trials
+
+
+def audit(rows: list[dict], *, trials: int = 200) -> dict:
+    """지름길 세 축을 잰다 — 만들었다고 끝이 아니라 재서 확인한다.
+
+    축마다 **실측**과 **라벨을 섞었을 때**를 나란히 낸다. 판단은 그 **차이**로 한다.
+    """
+    n = len(rows)
+    counts = collections.Counter(r["label"] for r in rows)
+    lengths: dict[str, list[int]] = collections.defaultdict(list)
+    for r in rows:
+        lengths[r["label"]].append(len(r["text"]))
+    med = {g: sorted(v)[len(v) // 2] for g, v in lengths.items()}
+
+    axes = {}
+    for name, fn, reps in (
+        ("document_type", lambda rs: category_rate(rs, "document_type"), trials),
+        ("theme", lambda rs: category_rate(rs, "theme"), trials),
+        ("length", length_rate, trials),
+        # 문구 축은 한 번 재는 데 비싸다 — 섞기 횟수를 줄인다(값은 안정적이다).
+        ("phrase", phrase_rate, max(10, trials // 20)),
+    ):
+        real = fn(rows)
+        null = null_rate(rows, fn, trials=reps)
+        axes[name] = {"rate": round(real, 1), "null": round(null, 1),
+                      "excess_pp": round(real - null, 1)}
 
     return {
-        "n": n, "by_grade": dict(counts), "baseline_rate": round(base * 100, 1),
-        "document_type_rate": round(axis("document_type"), 1),
-        "theme_rate": round(axis("theme"), 1),
+        "n": n, "by_grade": dict(counts),
+        "majority_rate": round(max(counts.values()) / n * 100, 1),
+        "axes": axes,
         "median_chars": med,
         "median_ratio": round(max(med.values()) / min(med.values()), 2),
-        "length_only_rate": round(hit / n * 100, 1),
     }
+
+
+def print_audit(rep: dict) -> None:
+    """검사 결과를 사람이 읽는 꼴로. **차이**를 보게 배치한다."""
+    print("%d건 · 등급별 %s · 최빈등급 %.1f%%"
+          % (rep["n"], rep["by_grade"], rep["majority_rate"]))
+    print("  %-10s %8s %10s %10s" % ("축", "실측", "라벨섞음", "차이"))
+    for name, row in rep["axes"].items():
+        print("  %-10s %7.1f%% %9.1f%% %9.1f%%p" % (name, row["rate"], row["null"], row["excess_pp"]))
+    print("  ※ 판단은 **차이**로 한다 — 범주가 많고 표본이 적으면 관계가 없어도 실측이 크게 나온다")
+    print("  길이 중앙값 %s · 배수 %s" % (rep["median_chars"], rep["median_ratio"]))
 
 
 def main(argv=None) -> int:
@@ -273,11 +354,7 @@ def main(argv=None) -> int:
 
     rows = build(a.n, a.seed)
     rep = audit(rows)
-    print("%d건 · 등급별 %s · 기준선 %.1f%%" % (rep["n"], rep["by_grade"], rep["baseline_rate"]))
-    print("  문서종류만으로 %.1f%% · 주제만으로 %.1f%%  (기준선에 가까워야 한다)"
-          % (rep["document_type_rate"], rep["theme_rate"]))
-    print("  길이만으로 %.1f%% · 중앙값 %s · 배수 %s"
-          % (rep["length_only_rate"], rep["median_chars"], rep["median_ratio"]))
+    print_audit(rep)
     print("\n예시(S=2·V=2·M=2 인 문서 첫 4줄):")
     for r in rows:
         if (r["s"], r["v"], r["m"]) == (2, 2, 2):

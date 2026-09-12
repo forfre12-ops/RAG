@@ -56,7 +56,12 @@ sys.path.insert(0, str(_POC / "scripts"))
 
 from koipa.modules.m3_labeling.rule_engine import grade_from_svm  # noqa: E402
 
-from build_grade_content_corpus import DOC_TYPES, THEMES  # noqa: E402
+from build_grade_content_corpus import (  # noqa: E402
+    DOC_TYPES,
+    THEMES,
+    audit,
+    print_audit,
+)
 
 GRADES = ("TS", "S1", "S2", "S3")
 
@@ -190,32 +195,8 @@ def generate_one(provider, combo, doc_type, theme, facet, *, min_chars, max_char
     return None
 
 
-def audit(rows: list[dict]) -> dict:
-    n = len(rows)
-    counts = collections.Counter(r["label"] for r in rows)
-
-    def axis(key: str) -> float:
-        table: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
-        for r in rows:
-            table[r[key]][r["label"]] += 1
-        return sum(c.most_common(1)[0][1] for c in table.values()) / n * 100
-
-    ordered = sorted((len(r["text"]), r["label"]) for r in rows)
-    bins, hit = 10, 0
-    size = len(ordered) / bins
-    for i in range(bins):
-        chunk = ordered[int(i * size):int((i + 1) * size)]
-        if chunk:
-            hit += collections.Counter(g for _c, g in chunk).most_common(1)[0][1]
-    return {
-        "n": n, "by_grade": dict(counts),
-        "baseline_rate": round(max(counts.values()) / n * 100, 1),
-        "document_type_rate": round(axis("document_type"), 1),
-        "theme_rate": round(axis("theme"), 1),
-        "length_only_rate": round(hit / n * 100, 1),
-        "median_chars": {g: sorted(len(r["text"]) for r in rows if r["label"] == g)[
-            max(0, counts[g] // 2)] for g in counts},
-    }
+# 검사는 규칙 생성기와 **같은 자**를 쓴다 — 두 벌로 재면 값이 갈려 비교가 안 된다.
+# 특히 '라벨을 섞었을 때' 기준선이 여기 들어 있다(작은 표본에서 헛경보를 막는다).
 
 
 def main(argv=None) -> int:
@@ -283,11 +264,8 @@ def main(argv=None) -> int:
         return 1
 
     rep = audit(rows)
-    print("\n채택 %d건 · 등급별 %s · 기준선 %.1f%%"
-          % (rep["n"], rep["by_grade"], rep["baseline_rate"]))
-    print("  문서종류만으로 %.1f%% · 주제만으로 %.1f%% · 길이만으로 %.1f%%  (기준선에 가까워야 한다)"
-          % (rep["document_type_rate"], rep["theme_rate"], rep["length_only_rate"]))
-    print("  길이 중앙값 %s" % rep["median_chars"])
+    print()
+    print_audit(rep)
     print("  재시도 분포:", dict(collections.Counter(r["attempts"] for r in rows)))
 
     if a.dry:
