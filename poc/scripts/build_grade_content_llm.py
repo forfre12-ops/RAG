@@ -82,16 +82,22 @@ SYSTEM = (
     "당신은 한국 기업의 실무 문서를 작성합니다. 보고서 말투로 담백하게 씁니다.\n"
     "규칙:\n"
     "1. 보안등급을 절대 언급하지 않습니다. '특급기밀·1급비밀·2급대외비·3급공개·기밀·비밀·"
-    "대외비·영업비밀·TS·S1·S2·S3' 같은 말을 쓰지 않습니다.\n"
+    "대외비·극비·영업비밀·TS·S1·S2·S3' 같은 말을 쓰지 않습니다.\n"
+    "   문서에 표시가 찍혀 있다는 사실을 적을 때도 등급 이름을 쓰지 말고 "
+    "'취급 주의 표시' · '보안 표시' 처럼 적습니다.\n"
     "2. 문서가 어느 등급인지 평가하거나 설명하지 않습니다. 업무 기록만 씁니다.\n"
     "3. 지시받은 세 가지 성질이 본문에 자연스럽게 드러나게 씁니다. 성질을 말로 설명하지 말고 "
     "내용으로 보이십시오.\n"
-    "4. 표제·머리말을 포함해 한국어로만 씁니다."
+    "4. 표제·머리말을 포함해 한국어로만 씁니다.\n"
+    "5. 요약하지 않습니다. 실제 업무 기록처럼 소제목을 나누어 충분한 분량으로 씁니다."
 )
 
+# ⚠ '기밀·비밀·대외비' 를 홑낱말로도 막는다. 처음엔 '기밀 등급' 처럼 붙은 꼴만 막았는데,
+#   모델이 "보안 표시 기준 '기밀' 적용" 이라고 써서 그대로 통과했다. 그 낱말 하나가
+#   등급을 알려 준다([[grade-name-words-are-shortcuts-2026-09-11]]: '기밀' → TS 69.1%).
+#   대신 표시가 있다는 사실은 '취급 주의 표시' 로 쓰도록 지시문에서 길을 열어 둔다.
 _BANNED = re.compile(
-    r"특급\s*기밀|1\s*급\s*비밀|2\s*급\s*대외비|3\s*급\s*공개|대외비|영업비밀|"
-    r"보안\s*등급|기밀\s*등급|\bTS\b|\bS1\b|\bS2\b|\bS3\b")
+    r"특급|기밀|비밀|대외비|극비|보안\s*등급|\bTS\b|\bS1\b|\bS2\b|\bS3\b")
 
 SCHEMA = {
     "name": "business_document",
@@ -108,14 +114,19 @@ SCHEMA = {
 
 
 def prompt_for(s: int, v: int, m: int, doc_type: str, theme: str, facet: str) -> str:
+    # ⚠ "600~1,100자" 만 적었더니 한 문단 267자로 압축해서 12/12 가 분량 미달로 탈락했다.
+    #   뼈대를 주고 각 절의 분량을 못 박아야 실제 업무 문서 길이가 나온다.
     return (
         f"주제: {theme} ({facet})\n"
         f"문서 종류: {doc_type}\n\n"
-        "아래 세 가지가 본문에 드러나도록 작성하십시오.\n"
+        "아래 세 가지가 본문에 드러나도록 작성하십시오. 성질 이름을 쓰지 말고 내용으로 보이십시오.\n"
         f"(가) {LEVEL_SPEC['S'][s]}\n"
         f"(나) {LEVEL_SPEC['V'][v]}\n"
         f"(다) {LEVEL_SPEC['M'][m]}\n\n"
-        "분량은 600~1,100자입니다. JSON 으로 title 과 body 를 주십시오."
+        "다음 네 소제목을 그대로 쓰고, 각 절을 **최소 4문장**으로 채우십시오.\n"
+        "## 배경\n## 확인한 내용\n## 영향 검토\n## 문서 취급\n\n"
+        "body 는 전체 **700자 이상 1,300자 이하**여야 합니다. 표를 쓰지 마십시오.\n"
+        "JSON 으로 title 과 body 를 주십시오."
     )
 
 
@@ -144,25 +155,31 @@ def _parse(text: str) -> tuple[str, str] | None:
 
 def generate_one(provider, combo, doc_type, theme, facet, *, min_chars, max_chars,
                  tries: int) -> dict | None:
+    """⚠ 버리는 사유를 **따로** 센다. 처음엔 '검사 탈락' 하나로 묶었다가 12/12 가 탈락했을 때
+    무엇 때문인지 못 봤다 — 사유를 합치면 고칠 자리를 못 찾는다."""
     s, v, m = combo
     prompt = prompt_for(s, v, m, doc_type, theme, facet)
+    reason = "시도 없음"
     for attempt in range(tries):
         try:
             out = provider.generate(
                 prompt, system=SYSTEM, max_tokens=1600,
                 temperature=0.9 if attempt else 0.7, json_schema=SCHEMA)
         except Exception as exc:  # noqa: BLE001
-            if attempt == tries - 1:
-                return {"_error": f"{type(exc).__name__}: {exc}"[:200]}
+            reason = f"호출 실패 {type(exc).__name__}: {exc}"[:120]
             continue
         parsed = _parse(out.text or "")
         if parsed is None:
+            reason = "파싱 실패(앞 60자: %s)" % (out.text or "")[:60].replace("\n", " ")
             continue
         title, body = parsed
         text = f"# {title}\n\n{body}" if title else body
         if not (min_chars <= len(text) <= max_chars):
+            reason = "길이 %d자 (허용 %d~%d)" % (len(text), min_chars, max_chars)
             continue
-        if _BANNED.search(text):
+        hit = _BANNED.search(text)
+        if hit:
+            reason = "금지어 '%s'" % hit.group(0)
             continue
         return {
             "text": text, "label": grade_from_svm(s, v, m), "s": s, "v": v, "m": m,
