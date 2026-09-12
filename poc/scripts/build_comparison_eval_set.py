@@ -196,7 +196,9 @@ def main(argv=None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     eval_path = out_dir / "eval.jsonl"
     body = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in picked)
-    eval_path.write_text(body, encoding="utf-8")
+    # ⚠ 줄바꿈을 그대로 쓴다. 기본값으로 쓰면 윈도우에서 \n 이 \r\n 으로 바뀌어
+    #   **적어 둔 sha256 과 파일이 달라진다**(지문이 지문 구실을 못 한다).
+    eval_path.write_text(body, encoding="utf-8", newline="\n")
 
     # 입력이 git 밖이 아니어도 지문을 남긴다 — 같은 질문에 다른 답이 나오는 일을 막는다.
     manifest = {
