@@ -305,13 +305,17 @@ def _case_specific_appendix(case: Case) -> str:
     )
     form, opening, method = forms[seed % len(forms)]
     selected_headings = [headings[(seed + offset) % len(headings)] for offset in range(4)]
-    risk_words = {
-        "TS": "핵심 기술·보안 또는 사업상 중대 비공개 정보의 즉시 노출",
-        "S1": "경쟁·협상·운영상 의미 있는 내부 판단의 구체적 노출",
-        "S2": "조직 운영·지원·품질 관리에 영향을 주는 내부 정보의 불필요한 확산",
-        "S3": "공개 안내의 범위를 넘어선 개별 운영정보의 혼입",
-    }
-    grade_note = risk_words[case.grade]
+    # [2026-09-12] **등급으로 고르지 않는다.** 종전에는 이 문장이 등급마다 고정이라 본문이
+    # 등급을 그대로 말하고 있었다 — 세척(clean_candidate_answer_leak.py)은 '## 등급 제안 사유'
+    # 절만 걷어서 이 문장은 964건에 그대로 남아 있었다(후보 1,055건 실측 · 한 등급 전용 100%).
+    # 제목 해시로 고른다: 문서마다 달라 문장이 단조롭지 않으면서 등급과는 상관이 없다.
+    risk_words = (
+        "핵심 기술·보안 또는 사업상 중대 비공개 정보의 즉시 노출",
+        "경쟁·협상·운영상 의미 있는 내부 판단의 구체적 노출",
+        "조직 운영·지원·품질 관리에 영향을 주는 내부 정보의 불필요한 확산",
+        "공개 안내의 범위를 넘어선 개별 운영정보의 혼입",
+    )
+    grade_note = risk_words[seed % len(risk_words)]
     return f"""
 ## {form}
 
