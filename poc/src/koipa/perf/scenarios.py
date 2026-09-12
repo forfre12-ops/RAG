@@ -192,6 +192,11 @@ def s1_sync_classify(ctx: ScenarioContext) -> None:
               " (PSH_EVAL_JSONL 또는 LOCKED_EVAL_JSONL 로 지정)")
         return
     print(f"[PSH][S1] 평가셋 {eval_source} · {len(eval_set)}건으로 F1·FNR 측정")
+    # [2026-09-12] 결과 파일에도 남긴다 — 전에는 이 줄이 로그에만 있어, JSON·보고서만 받은 쪽은
+    # F1 0.944 가 **어느 셋에서 나온 값인지** 알 수 없었다. 기본 셋 holdout_eval.hardened.jsonl(42건)은
+    # 길이만으로 등급이 갈리는 셋이라 그대로 인용하면 안 된다(memory: holdout-length-tells-grade).
+    ctx.note("eval_set", eval_source)
+    ctx.note("eval_n", str(len(eval_set)))
 
     fn_ts = 0  # TS인데 하위 등급으로 예측 (미탐)
     n_ts = 0

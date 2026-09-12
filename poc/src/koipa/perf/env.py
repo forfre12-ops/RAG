@@ -57,6 +57,16 @@ def _git(args: list[str]) -> str:
         return ""
 
 
+def _build_sha() -> str:
+    """이미지에 구워진 빌드 SHA. 배포 컨테이너에는 `.git` 이 없어 `_git()` 이 빈 값을 준다.
+
+    출처는 healthz 와 같다 — `Dockerfile.api.prod` 가 `--build-arg KOIPA_BUILD_SHA` 를
+    ENV 로 굽고(19-21행) `api/health.py:252` 가 그 값을 읽는다. "unknown" 은 빈 값으로 본다.
+    """
+    sha = (os.environ.get("KOIPA_BUILD_SHA") or "").strip()
+    return "" if sha in ("", "unknown") else sha
+
+
 def _ram_gb() -> float:
     try:
         import psutil  # type: ignore
@@ -196,7 +206,11 @@ def capture_env(
         cpu_count=os.cpu_count() or 0,
         ram_gb=_ram_gb(),
         gpu=_gpu(),
-        git_sha=_git(["rev-parse", "--short", "HEAD"]),
+        # [2026-09-12] 배포 컨테이너에는 `.git` 이 없어 `_git()` 이 빈 문자열을 준다 —
+        # 211 실측 결과 JSON 의 git_sha 가 "" 였고, 어느 판으로 잰 것인지가 파일 안에 없었다
+        # (healthz 를 따로 조회해야만 알 수 있었다 · rag-d4 지적). 이미지에 구워진
+        # KOIPA_BUILD_SHA 로 채운다 — healthz 가 쓰는 것과 같은 출처다(api/health.py:252).
+        git_sha=_git(["rev-parse", "--short", "HEAD"]) or _build_sha(),
         git_branch=_git(["rev-parse", "--abbrev-ref", "HEAD"]),
         pytest_collected=_pytest_collected() if probe_pytest else None,
         services=svc,

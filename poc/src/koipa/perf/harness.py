@@ -48,6 +48,9 @@ class ScenarioResult:
     status: str  # "PASS" | "FAIL" | "SKIP" | "ERROR"
     duration_ms: float
     measurements: dict[str, list[float | bool]] = field(default_factory=dict)
+    # [2026-09-12] 숫자가 아닌 근거(평가셋 파일명 등). `measurements` 는 float|bool 만 받는데,
+    # "이 F1 을 무엇으로 쟀나" 는 숫자가 아니다 — 로그에만 찍혀 결과 파일만 보면 알 수 없었다.
+    notes: dict[str, str] = field(default_factory=dict)
     kpis: list[KPIResult] = field(default_factory=list)
     error: str = ""
     skip_reason: str = ""
@@ -112,8 +115,37 @@ class AvailableResources:
         return bool(getattr(self, name, False))
 
 
+def _serving_model_loaded() -> bool:
+    """이 프로세스의 분류 서비스가 **학습 모델을 실제로 적재했는지**.
+
+    [2026-09-12] 211 실측에서 S9.2(적대적 FNR)·S9.4(무음 미탐)·S1.3·S1.4 가 매 회차
+    `missing: trained_model` 로 SKIP 됐다 — RFP 가 스스로 "핵심 성능 목표"라고 적은 미탐
+    지표가 서버에서 한 번도 안 재진 것이다. 원인은 모델 파일이 아니라 **DB 등록**이었다:
+    아래 DB 검사는 활성 ModelVersion 행만 보는데 211 의 `tad_mm_mdl_ver_mng` 는 0행이고
+    (9/10 PostgreSQL 재배포 때 안 옮겼다), 서버는 `CLASSIFIER_MODEL_DIR` 폴백으로 서빙 중이라
+    healthz 는 `model=loaded` 다. KPI 가 재는 것은 **서빙 경로**이므로 서빙이 무엇을 적재했는지가
+    옳은 질문이다(`api/health.py:_check_model` 과 같은 판정).
+
+    ⚠ 인스턴스를 **만들지 않는다.** 없으면 False 다 — 자원 판정 한 번 하려고 모델을 적재하면
+    S11 측정 구간에 적재 비용이 섞인다(`--only S11` 단독 실행이 CPU 97% 로 찍혔던 것과 같은 함정).
+    하니스는 시나리오보다 먼저 자원을 판정하므로, 첫 회차에는 대개 False 이고 DB 검사로 넘어간다.
+    """
+    try:
+        import sys  # noqa: PLC0415
+
+        mod = sys.modules.get("koipa.services.classify_service")
+        if mod is None:
+            return False
+        svc = getattr(mod.ClassifyService, "_instance", None)
+        if svc is None:
+            return False
+        return getattr(svc.inference, "_model", None) is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _detect_trained_model() -> bool:
-    """active model이 DB에 등록돼 있고 model_uri가 비어있지 않으면 학습된 모델로 간주.
+    """서빙이 학습 모델을 적재했거나, active model이 DB에 등록돼 있으면 학습된 모델로 간주.
 
     실패(DB 미가용·미설치 등) 시 False — dryrun 환경 안전.
     """
@@ -126,6 +158,10 @@ def _detect_trained_model() -> bool:
             return True
         if env_flag in ("0", "false", "no"):
             return False
+
+        # 서빙이 이미 적재했으면 DB 등록 여부와 무관하게 학습 모델이다(위 함수 주석 참조).
+        if _serving_model_loaded():
+            return True
 
         from sqlalchemy import select
 
@@ -168,11 +204,19 @@ class ScenarioContext:
         self.resources = resources
         self.mode = mode
         self.measurements: dict[str, list[float | bool]] = {}
+        self.notes: dict[str, str] = {}
         self.skip_reason: str = ""
         self.skipped: bool = False
 
     def record(self, key: str, value: float | bool) -> None:
         self.measurements.setdefault(key, []).append(value)
+
+    def note(self, key: str, value: str) -> None:
+        """숫자가 아닌 근거를 결과에 남긴다 — 무엇으로 쟀는지(평가셋 파일명 등).
+
+        KPI 판정에는 쓰이지 않는다(`_compute_kpis` 는 `measurements` 만 읽는다).
+        """
+        self.notes[key] = str(value)
 
     def skip(self, reason: str) -> None:
         self.skipped = True
@@ -241,6 +285,7 @@ class ScenarioRunner:
                     status=status,
                     duration_ms=duration_ms,
                     measurements=ctx.measurements,
+                    notes=ctx.notes,
                     kpis=kpi_results,
                     error=error,
                     skip_reason=ctx.skip_reason,
