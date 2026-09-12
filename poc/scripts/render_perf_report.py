@@ -186,7 +186,7 @@ def _value_passes(v: float, compare: str, threshold: float | None) -> bool:
 
 
 def sparkline_with_threshold(
-    values: list[float],
+    values: list[float | None],
     *,
     threshold: float | bool | None = None,
     compare: str = "le",
@@ -198,16 +198,23 @@ def sparkline_with_threshold(
     - 측정값(검은 선) + 점별 PASS/FAIL 색(초록/빨강) + 임계선(점선, 주황) 한 차트에
     - 임계 미달 회차를 즉시 식별 가능
     - 임계가 None이면 일반 sparkline과 동일 동작
+    - [2026-09-12] 값이 ``None`` 인 회차는 **점도 선도 그리지 않는다**(선이 끊긴다).
+      그 회차에 재지 않았다는 뜻이다. 전에는 미측정을 0 으로 그려 초록 점까지 찍혔고,
+      읽는 쪽은 "0 이 측정됐고 통과했다"로 읽었다 — 211 부분 실측(2026-09-11)에서
+      S9.1·S16.4 가 그렇게 실렸다.
     """
     if not values:
         return ""
-    if len(values) == 1:
-        values = values * 2
+    pts_at: list[tuple[int, float]] = [
+        (i, float(v)) for i, v in enumerate(values) if v is not None
+    ]
+    if not pts_at:
+        return ""
 
     if isinstance(threshold, bool):
         threshold = 1.0 if threshold else 0.0
 
-    candidates = list(values)
+    candidates = [v for _, v in pts_at]
     if threshold is not None:
         candidates.append(float(threshold))
     lo, hi = min(candidates), max(candidates)
@@ -219,17 +226,31 @@ def sparkline_with_threshold(
     def _y(v: float) -> float:
         return height - 1 - ((v - lo) / rng) * (height - 2)
 
-    pts = []
-    for i, v in enumerate(values):
-        x = i * (width - 2) / (len(values) - 1) + 1
-        pts.append((x, _y(v), v))
+    denom = max(len(values) - 1, 1)
 
-    path_d = "M " + " L ".join(f"{x:.1f},{y:.1f}" for x, y, _ in pts)
+    def _x(i: int) -> float:
+        return i * (width - 2) / denom + 1
+
+    # 연속한 회차끼리만 선으로 잇는다 — 사이에 미측정이 있으면 끊어 그린다.
+    paths: list[str] = []
+    seg: list[str] = []
+    prev_i: int | None = None
+    for i, v in pts_at:
+        if prev_i is not None and i != prev_i + 1 and len(seg) > 1:
+            paths.append("M " + " L ".join(seg))
+            seg = []
+        elif prev_i is not None and i != prev_i + 1:
+            seg = []
+        seg.append(f"{_x(i):.1f},{_y(v):.1f}")
+        prev_i = i
+    if len(seg) > 1:
+        paths.append("M " + " L ".join(seg))
+
     circles = []
-    for x, y, v in pts:
+    for i, v in pts_at:
         ok = _value_passes(v, compare, threshold) if threshold is not None else True
         color = "#16a34a" if ok else "#dc2626"
-        circles.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.2" fill="{color}"/>')
+        circles.append(f'<circle cx="{_x(i):.1f}" cy="{_y(v):.1f}" r="2.2" fill="{color}"/>')
 
     thr_line = ""
     if threshold is not None:
@@ -239,10 +260,13 @@ def sparkline_with_threshold(
             f'stroke="#d97706" stroke-width="1" stroke-dasharray="3,3"/>'
         )
 
+    lines = "".join(
+        f'<path d="{d}" fill="none" stroke="#525252" stroke-width="1.2"/>' for d in paths
+    )
     return (
         f'<svg class="spark" width="{width}" height="{height}" viewBox="0 0 {width} {height}">'
         f"{thr_line}"
-        f'<path d="{path_d}" fill="none" stroke="#525252" stroke-width="1.2"/>'
+        f"{lines}"
         f"{''.join(circles)}"
         f"</svg>"
     )
@@ -400,7 +424,8 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
   <h2><span class="num">§2.5</span> 전체 KPI 추세</h2>
   <p style="color:var(--text-dim); font-size:12.5px; margin:0 0 8px;">
     각 KPI의 최근 {len(prev_runs)+1}회 측정 추이. 점선=임계, 초록 점=PASS, 빨강 점=FAIL.
-    SKIP된 KPI는 측정값 0으로 표시되니 컬러 무시.
+    재지 않은 회차는 점을 찍지 않아 선이 끊깁니다. 최근값·판정이 <strong>미측정</strong>이면
+    이번 회차에 그 시나리오를 돌리지 않은 것입니다 — 지난 회차 판정이 아닙니다.
   </p>
   {trend_full}
 </section>
@@ -491,11 +516,14 @@ def _build_core_widgets(scenarios: list[dict], summ: dict) -> str:
 
 def _build_matrix_rows(scenarios: list[dict], prev_runs: list[dict]) -> str:
     # 직전 회차 KPI 인덱싱
+    # [2026-09-12] SKIP 회차 값은 비교 대상이 아니다 — measured 0.0 은 자리표시다.
     prev_map: dict[str, float] = {}
     if prev_runs:
         prev = prev_runs[0]
         for s in prev.get("scenarios", []):
             for k in s.get("kpis", []):
+                if k.get("status") == "SKIP":
+                    continue
                 prev_map[k.get("kpi_id", "")] = float(k.get("measured", 0))
 
     rows: list[str] = []
@@ -503,18 +531,26 @@ def _build_matrix_rows(scenarios: list[dict], prev_runs: list[dict]) -> str:
         title = f"{s.get('scenario')} {s.get('title', '')}"
         for k in s.get("kpis", []):
             kid = k.get("kpi_id", "")
+            status = k.get("status", "SKIP")
+            # SKIP 이면 잰 값이 없다 — 0 을 적으면 "0 이 나왔다"로 읽히고 델타까지 붙는다.
+            skipped = status == "SKIP"
             measured = float(k.get("measured", 0))
             prev = prev_map.get(kid)
+            value_cell = "미측정" if skipped else _fmt_value(measured, k.get("unit", ""))
+            delta_cell = (
+                '<span class="delta flat">—</span>' if skipped
+                else _delta(measured, prev, k.get("unit", ""))
+            )
             rows.append(
                 f"<tr>"
                 f'<td class="cell-mono">{html.escape(kid)}</td>'
                 f"<td>{html.escape(title)}</td>"
                 f"<td>{html.escape(k.get('name', ''))}</td>"
-                f'<td class="cell-mono">{_fmt_value(measured, k.get("unit", ""))}</td>'
+                f'<td class="cell-mono">{value_cell}</td>'
                 f'<td class="cell-mono">{_fmt_threshold(k.get("threshold"), k.get("compare", "le"), k.get("unit", ""))}</td>'
-                f'<td><span class="status-pill {k.get("status", "SKIP")}">{k.get("status", "SKIP")}</span></td>'
+                f'<td><span class="status-pill {status}">{status}</span></td>'
                 f'<td class="cell-mono">{k.get("n_samples", 0)}</td>'
-                f"<td>{_delta(measured, prev, k.get('unit', ''))}</td>"
+                f"<td>{delta_cell}</td>"
                 f"</tr>"
             )
     return "".join(rows)
@@ -526,18 +562,19 @@ def _build_trends(history: list[dict]) -> str:
         return '<p style="color:var(--text-dim); font-size:13px;">측정 누적 중 (N=1) — 다음 회차부터 추세 표시.</p>'
 
     # KPI별 측정값 + 임계·compare 추출 (가장 최근 run에서)
-    series: dict[str, list[float]] = {ck.id: [] for ck in core_kpis()}
+    # [2026-09-12] 재지 않았거나 SKIP 인 회차는 None — 0 으로 채우면 카드가 초록/빨강으로 칠해진다.
+    series: dict[str, list[float | None]] = {ck.id: [] for ck in core_kpis()}
     latest_kpi_meta: dict[str, dict] = {}
     for run in history:
-        idx = {}
+        idx: dict[str, float | None] = {}
         for s in run.get("scenarios", []):
             for k in s.get("kpis", []):
                 kid = k.get("kpi_id", "")
-                idx[kid] = float(k.get("measured", 0))
+                idx[kid] = None if k.get("status") == "SKIP" else float(k.get("measured", 0))
                 # latest meta (마지막 처리가 가장 최근)
                 latest_kpi_meta[kid] = k
         for ck in core_kpis():
-            series[ck.id].append(idx.get(ck.id, 0.0))
+            series[ck.id].append(idx.get(ck.id))
 
     cards: list[str] = []
     for ck in core_kpis():
@@ -548,15 +585,21 @@ def _build_trends(history: list[dict]) -> str:
         chart = sparkline_with_threshold(
             vals, threshold=threshold, compare=compare, width=180, height=44,
         )
-        # 최근 값이 임계 미달인지로 카드 컬러
-        latest_ok = _value_passes(vals[-1], compare, threshold) if threshold is not None else True
-        cls = "pass" if latest_ok else "fail"
+        # 최근 값이 임계 미달인지로 카드 컬러 — 값이 없으면 판정하지 않는다(회색).
+        last = vals[-1] if vals else None
+        if last is None:
+            cls = "skip"
+        elif threshold is None:
+            cls = "pass"
+        else:
+            cls = "pass" if _value_passes(last, compare, threshold) else "fail"
         cards.append(
             f'<div class="widget {cls}">'
             f'<div class="lbl">{html.escape(ck.id)} {html.escape(ck.name)}</div>'
             f'<div class="val" style="font-size:14px;">{chart}</div>'
-            f'<div class="sub">{_fmt_value(vals[-1], ck.unit)} · '
-            f'{_fmt_threshold(threshold, compare, ck.unit) if threshold is not None else "—"} · N={len(vals)}</div>'
+            f'<div class="sub">{_fmt_value(last, ck.unit) if last is not None else "미측정"} · '
+            f'{_fmt_threshold(threshold, compare, ck.unit) if threshold is not None else "—"} · '
+            f'N={sum(1 for v in vals if v is not None)}</div>'
             f'</div>'
         )
     return f'<div class="widgets">{"".join(cards)}</div>'
@@ -568,11 +611,15 @@ def _build_full_kpi_trends(history: list[dict]) -> str:
         return ""
 
     # KPI별 측정값 시계열 + 최근 메타
-    series: dict[str, list[float]] = {}
+    # [2026-09-12] 재지 않은 회차는 None 이다. 전에는 0 을 넣어 "0 이 측정됐다"로 그려졌고,
+    # 판정 칸은 *그 KPI 가 마지막으로 나왔던 회차*의 것이라 "최근값 0.0 · 최근 판정 PASS"
+    # 같은 조합이 나왔다(211 부분 실측 2026-09-11: S16.4 0.0 PASS · S9.1 0.0 PASS).
+    series: dict[str, list[float | None]] = {}
     latest_meta: dict[str, dict] = {}
     scenario_of: dict[str, str] = {}
-    for run in history:
-        run_kpis: dict[str, dict] = {}
+    run_kpis: dict[str, dict] = {}
+    for run_i, run in enumerate(history):
+        run_kpis = {}
         for s in run.get("scenarios", []):
             for k in s.get("kpis", []):
                 kid = k.get("kpi_id", "")
@@ -581,13 +628,15 @@ def _build_full_kpi_trends(history: list[dict]) -> str:
                 run_kpis[kid] = k
                 latest_meta[kid] = k
                 scenario_of[kid] = s.get("scenario", "")
-        # 모든 알려진 KPI에 대해 측정값 (없으면 0) 추가
-        all_ids = set(series.keys()) | set(run_kpis.keys())
-        for kid in all_ids:
-            if kid not in series:
-                series[kid] = []
-            v = run_kpis.get(kid, {}).get("measured", 0)
-            series[kid].append(float(v))
+        for kid in set(series.keys()) | set(run_kpis.keys()):
+            vals = series.setdefault(kid, [])
+            vals.extend([None] * (run_i - len(vals)))   # 처음 나오기 전 회차는 빈칸
+            k = run_kpis.get(kid)
+            # SKIP 의 measured 는 0.0 자리표시다(harness.ScenarioRunner._compute_kpis) — 값이 아니다.
+            vals.append(
+                None if (k is None or k.get("status") == "SKIP") else float(k.get("measured", 0))
+            )
+    latest_run_kpis = run_kpis   # 마지막 회차에 실제로 있던 KPI 만
 
     # 시나리오별 그룹 정렬
     grouped: dict[str, list[str]] = {}
@@ -606,14 +655,23 @@ def _build_full_kpi_trends(history: list[dict]) -> str:
             chart = sparkline_with_threshold(
                 vals, threshold=threshold, compare=compare, width=140, height=32,
             )
-            status = meta.get("status", "SKIP")
+            k_now = latest_run_kpis.get(kid)
+            last = vals[-1] if vals else None
+            if k_now is None:
+                # 이번 회차에 돌지 않은 시나리오다 — 지난 판정을 '최근 판정'으로 보이면 안 된다.
+                status, label = "SKIP", "미측정"
+                title = f"이번 회차에 재지 않았다 (마지막 판정 {meta.get('status', '?')})"
+            else:
+                status = k_now.get("status", "SKIP")
+                label = status
+                title = k_now.get("skip_reason", "") or ""
             rows.append(
                 f"<tr>"
                 f'<td class="cell-mono">{html.escape(kid)}</td>'
                 f"<td>{html.escape(meta.get('name', ''))}</td>"
                 f'<td>{chart}</td>'
-                f'<td class="cell-mono">{_fmt_value(vals[-1], unit)}</td>'
-                f'<td><span class="status-pill {status}">{status}</span></td>'
+                f'<td class="cell-mono">{_fmt_value(last, unit) if last is not None else "미측정"}</td>'
+                f'<td><span class="status-pill {status}" title="{html.escape(title)}">{label}</span></td>'
                 f"</tr>"
             )
     return (
