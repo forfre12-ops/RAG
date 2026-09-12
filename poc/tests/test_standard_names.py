@@ -14,7 +14,12 @@ from pathlib import Path
 
 from koipa.db import Base
 from koipa.db import models  # noqa: F401 — 표 등록
-from koipa.db.standard_names import COLUMNS, TABLES, logical_names
+from koipa.db.standard_names import (
+    COLUMNS,
+    POST_BASE_RENAMES,
+    TABLES,
+    logical_names,
+)
 
 _MIG = Path(__file__).resolve().parents[1] / "alembic" / "versions" / "7b3e9d2a4f10_standard_naming.py"
 
@@ -50,14 +55,41 @@ def test_orm_columns_match_standard_columns():
 
 
 def test_migration_copy_matches_standard_names():
-    """마이그레이션은 앱 코드를 import 하지 않고 사본을 든다 — 사본이 정본과 같아야 한다."""
+    """마이그레이션은 앱 코드를 import 하지 않고 사본을 든다 — 사본이 정본과 같아야 한다.
+
+    ⚠ 7b3e9d2a4f10 은 **이미 서버에서 돈 판**이라 고치지 않는다. 그 뒤에 다시 바꾼 이름은
+      뒤 마이그레이션이 처리하고 `POST_BASE_RENAMES` 에 남는다. 그래서 대조 전에 그
+      나중 이름을 되돌려 **그 판이 만든 이름**으로 맞춘다.
+    """
     mig = _load_migration()
     assert mig.TABLES == {old: new for old, (new, _) in TABLES.items()}
+    later = {
+        (table, now): made_by_base
+        for table, rows in POST_BASE_RENAMES.items()
+        for made_by_base, now, _rev, _why in rows
+    }
     changed = {
-        old: tuple((a, b) for a, b, _ in cols if a != b)
+        old: tuple((a, later.get((old, b), b)) for a, b, _ in cols
+                   if a != later.get((old, b), b))
         for old, cols in COLUMNS.items()
     }
     assert mig.COLUMNS == {k: v for k, v in changed.items() if v}
+
+
+def test_post_base_renames_have_a_migration_and_a_reason():
+    """나중에 바꾼 이름은 **어느 마이그레이션이 바꿨는지와 왜 바꿨는지**가 같이 있어야 한다.
+
+    이 기록이 없으면 다음 사람이 정본과 서버 DB 가 왜 다른지 알 수 없다.
+    """
+    versions = Path(__file__).resolve().parents[1] / "alembic" / "versions"
+    revisions = {p.name.split("_", 1)[0] for p in versions.glob("*.py")}
+    for table, rows in POST_BASE_RENAMES.items():
+        for base_name, now_name, rev, why in rows:
+            assert base_name != now_name, f"{table}: 바뀐 것이 없다"
+            assert rev in revisions, f"{table}.{now_name}: 마이그레이션 {rev} 이 없다"
+            assert len(why) > 20, f"{table}.{now_name}: 사유가 너무 짧다"
+            std = {new for _, new, _ in COLUMNS[table]}
+            assert now_name in std, f"{table}: 정본이 {now_name} 을 쓰지 않는다"
 
 
 def test_names_are_valid_lowercase_identifiers_and_unique_per_table():

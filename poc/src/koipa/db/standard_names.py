@@ -10,7 +10,7 @@
     v1.1 의 칼럼ID 193개는 전부 표준단어 약어로만 되어 있고 논리명도 전부 표준용어에 있다(실측).
   - v1.1 에 없던 것 — 새로 지었다. 쓴 단어는 전부 표준단어에 있다:
       tad_dm_doc_vctr_mng · tad_sm_syn_datst_cpst_mng · tad_sy_lck_mng 세 표,
-      tad_mm_mdl_ver_mng.actvtn_key · tad_lm_llm_usqty_mng.whol_tkn_cnt(DB 생성 칼럼).
+      tad_mm_mdl_ver_mng.actvtn_sn · tad_lm_llm_usqty_mng.whol_tkn_cnt(DB 생성 칼럼).
     본문해시내용·잠금명·데이터셋버전명·합성작업아이디·활성키·전체토큰수 는 표준용어로는
     미등록이라 용어집에 자체표준 용어로 올려야 한다.
   - v1.1 을 고친 것 — tad_mm_mdl_ver_mng.mlflow_run_id 를 v1.1 은 EXCN_ID 로 적었으나
@@ -272,7 +272,7 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("model_uri", "mdl_strg_path_nm", "모델저장경로명"),
         ("mlflow_run_id", "flw_excn_id", "흐름실행아이디"),
         ("is_active", "actvtn_yn", "활성여부"),
-        ("active_key", "actvtn_key", "활성키"),
+        ("active_key", "actvtn_sn", "활성일련번호"),
         ("activated_at", "vtlz_dt", "활성화일시"),
         ("deactivated_at", "dsbl_dt", "비활성화일시"),
         ("rolled_back_from", "rlbk_src_ver_id", "롤백출처버전아이디"),
@@ -328,6 +328,21 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "tb_advisory_locks": (
         ("name", "lck_nm", "잠금명"),
+    ),
+}
+
+
+# 7b3e9d2a4f10 뒤에 **다시 바꾼** 이름. 그 마이그레이션은 이미 서버에서 돌았으므로 고치지 않는다
+# (고치면 이미 올린 DB 와 새로 만드는 DB 의 이름이 갈린다). 대신 그 뒤 마이그레이션이 한 번 더
+# 바꾸고, 여기에 무엇을 언제 왜 바꿨는지 남긴다. 시험이 이 표를 되돌려 사본과 대조한다.
+#
+#   옛 표 이름: ((7b3e9d2a4f10 이 만든 이름, 지금 이름, 바꾼 마이그레이션, 사유), ...)
+POST_BASE_RENAMES: dict[str, tuple[tuple[str, str, str, str], ...]] = {
+    "tb_model_versions": (
+        ("actvtn_key", "actvtn_sn", "9c4e1f7a2b58",
+         "용어집에서 '키(KEY)' 는 형식단어여부=N 이라 용어 끝자리로 쓸 수 없다. "
+         "끝이 KEY 인 표준용어는 0/13,704 이고 '키' 로 끝나는 표준도메인도 없다. "
+         "값은 활성일 때 1·아니면 NULL 인 정수라 형식단어 SN(일련번호)이 맞다."),
     ),
 }
 

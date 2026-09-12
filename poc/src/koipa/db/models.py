@@ -347,7 +347,7 @@ class ModelVersion(Base):
     # 활성 행만 하나로 묶인다. Postgres·MariaDB 양쪽에서 GENERATED ALWAYS AS ... STORED 로
     # 동일하게 동작함을 실측 확인했다(둘 다 두 번째 활성 삽입에서 IntegrityError).
     active_key: Mapped[int | None] = mapped_column(
-        "actvtn_key", SmallInteger, Computed("CASE WHEN actvtn_yn THEN 1 END", persisted=True)
+        "actvtn_sn", SmallInteger, Computed("CASE WHEN actvtn_yn THEN 1 END", persisted=True)
     )
     activated_at: Mapped[dt.datetime | None] = mapped_column("vtlz_dt", DateTime(timezone=True))
     deactivated_at: Mapped[dt.datetime | None] = mapped_column("dsbl_dt", DateTime(timezone=True))
@@ -357,7 +357,7 @@ class ModelVersion(Base):
     created_at: Mapped[dt.datetime] = mapped_column("crt_dt", DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_mv_active", "actvtn_key", unique=True),
+        Index("idx_mv_active", "actvtn_sn", unique=True),
         Index("idx_mv_mlflow", "flw_excn_id"),
     )
 
