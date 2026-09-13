@@ -96,3 +96,34 @@ def test_measured_values_2026_09_14(tmp_path) -> None:
     assert m["model_recall"]["misses"] == 6
     assert m["serving_recall"]["misses"] == 2
     assert m["high_grade_auto_confirm_fn_rate"]["misses"] == 1
+
+
+# ── 과탐 축 — EVAL_CRITERIA 제4조 "동반 필수: 미탐만 보면 속는다" ──────────
+
+def test_overclass_axes_are_computed_on_low_grade_docs() -> None:
+    rows = [
+        _r("S3", "TS", "S1", "staging"),      # 격상 + 자동확정
+        _r("S3", "S3", "S2", "needs_review"), # 과탐이나 검수로 감
+        _r("S3", "S3", "S3", "staging"),      # 정상
+        _r("TS", "TS", "TS", "staging"),      # 고등급 — 과탐 분모에서 빠진다
+    ]
+    m = compute(rows)
+    assert m["n_low_grade"] == 3
+    assert m["model_overclass"]["hits"] == 1
+    assert m["serving_overclass"]["hits"] == 2
+    assert m["severe_overclass"]["hits"] == 1          # S1 으로 격상된 1건
+    assert m["auto_confirmed_overclass"]["hits"] == 1  # 검수로 간 것은 빠진다
+
+
+def test_severe_overclass_counts_only_high_grade_predictions() -> None:
+    """S3 를 S2 라 부른 것과 TS 라 부른 것은 무게가 다르다 — 감리 185(가)가 후자를 지목했다."""
+    rows = [_r("S3", "S2", "S2"), _r("S3", "TS", "TS")]
+    m = compute(rows)
+    assert m["serving_overclass"]["hits"] == 2
+    assert m["severe_overclass"]["hits"] == 1
+
+
+def test_no_low_grade_gives_none_not_zero() -> None:
+    m = compute([_r("TS", "TS", "TS")])
+    assert m["n_low_grade"] == 0
+    assert m["serving_overclass"]["rate"] is None

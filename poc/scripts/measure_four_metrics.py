@@ -67,6 +67,7 @@ from koipa.eval_authority import (  # noqa: E402
 
 GRADE_ORDER = {"TS": 0, "S1": 1, "S2": 2, "S3": 3}
 HIGH = ("TS", "S1")
+LOW = ("S2", "S3")
 TRAIN_POOLS = (
     "datasets/gold_real/train_subset.jsonl",
     "datasets/labeled_p1_v5_clean/train.jsonl",
@@ -165,9 +166,24 @@ def compute(records: list[dict]) -> dict:
     def rate(k: int, n: int) -> float | None:
         return (k / n) if n else None
 
+    # 과탐 축 — EVAL_CRITERIA 제4조 "동반 필수: 과탐률. 미탐만 보면 속는다".
+    # 과소분류 7건으로 가장 좋아 보인 판의 S3 과탐이 25/25 = 100% 였던 전례가 있다.
+    lo = [r for r in records if r.get("truth") in LOW]
+    n_lo = len(lo)
+    model_over = [r for r in lo if _lower(r["truth"], r.get("model_grade") or r.get("predicted"))]
+    serving_over = [r for r in lo if _lower(r["truth"], r.get("predicted"))]
+    # 격상(severe) — 공개·내부문서를 고등급(TS·S1)이라 부른 것. 감리 185(가)가 지목한 축.
+    severe_over = [r for r in lo if r.get("predicted") in HIGH]
+    auto_over = [r for r in serving_over if r.get("status") != "needs_review"]
+
     return {
         "n_all": n_all,
         "n_high_grade": n_hi,
+        "n_low_grade": n_lo,
+        "model_overclass": {"hits": len(model_over), "n": n_lo, "rate": rate(len(model_over), n_lo)},
+        "serving_overclass": {"hits": len(serving_over), "n": n_lo, "rate": rate(len(serving_over), n_lo)},
+        "severe_overclass": {"hits": len(severe_over), "n": n_lo, "rate": rate(len(severe_over), n_lo)},
+        "auto_confirmed_overclass": {"hits": len(auto_over), "n": n_lo, "rate": rate(len(auto_over), n_lo)},
         "model_recall": {"misses": len(model_miss), "n": n_hi, "rate": rate(len(model_miss), n_hi)},
         "serving_recall": {"misses": len(serving_miss), "n": n_hi, "rate": rate(len(serving_miss), n_hi)},
         "high_grade_auto_confirm_fn_rate": {"misses": len(auto_miss), "n": n_hi, "rate": rate(len(auto_miss), n_hi)},
@@ -203,7 +219,10 @@ def main() -> int:
             continue
         tier, overlap, tier_ct = suite_context(eval_path)
         m = compute(records)
+        # stem 이 records·raw·train 처럼 흔한 말이면 폴더명을 붙인다 — 표에서 구분이 안 된다
         suite = eval_path.stem
+        if suite in ("records", "raw", "train", "val", "test", "eval"):
+            suite = f"{eval_path.parent.name}/{suite}"
 
         print("=" * 78)
         print(f"{suite}  ·  고등급 {m['n_high_grade']}건 / 전체 {m['n_all']}건")
