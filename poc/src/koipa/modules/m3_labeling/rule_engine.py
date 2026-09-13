@@ -57,18 +57,72 @@ def _settings_semantic_threshold() -> float:
 SVM_GRADE_MAP: dict[int, str] = {8: "TS", 4: "TS", 2: "S2", 1: "S2", 0: "S3"}  # 근사값 — 직접 사용 금지
 
 
-def grade_from_svm(s: int, v: int, m: int) -> str:
-    """정본 곱셈식 등급 산정 v2.2 — 등급 = S×V×M + S1 운영 기준.
+_VALID_FORMULA_MODES = ("v22", "guide", "fnr")
 
-    v2.2 분기 (doc/22 §4.5~§4.6, 골든셋 100건 실증):
-      s==2 AND v==2 → m==0: S1 / m≥1(곱≥4): TS
-      그 외          → 곱≥1: S2 / 곱==0: S3
+# 가이드 p12 순수 곱셈 매핑 — 워크드 예시(조직도 1·1·1=1=대외비 · 인사평가 1·2·2=4=비밀 ·
+# 중장기경영계획 2·2·2=8=극비)가 이 표를 그대로 쓴다.
+_GUIDE_PRODUCT_MAP = {0: "S3", 1: "S2", 2: "S2", 4: "S1", 8: "TS"}
 
-    s=2,v=2,m=0 → 곱=0이나 S1 확정(관리 미공식화 고가치 영업비밀).
-    s<2 OR v<2이면 최고 등급은 S2(비공지성·경제가치 불완전 → S1/TS 미해당).
+
+def _settings_formula_mode() -> str:
+    """settings.grade_formula_mode → 없거나 모르는 값이면 현행 "v22" 로 폴백."""
+    try:
+        from koipa.config import settings  # noqa: PLC0415
+        mode = str(getattr(settings, "grade_formula_mode", "v22")).strip().lower()
+        if mode in _VALID_FORMULA_MODES:
+            return mode
+        logger.warning("모르는 등급 산정식 모드 %r — v22 로 폴백", mode)
+    except Exception as _exc:  # noqa: BLE001
+        logger.warning("등급 산정식 모드를 설정에서 못 읽음 - v22 로 폴백 (%s: %s)",
+                       type(_exc).__name__, _exc)
+    return "v22"
+
+
+def grade_from_svm(s: int, v: int, m: int, *, mode: str | None = None) -> str:
+    """등급 = S×V×M. **산정식은 세 모드 중 설정으로 고른다**(기본 "v22" = 현행).
+
+    적용서 v2.2 §3.7 이 "가이드 순수 곱셈을 기본값으로 두고 v2.2 보정을 운영 토글로
+    분리한다 — 하드코딩 금지·설정 주도" 를 권고했는데 산정식만 코드에 박혀 있었다.
+    고객사마다 아픈 곳이 다르다 — 과분류가 문제인 곳과 미탐이 문제인 곳이 갈린다.
+
+      "v22"   현행·기본값. s==2 AND v==2 → m==0: S1 / 곱≥4: TS. 그 외 곱≥1: S2 / 0: S3.
+              2026-06 에 공개판례 85% 과분류를 산정식 자체로 막으려고 택했다(적용서 §3.3).
+      "guide" 발주처 가이드 p12 순수 곱셈. 0→S3 · 1·2→S2 · 4→S1 · 8→TS.
+      "fnr"   가이드 매핑 + 미탐 방향만 보정 — (2,2,0) 을 S1 로 유지한다.
+
+    v22 와 guide 는 27조합 중 **4개**가 다르다(실측 2026-09-13):
+        1·2·2 와 2·1·2  guide=S1  v22=S2   ← v22 가 낮게 본다(미탐 방향)
+        2·2·0            guide=S3  v22=S1   ← v22 가 높게 본다
+        2·2·1            guide=S1  v22=TS   ← v22 가 높게 본다
+
+    ⛔ **모드를 바꿔도 서빙 최종 등급은 바뀌지 않는다 — 실측 2026-09-13.**
+       hardened42·holdout109·golden100 세 면을 v22 와 guide 로 각각 서빙 경로 전체에
+       태웠더니 무음 미탐·자동확정률이 **소수점까지 동일**했다. 이유는
+       [[rule-svm-formula-is-noop-2026-08-26]] 가 이미 실측한 바와 같다 —
+       s_lv·v_lv 가 content_grade(키워드 argmax)에서 역산되고, 최종 룰 등급은
+       `min-rank(svm_grade, content_grade)` 라 **content 쪽이 덮는다.**
+       1,003건에서 곱셈 단계가 등급을 바꾼 것은 0건이었다.
+
+       그래도 이 모드를 두는 이유는 둘이다.
+         ① 적용서 v2.2 §3.7 이 "하드코딩 금지·설정 주도" 를 권고했고 그 이행이다.
+         ② 룰 구조가 바뀌어 svm 단계가 실제로 판정에 관여하게 되면 그때 바로 쓴다.
+       ⚠ 지금 이 설정을 바꿔 미탐이 줄기를 기대하지 말 것. 실제 판정자는 키워드 argmax 다.
     """
     s, v, m = int(s), int(v), int(m)
     product = s * v * m
+    mode = (mode or _settings_formula_mode())
+
+    if mode == "guide":
+        # 발주처 가이드 p12 그대로. 운영 보정 없음.
+        return _GUIDE_PRODUCT_MAP.get(product, "S2")
+
+    if mode == "fnr":
+        # 가이드 매핑 + 미탐 방향만 보정. 고가치·미관리(2,2,0)를 공개로 떨구지 않는다.
+        if s == 2 and v == 2 and m == 0:
+            return "S1"
+        return _GUIDE_PRODUCT_MAP.get(product, "S2")
+
+    # "v22" — 현행(기본값). 바꾸지 않는다.
     if s == 2 and v == 2:
         return "TS" if product >= 4 else "S1"
     if product >= 1:
