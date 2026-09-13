@@ -200,6 +200,12 @@ def main(argv: list[str] | None = None) -> int:
             "truth": truth,
             "model_grade": result.get("model_grade"),
             "predicted": predicted,
+            # [2026-09-13] 룰 원시등급·요소를 함께 남긴다. 미탐 8건을 분석할 때 레코드에
+            # 이것이 없어 문서를 다시 태워야 했다. 룰이 모델보다 **높게** 본 경우가
+            # 미탐의 표지인지 보려면 이 두 값이 레코드에 있어야 한다.
+            "rule_grade": result.get("rule_grade"),
+            "rule_factors": (result.get("rule_evaluation_factors") or {}).get("scores"),
+            "model_factors": (result.get("evaluation_factors") or {}).get("scores"),
             "status": status,
             "confidence": result.get("confidence"),
             "warnings": warnings,

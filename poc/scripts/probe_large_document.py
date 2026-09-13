@@ -92,6 +92,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--repeat", type=int, default=1, help="회차(중앙값 보고)")
     ap.add_argument("--stop-after", type=float, default=900.0,
                     help="이 시간을 넘기면 이후 규모는 재지 않는다")
+    # [2026-09-13] PER-002 "100쪽 30초" 를 CPU 로 맞추려면 코어가 몇 개 필요한지는
+    #   코어 수 대비 시간 곡선이 있어야 답할 수 있다. OMP_NUM_THREADS 만 바꾸면
+    #   torch 가 무시한다(물리코어 수를 쓴다) — 실측 2026-09-13: OMP=16 을 줘도 threads=8.
+    #   torch.set_num_threads() 를 **직접** 불러야 바뀐다.
+    ap.add_argument("--threads", type=int, default=0,
+                    help="torch 연산 스레드 수(0=기본). 코어 수 대비 시간 곡선을 잴 때 쓴다")
     args = ap.parse_args(argv)
 
     from koipa.modules.m2_preprocess.pipeline import PreprocessPipeline
@@ -100,6 +106,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         import torch
+        if args.threads > 0:
+            torch.set_num_threads(args.threads)
         threads = torch.get_num_threads()
     except Exception:  # noqa: BLE001
         threads = -1
