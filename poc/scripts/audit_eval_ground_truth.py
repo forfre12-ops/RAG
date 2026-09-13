@@ -1,0 +1,258 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""우리 '정답' 은 누가 정했는가 — 전수로 세어 등급을 매긴다.
+
+## 왜 만들었나 (2026-09-13)
+
+사용자 질문: "분류품질은 뭘 기준으로 판단하는거야? 우리가 기준이 있니?"
+
+그때까지 우리가 "품질" 이라 부른 것은 세 평가면(holdout109·hardened42·golden100)에서
+**정답 대비 틀린 비율**이었다. 그런데 그 정답을 누가 정했는지는 한 번도 세지 않았다.
+세어 보니 448,445행 중 사람이 서명한 것은 **39건(0.009%)** 이었다.
+
+한 번 세고 끝낼 일이 아니다. 실문서·서명이 들어오기 시작하면 이 비율이 움직이고,
+**"지금 우리가 무엇을 주장할 수 있는가" 가 그 비율로 정해진다.** 그래서 도구로 남긴다.
+
+## 정답 등급 — 이 사업에서 쓰는 정의
+
+    GOLD     사람이 판단하고 서명했다. 신원이 남는다.
+             -> 실무 성능을 주장할 수 있다. 단 표본 수 안에서만.
+    SILVER   기계가 판정했으나 **여럿이 합의**했다(LLM 다수결·이중 라벨러 합의·판례 근거).
+             -> 상대 비교(A vs B)에 쓴다. 실무 성능 주장에는 못 쓴다.
+    BRONZE   한 기계가 단독으로 매겼거나, 생성기가 의도한 라벨을 그대로 정답이라 했다.
+             -> 회귀 감시용. 성능 주장에 인용 금지.
+    CIRCULAR 우리 규칙이 만든 라벨(규칙 역산·factor 상태 파생).
+             -> **우리 규칙을 우리가 얼마나 재현하나** 를 잴 뿐이다. 성능이 아니다.
+
+⚠ 등급은 라벨이 **맞다/틀리다** 가 아니라 **무엇을 주장할 수 있나** 를 정한다.
+   BRONZE 라벨이 틀렸다는 뜻이 아니다. 그것으로 "재현율 90% 달성" 을 말할 수 없다는 뜻이다.
+
+사용:
+
+    PYTHONIOENCODING=utf-8 ./.venv/Scripts/python.exe scripts/audit_eval_ground_truth.py
+    ... --json reports/EVAL_GROUND_TRUTH.json
+    ... --eval-only          # 실제로 채점에 쓰는 평가면만
+"""
+from __future__ import annotations
+
+import argparse
+import collections
+import json
+import sys
+from pathlib import Path
+
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+POC = Path(__file__).resolve().parent.parent
+
+# 채점에 실제로 쓰는 평가면. 여기 없는 셋은 성능 주장에 등장하면 안 된다.
+EVAL_SETS = {
+    "holdout109": "datasets/gold_real/holdout_eval.jsonl",
+    "hardened42": "datasets/gold_real/holdout_eval.hardened.jsonl",
+    "golden100": "datasets/gold/golden100_labeled_v2.jsonl",
+    "v5_clean/test": "datasets/labeled_p1_v5_clean/test.jsonl",
+}
+
+# label_source -> 등급. 모르는 값은 UNKNOWN 으로 드러낸다(조용히 BRONZE 로 넘기지 않는다).
+TIER_BY_SOURCE = {
+    # 사람
+    "human_review": "GOLD",
+    # 여럿이 합의
+    "llm_judge_consensus": "SILVER",
+    "rule_llm_agreement": "SILVER",
+    "dual_labeler_agreement": "SILVER",
+    "rubric_3judge_blind": "SILVER",
+    "koipa_case_based": "SILVER",      # 판례 근거
+    "public_definitive": "SILVER",     # 공개 원문이 등급을 명시
+    "public_form_definitive": "SILVER",
+    "nkt_designated": "SILVER",        # 국가핵심기술 지정 목록
+    "patent_proxy_nkt": "SILVER",
+    "provenance_gate_s3": "SILVER",    # 출처가 공개임이 확정
+    # 기계 단독
+    "llm_judge_primary": "BRONZE",
+    "codex_review": "BRONZE",
+    "synthetic_llm": "BRONZE",
+    "generator_intended_label": "BRONZE",
+    "curated_scenario": "BRONZE",
+    "bilingual_en": "BRONZE",
+    "rag_corpus_v2": "BRONZE",
+    "needs_review": "BRONZE",
+    # 우리 규칙이 만든 것
+    "derived_from_factor_states": "CIRCULAR",
+    "rule_from_content_svm": "CIRCULAR",
+}
+
+TIER_ORDER = ("GOLD", "SILVER", "BRONZE", "CIRCULAR", "UNKNOWN", "NONE")
+
+CLAIM = {
+    "GOLD": "실무 성능 주장 가능(표본 수 안에서)",
+    "SILVER": "상대 비교(A vs B)에만",
+    "BRONZE": "회귀 감시용 · 성능 주장 금지",
+    "CIRCULAR": "우리 규칙 재현율일 뿐 · 성능 아님",
+    "UNKNOWN": "출처 미상 — 분류표에 넣을 것",
+    "NONE": "출처 기록 없음",
+}
+
+
+def tier_of(row: dict) -> tuple[str, str]:
+    src = row.get("label_source")
+    if not src:
+        prov = row.get("label_provenance")
+        if isinstance(prov, dict) and prov.get("method"):
+            src = str(prov["method"])
+    if not src:
+        return "NONE", ""
+    src = str(src)
+    return TIER_BY_SOURCE.get(src, "UNKNOWN"), src
+
+
+def scan(paths: dict[str, Path]) -> dict:
+    out: dict[str, dict] = {}
+    for name, p in paths.items():
+        if not p.exists():
+            out[name] = {"error": f"파일 없음: {p}"}
+            continue
+        tiers: collections.Counter[str] = collections.Counter()
+        sources: collections.Counter[str] = collections.Counter()
+        signoff_missing = 0
+        n = 0
+        for line in p.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except Exception:
+                continue
+            n += 1
+            t, s = tier_of(row)
+            tiers[t] += 1
+            if s:
+                sources[s] += 1
+            # 서명이 필요하다고 스스로 적어 놓고 서명이 없는 행
+            if row.get("requires_human_signoff") and not str(
+                row.get("reviewer_id") or ""
+            ).strip().startswith(("jaewon", "r1")):
+                signoff_missing += 1
+        out[name] = {
+            "path": str(p.relative_to(POC)),
+            "n": n,
+            "tiers": {k: tiers[k] for k in TIER_ORDER if tiers[k]},
+            "sources": dict(sources.most_common()),
+            "requires_signoff_but_unsigned": signoff_missing,
+            # 가장 낮은 등급이 그 셋이 주장할 수 있는 한계를 정한다.
+            "claim_ceiling": next(
+                (k for k in reversed(TIER_ORDER) if tiers[k]), "NONE"
+            ),
+            "worst_tier": next(
+                (k for k in ("CIRCULAR", "UNKNOWN", "NONE", "BRONZE", "SILVER", "GOLD") if tiers[k]),
+                "NONE",
+            ),
+        }
+    return out
+
+
+def scan_all_datasets() -> dict:
+    tiers: collections.Counter[str] = collections.Counter()
+    sources: collections.Counter[str] = collections.Counter()
+    files = rows = 0
+    for p in (POC / "datasets").rglob("*.jsonl"):
+        files += 1
+        try:
+            fh = p.open(encoding="utf-8")
+        except Exception:
+            continue
+        with fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except Exception:
+                    continue
+                rows += 1
+                t, s = tier_of(row)
+                tiers[t] += 1
+                if s:
+                    sources[s] += 1
+    return {
+        "files": files,
+        "rows": rows,
+        "tiers": {k: tiers[k] for k in TIER_ORDER if tiers[k]},
+        "sources": dict(sources.most_common(30)),
+    }
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument("--json", default=None, help="결과를 JSON 으로 저장")
+    ap.add_argument("--eval-only", action="store_true", help="채점에 쓰는 평가면만 본다")
+    args = ap.parse_args()
+
+    paths = {k: POC / v for k, v in EVAL_SETS.items()}
+    per_set = scan(paths)
+
+    print("=" * 78)
+    print("채점에 쓰는 평가면 — 정답을 누가 정했나")
+    print("=" * 78)
+    for name, d in per_set.items():
+        if "error" in d:
+            print(f"\n  [{name}] {d['error']}")
+            continue
+        print(f"\n  [{name}] {d['n']}건 · {d['path']}")
+        for t in TIER_ORDER:
+            if d["tiers"].get(t):
+                print(f"      {t:9s} {d['tiers'][t]:>5}건   {CLAIM[t]}")
+        if d["requires_signoff_but_unsigned"]:
+            print(
+                f"      ⚠ 스스로 '사람 서명 필요' 라 적어 놓고 서명이 없는 행: "
+                f"{d['requires_signoff_but_unsigned']}건"
+            )
+        print(f"      => 이 셋으로 할 수 있는 주장: {CLAIM[d['worst_tier']]}")
+
+    if not args.eval_only:
+        allsets = scan_all_datasets()
+        print("\n" + "=" * 78)
+        print(f"전 데이터셋 — 파일 {allsets['files']}개 · 행 {allsets['rows']:,}개")
+        print("=" * 78)
+        total = allsets["rows"] or 1
+        for t in TIER_ORDER:
+            c = allsets["tiers"].get(t)
+            if c:
+                print(f"  {t:9s} {c:>9,}건 ({c/total*100:6.3f}%)   {CLAIM[t]}")
+        unknown = [
+            s
+            for s in allsets["sources"]
+            if s not in TIER_BY_SOURCE
+        ]
+        if unknown:
+            print(f"\n  ⚠ 등급표에 없는 출처 {len(unknown)}종 — 분류해서 표에 넣을 것:")
+            for s in unknown[:12]:
+                print(f"      {allsets['sources'][s]:>8,}  {s}")
+    else:
+        allsets = None
+
+    if args.json:
+        out = POC / args.json
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(
+            json.dumps(
+                {"eval_sets": per_set, "all_datasets": allsets, "tier_map": TIER_BY_SOURCE},
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        print(f"\nwrote {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
