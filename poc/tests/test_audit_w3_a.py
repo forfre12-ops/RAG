@@ -242,6 +242,7 @@ class _RecordingClassifyRepo:
     """
 
     created_classification_id = uuid.UUID("12345678-1234-5678-1234-567812345678")
+    status_updates: list = []
 
     def __init__(self, db):
         self.db = db
@@ -262,6 +263,10 @@ class _RecordingClassifyRepo:
 
     def add_rag_evidence_from_hits(self, *a, **kw):
         raise RuntimeError("rag evidence write exploded")
+
+    def update_status(self, classification_id, status):
+        """[2026-09-13] evidence 저장이 실패하면 서비스가 확정 자격을 뺀다 — 그때 호출된다."""
+        self.__class__.status_updates.append((classification_id, status))
 
 
 @pytest.mark.slow
@@ -301,12 +306,22 @@ def test_evidence_failure_does_not_discard_classification(monkeypatch):
     class _Req:
         doc_id = "12345678-1234-5678-1234-567812345678"
 
-    cid, warns = svc._try_persist(_Req(), _Pred(), chunks=[])  # noqa: SLF001
+    _RecordingClassifyRepo.status_updates = []
+    cid, warns, eff_status = svc._try_persist(  # noqa: SLF001
+        _Req(), _Pred(), chunks=[], status="staging"
+    )
 
     assert cid == _RecordingClassifyRepo.created_classification_id, (
         "evidence 실패가 classification_id 를 폐기했다 — 트랜잭션 분리 실패"
     )
     assert any("evidence persist failed" in w for w in warns)
+    # [2026-09-13] 등급은 살리되 **확정 자격은 뺀다** — 근거 없는 확정을 막는다.
+    assert eff_status == "needs_review", (
+        f"근거 저장 실패인데 확정 자격이 남았다 — got {eff_status!r}"
+    )
+    assert _RecordingClassifyRepo.status_updates == [
+        (_RecordingClassifyRepo.created_classification_id, "needs_review")
+    ], "DB 행 status 도 함께 내려야 응답과 검수 큐가 어긋나지 않는다"
 
 
 @pytest.mark.slow
@@ -342,6 +357,10 @@ def test_classification_returned_when_no_evidence(monkeypatch):
     class _Req:
         doc_id = "12345678-1234-5678-1234-567812345678"
 
-    cid, warns = svc._try_persist(_Req(), _Pred(), chunks=[])  # noqa: SLF001
+    cid, warns, eff_status = svc._try_persist(  # noqa: SLF001
+        _Req(), _Pred(), chunks=[], status="staging"
+    )
     assert cid == _RecordingClassifyRepo.created_classification_id
     assert not any("evidence persist failed" in w for w in warns)
+    # 근거가 애초에 없으면 저장 실패도 없다 — 확정 자격을 건드리지 않는다.
+    assert eff_status == "staging", f"근거 없는 문서의 status 를 바꿨다 — got {eff_status!r}"

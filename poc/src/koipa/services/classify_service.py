@@ -743,11 +743,13 @@ class ClassifyService:
             automation_assessment = build_automation_assessment(
                 pred, status=status, warnings=warnings_acc,
             )
-            inference_id, persist_warnings = self._try_persist(
+            inference_id, persist_warnings, status = self._try_persist(
                 req, pred, chunks=chunks, status=status,
                 automation_assessment=automation_assessment.model_dump(),
             )
             warnings_acc.extend(persist_warnings)
+            # ⚠ status 가 여기서 바뀔 수 있다 — 근거 저장이 실패하면 확정 자격을 뺀다.
+            #   응답과 DB 행이 같은 값을 갖도록 _try_persist 가 DB 도 함께 내린다.
             notify("finalize")
 
             logger.info(
@@ -1182,10 +1184,12 @@ class ClassifyService:
         chunks: list[_PreprocessChunk] | None = None,
         status: str = "staging",
         automation_assessment: dict | None = None,
-    ) -> tuple[uuid.UUID, list[str]]:
+    ) -> tuple[uuid.UUID, list[str], str]:
         """Best-effort 영속화.
 
-        반환: (inference_id, warning_list)
+        반환: (inference_id, warning_list, effective_status)
+        ⚠ effective_status 는 들어온 status 와 다를 수 있다 — 근거(evidence) 저장이
+          실패하면 확정 자격을 빼고 needs_review 로 내려 돌려준다(2026-09-13).
         - 성공: classifications.classification_id 사용
         - 실패: 새 UUID + warning에 사유 기록 (예외 안 던짐)
 
@@ -1197,11 +1201,11 @@ class ClassifyService:
 
         if doc_uuid is None:
             warns.append(f"persistence skipped: doc_id={req.doc_id!r} is not a UUID")
-            return uuid.uuid4(), warns
+            return uuid.uuid4(), warns, status
         if _skip_optional_db_work():
             self._inc_persist_failure("db_unavailable")
             warns.append("persistence skipped: db unavailable")
-            return uuid.uuid4(), warns
+            return uuid.uuid4(), warns, status
 
         # session_scope import는 함수 안에서 — settings.database_url 변경 가능성·테스트 격리
         try:
@@ -1209,7 +1213,7 @@ class ClassifyService:
         except ImportError as exc:
             self._inc_persist_failure("import_error")
             warns.append(f"persistence skipped: db module unavailable ({exc})")
-            return uuid.uuid4(), warns
+            return uuid.uuid4(), warns, status
 
         try:
             # ── Step 1: classification 영속화 (자체 커밋) ──────────────────────
@@ -1226,13 +1230,13 @@ class ClassifyService:
                     warns.append(
                         f"persistence skipped: doc_id={doc_uuid} not found"
                     )
-                    return uuid.uuid4(), warns
+                    return uuid.uuid4(), warns, status
 
                 level_id = repo.level_id_by_code(pred.label)
                 if level_id is None:
                     self._inc_persist_failure("no_level")
                     warns.append(f"persistence skipped: unknown level code {pred.label!r}")
-                    return uuid.uuid4(), warns
+                    return uuid.uuid4(), warns, status
 
                 alternatives = [
                     {"level_code": code, "confidence": float(score)}
@@ -1281,7 +1285,7 @@ class ClassifyService:
                 req.doc_id, type(exc).__name__, exc_info=True,
             )
             warns.append(f"persistence skipped: db error ({type(exc).__name__})")
-            return uuid.uuid4(), warns
+            return uuid.uuid4(), warns, status
         except Exception as exc:  # noqa: BLE001
             self._inc_persist_failure("unexpected")
             logger.error(
@@ -1294,7 +1298,7 @@ class ClassifyService:
                 stacklevel=2,
             )
             warns.append(f"persistence skipped: unexpected error ({type(exc).__name__})")
-            return uuid.uuid4(), warns
+            return uuid.uuid4(), warns, status
 
         # ── Step 2: evidence 영속화 (best-effort, 별도 트랜잭션) ──
         # M-classify-tx: 여기서 실패하더라도 Step 1 에서 이미 commit 된
@@ -1312,18 +1316,44 @@ class ClassifyService:
                         default_chunk_id=evidence_default_chunk,
                     )
             except Exception as exc:  # noqa: BLE001
-                # evidence 실패는 classification 을 폐기하지 않는다 — warning 만.
+                # evidence 실패는 classification 을 폐기하지 않는다 — 등급은 살린다.
+                # 다만 **확정 자격은 뺀다**(2026-09-13, 외부 코드 리뷰 지적).
+                # 종전에는 경고만 남고 status 가 staging 그대로라, 관리자가 승인하면
+                # **근거 없는 등급이 확정**됐다. 보안등급에서 "판정 성공" 과 "감사 가능한
+                # 판정의 완성" 은 다르다 — 나중에 "왜 그 등급이었나" 에 답할 수 없으면
+                # 확정으로 넘기면 안 된다. 등급은 그대로 두고 검수로만 보낸다(FNR-safe).
                 self._inc_persist_failure("evidence_error")
                 logger.warning(
-                    "classify evidence persist failed (classification kept): "
-                    "classification_id=%s err=%s",
+                    "classify evidence persist failed (classification kept, "
+                    "routed to review): classification_id=%s err=%s",
                     classification_id, type(exc).__name__, exc_info=True,
                 )
                 warns.append(
-                    f"evidence persist failed (classification kept): {type(exc).__name__}"
+                    "evidence persist failed (classification kept, routed to review):"
+                    f" 판정 근거를 저장하지 못했다 — 등급은 유지하고 확정 자격만 뺀다."
+                    f" {type(exc).__name__}"
                 )
+                if status != "needs_review":
+                    status = "needs_review"
+                    try:
+                        from koipa.db import session_scope  # noqa: PLC0415
 
-        return classification_id, warns
+                        with session_scope() as db3:
+                            ClassifyRepo(db3).update_status(classification_id, "needs_review")
+                    except Exception as exc2:  # noqa: BLE001
+                        # 상태까지 못 내리면 그 사실을 남긴다 — 조용히 staging 으로 두지 않는다.
+                        self._inc_persist_failure("status_downgrade_error")
+                        logger.error(
+                            "evidence 저장 실패 후 status 를 needs_review 로 내리지 못했다 — "
+                            "DB 행이 staging 으로 남아 있다: classification_id=%s err=%s",
+                            classification_id, type(exc2).__name__, exc_info=True,
+                        )
+                        warns.append(
+                            "evidence-persist-failed: DB status 하향에도 실패했다 —"
+                            f" 검수 큐에 안 보일 수 있다({type(exc2).__name__})"
+                        )
+
+        return classification_id, warns, status
 
     @staticmethod
     def _ingestion_review_flagged(processing_status: str | None) -> bool:
