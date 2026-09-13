@@ -263,34 +263,46 @@ def main() -> int:
                       f" · 정확도 {s['accuracy']} · S3과탐 {s['s3_over']}/{s['s3_n']}")
             results[cond][str(seed)] = per_set
 
+    # ⚠ 과소분류만 보면 속는다 — 실측 2026-09-13: B seed1337 이 golden100 과소분류 7건으로
+    # 여섯 판 중 가장 좋았는데 같은 판의 S3 과탐이 25/25 = 100% 였다. **전부 고등급이라
+    # 부르면 미탐은 0 이 된다.** 그래서 정확도·과탐을 반드시 같이 낸다.
     # 범위로 낸다 — 한 판 값으로 비교하지 않는다.
     print("\n" + "=" * 72)
-    print("조건별 과소분류 건수 (시드 3판 범위) — 무음 미탐이 아니다")
+    print("조건별 시드 3판 범위 — 세 축을 같이 본다 (과소분류만 보면 속는다)")
     print("=" * 72)
     summary: dict[str, dict] = {}
+    AXES = (
+        ("underclassified", "과소분류", False),
+        ("accuracy", "정확도", True),
+        ("s3_over", "S3과탐", False),
+    )
+    b_name = f"B_window{args.chunk_char_size}"
     for name in evals:
         print(f"\n  [{name}]")
         summary[name] = {}
-        for cond in conditions:
-            vals = [
-                v[name]["underclassified"]
-                for v in results[cond].values()
-                if name in v and "underclassified" in v[name]
-            ]
-            if not vals:
-                print(f"    {cond:18s} 값 없음")
+        for key, nice, higher_better in AXES:
+            summary[name][key] = {}
+            for cond in conditions:
+                vals = [
+                    v[name][key]
+                    for v in results[cond].values()
+                    if name in v and key in v[name] and v[name][key] is not None
+                ]
+                if not vals:
+                    continue
+                summary[name][key][cond] = {"values": vals, "min": min(vals), "max": max(vals)}
+                print(f"    {nice:8s} {cond:18s} {vals}")
+            a = summary[name][key].get("A_baseline")
+            b = summary[name][key].get(b_name)
+            if not (a and b):
                 continue
-            summary[name][cond] = {"values": vals, "min": min(vals), "max": max(vals)}
-            print(f"    {cond:18s} {vals}  (최소 {min(vals)} · 최대 {max(vals)})")
-        a = summary[name].get("A_baseline")
-        b = summary[name].get(f"B_window{args.chunk_char_size}")
-        if a and b:
             if b["max"] < a["min"]:
-                print("    -> B 가 낫다 (판이 겹치지 않는다)")
+                verdict = "B 나쁨" if higher_better else "B 좋음"
             elif b["min"] > a["max"]:
-                print("    -> B 가 나쁘다 (판이 겹치지 않는다)")
+                verdict = "B 좋음" if higher_better else "B 나쁨"
             else:
-                print("    -> 판이 겹친다 = 차이 없음")
+                verdict = "판이 겹친다 = 차이 없음"
+            print(f"    {'':8s} -> {verdict}")
 
     out = POC / args.report
     out.parent.mkdir(parents=True, exist_ok=True)
