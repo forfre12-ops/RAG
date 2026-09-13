@@ -151,7 +151,14 @@ def _condition_results(rule: Rule, facts: dict) -> tuple[list[str], list[str]]:
         if _test(op, facts.get(fact), expected):
             matched.append(f"{fact} {op} {expected!r}" if expected is not None else f"{fact} {op}")
         else:
-            return [], unknown  # 하나라도 어긋나면 이 규칙은 해당 없음
+            # [2026-09-13] **불충족이 확정되면 unknown 을 들고 나가지 않는다.**
+            # 종전에는 `return [], unknown` 이라 앞서 쌓인 미확인이 그대로 나갔고,
+            # 그 결과 **조건 작성 순서에 따라 검수 여부가 달라졌다**(외부 리뷰가 재현):
+            #   접근범위(미확인) 먼저 → needs_review=True
+            #   공개여부(불충족) 먼저 → needs_review=False
+            # 한 조건이라도 '아님' 이 확인되면 그 규칙은 순서와 무관하게 해당 없음이고,
+            # 남은 미확인은 이 규칙의 판단에 더 이상 영향을 주지 않는다.
+            return [], []
     return matched, unknown
 
 
@@ -165,6 +172,7 @@ def evaluate(policy: Policy, facts: dict) -> Proposal:
             "effective_date": policy.effective_date}
     blocked: list[str] = []
     all_missing: list[str] = []
+    conflicting: list[str] = []
     best: tuple[int, Rule, list[str]] | None = None
 
     for rule in sorted(policy.rules, key=lambda r: (r.priority, r.id)):
@@ -180,6 +188,14 @@ def evaluate(policy: Policy, facts: dict) -> Proposal:
             continue
         if best is None:
             best = (rule.priority, rule, matched)
+        elif rule.priority == best[0] and rule.grade != best[1].grade:
+            # [2026-09-13] 같은 우선순위인데 등급이 다르면 **규칙 id 사전순**으로 골라
+            # 낮은 등급이 이기던 버그가 있었다(외부 리뷰 재현: A-low(S2) 가 B-high(TS) 를 이김).
+            # 조용한 하향은 곧 미탐이다. FNR-safe 로 **더 민감한 등급**을 택하고 충돌을 남긴다.
+            # 정책은 애초에 이런 충돌이 없어야 하므로 check_org_policy_rules 가 발행 시 잡는다.
+            conflicting.append(f"{best[1].id}({best[1].grade})~{rule.id}({rule.grade})")
+            if policy.severity(rule.grade) > policy.severity(best[1].grade):
+                best = (rule.priority, rule, matched)
 
     missing_unique = tuple(dict.fromkeys(all_missing))
 
@@ -201,9 +217,11 @@ def evaluate(policy: Policy, facts: dict) -> Proposal:
     return Proposal(
         **base, grade=rule.grade, rule_id=rule.id, matched=tuple(matched),
         missing_evidence=missing_unique, blocked_rules=tuple(blocked),
-        needs_review=bool(higher_blocked),
+        needs_review=bool(higher_blocked) or bool(conflicting),
         reason=(("증거가 없어 더 높은 등급 규칙(%s)을 판단하지 못했다 — 검수 필요"
                  % ", ".join(higher_blocked)) if higher_blocked
+                else ("같은 우선순위에서 등급이 갈린다(%s) — 더 민감한 쪽을 택하고 검수로 보낸다"
+                      % ", ".join(conflicting)) if conflicting
                 else "규칙 %s 충족" % rule.id),
     )
 
