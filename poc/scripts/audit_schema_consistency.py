@@ -156,6 +156,22 @@ def audit() -> dict:
     return r
 
 
+# R4(컬럼ID 기준 NOT NULL 불일치) 중 **업무상 정당한 차이**와 그 근거.
+# [2026-09-13] 8건을 하나씩 models.py 에서 열어 확인했다. 사유를 여기 두지 않으면
+# "8건" 을 볼 때마다 같은 확인을 되풀이한다. 여기 없는 컬럼ID 가 뜨면 그것이 검토 대상이다.
+# ⚠ 사유를 적는 것이 곧 해소가 아니다 — 감리에 답할 때는 "정당한 차이 N건" 으로 세어 말할 것.
+R4_JUSTIFIED: dict[str, str] = {
+    "doc_id": "합성 문서(tad_sm_syn_doc_mng)는 원본 문서를 참조하되 없을 수 있다 — 선택적 FK",
+    "char_cnt": "문서 등록 시점엔 파싱 전이라 글자수 미상. 청크는 생성 시 확정되므로 NOT NULL",
+    "rlbl_scr": "사람이 단 라벨에는 신뢰도 점수가 없다. 분류 결과에는 항상 있다",
+    "mdl_ver_id": "학습이 실패하면 모델 버전이 없다 — 선택적 FK",
+    "cfmtn_grd_sn": "교정이 없으면 NULL. 한 칸에 뭉개면 '교정이 있었다'는 사실 자체가 사라진다",
+    "rqmt_sn": "판단요소 연결이 선택적이다 — 선택적 FK",
+    "file_nm": "파일이 없는 가이드 버전이 가능하다",
+    "wgvl_cfc": "server_default 1.0 이 있어 실질적으로 NOT NULL 과 같다",
+}
+
+
 def db_nullability_mismatch(url: str) -> list[str]:
     """정의서(models.py 파서 + 벡터 표)의 NOT NULL 을 실제 DB(information_schema)와 칼럼마다 대조한다."""
     import psycopg  # noqa: PLC0415
@@ -202,7 +218,11 @@ def main(argv=None) -> int:
     if "R7_db_nullability" in r:
         labels["R7_db_nullability"] = "R7 정의서↔실DB NOT NULL 불일치"
     for k, lab in labels.items():
-        print(f"  {lab:28s} {len(r[k]):3d}건")
+        extra = ""
+        if k == "R4_id_to_notnull" and r[k]:
+            ok = sum(1 for key in r[k] if key in R4_JUSTIFIED)
+            extra = f"   (사유 기재 {ok} · 미기재 {len(r[k]) - ok})"
+        print(f"  {lab:28s} {len(r[k]):3d}건{extra}")
     if a.list:
         for k, lab in labels.items():
             if not r[k]:
@@ -210,7 +230,12 @@ def main(argv=None) -> int:
             print(f"\n[{lab}]")
             if isinstance(r[k], dict):
                 for key, vals in r[k].items():
-                    print(f"  {key}")
+                    why = R4_JUSTIFIED.get(key) if k == "R4_id_to_notnull" else None
+                    print(f"  {key}{'' if why is None else '   [정당]'}")
+                    if why:
+                        print(f"      사유: {why}")
+                    elif k == "R4_id_to_notnull":
+                        print("      사유: **미기재 — 검토 대상**")
                     for v, where in vals.items():
                         print(f"      {v!s:40s} ← {', '.join(where)}")
             else:
