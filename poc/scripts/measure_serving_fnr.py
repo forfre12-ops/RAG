@@ -133,6 +133,59 @@ def classify(api: str, key: str, doc_id: str, text: str, timeout: int,
     return None
 
 
+def _provenance(eval_path: Path, api: str) -> dict:
+    """이 수치가 **어느 코드·모델·설정**에서 나왔는지 지문을 남긴다.
+
+    왜(2026-09-13 · 외부 코드 리뷰 지적). 종전 리포트에는 수치만 있어서, 같은 파일명으로
+    여러 조건을 재고 나면 어느 값이 무엇이었는지 구분할 수 없었다. 실제로 하루에
+    v22/guide/2차의견ON/S2제외를 번갈아 재면서 같은 자리에 덮어썼다.
+
+    ⚠ 서버 쪽 설정은 이 스크립트가 아니라 **API 프로세스**가 들고 있다. 여기서 읽는 값은
+      측정을 돌린 셸의 값이므로, 서버를 다른 env 로 띄웠다면 다르다. 그래서 키 이름에
+      client_env 를 붙인다 — 서버 설정을 단언하지 않는다.
+    """
+    import os
+    import subprocess
+
+    def _sh(*cmd: str) -> str | None:
+        """실패는 None 으로 돌려준다 — 빈 문자열과 구분해야 한다.
+
+        ⚠ 종전 초안은 실패도 "?" 로 뭉갰고, 그러면 `git status --porcelain` 실패가
+          "깨끗함" 으로 읽혔다. 지문이 조용히 거짓말하면 안 된다.
+        """
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=10,
+                               cwd=str(Path(__file__).resolve().parents[1]))
+            return r.stdout.strip() if r.returncode == 0 else None
+        except Exception:  # noqa: BLE001
+            return None
+
+    try:
+        blob = eval_path.read_bytes()
+        eval_sha = hashlib.sha256(blob).hexdigest()[:16]
+    except Exception:  # noqa: BLE001
+        eval_sha = "?"
+
+    watched = ("GRADE_FORMULA_MODE", "NO_AUTO_CONFIRM_GRADES",
+               "MODEL_SECONDOPINION_LLM_ENABLED", "LOCAL_LLM_MODEL",
+               "CLASSIFIER_MODEL_DIR", "DEPLOY_PROFILE", "CLASSIFIER_DEVICE")
+    return {
+        "measured_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "git_sha": _sh("git", "rev-parse", "--short", "HEAD") or "unknown",
+        # 못 읽었으면 "unknown" 이다 — false(깨끗함)로 단정하지 않는다.
+        "git_dirty": (lambda o: "unknown" if o is None else bool(o))(
+            _sh("git", "status", "--porcelain")
+        ),
+        "eval_sha256_16": eval_sha,
+        "api": api,
+        "client_env": {k: os.environ.get(k) for k in watched if os.environ.get(k)},
+        "note": (
+            "client_env 는 측정을 돌린 셸의 값이다 — 서버(API 프로세스)가 다른 env 로 떠 있으면 "
+            "다르다. 서버 설정을 단언하지 않는다."
+        ),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="서빙 경로 무음 미탐률 측정")
     parser.add_argument("--eval", required=True)
@@ -226,6 +279,7 @@ def main(argv: list[str] | None = None) -> int:
     caught = [r for r in underclassified if r["status"] == "needs_review"]
 
     report = {
+        "provenance": _provenance(Path(args.eval), args.api),
         "eval_set": args.eval,
         "api": args.api,
         "scored": len(records),
@@ -260,8 +314,19 @@ def main(argv: list[str] | None = None) -> int:
         "unmapped_review_reasons": sum(
             1 for r in records if r.get("causal_review_reason") == "unmapped"
         ),
+        # [2026-09-13 이름 정정] 이 값은 **검수로 안 간 비율**이지 사람 확정 완료율이 아니다.
+        # 측정은 비-UUID doc_id 로 DB 저장을 건너뛰므로 확정 단계 자체를 타지 않는다.
+        # 기존 키(auto_confirm_rate)는 과거 리포트와 대조가 끊기지 않게 당분간 함께 낸다.
+        "not_routed_to_review_rate": round(
+            sum(1 for r in records if r["status"] != "needs_review") / max(len(records), 1), 4
+        ),
         "auto_confirm_rate": round(
             sum(1 for r in records if r["status"] != "needs_review") / max(len(records), 1), 4
+        ),
+        "rate_naming_note": (
+            "not_routed_to_review_rate = needs_review 가 아닌 응답의 비율. "
+            "사람 확정 완료율이 아니며 저장·검수 완료는 이 측정의 범위 밖이다. "
+            "auto_confirm_rate 는 같은 값의 옛 이름(호환용)."
         ),
         "predicted_distribution": dict(sorted(Counter(r["predicted"] for r in records).items())),
         "note": (

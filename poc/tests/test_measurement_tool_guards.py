@@ -108,3 +108,31 @@ def test_grade_boundary_pair_types_are_stable() -> None:
     assert len(pairs) == 18, f"경계 쌍 유형은 18개였다 — 지금 {len(pairs)}개"
     s1 = [k for k, v in cells.items() if v == "S1"]
     assert s1 == [(2, 2, 0)], f"S1 은 (2,2,0) 하나뿐이었다 — 지금 {s1}"
+
+# ── 리포트가 "어느 조건의 수치인지" 를 말하는가 ──────────────────────────────
+
+def test_serving_fnr_report_carries_provenance() -> None:
+    """수치만 있고 조건이 없으면 나중에 무엇과 비교할지 알 수 없다.
+
+    2026-09-13 에 하루 동안 v22/guide/2차의견ON/S2제외를 번갈아 재면서 같은 파일명에
+    덮어썼다. 외부 코드 리뷰가 그 점을 지적했다.
+    """
+    mod = _load("measure_serving_fnr")
+    pv = mod._provenance(_POC / "datasets/gold_real/holdout_eval.hardened.jsonl", "http://x")
+    for key in ("measured_at", "git_sha", "git_dirty", "eval_sha256_16", "client_env"):
+        assert key in pv, f"지문에 {key} 가 없다"
+    assert pv["eval_sha256_16"] != "?", "평가셋 해시를 못 읽었다"
+    # 못 읽은 것을 false(깨끗함)로 단정하면 안 된다 — unknown 이어야 한다.
+    assert pv["git_dirty"] in (True, False, "unknown")
+
+
+def test_rate_naming_is_not_misleading() -> None:
+    """auto_confirm_rate 는 사람 확정 완료율이 아니다 — 이름이 오해를 부른다.
+
+    실제 계산은 `status != needs_review` 의 비율이고, 측정은 비-UUID doc_id 로
+    DB 저장을 건너뛰므로 확정 단계를 타지도 않는다.
+    """
+    src = (_SCRIPTS / "measure_serving_fnr.py").read_text(encoding="utf-8")
+    assert "not_routed_to_review_rate" in src, "오해 없는 이름이 없다"
+    assert "rate_naming_note" in src, "이름의 뜻을 리포트에 적지 않았다"
+    assert "auto_confirm_rate" in src, "옛 키를 지우면 과거 리포트와 대조가 끊긴다"
