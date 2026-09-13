@@ -969,6 +969,8 @@ paths:
                   grades:
                     type: array
                     items: { $ref: '#/components/schemas/GradeDefinition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
     put:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
@@ -1014,8 +1016,15 @@ paths:
                   serving_impact:
                     type: string
                     description: 이 변경이 서빙 분류기에 주는 영향. 빈 문자열이면 영향 없음
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: |
+            쓰기는 admin 전용이다(GET 은 admin·reviewer·system·kl_backend 허용).
+            reviewer/system 키로 PUT 하면 여기로 떨어진다 — `app.py` 의 `_schema_grades_rbac`.
         '409':
           description: 서빙 분류기를 멈추게 하는 변경이라 저장하지 않음(force 와 사유 없음). detail 에 영향이 적힌다
+        '422':
+          description: 요청 본문 검증 실패(grades·actor 누락 등)
 
   /metrics/latest:
     get:
