@@ -278,6 +278,18 @@ def main() -> int:
         action="store_true",
         help="문서단위 train만 레거시 chunk 확장; pre_chunked 입력과 동시 사용 불가",
     )
+    ap.add_argument(
+        "--chunk-char-size",
+        type=int,
+        default=None,
+        help=(
+            "확장 조각의 글자 수(0/미지정=max_seq_len*3=1536). "
+            "[2026-09-13 실측] 정본 학습셋에서 한국어는 512토큰 = 약 1,107자라, "
+            "기본 1536자 조각은 창을 넘어 **펼쳐도 42.5%%가 여전히 잘린다**. "
+            "800 이면 초과 조각이 2/4,655(0.0%%)로 사실상 0 이다. "
+            "--chunk-expand 와 함께 쓸 때만 의미가 있다."
+        ),
+    )
     ap.add_argument("--val-path", default=None)
     ap.add_argument("--test-path", default=None)
     ap.add_argument(
@@ -383,6 +395,8 @@ def main() -> int:
             spec_kwargs["max_seq_len"] = args.max_seq_len
         if args.chunk_expand:
             spec_kwargs["chunk_expand"] = True
+        if getattr(args, "chunk_char_size", None):
+            spec_kwargs["chunk_char_size"] = args.chunk_char_size
         spec = TrainSpec(**spec_kwargs)
         print(f"[p1] full mode spec: {spec_kwargs}", file=sys.stderr)
         report = train_classifier(spec)
