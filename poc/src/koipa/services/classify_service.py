@@ -501,6 +501,30 @@ class ClassifyService:
                     "sparse-evidence: rule auto-confirm rested on thin evidence — routed to human review"
                 )
 
+            # [no-auto-confirm-grades] 특정 등급 예측은 자동확정에서 뺀다 — 등급은 무변경.
+            # 왜(2026-09-13 실측 · golden100 적대셋 100건 · 서빙 경로 전체):
+            #     기본(빈 목록)   무음 미탐 8건 · 자동확정 74%
+            #     ["S2"]          무음 미탐 2건 · 자동확정 35%
+            # 미탐 8건 중 6건이 S1 을 S2 로 본 것이라 S2 를 빼면 대부분 걸린다.
+            # ⚠ 같은 날 LLM 2차의견은 미탐 1건·자동확정 39% 로 거의 같은 자리인데 건당 4초가
+            #   더 들고 판별력이 없었다(발동 35건 중 실제 고등급 11 — 무작위 기대 17.5 이하).
+            # ⛔ 품질 개선이 아니라 **선택지**다. 미탐이 아픈 고객사는 켜고, 검수가 빠듯하면 끈다.
+            if status != "needs_review":
+                try:
+                    from koipa.config import settings as _st  # noqa: PLC0415
+                    _blocked = {str(g).strip().upper()
+                                for g in (getattr(_st, "no_auto_confirm_grades", None) or [])}
+                except Exception:  # noqa: BLE001 — 설정을 못 읽어도 분류를 막지 않는다
+                    _blocked = set()
+                if _blocked:
+                    _code = pred.label.value if hasattr(pred.label, "value") else str(pred.label)
+                    if str(_code).upper() in _blocked:
+                        status = "needs_review"
+                        warnings_acc.append(
+                            f"no-auto-confirm-grade: predicted {_code} is excluded from auto-confirm"
+                            " by policy — routed to human review (grade unchanged)"
+                        )
+
             # [abbrev-only-escalation | FIX-E] 청크 severe-agg가 고등급으로 승격했으나 그 근거가
             # _HIGH_RISK_PATTERNS 영문 약어 부스트(CVD·N2O·EUV 등)뿐이고 한국어 시드 근거가 전무한
             # 경우 — pipeline이 남긴 신호. 공개특허/기술문서의 범용 공정약어 밀도만으로 최고등급
