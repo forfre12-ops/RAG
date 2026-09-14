@@ -18,7 +18,7 @@ UV ?= $(PY) -m uv
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 acceptance-pack acceptance-pack-deps acceptance-test pilot-scorecard pilot-verify poc-all clean clean-data reports test-lite-cov \
         perf-scenarios perf-scenarios-full perf-clean-run \
-        gold-set retrieval-gold check-data check-gold check-leakage check-release-evidence check-parser-support openapi-consistency check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-gate-recalculate release-manifest \
+        gold-set retrieval-gold check-data check-gold check-leakage check-patent-proxy check-release-evidence check-parser-support openapi-consistency check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-gate-recalculate release-manifest \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers eval-trusted-ci \
         test-lite test-slow test-fullstack test-kl-integration test-model-download test-full
@@ -223,6 +223,15 @@ check-leakage: ## holdout↔train 텍스트해시 누출 게이트 (exit 1 on FA
 	    --holdout datasets/gold_real/holdout_eval.clean.jsonl,datasets/gold_real/holdout_business.clean.jsonl \
 	    --strict-coverage \
 	    --report reports/leakage_report.json
+
+check-patent-proxy: ## 공개특허-프록시 과라벨 유입 가드 (exit 1 on FAIL; 데이터 위생)
+	# 공개 특허공보는 비공지성 결여로 정의상 S3 다. 과거 step3 빌드가 공개특허 7,200건을
+	# S1·TS 로 라벨해 '특허 문체 = 고등급' shortcut 을 가르쳤다(2026-07-26 감사).
+	# 가드 스크립트는 그때 만들었으나 **아무 데도 배선되지 않아** 손으로 돌려야만 돌았다.
+	# train 만이 아니라 val·test 까지 본다 — 평가면이 오염되면 채점이 거꾸로 된다.
+	$(PY) scripts/check_no_patent_proxy.py --path datasets/labeled_p1_v5_clean/train.jsonl
+	$(PY) scripts/check_no_patent_proxy.py --path datasets/labeled_p1_v5_clean/val.jsonl
+	$(PY) scripts/check_no_patent_proxy.py --path datasets/labeled_p1_v5_clean/test.jsonl
 
 leakage-manifest: ## train 풀 → 누출 게이트용 텍스트해시 매니페스트(커밋 대상) 재생성
 	$(PY) scripts/build_leakage_manifest.py \

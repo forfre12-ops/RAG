@@ -493,6 +493,9 @@ jobs:
       - name: Leakage gate - train/holdout text hash
         run: make check-leakage
 
+      - name: Patent-proxy overlabel gate - 공개특허를 고등급으로 가르치지 않는다
+        run: make check-patent-proxy
+
       - name: Run PoC dryrun suite (P4 -> P3 -> P2 -> P1 -> P5)
         run: python scripts/run_all_pocs.py
 
