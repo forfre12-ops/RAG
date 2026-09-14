@@ -144,6 +144,9 @@ class EvalEvidence:
     representativeness_blocker: str = ""
     #: 여러 평가면을 합산하지 않았음을 명시 — 적대면·일반면·공개S3면은 따로 본다
     aggregated_faces: tuple[str, ...] = ()
+    #: 이 평가면이 제외 목록에 있으면 그 사유. 있으면 무조건 BLOCKED 다.
+    #: (예: patent_proxy — 정답이 우리 등급식과 반대라 채점이 뒤집힌다)
+    suite_excluded_reason: str = ""
 
     def __post_init__(self) -> None:
         if self.n < 0 or self.misses < 0:
@@ -216,7 +219,37 @@ class ClaimVerdict:
             "ship_model_id": e.ship_model_id,
             "measured_at": e.measured_at,
             "aggregated_faces": list(e.aggregated_faces),
+            "suite_excluded_reason": e.suite_excluded_reason,
         }
+
+
+#: 평가면 단위 제외 목록. 파일을 옮기지 않고 **역할을 뺀다** — 경로가 847곳에 박혀 있어
+#: 이동은 되돌릴 수 없다(git 추적 1.39%). 목록은 커밋되는 자리에 둔다.
+EXCLUSIONS_PATH = "evidence/eval_suite_exclusions.jsonl"
+
+
+def load_suite_exclusions(poc_root=None) -> dict[str, dict]:
+    """제외된 평가면 목록. 파일 부재는 '아직 아무것도 제외 안 함' 이라 빈 dict 를 돌린다."""
+    import json as _json  # noqa: PLC0415
+    from pathlib import Path as _Path  # noqa: PLC0415
+
+    root = _Path(poc_root) if poc_root else _Path(__file__).resolve().parent.parent.parent
+    p = root / EXCLUSIONS_PATH
+    out: dict[str, dict] = {}
+    if not p.exists():
+        return out
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            r = _json.loads(line)
+        except ValueError:
+            continue
+        key = str(r.get("suite_path") or "")
+        if key:
+            out[key] = r
+    return out
 
 
 def _ci_upper(misses: int, n: int, method: CIMethod) -> float | None:
@@ -241,6 +274,10 @@ def assess(evidence: EvalEvidence) -> ClaimVerdict:
     e = evidence
     blocked: list[str] = []
     diagnostic: list[str] = []
+
+    # (0) 평가면 제외 — 정답 자체가 쓸 수 없는 면이면 다른 축을 볼 필요가 없다
+    if e.suite_excluded_reason.strip():
+        blocked.append(f"평가면 제외 목록에 있음 — {e.suite_excluded_reason.strip()}")
 
     # (1) 누출 — 검사 안 했으면 '겹침 0' 과 구별되어야 한다
     if not e.training_overlap_checked:
@@ -317,4 +354,5 @@ def required_n(max_miss_rate: float, misses: int, method: CIMethod, *, cap: int 
 __all__ = [
     "CIMethod", "ClaimStatus", "ClaimVerdict", "EvalEvidence", "MetricName",
     "Representativeness", "TargetSpec", "TruthTier", "assess", "required_n",
+    "load_suite_exclusions", "EXCLUSIONS_PATH",
 ]

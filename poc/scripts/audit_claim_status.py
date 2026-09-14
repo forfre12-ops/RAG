@@ -49,6 +49,7 @@ for _s in (sys.stdout, sys.stderr):
 from audit_eval_ground_truth import tier_of  # noqa: E402
 from koipa.eval_authority import (  # noqa: E402
     CIMethod,
+    load_suite_exclusions,
     EvalEvidence,
     MetricName,
     Representativeness,
@@ -167,6 +168,9 @@ def audit_one(report_path: Path, train: set[str]) -> dict | None:
         return None  # 이 도구가 판정할 수 있는 모양이 아니다
 
     eval_path = POC / str(eval_rel)
+    # 평가면이 제외 목록에 있으면 정답 자체가 쓸 수 없다 — 게이트가 무조건 BLOCKED 로 잡는다
+    excl = load_suite_exclusions(POC).get(str(eval_rel).replace("\\", "/"), {})
+    excl_reason = str(excl.get("reason") or "") if "scoring" in (excl.get("excluded_from") or []) else ""
     tier, tier_counts, _n_eval = _suite_tier(eval_path, high_only=True)
     overlap = _overlap(eval_path, train, high_only=True)
 
@@ -185,6 +189,7 @@ def audit_one(report_path: Path, train: set[str]) -> dict | None:
         training_overlap_count=overlap,
         ship_model_id=str(((rep.get("provenance") or {}).get("git_sha")) or ""),
         measured_at=str(((rep.get("provenance") or {}).get("measured_at")) or ""),
+        suite_excluded_reason=excl_reason,
     )
     v = assess(ev)
     d = v.to_dict()

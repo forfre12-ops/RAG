@@ -173,3 +173,46 @@ def test_verdict_is_frozen() -> None:
 def test_misses_cannot_exceed_n() -> None:
     with pytest.raises(ValueError):
         _ev(n=10, misses=11)
+
+
+# ── 평가면 제외 목록 — 정답 자체가 쓸 수 없는 면 ──────────────────────────
+
+def test_excluded_suite_blocks_even_when_everything_else_is_perfect() -> None:
+    """GOLD · 목표확정 · 겹침0 · 미탐0 이어도 제외면이면 BLOCKED 다.
+
+    patent_proxy 가 그 경우다 — 1,200건 전부 source=공개특허인데 label 이 S1/TS 라,
+    이 면으로 채점하면 모델이 옳게 S3 라 부를 때 '미탐' 으로 기록된다.
+    """
+    v = assess(_ev(suite_excluded_reason="정답이 우리 등급식과 반대다 — 공개특허를 S1 이라 부른다"))
+    assert v.status is ClaimStatus.BLOCKED
+    assert any("제외 목록" in r for r in v.reasons)
+    assert "충족" not in v.as_headline()
+
+
+def test_blank_exclusion_reason_does_not_block() -> None:
+    """빈 문자열·공백은 '제외 안 됨' 이다 — 실수로 막히면 안 된다."""
+    assert assess(_ev(suite_excluded_reason="")).status is ClaimStatus.PASS
+    assert assess(_ev(suite_excluded_reason="   ")).status is ClaimStatus.PASS
+
+
+def test_exclusion_list_loads_and_names_patent_proxy() -> None:
+    """목록 파일이 실재하고 patent_proxy 계열이 채점에서 빠져 있어야 한다."""
+    from koipa.eval_authority import load_suite_exclusions
+    ex = load_suite_exclusions()
+    assert ex, "제외 목록이 비었다 — evidence/eval_suite_exclusions.jsonl 확인"
+    scoring_excluded = [k for k, v in ex.items() if "scoring" in (v.get("excluded_from") or [])]
+    assert any("patent_proxy/holdout_eval" in k for k in scoring_excluded), (
+        "patent_proxy 평가면이 채점 제외에서 빠졌다 — 채점이 뒤집힌다"
+    )
+    training_excluded = [k for k, v in ex.items() if "training" in (v.get("excluded_from") or [])]
+    for step in ("step2", "step3"):
+        assert any(step in k for k in training_excluded), f"{step} 이 학습 제외에서 빠졌다"
+
+
+def test_every_exclusion_states_a_reason_and_evidence() -> None:
+    """제외는 되돌리기 어려운 결정이다 — 사유와 근거가 없으면 나중에 못 되돌린다."""
+    from koipa.eval_authority import load_suite_exclusions
+    for path, rec in load_suite_exclusions().items():
+        assert str(rec.get("reason") or "").strip(), f"{path} 에 제외 사유가 없다"
+        assert str(rec.get("evidence") or "").strip(), f"{path} 에 근거가 없다"
+        assert rec.get("excluded_from"), f"{path} 에 무엇에서 빼는지가 없다"

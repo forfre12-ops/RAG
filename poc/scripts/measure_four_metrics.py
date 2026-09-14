@@ -57,6 +57,7 @@ for _s in (sys.stdout, sys.stderr):
 from audit_eval_ground_truth import tier_of  # noqa: E402
 from koipa.eval_authority import (  # noqa: E402
     CIMethod,
+    load_suite_exclusions,
     EvalEvidence,
     MetricName,
     Representativeness,
@@ -217,6 +218,8 @@ def main() -> int:
         if not records:
             print(f"[건너뜀] {rec_rel} — 레코드 없음")
             continue
+        excl = load_suite_exclusions(POC).get(str(eval_rel).replace("\\", "/"), {})
+        excl_reason = str(excl.get("reason") or "") if "scoring" in (excl.get("excluded_from") or []) else ""
         tier, overlap, tier_ct = suite_context(eval_path)
         m = compute(records)
         # stem 이 records·raw·train 처럼 흔한 말이면 폴더명을 붙인다 — 표에서 구분이 안 된다
@@ -227,6 +230,8 @@ def main() -> int:
         print("=" * 78)
         print(f"{suite}  ·  고등급 {m['n_high_grade']}건 / 전체 {m['n_all']}건")
         print(f"  정답등급 {tier.value} {dict(tier_ct)} · 학습겹침 {overlap}건")
+        if excl_reason:
+            print(f"  ⛔ 제외 평가면 — {excl_reason[:70]}…")
         print("=" * 78)
 
         verdicts = {}
@@ -244,6 +249,7 @@ def main() -> int:
                 representativeness=Representativeness.UNPROVABLE_NOW,
                 representativeness_blocker=REPRESENTATIVENESS_BLOCKER,
                 training_overlap_checked=True, training_overlap_count=overlap,
+                suite_excluded_reason=excl_reason,
             )
             v = assess(ev)
             verdicts[key] = v.to_dict()
