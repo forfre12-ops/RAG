@@ -71,3 +71,37 @@ def test_measured_shape_2026_09_14() -> None:
     assert abs(a["severe_rate"] - 17 / 60) < 1e-9
     assert b["severe"] == 0
     assert b["overclass_rate"] == 0.0
+
+
+# ── ICD 계약값이 실제로 cap 을 발동시키는가 ──────────────────────────────
+
+def test_icd_source_type_values_drive_the_cap() -> None:
+    """KL 이 ICD §3.1 대로 보내는 값이 출처 cap 을 발동시켜야 한다.
+
+    실측 2026-09-14: 레거시 한글 토큰('보도자료')과 ICD 정식값('public')이
+    같은 60건에서 **동일한 결과**를 냈다(격상 28.3% → 0.0%). 토큰 목록이
+    바뀌어 ICD 값이 빠지면 그 순간 KL 이 보내는 메타데이터가 무시된다.
+    """
+    import sys as _sys
+    from pathlib import Path as _Path
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent.parent / "src"))
+    from koipa.modules.m3_labeling.rule_engine import _ICD_SOURCE_TYPES
+    from koipa.modules.m5_inference.pipeline import _source_prior_is_public
+
+    # 공개로 보아 S3 로 cap 해야 하는 값
+    for v in ("public", "registered_patent", "academic"):
+        assert v in _ICD_SOURCE_TYPES, f"{v} 가 ICD 값 집합에서 빠졌다"
+        assert _source_prior_is_public(v) is True, f"{v} 가 cap 을 발동시키지 않는다"
+
+    # 비공개 — cap 이 걸리면 내부 문서가 S3 로 떨어져 미탐이 된다
+    for v in ("internal", "external_confidential"):
+        assert v in _ICD_SOURCE_TYPES
+        assert _source_prior_is_public(v) is False, f"{v} 에 cap 이 걸린다 — 미탐 위험"
+
+
+def test_negative_tokens_beat_public_tokens() -> None:
+    """'미공개 보도자료' 처럼 부정어가 붙으면 공개로 보면 안 된다."""
+    from koipa.modules.m5_inference.pipeline import _source_prior_is_public
+    assert _source_prior_is_public("보도자료") is True
+    for v in ("미공개", "비공개 보도자료", "internal draft", "공개특허 초안"):
+        assert _source_prior_is_public(v) is False, f"{v!r} 를 공개로 봤다"
