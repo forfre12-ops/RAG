@@ -43,7 +43,13 @@ BASELINE = _ROOT / "reports" / "regression_baseline.json"
 EVAL_SETS = {
     "hardened42": "datasets/gold_real/holdout_eval.hardened.jsonl",
     "clean42": "datasets/gold_real/holdout_eval.clean.jsonl",
-    "holdout109": "datasets/gold_real/_rejudge_claude/holdout109_provenance_corrected.jsonl",
+    # [2026-09-14] 이름을 바꿨다 — 'holdout109' 가 이 파일과 gold_real/holdout_eval.jsonl
+    # 둘을 동시에 가리키고 있었다(같은 파일 안의 MODEL_DECISION_SETS 는 후자를 쓴다).
+    # 두 파일은 본문 sha1 이 109/109 같은데 **라벨이 24건(22.0%) 다르다** — 그래서
+    # 두 도구가 낸 'holdout109 정확도' 는 애초에 같은 축의 값이 아니었다.
+    # 어느 쪽이 정본인지는 미결(발주처·사람 판정 필요)이라 여기서는 이름만 가른다.
+    # ⚠ 이 키 변경으로 기존 기준선과 이름이 어긋난다 — 다음 실행에서 --accept 로 재스냅샷할 것.
+    "holdout109_rejudged": "datasets/gold_real/_rejudge_claude/holdout109_provenance_corrected.jsonl",
     "v3_final800": "datasets/proxy_eval/direct_authored_proxy_eval_split.v3/final_800.locked.jsonl",
 }
 
