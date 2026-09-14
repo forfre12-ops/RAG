@@ -48,6 +48,11 @@ for _s in (sys.stdout, sys.stderr):
         pass
 
 POC = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(POC / "src"))
+
+from koipa.golden_tiers import (  # noqa: E402
+    document_origin, evaluation_signoff_gaps, is_valid_signoff,
+)
 
 # 채점에 실제로 쓰는 평가면. 여기 없는 셋은 성능 주장에 등장하면 안 된다.
 EVAL_SETS = {
@@ -89,7 +94,7 @@ TIER_BY_SOURCE = {
 TIER_ORDER = ("GOLD", "SILVER", "BRONZE", "CIRCULAR", "UNKNOWN", "NONE")
 
 CLAIM = {
-    "GOLD": "실무 성능 주장 가능(표본 수 안에서)",
+    "GOLD": "평가 증거 구비 — 목표·대표성·누출·승인 진위 별도 확인 필요",
     "SILVER": "상대 비교(A vs B)에만",
     "BRONZE": "회귀 감시용 · 성능 주장 금지",
     "CIRCULAR": "우리 규칙 재현율일 뿐 · 성능 아님",
@@ -107,6 +112,12 @@ def tier_of(row: dict) -> tuple[str, str]:
     if not src:
         return "NONE", ""
     src = str(src)
+    if src == "human_review":
+        # A string or legacy signature is not a policy-grounded evaluation answer.
+        if evaluation_signoff_gaps(row):
+            return "UNKNOWN", src
+        # Approved, independently reviewed reference cases may be GOLD too.
+        # Their synthetic origin/scope must NOT become a customer performance claim.
     return TIER_BY_SOURCE.get(src, "UNKNOWN"), src
 
 
@@ -118,6 +129,8 @@ def scan(paths: dict[str, Path]) -> dict:
             continue
         tiers: collections.Counter[str] = collections.Counter()
         sources: collections.Counter[str] = collections.Counter()
+        origins: collections.Counter[str] = collections.Counter()
+        scopes: collections.Counter[str] = collections.Counter()
         signoff_missing = 0
         n = 0
         for line in p.read_text(encoding="utf-8").splitlines():
@@ -131,18 +144,19 @@ def scan(paths: dict[str, Path]) -> dict:
             n += 1
             t, s = tier_of(row)
             tiers[t] += 1
+            origins[document_origin(row)] += 1
+            scopes[str(row.get("evaluation_scope") or "unrecorded")] += 1
             if s:
                 sources[s] += 1
             # 서명이 필요하다고 스스로 적어 놓고 서명이 없는 행
-            if row.get("requires_human_signoff") and not str(
-                row.get("reviewer_id") or ""
-            ).strip().startswith(("jaewon", "r1")):
+            if row.get("requires_human_signoff") and not is_valid_signoff(row):
                 signoff_missing += 1
         out[name] = {
             "path": str(p.relative_to(POC)),
             "n": n,
             "tiers": {k: tiers[k] for k in TIER_ORDER if tiers[k]},
             "sources": dict(sources.most_common()),
+            "document_origins": dict(origins), "evaluation_scopes": dict(scopes),
             "requires_signoff_but_unsigned": signoff_missing,
             # 가장 낮은 등급이 그 셋이 주장할 수 있는 한계를 정한다.
             "claim_ceiling": next(
@@ -159,6 +173,8 @@ def scan(paths: dict[str, Path]) -> dict:
 def scan_all_datasets() -> dict:
     tiers: collections.Counter[str] = collections.Counter()
     sources: collections.Counter[str] = collections.Counter()
+    origins: collections.Counter[str] = collections.Counter()
+    scopes: collections.Counter[str] = collections.Counter()
     files = rows = 0
     for p in (POC / "datasets").rglob("*.jsonl"):
         files += 1
@@ -178,6 +194,8 @@ def scan_all_datasets() -> dict:
                 rows += 1
                 t, s = tier_of(row)
                 tiers[t] += 1
+                origins[document_origin(row)] += 1
+                scopes[str(row.get("evaluation_scope") or "unrecorded")] += 1
                 if s:
                     sources[s] += 1
     return {
@@ -185,6 +203,7 @@ def scan_all_datasets() -> dict:
         "rows": rows,
         "tiers": {k: tiers[k] for k in TIER_ORDER if tiers[k]},
         "sources": dict(sources.most_common(30)),
+        "document_origins": dict(origins), "evaluation_scopes": dict(scopes),
     }
 
 

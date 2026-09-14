@@ -30,6 +30,7 @@ consumer 계약:
 from __future__ import annotations
 
 import re
+import hashlib
 from typing import Sequence
 
 TIER_LOCKED = "locked_gold_eval"
@@ -40,6 +41,49 @@ TIER_SILVER = "silver_train"
 # (무효 서명·correction-import 민팅·손편집 human_review, 및 서명은 유효하나 합성 본문인 사례.)
 # de-locked human_review가 SILVER(학습연료)로 흘러드는 역-누수를 차단하는 명시적 버킷.
 TIER_HELD = "held_review"
+
+
+def evaluation_signoff_gaps(record: dict) -> list[str]:
+    """Additional evidence-envelope checks for evaluation, not operational approval.
+
+    This checks recorded evidence, not the authenticity of a person's identity or
+    an approval document. Existing signoff/training routing is deliberately unchanged.
+    """
+    gaps = []
+    if record.get("label") not in {"TS", "S1", "S2", "S3"}:
+        gaps.append("missing_valid_grade")
+    if not is_valid_signoff(record):
+        gaps.append("invalid_human_signoff")
+    if record.get("review_status") == REJECTED_BY_REVIEWER or record.get("signoff_rejected"):
+        gaps.append("rejected_by_reviewer")
+    if record.get("intended_use") == "train":
+        gaps.append("designated_for_training_not_evaluation")
+    for key in ("policy_version", "rule_id", "not_higher_reason", "not_lower_reason"):
+        if not str(record.get(key) or "").strip():
+            gaps.append(f"missing_{key}")
+    approval = record.get("policy_approval")
+    if not isinstance(approval, dict) or approval.get("status") != "approved" or not (
+        approval.get("reference") and re.fullmatch(r"[0-9a-f]{64}", str(approval.get("sha256", "")))
+    ):
+        gaps.append("missing_policy_approval_evidence")
+    evidence = record.get("decision_evidence")
+    if not isinstance(evidence, list) or not evidence or not all(
+        isinstance(e, dict) and e.get("fact") and e.get("reference") and e.get("observed_at")
+        and e.get("source_kind") in {"system", "document", "owner_attestation", "public_archive"}
+        and re.fullmatch(r"[0-9a-f]{64}", str(e.get("sha256", ""))) for e in evidence
+    ):
+        gaps.append("missing_decision_evidence")
+    text = next((record[k] for k in ("text", "content", "body")
+                 if isinstance(record.get(k), str) and record[k].strip()), "")
+    if not text or record.get("document_sha256") != hashlib.sha256(text.encode()).hexdigest():
+        gaps.append("document_evidence_binding_missing")
+    if record.get("evaluation_scope") not in {"reference", "organization", "customer"}:
+        gaps.append("missing_evaluation_scope")
+    if document_origin(record) == ORIGIN_UNKNOWN:
+        gaps.append("unknown_document_origin")
+    if record.get("evaluation_scope") in {"organization", "customer"} and document_origin(record) != ORIGIN_CUSTOMER_REAL:
+        gaps.append("scope_does_not_match_document_origin")
+    return gaps
 
 # ── 문서 텍스트 출처(document_origin) — 라벨 권위와 직교하는 '본문 실재성' 축 ──────────────
 # real 평가정답·최종 성능근거는 실문서에서만 나온다(capstone F1 0.26 텍스처 갭). 명시 필드가

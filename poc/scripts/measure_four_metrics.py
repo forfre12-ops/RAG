@@ -77,6 +77,7 @@ TRAIN_POOLS = (
 )
 TEXT_KEYS = ("text", "content", "body")
 LABEL_KEYS = ("label", "target", "grade", "gold", "y")
+METRICS_SCHEMA_VERSION = "four-grade-v2"
 
 TARGET_TODAY = TargetSpec.unresolved(
     conflicting=("RFP 재현율 90%", "KL 품질계획서 80%", "시나리오 KPI 미탐 5%")
@@ -129,10 +130,14 @@ def _h(t: str) -> str:
     return hashlib.sha256(re.sub(r"\s+", "", t or "").encode("utf-8")).hexdigest()
 
 
-def suite_context(eval_path: Path) -> tuple[TruthTier, int, Counter]:
-    """평가면의 정답 등급(가장 낮은 것이 한계)과 학습 겹침 — 고등급 행 기준."""
+def suite_context(eval_path: Path, train_paths=None) -> tuple[TruthTier, int, Counter]:
+    """Whole-suite truth authority and overlap, including S2 and S3.
+
+    Legacy default pools are a partial diagnostic check only. Candidate approval
+    requires an explicit, fingerprinted training manifest in judge_model_candidate.
+    """
     train: set[str] = set()
-    for rel in TRAIN_POOLS:
+    for rel in (TRAIN_POOLS if train_paths is None else train_paths):
         for row in _rows(POC / rel):
             t = _text(row)
             if t:
@@ -140,8 +145,6 @@ def suite_context(eval_path: Path) -> tuple[TruthTier, int, Counter]:
     tiers: Counter = Counter()
     overlap = 0
     for row in _rows(eval_path):
-        if _label(row) not in HIGH:
-            continue
         tiers[tier_of(row)[0]] += 1
         t = _text(row)
         if t and _h(t) in train:
@@ -155,6 +158,11 @@ def suite_context(eval_path: Path) -> tuple[TruthTier, int, Counter]:
 def compute(records: list[dict]) -> dict:
     """records 한 벌에서 네 지표 + 두 운영 지표를 센다."""
     n_all = len(records)
+    if any(r.get("truth") not in GRADE_ORDER or r.get("predicted") not in GRADE_ORDER
+           for r in records):
+        raise ValueError("Four-grade evaluation requires valid truth and predicted grades on every row")
+    if any(r.get("model_grade") and r["model_grade"] not in GRADE_ORDER for r in records):
+        raise ValueError("Invalid raw model grade")
     hi = [r for r in records if r.get("truth") in HIGH]
     n_hi = len(hi)
 
@@ -177,7 +185,42 @@ def compute(records: list[dict]) -> dict:
     severe_over = [r for r in lo if r.get("predicted") in HIGH]
     auto_over = [r for r in serving_over if r.get("status") != "needs_review"]
 
-    return {
+    matrix = {g: {p: 0 for p in GRADE_ORDER} for g in GRADE_ORDER}
+    for row in records:
+        matrix[row["truth"]][row["predicted"]] += 1
+    per_grade = {}
+    errors = {}
+    for grade in GRADE_ORDER:
+        support = sum(matrix[grade].values())
+        predicted_n = sum(matrix[g][grade] for g in GRADE_ORDER)
+        tp = matrix[grade][grade]
+        per_grade[grade] = {"support": support, "predicted_n": predicted_n, "tp": tp,
+                            "precision": rate(tp, predicted_n), "recall": rate(tp, support)}
+        errors[f"grade_error_{grade}"] = {
+            "misses": support - tp, "n": support, "rate": rate(support - tp, support)}
+    exact_errors = sum(r["predicted"] != r["truth"] for r in records)
+    s2 = [r for r in records if r["truth"] == "S2"]
+    s2_misses = sum(r["predicted"] == "S3" for r in s2)
+    not_reviewed = [r for r in records if r.get("status") == "staging"]
+    not_reviewed_errors = sum(r["predicted"] != r["truth"] for r in not_reviewed)
+    result = {
+        "schema_version": METRICS_SCHEMA_VERSION,
+        "legacy_metric_note": "model_recall/serving_recall are downward miss rates, NOT recall; "
+                              "auto_confirm aliases measure routing, NOT persisted/human confirmation",
+        "confusion_matrix": matrix, "per_grade": per_grade,
+        "exact_grade_error": {"misses": exact_errors, "n": n_all, "rate": rate(exact_errors, n_all)},
+        "exact_grade_accuracy": {"hits": n_all - exact_errors, "n": n_all,
+                                 "rate": rate(n_all - exact_errors, n_all)},
+        "s2_underclass": {"misses": s2_misses, "n": len(s2), "rate": rate(s2_misses, len(s2))},
+        "high_grade_detection_recall": {"hits": sum(r["predicted"] in HIGH for r in hi),
+                                        "n": n_hi, "rate": rate(sum(r["predicted"] in HIGH for r in hi), n_hi)},
+        "not_routed_error": {"misses": not_reviewed_errors, "n": len(not_reviewed),
+                             "rate": rate(not_reviewed_errors, len(not_reviewed))},
+        "not_routed_to_review_rate": {"hits": len(not_reviewed), "n": n_all,
+                                      "rate": rate(len(not_reviewed), n_all)},
+        "status_missing": sum(not r.get("status") for r in records),
+        "status_unrecognized": sum(bool(r.get("status")) and r["status"] not in
+                                   {"staging", "needs_review"} for r in records),
         "n_all": n_all,
         "n_high_grade": n_hi,
         "n_low_grade": n_lo,
@@ -195,6 +238,8 @@ def compute(records: list[dict]) -> dict:
         "review_load": {"reviewed": len(review_load), "n": n_all, "rate": rate(len(review_load), n_all)},
         "model_grade_missing": sum(1 for r in records if not r.get("model_grade")),
     }
+    result.update(errors)
+    return result
 
 
 def main() -> int:
@@ -214,10 +259,15 @@ def main() -> int:
     out_all = []
     for rec_rel, eval_rel in zip(args.records, args.eval_set):
         rec_path, eval_path = POC / rec_rel, POC / eval_rel
-        records = list(_rows(rec_path))
-        if not records:
-            print(f"[건너뜀] {rec_rel} — 레코드 없음")
-            continue
+        from evaluation_inputs import read_rows, record_binding  # noqa: PLC0415
+        try:
+            records = read_rows(rec_path)
+            problems = record_binding(records, read_rows(eval_path))
+            if problems:
+                raise ValueError("; ".join(problems))
+        except (OSError, ValueError) as exc:
+            print(f"[입력 오류] {exc}")
+            return 2
         excl = load_suite_exclusions(POC).get(str(eval_rel).replace("\\", "/"), {})
         excl_reason = str(excl.get("reason") or "") if "scoring" in (excl.get("excluded_from") or []) else ""
         tier, overlap, tier_ct = suite_context(eval_path)
@@ -248,7 +298,8 @@ def main() -> int:
                 target=TARGET_TODAY,
                 representativeness=Representativeness.UNPROVABLE_NOW,
                 representativeness_blocker=REPRESENTATIVENESS_BLOCKER,
-                training_overlap_checked=True, training_overlap_count=overlap,
+                # These legacy pools are not the candidate's complete manifest.
+                training_overlap_checked=False, training_overlap_count=overlap,
                 suite_excluded_reason=excl_reason,
             )
             v = assess(ev)

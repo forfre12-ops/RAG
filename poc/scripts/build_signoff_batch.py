@@ -11,14 +11,15 @@
     → 배포 모델로 한 번 평가 → 학습에서 영구 제외
 
 이 도구는 그 순서를 **파일 구조로 강제한다.** 선정은 잠근 모집단 + 고정 시드로만 하고,
-검수자에게 나가는 팩에는 라벨·예측·문서종류가 **들어갈 자리가 없다**.
+검수자에게 나가는 팩에는 기계 라벨·예측이 없고, 승인 기준과 실제 증거는 제공한다.
 
 ## 표면 칸을 뺀다
 
 2026-08-08 품질 파일럿 팩(`datasets/proxy_gold/blind_quality_pilot/`)에는
 `document_type` 이 그대로 실려 있었다. 품질 점수를 묻는 팩이라 문제가 없었지만,
 **등급을 묻는 팩에서는 그것이 답을 알려준다** — 문서종류 단서만으로 등급 정확도가
-99.9% 까지 나온 실측이 있다(2026-09-12). 그래서 팩에는 본문과 review_id 만 넣는다.
+99.9% 까지 나온 실측이 있다(2026-09-12). 기계가 부여한 종류·예측을 제외하되,
+실제 출처와 관리 증거까지 숨기지는 않는다. 값이 존재한다고 진위가 검증된 것은 아니다.
 
 ## 학습 겹침은 제외하고, 제외 건수를 남긴다
 
@@ -49,6 +50,8 @@ from pathlib import Path
 POC = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(POC / "src"))
 
+from koipa.golden_tiers import document_origin  # noqa: E402
+
 for _s in (sys.stdout, sys.stderr):
     try:
         _s.reconfigure(encoding="utf-8", errors="replace")
@@ -75,6 +78,24 @@ FORBIDDEN_IN_PACK = (
 )
 
 MIN_CHARS = 50
+
+SOURCE_FIELDS = ("source_reference", "source_agency", "retrieved_at", "source_sha256")
+SYSTEM_FIELDS = ("access_scope", "security_marking", "owner_org", "actual_reader_scope")
+
+
+def evidence_bundle(row: dict) -> dict:
+    """Preserve inputs, not model explanations. Presence is not verification."""
+    md = row.get("metadata") if isinstance(row.get("metadata"), dict) else row
+    text = _text(row)
+    return {
+        "document_sha256": hashlib.sha256(text.encode()).hexdigest(),
+        "document_origin": document_origin(row),
+        "source": {k: row[k] for k in SOURCE_FIELDS if row.get(k)},
+        "system_facts": {k: md[k] for k in SYSTEM_FIELDS if md.get(k)},
+        "evidence_verification": "not_verified",
+        "missing_system_fields": [k for k in SYSTEM_FIELDS if not md.get(k)],
+        "note": "본문 표식과 실제 관리 상태는 다릅니다. 없는 값을 추정해 채우지 마십시오.",
+    }
 
 
 def _norm(t: str) -> str:
@@ -146,8 +167,9 @@ def collect_population(sources: list[str], *, origins: set[str], grades: set[str
                 if grades and lb not in grades:
                     drop[f"등급 대상 아님({lb or '없음'})"] += 1
                     continue
-                origin = str(row.get("document_origin") or "")
-                if origins and origin not in origins:
+                origin = document_origin(row)
+                accepted_origins = {"customer_real" if x == "organization_real" else x for x in origins}
+                if origins and origin not in accepted_origins:
                     drop[f"출처 대상 아님({origin or '없음'})"] += 1
                     continue
                 hh = _h(t)
@@ -167,6 +189,7 @@ def collect_population(sources: list[str], *, origins: set[str], grades: set[str
                     "source_reference": row.get("source_reference"),
                     "source_agency": row.get("source_agency"),
                     "retrieved_at": row.get("retrieved_at"),
+                    "evidence_bundle": evidence_bundle(row),
                 }
     return list(seen.values()), drop
 
@@ -205,12 +228,21 @@ def stratified_pick(pool: list[dict], n: int, seed: int, by: str) -> tuple[list[
 
 
 def write_batch(out: Path, picked: list[dict], manifest: dict) -> None:
-    out.mkdir(parents=True, exist_ok=True)
+    # Never overwrite a reviewer response or another user's existing batch.
+    if out.exists():
+        raise FileExistsError(f"Review batch already exists: {out}")
+    out.mkdir(parents=True, exist_ok=False)
+    reviewer_dir, coordinator_dir = out / "reviewer", out / "coordinator"
+    reviewer_dir.mkdir()
+    coordinator_dir.mkdir()
     pack, key, answer = [], [], []
     for i, r in enumerate(picked, 1):
         rid = f"SG{i:04d}"
-        # ⚠ 팩에는 본문과 id 만 — 금지 칸은 애초에 담지 않는다
-        pack.append({"review_id": rid, "text": r["text"]})
+        pack.append({"review_id": rid, "text": r["text"],
+                     "evidence_bundle": r.get("evidence_bundle") or evidence_bundle(r),
+                     "policy_context": manifest.get("policy_context", {
+                         "version": None, "approval_status": "unapproved", "reference": None}),
+                     "purpose": manifest.get("purpose", "review_candidate")})
         key.append({
             "review_id": rid, "text_sha256": r["text_sha256"],
             "original_doc_id": r["original_doc_id"], "source_path": r["source_path"],
@@ -219,6 +251,8 @@ def write_batch(out: Path, picked: list[dict], manifest: dict) -> None:
         answer.append({
             "review_id": rid,
             "grade": None,               # TS/S1/S2/S3 또는 "판정보류"
+            "decision_status": "pending_review",
+            "missing_evidence": [], "decision_evidence": [],
             "secrecy": None, "value": None, "management": None,   # 0/1/2 또는 "확인 안 됨"
             "evidence_start": None, "evidence_end": None, "evidence_quote": None,
             "rule_id": None,             # 적용한 규칙
@@ -230,28 +264,61 @@ def write_batch(out: Path, picked: list[dict], manifest: dict) -> None:
             "signed_at": None,
         })
 
-    def _dump(name: str, rows: list[dict]) -> None:
-        (out / name).write_text(
+    def check_keys(value):
+        if isinstance(value, dict):
+            for k, v in value.items():
+                if k in FORBIDDEN_IN_PACK:
+                    raise ValueError(f"Forbidden machine-label field in reviewer pack: {k}")
+                check_keys(v)
+        elif isinstance(value, list):
+            for v in value:
+                check_keys(v)
+
+    check_keys(pack)
+
+    def _dump(directory: Path, name: str, rows: list[dict]) -> None:
+        (directory / name).write_text(
             "\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n",
             encoding="utf-8")
 
-    _dump("review_pack.jsonl", pack)
-    _dump("blind_key.jsonl", key)
-    _dump("answer_template.jsonl", answer)
-    (out / "population_manifest.json").write_text(
+    _dump(reviewer_dir, "review_pack.jsonl", pack)
+    _dump(coordinator_dir, "blind_key.jsonl", key)
+    _dump(reviewer_dir, "answer_template.jsonl", answer)
+    write_casebook(reviewer_dir, pack)
+    (coordinator_dir / "population_manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-    (out / "REVIEW_INSTRUCTIONS.md").write_text(_INSTRUCTIONS, encoding="utf-8")
+    (reviewer_dir / "REVIEW_INSTRUCTIONS.md").write_text(_INSTRUCTIONS, encoding="utf-8")
 
-    # 팩에 금지 칸이 새지 않았는지 자기검사 — 검사기가 헛돌면 초록불이 거짓말이 된다
-    leaked = {k for row in pack for k in row if k in FORBIDDEN_IN_PACK}
-    if leaked:
-        raise RuntimeError(f"팩에 금지 칸이 실렸다: {sorted(leaked)}")
+
+def write_casebook(reviewer_dir: Path, pack: list[dict]) -> None:
+    """Render an existing input pack without touching anyone's answer file."""
+    pages = ["# 검수 사례집\n\n모델 예측·기존 라벨을 숨긴 입력 자료입니다. "
+             "정책 승인 상태와 증거 확인 여부를 먼저 확인하십시오.\n"]
+    for row in pack:
+        # Preserve full text; choose a fence that cannot be closed by the source.
+        longest = max((len(x) for x in re.findall(r"`+", row["text"])), default=0)
+        fence = "`" * max(3, longest + 1)
+        pages.append(f"## {row['review_id']}\n\n"
+                     f"용도: {row['purpose']}\n\n"
+                     f"정책 상태: {row['policy_context'].get('approval_status', 'unapproved')}\n\n"
+                     "### 원문\n\n" + fence + "text\n" + row["text"] + "\n" + fence + "\n\n"
+                     "### 제공된 증거 및 누락 정보\n\n```json\n" +
+                     json.dumps(row["evidence_bundle"], ensure_ascii=False, indent=2) + "\n```\n\n"
+                     "판정은 별도 answer_template 사본에 작성하십시오. 확인하지 못한 값은 "
+                     "추정하지 말고 missing_evidence에 적으십시오.\n")
+    with (reviewer_dir / "CASES.md").open("x", encoding="utf-8") as fh:
+        fh.write("\n".join(pages))
 
 
 _INSTRUCTIONS = """# 등급 서명 안내
 
-`review_pack.jsonl` 만 검수자에게 제공하십시오.
-`blind_key.jsonl` 은 **모든 서명이 끝나기 전까지** 제공하지 마십시오.
+검수자에게는 `reviewer/`와 승인된 정책 문서·허용된 실제 증거만 제공합니다.
+`coordinator/`의 기존 라벨·선정 원장은 제공하지 않습니다. 폴더 분리는 접근권한 설정을
+대신하지 않으므로 전달 담당자가 실제 권한과 전달 범위를 확인해야 합니다.
+각 검수자는 별도 응답 사본을 작성하고 상대의 답을 보지 않습니다.
+
+정책이 unapproved/draft면 검수 절차 교정용입니다. 운영 GOLD로 서명·승격하지 않습니다.
+이 팩의 system_facts/source는 전달된 값이며, 진위·시점은 추가 확인해야 합니다.
 
 ## 적어야 하는 것 (`answer_template.jsonl`)
 
@@ -260,7 +327,9 @@ _INSTRUCTIONS = """# 등급 서명 안내
 
 | 칸 | 무엇 |
 |---|---|
-| `grade` | TS · S1 · S2 · S3 · 판정보류 |
+| `grade` | TS · S1 · S2 · S3, 확정 불가면 null |
+| `decision_status` | pending_review · needs_evidence · adjudication_required · decided |
+| `missing_evidence` / `decision_evidence` | 부족한 증거와 각 사실을 입증하는 문서·시스템 참조 |
 | `secrecy` / `value` / `management` | 0 · 1 · 2 · 확인 안 됨 |
 | `evidence_start` / `evidence_end` / `evidence_quote` | 그렇게 본 근거가 본문 어디인가 |
 | `rule_id` | 적용한 규칙 |
@@ -272,8 +341,10 @@ _INSTRUCTIONS = """# 등급 서명 안내
 
 - 문서의 출처나 모델 예측을 **추정하지 마십시오.** 본문과 주어진 사실만 봅니다.
 - 다른 검수자의 답을 보지 마십시오. 일치도를 재려면 독립 판단이어야 합니다.
-- `signer_role` 은 `holder`(비밀 보유 기업) · `client`(고객사) · `orderer`(발주처) ·
-  `vendor`(수행사) 중 하나입니다. **vendor 서명은 GOLD 로 치지 않습니다** — 자기채점입니다.
+- `signer_role`에 소속과 자격을 적습니다. 내부 전문가도 정책상 권한·독립성·이해충돌
+  확인이 필요합니다. 소속 문자열만으로 GOLD 자격을 결정하지 않습니다.
+- 승인 기준표를 보는 것은 허용됩니다. 모델 예측·기존 기계 라벨을 답으로 베끼면 안 됩니다.
+- 같은 본문이라도 정책·시점·관리 증거가 바뀌면 재판정해야 합니다.
 """
 
 
@@ -283,7 +354,7 @@ def main() -> int:
     ap.add_argument("--source", action="append", required=True, help='예: "datasets/**/*.jsonl"')
     ap.add_argument("--require-origin", default="",
                     help="쉼표 구분. 비우면 출처 제한 없음(권장하지 않음)")
-    ap.add_argument("--grade", default="TS,S1", help="대상 등급(숨긴 라벨 기준). 비우면 전부")
+    ap.add_argument("--grade", default="", help="기존 라벨 필터. 기본은 미분류·S2를 포함한 전부")
     ap.add_argument("--n", type=int, default=100)
     ap.add_argument("--seed", type=int, default=20260914)
     ap.add_argument("--strata", default="origin", help="층화 기준 필드")
@@ -320,21 +391,20 @@ def main() -> int:
         "excluded": dict(drop),
         "train_pools": list(TRAIN_POOLS),
         "train_pool_hashes": len(train),
-        "note": "모집단·층화는 모델 예측을 보기 전에 잠갔다. 팩에는 라벨·예측·문서종류가 없다.",
+        "note": "선정 규칙·기존 라벨 필터를 기록함. 실제 평가 전에 모집단 선정 시점 별도 확인 필요.",
+        "training_manifest_complete": False,
+        "claim_status": "NOT_ASSESSED",
     }
 
     if not pool:
         print()
         print("⛔ 모집단이 0건이라 배치를 만들지 않는다.")
         print("   무엇이 있어야 하는가 —")
-        print("   · 서명 대상은 **실문서**여야 한다(document_origin 이 public/organization/customer_real).")
-        print("   · 그런데 고등급(TS/S1) 고유본문 50,685건 중 실문서 표기는 고유 1건이고")
-        print("     그마저 학습셋에 있다(실측 2026-09-14). 즉 지금 리포에 후보가 없다.")
-        print("   · 판례는 본문이 실문서지만 우리 입장이 '정답 S3' 이라 고등급 후보가 못 된다.")
-        print("   → 경로 B(자체 사내 문서) 수집이 유일하게 오늘 시작 가능한 길이다.")
+        print("   현재 입력·필터에 맞는 후보가 없습니다. 위 제외 사유를 확인하십시오.")
+        print("   후보 0건은 정답 제작 불가능을 뜻하지 않습니다. 미분류·승인된 추가 자료를 검토하십시오.")
         if args.out:
             out = POC / args.out
-            out.mkdir(parents=True, exist_ok=True)
+            out.mkdir(parents=True, exist_ok=False)
             (out / "population_manifest.json").write_text(
                 json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"\n   모집단 명세만 저장: {out.relative_to(POC)}/population_manifest.json")
@@ -354,10 +424,8 @@ def main() -> int:
     out = POC / args.out
     write_batch(out, picked, manifest)
     print(f"\n저장: {out.relative_to(POC)}/")
-    print("  review_pack.jsonl        ← 검수자에게 제공")
-    print("  answer_template.jsonl    ← 검수자가 채움")
-    print("  blind_key.jsonl          ⚠ 서명 완료 전까지 제공 금지")
-    print("  population_manifest.json · REVIEW_INSTRUCTIONS.md")
+    print("  reviewer/              ← 검수자에게 제공")
+    print("  coordinator/           ⚠ 검수자 전달 금지(기존 라벨 포함)")
     return 0
 
 

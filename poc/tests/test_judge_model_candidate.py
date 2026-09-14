@@ -15,11 +15,15 @@ from pathlib import Path
 POC = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(POC / "scripts"))
 
-from judge_model_candidate import HARD_AXES, SOFT_AXES, judge  # noqa: E402
+from judge_model_candidate import HARD_AXES, SOFT_AXES, INPUT_CONTRACT_VERSION, judge  # noqa: E402
+from measure_four_metrics import METRICS_SCHEMA_VERSION  # noqa: E402
 
 
 def _face(name="f1", *, usable=True, overlap=0, excluded="", **rates):
     base = {
+        "s2_underclass": 0.05,
+        "exact_grade_error": 0.10,
+        **{f"grade_error_{g}": 0.10 for g in ("TS", "S1", "S2", "S3")},
         "high_grade_auto_confirm_fn_rate": 0.05,
         "serving_recall": 0.05,
         "severe_overclass": 0.10,
@@ -30,10 +34,17 @@ def _face(name="f1", *, usable=True, overlap=0, excluded="", **rates):
     }
     base.update(rates)
     return {
+        "input_contract_version": INPUT_CONTRACT_VERSION,
+        "training_overlap_checked": True,
+        "eval_sha256": "a" * 64, "records_sha256": "b" * 64,
+        "training_manifest_sha256": "c" * 64, "measurement_config_sha256": "d" * 64,
+        "model_id": "test-model", "policy_version": "reference-test-v1", "org_id": "test-org",
+        "comparison_status": "DIAGNOSTIC_ONLY",
         "face": name, "usable_for_judgement": usable,
         "training_overlap": overlap, "excluded_reason": excluded,
         "truth_tier": "SILVER",
-        "metrics": {k: {"rate": v} for k, v in base.items()},
+        "metrics": {"schema_version": METRICS_SCHEMA_VERSION,
+                    **{k: {"rate": v, "n": 100} for k, v in base.items()}},
     }
 
 
@@ -45,7 +56,8 @@ def test_identical_candidate_promotes() -> None:
     """아무것도 안 바뀌면 승격 가능하다(= 회귀 없음)."""
     b = _baseline(_face())
     r = judge(b, [_face()])
-    assert r["verdict"] == "PROMOTE"
+    assert r["verdict"] == "REGRESSION_OK"
+    assert r["claim_status"] == "NOT_ASSESSED"
     assert r["judged_faces"] == 1
     assert not r["deltas"]
 
@@ -55,7 +67,7 @@ def test_improvement_on_all_axes_promotes() -> None:
     better = _face(high_grade_auto_confirm_fn_rate=0.02, severe_overclass=0.05,
                    serving_overclass=0.10)
     r = judge(b, [better])
-    assert r["verdict"] == "PROMOTE"
+    assert r["verdict"] == "REGRESSION_OK"
     assert all(not d.get("worse") for d in r["deltas"])
 
 
@@ -121,11 +133,53 @@ def test_face_missing_from_baseline_holds() -> None:
     assert any("기준선에 없는 면" in x for x in r["reasons"])
 
 
-def test_missing_axis_is_skipped_not_treated_as_zero() -> None:
-    """분모가 없어 rate 가 None 인 축은 건너뛴다 — 0% 로 읽으면 통과처럼 보인다."""
+def test_missing_axis_holds_not_treated_as_zero() -> None:
+    """A missing field is not proof of a zero denominator."""
     b = _baseline(_face())
     cand = _face()
     cand["metrics"]["severe_overclass"] = {"rate": None}
     r = judge(b, [cand])
-    assert r["verdict"] == "PROMOTE"
+    assert r["verdict"] == "HOLD"
     assert all(d["axis"] != "severe_overclass" for d in r["deltas"])
+
+
+def test_genuinely_empty_denominator_on_both_sides_is_not_zero_percent():
+    base, cand = _face(), _face()
+    for face in (base, cand):
+        face["metrics"]["severe_overclass"] = {"rate": None, "n": 0}
+    assert judge(_baseline(base), [cand])["verdict"] == "REGRESSION_OK"
+
+
+@pytest.mark.parametrize("tier", ["NONE", "UNKNOWN", "CIRCULAR"])
+def test_untrusted_truth_cannot_pass_even_if_usable_flag_is_true(tier):
+    face = _face()
+    face["truth_tier"] = tier
+    assert judge(_baseline(face), [face])["verdict"] == "HOLD"
+
+
+def test_missing_required_face_cannot_improve_verdict():
+    assert judge(_baseline(_face("a"), _face("b")), [_face("a")])["verdict"] == "HOLD"
+
+
+@pytest.mark.parametrize("key", ["eval_sha256", "org_id", "policy_version", "measurement_config_sha256"])
+def test_changed_input_or_policy_is_not_same_condition_comparison(key):
+    face = _face()
+    face[key] = "e" * 64
+    assert judge(_baseline(_face()), [face])["verdict"] == "HOLD"
+
+
+def test_legacy_snapshot_requires_remeasurement():
+    old = _face()
+    old.pop("input_contract_version")
+    assert judge(_baseline(old), [_face()])["verdict"] == "HOLD"
+
+
+def test_later_error_cannot_overwrite_hard_rejection():
+    result = judge(_baseline(_face("a"), _face("b")),
+                   [_face("a", s2_underclass=0.5), {"face": "b", "error": "missing"}])
+    assert result["verdict"] == "REJECT"
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -0.1, 1.1])
+def test_invalid_metric_never_passes(value):
+    assert judge(_baseline(_face()), [_face(s2_underclass=value)])["verdict"] == "HOLD"

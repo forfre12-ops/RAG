@@ -60,6 +60,25 @@ class TruthTier(str, Enum):
 _DIAGNOSTIC_TIERS = frozenset({TruthTier.SILVER, TruthTier.BRONZE})
 
 
+def assess_comparison(*, truth_tier: str, overlap_checked: bool,
+                      overlap_count: int, excluded_reason: str = "") -> dict:
+    """Relative comparison eligibility; never produces a customer acceptance PASS.
+
+    Contract target/representativeness remain the responsibility of assess().
+    An unresolved customer target must not prevent scoped internal diagnostics.
+    """
+    reasons = []
+    if truth_tier not in {"GOLD", "SILVER", "BRONZE"}:
+        reasons.append(f"정답 권위 부족: {truth_tier}")
+    if not overlap_checked:
+        reasons.append("학습 목록 미확정 또는 중복 미검사")
+    if overlap_count:
+        reasons.append(f"학습 겹침 {overlap_count}건")
+    if excluded_reason:
+        reasons.append(f"평가면 제외: {excluded_reason}")
+    return {"status": "BLOCKED" if reasons else "DIAGNOSTIC_ONLY", "reasons": reasons}
+
+
 class Representativeness(str, Enum):
     PROVEN = "proven"
     UNPROVEN = "unproven"
@@ -355,4 +374,5 @@ __all__ = [
     "CIMethod", "ClaimStatus", "ClaimVerdict", "EvalEvidence", "MetricName",
     "Representativeness", "TargetSpec", "TruthTier", "assess", "required_n",
     "load_suite_exclusions", "EXCLUSIONS_PATH",
+    "assess_comparison",
 ]
