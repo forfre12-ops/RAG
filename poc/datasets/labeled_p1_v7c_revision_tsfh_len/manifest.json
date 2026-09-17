@@ -1,0 +1,31 @@
+{
+ "base": "datasets/labeled_p1_v7a_revision",
+ "base_rows": 2063,
+ "extra": "datasets/synth_ts_fin_hr_20260911/samples.jsonl",
+ "extra_rows": 19,
+ "seed": 42,
+ "extra_chars_before": {
+  "median": 994
+ },
+ "extra_chars_after": {
+  "median": 336
+ },
+ "base_ts_chars": {
+  "median": 440.5
+ },
+ "not_committed": "비교 실험용 — 스크립트와 커밋된 입력으로 다시 만든다",
+ "files": {
+  "train.jsonl": {
+   "rows": 2082,
+   "sha256": "9433c19fe16778501fddbd43f3fac738942875617912d99d24695a0c5d80e1aa"
+  },
+  "val.jsonl": {
+   "rows": 249,
+   "sha256": "328d4e469f35505c8c0cd02ed46f278154988a1f16e73b3360e90367ea38963e"
+  },
+  "test.jsonl": {
+   "rows": 249,
+   "sha256": "2b4d79d1578505636016ace104baa64e42345f4f6859e289395149965f6b816a"
+  }
+ }
+}
