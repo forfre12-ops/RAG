@@ -42,18 +42,47 @@ except ImportError:
 force_utf8_stdio()
 
 
+def _embed_chunk(chunk, *, url, model):
+    req = urllib.request.Request(
+        url, data=json.dumps({"model": model, "input": chunk}).encode("utf-8"),
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        return json.loads(resp.read().decode("utf-8"))["embeddings"]
+
+
 def embed(texts, *, url, model, batch=16):
+    # 2026-09-17 실측: 4000자로 자른 한국어 문서도 16개를 한 배치로 묶으면 토큰 합계가
+    # bge-m3 문맥 길이(8192)를 넘는 경우가 있다("context length exceeds"). 배치가 실패하면
+    # 절반으로 쪼개 재시도한다(단건까지 쪼개도 실패하면 그 문서는 원문 그대로 예외를 낸다 —
+    # 조용히 건너뛰지 않는다).
     out = []
     t0 = time.perf_counter()
-    for i in range(0, len(texts), batch):
-        chunk = [t[:4000] for t in texts[i:i + batch]]
-        req = urllib.request.Request(
-            url, data=json.dumps({"model": model, "input": chunk}).encode("utf-8"),
-            headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            out.extend(json.loads(resp.read().decode("utf-8"))["embeddings"])
+    i = 0
+    n = len(texts)
+    while i < n:
+        chunk_texts = [t[:4000] for t in texts[i:i + batch]]
+        size = len(chunk_texts)
+        try:
+            out.extend(_embed_chunk(chunk_texts, url=url, model=model))
+        except urllib.error.HTTPError:
+            if size > 1:
+                half = max(1, size // 2)
+                out.extend(embed(texts[i:i + half], url=url, model=model, batch=half))
+                out.extend(embed(texts[i + half:i + size], url=url, model=model, batch=size - half))
+            else:
+                # 단건도 실패 = 4000자가 여전히 토큰 문맥길이(8192)를 넘는 문서다(실측
+                # 2026-09-17, doc_id b9ba4e12... char_len 5457 도 여기 걸렸다). 절반 길이로
+                # 한 번 더 시도한다 — 그래도 안 되면 그 사실을 남기고 예외를 낸다(조용히 skip 금지).
+                shorter = texts[i][:2000]
+                try:
+                    out.extend(_embed_chunk([shorter], url=url, model=model))
+                    print(f"  ⚠ index {i}: 4000자 실패, 2000자로 재시도해 성공(원문 {len(texts[i])}자)")
+                except urllib.error.HTTPError:
+                    print(f"  ⚠ index {i}: 2000자로도 실패, 원문 {len(texts[i])}자 — 이 문서를 확인할 것")
+                    raise
         if (i // batch) % 30 == 0:
-            print("  %d/%d · %.0fs" % (i + len(chunk), len(texts), time.perf_counter() - t0))
+            print("  %d/%d · %.0fs" % (i + size, n, time.perf_counter() - t0))
+        i += size
     return out
 
 
