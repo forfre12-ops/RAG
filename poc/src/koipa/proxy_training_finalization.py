@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from koipa.hygiene import text_hash
+from koipa.dataset_usage import assert_dataset_usage
 from koipa.proxy_model_comparison import (
     LABELS,
     SERVING_CHAR_CHUNK_MULTIPLIER,
@@ -687,6 +688,7 @@ def collect_document_window_logits(
     """
     if not rows:
         raise ProxyTrainingFinalizationError("document inference rows are empty")
+    assert_dataset_usage(rows, purpose="model_evaluation")
     if batch_size < 1:
         raise ProxyTrainingFinalizationError("batch_size must be positive")
     label_order = _resolve_model_label_order(model)
@@ -828,6 +830,7 @@ def load_model_document_logits(
     **kwargs: object,
 ) -> DocumentLogitBatch:
     """Load a checkpoint and collect serving-faithful unscaled document traces."""
+    assert_dataset_usage(rows, purpose="model_evaluation")
     if model_dir.is_symlink() or not model_dir.is_dir():
         raise ProxyTrainingFinalizationError(
             f"model checkpoint is not a regular directory: {model_dir}"

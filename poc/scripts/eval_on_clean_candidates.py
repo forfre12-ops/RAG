@@ -43,6 +43,9 @@ if str(_HERE) not in sys.path:
 if str(_POC / "src") not in sys.path:
     sys.path.insert(0, str(_POC / "src"))
 
+from classification_audit_inputs import load_legacy_pool
+from koipa.dataset_usage import assert_dataset_usage
+
 ROOT = _POC / "datasets" / "proxy_gold" / "single_document_candidates"
 GRADES = ("TS", "S1", "S2", "S3")
 _SEV = {"TS": 3, "S1": 2, "S2": 1, "S3": 0}
@@ -52,35 +55,9 @@ _ANSWER = re.compile(r"##\s*등급\s*제안\s*사유\s*:\s*(TS|S1|S2|S3)")
 DEFAULT_MODELS = ["artifacts/classifier_p1_v5_clean/v-fe4b386b"]
 
 
-def load_candidates() -> list[dict]:
+def load_candidates(pool: Path | None = None) -> list[dict]:
     """콘솔과 **같은 우선순위**로 본문을 고른다 — content_revision_path 가 있으면 그쪽."""
-    rows = []
-    for mp in sorted(ROOT.glob("*.metadata.json")):
-        try:
-            meta = json.loads(mp.read_text("utf-8"))
-        except Exception:  # noqa: BLE001
-            continue
-        doc_id = str(meta.get("doc_id") or "")
-        gm = _GRADE_IN_ID.search(doc_id)
-        label = gm.group(1) if gm else str(meta.get("intended_label") or "")
-        if label not in GRADES:
-            continue
-        rev = str(meta.get("content_revision_path") or "").strip()
-        src = (ROOT / rev) if rev else None
-        if src is None or not src.is_file():
-            stem = mp.name.replace(".metadata.json", "")
-            c = [p for p in sorted(ROOT.glob(stem + "*.md")) if not p.name.endswith(".cleaned.md")]
-            if len(c) != 1:
-                continue
-            src = c[0]
-        try:
-            text = src.read_text("utf-8")
-        except OSError:
-            continue
-        rows.append({
-            "doc_id": doc_id, "text": text, "label": label,
-            "origin": str(meta.get("document_origin") or "unknown"),
-        })
+    rows, _, _ = load_legacy_pool((pool or ROOT).resolve())
     return rows
 
 
@@ -155,6 +132,8 @@ def main(argv=None) -> int:
     rows = load_candidates()
     if a.origin != "all":
         rows = [r for r in rows if r["origin"] == a.origin]
+
+    assert_dataset_usage(rows, purpose="model_evaluation", source=ROOT)
 
     leaked = sum(1 for r in rows if _ANSWER.search(r["text"]))
     print("=" * 74)

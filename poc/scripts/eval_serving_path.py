@@ -27,16 +27,20 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+from koipa.dataset_usage import assert_dataset_usage, assert_path_usage
+
 LABELS = ["TS", "S1", "S2", "S3"]
 
 
 def load_rows(path: Path) -> list[dict]:
+    assert_path_usage(path, "model_evaluation")
     rows = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         r = json.loads(line)
+        assert_dataset_usage([r], purpose="model_evaluation")
         label = r.get("label") or r.get("expected_grade") or r.get("target")
         text = r.get("text") or r.get("body") or ""
         if label in LABELS and text:

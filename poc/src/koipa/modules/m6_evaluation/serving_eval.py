@@ -15,6 +15,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional, Sequence
 
+from koipa.dataset_usage import assert_dataset_usage
+
 from koipa.modules.m6_evaluation.metrics import (
     DEFAULT_LABELS,
     MetricsResult,
@@ -62,6 +64,7 @@ def predict_via_serving(
 
     label이 없는 row는 건너뛴다(집계와 동일).
     """
+    assert_dataset_usage(rows, purpose="model_evaluation")
     if pipeline is None:
         from koipa.modules.m5_inference.pipeline import InferencePipeline  # noqa: PLC0415
         pipeline = InferencePipeline(model_dir=model_dir)

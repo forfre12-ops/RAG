@@ -114,3 +114,14 @@ def test_predict_skips_rows_without_label():
     pipe = _FakePipe({"b": Grade.S2})
     out = predict_via_serving(rows, pipeline=pipe)
     assert len(out) == 1 and out[0]["label"] == "S2"
+
+
+def test_policy_fixture_is_rejected_before_pipeline_execution():
+    import pytest
+    from koipa.dataset_usage import DatasetUsageError
+
+    pipe = _FakePipe({"fixture": Grade.S1})
+    rows = [{"text": "fixture", "label": "S1", "dataset_role": "policy_fixture"}]
+    with pytest.raises(DatasetUsageError):
+        predict_via_serving(rows, pipeline=pipe)
+    assert pipe.calls == 0

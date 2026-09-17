@@ -26,6 +26,7 @@ from sklearn.metrics import (
 )
 
 from koipa.schemas.common import Grade
+from koipa.dataset_usage import assert_dataset_usage
 
 _LABEL_LIST: list[str] = [g.value for g in (Grade.TS, Grade.S1, Grade.S2, Grade.S3)]
 _LABEL2ID = {label: i for i, label in enumerate(_LABEL_LIST)}
@@ -342,10 +343,14 @@ class TrainReport:
 
 def _load_jsonl(path: str) -> tuple[list[str], list[int]]:
     texts, labels = [], []
+    rows = []
     for row_number, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
             continue
         row = json.loads(line)
+        rows.append((row_number, row))
+    assert_dataset_usage((row for _, row in rows), purpose="model_evaluation", source=Path(path))
+    for row_number, row in rows:
         if any(field in row for field in _CHUNK_SENTINEL_FIELDS):
             raise ValueError(
                 f"{path}:{row_number}: validation/test input must be document-level, "
@@ -408,6 +413,7 @@ def _load_training_jsonl(
         parsed["_input_row_number"] = row_number
         rows.append(parsed)
 
+    assert_dataset_usage(rows, purpose="training", source=source)
     chunk_marked = [any(field in row for field in _CHUNK_SENTINEL_FIELDS) for row in rows]
     chunk_complete = [
         all(str(row.get(field) or "").strip() for field in _PRE_CHUNK_FIELDS)

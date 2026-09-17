@@ -26,6 +26,7 @@ from typing import Any
 import uuid
 
 from koipa.hygiene import text_hash
+from koipa.dataset_usage import assert_dataset_usage
 from koipa.modules.m2_preprocess.chunker import split as _m5_char_split
 from koipa.proxy_corpus import (
     DEFAULT_TARGET_COUNTS,
@@ -1471,6 +1472,7 @@ def predict_model(
     require_fast_overflow: bool = False,
 ) -> ModelPredictionBatch:
     """Run M5-faithful chunk/window aggregation and return document predictions."""
+    assert_dataset_usage(rows, purpose="model_evaluation")
     contract = serving_aggregation_contract(
         max_length=max_length,
         chunk_overlap=chunk_overlap,

@@ -20,17 +20,22 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from koipa.dataset_usage import assert_dataset_usage, assert_path_usage
+
 GRADES = ("TS", "S1", "S2", "S3")
 IDX = {g: i for i, g in enumerate(GRADES)}
 ORDER = {g: i for i, g in enumerate(GRADES)}   # 작을수록 높은 등급
 
 
-def load(path: Path) -> tuple[list[str], list[int]]:
+def load(path: Path, *, purpose: str = "training") -> tuple[list[str], list[int]]:
+    assert_path_usage(path, purpose)
     xs, ys = [], []
     for line in path.read_text("utf-8").splitlines():
         if not line.strip():
             continue
         r = json.loads(line)
+        assert_dataset_usage([r], purpose=purpose)
         t = r.get("text") or r.get("content") or ""
         g = r.get("label") or r.get("grade")
         if t and g in IDX:
@@ -101,8 +106,8 @@ def main(argv: list[str] | None = None) -> int:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     d = Path(args.data)
     tr_x, tr_y = load(d / "train.jsonl")
-    va_x, va_y = load(d / "val.jsonl")
-    te_x, te_y = load(d / "test.jsonl")
+    va_x, va_y = load(d / "val.jsonl", purpose="model_evaluation")
+    te_x, te_y = load(d / "test.jsonl", purpose="model_evaluation")
     print(f"[{args.tag}] {d} · train {len(tr_x)} · val {len(va_x)} · test {len(te_x)} · {device}")
     print(f"  등급 분포 {dict(Counter(GRADES[y] for y in tr_y))}")
 
@@ -154,8 +159,8 @@ def main(argv: list[str] | None = None) -> int:
     cross = None
     if args.cross_eval:
         cd = Path(args.cross_eval)
-        cv_x, cv_y = load(cd / "val.jsonl")
-        ct_x, ct_y = load(cd / "test.jsonl")
+        cv_x, cv_y = load(cd / "val.jsonl", purpose="model_evaluation")
+        ct_x, ct_y = load(cd / "test.jsonl", purpose="model_evaluation")
         cross = {
             "data": str(cd),
             "val": evaluate(model, tok, cv_x, cv_y, device, args.max_len, args.batch),

@@ -30,14 +30,19 @@ import sys
 _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT / "src"))
 
+from koipa.dataset_usage import assert_dataset_usage, assert_path_usage
+
 GRADES = ("TS", "S1", "S2", "S3")
 # 고등급 = 미탐이 문제가 되는 등급. 본 사업 1차 목표가 이쪽이다.
 HIGH = ("TS", "S1")
 
 
 def _read_jsonl(path: Path) -> list[dict]:
+    assert_path_usage(path, "model_evaluation")
     with path.open("r", encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
+        rows = [json.loads(line) for line in handle if line.strip()]
+    assert_dataset_usage(rows, purpose="model_evaluation", source=path)
+    return rows
 
 
 def _f1_macro(truth: list[str], pred: list[str]) -> tuple[float, dict]:

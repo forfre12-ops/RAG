@@ -57,6 +57,8 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+from koipa.dataset_usage import assert_dataset_usage, assert_path_usage
+
 LABELS = ["TS", "S1", "S2", "S3"]
 GRADE_ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
 
@@ -77,12 +79,14 @@ _EVAL_TYPE_DEFAULT_FILTER: dict[str, list[str] | None] = {
 
 def load_jsonl(path: Path, label_source_filter: list[str] | None = None) -> list[dict]:
     """JSONL 로드. label_source_filter 지정 시 해당 레코드만 반환."""
+    assert_path_usage(path, "model_evaluation")
     rows = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         r = json.loads(line)
+        assert_dataset_usage([r], purpose="model_evaluation")
         if label_source_filter is not None:
             if r.get("label_source") not in label_source_filter:
                 continue
@@ -99,6 +103,7 @@ def build_test_from_synth(synth_dir: Path) -> list[dict]:
 
 
 def evaluate_dryrun(rows: list[dict]) -> dict:
+    assert_dataset_usage(rows, purpose="model_evaluation")
     from koipa.modules.m3_labeling import LabelingPipeline
 
     pipe = LabelingPipeline()

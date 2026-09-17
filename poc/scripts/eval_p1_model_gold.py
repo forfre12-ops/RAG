@@ -13,6 +13,8 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+from koipa.dataset_usage import assert_dataset_usage, assert_path_usage
+
 LABELS = ["TS", "S1", "S2", "S3"]
 GRADE_ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
 PUBLIC_SOURCE_MARKERS = (
@@ -31,12 +33,14 @@ PUBLIC_SOURCE_MARKERS = (
 
 
 def load_jsonl(path: Path, label_sources: set[str] | None = None) -> list[dict]:
+    assert_path_usage(path, "model_evaluation")
     rows: list[dict] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         row = json.loads(line)
+        assert_dataset_usage([row], purpose="model_evaluation")
         label = row.get("label") or row.get("expected_grade")
         if label not in LABELS:
             continue
@@ -87,6 +91,7 @@ def compute_metrics(y_true: list[str], y_pred: list[str]) -> dict:
 
 
 def predict_direct(model_dir: Path, rows: list[dict], batch_size: int = 16) -> list[dict]:
+    assert_dataset_usage(rows, purpose="model_evaluation")
     import torch
     import torch.nn.functional as F
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -111,6 +116,7 @@ def predict_direct(model_dir: Path, rows: list[dict], batch_size: int = 16) -> l
 
 
 def predict_api_like(model_dir: Path, rows: list[dict]) -> list[dict]:
+    assert_dataset_usage(rows, purpose="model_evaluation")
     from koipa.modules.m5_inference.pipeline import InferencePipeline
 
     pipe = InferencePipeline(model_dir=model_dir)

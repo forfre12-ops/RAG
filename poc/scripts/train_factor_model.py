@@ -35,11 +35,14 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_ROOT / "src"))
 
+from koipa.dataset_usage import assert_dataset_usage, assert_path_usage
+
 FACTORS = ("secrecy", "value", "management")
 DEFAULT_BASE = "kakaobank/kf-deberta-base"
 
 
-def _load(path: Path) -> tuple[list[str], list[tuple[int, int, int]], list[str]]:
+def _load(path: Path, *, purpose: str = "training") -> tuple[list[str], list[tuple[int, int, int]], list[str]]:
+    assert_path_usage(path, purpose)
     texts: list[str] = []
     levels: list[tuple[int, int, int]] = []
     grades: list[str] = []
@@ -47,6 +50,7 @@ def _load(path: Path) -> tuple[list[str], list[tuple[int, int, int]], list[str]]
         if not line.strip():
             continue
         row = json.loads(line)
+        assert_dataset_usage([row], purpose=purpose)
         text = row.get("text") or row.get("content") or ""
         if not text:
             continue
@@ -207,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
         return TensorDataset(enc["input_ids"], enc["attention_mask"], y)
 
     tr_x, tr_y, _ = _load(Path(args.train))
-    va_x, va_y, va_g = _load(Path(args.val))
+    va_x, va_y, va_g = _load(Path(args.val), purpose="model_evaluation")
     print(f"[data] train {len(tr_x)} · val {len(va_x)}")
 
     if args.chunk_chars > 0:
@@ -233,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
     dl_dev = None
     dev_g: list[str] = []
     if args.dev:
-        de_x, de_y, dev_g = _load(Path(args.dev))
+        de_x, de_y, dev_g = _load(Path(args.dev), purpose="model_evaluation")
         dl_dev = DataLoader(encode(de_x, de_y), batch_size=args.batch)
         # print 에 em dash 금지 (Windows cp949 콘솔에서 UnicodeEncodeError)
         print(f"[data] dev {len(de_x)} (계보 다름, 조기종료 기준)")

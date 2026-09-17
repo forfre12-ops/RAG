@@ -45,10 +45,19 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_ROOT / "src"))
 
+from koipa.dataset_usage import assert_dataset_usage, assert_path_usage
+
 ORDER = ["TS", "S1", "S2", "S3"]
 RANK = {g: i for i, g in enumerate(ORDER)}
 HIGH = ("TS", "S1")
 PUBLIC_TIER = ("koipa_case_based", "nkt_designated", "public_definitive")
+
+
+def load_rows(path: Path) -> list[dict]:
+    assert_path_usage(path, "model_evaluation")
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert_dataset_usage(rows, purpose="model_evaluation", source=path)
+    return rows
 
 
 def f1_macro(pairs: list[tuple[str, str]]) -> float:
@@ -84,6 +93,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--report", default="reports/SERVING_VS_RAW.json")
     args = ap.parse_args(argv)
 
+    rows = load_rows(Path(args.gold))
+    tier = [r for r in rows if r.get("label_source") in PUBLIC_TIER]
+    assert_dataset_usage(tier, purpose="model_evaluation")
+
     os.environ.setdefault("TESTING", "1")
     os.environ.setdefault("VECTOR_BACKEND", "inmemory")
     os.environ.setdefault("REQUIRE_REAL_EMBEDDER", "false")
@@ -93,12 +106,6 @@ def main(argv: list[str] | None = None) -> int:
     from koipa.schemas.classify import ClassifyRequest
     from koipa.services.classify_service import ClassifyService
 
-    rows = [
-        json.loads(l)
-        for l in Path(args.gold).read_text(encoding="utf-8").splitlines()
-        if l.strip()
-    ]
-    tier = [r for r in rows if r.get("label_source") in PUBLIC_TIER]
     print(f"[판정면] public tier {len(tier)}건 "
           f"{dict(Counter(r.get('label_source') for r in tier))}\n")
 
