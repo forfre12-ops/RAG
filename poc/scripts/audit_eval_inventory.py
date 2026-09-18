@@ -92,7 +92,9 @@ ROLE_RULES = (
 ROLE_ORDER = ("eval", "train", "runtime", "build", "test", "ci", "other")
 
 # 가장 낮은 등급이 그 셋의 주장 한계다 — audit_eval_ground_truth 와 같은 규칙
-WORST_FIRST = ("CIRCULAR", "UNKNOWN", "NONE", "BRONZE", "SILVER", "GOLD")
+# ⚠ 이 튜플은 audit_eval_ground_truth.worst_tier 의 하드코딩과 중복 정의다(2026-09-18
+# REJECTED 추가 시 둘 다 고쳐야 했다 — 이 중복 자체가 위험 요인, 향후 import로 통합 검토)
+WORST_FIRST = ("REJECTED", "CIRCULAR", "UNKNOWN", "NONE", "BRONZE", "SILVER", "GOLD")
 
 
 def _iter_source_files() -> list[Path]:

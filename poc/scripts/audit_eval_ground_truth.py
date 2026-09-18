@@ -23,9 +23,16 @@
              -> 회귀 감시용. 성능 주장에 인용 금지.
     CIRCULAR 우리 규칙이 만든 라벨(규칙 역산·factor 상태 파생).
              -> **우리 규칙을 우리가 얼마나 재현하나** 를 잴 뿐이다. 성능이 아니다.
+    REJECTED 라벨이 데이터 정의와 **모순됨이 확인됐다**(예: 공개문서인데 비밀등급).
+             -> 학습·평가 어디에도 쓰면 안 된다. 신뢰도가 낮다는 뜻이 아니라 틀렸다는 뜻이다.
 
 ⚠ 등급은 라벨이 **맞다/틀리다** 가 아니라 **무엇을 주장할 수 있나** 를 정한다.
    BRONZE 라벨이 틀렸다는 뜻이 아니다. 그것으로 "재현율 90% 달성" 을 말할 수 없다는 뜻이다.
+   REJECTED 만 예외다 — 이건 신뢰도가 아니라 **정의 위반이 실측으로 확인된 상태**다
+   (2026-09-18: patent_proxy_nkt 가 SILVER 로 잘못 분류돼 있었다 — 이미 check_no_
+   patent_proxy.py(2026-07-26)가 "공개특허=정의상 S3인데 S1/TS 로 라벨함"을 지적한
+   데이터였는데, 이 표에는 반영이 안 돼 있었다. 근거: source='공개특허'인데 label='S1'
+   인 모순 자체, grade_basis가 키워드매칭 하나뿐인 기계적 배정(다수 합의 흔적 없음)).
 
 사용:
 
@@ -75,7 +82,6 @@ TIER_BY_SOURCE = {
     "public_definitive": "SILVER",     # 공개 원문이 등급을 명시
     "public_form_definitive": "SILVER",
     "nkt_designated": "SILVER",        # 국가핵심기술 지정 목록
-    "patent_proxy_nkt": "SILVER",
     "provenance_gate_s3": "SILVER",    # 출처가 공개임이 확정
     # 기계 단독
     "llm_judge_primary": "BRONZE",
@@ -89,11 +95,14 @@ TIER_BY_SOURCE = {
     # 우리 규칙이 만든 것
     "derived_from_factor_states": "CIRCULAR",
     "rule_from_content_svm": "CIRCULAR",
+    # 정의 위반이 확인됨 — 학습·평가 배제 대상(위 REJECTED 설명 참고)
+    "patent_proxy_nkt": "REJECTED",
 }
 
-TIER_ORDER = ("GOLD", "SILVER", "BRONZE", "CIRCULAR", "UNKNOWN", "NONE")
+TIER_ORDER = ("REJECTED", "GOLD", "SILVER", "BRONZE", "CIRCULAR", "UNKNOWN", "NONE")
 
 CLAIM = {
+    "REJECTED": "정의 위반 확인 — 학습·평가 배제. 신뢰도 문제가 아니라 라벨이 틀림",
     "GOLD": "평가 증거 구비 — 목표·대표성·누출·승인 진위 별도 확인 필요",
     "SILVER": "상대 비교(A vs B)에만",
     "BRONZE": "회귀 감시용 · 성능 주장 금지",
@@ -163,7 +172,7 @@ def scan(paths: dict[str, Path]) -> dict:
                 (k for k in reversed(TIER_ORDER) if tiers[k]), "NONE"
             ),
             "worst_tier": next(
-                (k for k in ("CIRCULAR", "UNKNOWN", "NONE", "BRONZE", "SILVER", "GOLD") if tiers[k]),
+                (k for k in ("REJECTED", "CIRCULAR", "UNKNOWN", "NONE", "BRONZE", "SILVER", "GOLD") if tiers[k]),
                 "NONE",
             ),
         }
