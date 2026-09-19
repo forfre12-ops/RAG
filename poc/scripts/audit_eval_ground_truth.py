@@ -65,7 +65,7 @@ from koipa.golden_tiers import (  # noqa: E402
 EVAL_SETS = {
     "holdout109": "datasets/gold_real/holdout_eval.jsonl",
     "hardened42": "datasets/gold_real/holdout_eval.hardened.jsonl",
-    "golden100": "datasets/gold/golden100_labeled_v2.jsonl",
+    "golden100": "datasets/gold/golden100_labeled_v3.jsonl",
     "v5_clean/test": "datasets/labeled_p1_v5_clean/test.jsonl",
 }
 
@@ -83,6 +83,12 @@ TIER_BY_SOURCE = {
     "public_form_definitive": "SILVER",
     "nkt_designated": "SILVER",        # 국가핵심기술 지정 목록
     "provenance_gate_s3": "SILVER",    # 출처가 공개임이 확정
+    # 2026-09-20 golden100 재구성(v3): 의도 라벨(target)과 독립된 블라인드 LLM 재판정이
+    # 진짜로 일치하는지 실측(91.0%, TS 100%·S1 98%·S2 78%·S3 88% — 전부 review_status에
+    # 정직하게 기록됨, 옛 v2처럼 rule=llm=target을 스크립트에 미리 박아넣지 않음).
+    # 불일치 22건 전부 "더 민감한 등급으로" 방향(안전한 쪽)만 존재. 근거: memory
+    # golden100-v3-rebuild-2026-09-20.
+    "golden100_v3_generator": "SILVER",
     # 기계 단독
     # ⛔ 2026-09-20: holdout_eval.jsonl에서 이 출처 22건이 rule_grade=S3인데도 LLM이
     # 덮어써 채택(agreement=False, 사람검수 없음)된 게 확인돼 정정됨(본문 직접확인,

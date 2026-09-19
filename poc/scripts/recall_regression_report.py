@@ -43,7 +43,7 @@ FACES = {
         "note": "usable_for_comparison=False(Theil's U 0.372) — holdout109_rejudged 와 라벨 22.0% 불일치, 정본 미확정",
     },
     "golden100": {
-        "gold": "datasets/gold/golden100_labeled_v2.jsonl",
+        "gold": "datasets/gold/golden100_labeled_v3.jsonl",
         "contaminated": False,
         "note": "적대(adversarial) 설계셋 — 오염 재검증은 안 됐으나 '공정비교 4종'에 원래 속하지 않았음. datasets/adversarial/golden_100.jsonl(본문 없음)과 절대 혼동하지 말 것",
     },

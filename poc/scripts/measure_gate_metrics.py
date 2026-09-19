@@ -194,8 +194,8 @@ SURFACES: dict[str, dict] = {
     },
     "golden100": {
         "name": "golden100 적대셋",
-        "path": "datasets/gold/golden100_labeled_v2.jsonl",
-        "loader": lambda: _load_jsonl("datasets/gold/golden100_labeled_v2.jsonl", "body", "target"),
+        "path": "datasets/gold/golden100_labeled_v3.jsonl",
+        "loader": lambda: _load_jsonl("datasets/gold/golden100_labeled_v3.jsonl", "body", "target"),
         "known_leak": "적대적 경계셋 · 합성 · 사람 서명 0. 실트래픽 분포가 아니다.",
     },
 }

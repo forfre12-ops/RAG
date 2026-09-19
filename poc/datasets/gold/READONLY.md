@@ -30,6 +30,14 @@
 3. 룰 라벨러 키워드 seed로 사용 금지
 4. 파일 수정 시 반드시 `make_gold_set.py` 경유 또는 명시적 수작업 검수
 
+## golden100 재구성(v3, 2026-09-20)
+
+`golden100_labeled_v2.jsonl`은 등급당 25건뿐이고 라벨이 순환논리(스크립트가 target=rule=llm을
+미리 같게 써넣음)였던 게 확인돼 `golden100_labeled_v3.jsonl`(등급당 50건, 목표라벨과 독립
+블라인드 LLM 재판정을 실제로 대조해 91.0% 일치를 실측)로 재구성했다. 상세: `GOLDEN100_V3_REBUILD.md`.
+v2는 과거 수치 비교용으로 그대로 남겨뒀다 — v2/v3 수치를 섞어 비교하지 말 것. **v3도 여전히
+100% 합성이라 아래 "운영 성능 근거 불가" 원칙은 동일하게 적용된다.**
+
 ## 진짜 gold set 구축
 
 `datasets/gold_real/LABELING_GUIDE.md` 참조.

@@ -79,7 +79,7 @@ HIGH = ("TS", "S1")
 EVAL_SETS = {
     "holdout109": "datasets/gold_real/holdout_eval.jsonl",
     "hardened42": "datasets/gold_real/holdout_eval.hardened.jsonl",
-    "golden100": "datasets/gold/golden100_labeled_v2.jsonl",
+    "golden100": "datasets/gold/golden100_labeled_v3.jsonl",
 }
 
 

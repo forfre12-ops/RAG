@@ -35,7 +35,7 @@ VARIANTS = ("current", "no_svm", "no_svm_no_agreement", "direct_model")
 DEFAULT_SETS = {
     "hardened42": "datasets/gold_real/holdout_eval.hardened.jsonl",
     "holdout109": "datasets/gold_real/holdout_eval.jsonl",
-    "golden100": "datasets/gold/golden100_labeled_v2.jsonl",
+    "golden100": "datasets/gold/golden100_labeled_v3.jsonl",
     "mundane150": "datasets/labeled_v8_mundane/mundane_holdout.jsonl",
     "proxy_development200": "datasets/proxy_eval/direct_authored_proxy_eval_split.v3/development_200.jsonl",
 }

@@ -44,7 +44,7 @@ from koipa.modules.m5_inference.pipeline import InferencePipeline  # noqa: E402
 FACES = {
     "holdout109": "datasets/gold_real/holdout_eval.jsonl",
     "hardened42": "datasets/gold_real/holdout_eval.hardened.jsonl",
-    "golden100": "datasets/gold/golden100_labeled_v2.jsonl",
+    "golden100": "datasets/gold/golden100_labeled_v3.jsonl",
 }
 TEXT_KEYS = ("text", "content", "body")
 MIN_TS = float(getattr(settings, "ts_tie_break_min_ts_score", 0.05))
