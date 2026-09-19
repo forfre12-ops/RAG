@@ -89,7 +89,7 @@ def evaluation_signoff_gaps(record: dict) -> list[str]:
 # real 평가정답·최종 성능근거는 실문서에서만 나온다(capstone F1 0.26 텍스처 갭). 명시 필드가
 # 우선, 없으면 source에서 결정적 유도, 그래도 모르면 unknown(fail-closed).
 ORIGIN_SYNTHETIC = "synthetic"
-ORIGIN_PUBLIC_REAL = "public_real"       # 공개 실문서(판례·금융보고서 등) — 중앙 실텍스트 회귀 근거
+ORIGIN_PUBLIC_REAL = "public_real"       # 공개 실문서(판례 등) — 중앙 실텍스트 회귀 근거
 ORIGIN_CUSTOMER_REAL = "customer_real"   # 고객사 실(비식별)문서 — 최종 운영 성능 근거
 ORIGIN_UNKNOWN = "unknown"               # 기본값(fail-closed): 명시·유도 불가 → real 아님
 _VALID_ORIGINS = frozenset({ORIGIN_SYNTHETIC, ORIGIN_PUBLIC_REAL, ORIGIN_CUSTOMER_REAL, ORIGIN_UNKNOWN})
@@ -97,7 +97,14 @@ _REAL_TEXT_ORIGINS = frozenset({ORIGIN_PUBLIC_REAL, ORIGIN_CUSTOMER_REAL})
 # source(본문 태그) → origin 결정적 유도. (콘솔 표시만 깨질 뿐 파일·리터럴은 UTF-8 정상.)
 _SYNTHETIC_ORIGIN_SOURCES = frozenset({"synthetic", "public_scenario", "synthetic_grounded"})
 _CUSTOMER_REAL_ORIGIN_SOURCES = frozenset({"real_deidentified"})
-_PUBLIC_REAL_EXACT_SOURCES = frozenset({"금융보고서"})
+# ⛔ 2026-09-19 "금융보고서" 제거 — source 이름만 보고 public_real 로 찍고 있었으나
+# 실제 원본은 합성이다(datasets/raw/manifest.yaml:119 nmixx-fin/synthetic_financial_report_korean
+# → p2_oss_corpus_builder.py:198). 이미 export_golden_review_xlsx.py:32-36 이 이 오분류를
+# 지적해뒀다("금융보고서 229건이 public_real 로 집계되지만 원자료는 합성" — 정정 시
+# public_real 641→412, 실문서 S2 48→0). 전체 datasets/ 재검색(27,186건, 253파일)으로도
+# 이 소스에 대응하는 진짜 실문서(GOLD·검증된 SILVER)를 찾지 못해 정정을 반영한다.
+# 같은 이름의 다른 출처를 다시 넣기 전에 원본 계보(manifest.yaml)부터 확인할 것.
+_PUBLIC_REAL_EXACT_SOURCES = frozenset()
 _PUBLIC_REAL_PREFIXES = ("판례",)        # 판례 · 판례(1000+/2000+/3000+) · 판례_공개문서 …
 
 # ── 권위 분류(2026-07-03 감사) — floor tier 안에서도 '실세계 정답'과 '큐레이트 프록시'를 구분한다 ──

@@ -103,7 +103,9 @@ def test_document_origin_mapping():
     assert document_origin({"source": "판례"}) == ORIGIN_PUBLIC_REAL
     assert document_origin({"source": "판례(3000+)"}) == ORIGIN_PUBLIC_REAL
     assert document_origin({"source": "판례_공개문서"}) == ORIGIN_PUBLIC_REAL
-    assert document_origin({"source": "금융보고서"}) == ORIGIN_PUBLIC_REAL
+    # ⛔ 2026-09-19 "금융보고서"는 public_real 아님 — 원본이 합성(nmixx-fin/
+    # synthetic_financial_report_korean, export_golden_review_xlsx.py:32-36 선행 지적).
+    assert document_origin({"source": "금융보고서"}) == ORIGIN_UNKNOWN
     assert document_origin({"source": "public_scenario"}) == ORIGIN_SYNTHETIC
     assert document_origin({"source": "synthetic_grounded"}) == ORIGIN_SYNTHETIC
     assert document_origin({"source": "synthetic"}) == ORIGIN_SYNTHETIC
