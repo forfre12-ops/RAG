@@ -84,6 +84,12 @@ TIER_BY_SOURCE = {
     "nkt_designated": "SILVER",        # 국가핵심기술 지정 목록
     "provenance_gate_s3": "SILVER",    # 출처가 공개임이 확정
     # 기계 단독
+    # ⛔ 2026-09-20: holdout_eval.jsonl에서 이 출처 22건이 rule_grade=S3인데도 LLM이
+    # 덮어써 채택(agreement=False, 사람검수 없음)된 게 확인돼 정정됨(본문 직접확인,
+    # 전부 실제 공개 판례·증권사 공개 시장리서치) — 정정된 행은
+    # label_before_correction_2026_09_20 필드로 원래값 보존. 근거: memory
+    # holdout109-llm-judge-overrode-rule-s3-2026-09-20. BRONZE 등급 자체는 유지(다른
+    # llm_judge_primary 행까지 전수 확인한 건 아님).
     "llm_judge_primary": "BRONZE",
     "codex_review": "BRONZE",
     "synthetic_llm": "BRONZE",
