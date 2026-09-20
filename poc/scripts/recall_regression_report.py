@@ -30,7 +30,7 @@ FACES = {
     "hardened42": {
         "gold": "datasets/gold_real/holdout_eval.hardened.jsonl",
         "contaminated": True,
-        "note": "usable_for_comparison=False(길이-only 1NN 0.429, tell 1.000) — 정확도 근거로 인용 금지",
+        "note": "usable_for_comparison=False(길이-only 1NN 0.429, tell 1.000) — 정확도 근거로 인용 금지. clean42 와 같은 42문서(holdout109 에 포함) — 독립 면으로 세지 말 것",
     },
     "clean42": {
         "gold": "datasets/gold_real/holdout_eval.clean.jsonl",

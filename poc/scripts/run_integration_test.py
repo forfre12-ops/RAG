@@ -37,7 +37,7 @@ from measure_ngram_shortcuts import measure as ngram_measure  # noqa: E402
 # 기존 gold_real 홀드아웃 4면 — recall_regression_report.py 와 동일 등록표(정본 하나로 유지)
 EXISTING_FACES = {
     "hardened42": {"gold": "datasets/gold_real/holdout_eval.hardened.jsonl", "contaminated": True,
-                   "note": "usable_for_comparison=False(길이-only 1NN 0.429, tell 1.000)"},
+                   "note": "usable_for_comparison=False(길이-only 1NN 0.429, tell 1.000). clean42 와 같은 42문서(holdout109 에 포함) — 독립 면 아님"},
     "clean42": {"gold": "datasets/gold_real/holdout_eval.clean.jsonl", "contaminated": True,
                 "note": "usable_for_comparison=False(길이-only 1NN 0.571, tell 1.000)"},
     "holdout109": {"gold": "datasets/gold_real/holdout_eval.jsonl", "contaminated": True,
