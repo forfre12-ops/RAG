@@ -30,7 +30,8 @@ REASON = ("llm_judge_primary 가 규칙 판정 S3 를 덮어씀 — 본문이 �
 
 
 def sha256(p: Path) -> str:
-    return hashlib.sha256(p.read_bytes()).hexdigest()
+    """LF 기준 sha256 — 저장소가 *.jsonl 을 eol=lf 로 정규화하므로 CRLF 작업 폴더에서도 같은 값이 나온다."""
+    return hashlib.sha256(p.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def is_candidate(r: dict) -> bool:
@@ -58,7 +59,8 @@ def main() -> int:
             print(f"[중단] {sp}: 정정 대상 {len(changed)}행 ≠ 확인한 {want}행 — 원본이 바뀌었거나 조건이 어긋남")
             return 1
         out = DST / f"{sp}.jsonl"
-        out.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+        with out.open("w", encoding="utf-8", newline="\n") as fh:
+            fh.write("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
         after = collections.Counter(r["label"] for r in rows)
         manifest["splits"][sp] = {
             "rows": len(rows), "changed": len(changed),
@@ -69,7 +71,8 @@ def main() -> int:
         }
         print(f"{sp}: {len(rows)}행 · 정정 {len(changed)}행 {dict(collections.Counter(c['from'] for c in changed))}"
               f" · 라벨 {dict(before)} → {dict(after)}")
-    (DST / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    with (DST / "manifest.json").open("w", encoding="utf-8", newline="\n") as fh:
+        fh.write(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
     return 0
 
 
