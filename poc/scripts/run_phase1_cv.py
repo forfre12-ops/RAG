@@ -212,6 +212,61 @@ def fold(k: int) -> int:
     return 0
 
 
+def mask_terms(text: str) -> str:
+    """등급명 낱말(생성기 금지어 20개: 특급기밀·1급 비밀·대외비·극비·TS/S1 등)을 지운다. NFKC 정규화 후 삭제 — 분류 경로 normalizer 도 NFKC."""
+    import unicodedata  # noqa: PLC0415
+
+    sys.path.insert(0, str(POC / "src"))
+    from koipa.services.synth_quality import _grade_term_pattern  # noqa: PLC0415
+
+    return _grade_term_pattern().sub("", unicodedata.normalize("NFKC", text or ""))
+
+
+def prepare_mask() -> int:
+    """정책 라벨 분할(reports/phase1_cv_courtfix)을 그대로 두고 학습·검증 문서의 등급명 낱말만 지운 사본을 만든다(보류 문서는 원문 유지)."""
+    base = POC / "reports" / "phase1_cv_courtfix"
+    WORK.mkdir(parents=True, exist_ok=True)
+    changed = total = 0
+    for k in range(K):
+        d = WORK / f"fold{k}"
+        d.mkdir(exist_ok=True)
+        for name in ("train", "val", "test"):
+            rows = [json.loads(x) for x in (base / f"fold{k}" / f"{name}.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
+            with (d / f"{name}.jsonl").open("w", encoding="utf-8", newline="\n") as fh:
+                for r in rows:
+                    if name != "test":
+                        new = mask_terms(r["text"])
+                        total += 1
+                        changed += new != r["text"]
+                        r["text"] = new
+                    fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+    print(f"학습·검증 문서 {total}건 중 낱말이 지워진 문서 {changed}건(분할 사본 합계)")
+    return 0
+
+
+def masked(k: int) -> int:
+    """분할 k 의 모델을 **낱말을 지운** 보류 문서(E2 — 내용만)에 τ=0.30 으로 평가한다."""
+    d = WORK / f"fold{k}"
+    mdir = sorted((d / "model").glob("v-*"))[-1]
+    os.environ.setdefault("TESTING", "1")
+    sys.path.insert(0, str(POC / "src"))
+    from koipa.config import settings  # noqa: PLC0415
+    from koipa.modules.m5_inference.pipeline import InferencePipeline  # noqa: PLC0415
+
+    settings.classifier_escalation_tau = TAU
+    pipe = InferencePipeline(model_dir=str(mdir))
+    truth = truth_labels()
+    preds = []
+    for r in load(f"reports/phase1_cv/fold{k}/test.jsonl"):     # 보류 문서 원문(기준 분할 — 모든 팔이 같은 보류 문서)
+        res = pipe.run(mask_terms(r["text"]), metadata=None)
+        code = res.label.value if hasattr(res.label, "value") else str(res.label)
+        preds.append({"label": truth[r["text"]], "pred": code, "scores": {a: float(b) for a, b in res.scores.items()},
+                      "source": r.get("label_source")})
+    (d / "preds_masked.json").write_text(json.dumps(preds, ensure_ascii=False), encoding="utf-8")
+    print(f"fold{k} 낱말 삭제본 평가 완료", flush=True)
+    return 0
+
+
 def esc_argmax(r: dict) -> str:
     return max(r["scores"], key=r["scores"].get)
 
@@ -260,13 +315,17 @@ def aggregate() -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["prepare", "prepare_policy", "fold", "external", "aggregate"])
+    ap.add_argument("cmd", choices=["prepare", "prepare_policy", "prepare_mask", "fold", "external", "masked", "aggregate"])
     ap.add_argument("k", nargs="?", type=int)
     a = ap.parse_args()
     if a.cmd == "prepare":
         return prepare()
     if a.cmd == "prepare_policy":
         return prepare_policy()
+    if a.cmd == "prepare_mask":
+        return prepare_mask()
+    if a.cmd == "masked":
+        return masked(a.k)
     if a.cmd == "external":
         return external(a.k)
     if a.cmd == "fold":
