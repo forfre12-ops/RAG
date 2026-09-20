@@ -195,8 +195,8 @@ SURFACES: dict[str, dict] = {
     "golden100": {
         "name": "golden100 적대셋",
         "path": "datasets/gold/golden100_labeled_v3.jsonl",
-        "loader": lambda: _load_jsonl("datasets/gold/golden100_labeled_v3.jsonl", "body", "target"),
-        "known_leak": "적대적 경계셋 · 합성 · 사람 서명 0. 실트래픽 분포가 아니다.",
+        "loader": lambda: _load_jsonl("datasets/gold/golden100_labeled_v3.jsonl", "text", "target"),
+        "known_leak": "적대적 경계셋 · 합성 · 사람 서명 0. 실트래픽 분포가 아니다. 지름길 셋 — 글자 n-gram 5겹 100.0%(라벨섞기 28.0%, 2026-09-20 실측)라 절대 성능 근거 불가.",
     },
 }
 

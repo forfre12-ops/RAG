@@ -35,7 +35,7 @@ FACES = {
     "clean42": {
         "gold": "datasets/gold_real/holdout_eval.clean.jsonl",
         "contaminated": True,
-        "note": "usable_for_comparison=False(길이-only 1NN 0.571, tell 1.000) — 정확도 근거로 인용 금지",
+        "note": "usable_for_comparison=False(길이-only 1NN 0.571, tell 1.000) — 정확도 근거로 인용 금지. hardened42 와 같은 42문서(본문 42/42 일치·holdout109 에 포함, 라벨만 4건 다름) — 독립 면으로 세지 말 것",
     },
     "holdout109": {
         "gold": "datasets/gold_real/holdout_eval.jsonl",
@@ -44,8 +44,8 @@ FACES = {
     },
     "golden100": {
         "gold": "datasets/gold/golden100_labeled_v3.jsonl",
-        "contaminated": False,
-        "note": "적대(adversarial) 설계셋 — 오염 재검증은 안 됐으나 '공정비교 4종'에 원래 속하지 않았음. datasets/adversarial/golden_100.jsonl(본문 없음)과 절대 혼동하지 말 것",
+        "contaminated": True,
+        "note": "지름길 셋 — 전부 합성이고 글자 2~4gram 로지스틱회귀가 5겹 교차검증 100.0%(라벨섞기 28.0%, +72.0pp; 2026-09-20 실측)로 등급을 맞힌다. 절대 성능 근거 불가, 같은 셋 위 모델 간 상대 비교용. datasets/adversarial/golden_100.jsonl(본문 없음)과 절대 혼동하지 말 것",
     },
 }
 

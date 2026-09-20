@@ -42,8 +42,8 @@ EXISTING_FACES = {
                 "note": "usable_for_comparison=False(길이-only 1NN 0.571, tell 1.000)"},
     "holdout109": {"gold": "datasets/gold_real/holdout_eval.jsonl", "contaminated": True,
                    "note": "usable_for_comparison=False(Theil's U 0.372), holdout109_rejudged 와 라벨 22.0% 불일치"},
-    "golden100": {"gold": "datasets/gold/golden100_labeled_v3.jsonl", "contaminated": False,
-                  "note": "적대(adversarial) 설계셋, 오염 재검증은 별도"},
+    "golden100": {"gold": "datasets/gold/golden100_labeled_v3.jsonl", "contaminated": True,
+                  "note": "지름길 셋(글자 n-gram 5겹 100.0%, 라벨섞기 28.0%; 2026-09-20) — 절대 성능 근거 불가, 상대 비교용"},
 }
 GRADES = ["TS", "S1", "S2", "S3"]
 
