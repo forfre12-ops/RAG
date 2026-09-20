@@ -326,6 +326,9 @@ def main() -> int:
     ap.add_argument("--no-mlflow", action="store_true",
                     help="MLflow 로깅 비활성화 (서버 없는 환경 또는 속도 우선)")
     ap.add_argument("--no-bf16", action="store_true", help="bf16 비활성화")
+    ap.add_argument("--no-class-weight", action="store_true",
+                    help="빈도 역수 클래스 가중을 끈다(모든 등급 손실 가중 1.0). 기본은 켜짐 — 다수 등급(S3)의 오류 비용이 "
+                         "고등급보다 작아지는 편향이 있다(2026-09-20 실측: S3 재현율 85 퍼센트). 기본 동작은 그대로다.")
     ap.add_argument("--max-seq-len", type=int, default=None,
                     help="최대 시퀀스 길이 (기본 512. 256으로 줄이면 4× 빨라짐)")
     args = ap.parse_args()
@@ -394,6 +397,8 @@ def main() -> int:
             spec_kwargs["use_mlflow"] = False
         if getattr(args, "no_bf16", False):
             spec_kwargs["bf16"] = False
+        if getattr(args, "no_class_weight", False):
+            spec_kwargs["class_weighted"] = False
         if getattr(args, "deterministic", False):
             spec_kwargs["deterministic"] = True
         if getattr(args, "max_seq_len", None):

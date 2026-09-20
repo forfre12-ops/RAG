@@ -186,6 +186,8 @@ def fold(k: int) -> int:
     cmd = [sys.executable, str(POC / "scripts" / "p1_train_classifier.py"), "--mode", "full", "--epochs", "5", "--seed", "42",
            "--train-path", str(d / "train.jsonl"), "--val-path", str(d / "val.jsonl"), "--test-path", str(d / "test.jsonl"),
            "--output-dir", str(out), "--no-mlflow"]
+    if os.environ.get("PHASE1_NO_CW") == "1":             # 클래스 가중 끄기 팔
+        cmd.append("--no-class-weight")
     if not list(out.glob("v-*/model.safetensors")):       # 재개: 학습이 끝난 분할은 건너뛴다
         with (d / "train.log").open("w", encoding="utf-8") as lg:
             rc = subprocess.run(cmd, cwd=str(POC), env=env, stdout=lg, stderr=subprocess.STDOUT).returncode
