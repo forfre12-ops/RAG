@@ -33,7 +33,8 @@ from math import sqrt
 from pathlib import Path
 
 POC = Path(__file__).resolve().parents[1]
-WORK = POC / "reports" / "phase1_cv"
+WORK = POC / "reports" / os.environ.get("PHASE1_DIR", "phase1_cv")
+POLICY_LABELS = os.environ.get("PHASE1_LABELS", "orig") == "policy"   # policy: 판결문 검출기(현재) 적중 문서를 S3 로
 G = ["TS", "S1", "S2", "S3"]
 R = {"S3": 0, "S2": 1, "S1": 2, "TS": 3}
 K = 5
@@ -117,6 +118,67 @@ def prepare() -> int:
     return 0
 
 
+def truth_labels() -> dict:
+    """평가 진실 라벨(본문→라벨). 기본 = 정정본 s3fix. PHASE1_LABELS=policy 이면 프로젝트 판결문 검출기 적중 문서를 S3 로 덮는다."""
+    sys.path.insert(0, str(POC / "scripts"))
+    truth = {}
+    for sp in ("train", "val", "test"):
+        for r in load(f"datasets/labeled_p1_v5_clean_s3fix/{sp}.jsonl"):
+            lab = r["label"]
+            if POLICY_LABELS:
+                from build_p1_v5_clean import is_public_ruling  # noqa: PLC0415
+                if is_public_ruling(r):
+                    lab = "S3"
+            truth[r["text"]] = lab
+    return truth
+
+
+def prepare_policy() -> int:
+    """기준 분할(reports/phase1_cv/fold*)을 그대로 두고 학습 라벨만 정책 라벨로 바꾼 사본을 만든다."""
+    base = POC / "reports" / "phase1_cv"
+    truth = truth_labels()
+    WORK.mkdir(parents=True, exist_ok=True)
+    changed = 0
+    for k in range(K):
+        d = WORK / f"fold{k}"
+        d.mkdir(exist_ok=True)
+        for name in ("train", "val", "test"):
+            rows = [json.loads(x) for x in (base / f"fold{k}" / f"{name}.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
+            with (d / f"{name}.jsonl").open("w", encoding="utf-8", newline="\n") as fh:
+                for r in rows:
+                    new = truth[r["text"]]
+                    changed += new != r["label"]
+                    r["label"] = new
+                    fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+    print(f"정책 라벨로 바뀐 행 {changed}건(분할 사본 합계 — 문서마다 학습·검증·보류 중 한 곳에 한 번씩)")
+    return 0
+
+
+def external(k: int) -> int:
+    """분할 k 의 모델을 독립 셋(golden100 v3.0 · holdout109)에 τ=0.30 으로 평가한다 — 다른 문서에서 미탐이 늘었는지 본다."""
+    d = WORK / f"fold{k}"
+    mdir = sorted((d / "model").glob("v-*"))[-1]
+    os.environ.setdefault("TESTING", "1")
+    sys.path.insert(0, str(POC / "src"))
+    from koipa.config import settings  # noqa: PLC0415
+    from koipa.modules.m5_inference.pipeline import InferencePipeline  # noqa: PLC0415
+
+    settings.classifier_escalation_tau = TAU
+    pipe = InferencePipeline(model_dir=str(mdir))
+    out = {}
+    for name, rel, lk in (("golden100_v3", "datasets/gold/golden100_labeled_v3.jsonl", "target"),
+                          ("holdout109", "datasets/gold_real/holdout_eval.jsonl", "label")):
+        recs = []
+        for r in load(rel):
+            res = pipe.run(r.get("text") or r.get("body"), metadata=None)
+            code = res.label.value if hasattr(res.label, "value") else str(res.label)
+            recs.append({"label": r[lk], "pred": code, "scores": {a: float(b) for a, b in res.scores.items()}})
+        out[name] = recs
+    (d / "preds_external.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    print(f"fold{k} 외부 셋 평가 완료", flush=True)
+    return 0
+
+
 def fold(k: int) -> int:
     d = WORK / f"fold{k}"
     out = d / "model"
@@ -138,11 +200,7 @@ def fold(k: int) -> int:
 
     settings.classifier_escalation_tau = TAU
     pipe = InferencePipeline(model_dir=str(mdir))
-    # doc_id 가 None 인 행이 있다 — 진실 라벨은 본문으로 찾는다(정정본 s3fix 의 본문→라벨)
-    truth = {}
-    for sp in ("train", "val", "test"):
-        for r in load(f"datasets/labeled_p1_v5_clean_s3fix/{sp}.jsonl"):
-            truth[r["text"]] = r["label"]
+    truth = truth_labels()
     preds = []
     for r in load(f"reports/phase1_cv/fold{k}/test.jsonl"):
         res = pipe.run(r["text"], metadata=None)
@@ -202,11 +260,15 @@ def aggregate() -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["prepare", "fold", "aggregate"])
+    ap.add_argument("cmd", choices=["prepare", "prepare_policy", "fold", "external", "aggregate"])
     ap.add_argument("k", nargs="?", type=int)
     a = ap.parse_args()
     if a.cmd == "prepare":
         return prepare()
+    if a.cmd == "prepare_policy":
+        return prepare_policy()
+    if a.cmd == "external":
+        return external(a.k)
     if a.cmd == "fold":
         return fold(a.k)
     return aggregate()

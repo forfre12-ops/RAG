@@ -236,6 +236,10 @@ check-patent-proxy: ## 공개특허-프록시 과라벨 유입 가드 (exit 1 on
 	$(PY) scripts/check_no_patent_proxy.py --path datasets/labeled_p1_v5_clean_s3fix/train.jsonl
 	$(PY) scripts/check_no_patent_proxy.py --path datasets/labeled_p1_v5_clean_s3fix/val.jsonl
 	$(PY) scripts/check_no_patent_proxy.py --path datasets/labeled_p1_v5_clean_s3fix/test.jsonl
+	# 판결문 정책 라벨 정정본(2026-09-20)도 같은 가드를 태운다.
+	$(PY) scripts/check_no_patent_proxy.py --path datasets/labeled_p1_v5_clean_policy/train.jsonl
+	$(PY) scripts/check_no_patent_proxy.py --path datasets/labeled_p1_v5_clean_policy/val.jsonl
+	$(PY) scripts/check_no_patent_proxy.py --path datasets/labeled_p1_v5_clean_policy/test.jsonl
 
 leakage-manifest: ## train 풀 → 누출 게이트용 텍스트해시 매니페스트(커밋 대상) 재생성
 	$(PY) scripts/build_leakage_manifest.py \

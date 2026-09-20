@@ -1,0 +1,85 @@
+{
+  "source_dir": "datasets/labeled_p1_v5_clean",
+  "status": "CANDIDATE — 배포본 아님",
+  "rules": {
+    "1": "llm_judge_primary 가 규칙 판정 S3 를 덮어씀(증시 시황·산업 통계·IR 후기·공개 조사 요약) → S3",
+    "2": "공개 판결문(현재 검출기 is_public_ruling 적중)은 비공지성 실패라 S3 — 옛 검출기가 놓쳐 TS/S1/S2 로 남아 있었음"
+  },
+  "splits": {
+    "train": {
+      "rows": 2042,
+      "rule1_changed": 56,
+      "rule2_changed": 38,
+      "rule2_from": {
+        "S1": 4,
+        "S2": 11,
+        "TS": 23
+      },
+      "label_before": {
+        "S1": 365,
+        "S2": 463,
+        "S3": 813,
+        "TS": 401
+      },
+      "label_after": {
+        "S1": 357,
+        "S3": 907,
+        "S2": 408,
+        "TS": 370
+      },
+      "source_sha256_lf": "47543528ad007d335fcd0f111f545eafebee3c243a630a03e5ddb98bb86a8c06",
+      "out_sha256_lf": "949b928ac8598948475e18ddc7fdbdb2bac4f6d891beb8cb32b3c8fbb1705d4d"
+    },
+    "val": {
+      "rows": 256,
+      "rule1_changed": 6,
+      "rule2_changed": 6,
+      "rule2_from": {
+        "S1": 2,
+        "S2": 1,
+        "TS": 3
+      },
+      "label_before": {
+        "S1": 46,
+        "S2": 58,
+        "S3": 102,
+        "TS": 50
+      },
+      "label_after": {
+        "S1": 43,
+        "S3": 114,
+        "S2": 52,
+        "TS": 47
+      },
+      "source_sha256_lf": "7485d838294a80a5d5ba7f7110bc5d99bf0b24d5b26073a93a23f54be354e2c8",
+      "out_sha256_lf": "7bf4c557c7f5188fadd4edaabf3c1ba24d694068197756de93dd552161345346"
+    },
+    "test": {
+      "rows": 256,
+      "rule1_changed": 3,
+      "rule2_changed": 8,
+      "rule2_from": {
+        "S2": 1,
+        "TS": 7
+      },
+      "label_before": {
+        "S1": 46,
+        "S2": 58,
+        "S3": 102,
+        "TS": 50
+      },
+      "label_after": {
+        "S1": 45,
+        "S3": 113,
+        "S2": 55,
+        "TS": 43
+      },
+      "source_sha256_lf": "e25cdd2e371c7d6524f7d29a0bcf48c45982dc677fd066d59fec62049dfcafc1",
+      "out_sha256_lf": "cc966c6f75a7c0fa1c3ed4ed33f1f9ef2e2c93c86a4e5ebcbe9d276f5da65ccf"
+    }
+  },
+  "totals": {
+    "rule1": 65,
+    "rule2": 52
+  }
+}
