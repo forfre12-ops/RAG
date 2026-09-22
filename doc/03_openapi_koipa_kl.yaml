@@ -1828,6 +1828,139 @@ paths:
               schema: { type: string }
         '401': { description: "포털 JWT 쿠키 필요 — login.html 경유" }
 
+  /golden/assignments:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [golden]
+      summary: 검수 배정 현황 (관리자 전용)
+      description: >-
+        검수자별 배정(문서 단위·배치 단위)과 어느 검수자에게도 배정되지 않은 후보 수를 돌려준다.
+        include_events=true 이면 배정 원장(candidate_assignments.jsonl) 이벤트를 최신순으로 함께 준다.
+        enforced 는 두 강제 손잡이(golden_reviewer_assignment_enforced · golden_review_blind_enforced)의
+        현재 값이다 — 꺼져 있으면(기본) 배정은 기록만 되고 검수자에게는 종전처럼 전체가 보인다.
+        enforcement 는 같은 값을 {assignment_enforced, blind_enforced} 로 준다(골든셋 콘솔의 「검수 배정」 패널이 읽는다).
+        assignments 는 지금 유효한 배정을 (검수자, 문서 하나 또는 배치 하나)마다 한 줄씩 편 표이고, 그 배정을 적은
+        원장 이벤트의 시각(assigned_at, UTC)·배정한 관리자(assigned_by)·사유(reason)가 붙는다.
+      parameters:
+        - { in: query, name: reviewer_id, schema: { type: string }, description: 이 검수자만 }
+        - { in: query, name: doc_id, schema: { type: string }, description: 이 문서를 볼 수 있는 검수자만 }
+        - { in: query, name: review_batch, schema: { type: string }, description: 이 배치를 배정받은 검수자만 }
+        - { in: query, name: include_events, schema: { type: boolean, default: false } }
+        - { in: query, name: limit, schema: { type: integer, default: 100, minimum: 1, maximum: 1000 } }
+      responses:
+        '200':
+          description: 배정 현황
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                required: [total_candidates, assigned_candidate_count, unassigned_candidate_count, reviewers,
+                           assignments, ledger_events_total, by_event, enforced, enforcement]
+                properties:
+                  total_candidates: { type: integer }
+                  assigned_candidate_count: { type: integer }
+                  unassigned_candidate_count: { type: integer }
+                  reviewers:
+                    type: array
+                    description: 검수자별 현재 배정(배정을 모두 해제한 검수자는 뺀다)
+                    items: { type: object, additionalProperties: true }
+                  assignments:
+                    type: array
+                    items:
+                      type: object
+                      required: [reviewer_id, kind, target, reason]
+                      properties:
+                        reviewer_id: { type: string }
+                        kind: { type: string, enum: [doc_id, review_batch] }
+                        target: { type: string, description: kind 가 doc_id 면 문서 ID, review_batch 면 배치 이름 }
+                        assigned_at: { type: string, nullable: true, description: 배정 시각(UTC ISO) }
+                        assigned_by: { type: string, nullable: true, description: 배정한 관리자(서버가 확정한 포털 JWT sub) }
+                        reason: { type: string }
+                  ledger_events_total: { type: integer }
+                  by_event: { type: object, additionalProperties: { type: integer } }
+                  enforced:
+                    type: object
+                    description: enforcement 와 같은 값의 옛 표기
+                    properties:
+                      assignment: { type: boolean }
+                      blind: { type: boolean }
+                  enforcement:
+                    type: object
+                    required: [assignment_enforced, blind_enforced]
+                    properties:
+                      assignment_enforced: { type: boolean, description: golden_reviewer_assignment_enforced }
+                      blind_enforced: { type: boolean, description: golden_review_blind_enforced }
+                  events:
+                    type: array
+                    description: include_events=true 일 때만
+                    items: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [golden]
+      summary: 검수자에게 문서 또는 검수 배치를 배정 (관리자 전용)
+      description: >-
+        doc_ids(문서 목록) 또는 review_batch(배치 단위) 중 정확히 하나를 reviewer_id 에게 배정한다.
+        배정한 관리자는 요청 본문이 아니라 서버가 확정한 포털 JWT 의 sub 이며, 본문에 actor_id 등을
+        실으면 422 다. 존재하지 않는 doc_id·배치는 422 로 거절한다. 이미 배정된 대상은 원장에 다시
+        적지 않고 skipped 로 돌려준다(멱등). 원장은 append-only 다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reviewer_id]
+              additionalProperties: false
+              properties:
+                reviewer_id: { type: string, maxLength: 128, description: 배정받는 전문가의 포털 sub }
+                doc_ids: { type: array, minItems: 1, maxItems: 500, items: { type: string } }
+                review_batch: { type: string, maxLength: 128 }
+                reason: { type: string, maxLength: 1000 }
+      responses:
+        '200':
+          description: 적용 결과 (applied · skipped · reviewer_visible_doc_count · assignment_enforced)
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: "대상이 없거나 둘 다 있음 · 존재하지 않는 doc_id/배치 · 본문에 허용되지 않는 필드" }
+
+  /golden/assignments/revoke:
+    post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [golden]
+      summary: 검수 배정 해제 (관리자 전용)
+      description: >-
+        배정과 같은 단위(문서 목록 또는 배치)로 해제한다. 원장에서 줄을 지우지 않고 unassign 이벤트를
+        덧붙인다. 배정되어 있지 않은 대상은 skipped 로 돌려준다. 배치로 배정한 검수자에게서 문서 하나만
+        빼는 것은 표현하지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reviewer_id]
+              additionalProperties: false
+              properties:
+                reviewer_id: { type: string, maxLength: 128 }
+                doc_ids: { type: array, minItems: 1, maxItems: 500, items: { type: string } }
+                review_batch: { type: string, maxLength: 128 }
+                reason: { type: string, maxLength: 1000 }
+      responses:
+        '200':
+          description: 해제 결과
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: "대상이 없거나 둘 다 있음 · 본문에 허용되지 않는 필드" }
+
   /dashboard/summary:
     get:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다

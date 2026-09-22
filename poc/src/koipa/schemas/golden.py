@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .common import Actor
 
@@ -292,3 +292,87 @@ class ProxyGoldPromoteResponse(BaseModel):
     published: bool
     publish_note: Optional[str] = None
     dry_run: bool = False
+
+
+class GoldenAssignmentRequest(BaseModel):
+    """검수자 배정 · 해제 요청 (관리자 전용).
+
+    배정 대상은 **문서 목록(doc_ids) 또는 검수 배치(review_batch) 중 정확히 하나**다.
+    배정한 관리자는 요청 본문에 없다 — 서버가 인증된 포털 JWT 의 sub 로 확정한다
+    (`extra="forbid"` 라서 actor_id 같은 자칭 필드를 실어 보내면 조용히 무시되지 않고 422 다).
+    reviewer_id 는 데이터다 — 배정받는 전문가의 포털 sub 와 같은 문자열이어야 그 사람에게 보인다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    reviewer_id: str = Field(min_length=1, max_length=128)
+    doc_ids: Optional[list[str]] = Field(default=None, min_length=1, max_length=500)
+    review_batch: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    reason: str = Field(default="", max_length=1000)
+
+    @model_validator(mode="after")
+    def _exactly_one_target(self) -> "GoldenAssignmentRequest":
+        if not self.reviewer_id.strip():
+            raise ValueError("reviewer_id 가 비어 있다(공백만은 불가)")
+        has_docs = self.doc_ids is not None
+        has_batch = self.review_batch is not None
+        if has_docs == has_batch:
+            raise ValueError("doc_ids 와 review_batch 중 정확히 하나만 지정")
+        if has_docs and not all(str(d).strip() for d in self.doc_ids):
+            raise ValueError("doc_ids 에 빈 값이 있다")
+        if has_batch and not self.review_batch.strip():
+            raise ValueError("review_batch 가 비어 있다(공백만은 불가)")
+        return self
+
+
+class GoldenAssignmentResponse(BaseModel):
+    event: str                          # assign | unassign
+    reviewer_id: str
+    actor_id: str                       # 서버가 확정한 배정 관리자(JWT sub)
+    applied: list[dict]                 # 이번에 원장에 새로 적힌 대상 — [{"doc_id": …} | {"review_batch": …}]
+    skipped: list[dict]                 # 이미 그 상태여서 적지 않은 대상(멱등)
+    events_written: int
+    # 이 검수자가 지금 볼 수 있는 문서 수(배정 원장 기준). 강제 손잡이가 꺼져 있으면 실제로는
+    # 여전히 전체가 보인다 — 화면·응답이 그 차이를 알 수 있게 아래 값을 함께 준다.
+    reviewer_visible_doc_count: int
+    assignment_enforced: bool
+
+
+class GoldenAssignmentEnforcement(BaseModel):
+    """두 격리 손잡이의 현재 값 — 관리자 화면의 「배정 강제」·「제안 등급 숨김」 표시가 읽는다(읽기 전용)."""
+
+    assignment_enforced: bool           # golden_reviewer_assignment_enforced
+    blind_enforced: bool                # golden_review_blind_enforced
+
+
+class GoldenAssignmentRow(BaseModel):
+    """지금 유효한 배정 한 줄 — (검수자, 문서 하나 또는 배치 하나). 시각·관리자·사유는 그 배정을 적은 원장 이벤트의 값이다."""
+
+    reviewer_id: str
+    kind: Literal["doc_id", "review_batch"]
+    target: str
+    assigned_at: Optional[str] = None   # UTC ISO — 손으로 넣은 원장 줄에 없으면 None
+    assigned_by: Optional[str] = None   # 배정한 관리자(서버가 확정한 JWT sub)
+    reason: str = ""
+
+
+class GoldenAssignmentStatusResponse(BaseModel):
+    """GET /golden/assignments — 관리자 전용 배정 현황.
+
+    2026-09-22 에 enforcement · assignments 를 더했다. 나머지 키는 종전 그대로다(`enforced` 는 `enforcement` 와 같은 값의
+    옛 표기 — 지우지 않는다). extra="allow" 라 여기에 적지 않은 키가 서버에서 늘어도 응답이 깨지지 않는다.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    total_candidates: int
+    assigned_candidate_count: int
+    unassigned_candidate_count: int
+    reviewers: list[dict]
+    assignments: list[GoldenAssignmentRow]
+    ledger_events_total: int
+    by_event: dict[str, int]
+    enforced: dict[str, bool]
+    enforcement: GoldenAssignmentEnforcement
+    events: Optional[list[dict]] = None     # include_events=true 일 때만 있다
+

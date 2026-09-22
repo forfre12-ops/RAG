@@ -6,12 +6,16 @@ human_review 승격은 별개 경로(import_review_corrections, 지재원 관리
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import html as _html
+import re
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    APIRouter, Cookie, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile,
+)
 from fastapi.responses import HTMLResponse
 
 from koipa.api._jwt_auth import require_auth
@@ -21,6 +25,9 @@ from koipa.config import settings
 from koipa.golden_tiers import human_reviewer_rejection_reason
 from koipa.services.job_store import get_default_store
 from koipa.schemas.golden import (
+    GoldenAssignmentRequest,
+    GoldenAssignmentResponse,
+    GoldenAssignmentStatusResponse,
     GoldenBuildRequest,
     GoldenBuildResponse,
     GoldenBuildStatus,
@@ -43,7 +50,8 @@ from koipa.services.golden_build_service import (
     GoldenSignoffStorageError,
     display_source_path,
 )
-from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService
+from koipa.services import golden_reviewer_access as access
+from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService, normalize_doc_id
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
 from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
 from koipa.console_nav import HEADER_CSS, NAV_CSS, REVIEW_SCREEN_EXCLUDE, header_html, upload_progress_js
@@ -137,6 +145,95 @@ def _console_actor_id(auth: dict) -> str:
     return actor_id
 
 
+# ── [2026-09-21] 검수자 접근 통제 — 배정 강제(golden_reviewer_assignment_enforced) · 숨김(golden_review_blind_enforced)
+# 두 손잡이 모두 기본 False = 종전 동작. 강제가 일어나는 자리는 access.resolve_scope /
+# access.enforcement_active 뿐이고, 아래 헬퍼와 각 라우트는 그 결과를 쓰기만 한다(설계 이유는
+# services/golden_reviewer_access.py 머리말).
+#
+# reviewer 가 닿는 라우트와 적용 방식 (관리자·kl_backend·system 은 전부 전체):
+#   GET  /golden/candidates                 배정으로 좁힘 + 숨김이면 자기 결정만으로 다시 센 시야(상태 필터·집계 포함) + grade 필터 거절
+#                                           + doc_id 는 별칭·줄 순서는 별칭 순·query 는 별칭 앞부분에만(2026-09-22)
+#   GET  /golden/candidates/summary         배정으로 좁힌 집계 + 숨김이면 자기 시야로 센 결정 집계 · 등급 분포·품질 제거
+#   GET  /golden/candidates/decisions       배정된 문서의 이벤트만 + 숨김이면 자기 이벤트만(M 입력은 자기가 적은 값으로만) · doc_id 는 별칭
+#   GET  /golden/candidates/session         본인 신원뿐 — 후보 데이터 없음(적용 대상 아님)
+#   GET  /golden/candidates/{doc_id}        배정 밖이면 404 + 숨김 필터 · 숨김이면 {doc_id} 는 별칭만 받는다(실 doc_id 는 404)
+#   POST /golden/candidates/{doc_id}/decision  배정 밖이면 404 · 숨김이면 approve 거절 · 응답도 자기 시야 · {doc_id} 는 별칭만
+#   GET  /golden/candidates/manage.html     후보 데이터가 인라인으로 박히지 않는 정적 틀(시험이 잠금) + 숨김이면 화면 조정
+#                                           + 관리자 전용 「검수 배정」 패널은 검수자 화면에서 통째로 제거(_strip_assignment_panel — 2026-09-22)
+#   GET  /golden/candidates/login.html      데이터 없음(적용 대상 아님)
+#   GET  /golden/jobs · /golden/jobs/{id} · /golden/summary
+#   GET  /golden/jobs/{id}/review.html · signoff.html · signoff/preflight, POST /golden/jobs/{id}/signoff
+#                                           잡 단위 화면·API 는 잡의 **전체 후보**를 담아 배정으로 걸러낼 수
+#                                           없고 제안 등급이 HTML 에 박힌다 → 손잡이가 켜진 동안 reviewer 에게 403,
+#                                           무인증 HTML 진입로는 401(로그인 요구)
+# 관리자 전용이라 reviewer 는 403 인 라우트: build · builds · jobs/register · candidates/upload ·
+#   candidates/{doc_id}/provenance · candidates/promote · assignments(신규 3개).
+# 별칭 ID(2026-09-22): 숨김이 켜진 동안 검수자 응답의 모든 doc_id 는 별칭(RV-…)이고 경로 {doc_id} 도 별칭만 받는다. 별칭을 못 만들면
+# (솔트 읽기·쓰기 실패 · 풀 안 충돌) 숨김 검수자의 요청은 503 이다. 관리자·kl_backend·system 의 후보 행·상세에는 같은 동안 대응용
+# reviewer_alias 키 하나만 더해진다(그 밖의 응답은 종전과 바이트 단위로 같다).
+def _scope(auth: dict | None) -> access.ReviewerScope:
+    try:
+        return access.resolve_scope(auth)
+    except access.ReviewerAccessError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@contextlib.contextmanager
+def _access_errors():
+    """검수자 접근 계층의 오류(별칭 계층을 쓸 수 없음 = 503)를 HTTP 오류로 옮긴다 — 서비스 계층을 프레임워크에서 떼어 두려고
+    예외를 따로 뒀다. HTTPException 은 그대로 지나간다."""
+    try:
+        yield
+    except access.ReviewerAccessError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+def _resolve_doc_id(scope: access.ReviewerScope, svc: ProxyGoldCandidateService, doc_id: str) -> str:
+    """경로의 {doc_id} → 실 doc_id. 숨김 검수자는 별칭만 받으며, 풀 수 없으면(실 doc_id 를 넣었거나 배정 밖 별칭)
+    **없는 문서와 똑같은** 404 다 — 응답 코드·본문이 같아야 존재 여부와 실 doc_id↔별칭 대응을 못 캔다."""
+    real = scope.resolve_doc_id(svc, doc_id)
+    if real is None:
+        raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+    return real
+
+
+def _require_visible(scope: access.ReviewerScope, svc: ProxyGoldCandidateService, doc_id: str) -> None:
+    """배정 밖 문서는 **없는 문서와 똑같이** 404 로 답한다.
+
+    403 을 주면 "이 doc_id 는 존재하는데 네 것이 아니다"를 알려 주는 셈이다 — 배정 밖 문서의
+    존재 여부(그리고 doc_id 가 등급을 품은 경우 그 문서의 등급)를 추측하는 통로가 된다. 없는
+    문서와 응답 코드·본문이 같으면 배정 안 된 검수자가 알아낼 수 있는 것이 없다.
+    """
+    visible = scope.visible_doc_ids(svc)
+    if visible is not None and doc_id not in visible:
+        raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+
+
+def _deny_restricted_on_jobs(auth: dict | None) -> None:
+    if _scope(auth).restricted:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "job-level golden screens/APIs are closed to reviewers while reviewer "
+                "assignment/blind review is enforced — use the candidate console (manage.html)"
+            ),
+        )
+
+
+def _job_html_guard(
+    request: Request, authorization: str | None, x_api_key: str | None,
+    koipa_access_token: str | None,
+) -> None:
+    """잡 HTML(무인증 진입로) — 손잡이가 켜졌을 때만 로그인을 요구하고 reviewer 를 막는다.
+
+    꺼져 있으면 아무것도 하지 않는다(종전 동작: 서명 URL 토큰만 본다). 켜져 있으면 쿠키·헤더의
+    인증을 **그 자리에서** 해석한다 — 인증 없이 열리는 라우터라 의존성으로는 못 건다.
+    """
+    if not access.enforcement_active():
+        return
+    _deny_restricted_on_jobs(require_auth(request, authorization, x_api_key, koipa_access_token))
+
+
 @router.post(
     "/golden/build",
     response_model=GoldenBuildResponse,
@@ -210,7 +307,10 @@ def golden_register_build(
     response_model=GoldenBuildStatus,
     dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
 )
-def golden_job_status(job_id: UUID) -> GoldenBuildStatus:
+def golden_job_status(
+    job_id: UUID, auth: dict = Depends(require_auth),
+) -> GoldenBuildStatus:
+    _deny_restricted_on_jobs(auth)
     st = GoldenBuildService().get_status(job_id)
     if st is None:
         raise HTTPException(status_code=404, detail="golden build job not found")
@@ -231,8 +331,12 @@ def golden_job_status(job_id: UUID) -> GoldenBuildStatus:
         "유도한다. 읽기 전용 — 정본 변경은 promote_golden_candidates.py 게이트만 담당한다."
     ),
 )
-def golden_corpus_summary(path: str | None = None) -> GoldenCorpusSummary:
+def golden_corpus_summary(
+    path: str | None = None, auth: dict = Depends(require_auth),
+) -> GoldenCorpusSummary:
     """정본 골든셋 구성 집계. path 미지정이면 settings.golden_corpus_jsonl."""
+    # 정본 코퍼스 전체의 등급·tier 분포다 — 배정으로 걸러낼 수 없다. 검수 화면은 안 쓴다(관리 콘솔용).
+    _deny_restricted_on_jobs(auth)
     target = (path or "").strip() or getattr(
         settings, "golden_corpus_jsonl", "datasets/gold_real/classification_gold.jsonl"
     )
@@ -254,6 +358,7 @@ def proxy_gold_candidate_list(
     status: str | None = None, grade: str | None = None,
     origin: str | None = None, query: str | None = None,
     review_batch: str | None = None,
+    auth: dict = Depends(require_auth),
 ) -> dict:
     """관리 후보 목록. 승인도 approved_proxy일 뿐 locked/실문서 골든이 아니다.
 
@@ -265,8 +370,21 @@ def proxy_gold_candidate_list(
         raise HTTPException(status_code=422, detail="invalid candidate status")
     if grade and grade not in {"TS", "S1", "S2", "S3"}:
         raise HTTPException(status_code=422, detail="invalid grade")
-    return ProxyGoldCandidateService().list_candidates(
-        status=status, grade=grade, origin=origin, query=query, review_batch=review_batch)
+    scope = _scope(auth)
+    if grade and scope.blind_active:
+        # 이 필터는 제안 등급(proposed_grade)으로도 걸러진다 — 숨김 검수에서 grade=TS 로 목록을
+        # 좁혀 보면 어느 문서가 TS 로 제안됐는지 그대로 읽힌다(응답 필드를 뺐어도 새는 통로).
+        # 조용히 무시하면 호출자가 걸러진 목록으로 오해하므로 거절한다.
+        raise HTTPException(
+            status_code=422, detail="grade filter is not available in blind review")
+    svc = ProxyGoldCandidateService()
+    # 숨김이면 서비스가 행을 별칭 시야로 바꾼 **뒤에** 정렬·검색한다 — 목록 순서는 별칭 순이고(실 doc_id 순이면 줄 위치로 등급이
+    # 읽힌다), query 는 등급 코드를 담을 수 있는 doc_id·title 에 맞추지 않고 별칭 앞부분에만 닿는다(blind_query_match).
+    with _access_errors():
+        return scope.shape_list(svc.list_candidates(
+            status=status, grade=grade, origin=origin, query=query, review_batch=review_batch,
+            visible_doc_ids=scope.visible_doc_ids(svc), view=scope.candidate_view(svc),
+            query_match=scope.query_match()), svc)
 
 
 @router.get(
@@ -274,9 +392,13 @@ def proxy_gold_candidate_list(
     dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
     summary="골든셋 관리 콘솔 집계",
 )
-def proxy_gold_candidate_summary() -> dict:
+def proxy_gold_candidate_summary(auth: dict = Depends(require_auth)) -> dict:
     """후보의 확정·미확정·보류·폐기·출처·등급 분포를 반환한다."""
-    return ProxyGoldCandidateService().summary()
+    scope = _scope(auth)
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        return scope.shape_summary(svc.summary(
+            visible_doc_ids=scope.visible_doc_ids(svc), view=scope.candidate_view(svc)))
 
 
 @router.get(
@@ -284,9 +406,15 @@ def proxy_gold_candidate_summary() -> dict:
     dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
     summary="결정 원장 최근 기록(보류·폐기·번복 포함)",
 )
-def proxy_gold_candidate_decisions(limit: int = Query(default=100, ge=1, le=500)) -> dict:
+def proxy_gold_candidate_decisions(
+    limit: int = Query(default=100, ge=1, le=500), auth: dict = Depends(require_auth),
+) -> dict:
     """append-only 결정 원장을 최신순으로 돌려준다. 문서를 열지 않고 감사할 수 있게."""
-    return ProxyGoldCandidateService().recent_decisions(limit=limit)
+    scope = _scope(auth)
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        return svc.recent_decisions(
+            limit=limit, visible_doc_ids=scope.visible_doc_ids(svc), **scope.event_view(svc))
 
 
 @router.get(
@@ -350,11 +478,16 @@ async def proxy_gold_candidate_upload(
     dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
     summary="합성 Proxy Gold 후보 상세",
 )
-def proxy_gold_candidate_detail(doc_id: str) -> dict:
-    candidate = ProxyGoldCandidateService().get_candidate(doc_id)
-    if candidate is None:
-        raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
-    return candidate
+def proxy_gold_candidate_detail(doc_id: str, auth: dict = Depends(require_auth)) -> dict:
+    scope = _scope(auth)
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        real_id = _resolve_doc_id(scope, svc, doc_id)      # 숨김이면 경로는 별칭이다
+        _require_visible(scope, svc, real_id)
+        candidate = svc.get_candidate(real_id)
+        if candidate is None:
+            raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+        return scope.shape_candidate(candidate, svc)
 
 
 @router.post(
@@ -412,9 +545,25 @@ def proxy_gold_candidate_decision(
 ) -> ProxyGoldCandidateDecisionResponse:
     """결정을 append-only 원장에 남긴다. 이 엔드포인트는 locked 승격을 수행하지 않는다."""
     actor_id = _console_actor_id(auth)
+    scope = _scope(auth)
+    svc = ProxyGoldCandidateService()
+    # 배정 밖이면 본문 검증(사유·등급) 결과와 무관하게 없는 문서와 같은 404 — 순서가 뒤바뀌면
+    # 422 사유가 "이 문서는 있다"를 알려 준다. 숨김이면 경로는 별칭이고, 실 doc_id 를 넣어도 같은 404 다.
+    with _access_errors():
+        real_id = _resolve_doc_id(scope, svc, doc_id)
+        _require_visible(scope, svc, real_id)
+    if scope.blind_active and req.action == "approve":
+        # 승인 = '제안 등급 그대로 확정'. 숨김 검수에서는 검수자가 제안을 볼 수 없으니 그 결정은
+        # 볼 수 없는 값을 받아들이는 것이고, 독립 판정이라는 전제를 서버가 스스로 깨게 된다.
+        # 등급을 직접 정하는 change 만 남긴다.
+        raise HTTPException(
+            status_code=403,
+            detail="approve (confirm the proposed grade) is not available in blind review; "
+                   "use action=change with an explicit grade",
+        )
     try:
-        candidate = ProxyGoldCandidateService().decide(
-            doc_id=doc_id, action=req.action, grade=req.grade,
+        candidate = svc.decide(
+            doc_id=real_id, action=req.action, grade=req.grade,
             reason=req.reason, actor_id=actor_id,
             # 비밀관리성(M) 입력 — 등급 결정과 같은 이벤트에 실린다.
             security_marking=req.security_marking, access_scope=req.access_scope,
@@ -423,8 +572,12 @@ def proxy_gold_candidate_decision(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if candidate is None:
         raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+    # 응답에도 숨김을 적용한다 — 저장된 후보(status·latest_decision·management)에는 다른 검수자의 결정이
+    # 섞여 있고 이벤트에는 proposed_grade·management_before 가 실려 있다. 자기 결정만으로 다시 만든 시야를 돌려준다.
+    with _access_errors():
+        candidate = scope.shape_candidate(candidate, svc)
     return ProxyGoldCandidateDecisionResponse(
-        doc_id=doc_id,
+        doc_id=candidate["doc_id"],           # 숨김이면 별칭, 아니면 종전과 같은 값(경로로 들어온 실 doc_id)
         status=candidate["status"],
         final_grade=candidate["final_grade"],
         latest_decision=candidate["latest_decision"],
@@ -461,12 +614,128 @@ def proxy_gold_candidate_promote(
     return ProxyGoldPromoteResponse(**out)
 
 
+# ── [2026-09-21] 검수자 배정 관리 — 관리자 전용 API (화면: manage.html 의 「검수 배정」 패널, 2026-09-22) ──
+# 배정은 후보 폴더의 append-only 원장(candidate_assignments.jsonl)에 쌓인다. 배정한 관리자는
+# 요청 본문이 아니라 서버가 확정한 포털 JWT sub 다(_console_actor_id — 본문의 자칭을 받지 않는다).
+# 손잡이(golden_reviewer_assignment_enforced)가 꺼져 있으면 배정은 **기록만** 되고 검수자에게는
+# 여전히 전체가 보인다 — 응답의 assignment_enforced 가 그 사실을 알려 준다.
+def _apply_assignment(
+    event: str, req: GoldenAssignmentRequest, auth: dict,
+) -> GoldenAssignmentResponse:
+    actor_id = _console_actor_id(auth)
+    svc = ProxyGoldCandidateService()
+    index = svc.review_batch_index()
+    if req.doc_ids is not None:
+        # 전달본 doc_id(GOLD-…_제목)를 콘솔 doc_id 로 맞춘다 — 이미 콘솔 id 이면 그대로 둔다.
+        ids = list(dict.fromkeys(d if d in index else normalize_doc_id(d) for d in req.doc_ids))
+        if event == access.EVENT_ASSIGN:
+            # 오타 난 id 를 조용히 배정하면 그 검수자에게는 아무것도 안 보이는데 아무도 모른다.
+            # 해제는 이미 사라진 문서를 정리할 수 있어야 하므로 존재를 요구하지 않는다.
+            unknown = [d for d in ids if d not in index]
+            if unknown:
+                raise HTTPException(
+                    status_code=422, detail=f"unknown doc_id: {unknown[:20]}"
+                    + (f" (+{len(unknown) - 20} more)" if len(unknown) > 20 else ""))
+        targets = [("doc_id", d) for d in ids]
+    else:
+        batch = req.review_batch.strip()
+        if event == access.EVENT_ASSIGN and batch not in {b for b in index.values() if b}:
+            raise HTTPException(status_code=422, detail=f"unknown review_batch: {batch}")
+        targets = [("review_batch", batch)]
+    ledger = access.AssignmentLedger(svc.root)
+    try:
+        written, skipped = ledger.apply(
+            event=event, reviewer_id=req.reviewer_id, actor_id=actor_id,
+            targets=targets, reason=req.reason)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return GoldenAssignmentResponse(
+        event=event,
+        reviewer_id=access.norm_id(req.reviewer_id),
+        actor_id=actor_id,
+        applied=[{k: e[k] for k in ("doc_id", "review_batch") if e.get(k)} for e in written],
+        skipped=skipped,
+        events_written=len(written),
+        reviewer_visible_doc_count=len(ledger.visible_doc_ids(req.reviewer_id, index)),
+        assignment_enforced=bool(getattr(settings, "golden_reviewer_assignment_enforced", False)),
+    )
+
+
+@router.post(
+    "/golden/assignments",
+    response_model=GoldenAssignmentResponse,
+    summary="검수자에게 문서 또는 검수 배치를 배정",
+)
+def golden_assignment_add(
+    req: GoldenAssignmentRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> GoldenAssignmentResponse:
+    """doc_ids(문서 목록) 또는 review_batch(배치 단위) 중 하나를 reviewer_id 에게 배정한다.
+
+    이미 배정된 대상은 원장에 다시 적지 않고 skipped 로 돌려준다(멱등).
+    """
+    return _apply_assignment(access.EVENT_ASSIGN, req, auth)
+
+
+@router.post(
+    "/golden/assignments/revoke",
+    response_model=GoldenAssignmentResponse,
+    summary="검수 배정 해제",
+)
+def golden_assignment_revoke(
+    req: GoldenAssignmentRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> GoldenAssignmentResponse:
+    """배정과 **같은 단위**로 해제한다(배치로 배정했으면 배치로 해제).
+
+    원장에서 줄을 지우지 않는다 — 해제도 unassign 이벤트로 덧붙는다.
+    """
+    return _apply_assignment(access.EVENT_UNASSIGN, req, auth)
+
+
+@router.get(
+    "/golden/assignments",
+    response_model=GoldenAssignmentStatusResponse,
+    response_model_exclude_unset=True,      # events 는 include_events=true 일 때만 나간다(종전과 같은 키 집합)
+    summary="검수 배정 현황",
+)
+def golden_assignment_status(
+    reviewer_id: str | None = None,
+    doc_id: str | None = None,
+    review_batch: str | None = None,
+    include_events: bool = False,
+    limit: int = Query(default=100, ge=1, le=1000),
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> dict:
+    """검수자별 배정과 문서 단위 커버리지(어느 검수자에게도 배정되지 않은 문서 수).
+
+    reviewer_id · doc_id(그 문서를 볼 수 있는 검수자) · review_batch(그 배치를 배정받은 검수자)로
+    좁힌다. include_events=true 이면 원장 이벤트를 최신순 limit 건 함께 준다.
+
+    assignments(2026-09-22) 는 지금 유효한 배정을 한 줄씩 편 표다 — 배정 시각·배정한 관리자·사유가 붙는다.
+    enforcement(2026-09-22) 는 두 손잡이의 현재 값이고 `enforced` 와 같은 값이다. 둘 다 같은 지역 변수에서 만들어 어긋날 수 없다.
+    """
+    svc = ProxyGoldCandidateService()
+    ledger = access.AssignmentLedger(svc.root)
+    out = ledger.status(
+        svc.review_batch_index(), reviewer_id=reviewer_id, doc_id=doc_id, review_batch=review_batch)
+    assignment_on = bool(getattr(settings, "golden_reviewer_assignment_enforced", False))
+    blind_on = bool(getattr(settings, "golden_review_blind_enforced", False))
+    out["enforced"] = {"assignment": assignment_on, "blind": blind_on}
+    out["enforcement"] = {"assignment_enforced": assignment_on, "blind_enforced": blind_on}
+    if include_events:
+        out["events"] = list(reversed(ledger.read_events()))[:limit]
+    return out
+
+
 @router.get(
     "/golden/jobs",
     response_model=GoldenJobListResponse,
     dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
 )
-def golden_job_list(limit: int = 20) -> GoldenJobListResponse:
+def golden_job_list(
+    limit: int = 20, auth: dict = Depends(require_auth),
+) -> GoldenJobListResponse:
     """최근 골든 잡 목록.
 
     목록이 없으면 콘솔은 마지막 job_id 를 메모리에만 들고 있어 새로고침 한 번에 검수하던
@@ -475,6 +744,7 @@ def golden_job_list(limit: int = 20) -> GoldenJobListResponse:
     JobStore 에는 골든 외 잡(분류·학습)도 섞이므로 kind 로 걸러낸다. 정렬은 백엔드에 따라
     best-effort(Redis 는 SCAN 순서) — 응답 ordering 필드로 그 한계를 명시한다.
     """
+    _deny_restricted_on_jobs(auth)
     limit = max(1, min(100, limit))
     # 필터로 걸러지는 만큼 여유 있게 읽고 자른다(골든 잡이 뒤로 밀려 안 보이는 것 방지).
     raw = get_default_store().list_recent(limit=limit * 5)
@@ -607,8 +877,233 @@ def _job_gate_html(job_id: UUID) -> HTMLResponse | None:
     return None
 
 
+# ── [2026-09-22] 관리자 전용 「검수 배정」 패널 ─────────────────────────────────────────────
+# 관리자·kl_backend 가 API 를 직접 부르지 않고 콘솔에서 전문가에게 문서·배치를 배정한다. 새 라우트는 없다 —
+# 기존 POST/GET /golden/assignments · POST /golden/assignments/revoke 와 GET /golden/candidates(available_batches)만 쓴다.
+#
+# ⚠ 검수자에게 이 패널의 마크업·스크립트·관리자 API 주소가 **아예 없어야** 한다(CSS 로 숨기는 것으로는 부족하다 — 검수자가
+#   화면 구조와 관리자 API 주소를 읽는다). 그래서 패널은 네 조각(메뉴 링크 · 스타일 · 본문 · 스크립트)이고 각 조각을 같은 표식으로
+#   감싼다. _as_reviewer_view · _as_blind_reviewer_view 가 _strip_assignment_panel 로 표식째 통째로 걷어낸다. 표식 밖의 관리자
+#   화면은 이 패널이 없던 때와 글자 하나 다르지 않다(패널 조각만 더해졌다).
+# 화면 코드 규칙: 서버가 준 값과 관리자가 입력한 값(검수자 ID 포함 — 임의 문자열)은 textContent·DOM 생성으로만 넣는다(innerHTML 없음).
+# 신원은 서버가 정한다 — 요청 본문에 배정한 관리자 ID 를 싣지 않고, 키·토큰 입력칸도 없다. 신뢰도 수치는 쓰지 않는다.
+_ASSIGN_PANEL_BEGIN = "<!--assign-panel:begin-->"
+_ASSIGN_PANEL_END = "<!--assign-panel:end-->"
+_ASSIGN_PANEL_RE = re.compile(re.escape(_ASSIGN_PANEL_BEGIN) + r".*?" + re.escape(_ASSIGN_PANEL_END), re.S)
+# 표식을 걷은 뒤에도 남아 있으면 안 되는 것 — 남아 있으면 검수자 화면을 내주지 않고 실패한다(fail-closed).
+_ASSIGN_PANEL_LEFTOVERS = ("assign-panel", "golden/assignments", 'id="assignments"', 'id="asn')
 
 
+def _wrap_assign_panel(part: str) -> str:
+    return _ASSIGN_PANEL_BEGIN + part + _ASSIGN_PANEL_END
+
+
+def _strip_assignment_panel(html: str) -> str:
+    """검수자용 화면에서 배정 패널 네 조각을 통째로 제거한다. 걷은 뒤에도 패널 흔적이 남으면 예외 — 화면을 내주지 않는다."""
+    out = _ASSIGN_PANEL_RE.sub("", html)
+    leftover = [t for t in _ASSIGN_PANEL_LEFTOVERS if t in out]
+    if leftover:
+        raise RuntimeError(f"reviewer console still carries the assignment panel: {leftover}")
+    return out
+
+
+_ASSIGN_PANEL_NAV = _wrap_assign_panel('<a href="#assignments"><span>06</span>검수 배정</a>')
+
+_ASSIGN_PANEL_CSS = _wrap_assign_panel(r"""<style>
+#assignments .asnState{display:grid;gap:10px;margin:26px 0 0;padding:16px 18px;border:1px solid var(--line);border-left:4px solid #111;background:#fafaf8}
+#assignments .asnState>div{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;font-size:13px}
+#assignments .asnKey{font-weight:800;min-width:104px}
+#assignments .asnHint{color:#5f666c;font-size:12.5px}
+#assignments .asnOn{background:var(--green);color:#087341}
+#assignments .asnOff{background:#eef1f4;color:#56616b}
+#assignments .asnNote{margin:10px 0 0;padding:9px 12px;border-left:3px solid var(--red);background:#fff8f8;color:#7a1f2b;font-size:13px}
+#assignments .asnNote:empty{display:none}
+#assignments .asnGrid{display:grid;grid-template-columns:minmax(0,1fr);gap:36px;margin-top:30px}
+#assignments h3{font-size:18px;letter-spacing:-.4px;margin:0 0 12px}
+#assignments .asnCount{color:#5f666c;font-size:13px;font-weight:400;letter-spacing:0;margin-left:6px}
+#assignments .asnHead,#assignments .asnRow{grid-template-columns:minmax(110px,1.1fr) 70px minmax(130px,1.5fr) 150px minmax(90px,1fr) 62px;gap:12px}
+#assignments .asnRow{display:grid;align-items:start;padding:12px;border-bottom:1px solid #e8e8e5;font-size:13px}
+#assignments .asnCell{min-width:0;overflow-wrap:anywhere}
+#assignments .asnTime{font:12px ui-monospace,monospace;color:#5f666c}
+#assignments .asnReasonLine{margin-top:3px;font-size:12px;color:#5f666c}
+#assignments .asnScroll{overflow-x:auto}
+#assignments .asnTable{min-width:690px}
+#assignments #asnRows{max-height:440px;overflow-y:auto;border-bottom:1px solid #e8e8e5}
+#assignments .asnForm{max-width:560px}
+#assignments .asnRevoke{padding:5px 10px;font-size:12px}
+#assignments .asnForm label{display:block;margin:14px 0 4px;font-size:12px;color:#5a636b}
+#assignments .asnForm input,#assignments .asnForm select,#assignments .asnForm textarea{display:block;width:100%;border:1px solid var(--line);padding:9px;background:#fff;font:inherit;font-size:13px}
+#assignments .asnForm textarea{height:130px;resize:vertical;font:12px ui-monospace,monospace}
+#assignments .asnForm .asnHint{display:block;margin-top:5px}
+@media(max-width:700px){#assignments .asnRow{grid-template-columns:1fr auto}#assignments .asnTable{min-width:0}}
+</style>""")
+
+_ASSIGN_PANEL_SECTION = _wrap_assign_panel(r"""<section id="assignments" class="section" aria-labelledby="asnTitle"><div class="sectionTop"><div><span class="secNum">06</span><h2 id="asnTitle">검수 배정</h2><p>검수자가 볼 수 있는 문서를 정합니다. 배정과 해제는 누가 언제 했는지와 함께 기록되며 지워지지 않습니다.</p></div><div class="filters"><button id="asnReload" class="btn" type="button">새로고침</button></div></div><div class="asnState"><div><span class="asnKey">배정 강제</span><span id="asnEnfAssign" class="pill asnOff">확인 중</span><span class="asnHint">켜면 검수자는 자신에게 배정된 문서만 봅니다.</span></div><div><span class="asnKey">제안 등급 숨김</span><span id="asnEnfBlind" class="pill asnOff">확인 중</span><span class="asnHint">켜면 검수자 화면에서 제안 등급과 다른 검수자의 결정이 보이지 않습니다.</span></div><div><span class="asnHint">두 항목은 서버 설정값이며 이 화면에서는 바꿀 수 없습니다.</span></div></div><p id="asnEnfNote" class="asnNote" role="status"></p><div class="asnGrid"><div class="asnCol"><h3>현재 배정 <span id="asnCount" class="asnCount"></span></h3><div class="list asnScroll"><div class="asnTable"><div class="rowhead asnHead"><div>검수자 ID</div><div>대상 종류</div><div>대상</div><div>배정일시 (UTC)</div><div>배정한 관리자</div><div></div></div><div id="asnRows"><div class="empty">배정 현황을 불러오는 중…</div></div></div></div><div id="asnTableMsg" class="inlineMsg" role="status" aria-live="polite"></div></div><div class="asnCol asnForm"><h3>새 배정</h3><label for="asnReviewer">검수자 ID</label><input id="asnReviewer" list="asnReviewers" maxlength="128" autocomplete="off" spellcheck="false" placeholder="검수자의 계정 이름"><datalist id="asnReviewers"></datalist><span class="asnHint">검수자가 로그인할 때 쓰는 토큰의 계정 이름과 글자까지 같아야 그 검수자에게 배정됩니다.</span><label for="asnKind">대상 종류</label><select id="asnKind"><option value="review_batch">검수 배치</option><option value="doc_ids">문서 목록</option></select><div id="asnBatchWrap"><label for="asnBatch">검수 배치</label><select id="asnBatch"></select></div><div id="asnDocsWrap" style="display:none"><label for="asnDocs">문서 ID (한 줄에 하나)</label><textarea id="asnDocs" spellcheck="false" disabled placeholder="문서 ID를 한 줄에 하나씩 붙여 넣으십시오"></textarea></div><label for="asnReason">사유 (선택)</label><input id="asnReason" maxlength="1000" autocomplete="off" placeholder="배정 기록에 함께 남습니다"><button id="asnSubmit" class="btn black" type="button" style="width:100%;margin-top:16px">배정</button><div id="asnMsg" class="inlineMsg" role="status" aria-live="polite"></div></div></div></section>""")
+
+_ASSIGN_PANEL_SCRIPT = _wrap_assign_panel(r"""<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id)};
+var ASN='/api/v1/golden/assignments';
+var CAND='/api/v1/golden/candidates';
+var LOGIN_URL='/api/v1/golden/candidates/login.html';
+var BOUNCE_FLAG='koipa_login_bounced';
+var busy=false,tableSeq=0,batchCount=0;
+function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
+function say(id,text,bad){var e=$(id);if(!e)return;e.textContent=text||'';e.className=bad?'inlineMsg error':'inlineMsg'}
+// 서버가 준 값도 관리자가 넣은 값도 문자열이다 — 화면에는 textContent 로만 넣는다(innerHTML 로 이어 붙이지 않는다).
+async function send(method,url,body){
+  var opt={method:method,credentials:'same-origin',headers:{}};
+  if(body!==undefined){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(body)}
+  var r;
+  try{r=await fetch(url,opt)}catch(e){return{net:true,status:0,ok:false,data:null,text:String((e&&e.message)||e)}}
+  var text='';try{text=await r.text()}catch(e){}
+  var data=null;try{data=text?JSON.parse(text):null}catch(e){}
+  return{net:false,status:r.status,ok:r.ok,data:data,text:text}
+}
+// 401 은 다른 콘솔과 같은 방식으로 로그인 화면에 한 번만 보낸다(표식은 이 탭이 닫힐 때까지 남긴다 — 성공 응답으로 지우지 않는다).
+function bounce(){
+  try{
+    if(sessionStorage.getItem(BOUNCE_FLAG)==='1')return false;
+    sessionStorage.setItem(BOUNCE_FLAG,'1');
+  }catch(e){return false}
+  location.href=LOGIN_URL+'?next='+encodeURIComponent(location.pathname+location.search+location.hash);
+  return true;
+}
+function detailOf(r){
+  var d=r.data&&r.data.detail;
+  if(typeof d==='string'&&d)return d;
+  if(Array.isArray(d)&&d.length)return d.map(function(x){return(x&&typeof x==='object'&&x.msg)?String(x.msg):String(x)}).join(' / ');
+  return(r.text||'').slice(0,300);
+}
+function failure(r,lead){
+  if(r.net)return lead+' — 서버에 연결하지 못했습니다. 네트워크를 확인한 뒤 다시 시도하십시오.';
+  if(r.status===401)return bounce()?'로그인 화면으로 이동합니다…':lead+' — 로그인이 만료되었습니다. 로그인 화면에서 다시 들어오십시오.';
+  if(r.status===403)return lead+' — 관리자 권한이 필요합니다. 이 계정으로는 검수 배정을 다룰 수 없습니다.';
+  if(r.status===422)return lead+' — '+detailOf(r);
+  return lead+' — 서버 오류('+r.status+') '+detailOf(r);
+}
+function fmtTime(v){return v?String(v).slice(0,19).replace('T',' '):'–'}
+function setBusy(v){
+  busy=v;$('asnSubmit').disabled=v;
+  Array.prototype.forEach.call(document.querySelectorAll('#asnRows .asnRevoke'),function(b){b.disabled=v});
+}
+function renderEnforcement(en){
+  en=(en&&typeof en==='object')?en:{};
+  function flag(id,v){var n=$(id);if(typeof v==='boolean'){n.textContent=v?'켜짐':'꺼짐';n.className='pill '+(v?'asnOn':'asnOff')}else{n.textContent='확인 못 함';n.className='pill asnOff'}}
+  flag('asnEnfAssign',en.assignment_enforced);flag('asnEnfBlind',en.blind_enforced);
+  $('asnEnfNote').textContent=en.assignment_enforced===false?'배정 강제가 꺼져 있어, 배정해도 검수자 화면에 적용되지 않습니다.':'';
+}
+function renderRows(list){
+  var box=$('asnRows'),dl=$('asnReviewers'),seen=new Set();
+  box.replaceChildren();dl.replaceChildren();
+  $('asnCount').textContent=list.length+'건';
+  if(!list.length){box.append(el('div','empty','현재 배정이 없습니다 — 아래 「새 배정」에서 검수자에게 문서나 배치를 배정하십시오'));return}
+  list.forEach(function(a){
+    if(a.reviewer_id&&!seen.has(a.reviewer_id)){seen.add(a.reviewer_id);var o=document.createElement('option');o.value=a.reviewer_id;dl.append(o)}
+    var row=el('div','asnRow'),tgt=el('div','asnCell');
+    tgt.append(el('div','asnTarget',a.target));
+    if(a.reason)tgt.append(el('div','asnReasonLine','사유: '+a.reason));
+    var act=el('div','asnCell'),b=el('button','btn asnRevoke','해제');
+    b.type='button';b.disabled=busy;
+    b.setAttribute('aria-label','검수자 '+a.reviewer_id+' 의 배정 해제 — '+a.target);
+    b.addEventListener('click',function(){revoke(a)});
+    act.append(b);
+    row.append(el('div','asnCell',a.reviewer_id),el('div','asnCell',a.kind==='review_batch'?'배치':'문서'),tgt,el('div','asnCell asnTime',fmtTime(a.assigned_at)),el('div','asnCell',a.assigned_by||'–'),act);
+    box.append(row);
+  });
+}
+// 돌려주는 값: 실패 문구(성공이면 '') — 표 옆 메시지를 누가 쓸지는 부르는 쪽이 정한다.
+async function loadTable(){
+  var seq=++tableSeq;
+  var r=await send('GET',ASN);
+  if(seq!==tableSeq)return '';                       // 더 나중에 시작한 조회가 있다 — 이 응답은 버린다
+  if(r.status===200&&r.data&&Array.isArray(r.data.assignments)){renderEnforcement(r.data.enforcement);renderRows(r.data.assignments);return ''}
+  var bad=r.status===200?'배정 현황을 불러오지 못했습니다 — 서버 응답의 모양이 이 화면과 맞지 않습니다.':failure(r,'배정 현황을 불러오지 못했습니다');
+  $('asnRows').replaceChildren(el('div','empty','배정 현황을 불러오지 못했습니다 — 「새로고침」을 눌러 다시 시도하십시오'));
+  $('asnCount').textContent='';
+  renderEnforcement(null);                           // 읽지 못한 값을 이전 화면 값으로 남기지 않는다
+  return bad;
+}
+function fillBatches(list){
+  var sel=$('asnBatch');sel.replaceChildren();batchCount=list.length;
+  var head=document.createElement('option');head.value='';head.textContent=list.length?'배치를 선택하십시오':'배치 표식 없음 — 문서 목록으로 배정하십시오';sel.append(head);
+  list.forEach(function(b){var o=document.createElement('option');o.value=b.review_batch;o.textContent=b.review_batch+' · '+b.total+'건';sel.append(o)});
+  syncKind();
+}
+async function loadBatches(){
+  var r=await send('GET',CAND);
+  if(r.status===200&&r.data&&Array.isArray(r.data.available_batches)){fillBatches(r.data.available_batches);return ''}
+  fillBatches([]);
+  return r.status===200?'검수 배치 목록을 불러오지 못했습니다 — 서버 응답의 모양이 이 화면과 맞지 않습니다.':failure(r,'검수 배치 목록을 불러오지 못했습니다');
+}
+function syncKind(){
+  var docs=$('asnKind').value==='doc_ids';
+  $('asnBatchWrap').style.display=docs?'none':'';$('asnBatch').disabled=docs||!batchCount;
+  $('asnDocsWrap').style.display=docs?'':'none';$('asnDocs').disabled=!docs;
+}
+function parseDocs(text){
+  var out=[],seen=new Set();
+  String(text).split(/\r\n|\r|\n/).forEach(function(l){var t=l.trim();if(t&&!seen.has(t)){seen.add(t);out.push(t)}});
+  return out;
+}
+async function reloadAll(){
+  say('asnTableMsg','');say('asnMsg','');
+  var res=await Promise.all([loadTable(),loadBatches()]);
+  if(res[0])say('asnTableMsg',res[0],true);
+  if(res[1])say('asnMsg',res[1],true);
+}
+async function submit(){
+  if(busy)return;
+  say('asnMsg','');
+  var reviewer=$('asnReviewer').value.trim();
+  if(!reviewer){say('asnMsg','검수자 ID를 입력하십시오.',true);$('asnReviewer').focus();return}
+  var body={reviewer_id:reviewer};
+  if($('asnKind').value==='doc_ids'){
+    var ids=parseDocs($('asnDocs').value);
+    if(!ids.length){say('asnMsg','배정할 문서 ID를 한 줄에 하나씩 입력하십시오.',true);$('asnDocs').focus();return}
+    body.doc_ids=ids;
+  }else{
+    var batch=$('asnBatch').value;
+    if(!batch){say('asnMsg','배정할 검수 배치를 선택하십시오.',true);return}
+    body.review_batch=batch;
+  }
+  body.reason=$('asnReason').value.trim();
+  setBusy(true);
+  var r=await send('POST',ASN,body);
+  setBusy(false);
+  if(r.status===200&&r.data){
+    say('asnMsg','새로 배정 '+(r.data.events_written||0)+'건 · 이미 배정돼 건너뜀 '+((r.data.skipped||[]).length)+'건');
+    $('asnDocs').value='';$('asnReason').value='';
+    var bad=await loadTable();
+    if(bad)say('asnTableMsg',bad,true);else say('asnTableMsg','');
+    return;
+  }
+  say('asnMsg',failure(r,'배정하지 못했습니다'),true);
+}
+async function revoke(a){
+  if(busy)return;
+  var body={reviewer_id:a.reviewer_id};
+  if(a.kind==='doc_id')body.doc_ids=[a.target];else body.review_batch=a.target;
+  say('asnTableMsg','');
+  setBusy(true);
+  var r=await send('POST',ASN+'/revoke',body);
+  setBusy(false);
+  if(r.status===200&&r.data){
+    var text=(r.data.events_written||0)>0?('해제했습니다 — '+a.reviewer_id+' · '+a.target):('이미 해제돼 있었습니다 — '+a.reviewer_id+' · '+a.target);
+    var bad=await loadTable();
+    say('asnTableMsg',bad?(text+'. '+bad):text,!!bad);
+    return;
+  }
+  say('asnTableMsg',failure(r,'해제하지 못했습니다'),true);
+}
+$('asnKind').addEventListener('change',syncKind);
+$('asnSubmit').addEventListener('click',submit);
+$('asnReload').addEventListener('click',reloadAll);
+syncKind();
+reloadAll();
+})();
+</script>""")
 
 
 def _render_specledger_gold_console_html() -> str:
@@ -622,7 +1117,7 @@ def _render_specledger_gold_console_html() -> str:
 .viewnote{margin-left:auto;font-size:11.5px;color:#8a9299}
 """ + DOC_CSS + r""".sideDetail{background:#fafaf8;padding:25px}.sideDetail h4{font:800 12px ui-monospace,monospace;color:#8b949b;margin:0 0 14px}.action label{display:block;font-size:12px;color:#6b7378;margin:12px 0 4px}.action select,.action textarea{width:100%;border:1px solid var(--line);padding:9px;background:#fff}.action textarea{height:95px;resize:vertical}.history{border-top:1px solid var(--line);margin-top:24px;padding-top:18px}.event{border-left:3px solid var(--red);padding:4px 0 4px 10px;margin:10px 0;font-size:12px}.event .when{color:#8b949b;margin-top:3px}.modal{position:fixed;inset:0;background:#111b;display:none;align-items:center;justify-content:center;padding:20px;z-index:200}.modal.show{display:flex}.dialog{background:#fff;border:1px solid #ddd;max-width:540px;width:100%;padding:28px;box-shadow:10px 10px 0 #111}.dialog h3{font-size:25px;margin:0 0 8px}.drop{border:1px dashed #aab0b3;padding:24px;margin:20px 0;background:#fafaf8}.drop input{width:100%}.dialogActions{display:flex;justify-content:flex-end;gap:8px}""" + SHELL_MEDIA_CSS + r"""@media(max-width:1050px){.detail.show{grid-template-columns:1fr}.detailMain{border-right:0}.sideDetail{border-top:1px solid var(--line)}}@media(max-width:700px){.candidate{grid-template-columns:1fr 70px}.candidate .origin,.candidate .chars{display:none}}
 .drop.over{border-color:#111;background:#f4f4f2}
-.inlineMsg{font-size:12px;line-height:1.55;margin-top:8px;color:#087341}.inlineMsg.error{color:#bf2337}.inlineMsg:empty{display:none}.apart{display:inline-block;border:1px solid #cfd3d6;background:#f4f5f6;color:#5f666c;font-size:11px;font-weight:700;padding:2px 6px;margin-left:6px;vertical-align:2px}.apartBox{border-left:3px solid #dededb;padding-left:13px}.rule{border-top:1px solid #eceae7;padding:10px 0}.rule b{display:block;margin-bottom:4px;font-size:12.5px}.rule span{color:#70757a;font-size:12px;line-height:1.5}"""  + HEADER_CSS + NAV_CSS + r"""</style></head><body>""" + header_html("검증문서 후보 관리", "manage", exclude=REVIEW_SCREEN_EXCLUDE, trailing=r"""<div class="topmid"><span class="dot"></span>등급 미확정 <span id="topCount">–</span>건</div>""") + r"""<div class="frame"><aside class="side"><div class="cap">CURRENT WORKSPACE</div><div class="workname">koipa-ai</div><div class="workdesc">Koipa AI Engine for KOIPA Trade-Secret System (PoC)</div><div class="branch">goldset/console-review</div><nav class="nav"><a href="#overview" class="active"><span>01</span>개요</a><a href="#candidates"><span>02</span>골든셋 후보</a><a href="#detail"><span>03</span>문서 상세·결정</a><a href="#ledgerAll"><span>04</span>보류·폐기 이력</a><a href="#quality"><span>05</span>품질 지표</a></nav><div class="ledger"><div class="cap">SNAPSHOT LEDGER</div><b id="session">포털 로그인 확인 중</b><div>origin · audit · decision</div></div></aside><main class="main"><section id="overview" class="hero"><div><div class="eyebrow">GOLDEN SET REVIEW CONSOLE</div><h1>검수 가능한<br><em>골든셋</em>을 관리합니다.</h1><p>합성 후보와 실문서를 한 곳에서 검수하고, 등급 확정·보류·폐기를 누가 왜 그렇게 정했는지와 함께 남깁니다. 기록은 덮어쓰지 않고 계속 쌓입니다.</p><div class="flow"><span>문서 수집</span><i>→</i><span>후보·검토</span><i>→</i><span>등급 확정</span><i>→</i><span>이력 보존</span></div></div><aside class="gate"><div class="glabel">등급 확정 진행</div><strong id="readiness">–</strong><div id="readinessNote" style="font-size:11.5px;color:#8d949b;margin:2px 0 6px"></div><p>확정된 후보 수 / 전체 후보 수입니다. 등급을 확정해도 <b>그것만으로 평가 정답지가 되지는 않습니다</b> — 아래 「평가정답으로 승격」을 눌러야 반영됩니다. 승격은 여러 번 눌러도 결과가 같습니다.</p><span class="status">● 후보 단계</span><div class="actions"><button class="btn black" id="openUpload">문서 업로드</button><button class="btn" id="promote">평가정답으로 승격</button><button class="btn" id="refresh">새로고침</button></div><div id="promoteMsg" class="inlineMsg" role="status" aria-live="polite"></div></aside></section><section class="summary" id="kpis"><div class="summaryIntro"><div class="cap">현황 요약</div><h2>골든셋 현황</h2><p>현재 워크스페이스의 검수 상태와 등급 분포입니다.</p></div></section><div id="flash" class="flash" role="status" aria-live="polite"></div><section id="candidates" class="section"><div class="sectionTop"><div><span class="secNum">02</span><h2>골든셋 후보</h2><p>문서를 선택하면 전문과 등급 결정 이력이 열립니다.</p></div><div class="filters"><select id="review_batch" aria-label="검수 배치" title="검수 전달본 단위로 목록을 좁힙니다. 비우면 전체 후보가 보입니다. 목록에 뜨는 배치는 이 서버 원장에 실제로 있는 것뿐입니다(응답의 available_batches)."><option value="">전체 배치</option></select><input id="query" placeholder="문서 ID 또는 제목" aria-label="문서 ID 또는 제목 검색"><select id="status"><option value="">전체 상태</option><option value="proposed">제안</option><option value="under_review">검토중</option><option value="approved_proxy">Proxy 확정</option><option value="grade_fixed_unlocked">등급 확정</option><option value="deferred">보류</option><option value="discarded">폐기</option><option value="out_of_scope">검수 대상 아님</option></select><select id="grade"><option value="">전체 등급</option><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select><select id="origin"><option value="">전체 출처</option><option value="synthetic">합성 후보</option><option value="public_real">공개 실문서</option><option value="organization_real">조직 보유 실문서</option></select><button id="filter" class="btn">필터</button></div></div><div class="list"><div class="rowhead"><div>DOCUMENT ID</div><div>DOCUMENT</div><div>GRADE / ORIGIN</div><div>STATUS</div><div>SIZE</div></div><div id="rows"><div class="empty">문서 목록을 불러오는 중입니다.</div></div></div></section><section id="detail" class="detail"><div class="detailMain"><div class="eyebrow">DOCUMENT EVIDENCE</div><h3 id="detailTitle">문서 상세</h3><div id="metas" class="metas"></div><div id="scope" class="scope"></div><div class="viewbar"><button class="btn sm" id="viewRendered" aria-pressed="true">읽기 좋게</button><button class="btn sm" id="viewRaw" aria-pressed="false">원문 그대로</button><span class="viewnote">검수 판단은 원문 기준입니다. 읽기 좋게 보기는 서식만 입힌 같은 내용입니다.</span></div><div id="documentRendered" class="docbody md"></div><pre id="document" class="docbody" style="display:none"></pre></div><aside class="sideDetail"><h4>등급 결정</h4><div class="action"><label>결정</label><select id="action"></select><div id="gradeWrap"><label>확정 등급</label><select id="finalGrade"><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select></div><div id="mgmtWrap" style="margin-top:12px;border-top:1px dashed #dededb;padding-top:12px"><h4 style="margin:0 0 6px">비밀관리성 (M)</h4><p style="font-size:12px;color:#70757a;line-height:1.5;margin:0 0 10px">이 두 가지는 <b>본문에 적혀 있지 않습니다.</b> 문서에 찍힌 표기는 원문에서 확인하고, 접근범위는 아는 경우에만 고르십시오. <b>모르면 「확인 안 됨」으로 두십시오</b> — 추측해서 고르면 등급이 바뀝니다.</p><label>보안표시 — 문서에 찍힌 표기</label><select id="secMarking"><option value="">확인 안 됨</option><option value="none">표기 없음</option><option value="confidential">대외비</option><option value="secret">기밀 · 1급 비밀</option><option value="top_secret">극비 · 특급기밀</option></select><label>접근범위 — 누가 열람할 수 있나</label><select id="accScope"><option value="">확인 안 됨</option><option value="approved_only">승인된 자에 한해 공개</option><option value="designated">지정된 접근자만 (NDA·열람 제한)</option><option value="department">특정 부서 · 임직원 일부</option><option value="all_employees">전 임직원 열람 가능</option></select><div id="mgmtState" style="font-size:11.5px;line-height:1.5;margin-top:8px"></div></div><label>사유 / 메모</label><textarea id="reason" placeholder="등급 지정·보류·폐기에는 사유가 필요합니다."></textarea><button id="save" class="btn black" style="width:100%;margin-top:12px">결정 저장</button><div id="saveMsg" class="inlineMsg" role="status" aria-live="polite"></div></div><div id="provBox" class="action apartBox" style="display:none;margin-top:18px;border-top:1px solid #dededb;padding-top:16px"><h4 style="margin:0 0 8px">출처 기록 <span class="apart">등급 결정과 별개</span> <span id="provStatus" style="font-weight:400;color:#70757a;font-size:12.5px"></span></h4><p id="provNote" style="font-size:12px;color:#70757a;line-height:1.5;margin:0 0 10px"><b>등급 결정과는 무관합니다.</b> 채우지 않아도 등급 확정·보류·폐기 모두 됩니다. 나중에 이 문서를 어디서 가져왔는지 답해야 할 때를 위한 기록이니, <b>아는 것만</b> 적으시면 됩니다. 여기에 적어도 등급·상태는 바뀌지 않습니다.</p><label>원천 위치 / 식별 정보<span style="color:#8a9299;font-weight:400;font-size:11.5px;margin-left:4px">(선택)</span></label><input id="provSrc" placeholder="예: 품질관리/운영절차/2026 또는 공개기관 URL"><label>사용 권한 또는 공개 근거<span style="color:#8a9299;font-weight:400;font-size:11.5px;margin-left:4px">(선택)</span></label><input id="provBasis" placeholder="예: 소유부서 검수용 사용 승인 / 공개 라이선스"><label>메모(선택)</label><input id="provReason" placeholder="사후 기록 사유"><div id="provOrigin" style="font-size:11.5px;color:#8d949b;margin-top:6px"></div><button id="provSave" class="btn" style="width:100%;margin-top:10px">출처 저장</button><div id="provMsg" class="inlineMsg" role="status" aria-live="polite"></div></div><div class="history"><h4>결정 이력</h4><div id="history" class="empty">결정 이력이 없습니다.</div></div></aside></section><section id="ledgerAll" class="section"><div class="sectionTop"><div><span class="secNum">04</span><h2>보류 · 폐기 이력</h2><p>문서를 열지 않고 전체 결정 기록을 최신순으로 봅니다. 기록은 덧붙이기만 하며 지워지지 않습니다.</p></div><div class="filters"><select id="ledgerFilter"><option value="">전체 결정</option><option value="defer">보류</option><option value="discard">폐기</option><option value="exclude">검수 대상 아님</option><option value="change">등급 변경</option><option value="approve">승인</option><option value="reopen">재검토</option></select><button id="ledgerReload" class="btn">불러오기</button></div></div><div class="list"><div class="rowhead" style="grid-template-columns:150px 110px 120px minmax(180px,1.6fr) 150px"><div>DOCUMENT ID</div><div>ACTION</div><div>GRADE</div><div>REASON</div><div>WHO / WHEN</div></div><div id="ledgerRows"><div class="empty">결정 기록이 없습니다.</div></div></div></section><section id="quality" class="section"><div class="sectionTop"><div><span class="secNum">05</span><h2>품질 지표</h2><p>등급을 맞히는 데 본문 말고 다른 단서가 섞였는지 봅니다. 여기가 나쁘면 이 골든셋으로 잰 정확도는 부풀려집니다.</p></div></div><div id="qualityBody"><div class="empty">지표를 불러오는 중입니다.</div></div></section></main></div><div id="modal" class="modal"><section class="dialog"><div class="eyebrow">문서 등록</div><h3>문서 업로드</h3><p>업로드 문서는 검토 대기 상태로만 저장됩니다. 자동 골든 승격이나 외부 LLM 전송은 하지 않습니다.</p><div class="drop" id="drop"><input id="file" type="file" accept=".txt,.md,.csv,.pdf,.doc,.docx,.hwp,.hwpx,.xlsx,.xls,.pptx"><p><b id="dropName">여기로 파일을 끌어다 놓거나 위에서 선택하세요</b><br>TXT · PDF · Word · HWP/HWPX · Excel · PPTX<br><span style="color:#8a9299">스캔 이미지는 지원하지 않습니다 — 본문 텍스트가 있는 파일만 등록됩니다.</span></p></div><div class="action"><label>문서 출처</label><select id="upOrigin"><option value="organization_real">조직 보유 실문서 — S2/S3</option><option value="public_real">공개 실문서 — S3 우선</option></select><label>원천 위치 / 식별 정보 <span style="color:#8a9299;font-weight:400">(선택)</span></label><input id="upSource" placeholder="예: 품질관리/운영절차/2026 또는 공개기관 URL" style="width:100%;border:1px solid var(--line);padding:9px"><label>사용 권한 또는 공개 근거 <span style="color:#8a9299;font-weight:400">(선택)</span></label><select id="upBasisSel"><option value="">선택하세요</option><option value="소유부서 검수용 사용 승인">소유부서 검수용 사용 승인</option><option value="기관 공개자료(공개 라이선스)">기관 공개자료(공개 라이선스)</option><option value="공공누리 등 공공저작물 이용허락">공공누리 등 공공저작물 이용허락</option><option value="사내 교육·배포용 승인">사내 교육·배포용 승인</option><option value="__custom__">직접 입력…</option></select><input id="upBasis" placeholder="근거를 직접 적으십시오" style="width:100%;border:1px solid var(--line);padding:9px;display:none;margin-top:6px"><p style="font-size:12px;color:#8a9299;margin:10px 0 0">지금 몰라도 등록됩니다 — 문서 상세의 「출처 기록」에서 나중에 채울 수 있습니다. <b>등급 확정을 막지는 않습니다.</b> 고객사 원문·반출 승인이 없는 문서는 등록하지 마십시오.</p></div><div class="rules" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px"><div class="eyebrow" style="margin-bottom:8px">등록 기준 · 등록 기준</div><div class="rule"><b>S3 · 공개·일반</b><span>공식 공지, 공개 매뉴얼, 일반 안내. 기관·버전·공개 위치를 기록합니다.</span></div><div class="rule"><b>S2 · 조직 내부</b><span>운영 절차, 품질 이력, 교육 자료, 변경·장애 후속조치 등. 소유부서의 검수·사용 근거를 기록합니다.</span></div><div class="rule"><b>제외</b><span>고객사 원문, 반출 승인이 없는 문서, 권한이 불명확한 파일은 등록하지 않습니다.</span></div><div class="rule"><b>다음 단계</b><span>여기 등록은 평가 정답지 승격이 아닙니다. 등급을 잠정 지정하고, 사람 검수 완료 뒤에만 별도 승격 절차를 사용합니다.</span></div></div><div id="upMsg" class="flash" style="display:none;margin:14px 0 0"></div><div class="dialogActions"><button id="cancelUpload" class="btn">취소</button><button id="upload" class="btn black">업로드 및 추출</button></div></section></div><script>""" + upload_progress_js() + r"""</script><script>
+.inlineMsg{font-size:12px;line-height:1.55;margin-top:8px;color:#087341}.inlineMsg.error{color:#bf2337}.inlineMsg:empty{display:none}.apart{display:inline-block;border:1px solid #cfd3d6;background:#f4f5f6;color:#5f666c;font-size:11px;font-weight:700;padding:2px 6px;margin-left:6px;vertical-align:2px}.apartBox{border-left:3px solid #dededb;padding-left:13px}.rule{border-top:1px solid #eceae7;padding:10px 0}.rule b{display:block;margin-bottom:4px;font-size:12.5px}.rule span{color:#70757a;font-size:12px;line-height:1.5}"""  + HEADER_CSS + NAV_CSS + r"""</style>""" + _ASSIGN_PANEL_CSS + r"""</head><body>""" + header_html("검증문서 후보 관리", "manage", exclude=REVIEW_SCREEN_EXCLUDE, trailing=r"""<div class="topmid"><span class="dot"></span>등급 미확정 <span id="topCount">–</span>건</div>""") + r"""<div class="frame"><aside class="side"><div class="cap">CURRENT WORKSPACE</div><div class="workname">koipa-ai</div><div class="workdesc">Koipa AI Engine for KOIPA Trade-Secret System (PoC)</div><div class="branch">goldset/console-review</div><nav class="nav"><a href="#overview" class="active"><span>01</span>개요</a><a href="#candidates"><span>02</span>골든셋 후보</a><a href="#detail"><span>03</span>문서 상세·결정</a><a href="#ledgerAll"><span>04</span>보류·폐기 이력</a><a href="#quality"><span>05</span>품질 지표</a>""" + _ASSIGN_PANEL_NAV + r"""</nav><div class="ledger"><div class="cap">SNAPSHOT LEDGER</div><b id="session">포털 로그인 확인 중</b><div>origin · audit · decision</div></div></aside><main class="main"><section id="overview" class="hero"><div><div class="eyebrow">GOLDEN SET REVIEW CONSOLE</div><h1>검수 가능한<br><em>골든셋</em>을 관리합니다.</h1><p>합성 후보와 실문서를 한 곳에서 검수하고, 등급 확정·보류·폐기를 누가 왜 그렇게 정했는지와 함께 남깁니다. 기록은 덮어쓰지 않고 계속 쌓입니다.</p><div class="flow"><span>문서 수집</span><i>→</i><span>후보·검토</span><i>→</i><span>등급 확정</span><i>→</i><span>이력 보존</span></div></div><aside class="gate"><div class="glabel">등급 확정 진행</div><strong id="readiness">–</strong><div id="readinessNote" style="font-size:11.5px;color:#8d949b;margin:2px 0 6px"></div><p>확정된 후보 수 / 전체 후보 수입니다. 등급을 확정해도 <b>그것만으로 평가 정답지가 되지는 않습니다</b> — 아래 「평가정답으로 승격」을 눌러야 반영됩니다. 승격은 여러 번 눌러도 결과가 같습니다.</p><span class="status">● 후보 단계</span><div class="actions"><button class="btn black" id="openUpload">문서 업로드</button><button class="btn" id="promote">평가정답으로 승격</button><button class="btn" id="refresh">새로고침</button></div><div id="promoteMsg" class="inlineMsg" role="status" aria-live="polite"></div></aside></section><section class="summary" id="kpis"><div class="summaryIntro"><div class="cap">현황 요약</div><h2>골든셋 현황</h2><p>현재 워크스페이스의 검수 상태와 등급 분포입니다.</p></div></section><div id="flash" class="flash" role="status" aria-live="polite"></div><section id="candidates" class="section"><div class="sectionTop"><div><span class="secNum">02</span><h2>골든셋 후보</h2><p>문서를 선택하면 전문과 등급 결정 이력이 열립니다.</p></div><div class="filters"><select id="review_batch" aria-label="검수 배치" title="검수 전달본 단위로 목록을 좁힙니다. 비우면 전체 후보가 보입니다. 목록에 뜨는 배치는 이 서버 원장에 실제로 있는 것뿐입니다(응답의 available_batches)."><option value="">전체 배치</option></select><input id="query" placeholder="문서 ID 또는 제목" aria-label="문서 ID 또는 제목 검색"><select id="status"><option value="">전체 상태</option><option value="proposed">제안</option><option value="under_review">검토중</option><option value="approved_proxy">Proxy 확정</option><option value="grade_fixed_unlocked">등급 확정</option><option value="deferred">보류</option><option value="discarded">폐기</option><option value="out_of_scope">검수 대상 아님</option></select><select id="grade"><option value="">전체 등급</option><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select><select id="origin"><option value="">전체 출처</option><option value="synthetic">합성 후보</option><option value="public_real">공개 실문서</option><option value="organization_real">조직 보유 실문서</option></select><button id="filter" class="btn">필터</button></div></div><div class="list"><div class="rowhead"><div>DOCUMENT ID</div><div>DOCUMENT</div><div>GRADE / ORIGIN</div><div>STATUS</div><div>SIZE</div></div><div id="rows"><div class="empty">문서 목록을 불러오는 중입니다.</div></div></div></section><section id="detail" class="detail"><div class="detailMain"><div class="eyebrow">DOCUMENT EVIDENCE</div><h3 id="detailTitle">문서 상세</h3><div id="metas" class="metas"></div><div id="scope" class="scope"></div><div class="viewbar"><button class="btn sm" id="viewRendered" aria-pressed="true">읽기 좋게</button><button class="btn sm" id="viewRaw" aria-pressed="false">원문 그대로</button><span class="viewnote">검수 판단은 원문 기준입니다. 읽기 좋게 보기는 서식만 입힌 같은 내용입니다.</span></div><div id="documentRendered" class="docbody md"></div><pre id="document" class="docbody" style="display:none"></pre></div><aside class="sideDetail"><h4>등급 결정</h4><div class="action"><label>결정</label><select id="action"></select><div id="gradeWrap"><label>확정 등급</label><select id="finalGrade"><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select></div><div id="mgmtWrap" style="margin-top:12px;border-top:1px dashed #dededb;padding-top:12px"><h4 style="margin:0 0 6px">비밀관리성 (M)</h4><p style="font-size:12px;color:#70757a;line-height:1.5;margin:0 0 10px">이 두 가지는 <b>본문에 적혀 있지 않습니다.</b> 문서에 찍힌 표기는 원문에서 확인하고, 접근범위는 아는 경우에만 고르십시오. <b>모르면 「확인 안 됨」으로 두십시오</b> — 추측해서 고르면 등급이 바뀝니다.</p><label>보안표시 — 문서에 찍힌 표기</label><select id="secMarking"><option value="">확인 안 됨</option><option value="none">표기 없음</option><option value="confidential">대외비</option><option value="secret">기밀 · 1급 비밀</option><option value="top_secret">극비 · 특급기밀</option></select><label>접근범위 — 누가 열람할 수 있나</label><select id="accScope"><option value="">확인 안 됨</option><option value="approved_only">승인된 자에 한해 공개</option><option value="designated">지정된 접근자만 (NDA·열람 제한)</option><option value="department">특정 부서 · 임직원 일부</option><option value="all_employees">전 임직원 열람 가능</option></select><div id="mgmtState" style="font-size:11.5px;line-height:1.5;margin-top:8px"></div></div><label>사유 / 메모</label><textarea id="reason" placeholder="등급 지정·보류·폐기에는 사유가 필요합니다."></textarea><button id="save" class="btn black" style="width:100%;margin-top:12px">결정 저장</button><div id="saveMsg" class="inlineMsg" role="status" aria-live="polite"></div></div><div id="provBox" class="action apartBox" style="display:none;margin-top:18px;border-top:1px solid #dededb;padding-top:16px"><h4 style="margin:0 0 8px">출처 기록 <span class="apart">등급 결정과 별개</span> <span id="provStatus" style="font-weight:400;color:#70757a;font-size:12.5px"></span></h4><p id="provNote" style="font-size:12px;color:#70757a;line-height:1.5;margin:0 0 10px"><b>등급 결정과는 무관합니다.</b> 채우지 않아도 등급 확정·보류·폐기 모두 됩니다. 나중에 이 문서를 어디서 가져왔는지 답해야 할 때를 위한 기록이니, <b>아는 것만</b> 적으시면 됩니다. 여기에 적어도 등급·상태는 바뀌지 않습니다.</p><label>원천 위치 / 식별 정보<span style="color:#8a9299;font-weight:400;font-size:11.5px;margin-left:4px">(선택)</span></label><input id="provSrc" placeholder="예: 품질관리/운영절차/2026 또는 공개기관 URL"><label>사용 권한 또는 공개 근거<span style="color:#8a9299;font-weight:400;font-size:11.5px;margin-left:4px">(선택)</span></label><input id="provBasis" placeholder="예: 소유부서 검수용 사용 승인 / 공개 라이선스"><label>메모(선택)</label><input id="provReason" placeholder="사후 기록 사유"><div id="provOrigin" style="font-size:11.5px;color:#8d949b;margin-top:6px"></div><button id="provSave" class="btn" style="width:100%;margin-top:10px">출처 저장</button><div id="provMsg" class="inlineMsg" role="status" aria-live="polite"></div></div><div class="history"><h4>결정 이력</h4><div id="history" class="empty">결정 이력이 없습니다.</div></div></aside></section><section id="ledgerAll" class="section"><div class="sectionTop"><div><span class="secNum">04</span><h2>보류 · 폐기 이력</h2><p>문서를 열지 않고 전체 결정 기록을 최신순으로 봅니다. 기록은 덧붙이기만 하며 지워지지 않습니다.</p></div><div class="filters"><select id="ledgerFilter"><option value="">전체 결정</option><option value="defer">보류</option><option value="discard">폐기</option><option value="exclude">검수 대상 아님</option><option value="change">등급 변경</option><option value="approve">승인</option><option value="reopen">재검토</option></select><button id="ledgerReload" class="btn">불러오기</button></div></div><div class="list"><div class="rowhead" style="grid-template-columns:150px 110px 120px minmax(180px,1.6fr) 150px"><div>DOCUMENT ID</div><div>ACTION</div><div>GRADE</div><div>REASON</div><div>WHO / WHEN</div></div><div id="ledgerRows"><div class="empty">결정 기록이 없습니다.</div></div></div></section><section id="quality" class="section"><div class="sectionTop"><div><span class="secNum">05</span><h2>품질 지표</h2><p>등급을 맞히는 데 본문 말고 다른 단서가 섞였는지 봅니다. 여기가 나쁘면 이 골든셋으로 잰 정확도는 부풀려집니다.</p></div></div><div id="qualityBody"><div class="empty">지표를 불러오는 중입니다.</div></div></section>""" + _ASSIGN_PANEL_SECTION + r"""</main></div><div id="modal" class="modal"><section class="dialog"><div class="eyebrow">문서 등록</div><h3>문서 업로드</h3><p>업로드 문서는 검토 대기 상태로만 저장됩니다. 자동 골든 승격이나 외부 LLM 전송은 하지 않습니다.</p><div class="drop" id="drop"><input id="file" type="file" accept=".txt,.md,.csv,.pdf,.doc,.docx,.hwp,.hwpx,.xlsx,.xls,.pptx"><p><b id="dropName">여기로 파일을 끌어다 놓거나 위에서 선택하세요</b><br>TXT · PDF · Word · HWP/HWPX · Excel · PPTX<br><span style="color:#8a9299">스캔 이미지는 지원하지 않습니다 — 본문 텍스트가 있는 파일만 등록됩니다.</span></p></div><div class="action"><label>문서 출처</label><select id="upOrigin"><option value="organization_real">조직 보유 실문서 — S2/S3</option><option value="public_real">공개 실문서 — S3 우선</option></select><label>원천 위치 / 식별 정보 <span style="color:#8a9299;font-weight:400">(선택)</span></label><input id="upSource" placeholder="예: 품질관리/운영절차/2026 또는 공개기관 URL" style="width:100%;border:1px solid var(--line);padding:9px"><label>사용 권한 또는 공개 근거 <span style="color:#8a9299;font-weight:400">(선택)</span></label><select id="upBasisSel"><option value="">선택하세요</option><option value="소유부서 검수용 사용 승인">소유부서 검수용 사용 승인</option><option value="기관 공개자료(공개 라이선스)">기관 공개자료(공개 라이선스)</option><option value="공공누리 등 공공저작물 이용허락">공공누리 등 공공저작물 이용허락</option><option value="사내 교육·배포용 승인">사내 교육·배포용 승인</option><option value="__custom__">직접 입력…</option></select><input id="upBasis" placeholder="근거를 직접 적으십시오" style="width:100%;border:1px solid var(--line);padding:9px;display:none;margin-top:6px"><p style="font-size:12px;color:#8a9299;margin:10px 0 0">지금 몰라도 등록됩니다 — 문서 상세의 「출처 기록」에서 나중에 채울 수 있습니다. <b>등급 확정을 막지는 않습니다.</b> 고객사 원문·반출 승인이 없는 문서는 등록하지 마십시오.</p></div><div class="rules" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px"><div class="eyebrow" style="margin-bottom:8px">등록 기준 · 등록 기준</div><div class="rule"><b>S3 · 공개·일반</b><span>공식 공지, 공개 매뉴얼, 일반 안내. 기관·버전·공개 위치를 기록합니다.</span></div><div class="rule"><b>S2 · 조직 내부</b><span>운영 절차, 품질 이력, 교육 자료, 변경·장애 후속조치 등. 소유부서의 검수·사용 근거를 기록합니다.</span></div><div class="rule"><b>제외</b><span>고객사 원문, 반출 승인이 없는 문서, 권한이 불명확한 파일은 등록하지 않습니다.</span></div><div class="rule"><b>다음 단계</b><span>여기 등록은 평가 정답지 승격이 아닙니다. 등급을 잠정 지정하고, 사람 검수 완료 뒤에만 별도 승격 절차를 사용합니다.</span></div></div><div id="upMsg" class="flash" style="display:none;margin:14px 0 0"></div><div class="dialogActions"><button id="cancelUpload" class="btn">취소</button><button id="upload" class="btn black">업로드 및 추출</button></div></section></div><script>""" + upload_progress_js() + r"""</script><script>
 let selected=null;const $=id=>document.getElementById(id);const api='/api/v1/golden/candidates';function msg(v,bad=false){const e=$('flash');e.textContent=v;e.className=bad?'flash error':'flash';const m=$('upMsg'),md=$('modal');if(m){if(md&&md.classList.contains('show')){m.textContent=v;m.className=bad?'flash error':'flash';m.style.display='';}else{m.style.display='none';}}}function note(id,v,bad=false){const e=$(id);if(!e)return;e.textContent=v||'';e.className=bad?'inlineMsg error':'inlineMsg'}function hdr(json=true){let h={};if(json)h['Content-Type']='application/json';return h}function qurl(){let q=new URLSearchParams();['status','grade','origin','query','review_batch'].forEach(id=>{let v=$(id).value.trim();if(v)q.set(id,v)});return api+(q.size?'?'+q:'')}async function req(url,opt={}){if(window.__GOLDEN_PREVIEW__){const p=window.__GOLDEN_PREVIEW__;if(opt.method)throw new Error('로컬 미리보기는 읽기 전용입니다. 업로드·등급 변경·폐기는 KL 콘솔 배포 후 사용할 수 있습니다.');if(url.endsWith('/session'))return {actor_id:'로컬 미리보기 · 읽기 전용'};const id=url.split('?')[0].slice((api+'/').length);if(id&&p.by_id[id])return p.by_id[id];return p.list}const r=await fetch(url,{...opt,credentials:'same-origin',headers:{...hdr(opt.json!==false),...(opt.headers||{})}});if(!r.ok)throw new Error((await r.text())||r.status);return r.json()}function metric(label,value,hint){let d=document.createElement('div');d.className='metric';d.innerHTML='<div class="mcap"></div><b></b><small></small>';d.children[0].textContent=label;d.children[1].textContent=value;d.children[2].textContent=hint;return d}function renderSummary(s,b){$('kpis').replaceChildren();let intro=document.createElement('div');intro.className='summaryIntro';intro.innerHTML='<div class="cap">현황 요약</div><h2>골든셋 현황</h2><p>현재 워크스페이스의 검수 상태와 등급 분포입니다.</p>';$('kpis').append(intro,metric('전체 후보',s.total+'건','원장 전량 · 폐기 '+(s.discarded||0)+'건 포함'),metric('등급 확정',s.fixed+'건','Proxy / Unlocked'),metric('미확정',s.unfixed+'건','검토 필요'),metric('보류 · 폐기',(s.deferred+s.discarded)+'건','감사 이력 보존'),metric('검수 대상 아님',(s.out_of_scope||0)+'건','범위 밖 · 되돌릴 수 있음'),metric('실문서',(s.actual_document_intake||0)+'건','출처 기록 대상'),metric('출처 기록',(s.actual_provenance_recorded||0)+'건','미완 '+(s.actual_provenance_partial||0)+'건 · 옛 자리 '+(s.actual_provenance_legacy||0)+'건'));var scoped=b&&b.total!==s.total;$('readiness').textContent=scoped?(b.terminal+'/'+b.total):(s.fixed+'/'+s.total);$('readinessNote').textContent=scoped?('이 배치 기준 · 남은 '+b.pending+'건'+(b.deferred?' · 보류 '+b.deferred+'건 포함':'')):'전체 후보 기준';$('topCount').textContent=scoped?b.pending:s.unfixed;renderQuality(s.quality);loadLedger()}function pill(status){let e=document.createElement('span');e.className='pill '+(status==='discarded'?'discard':status==='out_of_scope'?'discard':status==='deferred'?'defer':status.includes('fixed')||status==='approved_proxy'?'fixed':status==='under_review'?'review':'proposed');e.textContent={proposed:'제안',under_review:'검토중',approved_proxy:'Proxy 확정',grade_fixed_unlocked:'등급 확정',deferred:'보류',discarded:'폐기',out_of_scope:'검수 대상 아님'}[status]||status;return e}function renderBatches(list){let sel=$('review_batch');if(!sel)return;let keep=sel.value;sel.replaceChildren();let items=Array.isArray(list)?list:[];sel.append(option('',items.length?'전체 배치':'배치 표식 없음'));items.forEach(b=>sel.append(option(b.review_batch,b.review_batch+' · '+b.total+'건')));sel.disabled=!items.length;if(keep&&items.some(b=>b.review_batch===keep))sel.value=keep;}function renderRows(data){let box=$('rows');box.replaceChildren();renderSummary(data.summary,data.batch_summary);renderBatches(data.available_batches);if(!data.candidates.length){box.innerHTML='<div class="empty">조건에 맞는 문서가 없습니다.</div>';return}data.candidates.forEach(c=>{let row=document.createElement('button');row.className='candidate'+(selected&&selected.doc_id===c.doc_id?' selected':'');let grade=(c.proposed_grade||'–')+(c.final_grade?' → '+c.final_grade:'');row.innerHTML='<div class="docid"></div><div><div class="doctitle"></div><div class="docsub"></div></div><div><div class="grade"></div><div class="origin"></div></div><div></div><div class="chars"></div>';row.children[0].textContent=c.doc_id;row.children[1].children[0].textContent=c.title;row.children[1].children[1].textContent=({synthetic:'합성 후보',public_real:'공개 실문서',organization_real:'조직 보유 실문서'}[c.document_origin]||c.document_origin);row.children[2].children[0].textContent=grade;row.children[2].children[1].textContent=c.document_origin;row.children[3].append(pill(c.status));row.children[4].textContent=c.characters.toLocaleString();row.onclick=()=>show(c.doc_id);box.append(row)})}function option(v,t){let o=document.createElement('option');o.value=v;o.textContent=t;return o}function setActions(c){let a=$('action');a.replaceChildren();if(c.document_origin==='synthetic'&&c.proposed_grade)a.append(option('approve','승인 (제안 등급 그대로 확정)'));a.append(option('change','등급 지정/변경'),option('defer','보류'),option('discard','폐기'),option('exclude','검수 대상 아님'));if(c.status==='deferred'||c.status==='discarded'||c.status==='out_of_scope')a.append(option('reopen','재검토로 되돌림'));toggleGrade()}function toggleGrade(){$('gradeWrap').style.display=$('action').value==='change'?'block':'none';syncMgmt()}
 // [2026-08-24] 사유 누락 안내가 결정 넷을 나열해("등급 지정·보류·폐기·검수 대상 아님에는…")
 // 폐기에도 다른 조건이 걸린 것처럼 읽혔다. 고른 결정 이름만 말한다.
@@ -727,7 +1222,7 @@ $('refresh').onclick=load;$('promote').onclick=async()=>{const b=$('promote');b.
 $('cancelUpload').onclick=()=>{const m=$('upMsg');if(m)m.style.display='none';$('modal').classList.remove('show');};$('upload').onclick=upload;$('ledgerReload').onclick=loadLedger;$('ledgerFilter').onchange=loadLedger;
 $('viewRendered').onclick=()=>setDocView(true);$('viewRaw').onclick=()=>setDocView(false);setDocView(true);
 load();
-</script></body></html>"""
+</script>""" + _ASSIGN_PANEL_SCRIPT + r"""</body></html>"""
 
 
 
@@ -853,8 +1348,60 @@ def _is_console_admin(auth: dict) -> bool:
 
 
 def _as_reviewer_view(html: str) -> str:
+    # 배정 패널은 숨기는 것이 아니라 **없앤다** — 관리자 API 주소와 화면 구조가 검수자에게 읽히면 안 된다(위 _ASSIGN_PANEL_* 주석).
+    html = _strip_assignment_panel(html)
     html = html.replace("</head>", _REVIEWER_VIEW_CSS + "</head>", 1)
     return html.replace('<div class="frame">', _REVIEWER_VIEW_NOTE + '<div class="frame">', 1)
+
+
+# ── 숨김 검수(golden_review_blind_enforced) 화면 조정 ────────────────────────────────
+# ⚠ **이것은 화면 정리일 뿐 격리가 아니다.** 제안 등급은 서버가 응답에서 이미 뺐다(golden_reviewer_access
+#   .shape_*) — 이 화면에 실을 값 자체가 브라우저에 오지 않는다. 그래서 아래 치환이 어긋나도(화면 JS 가
+#   고쳐져 앵커 문자열이 사라져도) 답이 새지는 않고 "제안: 없음" 같은 어색한 표기가 남을 뿐이다.
+#   앵커가 살아 있는지는 tests/test_golden_blind_review.py 가 지킨다.
+# 문서 ID 는 서버가 내려주는 별칭을 그대로 표시하고 그 별칭으로 상세·결정·이력 이동을 요청한다 — 이 화면 JS 에서 doc_id 를
+# 다루는 자리(목록 행·선택 표시·상세 조회·결정 저장·결정 이력 이동)는 전부 응답에서 받은 값만 쓰므로 고칠 곳이 없다
+# (tests/test_golden_alias_ids.py 가 jsdom 으로 목록→상세→저장을 눌러 요청 주소에 별칭만 나가는지 확인한다).
+# 종전 화면이 제안 등급을 쓰던 자리를 하나씩 걷어 낸다:
+_BLIND_VIEW_CSS = (
+    "<style>"
+    "#quality,a[href=\"#quality\"]{display:none!important}"     # 품질 지표 = 등급별 길이 분포(서버도 뺌)
+    "#grade{display:none!important}"                             # 등급 필터 — 서버가 거절한다
+    "</style>"
+)
+_BLIND_VIEW_NOTE = (
+    '<div class="note" style="margin:10px 34px">독립 검수 모드입니다 — 제안 등급과 다른 검수자의 '
+    "결정은 표시되지 않습니다. 문서 ID 는 이 검수를 위해 붙인 별칭(RV-…)입니다. 본문을 읽고 등급을 직접 지정하십시오.</div>"
+)
+_BLIND_VIEW_PATCHES: tuple[tuple[str, str], ...] = (
+    # '승인 (제안 등급 그대로 확정)' 선택지 — 서버도 approve 를 거절한다
+    ("if(c.document_origin==='synthetic'&&c.proposed_grade)a.append(option('approve','승인 (제안 등급 그대로 확정)'));", ""),
+    # 목록의 등급 칸: 제안 등급 → 내 결정만
+    ("let grade=(c.proposed_grade||'–')+(c.final_grade?' → '+c.final_grade:'');",
+     "let grade=c.final_grade?('내 결정 '+c.final_grade):'–';"),
+    # 상세의 '제안' 칩
+    ("['제안',c.proposed_grade||'없음'],", ""),
+    # 확정 등급 기본값이 제안 등급(없으면 S3)이었다 — 미리 골라 둔 값 자체가 앵커다
+    ("$('finalGrade').value=c.final_grade||c.proposed_grade||'S3';", "$('finalGrade').value=c.final_grade||'';"),
+    ('<select id="finalGrade"><option>TS</option>',
+     '<select id="finalGrade"><option value="">등급을 선택하세요</option><option>TS</option>'),
+    ("if(action==='change')body.grade=$('finalGrade').value;",
+     "if(action==='change'){if(!$('finalGrade').value)throw new Error('확정할 등급을 선택하세요.');"
+     "body.grade=$('finalGrade').value}"),
+    # 결정 이력 표의 '제안 → 확정' 칸
+    ("(e.proposed_grade||'–')+' → '+(e.final_grade||'–')", "(e.final_grade||'–')"),
+    # 검색 칸 — 숨김에서는 별칭(RV-…) 앞부분으로만 찾는다(제목·실 doc_id 는 등급 코드를 담을 수 있어 검색에서 뺐다)
+    ('placeholder="문서 ID 또는 제목" aria-label="문서 ID 또는 제목 검색"',
+     'placeholder="문서 ID (RV-…) 검색" aria-label="문서 ID 검색"'),
+)
+
+
+def _as_blind_reviewer_view(html: str) -> str:
+    html = _strip_assignment_panel(html)     # 보통은 _as_reviewer_view 가 먼저 걷었다 — 이 변환만 따로 불려도 패널이 남지 않게 한 번 더
+    for old, new in _BLIND_VIEW_PATCHES:
+        html = html.replace(old, new, 1)
+    html = html.replace("</head>", _BLIND_VIEW_CSS + "</head>", 1)
+    return html.replace('<div class="frame">', _BLIND_VIEW_NOTE + '<div class="frame">', 1)
 
 
 @html_router.get("/golden/candidates/manage.html", response_class=HTMLResponse)
@@ -871,6 +1418,8 @@ def proxy_gold_candidate_manager_html(
     html = _render_specledger_gold_console_html()
     if not _is_console_admin(auth):
         html = _as_reviewer_view(html)
+        if _scope(auth).blind_active:       # 숨김 검수 — 서버가 데이터를 뺀 위에 화면도 맞춘다
+            html = _as_blind_reviewer_view(html)
     return HTMLResponse(content=html)
 
 
@@ -878,9 +1427,13 @@ def proxy_gold_candidate_manager_html(
 
 @html_router.get("/golden/jobs/{job_id}/review.html", response_class=HTMLResponse)
 def golden_job_review_html(
-    job_id: UUID, t: str | None = Query(default=None)
+    request: Request, job_id: UUID, t: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    koipa_access_token: str | None = Cookie(default=None),
 ) -> HTMLResponse:
     """빌드 잡의 후보를 지재원 관리자 검수용 인터랙티브 HTML로 반환(브라우저 직접 접속)."""
+    _job_html_guard(request, authorization, x_api_key, koipa_access_token)   # [2026-09-21] 손잡이 켜졌을 때만
     # [#14a] 비밀키 설정 시 서명 URL 토큰(?t=)을 강제 — 무인증 full-text 노출 차단.
     if not _verify_html_token(job_id, t):
         raise HTTPException(status_code=403, detail="invalid or missing signed-URL token (?t=)")
@@ -900,7 +1453,10 @@ def golden_job_review_html(
 
 @html_router.get("/golden/jobs/{job_id}/signoff.html", response_class=HTMLResponse)
 def golden_job_signoff_html(
-    job_id: UUID, t: str | None = Query(default=None)
+    request: Request, job_id: UUID, t: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    koipa_access_token: str | None = Cookie(default=None),
 ) -> HTMLResponse:
     """빌드 잡의 gold 후보를 화면 서명용 인터랙티브 HTML로 반환(골든셋 검수·브라우저 직접 접속).
 
@@ -911,6 +1467,7 @@ def golden_job_signoff_html(
       (보기 전용)과 달리" 라고 적혀 있었는데, 통합 뒤에도 남아 틀린 서술이 됐다 —
       test_review_signoff_cross_link.test_both_urls_serve_the_same_screen 이 같음을 잠근다.
     """
+    _job_html_guard(request, authorization, x_api_key, koipa_access_token)   # [2026-09-21] 손잡이 켜졌을 때만
     # [#14a] 비밀키 설정 시 서명 URL 토큰(?t=)을 강제 — 무인증 full-text 노출 차단.
     if not _verify_html_token(job_id, t):
         raise HTTPException(status_code=403, detail="invalid or missing signed-URL token (?t=)")
@@ -939,6 +1496,7 @@ def golden_job_signoff_preflight(
     2026-08-17 부터 신원은 로그인 쿠키(JWT sub)에서만 온다. 공유 API Key 로 부르면 개별
     신원이 없어 빈 값이 되고, 그때는 신원 검사를 건너뛴다(POST 시점에 걸린다).
     """
+    _deny_restricted_on_jobs(auth)
     reviewer_id, _overridden = resolve_actor_user_id("", auth)
     out = GoldenBuildService().signoff_preflight(
         job_id, reviewer_id=reviewer_id or "", publish=publish
@@ -964,6 +1522,7 @@ def golden_job_signoff(
     로 사전 거부(promote_to_locked 도 재차 거부하나 명시적 403 로 UX 개선). 정본 미변경, 라이브
     readiness 반영은 publish=True 일 때만(기본 미리보기).
     """
+    _deny_restricted_on_jobs(auth)
     reviewer_id, overridden = resolve_actor_user_id(req.actor.user_id, auth)
     # 사유를 함께 준다 — 거부 조건이 다섯 갈래인데 뒤 둘은 이름이 아니라 **설정** 때문에
     # 막히는 것이라, 이유가 없으면 이름만 계속 바꿔 보게 된다.

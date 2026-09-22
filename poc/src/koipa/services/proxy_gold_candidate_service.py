@@ -19,13 +19,14 @@ import re
 import tempfile
 from collections import Counter
 from pathlib import Path
-from typing import Any, Iterator
+from typing import AbstractSet, Any, Callable, Iterator
 from uuid import uuid4
 
+from koipa.jsonl_lines import dumps_line, split_lines
 
 logger = logging.getLogger(__name__)
 
-_POC_ROOT = Path(__file__).resolve().parents[3]
+_POC_ROOT =Path(__file__).resolve().parents[3]
 _DEFAULT_ROOT = _POC_ROOT / "datasets" / "proxy_gold" / "single_document_candidates"
 _LEDGER_NAME = "candidate_decisions.jsonl"
 # 콘솔 결정에서 승격된 사람 서명 평가정답. 후보·원장과 같은 폴더에 둔다 — 잡 단위로
@@ -36,7 +37,24 @@ _LOCKED_LEDGER_NAME = "locked_console_review.jsonl"
 # 들어 있어 파일이 하나라도 바뀌면 자동 무효화된다. 캐시가 없으면 매 요청 30MB 본문을
 # 다시 읽고 해시한다. 크기를 함께 보는 이유는 _scan() 주석에 있다 — mtime 만으로는
 # 파일시스템 시계 해상도(223 실측 4ms) 안에서 일어난 두 번째 기록을 놓친다.
-_CANDIDATE_CACHE: dict[tuple, list[dict[str, Any]]] = {}
+# 값 = (후보 행, doc_id → 메타데이터의 candidate_status). 뒤의 것은 후보 행에 없는 값이다 —
+# 행의 status 는 결정이 있으면 결정의 것으로 덮인다. 숨김 검수(golden_reviewer_access)가 "내가
+# 아직 결정하지 않은 문서"의 원래 상태를 보이려면 필요하다. 행에 새 키를 얹지 않고 캐시 옆에 둔 것은
+# 행이 모든 응답에 그대로 나가기 때문이다(키를 얹으면 손잡이를 끈 응답도 바뀐다).
+_CANDIDATE_CACHE: dict[tuple, tuple[list[dict[str, Any]], dict[str, str]]] = {}
+
+# 요청자별 시야(2026-09-21 숨김 검수). 후보 행 목록 / 원장 이벤트 목록을 받아 **그 요청자가 봐도 되는 것**으로
+# 바꿔 돌려주는 함수다. 서비스는 이 함수를 집계·필터보다 **앞에** 끼울 뿐 내용은 모른다(내용은
+# golden_reviewer_access). None 이면 종전 그대로다.
+CandidateView = Callable[[list[dict[str, Any]]], list[dict[str, Any]]]
+EventView = Callable[[list[dict[str, Any]]], list[dict[str, Any]]]
+# 목록 검색어(query)가 후보 행에 맞는지 정하는 함수 (행, 소문자로 접은 검색어) → 일치 여부. None 이면 종전 규칙
+# (doc_id·title 부분 일치)이다. 숨김 검수(golden_reviewer_access)가 doc_id·제목에 든 등급 코드를 캐지 못하게 바꿔 끼운다.
+QueryMatch = Callable[[dict[str, Any], str], bool]
+
+
+def _default_query_match(row: dict[str, Any], needle: str) -> bool:
+    return needle in row["doc_id"].lower() or needle in row["title"].lower()
 _VALID_GRADES = {"TS", "S1", "S2", "S3"}
 # [B2 2026-08-18] exclude = '검수 대상 아님'. deferred(나중에 볼 것)·discarded(폐기)와
 # 다른 제3의 종결이다 — 등급을 정하지도, 문서를 버리지도 않고 이번 검수 범위에서만 뺀다.
@@ -217,8 +235,23 @@ class ProxyGoldCandidateService:
         self, *, status: str | None = None, grade: str | None = None,
         origin: str | None = None, query: str | None = None,
         review_batch: str | None = None,
+        visible_doc_ids: AbstractSet[str] | None = None,
+        view: CandidateView | None = None,
+        query_match: QueryMatch | None = None,
     ) -> dict[str, Any]:
         all_candidates = self._candidates()
+        # [2026-09-21] 검수자 배정 강제 — 볼 수 있는 문서로 **먼저** 좁힌다. 그 뒤의 모든 계산
+        # (목록·summary·품질·batch_summary·available_batches)이 이 좁혀진 집합 위에서 돌기
+        # 때문에, 배정 안 된 문서의 등급 분포·배치 이름·건수가 집계로 새지 않는다.
+        # None = 제한 없음(관리자·강제 꺼짐). 빈 집합은 "아무것도 안 보임"이다 — 둘을 뭉치지 말 것.
+        if visible_doc_ids is not None:
+            all_candidates = [c for c in all_candidates if c["doc_id"] in visible_doc_ids]
+        # [2026-09-21] 숨김 검수 — 행을 **요청자의 시야로 바꾼 뒤에** 걸러 세야 한다. 상태 필터·폐기 제외·
+        # 요약·batch_summary 가 모두 행의 status 를 읽으므로, 나중에 바꾸면 "다른 검수자가 폐기한 문서가
+        # 내 목록에서 사라진다" · "?status=approved_proxy 로 남이 결정한 문서만 좁혀진다" 가 그대로 남는다.
+        # None = 종전 그대로(관리자·강제 꺼짐).
+        if view is not None:
+            all_candidates = view(all_candidates)
         # [B1-1] 기본 조회에서 폐기(discarded)를 뺀다. 폐기는 검수가 끝난 항목인데 목록에
         # 남아 있으면 검수자에게 계속 할 일로 보인다.
         # ⚠ 원장은 그대로다 — status="discarded" 로 명시하면 전부 나온다(조회 가능 = 보존).
@@ -241,7 +274,8 @@ class ProxyGoldCandidateService:
         if query:
             needle = query.strip().lower()
             if needle:
-                candidates = [c for c in candidates if needle in c["doc_id"].lower() or needle in c["title"].lower()]
+                match = query_match or _default_query_match
+                candidates = [c for c in candidates if match(c, needle)]
         candidates.sort(key=lambda c: c["doc_id"])
         # 화면은 목록 응답에 실린 summary 로 KPI·품질 지표를 그린다(별도 /summary 를 안 부른다).
         # quality 를 여기 빼먹으면 품질 패널이 "지표를 낼 수 없습니다"로만 뜬다(실측).
@@ -250,7 +284,8 @@ class ProxyGoldCandidateService:
         # [B1-3] KPI(summary)는 **원장 전량** 기준으로 둔다 — 화면 상단 숫자가 필터마다
         # 흔들리면 무엇을 세는 값인지 알 수 없다. 대신 목록 건수(total)와 다르다는 사실을
         # 응답에 적어, 화면이 "전체 306 / 목록 300 (폐기 6 제외)" 처럼 읽히게 한다.
-        embedded["scope"] = "all"
+        # 배정 강제로 좁혀진 요청이면 "all"(원장 전량)이 거짓이 된다 — 기준을 정직하게 적는다.
+        embedded["scope"] = "all" if visible_doc_ids is None else "assigned"
         return {
             "total": len(candidates),
             "listed_excludes_discarded": status is None,
@@ -282,25 +317,60 @@ class ProxyGoldCandidateService:
         )
         return [{"review_batch": b, "total": n} for b, n in sorted(counter.items())]
 
-    def summary(self) -> dict[str, Any]:
+    def summary(
+        self, *, visible_doc_ids: AbstractSet[str] | None = None, view: CandidateView | None = None,
+    ) -> dict[str, Any]:
         candidates = self._candidates()
+        if visible_doc_ids is not None:     # 의미는 list_candidates 주석과 같다
+            candidates = [c for c in candidates if c["doc_id"] in visible_doc_ids]
+        if view is not None:
+            candidates = view(candidates)
         out = self._summary(candidates)
         out["quality"] = self._quality(candidates)
         return out
 
-    def recent_decisions(self, limit: int = 100) -> dict[str, Any]:
+    def review_batch_index(self) -> dict[str, str | None]:
+        """doc_id → review_batch(표식 없으면 None). 본문·등급은 싣지 않는다.
+
+        검수 배정이 배치 단위로도 걸리므로(golden_reviewer_access) 배치가 어느 문서를 덮는지
+        알아야 한다. 후보 목록 캐시를 그대로 읽으므로 추가 디렉터리 스캔이 없다.
+        """
+        return {c["doc_id"]: c.get("review_batch") for c in self._candidates()}
+
+    def ledger_rows(self) -> list[dict[str, Any]]:
+        """결정 원장의 모든 줄을 원장 순서로 읽는다(JSON 으로 읽히지 않는 줄은 건너뜀). 읽기 전용."""
+        rows: list[dict[str, Any]] = []
+        if self.ledger_path.exists():
+            for line in split_lines(self.ledger_path.read_text(encoding="utf-8")):
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return rows
+
+    def recent_decisions(
+        self, limit: int = 100, *,
+        visible_doc_ids: AbstractSet[str] | None = None,
+        view: EventView | None = None,
+    ) -> dict[str, Any]:
         """결정 원장 최근 기록 — 보류·폐기·번복까지 그대로 보인다.
 
         화면에는 문서 하나를 골라야 이력이 보였다. 보류·폐기가 왜 그렇게 됐는지 훑어보려면
         문서를 일일이 열어야 해서, 감사 목적으로는 쓸 수 없었다.
+
+        [2026-09-21] 검수자 접근 통제용 두 인자(모두 기본값 = 종전 동작).
+          visible_doc_ids  이 문서의 이벤트만 센다. total·by_action 도 **걸러낸 뒤** 기준이다 —
+                           걸러내기 전 값을 싣으면 배정 안 된 문서의 활동량이 새고, limit 을 먼저
+                           자르면 남의 이벤트가 내 이벤트를 밀어낸다.
+          view             이벤트 목록(원장 순서, 위 필터 적용 뒤)을 요청자가 봐도 되는 이벤트로 바꾼다
+                           (숨김 검수: 자기 이벤트만, 그것도 M 입력은 자기가 적은 값으로만).
+                           **집계(total·by_action)와 limit 은 바꾼 뒤** 기준이다.
         """
-        events: list[dict[str, Any]] = []
-        if self.ledger_path.exists():
-            for line in self.ledger_path.read_text(encoding="utf-8").splitlines():
-                try:
-                    events.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
+        events = self.ledger_rows()
+        if visible_doc_ids is not None:
+            events = [e for e in events if str(e.get("doc_id") or "") in visible_doc_ids]
+        if view is not None:
+            events = view(events)
         by_action = Counter(str(e.get("action") or "") for e in events)
         return {
             "total": len(events),
@@ -499,7 +569,7 @@ class ProxyGoldCandidateService:
                     json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
                 )
             with self.ledger_path.open("a", encoding="utf-8", newline="\n") as handle:
-                handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+                handle.write(dumps_line(event, sort_keys=True) + "\n")
                 handle.flush()
                 os.fsync(handle.fileno())
         return self.get_candidate(doc_id)
@@ -671,7 +741,7 @@ class ProxyGoldCandidateService:
                 json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
             )
             with self.ledger_path.open("a", encoding="utf-8", newline="\n") as handle:
-                handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+                handle.write(dumps_line(event, sort_keys=True) + "\n")
                 handle.flush()
                 os.fsync(handle.fileno())
         return self.get_candidate(doc_id)
@@ -835,14 +905,26 @@ class ProxyGoldCandidateService:
         ), metas, docs
 
     def _candidates(self) -> list[dict[str, Any]]:
+        return self._load_candidates()[0]
+
+    def base_status_index(self) -> dict[str, str]:
+        """doc_id → 메타데이터의 candidate_status(결정이 덮기 **전**의 상태). 후보 행에는 없는 값이다.
+
+        숨김 검수(golden_reviewer_access)가 쓴다 — 다른 검수자가 결정한 문서가 내가 아직 결정하지 않은
+        문서로 보이려면 그 문서의 원래 상태를 알아야 한다. 후보 캐시와 같은 키로 함께 만들어져 어긋나지 않는다.
+        """
+        return self._load_candidates()[1]
+
+    def _load_candidates(self) -> tuple[list[dict[str, Any]], dict[str, str]]:
         if not self.root.exists():
-            return []
+            return [], {}
         cache_key, metas, docs_by_id = self._scan()
         cached = _CANDIDATE_CACHE.get(cache_key)
         if cached is not None:
             return cached
         latest = self._latest_decisions()
         rows: list[dict[str, Any]] = []
+        base_status: dict[str, str] = {}
         for meta_name in metas:
             meta_path = self.root / meta_name
             try:
@@ -879,6 +961,7 @@ class ProxyGoldCandidateService:
                                doc_id, source.name, type(exc).__name__)
                 continue
             decision = latest.get(doc_id, {})
+            base_status[doc_id] = str(meta.get("candidate_status") or "proposed")
             document_origin = str(meta.get("document_origin") or "unknown")
             proposed = str(meta.get("intended_label") or "") or None
             proposed_basis = None
@@ -931,8 +1014,8 @@ class ProxyGoldCandidateService:
         # 생기면 자동으로 무효화된다. 폭주를 막기 위해 최근 몇 세대만 유지한다.
         if len(_CANDIDATE_CACHE) > 4:
             _CANDIDATE_CACHE.clear()
-        _CANDIDATE_CACHE[cache_key] = rows
-        return rows
+        _CANDIDATE_CACHE[cache_key] = (rows, base_status)
+        return rows, base_status
 
     @staticmethod
     def _summary(candidates: list[dict[str, Any]]) -> dict[str, Any]:
@@ -992,7 +1075,7 @@ class ProxyGoldCandidateService:
         if not self.ledger_path.exists():
             return {}
         latest: dict[str, dict[str, Any]] = {}
-        for line in self.ledger_path.read_text(encoding="utf-8").splitlines():
+        for line in split_lines(self.ledger_path.read_text(encoding="utf-8")):
             try:
                 row = json.loads(line)
             except json.JSONDecodeError:
@@ -1015,7 +1098,7 @@ class ProxyGoldCandidateService:
         if not self.ledger_path.exists():
             return []
         events: list[dict[str, Any]] = []
-        for line in self.ledger_path.read_text(encoding="utf-8").splitlines():
+        for line in split_lines(self.ledger_path.read_text(encoding="utf-8")):
             try:
                 row = json.loads(line)
             except json.JSONDecodeError:

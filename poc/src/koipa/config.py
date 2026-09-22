@@ -326,6 +326,19 @@ class Settings(BaseSettings):
     # ⚠ 구멍은 그대로 열린다. 이 값이 True 이고 토큰이 있으면 login.html 주소를 여는 누구나
     #   관리자 토큰을 얻는다. 외부 노출 서버에서는 포트를 127.0.0.1 로 묶어 함께 막을 것.
     console_login_prefill_allow_unsafe: bool = False
+    # [2026-09-21] 골든셋 외부 전문가 검수용 접근 통제 두 손잡이(golden_reviewer_access.py).
+    # 둘 다 **기본 False = 종전 동작 그대로**다 — 켜지 않으면 검수자는 지금처럼 모든 후보를 본다.
+    # 관리자(admin)·kl_backend·system 역할은 두 손잡이와 무관하게 항상 전체를 본다.
+    #
+    # golden_reviewer_assignment_enforced: True 이면 reviewer 역할은 관리자가 자기에게 배정한
+    #   문서(candidate_assignments.jsonl)만 목록·상세·집계·결정·이력에서 볼 수 있다.
+    #   배정이 없는 문서는 아예 없는 것처럼 보인다(404). 잡 단위 화면(signoff.html 등)은
+    #   배정으로 걸러낼 수 없어 이 값이 켜져 있는 동안 검수자에게 닫힌다.
+    golden_reviewer_assignment_enforced: bool = False
+    # golden_review_blind_enforced: True 이면 reviewer 역할의 응답에서 제안 등급·근거·집계와
+    #   다른 사람의 결정을 서버가 제거하고, '제안 등급 그대로 확정'(approve)을 거절한다.
+    #   화면에서 가리는 것이 아니라 응답에서 빼는 것이 본체다(API 로 직접 읽히므로).
+    golden_review_blind_enforced: bool = False
 
     # NFR-SEC-01: 감사체인 HMAC 비밀키. 설정 시 audit_log hash chain을 HMAC-SHA256으로 링크해
     # 키 없는 과거 row 재작성(rewrite)을 차단(audit_chain._link_hex). 빈 값이면 레거시 sha256
