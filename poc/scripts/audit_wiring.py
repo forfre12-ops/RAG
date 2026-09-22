@@ -275,7 +275,10 @@ def main() -> int:
             st = _cfg.settings
             row = {}
             for n in sorted(dir(st)):
-                if not (n.endswith(("_enabled", "_on")) or n.startswith("enable_")):
+                # `_enforced` 는 2026-09-22 에 더했다 — 검수자 접근 통제 손잡이(golden_reviewer_assignment_enforced ·
+                # golden_review_blind_enforced)가 이 이름이라 종전 패턴으로는 안 잡혔다. 이름 패턴이라 다른 접미사
+                # (예: _guard·_strict)의 bool 손잡이는 여전히 못 본다 — 새 손잡이를 만들면 이 패턴에 걸리는지 확인할 것.
+                if not (n.endswith(("_enabled", "_on", "_enforced")) or n.startswith("enable_")):
                     continue
                 v = getattr(st, n, None)
                 if isinstance(v, bool):

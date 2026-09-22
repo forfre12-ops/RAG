@@ -373,17 +373,6 @@ def _xml_text(xml: str) -> str:
     return "\n".join(line for line in text.splitlines() if line.strip())
 
 
-def _html_to_text(raw: str) -> str:
-    import html as _html
-    import re as _re
-
-    raw = _re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw, flags=_re.S | _re.I)
-    text = _re.sub(r"<[^>]+>", " ", raw)
-    text = _html.unescape(text)
-    text = _re.sub(r"[ \t\u00a0]+", " ", text)
-    text = _re.sub(r"\s*\n\s*", "\n", text).strip()
-    return text
-
 def _extract_hwp(p: Path) -> ExtractResult:
     """HWP5/HWPX 추출 — rhwp-python(Rust PyO3, HWP5+HWPX 통합 파서, extra ``[hwp]``).
 
