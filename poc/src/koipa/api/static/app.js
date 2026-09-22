@@ -979,7 +979,7 @@ async function persistToQueue(analysis, file) {
       <b>실적재 완료</b> — doc_id <code>${escapeHtml(uj.doc_id)}</code> · 등급 <b>${escapeHtml(cj.label || "?")}</b> · 상태 <b>${escapeHtml(st)}</b>
       <div style="margin-top:4px">${routed
         ? "→ <b>거버넌스 콘솔 → 「DB 검수 큐 불러오기」</b> 하면 이 문서가 검수 대기로 나타납니다."
-        : "자동 확정(staging) — needs_review 가 아니라 검수 큐에는 나타나지 않습니다."}</div></div>`;
+        : "자동 확정(staging) — 검수 대기가 아니라 거버넌스 콘솔의 「확정 대기」 목록에 나타납니다(관리자가 최종 확정)."}</div></div>`;
     logLine("ok", `실적재 분류 OK ${cj.label || "?"} status=${st}`);
   } catch (e) {
     box.innerHTML = `<div class="gate-review"><b>실적재 오류</b>: ${escapeHtml(e.message)}</div>`;
