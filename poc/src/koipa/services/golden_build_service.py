@@ -19,6 +19,7 @@ from typing import Callable, Optional
 from koipa.golden_builder import GoldenBuildResult, build_golden_set, make_label_fn
 from koipa.golden_review_html import render_signoff_html_from_jsonl
 from koipa.golden_signoff import Signoff, merge_locked_records, promote_to_locked
+from koipa.jsonl_lines import dumps_line, split_lines
 from koipa.golden_tiers import (
     REJECTED_BY_REVIEWER,
     eval_readiness,
@@ -846,7 +847,7 @@ class GoldenBuildService:
             raise FileNotFoundError(f"corpus_dir 없음: {p}")
         rows: list[dict] = []
         if p.is_file():
-            for line in p.read_text(encoding="utf-8").splitlines():
+            for line in split_lines(p.read_text(encoding="utf-8")):
                 if line.strip():
                     rows.append(json.loads(line))
         else:
@@ -870,7 +871,7 @@ class GoldenBuildService:
         if not p.exists():
             return None
         texts: list[str] = []
-        for line in p.read_text(encoding="utf-8").splitlines():
+        for line in split_lines(p.read_text(encoding="utf-8")):
             if line.strip():
                 t = json.loads(line).get("text")
                 if t:
@@ -936,15 +937,17 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         for r in rows:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            f.write(dumps_line(r) + "\n")
 
 
 def _read_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
+    # 줄은 '\n' 으로만 가른다 — splitlines() 는 본문·사유의 U+2028·U+0085 에서 한 줄을 둘로 쪼개
+    # json.loads 가 예외를 낸다(2026-09-22, koipa/jsonl_lines.py).
     return [
         json.loads(ln)
-        for ln in path.read_text(encoding="utf-8").splitlines()
+        for ln in split_lines(path.read_text(encoding="utf-8"))
         if ln.strip()
     ]
 
@@ -995,7 +998,7 @@ def _atomic_write_jsonl(path: Path, rows: list[dict]) -> None:
         tmp = path.with_suffix(path.suffix + ".tmp")
         with tmp.open("w", encoding="utf-8") as f:
             for r in rows:
-                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                f.write(dumps_line(r) + "\n")
         tmp.replace(path)
     except OSError as exc:
         raise GoldenSignoffStorageError(

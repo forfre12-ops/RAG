@@ -258,7 +258,9 @@ def render_signoff_html_from_jsonl(
         pp = Path(path)
         if not pp.exists():
             return []
-        return [json.loads(ln) for ln in pp.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        # '\n' 으로만 가른다 — splitlines() 는 본문의 U+2028·U+0085 에서 줄을 쪼갠다(koipa/jsonl_lines.py).
+        from koipa.jsonl_lines import split_lines  # noqa: PLC0415
+        return [json.loads(ln) for ln in split_lines(pp.read_text(encoding="utf-8")) if ln.strip()]
 
     paths = list(paths)
     gold = _read(paths[0]) if paths else []

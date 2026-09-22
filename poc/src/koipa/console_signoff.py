@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from koipa.golden_signoff import Signoff
+from koipa.jsonl_lines import split_lines
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def eval_blocked_doc_ids(path: Path | None = None) -> set[str]:
     if not p.exists():
         return set()
     out: set[str] = set()
-    for line in p.read_text(encoding="utf-8").splitlines():
+    for line in split_lines(p.read_text(encoding="utf-8")):
         if not line.strip():
             continue
         try:
