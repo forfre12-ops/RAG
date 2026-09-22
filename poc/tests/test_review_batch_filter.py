@@ -33,7 +33,22 @@ def _pool_ids() -> set[str]:
     return out
 
 
+def _require_delivered_batch() -> None:
+    """전달본 데이터가 이 체크아웃에 없으면 건너뛴다(추적 파일만 있는 CI).
+
+    왜(2026-09-22). datasets/golden_review 와 후보 원장은 git 추적 밖이라 CI 체크아웃에는
+    없다. 거기서 아래 시험들은 skip 이 아니라 '0 < 0' 같은 실패로 끝났다(CI 기준선 재현:
+    reports/CLAUDE_CI_BASELINE_20260922). 데이터가 없는 것과 필터가 깨진 것을 가른다 —
+    test_unknown_batch_returns_empty_not_everything 은 데이터 없이도 돌고 CI 에서 통과했다.
+    """
+    from pathlib import Path
+
+    if not Path(POOL).exists():
+        pytest.skip(f"{POOL} 없음 — 전달본 데이터가 없는 체크아웃")
+
+
 def test_batch_filter_narrows_to_the_delivered_pool():
+    _require_delivered_batch()
     svc = ProxyGoldCandidateService()
     everything = svc.list_candidates()
     batch = svc.list_candidates(review_batch=BATCH)
@@ -51,6 +66,7 @@ def test_every_delivered_document_is_visible():
 
 def test_batch_is_grade_balanced():
     """등급별 30건 균형이 깨지면 검수 결과가 한쪽으로 쏠린다."""
+    _require_delivered_batch()
     svc = ProxyGoldCandidateService()
     rows = svc.list_candidates(review_batch=BATCH)["candidates"]
     counts: dict[str, int] = {}
@@ -74,6 +90,7 @@ def test_available_batches_lists_what_actually_exists():
     사실이 아니었다 — 같은 서버의 후보 120건(223 은 115건)이 표식을 달고 있다. 화면이 서버
     상태를 문장으로 단정하면 데이터가 바뀌어도 문장은 안 바뀐다.
     """
+    _require_delivered_batch()
     svc = ProxyGoldCandidateService()
     batches = svc.list_candidates()["available_batches"]
     assert batches, "원장에 배치 표식이 있는데 목록이 비었다"

@@ -17,6 +17,13 @@ import sys
 from math import sqrt
 from pathlib import Path
 
+try:  # 스크립트로 직접 실행 - scripts/ 가 sys.path 에 들어온다
+    from _cli_io import force_utf8_stdio  # noqa: E402
+except ImportError:  # 패키지로 import - 릴리스 번들의 import 폐쇄 검사가 이 경로다
+    from scripts._cli_io import force_utf8_stdio  # noqa: E402
+
+force_utf8_stdio()
+
 POC = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(POC / "scripts"))
 sys.path.insert(0, str(POC / "src"))

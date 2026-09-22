@@ -66,9 +66,16 @@ def test_every_registered_path_exists_or_is_known_missing() -> None:
 
 
 def test_the_two_holdout109_files_still_disagree() -> None:
-    """두 파일의 라벨 불일치 24건이 그대로인지 — 정본이 정해지면 이 시험을 갱신한다.
+    """두 파일의 라벨 불일치가 알려진 4건 그대로인지 — 정본이 정해지면 이 시험을 갱신한다.
 
     수를 고정하는 이유는 '누가 조용히 한쪽을 덮어썼는가' 를 잡기 위해서다.
+
+    갱신(2026-09-22). 불일치는 원래 24건이었다. 2026-09-20 커밋 5137f153 이 holdout_eval.jsonl 에서
+    rule_grade=S3 를 LLM 판정이 덮어쓴 22건을 S3 로 정정해 4건으로 줄었다(정정 전 라벨은
+    label_before_correction_2026_09_20 필드에 보존). 그 정정은 의도된 것이었고 이 시험이 뒤따라
+    갱신되지 않았다 — 개수만이 아니라 남은 문서를 직접 적어 두어, 이 4건 밖의 변화도 잡는다.
+    남은 4건: 공개 판결문 3건(source=판례)은 holdout_eval 에서 S1·provenance_corrected 에서 S3,
+    금융보고서 1건은 S3 대 S2. 어느 쪽이 정본인지는 아직 정해지지 않았다.
     """
     import json
     a = POC / "datasets/gold_real/holdout_eval.jsonl"
@@ -91,8 +98,9 @@ def test_the_two_holdout109_files_still_disagree() -> None:
     xa, xb = load(a), load(b)
     common = set(xa) & set(xb)
     assert len(common) == 109, f"공통 doc_id 가 {len(common)}건이다"
-    diff = [d for d in common if xa[d] != xb[d]]
-    assert len(diff) == 24, (
-        f"라벨 불일치가 24건에서 {len(diff)}건으로 바뀌었다 — "
+    diff = sorted(d for d in common if xa[d] != xb[d])
+    known = sorted(["23a1f4fa03e6cbd7", "3ee4da9b5ad3ff2c", "677eb3bdbcf20ea3", "f9833fb185fd83fe"])
+    assert diff == known, (
+        f"라벨 불일치가 알려진 4건 {known} 에서 {len(diff)}건 {diff} 으로 바뀌었다 — "
         "누가 한쪽을 고쳤다면 정본 결정이 있었는지 확인할 것"
     )
