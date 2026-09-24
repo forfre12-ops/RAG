@@ -202,6 +202,7 @@ GATE_LABELS = {
     "body-below-threshold": "무음 빈본문",
     "metadata-access-conflict": "접근범위와 예측 충돌",
     "metadata-management-conflict": "관리성 부재와 예측 충돌",
+    "metadata-management-underclass": "확인된 관리성이 예측보다 높은 등급",
     "icd-metadata-fnr-risk": "ICD 규약값 부적합",
     "s2-underclass-risk": "내부 신호가 있는데 S3 예측",
     "gate-fail-open": "게이트가 예외로 미적용",

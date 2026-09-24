@@ -47,6 +47,10 @@ REVIEW_GATES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("metadata-access-conflict", ("metadata-access-conflict",)),
     # :416  M=0 부재입증 vs 비공개 예측
     ("metadata-management-conflict", ("metadata-management-conflict",)),
+    # :581 (2026-09-22 기준 줄)  확인된 M 으로 정본 공식을 돌리면 예측보다 **높은** 등급 — 미탐 방향.
+    #   신호는 pipeline.py:1022 가 내고 classify_service.py:581-588 이 검수로 올린다(등급 무변경).
+    #   conflict(:567) 다음·icd(:606) 앞이 실제 평가 순서다.
+    ("metadata-management-underclass", ("metadata-management-underclass",)),
     # :441  ICD 규약 밖 값 중 **상향 게이트 입력**(미탐 방향)만 라우팅
     ("icd-metadata-fnr-risk", ("icd-metadata-unknown", "미탐 위험")),
     # :505  S3 예측인데 내부/비공개 신호

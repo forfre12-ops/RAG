@@ -29,6 +29,7 @@
     [/abbrev-only-escalation/, function () { return "영문 약어 밀도만으로 높은 등급이 나왔습니다"; }],
     [/metadata-access-conflict/, function () { return "접근 제한 표기에 비해 내용 예측이 낮습니다"; }],
     [/metadata-management-conflict/, function () { return "관리성 부재 표기인데 내용 예측이 비공개 등급입니다"; }],
+    [/metadata-management-underclass/, function () { return "확인된 관리성 수준이 예측보다 높은 등급을 가리킵니다(등급은 바꾸지 않았습니다)"; }],
     [/gate-fail-open/, function () { return "안전 게이트 하나가 적용되지 못했습니다"; }],
     [/s2-underclass-risk/, function () { return "내부 문서 신호가 있는데 공개 등급으로 예측되었습니다"; }],
     /* [2026-08-24 사용자 실측] 파일을 올려 분류했는데 사유 자리에 기본 문구
@@ -189,6 +190,7 @@
     "body-below-threshold": "판정할 본문이 사실상 없습니다",
     "metadata-access-conflict": "접근 제한 표기에 비해 내용 예측이 낮습니다",
     "metadata-management-conflict": "관리성 부재 표기인데 내용 예측이 비공개 등급입니다",
+    "metadata-management-underclass": "확인된 관리성 수준이 예측보다 높은 등급을 가리킵니다(등급은 바꾸지 않았습니다)",
     "icd-metadata-fnr-risk": "연동 메타데이터에 규약 밖 값이 있어 미탐 위험이 있습니다",
     "s2-underclass-risk": "내부 문서 신호가 있는데 공개 등급으로 예측되었습니다",
     "gate-fail-open": "안전 게이트 하나가 적용되지 못했습니다",

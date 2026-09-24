@@ -130,3 +130,92 @@ def test_every_gate_tag_has_korean_text():
     missing = [t for t in REVIEW_GATE_TAGS if f'"{t}":' not in table]
     assert not missing, f"화면 사유표에 한글 문구가 없는 게이트: {missing}"
     assert f'"{UNMAPPED}":' in table, "unmapped 도 사람 말로 옮겨 둬야 한다"
+
+
+# ── metadata-management-underclass (2026-09-22) ───────────────────────────────
+# 실측: 배포 프로필 + typed_facts metadata 주입 154건(reports/mock_final_train_20260921/
+# serving_v2_FS_s42_facts.json) 에서 검수 105건 중 57건의 사유가 'unmapped' 였다. 그 57건의 경고가
+# 아래 두 줄이다. classify_service.py:581-588 이 status 를 needs_review 로 올리는데 표에 없었다.
+_UNDERCLASS_PIPELINE = (
+    "metadata-management-underclass: 요소 (S,V,M=2) 의 정본 공식은 S1 인데 예측 S2"
+    " → 검수 라우팅 (미탐 방향 · 등급 미변경)"
+)
+_UNDERCLASS_ROUTED = (
+    "metadata-management-underclass: confirmed management level implies a higher"
+    " grade than predicted — routed to human review (grade unchanged, FNR-safe)"
+)
+_MGMT_CONFLICT = (
+    "metadata-management-conflict: proven-absent management vs non-public "
+    "predicted grade — routed to human review"
+)
+_S2_UNDER = "s2-underclass-risk: internal/non-public signals with S3 prediction — routed to human review"
+_ICD_FNR = (
+    "icd-metadata-unknown: security_marking='기밀' 은 ICD §3 규약값이 아니다"
+    " — 상향 게이트 입력이라 미탐 위험"
+)
+
+
+def test_underclass_warning_is_mapped_not_unmapped():
+    """이 경고로 검수된 건은 사유가 'unmapped' 가 아니라 자기 태그여야 한다."""
+    for warnings in ([_UNDERCLASS_ROUTED], [_UNDERCLASS_PIPELINE, _UNDERCLASS_ROUTED]):
+        assert causal_review_reason(warnings, "needs_review") == "metadata-management-underclass"
+        assert gate_hits(warnings) == ["metadata-management-underclass"]
+    counted = count_causal_reasons([
+        {"status": "needs_review", "warnings": [_UNDERCLASS_PIPELINE, _UNDERCLASS_ROUTED, _PERSIST]},
+        {"status": "needs_review", "warnings": [_UNDERCLASS_ROUTED]},
+    ])
+    assert counted == {"metadata-management-underclass": 2}
+    assert UNMAPPED not in counted
+
+
+def test_underclass_tag_is_in_gate_tags_and_between_conflict_and_icd():
+    tags = list(REVIEW_GATE_TAGS)
+    assert "metadata-management-underclass" in tags
+    assert (
+        tags.index("metadata-management-conflict")
+        < tags.index("metadata-management-underclass")
+        < tags.index("icd-metadata-fnr-risk")
+    )
+
+
+def test_underclass_priority_follows_classify_evaluation_order():
+    """앞 게이트가 걸리면 뒤 게이트는 평가되지 않는다 — 사유는 표 순서상 첫 게이트."""
+    # 앞선 게이트(low-confidence · metadata-management-conflict)가 함께 있으면 그쪽이 원인이다.
+    assert causal_review_reason([_UNDERCLASS_ROUTED, _LOWCONF], "needs_review") == "low-confidence"
+    assert causal_review_reason(
+        [_UNDERCLASS_ROUTED, _MGMT_CONFLICT], "needs_review"
+    ) == "metadata-management-conflict"
+    # 뒤에 오는 게이트(icd · s2-underclass-risk · agreement-gate)가 함께 있으면 underclass 가 원인이다.
+    later = [_ICD_FNR, _S2_UNDER, "agreement-gate: model=S1 vs rule=S2"]
+    assert causal_review_reason(later + [_UNDERCLASS_ROUTED], "needs_review") == (
+        "metadata-management-underclass"
+    )
+    assert gate_hits(later + [_UNDERCLASS_ROUTED]) == [
+        "metadata-management-underclass", "icd-metadata-fnr-risk",
+        "s2-underclass-risk", "agreement-gate",
+    ]
+
+
+def test_underclass_table_position_matches_classify_source_order():
+    """표에서의 자리가 classify() 소스의 게이트 평가 순서와 같다(conflict → underclass → icd)."""
+    src = (
+        Path(__file__).resolve().parent.parent / "src" / "koipa" / "services" / "classify_service.py"
+    ).read_text("utf-8")
+    pos = {
+        "metadata-management-conflict": src.index('"metadata-management-conflict" in w'),
+        "metadata-management-underclass": src.index('"metadata-management-underclass" in w'),
+        "icd-metadata-fnr-risk": src.index('"미탐 위험" in w'),
+    }
+    by_source = sorted(pos, key=pos.get)
+    by_table = sorted(pos, key=list(REVIEW_GATE_TAGS).index)
+    assert by_source == by_table, f"소스 순서 {by_source} != 표 순서 {by_table}"
+
+
+def test_underclass_reason_text_is_in_both_screen_tables():
+    """화면 표 두 곳(태그 표 TAG_TEXT · 경고 원문 표 GATE_REASONS)에 모두 있어야 한다."""
+    js = (
+        Path(__file__).resolve().parent.parent / "src" / "koipa" / "api" / "static" / "review_reason_ko.js"
+    ).read_text("utf-8")
+    assert '"metadata-management-underclass":' in js.split("var TAG_TEXT = {", 1)[1].split("};", 1)[0]
+    gate_reasons = js.split("var GATE_REASONS = [", 1)[1].split("\n  ];", 1)[0]
+    assert "/metadata-management-underclass/" in gate_reasons
