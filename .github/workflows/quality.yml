@@ -5,6 +5,19 @@ on:
   pull_request:
 
 jobs:
+  classification-data-barriers:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: poc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pytest scikit-learn pydantic
+      - name: Offline fixture isolation and leakage regression (no models or reports needed)
+        run: python -m pytest --confcutdir=tests/data_quality tests/data_quality -q
   static-contract:
     runs-on: ubuntu-latest
     defaults:
