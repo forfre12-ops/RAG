@@ -141,7 +141,16 @@ footer strong{color:var(--text-dim);}
 <h3>서명 무결성 · 주의</h3>
 <div class="callout warn"><div class="callout-label">서명자 신원</div><p>화면은 검수자 이름·API 키를 <b>받지 않는다</b>. 이름을 손으로 적을 수 있는 한 원장에 남는 서명자는 자칭이기 때문이다(2026-08-17 입력칸 제거). 토큰은 사람마다 따로 발급하고, 한 토큰을 여러 명이 쓰면 원장에 같은 이름만 남아 검수 기록이 성립하지 않는다. 고등급 <b>TS/S1 이중서명 토글은 2026-08-06 제거</b>됐다 — RFP·RTM에 근거가 없었다.</p></div>
 <ul><li><b>reviewer_id는 실계정만</b> 허용된다. 머신/플레이스홀더 계정은 403으로 거부된다.</li><li>화면은 이름을 보내지 않으며, 서버는 어떤 경로로 들어오더라도 reviewer_id를 <b>인증 신원(JWT <code>sub</code>)으로 교정</b>한다(위조 차단).</li><li>미결정 후보는 제출에서 제외된다.</li><li>정본 골든셋은 직접 변경되지 않는다. 승격분은 별도 <code>locked_gold_eval</code> 경로에 doc_id 기준으로 누적된다.</li></ul>
-  <div class="footnote">한국지식재산보호원 / 지재원 영업비밀 자동 등급분류 시스템 · 검수 관리자 사용자매뉴얼(DOC-MAN-01) · 기준 화면 admin.html · signoff.html · 2026-08-19</div>
+<div class="section-sep" id="sec-07-blind"><span class="section-sep-num">07</span><span class="section-sep-line"></span><span class="section-sep-title">외부 전문가 블라인드 검수 (manage.html) <span class="tag todo">신설 2026-09-24</span></span></div>
+<p>§06(signoff.html)과는 <b>다른 화면·다른 용도</b>다. §06은 우리 쪽이 생성한 골든 후보를 지재원 관리자가 서명하는 절차이고, 본 절은 <b>외부에서 섭외한 전문가</b>가 제안 등급을 보지 않고 <b>독립적으로</b> 등급을 매기는 절차다(2026-10 보호원 섭외 전문가 검수 대상). 화면 주소는 <code>/api/v1/golden/candidates/manage.html</code>이며, 검수 대상은 사실 우선 모의문서 1,711건이다(배치 표식 <code>expert_review_1731_20260924</code> — 이름의 1731 은 전달 당시 묶음 번호이고, 품질 검사에서 결함 20건을 뺀 1,711건이 콘솔에 올라간다).</p>
+<div class="callout warn"><div class="callout-label">배포 전 반드시 켤 것 — 안 켜면 블라인드가 아니다</div><p><code>GOLDEN_REVIEW_BLIND_ENFORCED=1</code>이 <b>기본값 꺼짐</b>이다. 이 값을 켜지 않고 배포하면 기동은 정상적으로 되지만 검수자 화면에 제안 등급·판단근거가 그대로 보여 <b>독립 판정 자체가 성립하지 않는다</b>(오류 메시지 없이 조용히 그렇게 된다). 검수자별로 문서를 나눠 배정하려면 <code>GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1</code>도 추가로 켠다(안 켜면 전원이 배치 전체를 본다). 설치 절차는 <code>INSTALL.md</code> §4 참고. 설치 스크립트(<code>setup.sh</code>)가 만드는 <code>.env</code> 와 배포 템플릿에는 이미 켜져 있다.</p></div>
+<h3>전문가 로그인 — 토큰을 입력할 일이 없다</h3>
+<ol><li>지재원 서버를 <code>setup.sh</code> 로 설치하면 <b>전문가용 계정(<code>expert-01</code>, 검수자 전용)이 자동으로 만들어져 로그인 화면에 미리 채워진다.</b> 전문가는 검수 화면 주소(<code>/api/v1/golden/candidates/manage.html</code>)를 열기만 하면 <b>토큰 입력 없이 자동으로 로그인</b>된다. 이 주소에 닿는 누구나 같은 권한으로 들어가므로 폐쇄망 안에서만 쓴다.</li><li>자동 로그인 토큰은 365일 유효하다. 만료되기 전에 운영자가 <code>bash setup.sh</code> 를 다시 실행하면 갱신된다(데이터는 그대로). 관리자 기능이 필요한 운영자는 번들 폴더의 <code>console_admin_token.txt</code> 내용을 로그인 화면에 붙여넣는다.</li><li>전문가별로 검수 기록(<code>--sub</code> 이름)을 따로 남겨야 하면 자동 로그인을 끄고(<code>CONSOLE_AUTOLOGIN=0 bash setup.sh</code>) 전문가마다 <code>python scripts/setup_console_test_login.py --sub "&lt;전문가 실명 또는 사번&gt;" --roles reviewer --days &lt;검수기간&gt;</code> 로 토큰을 발급해 로그인 화면에 붙여넣게 한다. <code>--sub</code> 값이 모든 검수 결정에 그대로 감사 기록되므로 실명을 쓴다.</li></ol>
+<h3>검수 절차</h3>
+<ol><li>로그인 후 <code>manage.html</code>로 이동 → 「검수 배치」 필터에서 <code>expert_review_1731_20260924</code>를 선택해 1,711건만 좁혀 본다.</li><li>목록의 문서 ID는 <b>별칭</b>(<code>RV-…</code>)이다 — 실제 관리번호가 아니며, 등급·근거·다른 검수자의 결정은 이 화면 어디에도 나오지 않는다.</li><li>문서를 클릭해 본문 전문을 읽는다(등급·판단근거 없음).</li><li>「결정」에서 <b>등급 지정/변경</b>을 고른다 — 블라인드 모드에서는 §06과 달리 <b>「승인(제안 등급대로 확정)」항목 자체가 없다.</b> 반드시 TS/S1/S2/S3 중 직접 판단한 값을 고르고, <b>사유</b>를 적어야 저장된다.</li><li>비밀관리성(보안표시·접근범위) 칸은 등급 결정과 별개다 — 본문에서 확인되지 않으면 「확인 안 됨」으로 둔다.</li><li>결정은 append-only 원장에 쌓이며, 「보류·폐기 이력」에서 본인이 낸 결정만 다시 볼 수 있다(다른 검수자의 결정·신원은 보이지 않는다).</li></ol>
+<div class="table-wrap"><table><thead><tr><th>구분</th><th>§06 signoff.html(내부)</th><th>§07 manage.html 블라인드(외부)</th></tr></thead><tbody><tr><td>대상 문서 ID</td><td>실 doc_id 그대로</td><td>별칭(<code>RV-…</code>)</td></tr><tr><td>제안 등급 노출</td><td>보임(참고 후 승인 가능)</td><td>안 보임(승인 항목 자체 없음)</td></tr><tr><td>다른 검수자 결정</td><td>같은 화면에서 확인 가능</td><td>본인 결정만 보임</td></tr><tr><td>용도</td><td>우리 쪽 생성 후보의 관리자 서명</td><td>외부 전문가 독립 판정</td></tr></tbody></table></div>
+<p style="font-size:12px;color:var(--text-dim)">자세한 배경·검증 기록은 내부 문서 <code>CLAUDE_EXPERT_REVIEW_1731_GUIDE_20260924.md</code> 참고(고객사 전달용 아님).</p>
+  <div class="footnote">한국지식재산보호원 / 지재원 영업비밀 자동 등급분류 시스템 · 검수 관리자 사용자매뉴얼(DOC-MAN-01) · 기준 화면 admin.html · signoff.html · manage.html · 2026-09-25(§07 전문가 로그인·검수 대상 건수 정정)</div>
 </article>
 <aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
 <a href="#sec-01-access">01 접속 · 인증 · Safe Mode</a>
@@ -150,6 +159,7 @@ footer strong{color:var(--text-dim);}
 <a href="#sec-04-retrain">04 재학습 · 모델 활성화</a>
 <a href="#sec-05-monitor">05 실시간 관제 · 대시보드</a>
 <a href="#sec-06-golden">06 골든셋 검수 · 서명</a>
+<a href="#sec-07-blind">07 외부 전문가 블라인드 검수</a>
 </nav></aside>
 </div>
 <footer><strong>한국지식재산보호원</strong> · 검수 관리자 사용자매뉴얼 — AI 거버넌스 관제콘솔 (DOC-MAN-01) · 감리 대응 산출물</footer>

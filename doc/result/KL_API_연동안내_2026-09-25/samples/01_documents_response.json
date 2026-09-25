@@ -1,0 +1,22 @@
+{
+  "doc_id": "ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73",
+  "filename": "cost_report.txt",
+  "source_format": "txt",
+  "file_hash": "d21c841ea4a451a398e6047d2884f69d8885efb3968b6a10d66d14e4104dc4e4",
+  "file_size_bytes": 592,
+  "extraction_method": "plain",
+  "extraction_quality": 1.0,
+  "ocr_used": false,
+  "char_count": 247,
+  "chunk_count": 1,
+  "pages_processed": null,
+  "pages_total": null,
+  "extraction_complete": true,
+  "classification_job_id": null,
+  "classification_status": null,
+  "classification_status_url": null,
+  "persisted": true,
+  "warnings": [],
+  "requires_review": false,
+  "review_reasons": []
+}

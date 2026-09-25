@@ -1,0 +1,758 @@
+# 자동 생성 파일 — 전체 규약서(doc/03_openapi_koipa_kl.yaml)에서 KL 이 호출하는 작업만 추렸다.
+# 직접 고치지 않는다. 만드는 곳: poc/scripts/build_kl_api_package.py
+openapi: 3.0.3
+info:
+  title: Koipa AI Engine API — KL 연동 인터페이스
+  description: |
+    한국지식재산보호원 AI 영업비밀관리시스템 — KL 웹시스템이 호출하는 5개 인터페이스만 담은 규격이다.
+    전체 규약서에서 자동으로 만든 것이라 직접 고치지 않는다.
+
+      IF-01  GET  /healthz                    준비 상태 확인
+      IF-02  POST /documents                  문서 등록(multipart) -> doc_id
+      IF-03  POST /classify/async             비동기 분류 요청(callback_url 은 선택)
+      IF-04  POST {callback_url}              엔진 -> KL 완료 통보(선택, POST /classify/async 의 callback_url 참고)
+      IF-05  GET  /classify/jobs/{job_id}     작업 상태·결과 조회
+      IF-06  GET  /classify/{doc_id}          문서 단위 최근 결과 조회
+
+    호출 순서와 예시는 함께 드리는 「AI 분류 엔진 연동 안내서」에 있다.
+    인증은 서버 간 호출 기준 X-API-Key 헤더다(/healthz 는 인증 없음).
+    오류는 HTTP 상태 코드로 구분한다. 본문은 대부분 {"detail": "사유"} 이고(422 는 항목별 배열),
+    심볼릭 code 필드는 413·429·500 에만 있다.
+  version: 1.0.0-draft
+  contact:
+    name: Koipa AI Engineering
+servers:
+- url: http://koipa-api:8000/api/v1
+  description: 온프레미스 Docker 내부망
+- url: https://{host}/api/v1
+  description: 프로덕션
+  variables:
+    host:
+      default: ai.example.koipa.local
+security:
+- ApiKeyAuth: []
+tags:
+- name: classify
+  description: 등급 분류 추론 (FUN-005)
+- name: documents
+  description: 등급 판정 대상 문서 업로드·ingestion (FUN-005 연계)
+- name: health
+  description: 상태 확인
+paths:
+  /healthz:
+    get:
+      x-audience: kl
+      tags:
+      - health
+      summary: 헬스 체크
+      security: []
+      responses:
+        '200':
+          description: 정상
+          content:
+            application/json:
+              schema:
+                type: object
+                description: 연동에 쓰는 필드는 status·model_version·uptime_sec 이다. 그 밖의 필드(build· deploy_profile·checks
+                  등)는 운영 진단용이라 예고 없이 늘거나 바뀔 수 있다.
+                required:
+                - status
+                additionalProperties: true
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  model_version:
+                    type: string
+                    example: v-fe4b386b
+                  uptime_sec:
+                    type: integer
+                    example: 5314
+                  warmup_done:
+                    type: boolean
+                    description: 모델 예열 완료 여부
+      x-interface: IF-01
+  /classify/async:
+    post:
+      x-audience: kl
+      tags:
+      - classify
+      summary: 분류 작업 큐 등록 (비동기)
+      description: |
+        POST /documents 로 받은 doc_id 를 분류 큐에 넣는다. **content 는 보내지 않는 것이 표준**이다 —
+        생략하면 등록 때 저장한 본문을 쓴다. 결과는 IF-05(GET /classify/jobs/{job_id})로 조회하거나
+        callback_url 로 받는다. 호출 한도는 분당 60건이며 넘으면 429 를 돌려준다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassifyAsyncRequest'
+      responses:
+        '202':
+          description: 큐 등록 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassifyAsyncResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: 요청 검증 실패(doc_id 누락 등). 본문은 {"detail":[{"loc":…,"msg":…}]} 형태.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-interface: IF-03
+  /classify/jobs/{job_id}:
+    get:
+      x-audience: kl
+      tags:
+      - classify
+      summary: 비동기 분류 작업 상태·결과 조회
+      description: |
+        status 가 done 이면 results[0] 에 분류 결과가 있다(단건 요청은 길이 1). failed 이면 error 에
+        사유가 있다. 작업 상태는 기본 24시간 보관하므로 그 안에 조회한다 — 이후에는
+        GET /classify/{doc_id} 로 최근 결과를 조회한다. 없는 job_id 는 404({"detail":"job not found"}).
+      parameters:
+      - in: path
+        name: job_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 작업 상태
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-interface: IF-05
+  /classify/{doc_id}:
+    get:
+      x-audience: kl
+      tags:
+      - classify
+      summary: 문서별 최근 분류 결과 조회
+      description: |
+        문서의 가장 최근 분류 결과를 **저장된 값으로 만들어** 돌려준다. 채워지는 필드는 label·confidence·
+        scores·model_version·elapsed_ms·status·confirmed_* 뿐이고, evaluation_factors·evidence·warnings·
+        rule_grade·model_grade·decision_path·grade_candidates·automation_assessment 는 비어 있다
+        (factors_source 는 기본값이라 의미가 없다). 근거·경고까지 필요하면 IF-05 작업 결과를 쓴다.
+        사람이 검수로 등급을 확정해도 label(예측 등급)은 바뀌지 않고, 확정 등급은
+        confirmed_label·confirmed_by·confirmed_at 으로 따로 온다(확정 전에는 null).
+        doc_id 는 POST /documents 가 돌려준 UUID 여야 한다(아니면 422). 분류 이력이 없으면
+        404({"detail":"no classification for doc_id"}).
+      parameters:
+      - in: path
+        name: doc_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassifyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: doc_id 가 UUID 형식이 아님. 본문은 {"detail":"doc_id must be a UUID"}.
+        '503':
+          description: DB 일시 장애. 본문은 {"detail":"service temporarily unavailable"} — 잠시 뒤 다시 조회한다.
+      x-interface: IF-06
+  /documents:
+    post:
+      x-audience: kl
+      tags:
+      - documents
+      summary: 분류 대상 문서 업로드·ingestion
+      description: |
+        등급 판정을 받을 업무 문서(HWP/PDF/DOCX/TXT 등)를 업로드한다.
+        포맷 자동 감지 → 텍스트 추출(필요 시 OCR) → 원본 스토리지 저장 →
+        documents/chunks 테이블 적재. 응답의 doc_id 를 POST /classify/async 본문
+        {"doc_id": "<doc_id>"} 에 실어 등급을 요청한다(쿼리 파라미터는 받지 않는다).
+        enqueue_classification=true 로 보내면 등록과 동시에 비동기 분류를 큐에 걸고, 응답에
+        classification_job_id 가 담긴다.
+        /guide/documents(지식베이스용 가이드 문서)와 완전 분리된 도메인.
+
+        같은 내용(SHA-256 동일)의 파일을 다시 등록하면 새 문서를 만들지 않고 기존 doc_id 를
+        돌려준다. 이때 함께 보낸 메타데이터·external_ref 는 갱신되지 않는다.
+        지원하지 않는 형식이거나 본문이 추출되지 않아도 201 로 등록된다 — 응답의 char_count·
+        warnings·requires_review 를 확인한다.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - actor
+              - file
+              properties:
+                actor:
+                  type: string
+                  description: Actor JSON 문자열 (user_id, role)
+                doc_type:
+                  type: string
+                  nullable: true
+                external_ref:
+                  type: string
+                  nullable: true
+                  description: 외부 문서 ID (EDMS 등). KL 자체 문서번호는 여기에 넣는다.
+                source_type:
+                  type: string
+                  nullable: true
+                  description: 'ICD §3.1 출처: public | registered_patent | academic | internal | external_confidential.
+                    공개 출처면 분류 시 S3 로 cap 된다.'
+                security_marking:
+                  type: string
+                  nullable: true
+                  description: 'ICD §3.2 보안표시: top_secret | secret | confidential | none. 표기가 있으면 접근범위보다 우선한다.'
+                access_scope:
+                  type: string
+                  nullable: true
+                  description: 'ICD §3.3 접근범위: approved_only | designated | department | all_employees. 보안표시가 none
+                    일 때 관리수준(M)을 정하는 주 입력.'
+                enqueue_classification:
+                  type: boolean
+                  default: false
+                  description: true 면 등록과 동시에 비동기 분류를 큐에 건다(응답에 classification_job_id).
+                file:
+                  type: string
+                  format: binary
+                  description: '원본 파일. 지원 형식: TXT·MD·LOG·CSV / HWP·HWPX / DOC·DOCX / XLS·XLSM·XLSX / PPTX·PPTM /
+                    PDF. 이미지는 OCR 로 처리하며 품질이 낮으면 requires_review 가 켜진다. 그 밖의 형식도 201 로 등록되지만 본문이 추출되지 않는다(char_count
+                    0).'
+      responses:
+        '201':
+          description: ingestion 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentUploadResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: '빈 파일 또는 actor JSON 오류. 본문은 {"detail": ...} 형태.'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-interface: IF-02
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    DocumentUploadResponse:
+      type: object
+      required:
+      - doc_id
+      - filename
+      - source_format
+      - file_hash
+      - file_size_bytes
+      - extraction_method
+      - extraction_quality
+      - ocr_used
+      - char_count
+      - chunk_count
+      - persisted
+      - warnings
+      properties:
+        doc_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: DB 적재 성공 시 UUID, 미가용 시 null. 같은 내용(SHA-256 동일)의 파일을 다시 등록하면 새로 만들지 않고 기존 doc_id 를 돌려준다.
+        filename:
+          type: string
+          description: 업로드한 파일 이름
+        source_format:
+          type: string
+          example: pdf
+          description: 감지한 파일 형식(확장자)
+        file_hash:
+          type: string
+          description: SHA-256 hex
+        file_size_bytes:
+          type: integer
+          description: 파일 크기(바이트)
+        extraction_method:
+          type: string
+          example: pdfminer
+          description: 본문 추출 방식
+        extraction_quality:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: 추출 품질(0~1). 낮으면 requires_review 가 켜질 수 있다.
+        ocr_used:
+          type: boolean
+          description: OCR 사용 여부
+        char_count:
+          type: integer
+          description: 추출된 글자 수. 0 이면 분류할 본문이 없다(지원하지 않는 형식 등) — warnings 를 확인한다.
+        chunk_count:
+          type: integer
+          description: 본문을 나눈 조각 수
+        pages_processed:
+          type: integer
+          nullable: true
+          description: 처리한 쪽수. 쪽 개념이 없는 형식은 null
+        pages_total:
+          type: integer
+          nullable: true
+          description: 전체 쪽수. 쪽 개념이 없는 형식은 null
+        extraction_complete:
+          type: boolean
+          description: 전체 본문을 추출했는지 여부
+        classification_job_id:
+          type: string
+          nullable: true
+          description: enqueue_classification=true 로 등록했을 때만 채워진다.
+        classification_status:
+          type: string
+          nullable: true
+          description: enqueue_classification=true 로 등록했을 때만 채워진다.
+        classification_status_url:
+          type: string
+          nullable: true
+          description: enqueue_classification=true 로 등록했을 때만 채워진다(호스트 없는 경로).
+        persisted:
+          type: boolean
+          description: DB/storage 저장 성공 여부
+        warnings:
+          type: array
+          items:
+            type: string
+        requires_review:
+          type: boolean
+          description: 저품질·OCR 추출 등으로 분류 전 검수가 필요하면 true. 자동분류를 그대로 통과하지 않는다.
+        review_reasons:
+          type: array
+          items:
+            type: string
+          description: requires_review 가 true 인 사유 목록
+    Grade:
+      type: string
+      description: 등급체계 코드. 관리자가 수정 가능하지만 기본 4단계 제공.
+      enum:
+      - TS
+      - S1
+      - S2
+      - S3
+    DocumentInput:
+      type: object
+      required:
+      - doc_id
+      properties:
+        doc_id:
+          type: string
+          description: |
+            POST /documents 가 돌려준 doc_id(UUID). 등록하지 않은 값을 content 없이 보내면 오류가
+            아니라 최고 등급(TS)·needs_review 결과가 오고 사유는 warnings 에 담긴다(fail-secure).
+            등록되지 않은 doc_id 의 결과는 검수 목록·판정 이력에 저장되지 않는다.
+            KL 자체 문서번호는 등록 때 external_ref 로 보낸다.
+        title:
+          type: string
+          nullable: true
+          description: 문서 제목. 없어도 된다.
+        content:
+          type: string
+          nullable: true
+          maxLength: 1048576
+          description: |
+            분류할 본문 텍스트(선택). **생략하는 것이 표준**이며, 생략하면 POST /documents 로
+            등록할 때 저장한 본문을 쓴다. 최대 1,048,576자.
+        metadata:
+          type: object
+          description: |
+            라벨링 보조 정보(작성 부서·문서 유형·작성일 등). 아래 3필드는 KL 연동 R6 계약
+            (⚠ ICD 협의안 v0.9 — 화요일 미팅서 K1~K7 확정 후 동결). metadata_floor 게이트
+            활성 시 등급 상향(floor)·검수 라우팅에 사용(운영 프로파일 onprem-local·full-train은 기본 활성).
+          properties:
+            source_type:
+              type: string
+              description: 문서 출처 유형(예 web_public/internal 등). source-prior 게이트 입력.
+            security_marking:
+              type: string
+              enum:
+              - top_secret
+              - secret
+              - confidential
+              description: |
+                KL 원본 보안표시 → 등급 floor(안전하게 상향만·하향 없음):
+                top_secret→TS · secret→S1 · confidential→S2. 소문자 exact-match(한글 표기 미매칭=무동작).
+            access_scope:
+              type: string
+              enum:
+              - approved_only
+              - designated
+              - department
+              - all_employees
+              description: |
+                접근범위 → 비밀관리성(M) 신호. 표기 없고 approved_only/designated/department이면
+                예측이 낮을 때 검수 라우팅(ICD §4.4). (all_employees 처리는 협의 대상)
+          additionalProperties: true
+        text_already_preprocessed:
+          type: boolean
+          default: false
+          description: true 면 엔진의 본문 정규화 단계를 건너뛴다. 보내지 않아도 된다.
+    ClassifyRequest:
+      allOf:
+      - $ref: '#/components/schemas/DocumentInput'
+      - type: object
+        properties:
+          return_evidence:
+            type: boolean
+            default: true
+            description: 근거(evidence)를 응답에 담을지 여부
+    ClassifyAsyncRequest:
+      allOf:
+      - $ref: '#/components/schemas/ClassifyRequest'
+      - type: object
+        properties:
+          callback_url:
+            type: string
+            format: uri
+            description: |
+              완료·실패 시 엔진이 결과 JSON 을 POST 할 주소(선택). http/https 만 허용하고 loopback·
+              link-local 주소는 거부한다 — 거부돼도 요청은 202 로 접수되므로 상태는 IF-05 로도 확인한다.
+              응답이 2xx 가 아니면 최대 5회 재시도하고 그래도 실패하면 엔진 쪽 DLQ 에 보관한다.
+              본문은 완료 시 {"job_id","status":"done","results":[ClassifyResponse]},
+              실패 시 {"job_id","status":"failed","error"} 이다. 서명 헤더는 붙이지 않는다.
+    EvaluationFactors:
+      type: object
+      description: 정본 가이드 3요건(S 비공지성 · V 경제적 유용성 · M 비밀관리성) 점수. 각 0~2.
+      properties:
+        secrecy:
+          type: number
+          minimum: 0
+          maximum: 2
+          description: 비공지성(S)
+        value:
+          type: number
+          minimum: 0
+          maximum: 2
+          description: 경제적 유용성(V)
+        management:
+          type: number
+          minimum: 0
+          maximum: 2
+          description: 비밀관리성(M)
+        scores:
+          type: object
+          description: 도메인 독립 factor_code → 점수 맵
+          additionalProperties:
+            type: number
+    EvidenceSpan:
+      type: object
+      required:
+      - start
+      - end
+      - text
+      properties:
+        start:
+          type: integer
+        end:
+          type: integer
+        text:
+          type: string
+        weight:
+          type: number
+        tag:
+          type: string
+          nullable: true
+    ClassifyResponse:
+      type: object
+      required:
+      - inference_id
+      - doc_id
+      - label
+      - confidence
+      - scores
+      - model_version
+      - elapsed_ms
+      properties:
+        inference_id:
+          type: string
+          format: uuid
+          description: 분류 결과 식별자
+        doc_id:
+          type: string
+          description: 분류한 문서의 doc_id
+        label:
+          $ref: '#/components/schemas/Grade'
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.87
+          description: 선택한 등급(label)의 확률(0~1)
+        scores:
+          type: object
+          description: 등급별 확률 분포
+          additionalProperties:
+            type: number
+            minimum: 0
+            maximum: 1
+        evaluation_factors:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/EvaluationFactors'
+        factors_source:
+          type: string
+          enum:
+          - rule_evidenced
+          - model_estimated
+          default: rule_evidenced
+          description: evaluation_factors 출처 — rule_evidenced(룰엔진 실증 근거·법리 표시 가능) / model_estimated(등급 역산 추정치·법리
+            근거 아님).
+        rule_evaluation_factors:
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/EvaluationFactors'
+          description: factors_source 가 model_estimated 일 때 룰이 실제로 관측한 S/V/M. 역산이 없었으면 null(그때는 evaluation_factors
+            가 곧 룰 관측값).
+        evidence:
+          type: array
+          description: 근거 키워드·문맥 span
+          items:
+            $ref: '#/components/schemas/EvidenceSpan'
+        model_version:
+          type: string
+          description: 판정에 쓴 모델 버전
+        elapsed_ms:
+          type: integer
+          description: 처리 시간(ms). 비동기 작업 결과에서는 측정하지 않아 0 이다.
+        status:
+          type: string
+          enum:
+          - staging
+          - needs_review
+          - needs_second_review
+          default: staging
+          description: staging=자동확정 후보 · needs_review/needs_second_review=검수 라우팅. 이 필드는 검수가 필요한지만 나타내며 'confirmed'
+            값은 나오지 않는다(사람이 확정한 등급은 confirmed_label).
+        warnings:
+          type: array
+          items:
+            type: string
+          description: 판정 사유·주의를 담은 문장 목록(영문). 형식이 바뀔 수 있으므로 화면 표시와 로그에만 쓴다.
+        rule_grade:
+          type: string
+          nullable: true
+          description: 룰 엔진(시드 키워드 S×V×M) 단독 판정.
+        model_grade:
+          type: string
+          nullable: true
+          description: 학습 분류기(BERT) 단독 판정(override/cap/floor 이전). 모델 미로드 시 null.
+        decision_path:
+          type: string
+          nullable: true
+          description: 최종 label 도출 경로(agreement/rule-override/source-cap/rule-only 등) — 룰·모델 이중판정 투명성.
+        grade_candidates:
+          type: array
+          items:
+            type: string
+          description: 비밀관리성(M)을 받지 못해 아직 하나로 정해지지 않은 등급 후보. 비어 있으면 label 이 유일한 답이다. label 을 대체하지 않는다.
+        grade_candidates_reason:
+          type: string
+          nullable: true
+          description: 후보가 남은 사유(사람이 읽는 문장)
+        automation_assessment:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: 자동확정 정책 검증용 관측치(그림자 모드). 연동에 쓰지 않으며 필드는 예고 없이 바뀔 수 있다.
+        confirmed_label:
+          type: string
+          nullable: true
+          description: 사람이 검수로 확정한 등급. 예측(label)과 별개이며 확정 전에는 null.
+        confirmed_by:
+          type: string
+          nullable: true
+          description: 확정한 검수자 식별자
+        confirmed_at:
+          type: string
+          nullable: true
+          description: 확정 시각(ISO 8601 UTC)
+    ClassifyAsyncResponse:
+      type: object
+      required:
+      - job_id
+      - status_url
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          description: 작업 식별자. IF-05 조회에 쓴다.
+        status:
+          type: string
+          description: 접수 직후 값. 큐 처리 경로는 queued, 즉시 처리 경로는 이미 done 또는 failed 일 수 있다.
+        status_url:
+          type: string
+          description: 상태 조회 경로(호스트 없는 상대 경로). 예 /api/v1/classify/jobs/{job_id}
+    JobStatus:
+      type: object
+      required:
+      - job_id
+      - status
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          description: 작업 식별자
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - done
+          - failed
+          - partial
+          - cancelled
+          description: |
+            현행 코드가 내는 값은 queued · done · failed · partial 이다.
+            partial — 일부 건은 성공·일부는 영구 실패(다건 작업). completed/failed 로 분포를 확인한다.
+        total:
+          type: integer
+          nullable: true
+          description: 요청 건수(단건은 1)
+        completed:
+          type: integer
+          nullable: true
+          description: 성공 건 수
+        failed:
+          type: integer
+          nullable: true
+          description: retry 모두 실패한 건 수
+        failed_doc_ids:
+          type: array
+          items:
+            type: string
+          description: 영구 실패한 doc_id 목록
+        errors:
+          type: array
+          description: 영구 실패 사유(doc_id · error_type · message · attempts)
+          items:
+            type: object
+            properties:
+              doc_id:
+                type: string
+              error_type:
+                type: string
+              message:
+                type: string
+              attempts:
+                type: integer
+        results:
+          type: array
+          nullable: true
+          description: 분류 결과. done 이면 채워지고 단건 요청은 길이 1 이다.
+          items:
+            $ref: '#/components/schemas/ClassifyResponse'
+        error:
+          type: string
+          nullable: true
+          description: failed 일 때 사유
+    HttpError:
+      type: object
+      required:
+      - detail
+      description: 500·429 를 뺀 오류 응답 본문(FastAPI 기본 형태). 상태 코드로 구분한다.
+      properties:
+        detail:
+          description: 오류 사유. 422 는 [{type, loc, msg, input}] 항목 배열이다.
+          oneOf:
+          - type: string
+          - type: array
+            items:
+              type: object
+              additionalProperties: true
+        code:
+          type: string
+          description: 413(요청 본문 한도)에서만 KOIPA_BODY_TOO_LARGE 가 온다.
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      description: 미처리 서버 오류(500) 본문. 그 밖의 오류 본문은 HttpError.
+      properties:
+        code:
+          type: string
+          description: |
+            기계 식별용 오류 코드. 현행 코드가 내는 값은 KOIPA_INTERNAL(500)·KOIPA_RATE_LIMIT(429)·
+            KOIPA_BODY_TOO_LARGE(413) 셋뿐이다. 다른 오류는 코드 없이 HTTP 상태 코드로 구분한다.
+        message:
+          type: string
+        request_id:
+          type: string
+          nullable: true
+        details:
+          type: object
+          nullable: true
+          additionalProperties: true
+        retryable:
+          type: boolean
+          description: true 면 같은 요청을 다시 보내 성공할 수 있다(미처리 500 은 true).
+  responses:
+    Unauthorized:
+      description: 인증 실패
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HttpError'
+    NotFound:
+      description: 리소스 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HttpError'
+    InternalError:
+      description: 서버 오류
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: 호출 한도 초과 (rate-limit). 헤더 Retry-After에 재시도 가능 시간(초) 포함.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: 재시도까지 대기 권장 시간(초)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: string
+                example: KOIPA_RATE_LIMIT
+              message:
+                type: string
+                example: 'rate limit exceeded: 60 per 1 minute'
+              retry_after_sec:
+                type: integer
+                example: 60
+    PayloadTooLarge:
+      description: 업로드 파일 크기 한도(기본 20MB) 또는 JSON 요청 본문 한도(기본 25MB) 초과.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HttpError'

@@ -1,5 +1,5 @@
 schema_version: 1
-updated_at: 2026-08-28
+updated_at: 2026-09-25
 
 policy:
   active_public_root: doc/result/감리정본
@@ -47,7 +47,10 @@ documents:
     owner: engineering
     audience: customer
     status: current
-    version: 1.0-draft
+    # [2026-09-24] 문서 본문(v0.9 협의안, 117·127·138·344·369행)과 다르던 걸 맞췄다.
+    # 문서 자신이 "KL 협의 확정 후 v1.0 반영 예정"이라 적어 뒀고 그 확정 근거를 못 찾아
+    # 본문 쪽을 정본으로 삼았다 — registry가 앞서가 있었다.
+    version: 0.9-draft
 
   - id: DOC-OPENAPI-001
     title: KL OpenAPI YAML
@@ -483,7 +486,10 @@ documents:
     owner: operations
     audience: customer
     status: current
-    version: 2026-07-pilot
+    # [2026-09-24] §07 외부 전문가 블라인드 검수(manage.html) 절 신설 — 기존 §06(signoff.html,
+    # 내부 서명)과는 다른 화면·다른 용도임을 명시. 10월 보호원 섭외 전문가 검수 대비.
+    # [2026-09-25] §07 정정 — 검수 대상 1,731→1,711건, 전문가 로그인은 설치가 자동 로그인을 켜므로 토큰 입력 없음.
+    version: 2026-09-25
 
   - id: DOC-QA-002
     title: 품질보증 결과서
@@ -556,7 +562,10 @@ documents:
     owner: engineering
     audience: customer
     status: current
-    version: 2026-08-설계감리
+    # [2026-09-24] 9/22 이후 누락된 검수 배정·승격 API 4건 반영(개정 이력 판2). 순수 내부운영
+    # 4건(유사문서·Prometheus·합성 커버리지/작업조회)은 KL 연동과 무관해 의도적으로 미기재 —
+    # 아래 버전도 그때로 갱신
+    version: 2026-09-24
 
   - id: DOC-GAMRI-003
     title: ERD 개체관계도
@@ -994,6 +1003,22 @@ documents:
     audience: customer
     status: current
     version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-011
+    title: AI 분류 엔진 연동 안내서
+    path: doc/result/KL_API_연동안내_2026-09-25/KL_API_연동_안내서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-09-25
+
+  - id: DOC-KLR-012
+    title: KL 연동 OpenAPI 규격 (KL 호출 5개 인터페이스)
+    path: doc/result/KL_API_연동안내_2026-09-25/koipa_kl_openapi.yaml
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-09-25
 
   - id: DOC-INT-013
     title: 미사용 자산 전수조사

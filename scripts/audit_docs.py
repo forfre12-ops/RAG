@@ -30,6 +30,8 @@ ACTIVE_DIRS = (
     DOC / "감리문서",
     # [2026-08-28] 발주처 회신 묶음. 나가는 자료이므로 검사 대상이다.
     DOC / "result" / "KL_회신_2026-08-28",
+    # [2026-09-25] KL 연동 안내서·규격. 나가는 자료이므로 검사 대상이다.
+    DOC / "result" / "KL_API_연동안내_2026-09-25",
 )
 
 ALLOWED_ACTIVE_DIR_NAMES = {"assets", "real"}
