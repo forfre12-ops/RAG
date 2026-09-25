@@ -253,6 +253,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+koipa = ["policy_fixture_registry.json"]
+
 [tool.bandit]
 # C8: 보안 SAST — 운영 진입 직전 OWASP ASVS L2 스캔.
 # 구 `.bandit`(INI) 에서 이관. INI 는 configparser 가 시스템 기본 인코딩으로 읽어

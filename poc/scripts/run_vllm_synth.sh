@@ -36,6 +36,18 @@ PORT="${VLLM_PORT:-18000}"
 FRACTION="${VLLM_GPU_FRACTION:-0.92}"
 MAX_LEN="${VLLM_MAX_MODEL_LEN:-32768}"
 ENV_FILE="${KOIPA_ENV_FILE:-$HOME/deploy/.env}"
+HF_DIR="${VLLM_HF_DIR:-/data/huggingface}"
+
+# 새 서버 대응(2026-09-22): 가중치가 서버 HF 캐시에만 있고 컨테이너는 오프라인 고정이라, 캐시가 빈 서버에서는
+# 기동이 실패했다. 캐시에 이 모델이 있으면 오프라인 그대로, 없으면 이번 한 번은 내려받게 한다(인터넷 필요,
+# 약 16GB). 내려받은 뒤에는 캐시가 채워져 다음 기동부터 오프라인이다.
+#   BIND 기본값 10.0.8.6 은 211 의 사설 IP 다 — 다른 서버에서는 VLLM_BIND 로 그 서버의 사설 IP 를 준다.
+if [ -d "$HF_DIR/hub/models--${MODEL//\//--}" ]; then
+  HF_OFFLINE=1
+else
+  HF_OFFLINE=0
+  echo "가중치가 $HF_DIR 에 없다 → 내려받는다(인터넷 필요, 약 16GB)"
+fi
 
 # 키는 합성 설정에서 읽는다 — 화면에 찍지 않는다. 두 값이 다르면 합성이 401 로 실패한다.
 KEY="$(grep -E '^LOCAL_LLM_API_KEY=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
@@ -49,9 +61,9 @@ fi
 
 docker run -d --name "$NAME" --gpus all --restart unless-stopped --ipc=host \
   -p "${BIND}:${PORT}:8000" \
-  -v /data/huggingface:/root/.cache/huggingface \
+  -v "$HF_DIR":/root/.cache/huggingface \
   -v /data/vllm-cache:/root/.cache/vllm \
-  -e HF_HUB_OFFLINE=1 \
+  -e HF_HUB_OFFLINE="$HF_OFFLINE" \
   "$IMAGE" "$MODEL" \
   --served-model-name "$SERVED" --api-key "$KEY" \
   --gpu-memory-utilization "$FRACTION" --max-model-len "$MAX_LEN"

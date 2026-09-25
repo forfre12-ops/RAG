@@ -195,7 +195,8 @@ p1-eval: ## 배포 P1 모델을 gold 티어(법적근거+전체)로 평가 → r
 	# 셋인데(p1_public·p1_llm·p1_serving) 종전에는 앞의 둘만 만들었다. 셋째는 어떤 타깃도
 	# 안 만들어서 **20일** 낡아 있었다(한도 14일). 권장 경로를 따라도 경고가 남으면
 	# 사람은 그 경고를 무시하게 된다.
-	TESTING=1 $(PY) scripts/eval_serving_vs_raw.py --model-dir $(P1_MODEL) \n	    --report reports/SERVING_VS_RAW.json
+	TESTING=1 $(PY) scripts/eval_serving_vs_raw.py --model-dir $(P1_MODEL) \
+	    --report reports/SERVING_VS_RAW.json
 
 p1-eval-v3: ## [legacy] v3 모델 gold 티어 평가 — 운영 경로 아님(역사 비교용)
 	$(PY) scripts/eval_p1_model_gold.py \
