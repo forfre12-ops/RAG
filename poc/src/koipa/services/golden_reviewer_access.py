@@ -173,9 +173,10 @@ BLIND_OWN_SUMMARY_FIELDS = frozenset({
     "fixed", "unfixed", "deferred", "discarded", "out_of_scope", "by_status",
     "actual_grade_fixed_unlocked",
 })
+# ledger_total(원장 전량 건수)은 배정으로 좁힌 **뒤**의 값이라 검수자에게는 자기에게 보이는 문서 수와 같다 — 총량이 새지 않는다.
 BLIND_KEPT_SUMMARY_FIELDS = frozenset({
     "total", "by_origin", "actual_document_intake", "actual_provenance_recorded",
-    "actual_provenance_partial", "actual_provenance_legacy", "scope",
+    "actual_provenance_partial", "actual_provenance_legacy", "scope", "ledger_total",
 })
 BLIND_HIDDEN_BATCH_SUMMARY_FIELDS = frozenset({"by_final_grade"})
 BLIND_OWN_BATCH_SUMMARY_FIELDS = frozenset({"terminal", "pending", "deferred", "by_status"})

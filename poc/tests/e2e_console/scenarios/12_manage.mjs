@@ -700,4 +700,116 @@ export const scenarios = [
       return page;
     },
   },
+
+  {
+    id: 'manage.paging.list-asks-for-a-page',
+    title: '목록은 쪽 단위로만 부른다 — 3천 건을 한 번에 받지 않는다',
+    needsMock: true,
+    why: '2026-09-25: 후보가 3,598건이 되자 한 응답이 3.6MB 였고 화면이 3천 줄을 그렸다. '
+       + '첫 진입부터 limit·offset 을 실어야 한다.',
+    async run({ server, check }) {
+      const page = await manage(server);
+      const call = server.exactCall('GET', '/golden/candidates');
+      check.ok(call, '목록을 불렀다');
+      check.includes(call?.path || '', 'limit=100', '한 쪽 크기를 실었다');
+      check.includes(call?.path || '', 'offset=0', '첫 쪽부터다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'manage.paging.pager-moves-pages',
+    title: '후보가 한 쪽을 넘으면 「다음」「이전」이 뜨고, 누르면 그 쪽만 다시 받는다',
+    needsMock: true,
+    async run({ server, check }) {
+      const { FIXTURES } = await import('../lib/server.mjs');
+      const base = FIXTURES['GET /golden/candidates'];
+      server.overrides['GET /golden/candidates'] = { ...base, total: 250, offset: 0, limit: 100, returned: base.candidates.length };
+      const page = await manage(server);
+
+      check.includes(page.text('pager'), '250', '전체 건수를 말한다');
+      check.ok(page.$('pageNext') && !page.$('pageNext').disabled, '「다음」이 눌린다');
+      check.ok(page.$('pagePrev')?.disabled, '첫 쪽이라 「이전」은 잠긴다');
+
+      server.overrides['GET /golden/candidates'] = { ...base, total: 250, offset: 100, limit: 100, returned: base.candidates.length };
+      page.click('pageNext');
+      await page.settle();
+      const call = server.exactCall('GET', '/golden/candidates');
+      check.includes(call?.path || '', 'offset=100', '두 번째 쪽(offset=100)을 불렀다');
+      check.ok(!page.$('pagePrev')?.disabled, '둘째 쪽에서는 「이전」이 풀린다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'manage.paging.default-batch-narrows-first-load',
+    title: '서버가 기본 검수 배치를 알려주면 첫 진입부터 그 배치로 좁혀 부른다',
+    needsMock: true,
+    why: '후보 풀에는 옛 회차가 쌓여 있어(3,598건 중 이번 회차 1,731) 전체를 기본으로 두면 '
+       + '이번에 검수할 문서가 옛 문서에 묻힌다.',
+    async run({ server, check }) {
+      const { FIXTURES } = await import('../lib/server.mjs');
+      const base = FIXTURES['GET /golden/candidates'];
+      server.overrides['GET /golden/candidates/session'] = {
+        ...(FIXTURES['GET /golden/candidates/session'] || { actor_id: '지재원관리자' }),
+        default_review_batch: '2026-08-A',
+      };
+      server.overrides['GET /golden/candidates'] = {
+        ...base, available_batches: [{ review_batch: '2026-08-A', total: 3 }, { review_batch: '옛회차', total: 9 }],
+      };
+      const page = await manage(server);
+      const first = server.exactCall('GET', '/golden/candidates');
+      check.includes(first?.path || '', 'review_batch=2026-08-A', '첫 목록 요청에 기본 배치가 실렸다');
+      check.eq(page.$('review_batch')?.value, '2026-08-A', '칸에도 그 배치가 골라져 있다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'manage.paging.opening-a-document-does-not-refetch-the-list',
+    title: '문서를 열어 보기만 할 때는 목록을 다시 받지 않는다',
+    needsMock: true,
+    needsData: true,
+    why: '2026-09-25: show() 끝에서 목록 전체를 다시 받았다 — 클릭 한 번마다 3.6MB 를 내려받고 '
+       + '3천 줄을 다시 그렸다. 목록이 바뀌는 것은 결정·출처 저장 뒤뿐이다.',
+    async run({ server, check }) {
+      const page = await manage(server);
+      const before = server.countCalls('GET', '/golden/candidates?');
+      page.click(page.q('#rows .candidate'));
+      await page.settle();
+      const after = server.countCalls('GET', '/golden/candidates?');
+      check.ok(server.exactCall('GET', '/golden/candidates/PGC-0001') || server.lastCall('GET', '/golden/candidates/PGC'), '상세는 불렀다');
+      check.eq(after, before, '목록은 다시 부르지 않았다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'manage.kpi.follows-the-selected-batch',
+    title: '배치를 고르면 상단 카드도 그 배치 기준으로 나오고, 원장 전량은 "N건 중"으로만 밝힌다',
+    needsMock: true,
+    why: '2026-09-25: 이번 회차 1,731건을 골라 놓고도 카드에 "전체 후보 3,598건 · 미확정 3,598건"이 떠 '
+       + '사용자가 "왜 3,598건이냐"고 되물었다. 회차를 고르면 카드가 그 회차의 숫자여야 한다.',
+    async run({ server, check }) {
+      const { FIXTURES } = await import('../lib/server.mjs');
+      const base = FIXTURES['GET /golden/candidates'];
+      server.overrides['GET /golden/candidates'] = {
+        ...base,
+        summary: { ...base.summary, total: 1731, unfixed: 1731, fixed: 0, scope: 'batch', ledger_total: 3598 },
+        batch_summary: { total: 1731, terminal: 0, pending: 1731, deferred: 0, by_status: { proposed: 1731 }, by_final_grade: {} },
+      };
+      const page = await manage(server);
+      const kpi = page.text('kpis');
+      check.includes(kpi, '1731건', '전체 후보 카드가 이 배치 건수다');
+      check.includes(kpi, '원장 전량 3,598건 중', '원장 전량은 "N건 중"으로만 밝힌다');
+      check.ok(!/전체 후보\s*3598/.test(kpi.replace(/\s+/g, ' ')), '카드에 3598건이 전체 후보로 뜨지 않는다');
+      check.eq(page.text('topCount'), '1731', '상단 미확정도 1731이다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
 ];

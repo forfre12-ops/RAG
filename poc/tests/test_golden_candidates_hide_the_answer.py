@@ -30,15 +30,25 @@ from collections import Counter, defaultdict
 import pytest
 
 _POC = pathlib.Path(__file__).resolve().parents[1]
-_ROOT = _POC / "datasets" / "proxy_gold" / "single_document_candidates"
+_POOL = _POC / "datasets" / "proxy_gold" / "single_document_candidates"
+# [2026-09-25] 검수 요청 대상이 아닌 옛 합성 후보(id 에 등급 코드가 박힌 것)를 이 보관 폴더로 옮겼다. 이 시험이 지키는 것은
+# 그 후보들의 본문이므로, 서빙 풀에 그런 후보가 없으면 보관 폴더를 본다(개정본은 같은 상대 경로 revisions/ 에 있다).
+_ARCHIVE = _POC / "datasets" / "proxy_gold" / "single_document_candidates_archive_20260925_not_requested"
+
+
+def _has_graded_ids(root: pathlib.Path) -> bool:
+    return root.is_dir() and any(root.glob("GOLD-*.metadata.json"))
+
+
+_ROOT = next((r for r in (_POOL, _ARCHIVE) if _has_graded_ids(r)), _POOL)
 
 _ANSWER_HEAD = re.compile(r"##\s*등급\s*제안\s*사유\s*:\s*(TS|S1|S2|S3)")
 _GRADE_IN_ID = re.compile(r"-(TS|S1|S2|S3)-")
 _TOK = re.compile(r"\b(TS|S1|S2|S3)\b")
 
 pytestmark = pytest.mark.skipif(
-    not _ROOT.is_dir() or not any(_ROOT.glob("*.metadata.json")),
-    reason="후보 풀이 없는 환경 — datasets/ 는 gitignore 다",
+    not _has_graded_ids(_ROOT),
+    reason="옛 후보(id 에 등급 코드가 있는 것)가 없는 환경 — datasets/ 는 gitignore 다",
 )
 
 

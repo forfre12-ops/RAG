@@ -17,7 +17,10 @@ import logging
 import os
 import re
 import tempfile
+import threading
+import time
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import AbstractSet, Any, Callable, Iterator
 from uuid import uuid4
@@ -41,7 +44,63 @@ _LOCKED_LEDGER_NAME = "locked_console_review.jsonl"
 # 행의 status 는 결정이 있으면 결정의 것으로 덮인다. 숨김 검수(golden_reviewer_access)가 "내가
 # 아직 결정하지 않은 문서"의 원래 상태를 보이려면 필요하다. 행에 새 키를 얹지 않고 캐시 옆에 둔 것은
 # 행이 모든 응답에 그대로 나가기 때문이다(키를 얹으면 손잡이를 끈 응답도 바뀐다).
-_CANDIDATE_CACHE: dict[tuple, tuple[list[dict[str, Any]], dict[str, str]]] = {}
+#
+# [2026-09-25] 후보가 3,598건(파일 7천 개)이 되자 이 캐시 구조가 무너졌다 — 실측(Docker Desktop
+# 바인드 마운트): ① 캐시 키를 만드는 디렉터리 전수 stat 이 **요청마다** 3.6초, ② 결정 한 번(원장이
+# 바뀜)마다 캐시가 통째로 무효화돼 다음 요청이 7천 파일을 다시 읽고 해시하는 데 **30초**. 결정
+# 하나 저장하고 다음 화면을 여는 데 30초가 걸리고, gunicorn 타임아웃(60초)에 닿을 수도 있었다.
+# 그래서 셋으로 나눈다:
+#   _BASE            파일에서 온 부분(행 본문·해시·메타). 파일이 바뀐 행만 다시 만든다.
+#   _CANDIDATE_CACHE 기반 + 원장의 결정 덮어쓰기. 원장이 바뀌면 이것만 다시 만든다(밀리초).
+#   디렉터리 재조회  _SCAN_TTL_SECONDS 마다 한 번(그 사이엔 디렉터리 mtime 한 번만 본다).
+_SCAN_TTL_SECONDS = 30.0
+_LOAD_THREADS = 16
+
+
+class _BaseSnapshot:
+    """파일에서 온 후보 행(결정 덮어쓰기 전). meta 파일명 → 행."""
+
+    __slots__ = ("sigs", "rows", "status_of", "order", "revision_metas", "at", "dir_mtime", "version",
+                 "base_status")
+
+    def __init__(self) -> None:
+        self.sigs: dict[str, tuple[int, int]] = {}
+        self.rows: dict[str, dict[str, Any]] = {}
+        self.status_of: dict[str, str] = {}
+        self.order: list[str] = []
+        self.revision_metas: set[str] = set()
+        self.at = 0.0
+        self.dir_mtime = 0
+        self.version = 0
+        self.base_status: dict[str, str] = {}
+
+
+_BASE: dict[str, _BaseSnapshot] = {}
+_BASE_LOCK = threading.RLock()
+
+
+class _CandidateCache(dict):
+    """결정 덮어쓴 후보 캐시. `.clear()` 가 기반 캐시(_BASE)까지 비운다.
+
+    시험과 운영 도구가 "재시작"을 흉내 낼 때 이 한 줄만 부르므로, 파생 캐시가 남아 옛 파일 내용을
+    돌려주지 않게 여기서 함께 비운다. 내부 세대 정리는 `dict.clear(_CANDIDATE_CACHE)` 를 쓴다.
+    """
+
+    def clear(self) -> None:  # noqa: D401
+        super().clear()
+        with _BASE_LOCK:
+            _BASE.clear()
+        _QUALITY_MEMO.clear()
+        _EXPOSURE_MEMO.clear()
+
+
+_CANDIDATE_CACHE: dict[tuple, tuple[list[dict[str, Any]], dict[str, str]]] = _CandidateCache()
+# 품질 지표 메모 — 후보 목록 객체(캐시 리스트 자체)가 같으면 결과도 같다. 요청마다 3천 건 본문을
+# 정규식으로 훑는 데 0.5초가 든다.
+_QUALITY_MEMO: dict[tuple[int, str], tuple[list[dict[str, Any]], dict[str, Any]]] = {}
+# 본문 등급 노출 검사 결과 — 키 (본문 sha256, 실문서 여부). 결정이 바뀌어도 본문은 안 바뀌므로 결정 때마다
+# 3천 건 본문을 정규식으로 다시 훑을 이유가 없다(실측: 결정 직후 첫 목록 조회가 0.55초였다).
+_EXPOSURE_MEMO: dict[tuple[str, bool], bool] = {}
 
 # 요청자별 시야(2026-09-21 숨김 검수). 후보 행 목록 / 원장 이벤트 목록을 받아 **그 요청자가 봐도 되는 것**으로
 # 바꿔 돌려주는 함수다. 서비스는 이 함수를 집계·필터보다 **앞에** 끼울 뿐 내용은 모른다(내용은
@@ -238,7 +297,12 @@ class ProxyGoldCandidateService:
         visible_doc_ids: AbstractSet[str] | None = None,
         view: CandidateView | None = None,
         query_match: QueryMatch | None = None,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> dict[str, Any]:
+        # [2026-09-25] limit/offset — 후보가 3,598건이 되자 한 응답이 3.6MB 였다(화면이 매번 통째로
+        # 받아 3천 줄을 그렸다). None = 종전처럼 전부(다른 호출자 호환). total·summary·batch_summary·
+        # available_batches 는 **잘라내기 전** 기준이다 — 쪽을 넘겨도 숫자가 흔들리면 안 된다.
         all_candidates = self._candidates()
         # [2026-09-21] 검수자 배정 강제 — 볼 수 있는 문서로 **먼저** 좁힌다. 그 뒤의 모든 계산
         # (목록·summary·품질·batch_summary·available_batches)이 이 좁혀진 집합 위에서 돌기
@@ -279,15 +343,33 @@ class ProxyGoldCandidateService:
         candidates.sort(key=lambda c: c["doc_id"])
         # 화면은 목록 응답에 실린 summary 로 KPI·품질 지표를 그린다(별도 /summary 를 안 부른다).
         # quality 를 여기 빼먹으면 품질 패널이 "지표를 낼 수 없습니다"로만 뜬다(실측).
-        embedded = self._summary(all_candidates)
-        embedded["quality"] = self._quality(all_candidates)
+        # [2026-09-25] 배치를 골랐으면 KPI·품질도 그 배치 기준이다. 종전에는 KPI 를 원장 전량으로 고정해서
+        # (B1-3: 상태·등급 필터마다 숫자가 흔들리면 안 된다는 이유) 이번 회차 1,731건을 골라 놓고도 화면 카드에는
+        # "전체 후보 3,598건 · 미확정 3,598건"이 떠 사용자가 "왜 3,598건이냐"고 되물었다. 배치는 필터가 아니라
+        # 범위(어느 회차를 검수하나)라서 히어로의 진행률(batch_summary)과 같은 기준으로 맞춘다. 원장 전량은
+        # ledger_total 로 함께 준다 — 화면이 "원장 전량 N건 중"으로 밝힌다.
+        kpi_base = all_candidates
+        kpi_scope = "all" if visible_doc_ids is None else "assigned"
+        if review_batch:
+            kpi_base = [c for c in all_candidates if c.get("review_batch") == review_batch]
+            kpi_scope = "batch"
+        embedded = self._summary(kpi_base)
+        if kpi_base is all_candidates:
+            embedded["quality"] = self._quality_memo(all_candidates)
+        else:
+            embedded["quality"] = self._quality_memo(kpi_base, base=all_candidates, tag=review_batch or "")
+        embedded["ledger_total"] = len(all_candidates)
         # [B1-3] KPI(summary)는 **원장 전량** 기준으로 둔다 — 화면 상단 숫자가 필터마다
         # 흔들리면 무엇을 세는 값인지 알 수 없다. 대신 목록 건수(total)와 다르다는 사실을
         # 응답에 적어, 화면이 "전체 306 / 목록 300 (폐기 6 제외)" 처럼 읽히게 한다.
         # 배정 강제로 좁혀진 요청이면 "all"(원장 전량)이 거짓이 된다 — 기준을 정직하게 적는다.
-        embedded["scope"] = "all" if visible_doc_ids is None else "assigned"
+        embedded["scope"] = kpi_scope
+        page = candidates if limit is None else candidates[max(0, offset): max(0, offset) + limit]
         return {
             "total": len(candidates),
+            "offset": max(0, offset) if limit is not None else 0,
+            "limit": limit,
+            "returned": len(page),
             "listed_excludes_discarded": status is None,
             "summary": embedded,
             # [E1-1] 필터된 집합 기준 집계 — **새 키**로 둔다. 기존 summary 는 화면 KPI
@@ -301,8 +383,27 @@ class ProxyGoldCandidateService:
             # 화면이 서버 상태를 **문장으로 단정하면** 데이터가 바뀌어도 문장은 안 바뀐다.
             # 원장 전량 기준으로 세므로 상태·등급 필터를 어떻게 걸어도 목록이 흔들리지 않는다.
             "available_batches": self._available_batches(all_candidates),
-            "candidates": [{k: v for k, v in c.items() if k != "text"} for c in candidates],
+            "candidates": [{k: v for k, v in c.items() if k != "text"} for c in page],
         }
+
+    def _quality_memo(
+        self, candidates: list[dict[str, Any]], *, base: list[dict[str, Any]] | None = None, tag: str = "",
+    ) -> dict[str, Any]:
+        """`_quality` 를 후보 목록 객체 단위로 기억한다. 캐시된 목록 그 자체(관리자·필터 없음)일
+        때만 맞는다 — 배정·숨김으로 걸러진 요청은 매번 새 리스트라 그냥 계산한다.
+
+        base·tag — 배치로 좁힌 부분집합은 요청마다 새 리스트라 identity 로 못 알아본다. 그 부분집합이
+        나온 원본 리스트(base)와 배치 이름(tag)으로 기억한다(원본이 바뀌면 identity 가 달라져 자동 무효)."""
+        ref = candidates if base is None else base
+        key = (id(ref), tag)
+        hit = _QUALITY_MEMO.get(key)
+        if hit is not None and hit[0] is ref:
+            return hit[1]
+        quality = self._quality(candidates)
+        if len(_QUALITY_MEMO) > 8:
+            _QUALITY_MEMO.clear()
+        _QUALITY_MEMO[key] = (ref, quality)
+        return quality
 
     @staticmethod
     def _available_batches(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -326,7 +427,7 @@ class ProxyGoldCandidateService:
         if view is not None:
             candidates = view(candidates)
         out = self._summary(candidates)
-        out["quality"] = self._quality(candidates)
+        out["quality"] = self._quality_memo(candidates)
         return out
 
     def review_batch_index(self) -> dict[str, str | None]:
@@ -413,11 +514,19 @@ class ProxyGoldCandidateService:
             hit += best == lab
         leak = round(hit / len(pairs), 3)
 
-        exposed = sum(
-            1 for _ln, _g, c in graded
-            if _exposes_grade(c.get("text") or "",
-                              is_real=bool(c.get("is_actual_document")))
-        )
+        def _exposed(c: dict[str, Any]) -> bool:
+            is_real = bool(c.get("is_actual_document"))
+            sha = c.get("document_sha256")
+            if not sha:                                  # 행을 손으로 만든 호출(시험 등) — 기억하지 않는다
+                return _exposes_grade(c.get("text") or "", is_real=is_real)
+            key = (str(sha), is_real)
+            hit = _EXPOSURE_MEMO.get(key)
+            if hit is None:
+                hit = _exposes_grade(c.get("text") or "", is_real=is_real)
+                _EXPOSURE_MEMO[key] = hit
+            return hit
+
+        exposed = sum(1 for _ln, _g, c in graded if _exposed(c))
         per_grade: dict[str, dict[str, int]] = {}
         for g in sorted(_VALID_GRADES):
             v = sorted(ln for ln, gg, _c in graded if gg == g)
@@ -568,6 +677,7 @@ class ProxyGoldCandidateService:
                 meta_path.write_text(
                     json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
                 )
+                self._expire_scan()      # 메타가 바뀌었다 — 다음 요청이 그 행만 다시 만든다
             with self.ledger_path.open("a", encoding="utf-8", newline="\n") as handle:
                 handle.write(dumps_line(event, sort_keys=True) + "\n")
                 handle.flush()
@@ -740,6 +850,7 @@ class ProxyGoldCandidateService:
             meta_path.write_text(
                 json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
             )
+            self._expire_scan()          # 메타가 바뀌었다 — 다음 요청이 그 행만 다시 만든다
             with self.ledger_path.open("a", encoding="utf-8", newline="\n") as handle:
                 handle.write(dumps_line(event, sort_keys=True) + "\n")
                 handle.flush()
@@ -847,62 +958,57 @@ class ProxyGoldCandidateService:
             source_path.write_bytes(content)
             markdown_path.write_text(text + "\n", encoding="utf-8")
             meta_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        self._expire_scan()              # 새 후보 파일이 생겼다 — 다음 요청이 그 행을 추가한다
         candidate = self.get_candidate(doc_id)
         assert candidate is not None
         return candidate
 
-    def _scan(self) -> tuple[tuple, list[str], dict[str, list[str]]]:
-        """디렉터리를 **한 번만** 훑어 (캐시키, metadata 목록, doc_id→본문파일) 을 만든다.
+    def _scan(self) -> tuple[dict[str, tuple[int, int]], list[str], dict[str, list[str]]]:
+        """디렉터리를 **한 번만** 훑어 (파일별 서명, metadata 목록, doc_id→본문파일) 을 만든다.
 
         종전에는 후보마다 `glob(f"{doc_id}_*.md")` 를 돌려 2,440개 엔트리 디렉터리를 272번
         재스캔했고(바인드 마운트에서 O(N×M)), 목록 응답에서 버릴 본문 30MB 를 매 요청 읽었다.
         실측: /golden/candidates 와 /summary 가 **120초 타임아웃**.
+
+        서명 = 파일별 (mtime_ns, 바이트 크기). 크기를 함께 보는 이유 — 파일시스템 시계 해상도가
+        낮으면(223 실측 4ms) mtime 만으로는 같은 틱 안의 두 번째 기록을 놓친다.
+        [2026-09-25] 이 훑기는 후보 3,598건(파일 7천 개)에서 바인드 마운트 기준 3.6초다. 그래서
+        요청마다 부르지 않고 `_base_snapshot()` 이 TTL 로 묶는다.
         """
         metas: list[str] = []
         docs: dict[str, list[str]] = {}
-        newest = 0
-        count = 0
-        # [2026-08-31] 캐시 키에 **바이트 크기**를 함께 넣는다 — mtime 만으로는 부족하다.
-        #
-        # 실측(223 · 30회 반복): 등급 확정 직후 보류를 걸면 30회 중 11회가 옛 상태를
-        # 돌려줬다. 원인은 이 컨테이너 파일시스템의 mtime 해상도가 4ms 라는 것이다.
-        # 두 기록이 같은 4ms 틱에 떨어지면 ledger_mtime 이 같아 캐시 키가 충돌하고,
-        # 원장에는 defer 가 정확히 적혀 있는데 화면은 확정 상태를 그대로 보여준다.
-        # (간격 0 이던 횟수 11 = 상태가 안 바뀐 횟수 11 로 정확히 일치했다)
-        #
-        # 원장은 append-only 라 **크기가 반드시 커진다.** 크기를 키에 넣으면 시계 해상도와
-        # 무관해진다. 메타 수정도 대개 크기를 바꾸므로 mtime 과 함께 쓰면 더 촘촘해진다.
-        # 비용은 없다 — stat() 은 이미 부르고 있고 st_size 를 같이 읽을 뿐이다.
-        total_size = 0
+        sigs: dict[str, tuple[int, int]] = {}
         with os.scandir(self.root) as it:
             for entry in it:
                 if not entry.is_file():
                     continue
                 name = entry.name
-                count += 1
                 try:
                     stat = entry.stat()
-                    mtime, size = stat.st_mtime_ns, stat.st_size
+                    sigs[name] = (stat.st_mtime_ns, stat.st_size)
                 except OSError:
-                    mtime, size = 0, 0
-                if mtime > newest:
-                    newest = mtime
-                total_size += size
+                    sigs[name] = (0, 0)
                 if name.endswith(".metadata.json"):
                     metas.append(name)
                 elif name.endswith(".md") and "_" in name:
                     docs.setdefault(name.split("_", 1)[0], []).append(name)
         metas.sort()
-        ledger_mtime = 0
-        ledger_size = -1
+        return sigs, metas, docs
+
+    def _ledger_key(self) -> tuple[int, int]:
+        """원장의 (mtime_ns, 크기). 원장은 append-only 라 크기가 반드시 커진다 — 시계 해상도와 무관하다."""
         try:
-            ledger_stat = self.ledger_path.stat()
-            ledger_mtime, ledger_size = ledger_stat.st_mtime_ns, ledger_stat.st_size
+            stat = self.ledger_path.stat()
+            return stat.st_mtime_ns, stat.st_size
         except OSError:
-            pass
-        return (
-            str(self.root), count, newest, total_size, ledger_mtime, ledger_size,
-        ), metas, docs
+            return 0, -1
+
+    def _expire_scan(self) -> None:
+        """이 프로세스가 후보 파일을 직접 썼을 때 다음 요청이 곧바로 다시 훑게 한다(TTL 을 건너뜀)."""
+        with _BASE_LOCK:
+            snap = _BASE.get(str(self.root))
+            if snap is not None:
+                snap.at = 0.0
 
     def _candidates(self) -> list[dict[str, Any]]:
         return self._load_candidates()[0]
@@ -915,107 +1021,212 @@ class ProxyGoldCandidateService:
         """
         return self._load_candidates()[1]
 
+    def _base_snapshot(self) -> _BaseSnapshot:
+        """파일에서 온 후보 행. 파일이 바뀐 행만 다시 만들고, 디렉터리 재조회는 TTL 로 묶는다."""
+        root = str(self.root)
+        try:
+            dir_mtime = self.root.stat().st_mtime_ns
+        except OSError:
+            dir_mtime = 0
+        snap = _BASE.get(root)
+        if (snap is not None and snap.dir_mtime == dir_mtime
+                and time.monotonic() - snap.at < _SCAN_TTL_SECONDS):
+            return snap
+        with _BASE_LOCK:
+            snap = _BASE.get(root)
+            now = time.monotonic()
+            if (snap is not None and snap.dir_mtime == dir_mtime
+                    and now - snap.at < _SCAN_TTL_SECONDS):
+                return snap
+            sigs, metas, docs = self._scan()
+            snap = self._reconcile(snap, sigs, metas, docs, dir_mtime, now)
+            _BASE[root] = snap
+            return snap
+
+    def _reconcile(
+        self, old: _BaseSnapshot | None, sigs: dict[str, tuple[int, int]], metas: list[str],
+        docs: dict[str, list[str]], dir_mtime: int, now: float,
+    ) -> _BaseSnapshot:
+        """새로 훑은 결과를 이전 스냅샷과 견줘, 파일이 바뀐 후보의 행만 다시 만든다."""
+        if old is None:
+            snap = _BaseSnapshot()
+            todo = list(metas)
+        else:
+            changed = {n for n, s in sigs.items() if old.sigs.get(n) != s}
+            changed |= set(old.sigs) - set(sigs)
+            if not changed:
+                old.at, old.dir_mtime = now, dir_mtime
+                return old
+            meta_set = set(metas)
+            gone_metas = [m for m in old.rows if m not in meta_set]
+            suffix = ".metadata.json"
+            prefixes = {n.split("_", 1)[0] for n in changed if n.endswith(".md") and "_" in n}
+            todo = [
+                m for m in metas
+                if m in changed                        # 메타가 새로 생기거나 바뀜
+                or m[: -len(suffix)] in prefixes       # 그 후보의 본문 파일이 바뀜
+                or m not in old.rows                   # 전에 건너뛴 것 — 다시 시도
+                or m in old.revision_metas             # 개정본 경로는 하위 폴더일 수 있어 서명을 못 봄
+            ]
+            if not todo and not gone_metas:
+                # 바뀐 것은 원장·잠금 파일뿐이다(결정마다 바뀐다) — 후보 행은 그대로라 버전도 안 올린다.
+                old.sigs, old.at, old.dir_mtime = sigs, now, dir_mtime
+                return old
+            snap = _BaseSnapshot()
+            snap.rows = dict(old.rows)
+            snap.status_of = dict(old.status_of)
+            snap.revision_metas = set(old.revision_metas)
+            snap.version = old.version
+            for gone in gone_metas:
+                snap.rows.pop(gone, None)
+                snap.status_of.pop(gone, None)
+                snap.revision_metas.discard(gone)
+        results = self._build_rows(todo, docs)
+        for meta_name, built in zip(todo, results):
+            if built is None:
+                snap.rows.pop(meta_name, None)
+                snap.status_of.pop(meta_name, None)
+                snap.revision_metas.discard(meta_name)
+                continue
+            row, base_status, has_revision = built
+            snap.rows[meta_name] = row
+            snap.status_of[meta_name] = base_status
+            if has_revision:
+                snap.revision_metas.add(meta_name)
+            else:
+                snap.revision_metas.discard(meta_name)
+        snap.sigs = sigs
+        snap.order = [m for m in metas if m in snap.rows]
+        snap.base_status = {snap.rows[m]["doc_id"]: snap.status_of[m] for m in snap.order}
+        snap.at, snap.dir_mtime = now, dir_mtime
+        snap.version += 1
+        return snap
+
+    def _build_rows(self, metas: list[str], docs_by_id: dict[str, list[str]]) -> list:
+        """메타 파일 여러 개를 병렬로 읽어 행으로 만든다 — 파일 하나당 지연이 큰 바인드 마운트에서
+        직렬로 읽으면 3,598건에 30초가 걸렸다."""
+        if not metas:
+            return []
+        if len(metas) < 8:
+            return [self._build_row(m, docs_by_id) for m in metas]
+        with ThreadPoolExecutor(max_workers=_LOAD_THREADS) as pool:
+            return list(pool.map(lambda m: self._build_row(m, docs_by_id), metas))
+
     def _load_candidates(self) -> tuple[list[dict[str, Any]], dict[str, str]]:
         if not self.root.exists():
             return [], {}
-        cache_key, metas, docs_by_id = self._scan()
-        cached = _CANDIDATE_CACHE.get(cache_key)
+        snap = self._base_snapshot()
+        key = (str(self.root), snap.version, self._ledger_key())
+        cached = _CANDIDATE_CACHE.get(key)
         if cached is not None:
             return cached
         latest = self._latest_decisions()
-        rows: list[dict[str, Any]] = []
-        base_status: dict[str, str] = {}
-        for meta_name in metas:
-            meta_path = self.root / meta_name
-            try:
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as exc:
-                # 후보가 목록에서 조용히 사라지던 자리. 검수자는 "왜 안 보이지"를
-                # 알 방법이 없었다. 건너뛰는 동작은 그대로 두고 사실만 남긴다.
-                logger.warning("골든 후보 건너뜀 — 메타를 읽지 못함: %s (%s: %s)",
-                               meta_name, type(exc).__name__, exc)
-                continue
-            doc_id = str(meta.get("doc_id") or "")
-            if not doc_id:
-                logger.warning("골든 후보 건너뜀 — 메타에 doc_id 가 없음: %s", meta_name)
-                continue
-            revision = str(meta.get("content_revision_path") or "").strip()
-            revision_path = (self.root / revision).resolve() if revision else None
-            if revision_path and revision_path.is_relative_to(self.root) and revision_path.is_file():
-                source = revision_path
-            else:
-                names = docs_by_id.get(doc_id) or []
-                if len(names) != 1:
-                    # 본문 파일을 하나로 특정하지 못하면 화면에서 사라진다.
-                    # 0건이면 없는 것이고, 2건 이상이면 어느 것인지 못 정한 것이다.
-                    logger.warning(
-                        "골든 후보 건너뜀 — 본문 파일 특정 실패: doc_id=%s 후보 %d건",
-                        doc_id, len(names),
-                    )
-                    continue
-                source = self.root / names[0]
-            try:
-                text = source.read_text(encoding="utf-8")
-            except OSError as exc:
-                logger.warning("골든 후보 건너뜀 — 본문을 읽지 못함: doc_id=%s path=%s (%s)",
-                               doc_id, source.name, type(exc).__name__)
-                continue
-            decision = latest.get(doc_id, {})
-            base_status[doc_id] = str(meta.get("candidate_status") or "proposed")
-            document_origin = str(meta.get("document_origin") or "unknown")
-            proposed = str(meta.get("intended_label") or "") or None
-            proposed_basis = None
-            if proposed is None and document_origin == "public_real":
-                proposed = "S3"
-                proposed_basis = "public source recorded; human confirmation pending"
-            try:
-                document_path = str(source.relative_to(_POC_ROOT))
-            except ValueError:
-                # 테스트/운영 도구가 별도 루트를 주입한 경우에도 목록 자체는 제공한다.
-                document_path = str(source)
-            rows.append({
-                "doc_id": doc_id,
-                "title": str(meta.get("document_type") or source.stem),
-                "proposed_grade": proposed,
-                "proposed_grade_basis": proposed_basis,
-                "final_grade": decision.get("final_grade"),
-                "status": decision.get("status") or str(meta.get("candidate_status") or "proposed"),
-                "document_origin": document_origin,
-                "requires_manual_audit": bool(meta.get("requires_manual_audit")),
-                # 검수 배치 표식. 전달본 단위로 묶어 목록을 좁힌다.
-                "review_batch": str(meta.get("review_batch") or "") or None,
-                "claim_scope": str(meta.get("claim_scope") or ""),
-                "document_path": document_path,
-                "content_revision": str(meta.get("content_revision") or "v1"),
-                "characters": len(text),
-                "document_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-                "latest_decision": decision or None,
-                "grade_fixed": bool(decision.get("final_grade")),
-                "extraction": meta.get("extraction"),
-                # [E3a-5 2026-08-17] 출처가 **두 자리**에 있다. 읽는 쪽이 한 자리만 봐서
-                # 실제로는 기록된 것이 "없음" 으로 보였다.
-                #   provenance dict          업로드 API 경로가 쓰는 자리 (12건)
-                #   metadata top-level       적재 스크립트가 쓴 자리 (62건)
-                #     load_kl_review_pool_to_console.py:205 `"source_reference": r.get("source")`
-                # 실측(223, 2026-08-17): 실문서 74건 중 62건이 top-level 에만 있었고
-                # 전부 실제 값이 있었다("판례(2000+)" 등). 데이터가 없던 것이 아니다.
-                # 자리를 합쳐서 읽는다 - 원본 파일은 안 건드린다(적재 스크립트는 E3a-7 에서 고친다).
-                "provenance": _merged_provenance(meta),
-                "source_file_sha256": str(meta.get("source_file_sha256") or "") or None,
-                # [2026-08-23] 비밀관리성(M) — 검수 화면이 현재 값과 그 결과를 함께 보여준다.
-                # state 를 같이 싣는 이유: "확인 안 됨(unknown)" 과 "전 임직원 열람
-                # (proven_absent)" 은 M 을 정반대로 만드는데, 값만 보내면 화면이 그 차이를
-                # 다시 계산해야 하고 그러면 판정식이 두 곳에 생긴다.
-                "management": _management_view(meta),
-                "is_actual_document": document_origin in {"public_real", "organization_real"},
-                "text": text,
-            })
-        # 캐시키에 (파일수·최신 mtime·원장 mtime) 이 들어 있어 문서 추가·수정·결정 기록이
-        # 생기면 자동으로 무효화된다. 폭주를 막기 위해 최근 몇 세대만 유지한다.
+        rows = []
+        for meta_name in snap.order:
+            base = snap.rows[meta_name]
+            decision = latest.get(base["doc_id"], {})
+            row = dict(base)
+            # 결정이 덮는 네 칸. 기반 행에는 자리표시만 있고(키 순서를 지키려고) 여기서 채운다.
+            row["final_grade"] = decision.get("final_grade")
+            row["status"] = decision.get("status") or snap.status_of[meta_name]
+            row["latest_decision"] = decision or None
+            row["grade_fixed"] = bool(decision.get("final_grade"))
+            rows.append(row)
+        result = (rows, dict(snap.base_status))
+        # 폭주를 막기 위해 최근 몇 세대만 유지한다.
         if len(_CANDIDATE_CACHE) > 4:
-            _CANDIDATE_CACHE.clear()
-        _CANDIDATE_CACHE[cache_key] = (rows, base_status)
-        return rows, base_status
+            dict.clear(_CANDIDATE_CACHE)
+        _CANDIDATE_CACHE[key] = result
+        return result
+
+    def _build_row(
+        self, meta_name: str, docs_by_id: dict[str, list[str]],
+    ) -> tuple[dict[str, Any], str, bool] | None:
+        """메타 파일 하나 → (기반 행, 메타의 candidate_status, 개정본 경로 사용 여부). 건너뛰면 None."""
+        meta_path = self.root / meta_name
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            # 후보가 목록에서 조용히 사라지던 자리. 검수자는 "왜 안 보이지"를
+            # 알 방법이 없었다. 건너뛰는 동작은 그대로 두고 사실만 남긴다.
+            logger.warning("골든 후보 건너뜀 — 메타를 읽지 못함: %s (%s: %s)",
+                           meta_name, type(exc).__name__, exc)
+            return None
+        doc_id = str(meta.get("doc_id") or "")
+        if not doc_id:
+            logger.warning("골든 후보 건너뜀 — 메타에 doc_id 가 없음: %s", meta_name)
+            return None
+        revision = str(meta.get("content_revision_path") or "").strip()
+        revision_path = (self.root / revision).resolve() if revision else None
+        if revision_path and revision_path.is_relative_to(self.root) and revision_path.is_file():
+            source = revision_path
+        else:
+            names = docs_by_id.get(doc_id) or []
+            if len(names) != 1:
+                # 본문 파일을 하나로 특정하지 못하면 화면에서 사라진다.
+                # 0건이면 없는 것이고, 2건 이상이면 어느 것인지 못 정한 것이다.
+                logger.warning(
+                    "골든 후보 건너뜀 — 본문 파일 특정 실패: doc_id=%s 후보 %d건",
+                    doc_id, len(names),
+                )
+                return None
+            source = self.root / names[0]
+        try:
+            text = source.read_text(encoding="utf-8")
+        except OSError as exc:
+            logger.warning("골든 후보 건너뜀 — 본문을 읽지 못함: doc_id=%s path=%s (%s)",
+                           doc_id, source.name, type(exc).__name__)
+            return None
+        base_status = str(meta.get("candidate_status") or "proposed")
+        document_origin = str(meta.get("document_origin") or "unknown")
+        proposed = str(meta.get("intended_label") or "") or None
+        proposed_basis = None
+        if proposed is None and document_origin == "public_real":
+            proposed = "S3"
+            proposed_basis = "public source recorded; human confirmation pending"
+        try:
+            document_path = str(source.relative_to(_POC_ROOT))
+        except ValueError:
+            # 테스트/운영 도구가 별도 루트를 주입한 경우에도 목록 자체는 제공한다.
+            document_path = str(source)
+        row = {
+            "doc_id": doc_id,
+            "title": str(meta.get("document_type") or source.stem),
+            "proposed_grade": proposed,
+            "proposed_grade_basis": proposed_basis,
+            "final_grade": None,                    # 결정 덮어쓰기에서 채운다(_load_candidates)
+            "status": base_status,                  # 위와 같다
+            "document_origin": document_origin,
+            "requires_manual_audit": bool(meta.get("requires_manual_audit")),
+            # 검수 배치 표식. 전달본 단위로 묶어 목록을 좁힌다.
+            "review_batch": str(meta.get("review_batch") or "") or None,
+            "claim_scope": str(meta.get("claim_scope") or ""),
+            "document_path": document_path,
+            "content_revision": str(meta.get("content_revision") or "v1"),
+            "characters": len(text),
+            "document_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "latest_decision": None,                # 결정 덮어쓰기에서 채운다
+            "grade_fixed": False,                   # 위와 같다
+            "extraction": meta.get("extraction"),
+            # [E3a-5 2026-08-17] 출처가 **두 자리**에 있다. 읽는 쪽이 한 자리만 봐서
+            # 실제로는 기록된 것이 "없음" 으로 보였다.
+            #   provenance dict          업로드 API 경로가 쓰는 자리 (12건)
+            #   metadata top-level       적재 스크립트가 쓴 자리 (62건)
+            #     load_kl_review_pool_to_console.py:205 `"source_reference": r.get("source")`
+            # 실측(223, 2026-08-17): 실문서 74건 중 62건이 top-level 에만 있었고
+            # 전부 실제 값이 있었다("판례(2000+)" 등). 데이터가 없던 것이 아니다.
+            # 자리를 합쳐서 읽는다 - 원본 파일은 안 건드린다(적재 스크립트는 E3a-7 에서 고친다).
+            "provenance": _merged_provenance(meta),
+            "source_file_sha256": str(meta.get("source_file_sha256") or "") or None,
+            # [2026-08-23] 비밀관리성(M) — 검수 화면이 현재 값과 그 결과를 함께 보여준다.
+            # state 를 같이 싣는 이유: "확인 안 됨(unknown)" 과 "전 임직원 열람
+            # (proven_absent)" 은 M 을 정반대로 만드는데, 값만 보내면 화면이 그 차이를
+            # 다시 계산해야 하고 그러면 판정식이 두 곳에 생긴다.
+            "management": _management_view(meta),
+            "is_actual_document": document_origin in {"public_real", "organization_real"},
+            "text": text,
+        }
+        return row, base_status, bool(revision)
 
     @staticmethod
     def _summary(candidates: list[dict[str, Any]]) -> dict[str, Any]:

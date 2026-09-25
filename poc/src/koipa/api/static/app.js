@@ -31,7 +31,7 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 function apiUrl(path) {
   return state.endpoint.replace(/\/+$/, "") + path;
 }
-// [2026-08-24] 이 화면은 **키도 토큰도 받지 않는다**(사용자 지시).
+// [2026-08-24] 이 화면은 **키도 토큰도 받지 않는다**.
 // 종전에는 화면을 열자마자 window.prompt 로 API 키를 물었다. 두 가지가 틀렸다.
 //   ① 맨 처음 나가는 호출이 /healthz 인데 그건 인증이 필요 없다 — 필요하지도 않은 것을
 //      시연 시작 화면에서 물었다(실측 2026-08-24 223: 자격증명 없이 GET /healthz → 200).
@@ -378,7 +378,7 @@ async function runClassify() {
   let lastStageT = t0;
   logLine("ev", "POST /api/v1/classify/stream  (SSE 실시간 스트림 시작)");
 
-  /* [2026-08-24 사용자 지적] 「문서 속성(ICD)」을 골라도 이 버튼에는 반영되지 않았다.
+  /* [2026-08-24] 「문서 속성(ICD)」을 골라도 이 버튼에는 반영되지 않았다.
      파일 업로드 경로 세 곳(analyzeFile · 비동기 제출 · 대용량 적재)은 icdEntries() 를 실어
      보내는데, 붙여넣은 본문·샘플을 분류하는 이 경로만 doc_id·title·content 만 보냈다.
      화면은 그 자리에서 "넣으면 등급 판정에 반영됩니다"라고 말하고 있었다 — 화면이 하지 않는
@@ -632,7 +632,7 @@ function renderStagesFromAnalyze(stages) {
 // 파일 분석 — 파싱 → 검수 게이트 → 등급까지 한 번에
 //   [2026-08-24] 별도 구역(#sec-parse, 구 parse_demo.html)의 인라인 스크립트를 여기로
 //   합쳤다. 같은 엔드포인트를 두 코드가 각각 호출하고 등급 결과 카드를 두 벌 그리고
-//   있었다(사용자 지적). 결과 렌더는 §2 한 곳(renderResult)으로 모으고, 파싱 세부와
+//   있었다. 결과 렌더는 §2 한 곳(renderResult)으로 모으고, 파싱 세부와
 //   검수 게이트만 §2 안의 접이식 「파싱 상세」로 내린다.
 // ──────────────────────────────────────────────────────────────────────
 
@@ -669,8 +669,8 @@ function renderParseDetail(j) {
   const gateBox = $("#gate-box");
   if (!fold || !kvBox || !gateBox) return;
   const p = j.parse || {};
-  /* [2026-08-21] 파싱 결과를 이름/값 11줄로 세워 놓으니 세로로만 길고 읽기 나빴다
-     (사용자 지적). 숫자는 타일로 묶고 나머지는 한 줄짜리 메모로 내린다. */
+  /* [2026-08-21] 파싱 결과를 이름/값 11줄로 세워 놓으니 세로로만 길고 읽기 나빴다.
+     숫자는 타일로 묶고 나머지는 한 줄짜리 메모로 내린다. */
   const tile = (cap, val, sub, warn) => `
     <div style="border:1px solid var(--border,#e1e1de);padding:9px 11px;min-width:0">
       <div style="font-size:11px;color:var(--text-dim,#8f9498);letter-spacing:.02em">${escapeHtml(cap)}</div>
@@ -1133,8 +1133,8 @@ function renderSummary(data) {
   const ev = data.evidence || [];
   const matched = ev.slice(0, 3).map((e) => e.text);
   const factors = data.evaluation_factors || {};
-  /* [2026-08-24 사용자 지적] "비공지성 0 · 경제유용성 0인데 뭐가 가장 높게 측정됐다는 거야?"
-     맞는 지적이다. 종전에는 세 값을 정렬해 **무조건 상위 2개**를 집어 "가장 높게 측정되었습니다"
+  /* [2026-08-24] "비공지성 0 · 경제유용성 0인데 뭐가 가장 높게 측정됐다는 거야?" — 종전 문구가
+     이 질문에 답하지 못했다. 세 값을 정렬해 **무조건 상위 2개**를 집어 "가장 높게 측정되었습니다"
      라고 적었다. 셋 다 0.00 이어도 앞의 둘(S·V)을 골라 그렇게 말했다 — 0점을 "가장 높다"고
      하는 것은 사실이 아니다. 같은 점수일 때도 "가장 높게"는 성립하지 않는다.
      그래서 세 경우를 가른다: 전부 0 / 전부 같은 점수 / 실제로 높은 것이 있음. */
@@ -1196,7 +1196,7 @@ function renderSummary(data) {
   const whyKo = (typeof window !== "undefined" && window.KOIPA_GATE_REASON)
     ? window.KOIPA_GATE_REASON(warns) : "";
   // 안전 규칙이 모델 최고점과 다른 등급을 채택했으면 그 사실을 같이 적는다 — 「룰·모델 모두
-  // TS 로 일치」 인데 검수로 가는 카드가 검수자에게 설명되지 않던 자리(2026-08-24 사용자 지적).
+  // TS 로 일치」 인데 검수로 가는 카드가 검수자에게 설명되지 않던 자리(2026-08-24 확인).
   const adjNote = (typeof window !== "undefined" && window.KOIPA_ADJUSTMENT_NOTE)
     ? window.KOIPA_ADJUSTMENT_NOTE(data) : "";
   const banner = needsReview
@@ -1206,7 +1206,7 @@ function renderSummary(data) {
     ? `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 <b>잠정 분류</b>되었으나 자동 확정되지 않고 검수로 라우팅되었습니다.`
     : `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 판정되었습니다.`;
 
-  // [2026-08-24] 화면에서는 신뢰도 수치를 **보여주지 않는다**(사용자 지시).
+  // [2026-08-24] 화면에서는 신뢰도 수치를 **보여주지 않는다**.
   //   근거: 화면 표시는 요건이 아니다 - RTM FUN-024 의 구현범위는 "검수자 큐 배분·심층지표"
   //   이고 "신뢰도를 화면에 표시" 라는 요건은 없다. 그리고 이 값은 정답확률이 아니라
   //   softmax 파생값이라(골든500 AUROC 0.58 · ECE 0.18) 화면에 숫자로 서면 실제보다

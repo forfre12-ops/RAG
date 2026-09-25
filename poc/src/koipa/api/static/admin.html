@@ -1099,7 +1099,7 @@ let AUTO_TIMER=null, AUTO_SILENT=false, AUTO_INFLIGHT=false, AUTO_TICK_OK=true;
 const $ = id => document.getElementById(id);
 const cfg = () => ({
   base: $('cfg-base').value.replace(/\/$/,''),
-  // [2026-08-24] 화면에서 키를 받지 않는다(사용자 지시). 인증은 같은 오리진
+  // [2026-08-24] 화면에서 키를 받지 않는다. 인증은 같은 오리진
   // 쿠키(koipa_access_token)가 맡는다 — fetch 가 자동으로 싣는다. 이 값은 예전에
   // 이 브라우저에 저장돼 있던 것을 그대로 쓸 때만 채워진다(api_key 모드로 도는 다른
   // 설치본 호환). 새로 넣을 경로는 없앴다 — 입력칸도 ?key= 주소도 없다.
@@ -1341,6 +1341,7 @@ function applyProfileVisibility(d){
   // 프로파일을 모르면(healthz 실패 등) 숨기지 않는다 — 판단 근거가 없을 때 기능을 감추면
   // "왜 안 보이지"로 헤매게 된다. fail-open.
   const hideFactory = (profile === 'onprem-local');
+  window.__hideFactory = hideFactory;   // 합성 생성 기능이 없는 서버 — loadSynthCoverage 가 헛 호출(404)을 안 한다
   // ⚠ 인라인 style 로 숨기면 showPane() 이 탭 전환 때 [data-pane] 전체의 display 를 다시
   //   써서 숨김이 지워진다(실측: 탭을 한 번 누르면 숨긴 카드가 되살아났다).
   //   클래스 + !important 로 두어 두 로직이 서로 간섭하지 않게 한다.
@@ -1403,7 +1404,7 @@ function applySynthAvailability(active){
           않기로 한 방침이다(2026-08-24).
        ② **못 고치는 것을 안내하지 않는다.** `LLM_PROVIDER`·`.env` 를 지웠다 — 이 화면을 보는
           사람은 서버 설정을 바꿀 권한이 없다. 검증문서 카드에서 같은 이유로 이미 뺐던 것이다.
-       ③ **내 조어를 뺐다.** "생성→검수 큐 경로가 도는지"는 표준어가 아니다(사용자 지적).
+       ③ **조어를 뺐다.** "생성→검수 큐 경로가 도는지"는 표준어가 아니다.
           무슨 일이 일어나고 무엇이 안 되는지만 적는다. */
     box.innerHTML = blocked
       /* [2026-08-24 3차 수정] 원인이 아니라 **결정**을 적는다. 종전 두 판은 둘 다 약했다 —
@@ -1682,7 +1683,7 @@ async function runClassify(){
  *   ⚠ 지운 것은 화면뿐이다 — confidence 는 API 응답(ICD required)·DB·감사로그에 그대로 남는다.
  * 대신 관리자가 실제로 알아야 하는 것을 적는다: 검수인가 자동인가, 그리고 **왜 검수인가**.
  * 사유 문구는 공용 표(review_reason_ko.js) 한 곳에서 가져온다 — 등급 시연 화면과 같은 말이 뜬다. */
-/* [2026-08-24] 새 문서를 올리면 **직전 문서의 판정 카드가 그대로 남아 있었다**(사용자 지적).
+/* [2026-08-24] 새 문서를 올리면 **직전 문서의 판정 카드가 그대로 남아 있었다**.
    classifyFromFile 은 본문·doc_id·제목만 갈아 끼우고 #cl-result 는 건드리지 않았으므로,
    「본문 추출」만 눌렀거나 분류가 실패하면 화면에는 새 문서 본문 + 옛 등급이 나란히 놓였다 —
    보는 사람은 그것을 새 문서의 등급으로 읽는다. 입력이 바뀌는 순간 결과를 비운다. */
@@ -2648,7 +2649,7 @@ function renderDashboard(d){
   // 등급이 있으면 그 사실을 배지 옆에 적는다. 게이트 판정 자체는 서버 계약 그대로 둔다.
   const pg=lr.per_grade||{}, rpg=lr.real_per_grade||{}, spg=lr.synthetic_per_grade||{};
   /* [2026-08-24] 종전에는 '실문서 0' 한 덩어리로 묶어, **서명이 아예 0건인 등급까지**
-     "서명분이 전부 합성입니다"라고 적었다(사용자 지적 — TS·S1·S2 가 0/0 인데 그 문장이 떴다).
+     "서명분이 전부 합성입니다"라고 적었다(TS·S1·S2 가 0/0 인데 그 문장이 떴다).
      없는 서명을 합성이라고 말하는 것은 사실과 다르다. 두 경우를 갈라 적는다:
        · 서명 0건        → 아직 서명한 것이 없다(구성을 말할 대상 자체가 없다)
        · 서명>0·실문서 0 → 서명은 있는데 본문이 전부 합성이다(수치 인용 시 한정 필요) */
@@ -2673,7 +2674,7 @@ function renderDashboard(d){
     alStatusPill(al.retrain_status)+dpDegraded(d,'active_learning'),
     dpBig(al.unconsumed_total??0, '건', (al.unconsumed_total>0)?'var(--red)':'var(--green)')
     + `<div class="dp-note">${(al.unconsumed_total>0)?'재학습에 반영되지 않은 교정입니다':'밀린 교정 없음'}</div>`
-    /* [2026-08-24] '확정' 칸을 넣었다(사용자 지적 — 3건인데 과소·과대·측면이 전부 0 이었다).
+    /* [2026-08-24] '확정' 칸을 넣었다(3건인데 과소·과대·측면이 전부 0 이었다).
        unconsumed_total 은 direction 이 confirm(등급 그대로 확정)인 교정까지 세는데 세부 칸에는
        그 방향이 없어서, 화면이 합계와 내역이 안 맞는 표를 보여 주고 있었다. */
     + dpStat([['확정', al.pending_confirm??0, ''],
@@ -2982,7 +2983,12 @@ async function loadSynthCoverage(){
   const box=$('sy-coverage'); if(!box) return;
   let d;
   try{ d=await api('GET','/synth/coverage'); }
-  catch(e){ box.innerHTML=`<div class="hint">채울 자리 격자를 불러오지 못했습니다: ${esc(errKo(e))}</div>`; return; }
+  catch(e){
+    // 404 = 이 서버에는 합성 생성 라우터가 없다(고객사 운영 프로파일은 합성 생성을 지재원에서만
+    // 한다). 고장이 아니므로 "불러오지 못했습니다" 오류 문구를 쓰지 않는다.
+    if(e && e.status===404){ box.innerHTML='<div class="hint">이 서버에서는 합성 생성 기능을 쓰지 않습니다.</div>'; return; }
+    box.innerHTML=`<div class="hint">채울 자리 격자를 불러오지 못했습니다: ${esc(errKo(e))}</div>`; return;
+  }
   if(!d || !d.available){
     box.innerHTML=`<div class="hint">채울 자리 격자 없음 — ${esc((d&&d.reason)||'학습셋을 읽지 못했습니다')}</div>`;
     return;
@@ -3346,7 +3352,7 @@ function syncSynthDomains(list){
 }
 
 /* [2026-08-24] 「API 키 자동 채움」 블록을 없앴다. 주소에 ?key= 를 붙여 여는 경로였는데,
- * 사용자 지시로 **웹 화면에서 키·토큰을 받지 않는다**. 인증은 같은 오리진 쿠키가
+ * 원칙상 **웹 화면에서 키·토큰을 받지 않는다**. 인증은 같은 오리진 쿠키가
  * 맡고, 없으면 401 → 로그인 화면으로 보낸다(위 bounceToLogin). */
 
 /* init */
@@ -3371,9 +3377,13 @@ syncWriteGate();
 syncActiveGrades();
 syncLlmProviders();  // 빈 셀렉트를 남기지 않는다 — checkHealth 가 곧 서버 목록으로 덮는다
 syncSynthDomains();
-loadSynthCoverage();  // 채울 자리 격자 — 무엇을 만들지 화면이 먼저 알려준다
-checkHealth();
-/* [2026-08-24] 새로고침하면 검토 목록이 빈 화면으로 돌아가던 것을 고친다(사용자 지적).
+// 채울 자리 격자 — 무엇을 만들지 화면이 먼저 알려준다. 프로파일을 안 뒤에 부른다: 고객사 운영(onprem-local)에는
+// 합성 생성 라우터가 없어 그대로 부르면 활동 로그에 `404 /synth/coverage` 가 남는다(고장이 아닌데 오류처럼 읽힌다).
+checkHealth().then(()=>{
+  if(window.__hideFactory){ const b=$('sy-coverage'); if(b) b.innerHTML='<div class="hint">이 서버에서는 합성 생성 기능을 쓰지 않습니다.</div>'; }
+  else loadSynthCoverage();
+});
+/* [2026-08-24] 새로고침하면 검토 목록이 빈 화면으로 돌아가던 것을 고친다.
    QUEUE 는 메모리 변수라 새로고침에 사라지는데 init 이 loadReviewQueue 를 부르지 않아,
    실제로는 DB 에 대기건이 있어도 화면은 "「검토할 문서 보기」를 누르면…" 안내문으로 돌아갔다.
    목록은 이 화면의 첫 할 일이므로 열 때 한 번 읽는다(GET /review-queue, 읽기 전용).

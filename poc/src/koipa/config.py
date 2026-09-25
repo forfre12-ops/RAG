@@ -339,6 +339,11 @@ class Settings(BaseSettings):
     #   다른 사람의 결정을 서버가 제거하고, '제안 등급 그대로 확정'(approve)을 거절한다.
     #   화면에서 가리는 것이 아니라 응답에서 빼는 것이 본체다(API 로 직접 읽히므로).
     golden_review_blind_enforced: bool = False
+    # golden_default_review_batch: 후보 관리 화면이 처음 열릴 때 좁혀 보는 검수 배치 표식.
+    #   후보 풀에는 예전 적재분이 지워지지 않고 쌓인다(실측 2026-09-25: 3,598건 = 이번 회차 1,731 +
+    #   같은 문서를 9/22 에 FD 이름으로 먼저 넣은 중복 800 + 8/8~9/12 옛 후보 1,067). 기본을 "전체"로 두면 이번에 검수할 문서가 옛 문서에
+    #   묻히고 첫 화면이 3천 건을 그린다. 비우면 종전처럼 전체. 화면에서 언제든 「전체 배치」로 바꿀 수 있다.
+    golden_default_review_batch: str = ""
 
     # NFR-SEC-01: 감사체인 HMAC 비밀키. 설정 시 audit_log hash chain을 HMAC-SHA256으로 링크해
     # 키 없는 과거 row 재작성(rewrite)을 차단(audit_chain._link_hex). 빈 값이면 레거시 sha256

@@ -131,7 +131,7 @@ def test_stripping_the_panel_gives_back_the_screen_that_existed_before_the_panel
     stripped = golden_api._strip_assignment_panel(admin)
     assert len(stripped) < len(admin) and stripped.endswith("</body></html>")
     for anchor in ('id="overview"', 'id="candidates"', 'id="detail"', 'id="ledgerAll"', 'id="quality"',
-                   'href="#quality"', "async function load()", "\nload();\n</script>"):
+                   'href="#quality"', "async function load(showProgress)", "\nload(true);\n</script>"):
         assert anchor in stripped, anchor
     assert stripped == golden_api._strip_assignment_panel(stripped), "걷어 낸 화면을 다시 걷어도 그대로여야 한다(멱등)"
     # 조각이 밖으로 나가는 자리가 없다: 마크업이 표식 밖에 있으면 검수자 화면에 남는다

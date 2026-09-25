@@ -103,4 +103,55 @@ export const scenarios = [
       return page;
     },
   },
+
+  {
+    id: 'upload.progress.manage-list-reload-shows-progress',
+    needsMock: true,
+    title: '후보 관리 — 목록을 새로고침·필터할 때도 같은 진행 팝업이 뜨고, 끝나면 닫힌다',
+    why: '2026-09-24: 후보가 3천 건대로 늘면서 목록 조회가 눈에 띄게 걸리는데, 화면에는 표시가 '
+       + '없어 "멈췄나" 로 읽혔다(요청 사유: 업로드 팝업과 같은 것을 목록 조회에도 달아 달라).',
+    async run({ server, check }) {
+      const page = await openPage(server, '/api/v1/golden/candidates/manage.html');
+      await page.settle();
+      check.eq(isOpen(page), false, '최초 로딩이 끝난 뒤에는 팝업이 없다');
+
+      server.faults.push({ path: /^\/golden\/candidates(\?|$)/, delayMs: 600 });
+      page.click('refresh');
+      check.eq(isOpen(page), true, '새로고침을 누르면 즉시 팝업이 뜬다');
+      check.includes(page.text('ap-title'), '목록', '무엇을 하고 있는지 업로드와 다른 문구로 말한다');
+
+      await page.settle();
+      check.eq(isOpen(page), false, '끝나면 팝업이 닫힌다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'upload.progress.manage-background-reload-does-not-show-progress',
+    writes: true,
+    needsMock: true,
+    title: '후보 관리 — 결정 저장 뒤의 배경 목록 재조회는 진행 팝업을 띄우지 않는다',
+    why: '결정 저장 직후 화면에는 "저장했습니다" 가 떠야 한다. 그 직후 목록을 배경에서 다시 '
+       + '읽어 오는데, 이때도 전체화면 팝업을 띄우면 방금 뜬 저장 결과를 곧바로 덮어 가린다.',
+    async run({ server, check }) {
+      const page = await openPage(server, '/api/v1/golden/candidates/manage.html');
+      await page.settle();
+      page.click(page.q('#rows .candidate'));
+      await page.settle();
+
+      server.faults.push({ path: /^\/golden\/candidates(\?|$)/, delayMs: 600 });
+      page.set('action', 'change');
+      page.set('finalGrade', 'S1');
+      page.set('reason', '재확인 완료');
+      page.click('save');
+      check.eq(isOpen(page), false, '결정 저장 뒤의 배경 재조회는 팝업을 띄우지 않는다');
+
+      await page.settle();
+      check.eq(isOpen(page), false, '배경 재조회가 끝난 뒤에도 여전히 팝업이 없다');
+      check.includes(page.text('saveMsg'), '저장', '저장 결과 문구가 팝업에 가려지지 않고 끝까지 남는다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
 ];

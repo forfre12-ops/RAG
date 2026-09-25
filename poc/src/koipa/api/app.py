@@ -1,4 +1,7 @@
 import logging
+import os
+import threading
+import time
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from uuid import uuid4
@@ -213,11 +216,30 @@ async def lifespan(app: FastAPI):
     except Exception as exc:  # noqa: BLE001
         logger.warning("OTel setup skipped: %s", exc)
     _warmup_models(settings)
+    # [2026-09-25] 골든 후보 캐시를 미리 데운다 — 후보가 수천 건이면 첫 요청이 파일 수천 개를 읽는다
+    # (Docker Desktop 바인드 마운트 실측 30초, 병렬 읽기로 줄인 뒤에도 수 초). 백그라운드로 돌려
+    # 기동을 늦추지 않고, 실패해도 첫 요청이 같은 일을 다시 한다. 시험(TESTING=1)에서는 안 돌린다.
+    if settings.serve_admin_console and os.environ.get("TESTING") != "1":
+        threading.Thread(target=_warm_golden_candidates, name="golden-cache-warmup", daemon=True).start()
     # health.py warmup_done 플래그 — lifespan 완료 시점에 True로 세팅.
     # uptime 기반 추정 대신 실제 startup 완료를 정확히 반영.
     from koipa.api import health as _health_mod  # noqa: PLC0415
     _health_mod.STARTUP_COMPLETE = True
     yield
+
+
+def _warm_golden_candidates() -> None:
+    """골든 후보 목록 캐시를 한 번 만들어 둔다. 어떤 실패도 기동에 영향을 주지 않는다."""
+    try:
+        from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService  # noqa: PLC0415
+
+        t0 = time.monotonic()
+        svc = ProxyGoldCandidateService()
+        n = len(svc._candidates())
+        svc.summary()          # 품질 지표(본문 등급 노출 검사)까지 기억시킨다 — 첫 화면 조회가 그걸 다시 안 하게
+        logger.info("golden candidate cache warm — %d건 %.1f초", n, time.monotonic() - t0)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("golden candidate cache warmup skipped: %s", exc)
 
 
 def _warmup_models(settings_obj) -> None:
@@ -390,7 +412,7 @@ else:
 # [2026-09-06] 조건을 enable_training 에서 **자기 스위치**로 바꿨다. 합성 생성(FUN-003)과
 # 학습은 다른 기능인데 한 축에 묶여 있어, 학습을 끄면 요건 기능이 화면에서도 API 에서도
 # 조용히 사라졌다. 지재원(full-train)에서는 반드시 열려 있어야 한다 —
-# tests/test_synth_router_availability.py 가 그 계약을 잠근다.
+# tests/test_deploy_profile.py 가 그 계약을 잠근다.
 if settings.enable_synthetic_generation:
     app.include_router(synthesis_api.router, prefix="/api/v1")
 else:
