@@ -40,7 +40,7 @@ COPY alembic.ini ./
 ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 RUN pip install --upgrade pip && \
     TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh \
-        hwp hwp-tables pdf-tables jwt xls
+        hwp hwp-tables pdf-tables jwt xls llm
 
 # [HWP 파싱 복구 — Dockerfile.api.prod 와 동일] rhwp 번들 FreeType 의 undefined symbol
 # (FT_Palette_Data_Get) 로 `import rhwp` 가 깨지는 것을 시스템 FreeType 선로드로 채운다.

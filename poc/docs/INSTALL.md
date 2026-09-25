@@ -127,10 +127,13 @@ cp infra-config/.env.template .env
 | `STORAGE_ENCRYPTION_KEY` | `<64 hex>` | 원본 at-rest 암호화. onprem-local은 암호화 강제라 **없으면 startup 실패** |
 | `KOIPA_AUDIT_CHAIN_SECRET` | `<64 hex>` | 감사체인 HMAC(NFR-SEC-01). **없으면 api startup 실패** |
 | `GOLDEN_HTML_URL_SECRET` | `<64 hex>` | 골든 검수·서명 화면 서명 URL 키. **없으면 그 화면이 무인증으로 열려 후보 문서 본문이 노출된다**(startup 은 통과하므로 조용히 열린 채 운영됨) |
+| `GOLDEN_REVIEW_BLIND_ENFORCED` | `1` | 외부 전문가 검수용. **기본값 False** — 이 줄이 없으면 검수자 화면에 제안 등급·근거가 그대로 보여 독립 판정이 깨진다(startup 은 통과, 조용히 그대로 운영됨). 전문가 검수 배치를 열 때 필수 |
+| `GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED` | `1` | 선택. 검수자별로 문서를 나눠 배정할 때만 켠다 — 안 켜면 전원이 배치 전체를 본다 |
+| `GOLDEN_DEFAULT_REVIEW_BATCH` | `expert_review_1731_20260924` | 후보 관리 화면(관리자)이 처음 열릴 때 좁혀 보는 검수 배치. 후보 풀에는 예전 적재분이 지워지지 않고 쌓이므로(개발 서버 2026-09-25 실측 3,598건 = 이번 회차 1,731 + 같은 문서의 중복 적재 800 + 옛 후보 1,067 — 이 중 요청 대상은 결함 20건을 뺀 1,711건) 비워 두면 첫 화면이 전체를 보여 이번 회차가 묻힌다. 그 배치가 서버에 없으면 자동으로 전체를 보여 주므로 값이 낡아도 화면이 비지는 않는다 |
 | `CORS_ALLOW_ORIGINS` | `["https://<콘솔 오리진>"]` | 운영 모드는 와일드카드(`*`) 거부. **JSON 배열** 형식 |
 
 > 64 hex 생성: `python3 -c "import secrets;print(secrets.token_hex(32))"`
-> 마지막 세 값이 비면 api 컨테이너가 재시작 루프에 빠진다(원인은 `docker logs`에 한 줄로 찍힌다).
+> 마지막 세 값(암호화·감사체인·골든 URL 시크릿)이 비면 api 컨테이너가 재시작 루프에 빠진다(원인은 `docker logs`에 한 줄로 찍힌다). `GOLDEN_REVIEW_BLIND_ENFORCED`류 둘은 비어도 기동은 되므로 이 표에 없으면 그냥 지나치기 쉽다 — 전문가 검수 절차는 `poc/docs/CLAUDE_EXPERT_REVIEW_1731_GUIDE_20260924.md` 참고.
 
 DB·Redis 엔드포인트는 compose가 컨테이너 네트워크 기준으로 자동 주입하므로 `.env`에 둘 필요 없다. 폐쇄망 번들은 원문·산출물을 로컬 파일시스템 볼륨에 저장하므로 MinIO·MLflow 엔드포인트를 설정하지 않는다.
 
@@ -240,6 +243,105 @@ API_KEY="$API_KEY" BASE_URL=http://localhost:8000 bash acceptance/run_acceptance
 기대: `[acceptance] PASS: N docs, 0 veto`. `UNDER!`(고등급 미탐)·파싱실패가 1건이라도 있으면 **FAIL** —
 `/healthz/deep` 로 원인(모델 미공급·보정 T=1.0·파서 extra 누락) 확인. 개발/lite 환경(레포 보유)에서는
 `make acceptance-test`(in-proc, 숫자 무손실까지 전수 검증)로도 확인 가능.
+
+### 10.2 검수 콘솔 로그인 — 설치가 끝나면 주소만 열면 된다
+
+**로그인에 토큰을 입력할 일은 없다.** `setup.sh` 7단계가 서명키와 토큰을 만들고, 그 토큰을 `.env` 의
+`CONSOLE_LOGIN_PREFILL_TOKEN` 에 적어 로그인 화면에 미리 채워 둔다. 미리 채워진 로그인 화면은 버튼을
+누르지 않아도 스스로 로그인하므로(사용자 결정 2026-08-20 "로그인은 항상 되어야 한다"), 콘솔 주소를
+여는 것만으로 들어간다. 설치 완료 안내에 열 주소·로그인되는 계정·토큰 만료일이 그대로 적힌다.
+
+| 노드 | 열 주소 | 자동으로 로그인되는 계정 |
+|---|---|---|
+| 지재원(`NODE=jjw`) | `<서버주소>:8000/api/v1/golden/candidates/manage.html` (전문가 검수 화면) | `expert-01` — `reviewer` 전용(제안 등급이 가려진다) |
+| 고객사(`NODE=customer`) | `<서버주소>:8000/console/admin.html` (관리 콘솔) | `admin` — `admin,reviewer` |
+
+⚠ **그 주소에 닿는 누구나 같은 권한으로 들어간다.** 폐쇄망 안에서만 쓴다. 하드닝 프로파일은 이 값이
+있으면 기동을 거부하므로 설치가 `CONSOLE_LOGIN_PREFILL_ALLOW_UNSAFE=1` 을 함께 적는다(명시적 허용).
+원장의 검수자 이름은 사람별이 아니라 "이 조직이 검수했다" 까지만 말한다 — 검수자가 1명인 운영에 맞춘 방식이다.
+끄려면 `CONSOLE_AUTOLOGIN=0 bash setup.sh`(그러면 로그인 화면에 토큰을 붙여넣어야 한다).
+
+**토큰 만료.** 자동 로그인 토큰은 365일(`CONSOLE_TOKEN_DAYS`) 유효하다. 만료되면 로그인 화면이 다시 토큰
+붙여넣기 칸으로 돌아오므로, 설치 완료 안내에 적힌 만료일 전에 `bash setup.sh` 를 다시 실행한다 — 토큰이
+새로 발급되고 `.env` 가 갱신된다(데이터·후보·검수 원장은 그대로).
+
+**관리자 토큰이 필요할 때.** 관리자 전용 기능(모델 활성화 · 평가정답 승격 · 검수 배정 등)은 관리자 토큰이
+필요하다(지재원 노드의 자동 로그인 계정은 `reviewer` 전용이다). 설치가 그 토큰을 번들 폴더의
+`console_admin_token.txt`(권한 600)에 저장해 뒀다 — 내용을 로그인 화면
+(`<서버주소>/api/v1/golden/candidates/login.html`)에 붙여넣으면 관리자로 들어간다. 지재원 노드의 전문가 토큰은
+`console_reviewer_token.txt` 에 있다. 이 두 파일은 외부에 공유하지 않는다.
+
+#### 사람별로 남기고 싶을 때(선택)
+
+자동 로그인은 한 계정으로 들어가므로 사람별 기록이 남지 않는다. 사람별로 남기려면 자동 로그인을 끄고
+(`CONSOLE_AUTOLOGIN=0 bash setup.sh`) 사람마다 토큰을 발급한다 — **한 토큰을 여러 명이 쓰면 원장에 같은
+이름만 남는다**:
+
+```bash
+docker compose --env-file .env -f infra-config/docker-compose.airgap.yml \
+  exec api python scripts/setup_console_test_login.py \
+  --sub <검수자이름> --roles reviewer --days 365 \
+  --also-copy-jwks datasets/_console_jwt/jwks.json
+docker compose --env-file .env -f infra-config/docker-compose.airgap.yml \
+  exec api cat secrets/console_jwt/tokens/<검수자이름>.txt
+```
+
+`--also-copy-jwks`가 검증키를 `golden_data` 볼륨(컨테이너가 실제로 보는 자리)에 다시 써 두므로
+매번 붙여야 한다.
+
+⚠ **서명키(개인키)는 컨테이너 안에만 있고 `secrets/`는 볼륨이 아니다 — 컨테이너를 다시 만들면 사라진다**
+(자동 로그인을 켜는 7단계도 스택을 한 번 다시 올리므로, 설치가 끝난 시점에는 이미 없다). 그 뒤 누구든
+토큰을 손으로 새로 발급하면(개인키가 없으니 스크립트가 새 키쌍을 자동으로 만든다) 검증키
+(`datasets/_console_jwt/jwks.json`)가 새 키로 통째로 교체되어, **이미 나눠 준 토큰과 자동 로그인 토큰이
+전부 조용히 무효화된다**(서명 검증 실패, 로그인 화면엔 평소와 같은 "토큰이 잘못됐다"만 뜬다 — 2026-09-24·25
+실측). 그러니 **토큰을 손으로 발급한 뒤에는 `bash setup.sh` 를 다시 실행**해 관리자·전문가 토큰과 자동 로그인
+설정을 한꺼번에 새로 맞추고, 손으로 발급했던 사람별 토큰도 함께 다시 발급해 나눠준다 — 한 명씩 나중에
+추가하면 그때마다 이전 사람들 것이 깨진다.
+
+### 10.3 전문가 검수 배치 적재 — `setup.sh` 6-1단계가 자동으로 한다(지재원 노드)
+
+`setup.sh` 가 번들 루트의 `golden_review_batch/`(사실 우선 모의문서 **1,711건** — 검수 요청에서 품질 결함
+20건을 뺀 것, `MD-####_review.md`+`MD-####.metadata.json` 쌍 3,422개)를 검수 콘솔이 읽는 `golden_data` 볼륨
+(`/app/datasets/proxy_gold/single_document_candidates/`)에 복사한다. 이 적재가 안 되면 콘솔은 뜨지만
+**검수할 문서가 0건**이다. 임시 컨테이너(api 이미지·비-root uid 1000)로 복사하므로 볼륨 경로를 알 필요가
+없고 파일 소유자도 맞는다(종전 수동 `cp` 는 볼륨 경로를 모르면 못 했고, 소유자가 uid 1000 이 아니면 서명 제출이
+500 이었다).
+
+- `cp -n`(no-clobber)이라 이미 있는 후보와 검수 원장은 덮어쓰지 않는다 — 다시 실행해도 안전하다.
+- 끝에 "볼륨에 후보 N건(번들 M건)"이 출력된다. N 이 M 보다 작거나 "확인하지 못했다"가 나오면 `bash setup.sh`
+  를 다시 실행한다.
+- 고객사 노드(`NODE=customer`)는 검수 문서를 올리지 않는다(전문가 검수는 지재원 노드에서 한다).
+- `setup.sh` 를 쓰지 않은 설치에서만 손으로 한다:
+
+```bash
+docker compose --env-file .env -f infra-config/docker-compose.airgap.yml \
+  run --rm --no-deps -T -v "$PWD/golden_review_batch":/incoming:ro,z --entrypoint sh api \
+  -c 'mkdir -p /app/datasets/proxy_gold/single_document_candidates && cp -n /incoming/* /app/datasets/proxy_gold/single_document_candidates/'
+```
+
+- 적재 후 §4의 `GOLDEN_REVIEW_BLIND_ENFORCED=1` 이 켜져 있는지 확인한다 — `setup.sh` 가 만드는 `.env` 와 두
+  템플릿(`.env.onprem-local`·`.env.full-train`)에는 이미 1 이 들어 있다.
+- 검수 화면 사용법은 `poc/docs/CLAUDE_EXPERT_REVIEW_1731_GUIDE_20260924.md`(내부 참고) ·
+  `사용자매뉴얼_검수관리자.html` §07(고객 전달용) 참고.
+
+### 10.4 평가정답 오염 방지 — 이미지에 이미 들어 있다(할 일 없음)
+
+> ⚠ **승격(promote) 버튼은 원래 배치를 구분하지 않는다.** 확정된 결정이 있는 후보를 후보 폴더
+> **전체에서** 통째로 평가정답(`locked_gold_eval`)으로 올린다. 검수 배치 1,711건 중 학습·검증에 이미 쓰인
+> 문서는 **평가정답이 될 수 없다**(학습에 쓴 문제로 시험 보는 train-on-test). 평가정답으로 써도 되는 것은 한 번도
+> 학습에 안 쓴 543건(개발 344 + 봉인 199)뿐이다.
+
+이 구분은 `evidence/eval_independence_exclusions.jsonl`(학습·검증에 쓴 문서 1,177건 등, 1,180행)이 맡고, 승격
+단계에서 `console_signoff.build_promotion_inputs()` 가 자동으로 읽어 거른다. **이 파일은 이미지에 구워져 있다**
+(`COPY evidence`) — 설치 뒤에 관리자가 할 일이 없다. 「평가정답으로 승격」 버튼을 그냥 누르면 543건만 정답지에
+들어가고, 제외된 문서의 검수 자체는 유효하다(라벨 품질 감사에 계속 쓸 수 있다 — 다만 평가정답으로 집계되지 않을
+뿐이다).
+
+확인(선택): `docker compose --env-file .env -f infra-config/docker-compose.airgap.yml exec api wc -l
+evidence/eval_independence_exclusions.jsonl` 이 1180 이면 들어 있는 것이다.
+
+> 예전 절차에 있던 `scripts/block_1731_trained_docs_from_eval.py` 는 **저장소에서 이 목록을 만들 때 쓰는
+> 도구**이지 설치 절차가 아니다. 설치된 컨테이너 안에서 돌리면 컨테이너를 다시 만들 때 결과가 사라진다.
 
 ---
 
