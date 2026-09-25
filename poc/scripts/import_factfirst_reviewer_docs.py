@@ -46,6 +46,11 @@ requires_manual_audit·review_batch` 등 **정해진 목록뿐**이다(원본 di
 
 기존 후보와 review_id 충돌은 없다(기존 doc_id 는 `GOLD-*`·16자리 16진수·업로드
 UUID 계열, `FD-` 접두는 이번 배치가 처음이다) — 그래도 실행 시 겹침을 세어 알린다.
+
+⚠ [2026-09-25] 이 스크립트가 들여온 FD- 800건은 9/24 전문가 검수 전달본 1,731건(MD-) 중 800건과
+본문 sha256 이 같은 **사본**이었다(제안 등급도 800/800 일치). 세는 도구
+`audit_golden_candidate_pool.py`, 치우는 도구 `archive_non_requested_candidates.py`(보관 폴더로 이동 — 2026-09-25 에 실행해 FD 800건이 이미 보관 폴더에 있다).
+사본을 치운 뒤 이 스크립트를 다시 돌리면 존재 여부만 보고 FD 파일을 새로 만들어 사본이 되살아난다.
 """
 
 from __future__ import annotations
@@ -54,6 +59,8 @@ import argparse
 import json
 import sys
 from pathlib import Path
+
+from _cli_io import force_utf8_stdio
 
 _HERE = Path(__file__).resolve().parent
 _POC = _HERE.parent
@@ -174,6 +181,7 @@ def write_candidate(row: dict, *, force: bool) -> str:
 
 
 def main() -> None:
+    force_utf8_stdio()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--commit", action="store_true", help="실제로 파일을 쓴다(기본은 미리보기만)")
     ap.add_argument("--force", action="store_true", help="이미 있는 review_id 도 덮어쓴다")

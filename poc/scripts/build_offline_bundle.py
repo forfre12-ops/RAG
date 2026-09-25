@@ -505,7 +505,6 @@ def expected_files(
     files.extend([
         "python-deps/wheels/",
         "python-deps/_requirements_no_torch.txt",
-        "infra-config/docker-compose.yml",
         "infra-config/docker-compose.airgap.yml",
         "infra-config/.env.template",
         "db-migrations/alembic/",  # baseline + 후속 revision 전체 (init.sql 폐기)
@@ -1161,6 +1160,42 @@ echo "[acceptance] $_v: ${n} docs, ${fail} veto(고등급 미탐/파싱실패), 
 '''
 
 
+# 전문가 검수 요청에서 뺀 문서(품질 결함 20건, 2026-09-25) — 번들에 싣지 않는다. 지재원에 가는 후보는
+# "전달 패키지 1,731건 전부"가 아니라 품질 기준을 통과한 것만이다. 목록은 evidence/ 에 커밋돼 있고
+# `scripts/audit_golden_candidate_pool.py --write-exclusions` 가 쓴다. 파일이 없으면 아무것도 안 뺀다.
+_REVIEW_REQUEST_EXCLUSIONS = _REPO_ROOT / "evidence" / "review_request_exclusions.jsonl"
+_REVIEW_FILE_ID = re.compile(r"^(MD-\d+)")
+
+
+def load_review_request_exclusions(path: Path | None = None) -> set[str]:
+    """검수 요청에서 뺀 문서 id 집합. 파일이 없거나 깨진 줄은 건너뛴다(뺀 것이 없다는 뜻이 된다)."""
+    p = path or _REVIEW_REQUEST_EXCLUSIONS
+    out: set[str] = set()
+    if not p.exists():
+        return out
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            doc_id = str(json.loads(line).get("doc_id") or "").strip()
+        except json.JSONDecodeError:
+            continue
+        if doc_id:
+            out.add(doc_id)
+    return out
+
+
+def select_review_batch_files(src: Path, excluded: set[str]) -> list[Path]:
+    """검수 배치 파일(MD-#### 접두: 메타·본문 쌍) 중 요청에서 뺀 문서의 것을 제외하고 고른다."""
+    files = []
+    for f in sorted(src.glob("MD-*")):
+        m = _REVIEW_FILE_ID.match(f.name)
+        if m and m.group(1) not in excluded:
+            files.append(f)
+    return files
+
+
 def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     """docker-compose(airgap 포함), env template, alembic, OCR 바이너리 복사. (ES 설정 폐기 — §03)"""
     import shutil
@@ -1169,8 +1204,9 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     infra.mkdir(parents=True, exist_ok=True)
 
     for src, dst in [
-        (_REPO_ROOT / "docker-compose.yml",              infra / "docker-compose.yml"),
-        # 폐쇄망 전용 compose (image 참조·beat 서비스·named 볼륨) — 운영 배포는 이걸 사용.
+        # 개발용 docker-compose.yml(api/worker가 build: 라 이미지 추출 불가 + mlflow 잔존)은
+        # 번들에 안 넣는다 — setup.sh·deploy_airgap.sh 어느 것도 참조하지 않아 그냥 있으면
+        # "왜 파일이 두 개고 뭐가 다른가"라는 혼란만 남긴다. 운영 배포는 아래 airgap 파일만 쓴다.
         (_REPO_ROOT / "docker-compose.airgap.yml",       infra / "docker-compose.airgap.yml"),
         # GPU 오버레이(옵인) — base 는 CPU. NVIDIA 노드만 -f 로 덧붙인다.
         (_REPO_ROOT / "docker-compose.gpu.yml",          infra / "docker-compose.gpu.yml"),
@@ -1497,6 +1533,46 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         print(
             "  [WARN] datasets/acceptance_pack 없음 — 고객 인수 샘플팩 미동봉. "
             "`make acceptance-pack` 로 먼저 생성하세요(상용 운영 포장).",
+            file=sys.stderr,
+        )
+
+    # [2026-09-24] 전문가 검수 배치(1,731건)를 번들에 함께 싣는다. `.dockerignore` 가
+    # datasets/ 전체를 이미지 빌드에서 뺀다(민감물 유입·빌드 지연 방지, 의도된 설계) — 그 결과
+    # golden.py 라우터·블라인드 코드는 이미지에 실려도 **검수할 문서 자체는 안 실렸다**. 이대로
+    # 내보내면 지재원은 빈 검수 화면만 받는다(실측: 이 검사 전엔 build_offline_bundle.py 가
+    # proxy_gold 를 어디서도 참조하지 않았다). single_document_candidates/ 전체(93MB, 다른 배치의
+    # 공개 실문서 79건 포함)를 통째로 싣지 않고 **이 배치(MD-#### 접두, 3.9MB)만 필터링**한다 —
+    # 이번 인도 목적과 무관한 과거 후보 풀까지 내보내지 않기 위해서다.
+    # [2026-09-25] 그 배치 1,731건 중 품질 결함 20건(evidence/review_request_exclusions.jsonl)은 뺀다 → 1,711건.
+    review_src = _REPO_ROOT / "datasets" / "proxy_gold" / "single_document_candidates"
+    review_batch_tag = "expert_review_1731_20260924"
+    review_excluded = load_review_request_exclusions()
+    review_files = select_review_batch_files(review_src, review_excluded) if review_src.exists() else []
+    if review_files:
+        import shutil as _sh_review  # noqa: PLC0415
+
+        review_dst = out_dir / "golden_review_batch"
+        review_dst.mkdir(parents=True, exist_ok=True)
+        for f in review_files:
+            _sh_review.copy2(f, review_dst / f.name)
+        n_docs = sum(1 for f in review_files if f.name.endswith("_review.md"))
+        size_mb = sum(f.stat().st_size for f in review_files) / (1024 * 1024)
+        print(
+            f"  [golden] 전문가 검수 배치({review_batch_tag}, {n_docs}건 · {size_mb:.1f}MB, "
+            f"검수 요청에서 뺀 {len(review_excluded)}건 제외) → {review_dst}",
+            file=sys.stderr,
+        )
+        print(
+            "  [golden] 적재는 설치 후 별도 수행: "
+            "`cp -r golden_review_batch/* <배포경로>/datasets/proxy_gold/single_document_candidates/` "
+            "(단, 후보 폴더가 이미 있으면 병합이지 덮어쓰기가 아니어야 한다 — 기존 후보와 안 섞이게 "
+            "review_batch 메타데이터로 이미 구분됨)",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"  [WARN] {review_src} 에 검수 배치 없음 — 전문가 검수 문서 미동봉. "
+            "`scripts/load_expert_review_1731_to_console.py` 로 먼저 적재하세요.",
             file=sys.stderr,
         )
 
