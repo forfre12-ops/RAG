@@ -136,8 +136,8 @@ def _test(op: str, value: Any, expected: Any) -> bool:
     raise ValueError(f"모르는 연산자: {op}")
 
 
-def _condition_results(rule: Rule, facts: dict) -> tuple[list[str], list[str]]:
-    """(충족한 조건, 값이 없어 판단 못 한 사실)."""
+def _condition_results(rule: Rule, facts: dict) -> tuple[list[str] | None, list[str]]:
+    """(충족한 조건, 미확인 사실). 첫 값 None은 확정된 AND 불충족이다."""
     matched: list[str] = []
     unknown: list[str] = []
     for fact, spec in rule.when.items():
@@ -158,7 +158,7 @@ def _condition_results(rule: Rule, facts: dict) -> tuple[list[str], list[str]]:
             #   공개여부(불충족) 먼저 → needs_review=False
             # 한 조건이라도 '아님' 이 확인되면 그 규칙은 순서와 무관하게 해당 없음이고,
             # 남은 미확인은 이 규칙의 판단에 더 이상 영향을 주지 않는다.
-            return [], []
+            return None, []
     return matched, unknown
 
 
@@ -177,6 +177,10 @@ def evaluate(policy: Policy, facts: dict) -> Proposal:
 
     for rule in sorted(policy.rules, key=lambda r: (r.priority, r.id)):
         matched, unknown = _condition_results(rule, facts)
+        # 확정된 불충족은 별도 requires_evidence 부재로 다시 보류시키지 않는다.
+        # unknown과 false를 구별해야 조건 순서뿐 아니라 증거 선언에도 일관된다.
+        if matched is None:
+            continue
         missing = [e for e in rule.requires_evidence
                    if facts.get(e) in (None, "", [], {})] + unknown
         if missing:

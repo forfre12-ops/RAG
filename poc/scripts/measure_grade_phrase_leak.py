@@ -29,12 +29,17 @@ from __future__ import annotations
 
 import argparse
 import collections
-import io
+import hashlib
 import json
 import random
 import re
 import sys
 from pathlib import Path
+from datetime import datetime, timezone
+
+from _cli_io import force_utf8_stdio
+from classification_audit_inputs import DEFAULT_POOL, load_audit_pool, verify_audit_snapshot
+from evaluation_inputs import sha256
 
 _POC = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_POC / "scripts"))
@@ -73,13 +78,13 @@ def _null_single_clue(cand: list[dict], per_doc: list[set[str]], min_docs: int,
         for sents, label in zip(per_doc, labels):
             for s in sents:
                 by_sentence[s][label] += 1
-        best: dict[str, tuple[float, int, str]] = {}
+        best: dict[str, tuple[float, int, str, str]] = {}
         for s, dist in by_sentence.items():
             docs = sum(dist.values())
             if docs < min_docs:
                 continue
-            grade, top = dist.most_common(1)[0]
-            best[s] = (top / docs, docs, grade)
+            grade = max(dist, key=lambda g: (dist[g], g))
+            best[s] = (dist[grade] / docs, docs, grade, s)
         hit = 0
         for sents, label in zip(per_doc, labels):
             picks = [best[s] for s in sents if s in best]
@@ -89,15 +94,11 @@ def _null_single_clue(cand: list[dict], per_doc: list[set[str]], min_docs: int,
     return total / trials
 
 
-def audit(*, min_docs: int, min_chars: int, pool: Path | None = None) -> dict:
-    import eval_on_clean_candidates as _src
-
-    # 다른 풀도 잴 수 있어야 한다 — 생성기를 고친 뒤 **새로 뽑은 것**과 대조하려면
-    # 기존 후보 풀(검수 이력이 붙어 있어 덮어쓰면 안 된다)이 아닌 곳을 가리켜야 한다.
-    if pool is not None:
-        _src.ROOT = pool
-
-    cand = [c for c in _src.load_candidates() if (c.get("text") or "").strip()]
+def audit(*, min_docs: int, min_chars: int, pool: Path | None = None,
+          split: str = "development", view: str = "body_only", cv_seeds: int = 0) -> dict:
+    if min_docs < 2 or min_chars < 1 or not 0 <= cv_seeds <= 100:
+        raise ValueError("min-docs >= 2, min-chars >= 1, cv-seeds in 0..100 required")
+    cand, input_audit = load_audit_pool(pool, split=split, view=view)
     n = len(cand)
     # 문장 집합은 한 번만 자른다 — 라벨 섞기에서 수십 번 다시 자르면 몇 분이 걸린다.
     per_doc_sentences = [sentences(c["text"], min_chars) for c in cand]
@@ -114,16 +115,17 @@ def audit(*, min_docs: int, min_chars: int, pool: Path | None = None) -> dict:
         docs = sum(dist.values())
         if docs < min_docs:
             continue
-        top_grade, top_n = dist.most_common(1)[0]
+        top_grade = max(dist, key=lambda g: (dist[g], g))
+        top_n = dist[top_grade]
         rows.append({
-            "sentence": s[:120],
+            "sentence": s,
             "docs": docs,
-            "purity": round(top_n / docs, 4),
+            "purity": top_n / docs,
             "top_grade": top_grade,
             "grades": dict(dist),
             "exclusive": len(dist) == 1,
         })
-    rows.sort(key=lambda r: (-r["purity"], -r["docs"]))
+    rows.sort(key=lambda r: (-r["purity"], -r["docs"], r["sentence"]))
 
     # 단서 하나로 등급을 찍으면 몇 %를 맞히는가 — 문서마다 **가장 쏠린 문장**을 단서로 쓴다.
     hit = covered = 0
@@ -133,7 +135,7 @@ def audit(*, min_docs: int, min_chars: int, pool: Path | None = None) -> dict:
         if not cand_rows:
             continue
         covered += 1
-        pick = max(cand_rows, key=lambda r: (r["purity"], r["docs"]))
+        pick = max(cand_rows, key=lambda r: (r["purity"], r["docs"], r["top_grade"], r["sentence"]))
         hit += (pick["top_grade"] == c["label"])
 
     # ⭐ 진짜 기준선은 **라벨을 섞었을 때** 같은 자가 내는 값이다. 이 추정량은 문서마다
@@ -143,7 +145,16 @@ def audit(*, min_docs: int, min_chars: int, pool: Path | None = None) -> dict:
     #     아니라 진짜 누설이었다. 그래도 값은 항상 **차이**로 읽는다.
     null = _null_single_clue(cand, per_doc_sentences, min_docs) if n else 0.0
 
-    return {
+    result = {
+        "status": "MEASURED_NOT_QUALIFIED",
+        "input_audit": input_audit,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "python_version": sys.version,
+        "char_cv_executed": bool(cv_seeds),
+        "phrase_permutation": {"trials": 20, "seed": 7},
+        "source_sha256": {name: sha256(Path(__file__).with_name(name)) for name in
+                          ("measure_grade_phrase_leak.py", "classification_audit_inputs.py",
+                           "measure_ngram_shortcuts.py", "evaluation_inputs.py")},
         "n_candidates": n,
         "grade_distribution": dict(grades),
         "baseline_majority": round(base, 4),
@@ -158,22 +169,70 @@ def audit(*, min_docs: int, min_chars: int, pool: Path | None = None) -> dict:
         "single_clue_accuracy": round(hit / n, 4) if n else 0.0,
         "top": rows[:50],
     }
+    if cv_seeds:
+        from measure_ngram_shortcuts import measure
+        result["char_ngram_probe"] = measure(cand, seeds=cv_seeds)
+    verify_audit_snapshot(input_audit)
+    result["input_snapshot_verified_after_measurement"] = True
+    return result
 
 
 def main(argv=None) -> int:
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    force_utf8_stdio()
     ap = argparse.ArgumentParser(description="되풀이 문장의 등급 쏠림 계수")
     ap.add_argument("--min-docs", type=int, default=20, help="이 수 이상 문서에 나오는 문장만 본다")
     ap.add_argument("--min-chars", type=int, default=12, help="이보다 짧은 문장은 버린다")
     ap.add_argument("--top", type=int, default=10, help="화면에 보일 상위 문장 수")
     ap.add_argument("--json", default="")
     ap.add_argument("--pool", default="", help="다른 후보 풀 디렉터리(기본: 골든 후보 풀)")
+    ap.add_argument("--split", choices=("development", "sealed_candidate", "all"), default="development",
+                    help="분할 풀의 기본값은 development. 봉인 분할은 명시적으로만 읽는다")
+    ap.add_argument("--view", choices=("body_only", "body_plus_synthetic_context"), default="body_only")
+    ap.add_argument("--cv-seeds", type=int, default=0, help="문자 n-gram/계열 CV 반복 수(0=미실행)")
+    ap.add_argument("--strict", action="store_true", help="지름길 경고 또는 문자/계열 CV 미실행이면 종료 3")
+    ap.add_argument("--max-excess-pp", type=float, default=20.0, help="문장 단서 경고 임계; 사업 합격선 아님")
+    ap.add_argument("--show-phrases", action="store_true", help="원문 구절을 출력/기록(기본은 해시만)")
     a = ap.parse_args(argv)
 
-    r = audit(min_docs=a.min_docs, min_chars=a.min_chars,
-              pool=Path(a.pool).resolve() if a.pool else None)
+    try:
+        if a.top < 0 or not 0 <= a.max_excess_pp <= 100:
+            raise ValueError("top must be >= 0 and max-excess-pp must be in 0..100")
+        out = (_POC / a.json).resolve() if a.json else None
+        pool = Path(a.pool).resolve() if a.pool else DEFAULT_POOL.resolve()
+        if out and (out.exists() or out.is_relative_to(pool)):
+            raise ValueError("Report must be new and outside the input pool")
+        r = audit(min_docs=a.min_docs, min_chars=a.min_chars, pool=pool,
+                  split=a.split, view=a.view, cv_seeds=a.cv_seeds)
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        print(f"검사 실패: {exc}", file=sys.stderr)
+        return 2
+    warnings, incomplete = [], []
+    if r["excess_pp"] > a.max_excess_pp:
+        warnings.append("repeated_phrase_shortcut")
+    if a.cv_seeds:
+        for name in ("stratified_cv", "family_cv"):
+            probe = r["char_ngram_probe"][name]
+            if probe["status"] != "MEASURED":
+                incomplete.append(name + "_unavailable")
+            elif probe["mean"] >= 0.8 and probe["excess_pp"] >= 30:
+                warnings.append(name + "_shortcut_signal")
+    else:
+        incomplete.append("char_and_family_cv_not_executed")
+    r["warnings"] = warnings
+    r["incomplete_checks"] = incomplete
+    r["strict_diagnostic_gate_passed"] = not warnings and not incomplete
+    r["engineering_alarm_thresholds"] = {"phrase_excess_pp": a.max_excess_pp,
+                                          "cv_mean": 0.8, "cv_excess_pp": 30,
+                                          "business_acceptance_criteria": False}
+    r["status"] = "SHORTCUT_WARNING" if warnings else ("INCOMPLETE_CHECKS" if incomplete else "MEASURED_NOT_QUALIFIED")
+    if not a.show_phrases:
+        r["top"] = [{k: v for k, v in row.items() if k != "sentence"} |
+                    {"sentence_sha256": hashlib.sha256(row["sentence"].encode()).hexdigest()}
+                    for row in r["top"]]
     if a.pool:
         print("풀: %s" % a.pool)
+    print("입력 %d건 · 검토/미라벨 제외 %d건 · 관점 %s" %
+          (r["input_audit"]["n_input_rows"], r["input_audit"]["excluded_review_rows"], a.view))
     print("분모: 후보 %d건 · 등급 분포 %s" % (r["n_candidates"], r["grade_distribution"]))
     print("되풀이 문장 %d개(%d개 문서 이상) · 그중 한 등급 전용 %d개"
           % (r["n_repeated_sentences"], r["min_docs"], r["n_exclusive_sentences"]))
@@ -185,13 +244,25 @@ def main(argv=None) -> int:
           % (r["baseline_majority"] * 100))
     print("\n쏠린 문장 상위 %d개:" % a.top)
     for row in r["top"][:a.top]:
-        print("  %5.1f%% %4d건 %-4s %s" % (row["purity"] * 100, row["docs"], row["top_grade"], row["sentence"][:80]))
+        clue = row.get("sentence", row.get("sentence_sha256", ""))
+        print("  %5.1f%% %4d건 %-4s %s" % (row["purity"] * 100, row["docs"], row["top_grade"], clue[:80]))
+    print("상태: %s · 고객사 정확도/학습 자격을 입증하지 않음" % r["status"])
+    if a.cv_seeds:
+        for name in ("stratified_cv", "family_cv"):
+            probe = r["char_ngram_probe"][name]
+            if probe["status"] == "MEASURED":
+                print("  %s: %d seeds · 평균 %.2f%% · permutation %.2f%%" %
+                      (name, a.cv_seeds, probe["mean"] * 100, probe["permutation_mean"] * 100))
+            else:
+                print("  %s: %s" % (name, probe["status"]))
+    else:
+        print("  문자 n-gram/계열 CV는 미실행(--cv-seeds로 지정)")
     if a.json:
-        out = _POC / a.json
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
+        with out.open("x", encoding="utf-8") as stream:
+            stream.write(json.dumps(r, ensure_ascii=False, indent=1) + "\n")
         print("\n기록: %s" % out)
-    return 0
+    return 3 if a.strict and (warnings or incomplete) else 0
 
 
 if __name__ == "__main__":
