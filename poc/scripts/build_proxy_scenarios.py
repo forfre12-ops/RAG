@@ -3150,32 +3150,6 @@ def _generate_plan_item(
     return None, rejection
 
 
-def generate_candidates(
-    plan: list[tuple[dict, dict, dict, int]],
-    *,
-    provider_name: str | None,
-    catalog_version: str,
-    generation_namespace: str = "main",
-    max_quality_retries: int = 1,
-) -> tuple[list[dict], list[dict]]:
-    generator = SyntheticDocGenerator(llm=build_provider(provider_name))
-    accepted: list[dict] = []
-    rejected: list[dict] = []
-    for item in plan:
-        candidate, rejection = _generate_plan_item(
-            item,
-            generator=generator,
-            catalog_version=catalog_version,
-            generation_namespace=generation_namespace,
-            max_quality_retries=max_quality_retries,
-        )
-        if candidate is not None:
-            accepted.append(candidate)
-        if rejection is not None:
-            rejected.append(rejection)
-    return accepted, rejected
-
-
 def _write_jsonl(path: Path, rows: Sequence[Mapping[str, object]]) -> None:
     """Backward-compatible one-shot helper with atomic no-overwrite semantics."""
     _atomic_write_bytes(path, _jsonl_bytes(rows))

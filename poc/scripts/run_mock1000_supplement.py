@@ -72,7 +72,6 @@ def deployed() -> int:
 
 
 def prepare() -> int:
-    import numpy as np
     from sklearn.feature_extraction.text import TfidfVectorizer
 
     old, seen = [], set()

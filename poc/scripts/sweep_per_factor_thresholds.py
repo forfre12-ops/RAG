@@ -28,7 +28,6 @@ v8_caus 확률에 얹어 본다.
 from __future__ import annotations
 
 import argparse
-import collections
 import json
 import math
 import sys

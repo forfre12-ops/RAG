@@ -17,7 +17,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_docgen_specs_r4 import AVOID, TRAPS, make_family  # noqa: E402
+from build_docgen_specs_r4 import AVOID, make_family  # noqa: E402
 from build_docgen_specs_r5 import DOMAINS  # noqa: E402
 from build_docgen_specs_r8 import FORMS as R8_FORMS, NEW_TASKS  # noqa: E402
 

@@ -116,7 +116,7 @@ class ClassifyResponse(BaseModel):
     factors_source: str = "rule_evidenced"
     # [2026-08-20] factors_source == "model_estimated" 일 때 **룰이 실제로 관측한**
     #   S/V/M. 종전에는 역산값이 원본을 덮어써서, 화면에 "S2·V2·M2 인데 룰은 S1" 처럼
-    #   판정식(grade_from_svm)으로 설명되지 않는 조합이 떴다(사용자 지적 2026-08-20).
+    #   판정식(grade_from_svm)으로 설명되지 않는 조합이 떴다.
     #   두 벌을 나란히 보여 주면 왜 룰과 모델이 갈렸는지가 그 자리에서 읽힌다.
     #   역산이 없었으면 None — 그때는 evaluation_factors 가 곧 룰 관측값이다.
     rule_evaluation_factors: Optional[EvaluationFactors] = None

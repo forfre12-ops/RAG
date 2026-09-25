@@ -30,21 +30,10 @@ PER_GRADE = {"TS": _N, "S1": _N, "S2": _N, "S3": _N}
 # [2026-09-08] 이 로직은 콘솔 후보 풀 정리에서도 필요해져 공용 모듈로 옮겼다.
 # 복사해 두면 두 벌이 조용히 갈라진다 — 한 곳에서만 정의한다.
 from golden_scaffolding import (  # noqa: E402
-    DROP_H2,
-    DROP_H3,
     GRADE_TOK,
     drop_grade_sentences,
     strip_scaffolding,
 )
-
-
-def stratified(items, want, keyfn):
-    """길이 분포 전 구간에서 고르게 뽑는다 — 최장만 뽑으면 길이가 등급 단서가 된다."""
-    items = sorted(items, key=keyfn)
-    if len(items) <= want:
-        return items
-    step = len(items) / want
-    return [items[min(int(i * step), len(items) - 1)] for i in range(want)]
 
 
 SCEN = re.compile(r"\b([A-Z]\d)-(\d{2})-(\d{2})\b")

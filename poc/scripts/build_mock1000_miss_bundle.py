@@ -20,7 +20,7 @@ try:
 except Exception:  # noqa: BLE001
     pass
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_mock1000_cv import K, POC, SRC, WORK, load_docs  # noqa: E402
+from run_mock1000_cv import K, POC, WORK, load_docs  # noqa: E402
 
 OUT = POC / "reports" / "mock1000_dev800" / "miss_analysis"
 RANK = {"S3": 0, "S2": 1, "S1": 2, "TS": 3}

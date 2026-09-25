@@ -113,7 +113,9 @@ class PreprocessPipeline:
 
     def chunk(self, text: str) -> list[Chunk]:
         # #15: 운영 권장 split_v2 — 헤딩/문장 경계 보존 + heading_path 메타 적재.
-        #      RAG indexer(rag/indexer.py, rag/document_indexer.py)와 동일 진입점 사용.
+        #      [2026-09-25 정정] 예전엔 별도 RAG indexer(rag/indexer.py)와 같은 진입점을 쓴다고
+        #      적혀 있었으나 그 모듈은 현재 리포에 없다 — split_v2 는 이제 이 모듈(chunker.py)
+        #      안에서만 정의·사용된다.
         #      청크 크기 정책(size/overlap)은 기존 설정값 그대로 전달해 보존한다.
         return split_v2(
             text,

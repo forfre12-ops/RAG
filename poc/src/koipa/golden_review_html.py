@@ -17,10 +17,8 @@ target 대조·정오답·미탐)다. 이 화면은 정답이 아직 없는 '후
 """
 from __future__ import annotations
 
-import base64
 import html as _html
 import json
-from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Sequence
 from koipa.console_nav import BRAND_NAME, HEADER_CSS, NAV_CSS, REVIEW_SCREEN_EXCLUDE, header_html
@@ -78,24 +76,14 @@ body{font-family:var(--font-sans);margin:0;background:var(--bg);color:var(--text
 _GRADES = ("TS", "S1", "S2", "S3")
 
 # ── 콘솔과 동일한 nav 크롬 조립 ────────────────────────────────────────────────
-# 로고는 base64 인라인 — 이 HTML 은 /api/v1/golden/... 에서 서빙되므로 콘솔의 상대경로
-# (./koipa_logo_mark.png)가 안 맞고, 감리 증적으로 단독 저장될 때도 깨지면 안 된다
-# (프로젝트 규칙: 새 HTML 은 로고 base64 인라인).
-_LOGO_PATH = Path(__file__).with_name("api") / "static" / "koipa_logo_mark.png"
-
-
-@lru_cache(maxsize=1)
-def _logo_data_uri() -> str:
-    """로고 data URI. 파일이 없으면 빈 문자열 — 마크는 생략되고 나머지는 정상 렌더."""
-    try:
-        return "data:image/png;base64," + base64.b64encode(_LOGO_PATH.read_bytes()).decode("ascii")
-    except OSError:
-        return ""
+# [2026-09-25] 이 자리에 있던 _LOGO_PATH·_logo_data_uri() 를 지웠다 — 다섯 화면을 합치면서
+# 로고를 포함한 헤더 전체가 console_nav.header_html() 로 옮겨 갔는데(바로 아래 header()
+# 참조) 이 로컬 복사본은 그때 지워지지 않고 호출 없이 남아 있었다(참조 0 확인).
 
 
 # deploy_profile → 배포 주체. static/deploy_badge.js 의 표와 동일하게 유지할 것.
-# [2026-08-24] 역할 칸을 없앴다(사용자 지시). 「모델 공장」은 우리가 만든 비유이고
-# 제출본·사용매뉴얼에 0회다. 「폐쇄망 운영」·「dryrun」도 사용자 업무 역할이 아니라 배포 구성
+# [2026-08-24] 역할 칸을 없앴다. 「모델 공장」은 우리가 만든 비유이고
+# 제출본·사용매뉴얼에 0회다. 「폐쇄망 운영」·「dryrun」도 업무 역할이 아니라 배포 구성
 # 설명이다. 배지는 **소속 하나**만 말하고, 화면 이름은 상단이 말한다. 프로파일명은 title 로만.
 _SITES = {
     "full-train": ("지재원", "jjw"),
@@ -137,7 +125,7 @@ def _nav_html(sub: str, profile: Optional[str], screen: str, sibling: str = "") 
     """콘솔 5면이 공유하는 상단 바 — 마크업·CSS 는 console_nav 한 곳에 있다.
 
     [2026-08-20] 종전에는 이 함수가 헤더를 직접 조립했고, 후보 관리·로그인·거버넌스·
-    등급 시연이 각자 다른 헤더를 갖고 있었다. 사용자 지시로 **이 화면의 모양을 기준**으로
+    등급 시연이 각자 다른 헤더를 갖고 있었다. **이 화면의 모양을 기준**으로
     다섯 화면을 합치면서, 값의 출처를 console_nav.header_html 로 옮겼다.
 
     [2026-08-24] current 를 넘기지 않는다. 종전에는 "signoff" 를 넘겼는데, 그 키가 가리키던

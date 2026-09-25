@@ -161,7 +161,7 @@ def main() -> int:
               f"{weight['formula_matches_label']:,}/{n:,} 일치)")
         print(f"   M 값에 따라 등급이 갈리는 행  {weight['m_decides_grade']:,} / {n:,}"
               f"  ({weight['m_decides_rate']:.1%})")
-        print(f"\n③ M 을 못 받아 보수적으로 2 로 채웠을 때")
+        print("\n③ M 을 못 받아 보수적으로 2 로 채웠을 때")
         print(f"   등급이 틀리는 행  {weight['conservative_fill_wrong']:,} / {n:,}"
               f"  ({weight['conservative_fill_wrong_rate']:.1%})")
         for shift, cnt in sorted(weight["conservative_fill_shifts"].items(), key=lambda x: -x[1]):

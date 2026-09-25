@@ -43,9 +43,6 @@ DEFAULT_OUTPUT_DIR = Path("backups/pg")
 DEFAULT_PG_CONTAINER = "koipa-poc-postgres-1"   # 자동탐지 실패 시 최후 폴백(dev 컨테이너명)
 
 
-def autodetect_pg_container() -> str | None:
-    """실행 중 스택의 postgres 컨테이너 자동탐지. 2스택+면 모호 → None."""
-    return autodetect_container(("postgres",))
 DEFAULT_DB = "koipa"
 DEFAULT_USER = "koipa"
 DEFAULT_BUCKET = "koipa-backup"

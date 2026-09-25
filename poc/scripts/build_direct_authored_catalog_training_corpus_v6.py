@@ -125,13 +125,6 @@ def _blocks_with_offsets(text: str) -> list[tuple[int, int, str]]:
     return out
 
 
-def _factor_block_index(blocks, start: int, end: int) -> int | None:
-    for index, (block_start, block_end, _text) in enumerate(blocks):
-        if block_start <= start and end <= block_end:
-            return index
-    return None
-
-
 # 등급을 말로 적어 두던 섹션들. 실측(v6 1차 시도): 요인 문단 2개만 갈아 끼웠더니 인용의
 # tell 포함률은 88.3% → 0.0% 로 떨어졌지만 tell 문장 25종이 남았고, **전부** 아래 네 섹션에
 # 있었다(내 사실 문장 풀 유래 0종). 등급별로 통째 쓰인 판정문이라 요인 수준으로 다시 쓴다.

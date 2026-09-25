@@ -183,7 +183,7 @@ class GoldenBuildService:
     def find_registered_job(self, build_path: str) -> "Optional[uuid.UUID]":
         """같은 후보 파일로 **이미 등록된** 검수 잡을 찾는다. 없으면 None.
 
-        왜(2026-08-25 사용자 지적). 등록에 중복 검사가 없어 같은 파일을 다시 올릴 때마다 새
+        왜(2026-08-25). 등록에 중복 검사가 없어 같은 파일을 다시 올릴 때마다 새
         job_id 가 생겼다 — 실측 223: 목록 8행이 실제로는 파일 3개였다(demo_slate 4행·regate
         2행·ff5a822c 2행). 목록이 지저분한 것으로 끝나지 않는다. 검수 진행분은 잡 단위
         원장(_ledger_paths)에 쌓이므로 **쌍둥이 행을 열면 이미 서명한 건이 '남은 건수'로 다시
@@ -275,7 +275,7 @@ class GoldenBuildService:
     def list_registerable_builds(self, *, limit: int = 60) -> "list[dict]":
         """등록할 수 있는 슬레이트 파일 목록 — 화면이 고르게 하려고 만든다.
 
-        왜(2026-08-20 사용자 지적). 등록 칸이 자유 입력이었고 placeholder 로
+        왜(2026-08-20). 등록 칸이 자유 입력이었고 placeholder 로
         `datasets/gold_real/builds/build_xxxx.jsonl` 이 **채워진 값처럼 보였다.** 실제로는
         빈 칸이라 [등록]을 누르면 "경로를 입력하세요" 가 떴다. 서버에 어떤 파일이 있는지
         화면이 알려주지 않으니, 검수자는 존재하지도 않는 경로를 외워 쳐야 했다.

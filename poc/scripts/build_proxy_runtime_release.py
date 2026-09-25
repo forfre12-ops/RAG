@@ -596,6 +596,8 @@ def _run_closure_checks(
                     env=environment,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=45,
                     check=False,
                 )

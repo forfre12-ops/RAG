@@ -1,12 +1,15 @@
-"""lloydk → kopia 리네임 실행. 영역을 지정해 단계적으로 돌린다.
+"""lloydk → koipa 리네임 실행. 영역을 지정해 단계적으로 돌린다.
 
 발주처 확정(2026-08-12):
-    코드 식별자   kopia          (KL 테스트서버 계정명과 일치)
+    코드 식별자   koipa          (KL 테스트서버 계정명과 일치)
     기관 도메인   www.koipa.re.kr (기관 공식 — 실존 확인, HTTP 302)
     한글 표기     한국지식재산보호원
 
-⚠ **치환 순서가 중요하다.** `koipa` → `kopia` 를 전역으로 돌리면 도메인이
-`www.kopia.re.kr` 로 망가진다(존재하지 않는 주소). 그래서:
+⚠ [2026-09-25 정정] 이 docstring 은 원래 코드 식별자를 `koipa`와 글자가 뒤바뀐 `kopia`로
+적고 있었다 — 실제 리네임 결과(코드·경로·컨테이너 전부 `koipa`)와 다르다. 치환 순서가
+중요하다는 요지는 그대로다: 코드 식별자와 도메인이 서로 글자만 뒤바뀐 모양이라({koipa 식별자,
+koipa.re.kr 도메인이 아니라} 옛 표기 기준으로는 두 문자열이 애너그램 관계였다), 도메인 부분을
+먼저 토큰으로 빼두지 않으면 전역 치환이 도메인까지 건드려 망가뜨릴 수 있다. 그래서:
 
     1) 도메인을 토큰으로 빼둔다      lloydk.co.kr / koipa.re.kr → \x00DOMAIN\x00
     2) 나머지 치환을 전부 돌린다      lloydk·Lloydk·LLOYDK·KOIPA·KIPRA·로이드케이
@@ -15,8 +18,8 @@
 토큰에 NUL 을 쓰는 이유: 텍스트 소스에 나올 수 없어 오치환이 불가능하다.
 
 사용:
-    python scripts/kopia_rename_apply.py --area src      # 제품 소스만
-    python scripts/kopia_rename_apply.py --area all --apply
+    python scripts/koipa_rename_apply.py --area src      # 제품 소스만
+    python scripts/koipa_rename_apply.py --area all --apply
 기본은 dry-run(--apply 없으면 파일을 쓰지 않는다).
 """
 from __future__ import annotations
@@ -106,7 +109,7 @@ def walk(prefixes: tuple[str, ...]):
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="lloydk -> kopia 리네임")
+    parser = argparse.ArgumentParser(description="lloydk -> koipa 리네임")
     parser.add_argument("--area", choices=sorted(AREAS), default="src")
     parser.add_argument("--apply", action="store_true",
                         help="실제로 쓴다. 없으면 dry-run(파일 미변경)")

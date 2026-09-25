@@ -98,7 +98,8 @@ EXPLAINED_TABLES = {
     # tb_advisory_locks
     "tad_sy_lck_mng": "잠금 행 — 마이그레이션이 미리 넣고 런타임은 FOR UPDATE 로 잡기만",
     # tb_document_factor_scores
-    "tad_dm_doc_rqmt_scr_mng": "쓰기·읽기 0 · 실 DB 0행 — 정의서에서도 뺐다(EXCLUDED_TABLES)",
+    "tad_dm_doc_rqmt_scr_mng": "쓰기 0(영원히 빈다) · 실 DB 0행 — 정의서에서도 뺐다(EXCLUDED_TABLES). "
+                               "읽기는 1(모델 select 자체는 있음, 대상 행이 없을 뿐)",
 }
 
 

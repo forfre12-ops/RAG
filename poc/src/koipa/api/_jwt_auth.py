@@ -1,6 +1,6 @@
 """P1-C3: JWT 인증 — 운영 모드(settings.auth_mode=jwt) 활성 시 사용.
 
-기본 모드(X-API-Key)는 `_auth.py`를 그대로 사용. 본 모듈은 RS256 JWT 검증 기능을 제공.
+기본 모드(X-API-Key)는 본 모듈의 `require_auth`가 그대로 처리. 본 모듈은 RS256 JWT 검증 기능도 제공.
 
 운영 정책:
 - 알고리즘 RS256만 허용 (HS256·none 거부)

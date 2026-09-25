@@ -36,7 +36,7 @@ class ActiveLearningStatus:
     pending_overclass: int = 0
     pending_lateral: int = 0
     # [2026-08-24] direction='confirm'(등급 그대로 확정)도 unconsumed_total 에 들어가는데 방향별
-    # 필드가 없어, 콘솔이 '합계 3 · 과소0 과대0 측면0' 처럼 내역이 비는 표를 그렸다(사용자 지적).
+    # 필드가 없어, 콘솔이 '합계 3 · 과소0 과대0 측면0' 처럼 내역이 비는 표를 그렸다.
     pending_confirm: int = 0
     last_correction_at: Optional[str] = None
     retrain_status: str = "OK"  # OK / RETRAIN_RECOMMENDED / URGENT_RETRAIN

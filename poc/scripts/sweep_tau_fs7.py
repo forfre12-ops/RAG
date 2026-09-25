@@ -3,7 +3,6 @@
 """FS7 escalation τ 스윕 — 사전 등록 reports/mock_final_train_20260921/PREREG_TAU_SWEEP.md. 출력: tau_sweep_result.txt"""
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -14,7 +13,7 @@ except Exception:  # noqa: BLE001
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from eval_r6_cross_generator import verified_docs as v6  # noqa: E402
 from eval_r8_style_shift import verified as v8  # noqa: E402
-from run_mock1000_cv import G, POC, load_jsonl, prf  # noqa: E402
+from run_mock1000_cv import POC, load_jsonl, prf  # noqa: E402
 from run_mock1000_pilotmix import _pipe, _predict  # noqa: E402
 
 OUT = POC / "reports" / "mock_final_train_20260921"

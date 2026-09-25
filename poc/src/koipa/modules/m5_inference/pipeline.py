@@ -241,7 +241,7 @@ class InferenceResult:
     model_grade: Optional[str] = None
     # [2026-08-20] 룰이 **실제로 관측한** S/V/M. `factors` 는 룰과 모델이 갈릴 때 모델 등급에
     # 맞춰 역산한 값으로 덮이는데(아래 [A3]), 그러면 화면에 "S2·V2·M2 인데 룰은 S1" 처럼
-    # 판정식으로 설명되지 않는 조합이 뜬다(사용자 지적). 덮기 전 값을 따로 남겨 두 벌을
+    # 판정식으로 설명되지 않는 조합이 뜬다. 덮기 전 값을 따로 남겨 두 벌을
     # 나란히 보여줄 수 있게 한다. 역산이 없었으면 None(= factors 가 곧 룰 관측값).
     rule_factors: Optional[EvaluationFactors] = None
     # [후보집합] 비밀관리성(M)을 못 받았을 때 **M 하나로 갈리는 등급들**. 비면 갈릴 것이
@@ -1511,7 +1511,7 @@ class InferencePipeline:
                 if grade_from_svm(fsv, fvv, fmv) != pred_code:
                     # [2026-08-20] 덮기 **전** 값을 남긴다. 종전에는 버려서, 화면에 역산값만
                     # 남고 "S2·V2·M2 인데 룰은 S1" 처럼 판정식으로 설명이 안 되는 조합이
-                    # 보였다(사용자 지적). 두 벌을 나란히 보여야 왜 갈렸는지 읽힌다.
+                    # 보였다. 두 벌을 나란히 보여야 왜 갈렸는지 읽힌다.
                     rule_factors = factors
                     s2, v2, m2 = svm_levels_for_grade(pred_code)
                     factors = EvaluationFactors.from_factor_scores(

@@ -53,16 +53,8 @@ from koipa.db.standard_names import TABLES as STD_TABLES, logical_names  # noqa:
 # 옛 표 이름 → 표준 표 이름. 7b3e9d2a4f10 은 이름을 f-문자열 반복문으로 바꿔 정규식으로 못 읽는다.
 _RENAMED = {old: new for old, (new, _) in STD_TABLES.items()}
 
-_SEP = re.compile(r"\s+—\s+|\.\s|\(|,")
 _CREATE = re.compile(r"CREATE TABLE(?: IF NOT EXISTS)?\s+([a-z_][a-z0-9_]*)|op\.create_table\(\s*[\"']([a-z_][a-z0-9_]*)")
 _DROP = re.compile(r"DROP TABLE(?: IF EXISTS)?\s+([a-z_][a-z0-9_]*)|op\.drop_table\(\s*[\"']([a-z_][a-z0-9_]*)")
-
-
-def logical(desc: str) -> str:
-    s = (desc or "").strip()
-    if not s:
-        return ""
-    return _SEP.split(s, maxsplit=1)[0].strip().rstrip(".")
 
 
 def _alembic_live_tables() -> tuple[set[str], set[str]]:

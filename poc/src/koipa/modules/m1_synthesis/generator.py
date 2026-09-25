@@ -233,7 +233,7 @@ body가 {len_max}자에 가까워지면 새 내용 추가를 멈추고 JSON의 �
 #
 # ⚠ 프롬프트의 JSON 서술과 이 스키마는 **같은 필드 집합**이어야 한다. 갈라지면 스키마를
 #   받는 서버와 못 받는 서버가 서로 다른 모양을 돌려준다. 시험이 이 일치를 지킨다
-#   (test_synth_structured_output.py).
+#   (tests/test_synth_generation_three_gaps.py).
 SYNTH_DOC_JSON_SCHEMA: dict = {
     "type": "object",
     "properties": {

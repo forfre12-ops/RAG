@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_mock1000_cv import G, K, RANK, TAU, WORK, POC, load_jsonl, prf, sha256_file  # noqa: E402
+from run_mock1000_cv import G, K, TAU, WORK, POC, load_jsonl, prf, sha256_file  # noqa: E402
 
 PCTS = (25, 50)
 
