@@ -165,6 +165,14 @@ REVISIONS = [
      '평가 요건 <code>rqmt_nm</code>, LLM 사용량 생성열 <code>whol_tkn_cnt</code>.<br>'
      '<b>지우지 않은 것</b> — 문서 벡터 표(유사문서 조회 — 9/9 고객사 요청으로 pgvector 로 되돌리며 신설)와, 값은 채우지만 읽는 곳이 없는 26개 '
      '칼럼(감사·이력 성격).'),
+    ("11", "2026-09-27", "5e2ddbd1",
+     '<b>규정 참고 표시용 표 3개를 넣었습니다</b>(마이그레이션 <code>a1d4c7e9b302</code>) — 규정 판 '
+     '<code>tad_rm_rgltn_mng</code> · 조항 <code>tad_rm_rgltn_artcl_mng</code> · 문장 '
+     '<code>tad_rm_rgltn_stc_mng</code>(18표 190칼럼 → 21표 233칼럼). 회원사가 올린 규정을 조항·문장으로 나눠 '
+     '색인하는 선택 기능의 저장소이며, 기능이 기본 꺼짐이라 규정을 올리기 전에는 세 표가 비어 있습니다. '
+     '등급 판정·자동 확정에는 쓰이지 않습니다.<br>'
+     '<b>관계도를 고쳤습니다</b> — 도식 높이를 배치에서 계산하도록 바꿔 규정 표 3개가 잘리지 않고, 관계 목록의 '
+     '외래키 칼럼을 ORM 속성명이 아니라 DB 물리명으로 적습니다(예: <code>classification_id</code> 대신 <code>clsf_id</code>).'),
 ]
 
 

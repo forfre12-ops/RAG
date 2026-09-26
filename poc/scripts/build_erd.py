@@ -74,6 +74,24 @@ from koipa.db.standard_names import TABLES as _STD_TABLES  # noqa: E402
 
 LOGICAL = {_STD_TABLES.get(k, (k,))[0]: v for k, v in LOGICAL.items()}
 
+
+def _fill_logical_from_spec_meta() -> None:
+    """옛 이름이 없는 표(규정 참고 표시 등)의 논리명은 정의서 메타(table_spec_meta.TABLES)에서 채운다.
+
+    [2026-09-27] 위 사전은 옛 물리명으로 적은 것이라 새로 생긴 표가 빠지면 관계 목록의 논리명 칸에 물리명이
+    한 번 더 찍혔다(규정 표 3개). 이미 적힌 이름은 건드리지 않고 없는 것만 채운다.
+    """
+    try:
+        sys.path.insert(0, str(_ROOT.parent / "scripts"))
+        import table_spec_meta as _meta        # noqa: PLC0415
+        for name, row in getattr(_meta, "TABLES", {}).items():
+            LOGICAL.setdefault(name, row[1])
+    except Exception as exc:                   # noqa: BLE001
+        print("[!] 정의서 메타의 논리명을 못 읽었다: %s" % exc, file=sys.stderr)
+
+
+_fill_logical_from_spec_meta()
+
 # 외래키 제약은 없으나 논리적으로 참조하는 관계. FK 목록에는 안 잡히지만 관계는 실재한다.
 #
 # [2026-09-03] 정본을 scripts/table_spec_meta.py 로 옮겼다. 종전에는 여기와 build_table_spec.py
@@ -117,7 +135,11 @@ def parse_models() -> tuple[dict[str, int], list[tuple[str, str, str]]]:
             cols[cur] += 1
         m2 = re.match(r'\s*([a-z_]+)\s*:.*ForeignKey\("([^"]+)"', ln)
         if m2:
-            fks.append((cur, m2.group(1), m2.group(2).split(".")[0]))
+            # [2026-09-26] 관계 목록의 '외래키 컬럼'은 DB 물리명이어야 정의서와 맞는다. 표준명 전환(9/11) 뒤
+            # ORM 속성명(classification_id)과 물리명(clsf_id)이 갈렸는데 속성명을 적고 있었다.
+            # 물리명은 mapped_column("clsf_id", ...) 의 첫 문자열 인자다(없으면 속성명이 곧 물리명).
+            phys = re.search(r'mapped_column\(\s*"([^"]+)"\s*,', ln)
+            fks.append((cur, phys.group(1) if phys else m2.group(1), m2.group(2).split(".")[0]))
     # [2026-09-03] 정의서에서 뺀 표는 도식에서도 뺀다 — 안 그러면 상자 수가 본문과 갈린다.
     # 제외 목록의 정본은 scripts/table_spec_meta.py 한 곳이다.
     # [2026-09-03] 정의서에서 뺀 표·칼럼은 도식에서도 뺀다. 정본은 scripts/table_spec_meta.py
