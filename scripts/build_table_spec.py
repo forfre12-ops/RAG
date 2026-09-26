@@ -152,7 +152,7 @@ REVISIONS = [
      '<b>같은 칼럼ID 인데 표마다 NOT NULL 이 다른 8건에 사유를 적었습니다</b> — 나중에 정해지는 값'
      '(추출 전 글자 수, 학습 완료 전 모델 버전)이거나 선택 참조·선택값(요건, 키워드 가중치, 가이드 파일명, '
      '라벨 확신도 등)이어서 설계상 NULL 을 허용합니다. 8건 모두 칼럼 설명에 사유가 있습니다.'),
-    ("10", "2026-09-26", _HEAD_MARKER,
+    ("10", "2026-09-26", "aaea98c3",
      '<b>안 쓰는 표 4개와 칼럼 18개를 ORM 과 DB 에서 지웠습니다</b>(마이그레이션 '
      '<code>b7d3f5a19c24</code>). 표: <code>tb_document_factor_scores</code>(요건 점수) · '
      '<code>tb_training_epochs</code>(학습 에폭) · <code>tb_training_datasets</code>(학습 문서 목록) · '
