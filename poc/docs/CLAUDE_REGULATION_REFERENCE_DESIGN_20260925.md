@@ -1,6 +1,6 @@
 # 규정 참고 표시 — 기획·설계서 (초안 v0.1)
 
-작성 2026-09-25 · 대상 독자 = 구현 담당 개발자, 검수·배포 담당 · 상태 = **초안(결정 12건 대기, §1.11)**
+작성 2026-09-25 · 대상 독자 = 구현 담당 개발자, 검수·배포 담당 · 상태 = **구현됨 — §1.11 권고안 기준, 미커밋·미배포** (구현 결과와 설계가 달라진 곳은 **제3부**에 모았고, 아래 본문도 그에 맞게 고쳤다). **2026-09-26 갱신 — 제품 엔진의 결과를 3명이 따로 읽고 판정했다. 「쓸만한가」의 답은 §3.4·§3.5이고, 본문 곳곳의 옛 판정값(도움 35%·오도 0/20)은 bge-m3 결과에 대한 설계자 1명의 값이다. 같은 날 후속으로 「해당되는 규정만」 보이게 하는 로컬 LLM 옵션(선택·기본 꺼짐)을 넣었다 — §3.6**
 
 > 이 문서는 "회원사가 올려 둔 사내 규정에서, 검수 중인 문서와 관련된 **규정 원문 문장**을 참고로 보여 주는" 기능을 넣기로 한 뒤의 상세 기획과 설계다.
 > 기능이 **등급을 바꾸지 않는다**는 것이 모든 설계의 출발점이다.
@@ -16,9 +16,9 @@
 | 어떻게 | 규정 파일 업로드 → 조항·문장 분할 → 조항 종류 태깅 → 임베딩(운영 임베더) → 활성화. 조회는 문서 대표 벡터(이미 색인됨)로 결정형 계산 |
 | 요건 근거 | FUN-004 「RAG 규정 보완(선택 옵션)」 — 현재 서빙 배선 0건인 부분충족 항목을 이 기능이 채운다 |
 | 기본 상태 | **꺼짐**(`regulation_reference_enabled=false`). 꺼져 있으면 라우트·화면·작업 모두 없다(무동작) |
-| 실측 효과 | 시연용 규정 기준 **문서 3건 중 1건(35%)** 에서 직접 적용되는 문장이 뜨고, 표본 20건에서 오도 0건(95% 상한 약 14%). 회원사 실제 규정은 **아직 안 쟀다** |
-| 가장 큰 미해결 | 규정이 문서에 **적용되는지**를 점수로 못 가른다 → 관리자 확인 절차 + 활성화 전 미리보기로 막는다(§1.5 F-06·F-07) |
-| 선행 작업 | ① 표준명 등록 구조 확장 ② 운영 임베더(KURE-v1)로 재측정 ③ 조항 종류 규칙을 다른 규정으로 재검증 ④ 협의 미확정 안건과의 저촉 확인 |
+| 실측 효과 | 시연용 규정·합성 문서 71건을 **제품 엔진(KURE-v1)** 으로 조회해 검수 화면에 실제로 보일 1건을 **판정자 3명(설계 세션 1 + 독립 서브에이전트 2 — 전부 LLM)이 따로 읽고 판정**했다(2026-09-26, 다수결): **도움 14건(20%) · 무용 38건(54%) · 오도 19건(27%)**. 세 명의 범위는 도움 13~35%·오도 14~32% — **이 기능을 설계한 사람의 판정이 가장 관대했고**(도움 35%·오도 14%) 독립 판정자 둘은 도움 20%·13%, 오도 27%·32% 였다. 이전 값(도움 35%·오도 0/20)은 bge-m3 결과에 대한 설계자 1명의 판정이다. 조회 적중은 1위 28/71 · 상위3 40/71. 회원사 실제 규정은 **아직 안 쟀다**(§3.4). **후속(§3.6): 로컬 LLM 이 후보 조항에서 해당 항만 고르게 하는 선택 옵션을 켜면(제품 경로 재측정, 옵션 끔도 같은 「해당/해당 안 됨」 기준으로 다시 읽음) 화면에 뜬 규정이 해당하는 비율이 17%(71건 중 12)→78%(18건 중 14), 해당 안 되는 규정이 뜬 문서는 59→4건, 공개 판례·금융 38건은 38→0~1건(실행마다 판례 1건이 경계)이다. 대신 규정이 뜨는 문서가 71건 중 18건으로 줄고, 해당으로 읽힌 문서 수는 12→14로 비슷하나 같은 문서는 6건뿐이며, 어느 판에서든 해당으로 읽힌 문서 34건(하한) 중 켠 쪽이 낸 것은 14건(41%)·끈 쪽은 12건(35%)이다(방식을 `single` 로 바꾸면 30건·정밀도 70%·문서당 1.1초 — §3.6). GPU·로컬 LLM 필요, 기본 꺼짐** |
+| 가장 큰 미해결 | 규정이 문서에 **적용되는지**를 점수로 못 가른다 → 관리자 확인 절차 + 활성화 전 미리보기로 막는다(§1.5 F-06·F-07). **2026-09-26 다시 확인**: 조회 점수(밀집·낱말·문장)와 교차 인코더(bge-reranker-v2-m3) 점수 모두 도움과 그 밖을 못 가른다(AUROC 0.42~0.71) — 문턱을 올리면 오히려 오도 비율이 오른다(§3.4). **점수 대신 로컬 LLM 이 「해당되는 항」을 고르게 하는 옵션으로 풀었다(§3.6)** |
+| 선행 작업 | ① 표준명 등록 구조 확장 ✅ ② 운영 임베더(KURE-v1)로 재측정 ✅(적중·속도·판정 3명 — 전부 LLM) ③ 조항 종류 규칙을 다른 규정으로 재검증 ⚠(분할기만 — 결함 2건 수정, 태깅은 못 함) ④ 협의 미확정 안건과의 저촉 확인 — 미착수(기본 꺼짐 유지) |
 
 ---
 
@@ -28,7 +28,7 @@
 
 1. **요건**: FUN-004 「등급분류 학습」 중 "RAG 규정 보완"은 **선택 옵션**이다. 2026-09-22 요건 재점검에서 이 항목은 "서빙 배선 0건"인 **부분충족**이었다 (`policy_engine.py`·`evidence_collection.py`·`policy_shadow.py`는 서빙 경로에서 호출되지 않는다 — `policy_shadow.py:1` "Never wired to production classification").
 2. **왜 등급 판정이 아닌가**: 규정 원문으로 등급 매핑표를 채우는 시험이 두 규정에서 모두 실패했다(공개 규정 3건 핵심 두 열 0/11, 기록물관리 지침 23/50). 벡터로 등급 품질을 올리는 길도 닫혔다(AUROC 0.49). 그래서 규정은 **판정 입력이 아니라 근거 표시 보조**로 내려갔다(`org_mapping.py:12`).
-3. **왜 LLM 요약이 아닌가**: 고객사 대부분은 GPU가 없다. qwen3:14b 요약은 CPU에서 문서당 중앙 95초였고, 요약 방식은 도움 33%·오도 24%였다(개선해도 44%/0%로 LLM 없는 추출식 35%/0%와 표본 오차 안).
+3. **왜 LLM 요약이 아닌가**: 고객사 대부분은 GPU가 없다. qwen3:14b 요약은 CPU에서 문서당 중앙 95초였고, 요약 방식은 도움 33%·오도 24%였다(개선해도 44%/0%로 LLM 없는 추출식 35%/0%와 표본 오차 안 — bge-m3 결과·표본 20·설계자 1명 판정. 제품 엔진 71건을 3명이 읽은 값은 §3.4).
 4. **협의 저촉 가능성**: 2026-09-20 협의의 미확정 항목에 "기업 배포 시 LLM/RAG 방식"이 있고 "임의 적용 금지" 조건이 붙었다. 이 기능은 LLM이 없고 등급을 바꾸지 않는 **선택 옵션(기본 꺼짐)** 이라 "적용"이 아니라 "제공"으로 두었으나, 협의 결론과 충돌하면 기본 꺼짐을 유지한다(→ D-01).
 
 ## 1.2 목표와 비목표
@@ -53,13 +53,16 @@
 |---|---|---|
 | 규정이 매핑표를 채우는 정도 | 시연규정 16/20(표기→우리 값 ③ 0/4), 기록물관리 지침 23/50(③ 0/10) | 규정에 등급별 문서종류·열람범위·표기가 적혀야 채워진다 |
 | 조각 조회 적중(질의를 조각에서 만든 시험) | 하이브리드 1위 36/37 | 실문서 적중률이 아님 |
-| 직접 적용 조항이 조회에 드는 문서 | 1위 28/71(39%) · 상위3 36/71(51%) · 무작위 13~21% | 정답 조항 집합은 내가 조회 전에 정함, 한 사람 |
-| 표시 방식별 도움/무용/오도(표본 20, 그룹 가중) | LLM 요약 기본 33/43/24 · LLM 개선 44/56/0 · 추출식 S1 41/45/15 · **추출식 S1c(1개) 35/65/0** | 읽은 사람 1명, 0/20의 95% 상한 약 14% |
+| 직접 적용 조항이 조회에 드는 문서 | 1위 28/71(39%) · 상위3 36/71(51%) · 무작위 13~21% (bge-m3 기준 — 운영 임베더 값은 아래 KURE-v1 행) | 정답 조항 집합은 내가 조회 전에 정함, 한 사람 |
+| 표시 방식별 도움/무용/오도(표본 20, 그룹 가중) | LLM 요약 기본 33/43/24 · LLM 개선 44/56/0 · 추출식 S1 41/45/15 · **추출식 S1c(1개) 35/65/0** | bge-m3 결과 · 설계자 1명, 0/20의 95% 상한 약 14%. **제품 엔진(KURE-v1)을 3명이 읽은 값은 아래 「운영 엔진 판정」 행 — 도움 13~35%·오도 14~32%** |
 | 표시 개수별 정밀도 | 1번째 39% · 2번째 13% · 3번째 7% | 3개를 보이면 잡음 80% |
 | 항목 점수로 거르기 | AUROC 0.68 — 소용없음 | |
 | **규정 적용성** | 같은 문서 71건의 최고 문장 점수 시연규정 0.617 · 안 맞는 지침 0.627 (AUROC 0.332) | 점수로 못 가른다 |
 | 종류가 전혀 다른 문서(판례·금융) | 점수로 걸러진다(AUROC 0.97~1.0) | |
-| 문서 대표 벡터(평균)로 조회 | 1위 30/71 · 상위3 38/71 (문서 앞 1,500자 임베딩은 28/36) | bge-m3 기준 — 운영 임베더 재측정 필요 |
+| 문서 대표 벡터(평균)로 조회 | 1위 30/71 · 상위3 38/71 (문서 앞 1,500자 임베딩은 28/36) | bge-m3(ollama) 기준 — 운영 임베더 값은 다음 행 |
+| **운영 임베더(KURE-v1)로 재측정** (2026-09-25, 제품 엔진 그대로) | 1위 **28/71** · 상위3 **40/71** — 무작위 기대는 5.4 · 15.1. GPU 와 CPU 결과가 같다 | 같은 시연 규정·합성 문서·정답 조항. 도구 `scripts/measure_regulation_runtime.py` |
+| **운영 엔진 판정**(2026-09-26, 위 KURE-v1 결과에서 화면에 보일 1건을 71건 전부) | 3명이 같은 시트를 따로 읽음 — 다수결 **도움 14(20%) · 무용 38(54%) · 오도 19(27%)**. 판정자별: 설계자 25/36/10 · 독립 A 14/38/19 · 독립 B 9/39/23. 세 명이 모두 같은 문서 45/71, 도움을 셋 다 고른 것 6건, 오도를 셋 다 고른 것 9건. 일치도 κ: A–B 0.81 · A–설계자 0.55 · B–설계자 0.46 | 읽는 쪽은 문서 앞부분(420자)과 표시 문장만 봤다. 정답 조항·적중 여부는 가렸다. 판정 기준 — 도움=이 문서의 종류·상황에 적용되는 규정, 무용=적용 안 되고 등급 방향도 안 끔, 오도=적용 안 되는데 닮은 낱말 때문에 적용되는 것처럼 보이고 문서와 다른 등급을 말함. **판정자 셋 모두 LLM(Claude 계열: 설계 세션 1 + 독립 서브에이전트 2)이다 — 검수자 사람이 읽은 값이 아니다.** 문서 71건은 합성(템플릿 55 + 실문체에 가까운 16)이고, 실문체 16건만 보면 다수결 도움 5·무용 8·오도 3, 템플릿 55건은 도움 9·무용 30·오도 16. 도구 `scripts/analyze_regulation_judgments.py`, 자료 `poc/reports/CLAUDE_REGULATION_RAG_20260925/sample_org/kure_v1_judgment_20260926/` |
+| 표시 점수·교차 인코더로 관련 없는 문서 거르기(같은 71건·판정) | 밀집 점수 AUROC 0.54~0.59, 낱말 점수 0.47~0.71, 두 채널 모두 1위 0.54~0.56. 교차 인코더(BAAI/bge-reranker-v2-m3): 조항 1위 적중 **19/71**(제품 RRF 28/71 보다 나쁨) · 상위3 41/71, 점수 AUROC 0.42~0.67. 문턱을 올리면(다수결 기준) 도움 비율은 그대로(16~21%)이고 **오도 비율만 27%→41%**로 오른다(설계자 판정 기준으로는 도움 35%→48%이나 오도도 14%→21%로 오르고 남는 문서가 29건뿐이다) | 판정자 3명 각각과 다수결로 잼. 문턱 모의는 `regulation_min_similarity` 가 비교하는 밀집 점수 기준 |
 | 문장 선택을 문서 대표 벡터만으로 | 시험 방식과 같은 문장 54/71(76%), 낱말 방식 27% | 품질 우열은 미검증 |
 | 조항 종류 자동 태깅 | 제목 키워드 규칙이 손으로 뺀 21개와 21/21 일치 | **규칙을 이 규정에 맞춰 만들었다** — 다른 규정으로 재검증 필요 |
 | 같은 조건 재실행 | (LLM 방식) 17/20 일치 | 추출식은 결정형이라 문제 없음 |
@@ -148,12 +151,12 @@
 
 | 지표 | 정의 | 측정 시점 | 제안 기준(결정 D-10) |
 |---|---|---|---|
-| 도움 비율 | 표본 20건을 사람이 판정(도움/무용/오도), 그룹 가중 | Phase 3 파일럿 | 시험값(35%) 이상 |
-| 오도 | 잘못된 문장이거나 문서와 다른 등급 방향으로 끄는 표시 | 같음 | 표본 20건에서 **0건** |
+| 도움 비율 | 표본 20건을 사람이 판정(도움/무용/오도), 그룹 가중 | Phase 3 파일럿 | 시험값(35%) 이상 — **현재 제품 엔진은 71건 다수결 20%(판정자 범위 13~35%)로 미달**(§3.4) |
+| 오도 | 잘못된 문장이거나 문서와 다른 등급 방향으로 끄는 표시 | 같음 | 표본 20건에서 **0건** — **현재 제품 엔진은 71건 다수결 27%(범위 14~32%)** (§3.4) |
 | 검수 소요 | 문서당 검수 시간 전후 비교 | 파일럿 후 | 측정만(기준 없음) |
 | 운영 피드백 | F-13 「도움이 됨」 비율 | 운영 중(F-13 도입 시) | 참고 |
 
-파일럿 절차: 회원사 규정 1부 + 회원사 문서 표본 → `measure_regulation_extract.py`와 같은 방식으로 조회 → **판정을 가린 채** 표본을 두 사람이 읽는다(이번 시험은 한 사람이었다).
+파일럿 절차: 회원사 규정 1부 + 회원사 문서 표본 → `measure_regulation_runtime.py --dump-items` 로 검수 화면에 보일 1건을 뽑는다 → **판정을 가린 채** 표본을 두 사람 이상이 따로 읽는다 → `analyze_regulation_judgments.py` 로 판정자별 건수·일치도·다수결을 낸다(2026-09-26 판정은 LLM 세 명이 읽은 값이라 사람 검수자의 판정이 아니다 — 파일럿에서는 사람이 읽는다).
 
 ## 1.9 단계별 계획
 
@@ -171,11 +174,11 @@
 
 | ID | 위험 | 대응 |
 |---|---|---|
-| R-01 | 회원사 규정에서 시험값보다 낮게 나온다 | Phase 0/3에서 재측정, 낮으면 표시 개수 1 유지·문턱 상향·기능을 선택 옵션으로만 둔다 |
+| R-01 | 회원사 규정에서 시험값보다 낮게 나온다 (**시연 규정에서도 제품 엔진은 이미 시험값보다 낮다** — §3.4) | Phase 0/3에서 재측정, 낮으면 표시 개수 1 유지·기능을 선택 옵션으로만 둔다. 문턱 상향은 시연 규정 71건에서 도움 비율을 올리지 못하고 오도 비율만 올렸다(§3.4) |
 | R-02 | **규정이 문서에 안 맞는데 활성화된다** — LLM 요약 시험에서 안 맞는 지침을 올리자 문서의 54%에 무관 요약이 나왔고, 추출식은 문턱이 없으면 항상 1개를 보이므로 그보다 나쁠 수 있다 | 적용 대상 확인 필수 + 활성화 전 미리보기 + 활성 후 피드백(F-13) |
 | R-03 | 규정 형식이 달라 조항 분할이 실패한다 | 분할 모드·경고를 화면에 보이고, 조항 표에서 관리자가 표시 대상을 조정. 문단 대체 모드는 정확도 낮음을 경고 |
 | R-04 | 운영 임베더(KURE-v1)가 시험(bge-m3)과 다르게 동작한다 | Phase 0 재측정. 문서 대표 벡터와 규정의 임베딩 모델이 다르면 표시를 끈다(§2.5) |
-| R-05 | 표시된 규정 문장이 등급 방향으로 검수자를 끈다(앵커링) | 등급 정의·절차 조항을 표시에서 제외, 등급별 목록은 전체 표시, 고정 문구. **근거 조항의 등급이 정답 등급과 같은지는 미측정** |
+| R-05 | 표시된 규정 문장이 등급 방향으로 검수자를 끈다(앵커링) | 등급 정의·절차 조항을 표시에서 제외, 등급별 목록은 전체 표시, 고정 문구. **표시 노출은 측정했다(2026-09-26, §3.4)**: 오도로 판정된 19건 중 문장에 등급이 적힌 18건에서 14건이 문서 등급과 다른 등급을 말하고, 도움으로 판정된 14건 중 5건도 규정이 말하는 등급이 문서 등급(TS)보다 낮다(제40조 「기밀·대외비」). **검수자가 실제로 등급을 바꾸는지(행동 효과)는 재지 않았다** |
 | R-06 | 큰 규정의 색인이 느리다(문장 수천 개 × 임베딩) | 색인 상한·배치·작업 제한 조정(§2.10) |
 | R-07 | 새 표 이름이 표준용어집에 없다 → 감리 지적 재발 | 표준명 구조 확장과 용어 대조를 Phase 0에 둔다 |
 | R-08 | 콘솔 규칙 시험이 많아 화면 작업이 예상보다 크다 | §2.7 체크리스트로 처음부터 맞춘다 |
@@ -184,6 +187,8 @@
 | R-11 | 협의 미확정 안건과 저촉 | D-01 |
 
 ## 1.11 결정이 필요한 것
+
+> **처리 상태(2026-09-25)**: 사용자가 「진행」을 지시해 **권고안 그대로 구현했다.** 이의가 있으면 해당 결정만 되돌린다. 구현하지 않은 것은 D-06(공개 출처 문서 제외) · D-07(피드백 버튼, 요건 외 승인 필요) · D-11(회원사용 산출물, 지시 필요)이고 D-01(협의 저촉)은 기본 꺼짐으로 유지했다(제3부 §3.3~3.5).
 
 | ID | 결정 | 권고 | 이유 |
 |---|---|---|---|
@@ -242,8 +247,8 @@ POST /regulations ──▶ RegulationService ◀── RegulationEvidenceServic
 |---|---|---|
 | 신규 | `src/koipa/regulation/splitter.py` | 조항·문장 분할(순수 함수) |
 | 신규 | `src/koipa/regulation/tagger.py` | 조항 종류 태깅 규칙 |
-| 신규 | `src/koipa/regulation/index.py` | 프로세스 내 색인(밀집·낱말)·캐시 |
-| 신규 | `src/koipa/regulation/selector.py` | 조항·문장 선택, 목록 확장 |
+| 신규 | `src/koipa/regulation/index.py` | 프로세스 내 색인(밀집·낱말 순위합산)·문장 선택·목록 확장 — 설계의 `selector.py` 는 따로 만들지 않고 여기에 두었다 |
+| 신규 | `src/koipa/regulation/lexical.py` · `vectors.py` · `status.py` | 낱말(글자 2-gram TF-IDF) 색인 · 벡터 직렬화 · 상태값과 전이 규칙 |
 | 신규 | `src/koipa/services/regulation_service.py` | 등록·상태·활성화·삭제·미리보기 |
 | 신규 | `src/koipa/services/regulation_evidence_service.py` | 문서별 조회 |
 | 신규 | `src/koipa/repositories/regulation_repo.py` | 표 3개 접근 |
@@ -270,61 +275,64 @@ POST /regulations ──▶ RegulationService ◀── RegulationEvidenceServic
 - 표 3개가 모두 일반 ORM 표라 `alembic check`·감사 도구(R1~R7)가 그대로 적용된다.
 - ANN 인덱스가 없어 색인 재현성 문제가 없다(정확 검색).
 
-### 표 3개 (**물리 이름은 후보** — 표준용어집 대조 전)
+### 표 3개 (물리 이름 — 구현된 것)
 
-영역 코드는 새로 `rm`(규정관리)을 두는 안이다(`standard_names.py:18-19`의 "영역 첫 글자 + m" 관례, `sy`도 새로 둔 선례). 아래 이름은 표준용어집(13,704 용어)과 대조하지 않았고, **용어집 파일이 저장소에 없다**. 미등재 단어는 자체표준 용어로 등록해야 한다(감리 지적 재발 방지).
+영역 코드는 새로 `rm`(규정관리)을 두었다(`standard_names.py` 의 "영역 첫 글자 + m" 관례, `sy` 를 새로 둔 선례). 이름은 `POST_BASE_TABLES`·`POST_BASE_COLUMNS` 에 등록돼 있고,
+새 단어 12개(`rgltn`·`artcl`·`stc`·`dsply`·`aplcn`·`dscrp`·`cnfrm`·`lead`·`list`·`grp`·`wrn`·`chpt`)는 `NEW_TERMS_FOR_GLOSSARY` 에 적어 두었다.
+**표준용어집 파일이 저장소에 없어 용어집과는 대조하지 못했다(U-01)** — 미등재 단어는 자체표준 용어로 등록해야 한다(감리 지적 재발 방지).
 
-**① `tad_rm_reg_mng` 규정관리** — 규정 한 판(版) 한 행
+**① `tad_rm_rgltn_mng` 규정관리** — 규정 한 판(版) 한 행
 
-| ORM 속성 | 표준명 후보 | 논리명 | 타입 | 비고 |
+| ORM 속성 | 칼럼(표준명) | 논리명 | 타입 | 비고 |
 |---|---|---|---|---|
-| reg_id | reg_id | 규정아이디 | UUID PK | |
-| reg_name | reg_nm | 규정명 | TEXT NOT NULL | 같은 규정명의 판들은 한 계열 |
-| version_label | reg_ver_nm | 규정버전명 | TEXT NOT NULL | 예 "v3.1" |
-| effective_date | enfrc_ymd | 시행일자 | DATE NULL | 선택 |
-| status | prcs_sttus_cd | 처리상태코드 | TEXT NOT NULL | `indexing`·`ready`·`active`·`archived`·`failed` |
-| file_hash | file_hash_cn | 파일해시내용 | TEXT NOT NULL | SHA-256, 부분 UNIQUE(삭제 제외) |
-| raw_uri | orgtxt_path_nm | 원문경로명 | TEXT | 기존 칼럼명 재사용(`tad_dm_doc_mng`) |
-| file_ext | file_extn_nm | 파일확장자명 | TEXT | |
-| split_mode | split_mode_cd | 분할방식코드 | TEXT | `article`·`numbered`·`paragraph` |
-| clause_count | artcl_cnt | 조항수 | INT | |
-| sentence_count | stc_cnt | 문장수 | INT | |
-| embed_model | embd_mdl_nm | 임베딩모델명 | TEXT | `tad_dm_doc_vctr_mng.embd_mdl_nm`과 같은 이름 |
-| embedded_count | embd_cmptn_cnt | 임베딩완료수 | INT | 진행 표시 |
+| id | rgltn_id | 규정아이디 | UUID PK | |
+| name | rgltn_nm | 규정명 | VARCHAR(200) NOT NULL | 같은 규정명의 판들은 한 계열 |
+| version_label | ver_lbl_nm | 버전라벨명 | VARCHAR(50) NOT NULL | 예 "v3.1" |
+| effective_date | enfc_dt | 시행일시 | VARCHAR(30) NULL | 가이드 표(`tad_gm_guide_ver_mng.enfc_dt`)와 칼럼 ID 가 같아 타입을 맞췄다(감리 R3) — ISO 날짜 문자열 |
+| status | prcs_stts_cd | 처리상태코드 | VARCHAR(20) NOT NULL | `indexing`·`ready`·`active`·`archived`·`failed` |
+| file_hash | file_hash_nm | 파일해시명 | VARCHAR(64) NOT NULL | SHA-256. 부분 UNIQUE `uq_rgltn_hash_live`(삭제 제외). 다른 표는 NULL 허용이라 감리 R4 에 정당 사유로 등록 |
+| raw_uri | orgtxt_path_nm | 원문경로명 | VARCHAR(500) | 기존 칼럼명 재사용 |
+| source_format | orgnl_frmat_nm | 원본포맷명 | VARCHAR(10) NOT NULL | |
+| filename | file_nm | 파일명 | VARCHAR(500) NOT NULL | |
+| split_mode | prttn_mth_cd | 분할방식코드 | VARCHAR(30) | `article`·`numbered`·`paragraph` |
+| clause_count / sentence_count | artcl_cnt / stc_cnt | 조항수 / 문장수 | INT NOT NULL 기본 0 | |
+| embed_model | embd_mdl_nm | 임베딩모델명 | VARCHAR(200) | `tad_dm_doc_vctr_mng.embd_mdl_nm` 과 같은 이름 |
+| embed_target_count / embedded_count | embd_trgt_cnt / embd_cmptn_cnt | 임베딩대상수 / 임베딩완료수 | INT NOT NULL 기본 0 | 진행 표시 |
 | scope_note | aplcn_trgt_dscrp_cn | 적용대상설명내용 | TEXT | 관리자가 적는 한 줄 |
-| scope_confirmed | aplcn_trgt_cnfrm_yn | 적용대상확인여부 | BOOL NOT NULL default false | 활성화 조건 |
-| error_note | err_cn | 오류내용 | TEXT | 실패 사유 |
-| created_by / created_at | crt_id / crt_dt | 생성자아이디 / 생성일시 | | JWT sub |
-| activated_at / archived_at | actvtn_dt / arcv_dt | 활성화일시 / 보관일시 | TIMESTAMPTZ NULL | |
+| scope_confirmed | aplcn_trgt_cnfrm_yn | 적용대상확인여부 | BOOL NOT NULL 기본 false | 활성화 조건 |
+| warnings_text | wrn_stts_msg_cn | 경고상태메시지내용 | TEXT | 줄바꿈으로 이은 경고 문장 |
+| error_message | err_stts_msg_cn | 오류상태메시지내용 | TEXT | 실패 사유 |
+| created_by | creatr_id | 생성자아이디 | VARCHAR(50) | JWT sub |
+| created_at / updated_at | crt_dt / mdfcn_dt | 생성일시 / 수정일시 | TIMESTAMPTZ | 수정일시는 NULL 허용 |
+| activated_at / archived_at | vtlz_dt / dsbl_dt | 활성화일시 / 비활성화일시 | TIMESTAMPTZ NULL | |
 | deleted_at | del_dt | 삭제일시 | TIMESTAMPTZ NULL | 소프트 삭제(문서 표와 같은 관례) |
 
-**② `tad_rm_reg_artcl_mng` 규정조항관리** — 조항 한 행
+**② `tad_rm_rgltn_artcl_mng` 규정조항관리** — 조항 한 행
 
-| ORM 속성 | 표준명 후보 | 논리명 | 타입 | 비고 |
+| ORM 속성 | 칼럼(표준명) | 논리명 | 타입 | 비고 |
 |---|---|---|---|---|
-| clause_id | artcl_id | 조항아이디 | UUID PK | |
-| reg_id | reg_id | 규정아이디 | UUID FK ON DELETE CASCADE | |
-| seq | artcl_sn | 조항일련번호 | INT NOT NULL | UNIQUE(reg_id, seq) |
-| article_no | artcl_no_nm | 조항번호명 | TEXT | "제34조", 문단 모드는 "문단 12" |
-| title | artcl_ttl_nm | 조항제목명 | TEXT | |
-| chapter | chpt_nm | 장명 | TEXT | |
-| text | artcl_cn | 조항내용 | TEXT NOT NULL | 원문 |
-| kind | artcl_kind_cd | 조항종류코드 | TEXT NOT NULL | `general`·`procedure`·`grade_def`·`handling`·`other` |
-| kind_source | kind_src_cd | 종류출처코드 | TEXT | `auto`·`admin` |
-| display | dsply_yn | 표시여부 | BOOL NOT NULL | 기본: `handling`만 true |
+| id | artcl_id | 조항아이디 | UUID PK | |
+| regulation_id | rgltn_id | 규정아이디 | UUID FK ON DELETE CASCADE | |
+| seq | artcl_sn | 조항일련번호 | INT NOT NULL | UNIQUE(rgltn_id, artcl_sn) |
+| article_no | artcl_no_nm | 조항번호명 | VARCHAR(50) NOT NULL | "제34조", 문단 모드는 "문단 12" |
+| title / chapter | artcl_ttl_nm / chpt_nm | 조항제목명 / 장명 | VARCHAR(300) NOT NULL 기본 '' | |
+| text_ | artcl_cn | 조항내용 | TEXT NOT NULL | 원문 |
+| kind | artcl_knd_cd | 조항종류코드 | VARCHAR(20) NOT NULL | `general`·`procedure`·`grade_def`·`handling`·`other` |
+| kind_source | artcl_knd_src_cd | 조항종류출처코드 | VARCHAR(10) NOT NULL 기본 'auto' | `auto`·`admin` |
+| display | dsply_yn | 표시여부 | BOOL NOT NULL 기본 false | 기본: `handling` 만 true |
 | embedding | embd_vctr_cn | 임베딩벡터내용 | BYTEA NULL | 표시 대상 조항만 채운다 |
 
-**③ `tad_rm_reg_stc_mng` 규정문장관리** — 문장 한 행(표시 대상 조항만 색인)
+**③ `tad_rm_rgltn_stc_mng` 규정문장관리** — 문장 한 행(표시 대상 조항만 색인)
 
-| ORM 속성 | 표준명 후보 | 논리명 | 타입 | 비고 |
+| ORM 속성 | 칼럼(표준명) | 논리명 | 타입 | 비고 |
 |---|---|---|---|---|
-| sentence_id | stc_id | 문장아이디 | UUID PK | |
+| id | stc_id | 문장아이디 | UUID PK | |
 | clause_id | artcl_id | 조항아이디 | UUID FK ON DELETE CASCADE | |
-| seq | stc_sn | 문장일련번호 | INT NOT NULL | 조항 안 순번 |
-| text | stc_cn | 문장내용 | TEXT NOT NULL | 원문 그대로 |
-| is_lead | lead_yn | 서두문장여부 | BOOL NOT NULL | 선택 후보에서 제외 |
+| seq | stc_sn | 문장일련번호 | INT NOT NULL | 조항 안 순번, UNIQUE(artcl_id, stc_sn) |
+| text_ | stc_cn | 문장내용 | TEXT NOT NULL | 원문 그대로 |
+| is_lead | lead_yn | 서두문장여부 | BOOL NOT NULL 기본 false | 선택 후보에서 제외 |
 | list_group | list_grp_sn | 목록묶음일련번호 | INT NULL | 등급별 목록의 같은 묶음 |
-| embedding | embd_vctr_cn | 임베딩벡터내용 | BYTEA NULL | |
+| embedding | embd_vctr_cn | 임베딩벡터내용 | BYTEA NULL | 서두 문장은 비워 둔다 |
 
 **용량**: 시연규정 기준 조항 53·문장 171 → 벡터 약 0.9MB. 큰 규정(문장 3,000)도 벡터 12MB 안팎이라 프로세스당 메모리 문제가 없다.
 
@@ -341,10 +349,10 @@ POST /regulations ──▶ RegulationService ◀── RegulationEvidenceServic
 
 ### 마이그레이션
 
-- 현재 head `9c4e1f7a2b58` 다음에 새 리비전. `op.create_table` 3개 + 인덱스(`idx_rmreg_status`, `uq_rmreg_hash_live`(부분 UNIQUE), `uq_rmartcl_seq`, `idx_rmartcl_reg`, `idx_rmstc_clause`).
+- 현재 head `9c4e1f7a2b58` 다음에 새 리비전 `a1d4c7e9b302`(`alembic/versions/a1d4c7e9b302_regulation_reference.py`). `op.create_table` 3개 + 인덱스(`idx_rgltn_status`, `uq_rgltn_hash_live`(부분 UNIQUE), `uq_rgltn_artcl_seq`, `idx_rgltn_artcl_reg`, `uq_rgltn_stc_seq`, `idx_rgltn_stc_clause`).
 - 인덱스·제약 이름은 `idx_<약어>_…`/`uq_<약어>_…` 관례이며 표준명 적용 대상이 아니다(`standard_names.py:23-28`).
 - 재적용 안전: 표 존재 검사. downgrade는 인덱스→표 순서로 지운다. **이미 돈 판은 고치지 않는다.**
-- 검증: `alembic check` 무드리프트, 왕복(upgrade→downgrade→upgrade), `audit_schema_consistency.py` R1~R7.
+- 검증(2026-09-25, 실제 PostgreSQL 16 + pgvector 컨테이너): `alembic check` 무드리프트 · 왕복(upgrade→downgrade→upgrade) · `audit_schema_consistency.py` R1~R3·R5·R6 0건, R4 9건은 모두 정당 사유 등록.
 
 ## 2.4 규정 등록 파이프라인
 
@@ -382,7 +390,7 @@ POST /regulations ──▶ RegulationService ◀── RegulationEvidenceServic
 - **작업 제한**: 전역 제한이 soft 900초·hard 1200초(`config.py:379-380`)라 큰 규정은 걸린다. `celery_app.py` `task_annotations`에 이 태스크만 soft 3300·hard 3600초를 둔다(전역 validator는 soft<hard).
 - **임베더**: `build_embedder()`(프로세스 싱글톤). **`hash` 폴백이면 실패 처리** — 해시 임베딩은 의미가 없다(`embedding_provider="hash"` 프로파일 또는 `require_real_embedder` 위반).
 - **색인 상한**: `regulation_max_sentences`(기본 3,000). 넘으면 `failed` + "표시 대상 조항이 너무 많습니다. 규정을 나누어 올려 주십시오."
-- **시간 산정**(외삽, 미실측): 운영 임베더 KURE-v1은 CPU 6스레드에서 청크당 0.51초(2026-09-09 실측). 시연규정(조항 53+문장 171) ≈ 2분, 상한(3,000) ≈ 26분. **문장 단위 임베딩 시간은 Phase 0에서 재야 한다.**
+- **시간**(실측 2026-09-25, §2.10): 운영 임베더 KURE-v1은 CPU 8스레드에서 건당 0.278초 — 시연 규정(표시 조항 32 + 문장 171 = 203건) 56초, 상한 3,000문장은 약 14분(조항 임베딩 별도). 처음 설계 때는 청크 512자 기준 0.51초를 옮겨 와 추정했으나 문장·조항은 그보다 짧아 실측이 더 빠르다.
 - **진행 표시**: 화면이 `GET /regulations/{id}`를 3초 간격으로 부른다(`embedded_count`/`sentence_count+clause_count`).
 
 ### 분할기 (`regulation/splitter.py`)
@@ -393,7 +401,9 @@ POST /regulations ──▶ RegulationService ◀── RegulationEvidenceServic
 | `numbered` | `1. 제목` / `1.1 제목` 형식 머리글이 5개 이상 | 머리글부터 다음 머리글 전까지 |
 | `paragraph` | 위 둘 다 아님 | 줄 묶음(글머리 `ㅇ`·빈 줄) 기준 조각 + 직전 머리글. **화면에 "조 단위 구분이 없어 정확도가 낮을 수 있습니다" 경고** |
 
-- 40자 미만 조각(쪽 번호·머리글 찌꺼기)은 버린다. 반복되는 머리글·꼬리말(같은 줄이 5회 이상)은 버린다. (쪽 경계를 추출기가 주는지는 미확인 — 확인 사항 U-02.)
+- 40자 미만 조각(쪽 번호·머리글 찌꺼기)은 버린다. 반복되는 머리글·꼬리말(같은 줄이 5회 이상)은 버린다. **쪽 번호만 다른 머리글("18 │ 2025년 기록물관리 지침 │")도 숫자를 뺀 뒤 5회 이상 같으면 버린다**(숫자 아닌 부분이 8자 이상일 때만 — 짧은 번호 제목 "3. 목적"은 남긴다). (쪽 경계를 추출기가 주는지는 미확인 — 확인 사항 U-02.)
+- **인용은 머리글이 아니다** (2026-09-25, 두 번째 규정으로 돌려 보고 찾은 결함): 줄 첫머리의 `제9조 제1항 제1호`(제목이 다른 조항을 가리킴), `제18조(…) 참조`, `제30조(…), 제31조(…)`(나열)은 머리글에서 뺀다. 그래도 머리글로 읽힌 줄이 5개 이상이면 **조 번호가 조 순서(오름차순)로 이어지는지** 확인해 벗어난 쌍이 20%(최소 1쌍)를 넘으면 article 모드로 보지 않고 번호 머리글·문단 모드로 넘어간다(부칙에서 처음부터 다시 세는 것은 위반이 아니다). 어느 모드든 **조항으로 나뉜 글자가 전체의 50% 미만이면 경고**를 돌려준다. 고치기 전에는 공공 「기록물관리 지침」(25만 자)이 인용 줄 8개 때문에 article 모드 조항 66개로 나뉘어 조 번호가 전부 엉뚱했고(제18조 9번·제30조 26번·제49조 24번 반복) 경고도 없었다.
+- **PDF 줄바꿈 다시 잇기** (2026-09-26, 시연 규정을 실제 PDF 로 만들어 추출기를 거쳐 보고 찾은 결함): PDF 추출은 **눈에 보이는 줄** 단위라 문장이 줄 끝에서 끊긴 채 나온다 — 고치기 전에는 원본과 같은 문장이 23% 뿐이었다(검수자에게 보일 「규정 원문 문장」이 줄 끝 조각). 다음 순서로 잇는다. ① **줄 폭 감지**(`_wrap_width`): 줄이 30개 이상이고 긴 줄 상위 20%가 12글자 안에 몰려 있으며, 폭 바로 아래 6글자 구간의 줄 밀도가 그 아래 10글자 구간의 1.8배 이상(줄이 **벽처럼 한 폭에 몰린** 글)이고 8줄 이상일 때만 「줄바꿈으로 나뉜 글」로 본다 — 문단이 한 줄인 글(워드·마크다운)·짧은 항목 목록은 폭이 없다고 보고 **건드리지 않는다**(같은 객체를 돌려준다). ② **잇기**(`_reflow_wrapped_lines`): 줄이 문장 종결(`다.` 등)로 끝나지 않고 폭 가까이(여유 = min(16, max(12, 폭/2))) 찼으며 다음 줄이 항목 머리·장·조 머리·표 줄이 아니면 다음 줄과 잇는다. `다.` 로 시작하는 줄(앞 줄 꼬리)은 공백 없이 붙이고, 쪽 머리글·꼬리말·쪽 번호는 **쪽 경계 표시**로 바꿔 쪽을 건너 문장이 이어지게 한다. 빈 줄은 잡음(줄의 70% 이상이 빈 줄 뒤)이거나 쪽 경계일 때만 건너뛴다. ③ 결과: 글자/낱말 단위 줄 나눔 12가지 변형 × 문장 171개가 **모두 원본과 같다**(공백 무시), 실제 PDF 2가지(`test_regulation_extract_formats.py`)에서도 같다. 실제 「기록물관리 지침」 PDF 는 문단이 한 줄로 나와 폭이 없다고 판정돼 그대로 둔다.
 - **문장 분할**: 줄 단위 → 한 줄 안에서 `다.` 뒤 공백으로 분할 → 12자 미만 제외. 번호 항목(`1.`, `①`)은 한 문장으로 둔다.
 - **서두 문장**: `다음 각 호 / 다음 기준 / 다음과 같… / 다음 중 / 다음에 따른다`를 포함하는 문장은 `is_lead`로 표시하고 선택 후보에서 뺀다(내용이 없다 — 시험에서 213개 표시 중 20번 반복됐다).
 - **등급별 목록 묶음**: 같은 조항 안에서 `^\d+\.\s*<짧은 라벨>\s*[:：]` 형식 줄이 **3개 이상 연속**이면 한 묶음(`list_group`)으로 본다. 시험은 라벨을 "극비·기밀·대외비·일반"으로 못 박았으나 **회원사마다 등급 이름이 다르므로 라벨 이름을 고정하지 않는다** — 이 일반화는 시험하지 않았다(확인 사항 U-04).
@@ -409,7 +419,7 @@ POST /regulations ──▶ RegulationService ◀── RegulationEvidenceServic
 | `other` | 관리자가 지정 | 관리자 결정 |
 
 - **검증 상태**: 시연규정 53조에서 손으로 뺀 21개와 **21/21 일치**(`reports/.../design_checks.py`). 그러나 규칙을 이 규정의 제목을 보고 만들었으므로 일치는 당연하다. **다른 규정으로 일치율을 재야 한다**(W-03). 규칙이 틀려도 관리자가 조항 표에서 표시 대상을 바꿀 수 있다(F-10).
-- 왜 등급 정의·절차 조항을 표시에서 빼는가: 시험에서 "대외비 정의" 같은 조항이 문서 옆에 나열되어 등급 방향으로 끄는 오도(24%)의 주된 원인이었다. 빼자 0/20이 되었다.
+- 왜 등급 정의·절차 조항을 표시에서 빼는가: 시험에서 "대외비 정의" 같은 조항이 문서 옆에 나열되어 등급 방향으로 끄는 오도(24%)의 주된 원인이었다. 빼자 0/20이 되었다(bge-m3 결과·설계자 1명 판정 — 제품 엔진 71건에서는 등급 정의를 뺀 뒤에도 오도가 14~32%이고 그 주범은 제41조·제40조의 「차세대 제품은 극비」·「미공개 시제품은 기밀」 문장이다, §3.4).
 
 ## 2.5 조회 알고리즘 (`regulation/selector.py`, `services/regulation_evidence_service.py`)
 
@@ -462,7 +472,7 @@ def find(doc_id, max_items):
 |---|---|
 | 조항 조회(문서 대표 벡터 = 문단 임베딩 평균) | 시험(bge-m3): 1위 30/71, 상위3 38/71 — **운영 임베더로 재측정 필요** |
 | 문장 선택(문서 대표 벡터만) | 시험 방식과 같은 문장 54/71(76%) — **품질 우열 미검증**, 파일럿에서 사람이 재판독 |
-| 등급별 목록 확장, 서두 제외, 1개 표시 | 시험(S1c): 도움 35%·오도 0/20 — 시험은 라벨을 "극비" 등으로 고정했음 |
+| 등급별 목록 확장, 서두 제외, 1개 표시 | 시험(S1c): 도움 35%·오도 0/20 — bge-m3·설계자 1명 판정, 시험은 라벨을 "극비" 등으로 고정했음. 제품 엔진 71건 3명 판정은 §3.4 |
 | 성능 | 미측정. 예산 제안: p95 200ms(DB 2회 + 내적 수십 회). 임베딩 호출이 없다 |
 
 ### 캐시 (`regulation/index.py`)
@@ -477,7 +487,7 @@ def find(doc_id, max_items):
 
 | 메서드·경로 | 역할 | 요청 | 성공 | 오류 |
 |---|---|---|---|---|
-| `POST /regulations` | 업로드 | multipart: `file`, `name`, `version_label`, `effective_date?`, `actor`(JSON) | 202 `{reg_id, status:"indexing", duplicate:false}` / 중복이면 200 `{…, duplicate:true}` | 413·422·503 |
+| `POST /regulations` | 업로드 | multipart: `file`, `name`, `version_label`, `effective_date?` (행위자는 본문이 아니라 인증이 정한다) | 202 `{reg_id, status:"indexing", duplicate:false}` / 중복이면 200 `{…, duplicate:true}` | 413·422·503 |
 | `GET /regulations` | 목록 | `status?`, `limit`, `offset` | 200 `{items[], total}` | |
 | `GET /regulations/{reg_id}` | 상세·진행 | | 200 `{…, embedded_count, split_mode, warnings[]}` | 404 |
 | `GET /regulations/{reg_id}/clauses` | 조항 표 | `kind?`, `display?`, `limit`, `offset` | 200 `{items[], total}` | 404 |
@@ -488,7 +498,7 @@ def find(doc_id, max_items):
 | `DELETE /regulations/{reg_id}` | 삭제(보관·실패 판만) | | 204 | 404·409 |
 | `GET /documents/{doc_id}/regulation-evidence` | 문서별 참고 규정 | `max_items?` | 200 `RegulationEvidenceResponse` | 404(문서 없음)·503 |
 
-권한: 쓰기 `admin`·`kl_backend`(`require_role("admin","kl_backend")`, 가이드 API 선례), 읽기 `admin`·`reviewer`·`kl_backend`(검수 근거 API 선례). 본문 `actor`는 `bind_authenticated_actor`로 JWT sub에 덮어쓴다(기존 관례). `doc_id` 하이픈 정규화는 `/similar`와 같은 처리를 쓴다(하이픈 UUID vs `char(32)` 함정).
+권한: 쓰기 `admin`·`kl_backend`(`require_role("admin","kl_backend")`, 가이드 API 선례), 읽기 `admin`·`reviewer`·`kl_backend`(검수 근거 API 선례). 행위자 신원은 요청 본문이 아니라 인증 주체(JWT sub·역할)에서 읽어 감사에 남긴다 — 본문에 `actor` 를 두지 않았다. `doc_id` 하이픈 정규화는 `/similar`와 같은 처리를 쓴다(하이픈 UUID vs `char(32)` 함정).
 
 `RegulationEvidenceResponse` 예:
 
@@ -509,7 +519,7 @@ def find(doc_id, max_items):
 ```
 
 - **점수는 응답에 넣지 않는다.** 화면 금지 규칙과 별개로, 소비자가 신뢰도로 오용하는 것을 막는다. 진단이 필요하면 감사 로그가 아닌 개발용 도구(`measure_*`)를 쓴다.
-- **ICD**: 위 9개 경로를 `F:\antigravity\rag\doc\03_openapi_koipa_kl.yaml`에 `x-audience: internal`로 같은 커밋에서 추가한다. `test_openapi_contract_matches_routes.py`가 코드 경로가 ICD에 없으면 실패시키고, `test_kl_openapi_schema_matches_code.py`가 kl 오퍼레이션이 정확히 5개여야 한다고 잠근다. OpenAPI 3.0.3 유효성(nullable 사용, 3.1식 type 배열 금지)을 지킨다.
+- **ICD**: 위 10개 오퍼레이션(경로 8개)을 `doc/03_openapi_koipa_kl.yaml`에 `x-audience: internal`로 같은 커밋에서 추가했다(스키마 12개 포함). `test_openapi_contract_matches_routes.py`가 코드 경로가 ICD에 없으면 실패시키고, `test_kl_contract.py`가 kl 오퍼레이션이 정확히 5개여야 한다고 잠근다(설계 초안이 적은 `test_kl_openapi_schema_matches_code.py` 는 저장소에 없다). OpenAPI 3.0.3 유효성(nullable 사용, 3.1식 type 배열 금지)을 지킨다.
 - **레이트리밋·멱등**: 업로드는 기본 멱등 미들웨어(`Idempotency-Key` 헤더가 있을 때만 동작)와 파일 해시 중복으로 이중 처리된다. 조회는 `@limiter.limit("120/minute")`을 둔다(검수 화면이 행 펼침마다 부른다).
 - **라우터 등록**: `app.py`에서 `if settings.regulation_reference_enabled:` 조건으로 `include_router`(학습·합성 라우터 선례). **정적 경로를 가변 경로(`/regulations/{id}`)보다 먼저** 등록한다(`manage.html`이 doc_id로 삼켜진 사고).
 
@@ -558,7 +568,7 @@ def find(doc_id, max_items):
 | 항목 | 설계 |
 |---|---|
 | 권한 | §2.6 표. 공유 API 키(`system` 역할)는 규정 쓰기·검수 읽기 모두 불허(역할 검사로 자연히 막힘) |
-| 원문 보관 | 버킷 `regulations-raw` 암호화(AES-256-GCM, `storage_encrypted_buckets`에 추가). **다운로드 경로를 만들지 않는다.** 삭제하면 원본·조항·문장·벡터가 함께 지워진다 |
+| 원문 보관 | 버킷 `regulations-raw` 암호화(AES-256-GCM, `storage_encrypted_buckets` 기본값에 추가 — 목록을 직접 지정한 배포는 기능을 켤 때 설정 검증이 자동으로 더한다, §3.3). **다운로드 경로를 만들지 않는다.** 삭제하면 원본·조항·문장·벡터가 함께 지워진다 |
 | 규정 본문 | 조항·문장 텍스트는 DB에 평문(청크 표와 같은 수준). PII 마스킹 파이프라인은 거치지 않는다(규정 원문 왜곡 방지) |
 | 저장형 XSS | 규정 텍스트·규정명·설명은 모두 `textContent`/`esc()`. 시험에 `<img onerror>`·`<script>`·NFD 한글 |
 | 감사 | 명시 기록 `audit_repo.record(action=…, target_type="regulation", target_id=reg_id, …)`: `regulation.upload`·`regulation.activate`·`regulation.archive`·`regulation.delete`·`regulation.clause_update`. (요청 단위 자동 기록은 미들웨어가 하며 URL 첫 세그먼트가 action이다. 등급체계·키워드 변경은 명시 기록이 없었던 전례라, 이번에는 넣는다) |
@@ -584,13 +594,14 @@ def find(doc_id, max_items):
 
 ## 2.10 성능·용량·운영
 
-| 항목 | 추정(미측정) | 확인 방법 |
+| 항목 | 값 | 근거·한계 |
 |---|---|---|
-| 색인 시간 | (조항+문장) × 0.51초 — 시연규정 ≈ 2분, 상한 3,000문장 ≈ 26분 | Phase 0에서 KURE-v1 문장 임베딩 시간 실측 |
-| 색인 중 워커 점유 | 동시성 2(`worker_concurrency`)라 큐 `index`의 문서 벡터 색인과 경쟁 | 색인 중 문서 업로드 지연 확인 |
-| 메모리 | 프로세스당 규정 벡터 ≤ 15MB | 캐시 로드 후 RSS 확인 |
-| 조회 지연 | DB 2회 + 행렬곱, p95 200ms 예산 | Phase 1 성능 시험 |
-| 관측 | 메트릭 `regulation_evidence_requests_total{result}`(빈 이유별), `regulation_index_seconds` | prom_metrics 관례 |
+| 규정 색인 시간 | 시연 규정(표시 대상 조항 32 + 서두 아닌 문장 → 임베딩 **203건**): **CPU 8스레드 56.4초(건당 0.278초)**, GPU(RTX 5070 Ti) 1.6초 | `scripts/measure_regulation_runtime.py` 2026-09-25, KURE-v1. **상한 3,000문장은 외삽(약 14분)이며 재지 않았다.** 작업 제한(soft 3300초·hard 3600초) 안이다. 설계 초안의 "건당 0.51초"는 문서 청크 기준의 다른 기계 값이었다 |
+| 문서 대표 벡터(이미 있는 색인 워커, 참고) | CPU 청크당 0.327초·문서 중앙 2.13초(청크 7개), GPU 청크당 0.009초 | 같은 도구, 문서 71건·청크 486개 |
+| 색인 중 워커 점유 | **미측정** — 동시성 2(`worker_concurrency`)라 큐 `index`의 문서 벡터 색인과 경쟁할 수 있다 | 색인 중 문서 업로드 지연을 재야 한다 |
+| 메모리 | **미측정** — 설계값: 벡터 4KB × (조항+문장) ≤ 15MB | 캐시 로드 후 RSS 를 재야 한다 |
+| 조회 지연 | 서비스 계층 첫 호출(색인 적재 포함) 74~92ms, 이후 **p50 10.8ms · p95 13.5ms · p99 15.0ms**(300회). HTTP 계층(인증·속도 제한 포함, 200회) **p50 29.8ms · p95 47.1ms · p99 49.0ms** → 예산 p95 200ms 안 | `scripts/measure_regulation_latency.py` 2026-09-25. 실제 pgvector(도커 PG16, 같은 PC) · 시연 규정 + 시험 문서 30건×청크 12개 · 벡터 값은 결정형 가짜(지연만 잰다). **큰 규정·다중 워커·원격 DB 는 재지 않았다** |
+| 관측 | **미구현** — 메트릭 `regulation_evidence_requests_total{result}`·`regulation_index_seconds` 는 만들지 않았다 | 운영에서 필요해지면 prom_metrics 관례로 추가 |
 
 ## 2.11 시험 계획
 
@@ -645,6 +656,263 @@ def find(doc_id, max_items):
 
 ---
 
+# 제3부 구현 결과 (2026-09-25)
+
+권고안(§1.11)으로 백엔드·콘솔·시험까지 구현했다. **커밋·배포는 하지 않았다** — 작업은 별도 작업 트리(`.kilo/worktrees/regulation-ref`, 브랜치 `feat/regulation-reference`)에 있고, 기준은 **main 브랜치 머리 `16081145`**(작업 도중 main 이 앞서 가서 그 위로 다시 얹었다)이며 변경은 아직 커밋하지 않은 상태다. 기능은 기본 꺼짐이다.
+
+## 3.1 구현한 것
+
+| 구분 | 파일 | 내용 |
+|---|---|---|
+| 조회 엔진 | `src/koipa/regulation/{splitter,tagger,index,lexical,vectors,status}.py` | 조항·문장 분할, 종류 태깅, 프로세스 내 색인(밀집+낱말 순위합산, 문장 선택, 등급별 목록 확장), 상태 규칙 |
+| 저장 | `db/models.py`(ORM 3) · `db/standard_names.py` · `alembic/versions/a1d4c7e9b302_regulation_reference.py` · `repositories/regulation_repo.py` | 표 3개(§2.3), 표준명 사후 등록 구조 |
+| 서비스·API | `services/regulation_service.py` · `services/regulation_evidence_service.py` · `schemas/regulation.py` · `api/regulation.py` · `api/app.py` | 등록·색인·활성화·보관·삭제·조항 수정·미리보기·문서별 조회. 라우터는 플래그가 켜졌을 때만 붙는다 |
+| 워커 | `workers/tasks.py` · `celery_app.py` | `koipa.index_regulation`(큐 `index`, 작업 제한 3300/3600초) |
+| 설정 | `config.py` | 플래그 5개 + 암호화 버킷 `regulations-raw` |
+| 문서 벡터 | `adapters/vectorstore/document_vectors.py` | `get(doc_id)` 추가(대표 벡터 읽기) |
+| ICD | `doc/03_openapi_koipa_kl.yaml` | 오퍼레이션 10개(경로 8개)·스키마 12개, 전부 `x-audience: internal` |
+| 화면 | `api/static/admin.html` | 설정 탭 「사내 규정(참고 표시)」 카드 + 검수 화면 「관련 규정(참고)」 블록 |
+| 콘솔 시험 | `tests/e2e_console/{lib/fixtures.json, scenarios/18_regulation.mjs, 09_safety.mjs, 16_forbidden_strings.mjs}` | 시나리오 13개 신규, 쓰기 5종을 안전장치 표에 등록 |
+| 배포 안내 | `.env.example` · `.env.onprem-local` · `.env.full-train` · `docs/INSTALL.md` · `scripts/build_offline_bundle.py` | 주석 처리된 예시와 전제 조건(번들 `.env` 템플릿 포함) |
+| 도구 | `scripts/measure_regulation_runtime.py` · `measure_regulation_latency.py` · `measure_regulation_llm.py` · `analyze_regulation_judgments.py` | 운영 임베더 적중·속도, 실제 pgvector 조회 지연, 로컬 LLM 옵션의 제품 경로 측정, 판정 집계 |
+| 로컬 LLM 옵션(§3.6) | `regulation/llm_select.py` · `regulation/index.py`(`rank_clauses`·`evidence_item`) · `services/regulation_evidence_service.py`(`_find_with_llm`·캐시) · `adapters/llm/local_openai_provider.py`(Ollama 추론 끄기) · `config.py` 설정 8개(`regulation_llm_mode` 포함) | 조회 후보 조항에서 해당 항만 로컬 LLM 이 고른다. 기본 꺼짐. 응답 이유 4개(`not_applicable`·`public_document`·`llm_unavailable`·`llm_not_local`)와 화면 문구를 더했다 |
+| 감리 도구 | 루트 `scripts/table_spec_meta.py` · `build_table_spec.py` · `poc/scripts/audit_schema_consistency.py` | 새 표를 정의서 생성기·정합 검사가 알게 함 |
+
+시험(새로 쓴 것): `test_regulation_splitter.py` 84(인용 줄·쪽 머리글·표 구분자·PDF 줄바꿈 포함) · `test_regulation_index.py` 17 · `test_regulation_service_db.py` 28(실제 PostgreSQL) · `test_regulation_api.py` 24 · `test_document_vector_get_db.py` 5(실제 pgvector) · `test_regulation_worker_task.py` 8(태스크 등록·큐·시간 제한·재시도·**모든 워커 기동 명령이 `index` 큐를 소비하는가**) · `test_regulation_extract_formats.py` 4(워드 파일·표 규정·줄이 꺾인 실제 PDF 2가지를 실제 추출기로) · `test_regulation_flag_gate.py` 12(새 프로세스로 앱을 불러 **꺼져 있으면 라우트가 없음**을 확인 · 규정 원본이 디스크에 평문으로 없음 · 암호화 버킷 자동 보정 · LLM 옵션을 켜는 프로파일이 없음) · `test_regulation_llm_select.py` 109(답 읽기·번호 뒤에서 끊긴 답 읽기·조회 순위 지킴·실패를 「해당」으로 내보내지 않음·시간 초과·로컬 공급자만·공개 자료에는 안 뜸·스키마 출력만 16토큰에서 끊음·한 번에 고르기 32개[종류 확인과 고르기가 같은 system 문구·같은 문서 블록으로 시작]·후보마다 묻기의 종류 확인 문구 1개) · `test_regulation_service_llm.py` 50(꺼져 있으면 LLM 을 만들지도 않음·캐시·로컬이 아니면 문서를 안 보냄·방식 설정) = **341개**(2026-09-26 다시 셈 — 규정 시험 묶음 262개는 LLM 옵션을 더한 뒤 실제 PostgreSQL 16+pgvector 컨테이너로 돌려 통과했고, 그 뒤 생성 길이·한 번에 고르기·방식 설정·종류 확인 문구 시험 40개를, 독립 리뷰(§3.7) 뒤에 51개를 더했다. DB 를 쓰지 않는 규정 시험 묶음·어댑터 시험은 다시 돌려 통과), e2e 시나리오 13개. 판정 집계 도구 시험 `test_analyze_regulation_judgments.py` 7개는 별도, Ollama 추론 끄기·서버 주소·호출 한도 어댑터 시험 4개는 `test_local_llm_provider.py` 에 추가했다. 기존 시험 3개 파일(`test_standard_names.py`·`test_db_models.py`·`test_openapi_contract_matches_routes.py`)의 기대값을 새 표·경로에 맞게 고쳤다.
+
+## 3.2 작업 분해 상태
+
+| ID | 상태 |
+|---|---|
+| W-01 표준명 구조 | ✅ 구조·시험·도구 갱신. **용어집 대조는 못 했다**(파일 없음, U-01) |
+| W-02 운영 임베더 재측정 | ✅ 적중·속도(§1.3, §2.10)와 **판정자 3명의 도움/무용/오도 판정**(2026-09-26, §3.4). 결과가 옛 값보다 낮아 새 미해결이 생겼다(§3.5) |
+| W-03 규칙 재검증 | ⚠ 분할기만 시험해 결함 2건을 찾아 고쳤다(두 번째 규정의 인용 줄, PDF 줄바꿈 — §2.4). **태깅 규칙 재검증은 못 했다**(U-11) |
+| W-04 협의 저촉 확인(D-01) | 미착수 — 기본 꺼짐 유지 |
+| W-05~W-13 | ✅ |
+| W-14 회귀·성능 | ✅ §3.4 |
+| W-15 파일럿 | 미착수 — 회원사 규정이 있어야 한다 |
+| W-16 피드백 버튼(D-07) | 미착수 — 요건 외 승인 필요 |
+| W-17 배포 준비 | 일부 — 안내는 넣었고, 번들 임베더 확인(R-10)은 그대로 남아 있다. **배포는 하지 않았다** |
+| W-18 로컬 LLM 으로 해당 항만 고르기(§3.6, 2026-09-26 추가) | ✅ 구현·시험·제품 경로 재측정. **회원사 규정·사람 판정으로는 못 했다** — 판정자는 LLM 이다 |
+
+## 3.3 설계와 달라진 것
+
+1. `regulation/selector.py` 는 만들지 않았다 — 선택 로직이 `index.py` 안에 있다.
+2. 업로드에 `actor` 폼 필드가 없다 — 행위자는 인증(JWT sub·역할)에서 읽는다(§2.6).
+3. 규정 목록 열은 등록일이 아니라 **시행일**이다. 「미리보기」는 문서를 고르는 화면 대신 **콘솔에 올라와 있는 저장된 문서(최대 20건, 중복 제외)** 를 쓴다 — 붙여넣은 본문처럼 저장되지 않은 문서는 대상이 아니다. 조항 표는 「표시」를 켜고 끄는 것만 화면에 있고, 종류(`kind`)를 바꾸는 것은 API(`PATCH`)에만 있다.
+4. 오류 문구에 상태값(영문)을 그대로 싣지 않는다 — `status.LABEL_KO`("분석 중·사용 전·사용 중·보관·분석 실패").
+5. 분할기에 **설계에 없던 방어**를 넣었다: 인용 줄을 머리글에서 빼기, 조 번호 순서 확인, 쪽 번호 머리글 제거, 조항 커버리지 50% 미만 경고(§2.4). 공공 「기록물관리 지침」으로 돌려 보다가 찾은 결함에서 나왔다.
+6. 기동 시 전제 조건 경고(`_warn_regulation_prerequisites`)를 넣었다 — 켰는데 해시 임베더면 로그에 남긴다. 기동을 막지는 않는다.
+7. 색인 재실행(임베딩 모델을 바꾼 뒤 다시 분석) 기능은 만들지 않았다 — 지우고 다시 올린다(같은 파일 중복 검사는 삭제한 판을 제외한다).
+8. **암호화 버킷 자동 보정을 넣었다.** `STORAGE_ENCRYPTED_BUCKETS` 를 `.env` 에서 직접 지정한 배포는 기본값이 통째로 대체된다(예전 `.env.prod.example` 의 예시가 `["documents-raw"]` 였다). 기능을 켰는데 목록에 `regulations-raw` 가 없으면 회원사 규정 원본이 평문으로 저장되므로, 설정 검증(`config.py` `_check_cross_field`)이 그 이름을 더하고 경고를 남긴다(기동은 막지 않는다). `.env.prod.example` 의 예시 줄도 고쳤다.
+9. 분할기에 **PDF 줄바꿈 다시 잇기**를 넣었다(§2.4) — 설계에는 없던 것이다. 실제 PDF 로 만들어 추출기를 거쳐 보니 문장이 줄 끝에서 끊겨 나왔다.
+10. 판정 집계 도구 `scripts/analyze_regulation_judgments.py` 와 `measure_regulation_runtime.py --dump-items` 의 점수 열(`signals`, 화면·API 에는 나가지 않는다)을 넣었다 — 회원사 규정 파일럿(W-15)에서 같은 명령으로 다시 쓴다.
+
+## 3.4 검증 결과
+
+| 항목 | 결과 | 방법·한계 |
+|---|---|---|
+| **분류 회귀** | 플래그 **꺼짐·켜짐 모두 판정 변화 0** — 평가셋 4종 993건 + 시드 탐침 404건(1,397건), 모델 판정면 151건, 검수 라우팅 게이트 탐침 6건, 운영 파라미터·배포 모델 변화 없음. 켜면 API 경로 **10개가 추가**될 뿐(추가는 허용) | `regression_gate.py`: 기준 = 이 작업을 얹기 전의 main 머리 `16081145`(별도 깨끗한 작업 트리에서 찍음), 비교 = 이 작업. 모델 경로까지 재려고 `CLASSIFIER_MODEL_DIR=artifacts/classifier_p1_v5_clean/v-fe4b386b` 를 줬다. 처음 기준(`eac60757`)에서도 같은 결과였고, main 이 앞서 간 뒤 병합 기준에서 **다시 재서** 같았다 |
+| 조회 지연 | 서비스 계층 p95 13.5ms, HTTP 계층(인증 포함) p95 47.1ms — 예산 200ms 안 | §2.10. 작은 규정·같은 PC·가짜 벡터 값 |
+| 조회 적중(운영 임베더) | 1위 28/71 · 상위3 40/71 (무작위 기대 5.4 · 15.1) | §1.3. 시연 규정·합성 문서 |
+| **쓸만한가 — 화면에 보일 1건을 3명이 판정**(2026-09-26) | 다수결 **도움 14(20%) · 무용 38(54%) · 오도 19(27%)**. 판정자별 도움/무용/오도: 설계 세션 25/36/10 · 독립 A 14/38/19 · 독립 B 9/39/23 (일치도 κ: A–B 0.81, A–설계 0.55, B–설계 0.46). **오도가 도움보다 많다**(다수결). 조항별(다수결): 제41조 16건 중 도움 5·오도 10 · 제34조(외부 제공 승인 등급 목록) 16건 중 도움 1·무용 15 · 제37조 11건 중 무용 10 · 제40조 10건 중 도움 5·오도 5. 오도의 주범은 「차세대 제품은 극비」(제41조)가 설계 문서가 아닌 문서(로드맵·협상조건 검토서·지원절차 검토서·변경영향 분석서 등)에 뜨는 것이다 | 도구 `scripts/analyze_regulation_judgments.py`(입력 = `measure_regulation_runtime.py --dump-items`), 자료 `poc/reports/CLAUDE_REGULATION_RAG_20260925/sample_org/kure_v1_judgment_20260926/`. 한계 — ① 판정자 셋 모두 LLM 이다(사람 검수자가 읽은 값이 아니다) ② 문서 71건은 합성이고 55건은 주제와 문서 종류를 이어 붙인 템플릿이라 종류가 애매한 것이 많다. 실문체에 가까운 16건만 보면 도움 5·무용 8·오도 3 ③ 시연 규정은 우리가 쓴 것이다 ④ **검수자가 표시를 보고 등급을 실제로 바꾸는지(행동 효과)는 재지 않았다 — 노출만 쟀다** |
+| 점수·교차 인코더로 거르기 | 밀집 점수 AUROC 0.54~0.59 · 낱말 0.47~0.71 · 교차 인코더 0.42~0.67(도움 vs 그 밖). 교차 인코더 조항 1위 적중 19/71 < RRF 28/71. 문턱을 올리면(다수결) 도움 비율 16~21% 그대로, 오도 27%→41% | 같은 71건. 그래서 `regulation_min_similarity` 는 이 시험으로는 값을 정할 수 없다(기본 0 = 끔 유지) |
+| PDF 줄바꿈 | 시연 규정을 줄이 꺾인 PDF 로 만들면 추출 문장이 원본과 같은 비율 **23% → 100%**(12가지 줄 나눔 변형, 문장 171개) | §2.4. 실제 「기록물관리 지침」은 문단이 한 줄로 나와 폭 없음 판정 → 그대로 |
+| 색인 속도 | CPU 8스레드 건당 0.278초 → 시연 규정 56초 | §2.10 |
+| DB | `alembic check` 무드리프트 · 왕복 · 실제 PostgreSQL 16+pgvector 에서 시험 통과 · 정합 검사 R1~R3·R5·R6 0건 | §2.3 |
+| 콘솔 | e2e 214개 전부 통과(기존 201 + 신규 13 — main 머리 위로 옮긴 뒤 다시 셈, 2026-09-26 최종 코드로 다시 돌림), 금지 문자열·문구 형식·글자 대비·`onclick` 함수 실재·API 계약 시험 통과. **신규 시나리오가 실제로 실패할 수 있는지** 확인하려고 화면 코드를 일부러 망가뜨려 봤다 — 빈 결과에도 블록을 그림 · 적용 대상 확인 생략 · 이스케이프 제거 · 카드 항상 표시, 네 가지 모두 의도한 시나리오가 잡았다 | 실제 브라우저·레이아웃·색은 못 본다(jsdom) — 눈으로 확인이 필요하다 |
+| 감사 도구 | 죽은 정의 2건(FUN-005 입구, 의도적 유지) 그대로 — 내가 넣은 죽은 정의 2건은 지웠다. 죽은 칼럼 0. 새 플래그는 "핫패스" 분류로 잡히나(경로 휴리스틱: `koipa/api/`) 분류·검수 라우팅 경로에는 코드가 없다 | `audit_wiring.py` · `audit_flag_cost.py` |
+| **병합 가능성** | 작업 트리를 main 머리(`16081145`) 위로 옮겼다 — 3방향 적용에서 **충돌 0**(충돌이 나던 3곳 — INSTALL.md·app.py·.env.full-train — 은 내 변경 자리를 옮겨 없앴다). 이 상태에서 관련 시험 295개, e2e 214개 통과. main 머리 위에 커밋하면 빨리감기(fast-forward)로 들어간다 | 설계서(v0.1)는 main 에 이미 있어(`607fdf35`) 이 작업의 판이 그것을 고친 것이다. 병합·커밋 자체는 하지 않았다. **⚠ 2026-09-26 저녁 갱신**: 그 뒤 주 저장소에 다른 세션의 **미커밋 변경 131개**가 생겼다(안 쓰는 표·칼럼 정리 등). 그 위에 이 작업을 얹어 보니(임시 작업 트리, 되돌림) **4개 파일에서 충돌** — `config.py`(검증기 자리)·`db/models.py`(그쪽이 지운 `Guide` 옆에 내가 더한 규정 모델)·`scripts/audit_schema_consistency.py`·`scripts/build_table_spec.py` — 모두 이웃한 줄이라 양쪽을 살려 손으로 합치면 된다. 또 그 세션의 새 마이그레이션 `b7d3f5a19c24`(표 4개·칼럼 18개 제거)가 내 `a1d4c7e9b302` 와 **같은 부모(`9c4e1f7a2b58`)** 라 둘 다 들어가면 alembic 헤드가 2개가 된다 — **나중에 커밋하는 쪽이 `down_revision` 을 앞선 것으로 옮긴다**(합친 뒤 `alembic heads` 가 하나인지 확인). 그 마이그레이션은 유사 문서 조회 표(`tad_dm_doc_vctr_mng`)를 지우지 않아 이 기능의 의존과는 부딪히지 않는다 |
+| 전체 시험(lite) | **6,007 통과 · 75 건너뜀 · 3 실패 · 18 오류**(28분 21초, 2026-09-26 21:01 — 독립 리뷰(§3.7)를 반영한 최종 코드. 같은 날 17:01 실행은 5,957 · 74 · 3 · 18, 12:07 실행은 5,910 · 75 · 3 · 18, 옵션 전 5,843, 9/25 값은 5,807 · 73 · 3 · 18. 17:01 대비 통과 +50 = 리뷰 뒤 더한 시험 51개 − 「골든 별칭」 시험 1개(node/jsdom 이 없으면 건너뛴다 — 17:01 실행 중에는 콘솔 시험용 jsdom 정션을 잠깐 걸어 두어 돌았다). 어댑터 시험(`test_local_llm_provider.py`, 13개)은 lite 표시(`slow`)에서 빠져 이 묶음에 안 들어가므로 아래에서 따로 돌렸다. 실패·오류 21개는 직전 실행과 같은 시험이다 — 아래. 건너뜀 74 는 Postgres 에 닿지 않음 34(문구 3가지 합) · node/jsdom 없음 18 · 데이터가 없는 체크아웃 등이다. 서비스 시험 4개는 첫 후보가 뽑히면 둘째 호출을 취소하는 동작 때문에 호출 수가 부하에 따라 1~2로 흔들려 「해당 없음」 가짜로 바꿨다). 실패·오류는 전부 이 작업과 무관하고 9/25 과 같은 시험이다 — 아래 | `pytest tests -m "not fullstack and not model_download and not slow"` 전체(시험을 손으로 고르지 않았다). 실제 DB 가 필요한 시험은 이 묶음에서 건너뛰므로 따로 돌렸다 — 규정 시험 11파일 + `test_document_vector_get_db.py` + `test_db_models.py` + `test_standard_names.py` + `test_openapi_contract_matches_routes.py` 를 임시 PostgreSQL 16+pgvector 컨테이너(`alembic upgrade head` 까지 올림)에 연결해 **382 통과 · 건너뜀 0**(2026-09-26 21시 최종 코드 — 어댑터 시험 13개 포함. 처음 돌렸을 때 1건이 실패했다 — 기동 경고가 설정 객체의 `local_llm_base_url` 을 없어도 읽던 것 — 고친 뒤 통과. 리뷰 반영 전에는 329 통과였고, DB 없이는 같은 묶음이 274 통과 · 28 건너뜀이었다). 콘솔 e2e 는 이 묶음이 아니라 `node run.mjs` 로 직접 돌려 214개 통과(2026-09-26 17시, jsdom 정션을 잠깐 걸어 돌리고 지웠다 — pytest 감싸개는 정션이 없어 건너뜀. 그 뒤 화면 파일 `admin.html` 은 바뀌지 않았고 리뷰 반영은 서버 코드·시험·문서뿐이라 다시 돌리지 않았다) |
+
+**전체 시험의 3 실패 + 18 오류는 이 작업과 무관한 것이다**: `test_content_reference_review.py`(2 실패 + 18 오류 — 이 시험이 읽는 자료 폴더 `reports/CONTENT_REFERENCE_20260914/` 가 새 작업 트리에 없다)와 `test_nis_checklist_doc_fresh.py`(1 실패 — 제출본 체크리스트의 M10 한 줄이 생성기 출력과 다르다)다. **기준 커밋 `16081145` 를 아무것도 얹지 않고 그대로 체크아웃한 곳에서 이 파일들을 돌려도 똑같이 3 실패 + 18 오류**가 난다(2026-09-26 확인). 이 작업을 시작할 때의 기준 `eac60757` 에서는 `test_scripts_console_encoding.py` 도 실패했으나(`import_factfirst_reviewer_docs.py` 가 cp949 출구를 고정하지 않음) main 이 그 뒤에 고쳤다.
+
+## 3.5 남은 일과 확인하지 못한 것
+
+**결론(2026-09-26)**: 기능(등록·색인·조회·표시·권한·시험)은 완성돼 있고 꺼져 있으면 아무것도 바뀌지 않는다. 그러나 **조회 품질이 목표에 못 미친다** — 시연 규정 71건에서 화면에 보일 1건이 실제로 적용되는 규정인 문서는 다수결 20%(첫 판독 기준 — 도움/무용/오도·문서 420자. 옵션과 같은 「해당/해당 안 됨」 기준으로 다시 읽으면 17%), 오도 27%, 나머지는 무관이다(§3.4). **결정형(기본) 그대로는 켜서 검수자에게 보이기에 이르다.** 고칠 길로 보였던 둘 — 점수 문턱, 교차 인코더 재순위 — 은 같은 71건으로 시험해 **막혔다**(도움 비율이 오르지 않고 오도만 오른다 / 조항 1위 적중이 28→19건으로 떨어진다). **같은 날 사용자가 「해당되는 규정만 보여줘」·「로컬 LLM 을 써도 된다」고 해 로컬 LLM 이 후보 조항에서 해당 항만 고르게 하는 선택 옵션을 넣었다(§3.6)** — 켜면(제품 경로 재측정) 화면에 뜬 규정이 해당하는 비율이 17%→78%(옵션 끔도 같은 기준으로 다시 읽은 값), 해당 안 되는 규정이 뜬 문서가 59→4건(공개 판례·금융 38건은 38→0~1건)이다. 대신 규정이 뜨는 문서가 71건 중 18건으로 줄고 나머지는 아무것도 안 뜨며, 해당 규정이 있는 것으로 읽힌 문서 34건(하한) 중 20건은 이 옵션(기본 방식)도 못 찾는다 — 고르는 방식을 `single` 로 바꾸면 해당 규정을 찾은 문서가 14→30건이 되고 문서당 1.1초로 빨라지지만 틀린 규정이 뜬 문서도 4→13건이 된다(§3.6). **권고: 로컬 LLM·GPU 가 있는 배포에서는 이 옵션을 켜고 쓴다.** 판정자가 LLM 이고 시연 규정·합성 문서 기준이라 회원사 규정 파일럿(W-15)이 여전히 남는다.
+
+남은 일을 도구(`poc/reports/CLAUDE_REGULATION_RAG_20260925/count_remaining_work.py`)로 세었다 — 작업 분해 W 18건 중 **완료 13 · 일부 2(W-03·W-17) · 미착수 3(W-04·W-15·W-16)**, 확인하지 못한 것 U 12건 중 **열림 9**(U-01·U-04·U-06·U-07·U-08·U-09·U-10·U-11·U-12)·해소 3(U-02·U-03·U-05). 표의 일은 각각 오른쪽의 입력·결정·지시가 있어야 진행된다.
+
+| 남은 일 | 진행에 필요한 것 |
+|---|---|
+| 조회 품질 — 로컬 LLM·GPU 가 없는 서버 | 로컬 LLM 옵션(§3.6)으로 해당률 78%(제품 경로)까지 올렸으나(해당으로 읽힌 문서 34건(하한) 중 20건은 못 찾는다 — 한 번에 고르기 `single` 은 30건을 찾는다) LLM 이 없는 서버에는 결정형(해당률 17%)뿐이다. 그쪽은 설계가 없다 — 남은 길은 문서 종류와 조항 종류를 맞추는 방법(문서 종류 분류 + 조항이 다루는 문서 종류 표시)인데 새 모델링이다. 71건(55건이 주제와 문서 종류를 이어 붙인 합성 템플릿)은 그 효과를 재는 자료로 맞지 않는다 — 회원사 문서로 먼저 재는 편이 낫다. 착수 여부를 정해야 한다 |
+| 로컬 LLM 옵션(§3.6)의 사람 판정 | 판정자가 LLM 이었다 — 회원사 규정으로 파일럿을 할 때 사람 검수자가 같은 시트(`measure_regulation_llm.py` → `analyze_regulation_judgments.py`)를 읽는다 |
+| W-15 파일럿 (U-04·U-07·U-08·U-09·U-10·U-11·U-12를 함께 잰다) | 회원사 규정 1부 + 문서 표본 + 판정하는 **사람 검수자**. 도구 = `measure_regulation_runtime.py --dump-items` → `analyze_regulation_judgments.py` |
+| W-03 태깅 규칙 재검증 | 조 제목 형식이 다른 두 번째 규정(태깅은 시연 규정 제목에 맞춘 규칙이다) |
+| W-04 협의 저촉 확인(D-01) | 발주처와의 협의. 그때까지 기본 꺼짐 유지, 협의 시 제안 자료로 사용 |
+| W-16 피드백 버튼(D-07) | 요건 외 승인 |
+| W-17 배포 준비 | 번들 빌드에서 임베더가 실리는지(R-10) 확인 + **배포 지시** |
+| U-01 표준용어집 대조 | 표준용어집 파일(저장소에 없다) |
+| U-06 `source_type` 값 목록 | ICD 확인 — D-06(공개 출처 문서 제외) 판정에 필요 |
+
+- 색인 중 워커 점유·프로세스 메모리·큰 규정·다중 워커·원격 DB 의 조회 지연은 재지 않았다(조회 지연은 작은 규정·같은 PC·가짜 벡터 값이다).
+- 폐쇄망 번들에 임베더가 들어 있는지(R-10)는 이 작업에서 바뀌지 않았다 — 없으면 이 기능도, 이미 있는 유사 문서 색인도 오프라인에서 동작하지 않는다.
+- D-06(공개 출처 문서에 표시 안 함)·D-07(피드백 버튼)·D-11(회원사용 산출물)과 메트릭은 만들지 않았다.
+- 켜려면: 마이그레이션(`alembic upgrade head`) + `REGULATION_REFERENCE_ENABLED=1` + 실제 임베더. **배포는 지시가 있을 때만.**
+
+## 3.6 로컬 LLM 으로 「해당되는 규정만」 보이기 (2026-09-26 추가 — 선택 옵션·기본 꺼짐)
+
+**왜.** 사용자 지시(9/26): 「등급을 말하지 말고 해당되는 규정만 보여줘」·「로컬 LLM 을 써도 된다」. 종전 방식은 조회 1위를 항상 보였고, 그 규정이 문서에 실제로 해당하는 문서는 71건 중 12건(17%)이었다(옵션과 같은 「해당/해당 안 됨」 기준으로 다시 읽은 값 — 첫 판독 §3.4 는 도움/무용/오도 기준이라 14건·20%였다). 점수(밀집·낱말·교차 인코더)로는 해당 여부를 못 가른다(AUROC 0.42~0.71). 그래서 조회가 준 후보 조항을 로컬 LLM 이 훑어 「이 문서에 직접 적용되는 항」을 **번호로 고르게** 했다. 이 옵션의 평가 기준은 **「해당되는가」 하나**다 — 표시 문장이 문서의 등급과 같은 등급을 말하는지는 보지 않는다(§3.4 의 「오도」 집계는 등급 방향까지 봤다).
+
+**어떻게**(`regulation/llm_select.py` · 서비스 `_find_with_llm`).
+1. 조회(밀집+낱말 순위합산)가 준 상위 5개 후보 조항마다 LLM 에게 문서 앞 1,500자와 조항의 항 목록(번호를 붙임)을 보이고 「직접 적용되는 항의 번호, 없으면 0」을 묻는다(JSON 출력·온도 0·추론 끔). 다섯 개를 **동시에** 묻는다.
+2. 같은 시각에 문서가 「사내 문서」인지 「이미 공개된 외부 자료(판결문·법령·보도·공시)」인지 한 번 묻는다. 공개 자료이면 고른 것과 상관없이 아무것도 안 보인다(`public_document`) — 설계 D-06(공개 출처 문서에 표시 안 함)을 출처 메타데이터 없이 LLM 으로 낸 것이다.
+3. 조회 순위가 앞선 후보부터 처음으로 항을 고른 것의 **규정 원문**을 보인다(등급별 목록의 한 줄이면 목록 전체). 하나도 못 골랐으면 아무것도 안 보인다(`not_applicable`).
+- ⛔ LLM 이 만든 글은 화면·API 어디에도 없다 — 고른 번호로 규정 원문을 찾을 뿐이다. ⛔ 등급을 묻지 않는다.
+- ⛔ 판정이 서지 않으면(LLM 오류·시간 초과·해석 불가·종류 확인 실패) 안 보인다(`llm_unavailable`) — 확인하지 못한 규정을 「해당」으로 내보내지 않는다. 실패는 캐시하지 않는다.
+- ⛔ 문서 본문이 프롬프트에 들어가므로 **로컬 공급자**(`ollama`·`vllm`·`local_openai`·`lm_studio`)일 때만 부른다(허용목록 — 원격·목업이면 호출하지 않고 `llm_not_local`, 기동 로그에 경고). **서버 주소도 사내**(루프백·사설 IP, 이름을 풀어 나온 주소가 전부 사설)여야 한다 — 아니면 이름이 로컬이어도 보내지 않는다(§3.7).
+- 같은 문서·규정 판·모델·설정의 결과는 1시간 캐시한다(규정을 활성화·보관·삭제하면 비운다). 관리자 미리보기는 캐시를 쓰지 않는다.
+- 켜려면 `REGULATION_LLM_SELECT_ENABLED=1`(+ `LLM_PROVIDER=ollama` 등 로컬 공급자·`LOCAL_LLM_MODEL`). 조정값은 `.env.example`, 설치 안내는 `INSTALL.md`.
+
+**측정**(시연 규정·합성 문서 71건, qwen3:14b 추론 끔, 판정자 3명 다수결 — 문서는 앞 1,500자를 읽었다. ⚠ 판정자는 LLM 이다. 상위 5개 후보).
+
+| 방식 | 화면에 규정이 뜬 문서 | 그중 해당 | 정밀도 | 해당하는 규정이 뜬 문서 | 해당 안 되는 규정이 뜬 문서 |
+|---|---|---|---|---|---|
+| 조회 1위를 항상 보임(종전) — 같은 기준으로 다시 읽음 | 71 | 12 | 17% | 12 (17%) | 59 (83%) |
+| LLM 참/거짓(뜬 문장이 해당하나) | 16 | 12 | 75% | 12 (17%) | 4 (6%) |
+| LLM 항 고르기 1판(「낱말만 겹치면 0」) | 31 | 18 | 58% | 18 (25%) | 13 (18%) |
+| LLM 항 고르기 2판(프롬프트 시험, 호출 경로 = Ollama 고유 API) | 20 | 17 | 85% | 17 (24%) | 3 (4%) |
+| **같은 2판 = 제품 경로 재측정**(아래) | **18** | **14** | **78%** | **14 (20%)** | **4 (6%)** |
+
+2판의 후보 수별: 상위 1개 4건 중 3 · 2개 8건 중 6 · 3개 14건 중 11(79%) · 4개 17건 중 14(82%) · 5개 20건 중 17(85%) — 후보를 늘려도 정밀도가 떨어지지 않아 5개로 했다. 사전에 정한 적용 조항이 조회 상위 5개 후보 안에 드는 문서는 45/71(63%)이다(주제 기준이라 종류 기준의 「해당」보다 넓다).
+
+**공개 자료에는 뜨면 안 된다.** 같은 120건 문서 중 공개 판례·금융보고서 38건으로 「규정이 뜬 문서 수」를 셌다: 종전 38/38 · 참/거짓 5/38 · 1판 19/38 · 2판 12/38 → 문서 종류 확인을 더하면 그 12건 중 11건이 걸러져 1/38(제품 경로 재측정에서는 **0/38**, 같은 코드를 여러 번 돌리면 0~1/38 — 아래 「더 빠르게 하는 길」의 「잡음인가」). 문서 종류 확인 자체는 120건 중 119건을 맞혔다(공개 자료 38건 중 37, 사내 문서 82건 중 82). 처음 판이 공개 판결문에 제38조 「특허 출원 전의 발명 내용은 공개하지 않는다」를 붙인 것이 대표적인 오답이었다.
+
+**1판(58%)의 오답과 2판의 고침.** 오답은 ① 낱말이 겹친 일반 절차 조항(제52조 점검·제18조 열람 범위) ② 문서 제목 조각만 닮은 항(「협상조건 검토서」라는 제목 조각에 제14조 3호) ③ 공개 판결문에 사내 규정이 붙는 것이었다. 2판은 「이 문서 **자체가** 그 항이 정한 종류의 사내 문서」·「낱말·주제만 겹치면 0」·「외부 공개 자료·논평은 0」·「확실하지 않으면 0」을 더했다.
+
+**제품 경로 재측정**(실제 임베더·실제 로컬 LLM 공급자[Ollama `/v1`, 어댑터 경유]·문서 종류 확인 켬, `scripts/measure_regulation_llm.py`, 120건): 71건 중 규정이 뜬 문서 **18건** — 이미 읽은 판정으로 해당 14 · 해당 안 됨 4(정밀도 78%), 해당 규정이 뜬 문서 14/71(20%), 해당 안 되는 규정이 뜬 문서 4/71(6%). 공개 판례·금융 38건은 **0건**(이 실행에서. 같은 코드를 여러 번 돌리면 0~1건 — 문서 종류 확인이 37건을 공개 자료로 걸러 `public_document`, 1건은 `not_applicable`), 사내 문서를 공개 자료로 잘못 거른 것은 0건. 제외했던 업무 문서 11건도 0건. **문서당 지연 중앙 6.7초 · p95 12.5초 · 최대 18.1초**(이 PC RTX 5070 Ti, qwen3:14b, 후보 5개+종류 확인 동시)였고, 생성 길이를 줄인 뒤(아래 「시간이 어디에 쓰이나」) 같은 120건에서 **중앙 2.9초 · p95 5.0초 · 최대 5.1초**다 — 뜬 항목·이유는 120건 모두 글자까지 같았다. 18건 모두 앞서 판정자 3명이 읽은 (문서·조항·문장) 쌍이라 새로 읽지 않고 그 다수결을 썼다. 프롬프트 시험 판과 견주면 같은 항목 16건 · 같은 문서 다른 항목 1건(둘 다 해당 안 됨) · 시험 판에만 뜬 것 3건(전부 해당) · 제품 경로에만 뜬 것 1건(해당 안 됨)이다(`compare_probe_vs_product.py`) — 호출 경로(Ollama 고유 API 대 OpenAI 호환)와 본문 형태(원문 앞부분 대 마스킹 뒤 청크)가 둘 다 달라 어느 쪽 때문인지는 가르지 않았다. **제품이 실제로 내는 값은 이 재측정이다.**
+
+**같은 기준으로 다시 읽기 · 놓친 것 점검**(2026-09-26, 판정자 3명 — Opus·Fable·Sonnet, 전부 LLM). 위 표의 종전 행은 처음 판독의 값(도움/무용/오도 기준·문서 420자)이라 옵션 행과 잣대가 달랐다. 그래서 조회 1위 표시 항목 71건을 옵션과 같은 기준(해당/해당 안 됨·문서 앞 1,500자)으로 다시 읽혔다 — 이미 같은 기준으로 읽은 12건은 재사용하고 새로 59건을 읽었으며, 이전에 해당으로 읽힌 항목 3건을 대조군으로 섞었다(`eval_base.py`).
+- **옵션 끔: 71건 중 해당 12(17%) · 해당 안 됨 59.** 판정자 쌍별 일치 59~61/62(A–B 59 · A–C 60 · B–C 61), 대조군 3건은 3명 모두 이전과 같이 해당으로 읽었다. 판정자별 해당 수 A 11 · B 10 · C 11.
+- 첫 판독의 「도움」 14건 중 같은 기준으로도 해당인 것은 6건뿐이다(첫 판독에서만 도움 8건 · 재판독에서만 해당 6건). 「도움」은 「보여 줄 만하다」에 가까워 「직접 적용된다」보다 넓었다 — 첫 판독의 20%·57건은 옵션과 견주는 값으로 쓰지 않는다.
+- **켜면 무엇이 달라지나.** 해당으로 읽힌 문서 수는 끔 12 · 켬 14 로 비슷하지만 **같은 문서는 6건**이다. 켬에서만 해당인 8건은 LLM 이 조회 1위와 다른 항목을 골라 얻은 것이고, 끔에서만 해당인 6건(문서 번호 3·6·10·11·54·65)은 켜면 5건이 아무것도 안 뜨고 1건(문서 3)은 해당 안 되는 항이 뜬다 — 조회 1위가 맞았는데 LLM 이 「없음」으로 보낸 경우다.
+- **놓친 것(하한).** 어느 판·어느 시트에서든 해당으로 읽힌 문서는 처음 재판독 때 22건이었고, 방식을 더 시험하자(아래 「호출 수를 줄이는 방식 비교」) **34건으로 늘었다** — 읽지 않은 항목은 모르므로 하한이고 더 늘 수 있다. 34건 중 기본 방식(후보마다 묻기)이 낸 것은 14건(41%), 조회 1위(옵션 끔)는 12건(35%), 한 번에 고르기(`single`)는 30건(88%)이다. 처음 22건 기준으로 기본 방식이 못 낸 8건은 문서 번호 3·6·10·11·41·44·54·65 였다.
+- **읽기 재현성의 한계.** 이번 재판독 이전 단계(잃은 문서 8건을 읽은 12건 시트)에서 대조군 4건 중 1건(표시 항목이 「거래 협상 조건 검토서」인 문서 38)이 이전 판정 「해당 안 됨」→ 3명 모두 「해당(경계)」으로 뒤집혔다. 경계 사례는 다시 읽으면 바뀐다. 그 항목을 해당으로 치면 옵션 켬의 정밀도는 15/18(83%)이다 — 정밀도는 **78~83%** 범위로 본다.
+
+**시간이 어디에 쓰이나**(2026-09-26, 「규정을 읽어 오는 건데 왜 오래 걸리나」에 답하며 쪼개서 쟀다). 규정을 읽어 오는 조회는 빠르다 — 서비스 p95 13.5ms · HTTP p95 47.1ms(§2.10, 옵션 끔; 작은 규정·같은 PC·가짜 벡터 값). 시간은 LLM 호출이었다. 문서 1건 = 호출 6개(후보 5 + 문서 종류 1)이고, 호출 1개는 입력 약 1,350토큰(문서 앞 1,500자 + 조항)을 읽고 JSON 을 쓴다.
+- **처음 값(호출당 약 1.0초).** 입력 읽기 0.1초 + 출력 약 50토큰 생성 0.7초. 출력의 대부분은 `reason` 문장인데 코드는 쓰지 않는다 — 항 번호(문서 종류)가 첫 키이고 온도 0 이라 번호는 문장을 만들든 말든 같다. Ollama 가 6개 호출을 한 번에 하나씩 처리해(문서 1건 6.5초 ≈ 6 × 1.0초) 문서당 6~7초였다.
+- **고침.** 스키마 출력이면 16토큰에서 끊는다(`_VALUE_ONLY_TOKENS`, 키 순서를 못 믿는 서버는 종전 200). 호출 40개(조항 판정 32 · 문서 종류 8)에서 6·8·10·12·16토큰으로 끊은 값이 전체 출력의 값과 모두 같았고(같음 38 · 둘 다 읽지 못함 2 · 다름 0), 호출당 0.8초 → 0.3~0.35초. **같은 120건 제품 경로 재측정: 문서당 중앙 6.7 → 2.9초 · p95 12.5 → 5.0초 · 최대 18.1 → 5.1초, 뜬 항목·이유 120건 모두 같다.** 판정을 다시 읽을 필요가 없다(결과가 같다).
+- **남은 2.9초.** 호출 6개를 Ollama 가 한 번에 하나씩 처리해서다(문서 1건 2.1초 ≈ 6 × 0.32초, 어댑터 127.0.0.1 기준). Ollama 병렬 칸을 6 으로 올려도 빨라지지 않았다(문서 1건 3.1초 대 단일 칸 2.1초 — 이유는 가르지 않았다). 배치 처리를 하는 서버(vLLM)에서는 재지 않았다.
+- **윈도 PC 에서 `localhost`.** 어댑터가 `http://localhost:11434/v1` 을 부르면 호출마다 0.4초쯤 더 든다(0.69초 대 127.0.0.1 0.32초) — 이름 풀이 지연이다. 표준 라이브러리로 부르면 2초까지 늘었다. 리눅스 서버에는 해당 없음.
+- **모델 적재.** Ollama 는 놀고 있으면(기본 5분) 모델을 내린다 — 내려간 뒤 첫 호출은 적재 시간이 붙는다(3.7초 · 새 인스턴스 첫 적재 때 30초 넘게).
+- **GPU 없이(CPU 만).** 이 PC(Ryzen 7 7800X3D 8코어, GPU 층 0)에서 호출 1개 **37.5초**(입력 1,330토큰을 읽는 데 34초 = 39토큰/초, 출력 16토큰 3.2초)였다. 문서 1건은 호출 6개라 잇달아 부르면 약 225초로 계산했으나(37.5 × 6) 제품 경로로 문서 1건을 직접 재니 그보다 짧았다(후보마다 묻기 126~130초 — 아래 「GPU 없을 때 제품 경로 실측」). CPU 에서는 시간의 대부분이 입력 읽기라 출력을 줄인 효과가 작다. 서버 vCPU 는 이 데스크톱 CPU 보다 느릴 것이다(재지 않았다). CPU 에서 줄이는 길은 아래 「더 빠르게 하는 길」(`single` 은 문서당 75~79초까지 재었다).
+- 도구: `scripts/measure_regulation_llm.py`(제품 경로 120건) · 자료 `.../llm_select/time_*.py`.
+
+**호출 수를 줄이는 방식 비교**(2026-09-26, 「조항을 읽는데 6번이나 조회를 하는 게 최선인가」). 후보 조항마다 따로 물으면 문서를 후보 수만큼 다시 읽는다. 그래서 문서를 한 번만 보이는 방식 둘을 더 만들어 같은 120건·같은 기준(해당/해당 안 됨, 판정자 3명 다수결, 문서 앞 1,500자)으로 견주었다.
+채택 기준은 결과를 보기 전에 정했다(`single_mode_criteria.txt`) — 71건 중 해당 규정이 뜬 문서 ≥ 13 · 해당 안 되는 규정이 뜬 문서 ≤ 5 · 공개 자료 38건 중 ≤ 1 · 업무 문서 11건 중 ≤ 1 · 해당으로 읽힌 문서를 낸 수 ≥ 12 · 지연 ≤ 1.5초. **모두 넘어야 기본을 바꾼다.**
+
+| 방식 | 호출 | 71건 중 뜬 문서 | 그중 해당 | 정밀도 | 해당 안 되는 규정이 뜬 문서 | 공개(38)·업무(11)에 뜸 | 문서당 지연(중앙) |
+|---|---|---|---|---|---|---|---|
+| 조회 1위(옵션 끔) | 0 | 71 | 12 | 17% | 59 | 0 · 0 | — |
+| **후보마다 묻기(기본)** | 6 | 18 | 14 | 78% | 4 | 0 · 0 | 2.9초 · p95 5.0초 |
+| **한 번에 고르기(`single`)** | 2 | 43 | 30 | 70% | 13 | 0 · 1 | 1.1초 · p95 1.3초(종전 1.4초 · p95 1.6초 — 아래 「더 빠르게 하는 길」) |
+| 후보마다 답하기(`batch`, 걷어냄) | 2 | 44 | 28 | 64% | 16 | 1 · 4 | 2.4초(스키마 끈 시험) |
+
+- **`single`** = 사내 문서인지 먼저 확인하고(호출 1), 사내 문서이면 문서 앞부분과 후보 조항의 항 전체(항마다 A1·A2·B1… 기호)를 **한 번에** 보여 가장 직접적인 항의 기호를 고르게 한다(호출 2). 답의 기호는 스키마(enum)로 보인 기호에만 묶는다.
+- **결과.** 해당 규정을 찾은 문서가 14 → 30건(어느 방식으로든 해당으로 읽힌 문서 34건 중 41% → 88%), 호출 6 → 2번, 문서당 2.9 → 1.4초(종류 확인을 고르기와 같은 system 문구로 부른 뒤 1.1초). 대신 해당 안 되는 규정이 뜬 문서도 4 → 13건(정밀도 78 → 70%). 판정자 3명이 모두 해당으로 읽은 항목만 세면 11 → 25건(정밀도 61 → 58%), 「분명」(Hc 2표 이상)만 세면 7 → 13건이다 — 늘어난 몫은 경계 판정이 많지만 정밀도가 크게 무너지지는 않았다.
+- **채택 여부.** 기준 6개 중 하나 — 해당 안 되는 규정이 뜬 문서 ≤ 5 — 만 못 넘었다(13). 이 기능의 목적이 「해당되는 규정만 보여주기」라 **기본은 `per_candidate` 로 두고**, 더 많이 찾는 쪽이 낫다는 현장은 `REGULATION_LLM_MODE=single` 로 고르게 했다. 어느 쪽이 나은지는 「틀린 규정이 뜨는 비용」과 「해당 규정을 못 보여 주는 비용」 중 무엇이 큰지에 달렸다 — 사람 검수자와 회원사 규정으로 파일럿에서 정한다.
+- **`batch`(후보마다 따로 답하되 한 번에 묻기)** 는 `single` 보다 정밀도(64%)·업무 문서 오탐(4/11)·지연이 모두 나빠 걷어냈다.
+- **첫 시도의 실패.** 항에 1부터 이어지는 번호를 붙였더니 모델이 조항 번호(제34조·제40조·제41조…)를 항 번호로 답했다(120건 중 45건은 범위 밖 번호라 답을 읽을 수 없었고, 범위 안이어도 조항 번호를 고른 것이 섞였다 — 공개 자료 38건 중 8건에 규정이 뜸). 알파벳+숫자 기호로 바꾸고 답을 그 기호의 enum 으로 묶어 고쳤다.
+- **`single` 이 GPU 에서 2배쯤만 빠른 까닭.** 후보마다 묻는 호출 6번은 같은 문서 앞부분을 잇달아 부르면 서버가 다시 읽지 않아 이미 싸다(입력 읽기 중앙 0.11초, 문서의 첫 호출 0.46초). **CPU 는 어느 방식이든 문서 읽기가 시간의 대부분**이라 문서당 수 분이고(호출 1개 37.5초) 종류 확인과 고르기가 각각 문서를 읽으면 `single` 도 문서당 106~112초다 — 두 호출의 system 문구를 같게 하면 서버가 앞부분 읽기를 재사용해 74~75초가 된다(아래 「더 빠르게 하는 길」).
+- 자료: `.../llm_select/eval_modes_output.txt`(방식 비교)·`eval_modes_strict_output.txt`(엄격함별)·`llm_items_120_{cap,single3,batch}.json`·`llm_sheet_single2_*`·`llm_reader_{single2,batch}_*`. `single3` = 제품 경로(스키마 켬), `single2` = 스키마를 끈 시험 — 뜬 항목·이유가 120건 모두 같았다.
+
+**더 개선할 여지를 재 본 것**(2026-09-26, 「지금은 쓸만한데 더 개선할 여지는 없나」). 기준은 모두 결과를 보기 전에 적었다(`single_mode_criteria.txt`). 한 번에 고르기(`single`)·K=5 로 같은 120건에 돌렸다(`eval_models_output.txt`).
+
+| 시도 | 결과(71건 중 뜬 문서 · 공개 자료 38건 중 · 업무 문서 11건 중) | 채택 |
+|---|---|---|
+| GPU 없는 서버용 작은 모델 — exaone3.5 2.4B | 68건 · 24건 · 11건(읽은 것 중 해당 12·아님 33·미판정 23) · 0.4초 | 아니오 — 전부 붙인다 |
+| gemma3 12B | 71건 · 10건 · 11건(해당 27·아님 10·미판정 34) · p95 18.9초 | 아니오 — 전부 붙인다 |
+| qwen3 8B | 71건 · 2건 · 11건(해당 18·아님 7·미판정 46) · 0.9초 | 아니오 — 전부 붙인다 |
+| qwen3 4B | 0건 · 0건 · 0건 — 어느 문서에도 안 붙인다 · 0.7초 | 아니오 — 전부 안 붙인다 |
+| qwen3 14B(기준) | 43건 · 0건 · 1건(해당 30·아님 13) · 1.4초 | — |
+| 후보 조항 수 K 5 → 8(14B) | 44건 · 0건 · 3건 · 1.6초 | 아니오 — 업무 문서 오탐이 1 → 3 |
+| Ollama 모델 유지 시간 | 기본 5분(측정: expires_at = 마지막 호출 + 5분) 놀면 내려가 첫 호출에 적재 3.7~30초가 붙는다 | 예 — `OLLAMA_KEEP_ALIVE=-1` 안내(`.env.example`·`INSTALL.md`) |
+
+- **작은 모델은 길이 아니다.** 「해당 항 없음」을 가려내는 힘은 모델 크기에 달렸다 — 이 PC 에서 시험한 14B 미만 넷은 전부 붙이거나(2.4B·8B·gemma3 12B) 전부 안 붙였다(4B). 14B 만 가려낸다. 그런데 14B 는 CPU 에서 호출 1개 37.5초라 GPU 없는 서버는 **지금 길이 없다**. 남은 길은 문서가 들어올 때 미리 계산해 두는 것(비동기)뿐이다 — CPU 에서 제품 경로로 재면 한 번에 고르기는 문서당 75~79초 · 후보마다 묻기는 126~130초(문서 2건 — 「GPU 없을 때 제품 경로 실측」)라 검수 대상 문서에만 할 수 있다. 미리 계산해 두는 흐름은 만들지 않았다.
+- **문서 종류까지 한 번에 묻기(호출 1번)**: 종류 질문을 문서 바로 뒤에 두고 후보의 항 고르기를 이어 물었다(qwen3 14B·K=5·같은 120건, 기준은 결과 전에 적음). 문서 종류는 오히려 더 잘 알아본다(공개 자료 37/38 대 35/38, 사내 문서를 공개로 잘못 거른 것 0)·지연도 문서당 1.0초(p95 1.1초)로 빨라진다(2번 방식 1.4초 — 그 뒤 종류 확인을 고르기와 같은 system 문구로 부르자 2번 방식도 1.1초). 그러나 고르기가 헤퍼져 71건 중 뜬 문서가 43 → 53건, 업무 문서 11건 중 규정이 뜬 문서가 1 → 6건이 되어 기준(업무 ≤ 1)을 못 넘었다 — 걷어냈다(코드는 `llm_select_with_one_call_experiment.py.txt` 로 남겼다). 새로 뜬 10건은 읽지 않았다. **호출을 줄일수록 빨라지지만 더 마구 붙인다: 6번 → 2번 → 1번에서 뜬 문서 18 → 43 → 53건.**
+- **LLM 을 문서마다 부르지 않는 길(「LLM 안 부르고 조회만으로는 안 되나」)**: ① 조회만(옵션 끔·기본형)은 71건 중 해당 12건·정밀도 17%였고 점수 문턱·교차 인코더도 막혔다(§3.4). ② 이번에 「등록 때만 LLM」을 재 보았다 — 규정을 등록할 때 조항마다 LLM 을 **한 번만** 불러 「이 조항이 적용되는 문서의 종류·상황」 명사구 표를 만들고(표시 대상 조항 32개, GPU 27초·조항당 0.9초), 서빙은 LLM 없이 문서 앞머리 300자의 임베딩과 그 명사구 임베딩의 최대 유사도로 조항 점수를 냈다(`regtag_llm.py`·`regtag_eval.py`, 기준은 결과 전에 적음). 읽은 (문서, 조항) 쌍 116개(해당 42·해당 안 됨 74)에서 **AUROC 0.59**(기준 ≥ 0.80) — 조항 본문 유사도 0.45·제목+대상 묶음 0.41·조회 순위 0.30 보다 낫지만 못 쓴다. 문서마다 상위 1개를 보이면 읽은 것 중 해당이 52%(16/31, 40건은 읽지 않음), 조항 32개 전체에서 고르면 읽은 7건 중 1건이다(`regtag_eval_output.txt` — 처음 값 114쌍·0.58 은 새로 읽은 2건을 더하기 전이다). **실패.** ⚠ 읽은 쌍이 LLM 이 고른 것 위주라 표본이 치우쳐 있고, 합성 문서는 제목·유형이 정형이라 이 방식에 오히려 유리한데도 실패했다. ③ 결론: 「주제가 비슷하다」(조회)와 「이 문서가 그 조항의 대상이다」(적용)는 다르고, 후자를 가르는 데는 문서마다 LLM 판단이 필요했다 — 시험한 LLM 없는 길(점수 문턱·교차 인코더·등록 때 만든 적용 대상 표)은 모두 못 미쳤다. 등록 때 LLM 을 CPU 로 돌리는 시간은 조항당 약 30초로 계산(32개 약 16분, 측정 안 함).
+- K=8 의 새 17건은 읽지 않았다(기준 (c)를 이미 못 넘었다). 조회 후보 5개가 병목이 아니라는 뜻이다 — 뜬 문서가 43 → 44건뿐이다.
+- 못 잰 것: qwen3 14B 보다 큰 모델(32B 등) · 프롬프트를 새 문서에서 다시 재는 것(지금 문구는 같은 71건에서 다듬었다) · 사람 검수자의 판정 — 모든 수치가 판정자 LLM 3명·합성 문서·시연 규정 기준이다.
+
+**더 빠르게 하는 길**(2026-09-26, 「더 빠르게 할 수는 없다는 건가」). 있다 — 다만 GPU 서버는 문서당 1~3초라 얻을 몫이 작고, 몫이 큰 곳은 GPU 없는 서버(CPU)다. 아래는 재 본 것이다(qwen3 14B, 이 PC).
+
+| 길 | 잰 값 | 채택 |
+|---|---|---|
+| 한 번에 고르기에서 **종류 확인을 고르기와 같은 system 문구**로 부른다(두 호출이 같은 문서 앞부분으로 시작해 서버가 그 읽기를 재사용) | CPU(GPU 층 0)에서 문서당 **106~112초 → 74~75초(−31%)**, 문서 2건·답 같음. GPU 120건에서 중앙 1.4 → **1.1초**(p95 1.6 → 1.3초, 재실행 1.1 · 1.2초) · 뜬 항목·이유 117/120 같음 · 같은 코드 재실행 120/120 같음 · 해당 30 · 해당 안 됨 13(종전과 같음) · 공개 자료로 알아본 수 35 → 37 | 예 — `single` 에만 |
+| 같은 문구 통일을 **후보마다 묻기**에도 적용 | GPU 중앙 2.9 → 2.6~2.7초(작다). 대신 공개 판결문 1건에 제38조 「특허 출원 전의 발명 내용은 공개하지 않는다」가 새로 떴다(공개 38건 중 0 → 1, 재실행에서도 같은 문서) — 결과를 보고 적은 기준(공개 자료에 규정이 뜬 문서가 늘면 되돌린다)에 걸렸다. 다만 같은 판결문이 종전 문구로도 4회 중 1회 떴다(아래 「잡음인가」) | **아니오** — 종전 문구(`KIND_SYSTEM`)로 되돌림(원인은 확정하지 못함) |
+| CPU 스레드 수(`num_thread`) | 입력 읽기(요청별 옵션, Ollama 고유 API) 6스레드 29 · 8스레드 34 · 12스레드 40 · **16스레드 44토큰/초(8 대비 +29%)**. 제품 경로로 모델 파일(Modelfile)에 `PARAMETER num_thread 16` 을 주고 재면 문서당 **후보마다 묻기 128 → 104초 · 한 번에 고르기 77 → 65초**(문서 2건) | 안내만(`.env.example`·`INSTALL.md`) |
+| 위 둘을 함께 | 입력 읽기만 +29% 빨라진다고 계산하면 58.3~59.0초였으나, 제품 경로로 함께 재니 **59.3~70.3초(평균 65초)** — 계산이 조금 낙관적이었다 | — |
+| LLM 을 문서마다 부르지 않기 | 조회만 17%·점수 문턱·교차 인코더·등록 때만 LLM(AUROC 0.58) 모두 못 미쳤다(위) | 아니오 |
+
+- **판정 기록.** 통일 뒤 새로 뜬 두 항목을 판정자 3명(Opus·Fable·Sonnet, 전부 LLM)이 읽었다 — GOLD-B3-TS-020 에 뜬 제42조(협력사 단가·계약 조건)는 3명 모두 **해당**, GOLD-B3-TS-001 에 뜬 제18조(극비 문서마다 승인자 명시)는 3명 모두 **해당 안 됨**(일반 절차 항). 그래서 통일 뒤 후보마다 묻기는 뜬 문서 19 · 해당 15 · 해당 안 됨 4(79%, 재실행 20 · 15 · 5 = 75% — 새로 뜬 1건은 이미 읽은 판정), 한 번에 고르기는 43 · 30 · 13(70%, 재실행도 같음)이었다.
+- **잡음인가 변경 때문인가(정정 — 처음 결론은 표본이 하나뿐이었다).** 통일 전후로 두 방식 모두 120건 중 3건씩 달라졌고, 같은 코드를 처음 다시 돌리자 후보마다 묻기 1건 · 한 번에 고르기 0건이 달라져(기준은 재실행 전에 `single_mode_criteria.txt` 에 적음) 그때는 변경 때문일 가능성이 높다고 보고 후보마다 묻기를 되돌렸다. **그 뒤 같은 코드를 더 돌리자 그 결론을 못 지킨다**: 후보마다 묻기(종전 문구) 4회의 쌍 6개는 D = 0·1·1·1·2·2, 한 번에 고르기(통일 문구) 4회의 쌍 6개는 D = 0·0·0·1·1·1(`pairwise_noise.py`). 자주 바뀌는 문서는 정해져 있다 — GOLD-B3-TS-020(제42조가 뜨거나 안 뜸, 종전 문구 4회 중 2회 뜸)과 판례 0730716fcfe92701(공개 판결문에 제38조 「특허 출원 전의 발명 내용은 공개하지 않는다」가 뜨거나 안 뜸, 종전 문구 4회 중 1회 · 통일 문구 2회 중 2회 뜸; 한 번에 고르기에서도 4회 중 1회 제12조가 뜸). 통일이 분명히 바꾼 것은 한 번에 고르기에서 공개 자료로 걸러지는 문서가 35(종전 1회) → 37(통일 뒤 4회 모두)뿐이다. 후보마다 묻기에서 통일이 판결문 노출을 늘렸는지는 가르지 못했다(통일 2/2 대 종전 1/4). 되돌림은 결과를 본 뒤 적은 규칙을 그대로 적용한 것이고 얻는 것도 작아(중앙 2.9 → 2.6~2.7초) 그대로 둔다. 이 변경의 첫 전후 비교의 합격 기준은 사전에 적어 두지 않았다 — 결과를 본 뒤 정리한 값이다. **같은 코드도 120건 중 1~3건은 실행마다 뜨고 안 뜨는 것이 바뀐다**(온도 0 이어도 — 원인은 가르지 않았다). 그래서 공개 자료에 규정이 뜬 문서는 「0건」이 아니라 「0~1건/38」로 읽는다.
+- **복원 확인**(후보마다 묻기를 종전 문구로 되돌린 코드, 같은 120건, 기준은 실행 전에 적음). 종전 실행과 뜬 항목·이유가 **120/120 같다**(기준 ≥ 118) · 71건 중 18건(기준 18 ± 1) · 공개 자료 38건 중 규정이 뜬 문서 **0**(기준 0) · 문서당 중앙 2.9초 · p95 5.1초 · 최대 5.4초 — 세 기준을 모두 넘었다. 후보마다 묻기의 수치(정밀도 78% · 해당 14 · 해당 안 됨 4 · 2.9초)는 종전 그대로다. 그 뒤 같은 코드를 두 번 더 돌린 결과는 위 「잡음인가」 — 120건 중 1~2건이 달라졌다.
+- **최종 코드의 문서당 시간**(유휴 PC · 모델을 미리 올려 둔 뒤 · 120건 · 이 PC RTX 5070 Ti · qwen3 14B · 캐시 없음 · `measure_regulation_llm.py` 의 서비스 계층 시간이라 HTTP·인증은 빠진다): 후보마다 묻기(기본) **평균 2.9초** · 중앙 3.0초 · p95 5.2초 · 최대 5.3초(공개 자료로 안 걸러져 후보 판정까지 간 84건만 평균 3.4초), 한 번에 고르기 **평균 1.0초** · 중앙 1.1초 · p95 1.3초 · 최대 3.0초(83건 평균 1.2초). 전체 시험을 병행해 돌린 실행은 3.6초(p95 6.4초)·1.2초(p95 1.5초)로 느렸다 — 다른 일을 하는 PC 에서는 이만큼 늘 수 있다. 같은 문서를 1시간 안에 다시 열면 캐시로 바로 뜨고, 모델이 내려간 뒤 첫 호출은 적재 시간이 붙는다(3.7초, 새로 띄운 서버는 30초 넘게). 211 서버(GPU L4)에서는 재지 않았고, 2026-09-26 사용자 지시로 211 을 더 쓰지 않으므로 재지 않는다. 도구는 이 측정에서 평균·「후보 판정까지 간 문서만의 평균」을 더 내도록 고쳤다.
+- **후보마다 묻기 첫 통일 실행의 p95 20.4초.** 재실행은 중앙 2.6초 · p95 4.4초였다 — 첫 실행에서 튄 까닭은 가르지 않았다.
+- 못 잰 것: CPU 에서 문서 2건보다 많은 표본 · 서버급 vCPU(고객사 운영 서버는 16 vCPU·GPU 없음) · vLLM 에서 같은 재사용이 되는지.
+- 자료: `time_cpu_prefix.py`·`time_cpu_prefix_results_20260926.txt`(CPU) · `compare_ksys.py`(전후·재실행 비교) · `llm_items_120_{per_candidate,single}_ksys{,_rep}.json` · `llm_reader_model_ksys_*.json`(판독).
+
+**GPU 없을 때 제품 경로 실측**(2026-09-26, 「GPU 있을 때·없을 때 추가되는 시간」). 앞의 CPU 값은 Ollama 고유 API 로 잰 것이라 제품이 실제로 내는 시간을 다시 쟀다 — 제품 어댑터(OpenAI 호환 `/v1`)로 `measure_regulation_llm.py` 를 돌렸고, GPU 를 끈 모델 변형은 Modelfile(`FROM qwen3:14b` · `PARAMETER num_gpu 0` [· `PARAMETER num_thread 16`])로 만들어 `/api/ps` 의 `size_vram = 0` 을 확인했다(`CUDA_VISIBLE_DEVICES=-1` 방식은 GPU 를 잡아 쓰지 않았다). 문서는 71건 중 60·61번 2건이라 **표본이 작다**. 이 PC = Ryzen 7 7800X3D 8코어(논리 16).
+
+| 문서당 시간(제한 시간 600초로 잼) | 기본 스레드 | `num_thread 16` |
+|---|---|---|
+| 후보마다 묻기(기본) | 126.1 · 130.4초(평균 128) | 104.5 · 102.7초(평균 104) |
+| 한 번에 고르기(`single`) | 78.8 · 75.4초(평균 77) | 70.3 · 59.3초(평균 65) |
+
+- **기본 제한 시간 60초에서는 아무것도 안 뜬다.** 한 번에 고르기를 제한 시간 60초(제품 기본)로 돌리니 60.0초에 포기하고 `llm_unavailable`(안 보임)이었다 — CPU 에서는 두 방식 모두 60초를 넘으므로 `REGULATION_LLM_TIMEOUT_S` 를 늘려야 뜨고(최대 600) 그만큼 검수자가 기다린다.
+- 후보마다 묻기는 호출 6개를 잇달아 부른 계산값 225초보다 짧다(126~130초) — 후보 호출들이 같은 문서 앞부분으로 시작해 서버가 읽기를 재사용해서다.
+- 문서 2건의 결과: 후보마다 묻기는 둘 다 「해당 없음」, 한 번에 고르기는 GOLD-B1-S2-005 에 제40조를 골랐다(정확도는 이 시험의 대상이 아니다).
+- 못 잰 것: 표본 2건 초과 · 고객사 운영 서버(16 vCPU·GPU 없음, 데스크톱 CPU 보다 느릴 것으로 보이나 재지 않았다). 자료 `.../llm_select/run_cpu_product_path.sh`·`cpu_run_*.json`(문서별 초)·`Modelfile.cpu{8,16}`.
+
+**함정 하나(Ollama).** Ollama 0.34.2 의 OpenAI 호환 endpoint(`/v1`)는 `think:false`·`chat_template_kwargs`·`/no_think` 를 모두 무시하고 Qwen3 의 추론을 돌린다(완성 토큰 247·추론 909자 — `max_tokens` 200 이면 추론에 다 쓰여 답이 빈 문자열, `finish_reason=length`). `reasoning_effort:"none"` 만 추론을 끈다(완성 토큰 60·추론 0자). 그래서 어댑터(`LocalOpenAIProvider`)가 `generate(..., no_reasoning=True)` 로 **요청한 호출(이 기능)에만** 이 값을 보낸다(Ollama 일 때만 — vLLM 은 「none」을 400 으로 거절할 수 있다). 이 값을 안 보내면 이 옵션이 매번 `llm_unavailable` 이 된다(처음 제품 경로 시험이 그랬다). 처음에는 어댑터 전체에 적용해 어댑터를 같이 쓰는 합성·골든 라벨링의 Ollama+Qwen3 요청까지 바뀌었는데, 독립 리뷰(§3.7)가 짚어 요청한 호출에만으로 좁혔다 — 다른 호출자의 요청은 종전과 같다.
+
+**한계·확인하지 못한 것.**
+- 판정자가 LLM 이다. 검수자 사람이 읽은 값이 아니다(파일럿에서 사람이 읽는다).
+- 시연 규정·합성 문서 기준이다. 문서 71건 중 55건이 주제와 문서 종류를 이어 붙인 템플릿이라 종류가 애매하고, 이 규정에 해당 조항이 없는 문서가 많아 **안 뜨는 것이 정상인 문서가 대부분**이다(제품 경로에서 규정이 뜬 문서 25%, 해당하는 규정이 뜬 문서 20%).
+- **해당 규정이 있는 문서를 일부 놓친다.** 어느 판에서든 해당으로 읽힌 문서 34건(하한) 중 20건에서 이 옵션(기본 방식)이 해당 항목을 못 냈다 — 조회 1위가 맞았는데 LLM 이 「없음」으로 보낸 것이 5건이다. 정밀도(78~83%)는 뜬 것만 본 값이고, 「해당 규정이 있는 문서를 몇 % 찾는가」의 참값은 모른다.
+- 문서 앞 1,500자만 본다 — 긴 문서의 뒷부분에 해당 내용이 있으면 놓친다. 후보는 조회 상위 5개다 — 조회가 상위 5개에 못 넣은 조항은 LLM 이 볼 수 없다.
+- 회원사 규정으로는 재지 않았다. 규정 형식·조항 수가 다르면 수치가 달라진다.
+- GPU 가 있는 서버를 전제한다. CPU 만 있는 서버는 검수 화면에서 바로 보여 주기에는 느리다 — 이 PC(Ryzen 7 7800X3D 8코어)에서 호출 1개 37.5초, 문서 1건은 제품 경로로 후보마다 묻기 126~130초 · 한 번에 고르기 75~79초(위 「시간이 어디에 쓰이나」·「GPU 없을 때 제품 경로 실측」). 작은 모델(2.4B·4B·8B·gemma3 12B)은 GPU 에서 잰 시험에서 「해당 안 됨」을 가려내지 못했고(위 표) CPU 속도는 재지 않았다.
+- 검수 화면 응답이 처음 열 때 몇 초 걸린다(평균 2.9초 · 중앙 3.0초 · p95 5.2초 — 최종 코드·유휴 PC 재측정, 「왜 이 등급인가?」를 펼칠 때 따로 읽는다. 캐시가 있으면 즉시). 관리자 미리보기(문서 최대 20건)는 이 옵션에서 약 1분(20 × 2.9초) 걸린다.
+- 문서 안의 지시문(프롬프트 주입)은 「어느 항을 고를지」만 흔들 수 있고, 화면에는 규정 원문만 나가며 등급·저장 데이터에는 영향이 없다.
+- 만든 것 — `regulation/llm_select.py`(프롬프트·답 읽기·동시 호출·문서 종류 확인) · `services/regulation_evidence_service.py`(`_find_with_llm`·캐시) · `regulation/index.py`(`rank_clauses`·`evidence_item`) · 설정 8개(`regulation_llm_*`) · 시험 `test_regulation_llm_select.py`·`test_regulation_service_llm.py`·`test_local_llm_provider.py`(어댑터) · 도구 `scripts/measure_regulation_llm.py`. 자료: `poc/reports/CLAUDE_REGULATION_RAG_20260925/sample_org/kure_v1_judgment_20260926/llm_select/`.
+- 독립 코드 리뷰(LLM 3명, 27건)와 그 처리는 §3.7 — 반출 게이트가 서버 주소를 안 봤던 것·호출 한 건이 몇 시간씩 스레드를 붙잡을 수 있던 것을 포함해 고친 것과 남긴 것을 적었다.
+
+## 3.7 독립 코드 리뷰와 그 처리 (2026-09-26 저녁)
+
+**왜.** 「더 보완할 건 없나」에 답하려고 만든 사람(설계 세션)이 아닌 독립 리뷰어 3명이 코드를 따로 읽었다 — 읽기 전용 하위 에이전트 **LLM** 3명(보안·반출 = Opus · 동시성·견고성 = Fable · 논리·시험 충분성 = Sonnet)이고 **사람 검수자가 아니다**. 각자 9·8·10건(합 27건, 두 명이 같은 것을 짚은 경우 4건 포함)을 냈다(`llm_select/review_R{1,2,3}.json`). **27건 중 21건을 고쳤고**(코드·시험·문서 — 심각(high) 3건 전부 포함) **6건은 설계·수용으로 그대로 둔다**(아래 「고치지 않고 문서·결정으로 둔 것」). 나는 지적마다 해당 코드를 직접 열어 확인한 뒤 고쳤고, 고친 곳마다 시험을 새로 쓰고 **고치기 전 코드로 되돌려 그 시험이 실패하는지**(변이 시험, `mutation_check.py`·`mutation_check_output.txt`) 확인했다 — 변이 28개 중 27개를 잡았고 1개(IPv4 매핑 주소 정규화)는 이 파이썬(3.11.9)이 이미 처리해 결과가 같다(다른 패치 버전을 위한 방어라 그대로 둔다). 고친 뒤 실제 LLM(qwen3:14b·Ollama)으로 같은 120건을 다시 돌리니 **두 방식 모두 뜬 항목·이유가 120/120건 같았고**(`llm_items_120_*_review.json`) `llm_unavailable` 은 0건, 문서당 시간도 그대로다(후보마다 묻기 평균 3.0초 · 한 번에 고르기 평균 1.1초).
+
+**고친 것**(코드 + 시험).
+| 지적(리뷰어) | 무엇이 문제였나 | 고침 |
+|---|---|---|
+| **반출 게이트가 서버 주소를 안 봤다**(R1 high · R3) | 공급자 **이름**(vllm·local_openai)만 로컬이면 통과 — `LOCAL_LLM_BASE_URL` 이 사외 주소여도 문서 앞 1,500자와 조항 원문이 밖으로 나간다 | `llm_select.endpoint_is_local`: 루프백·사설·링크 로컬·공유 주소 공간 IP 만 통과, 이름은 풀어 나온 주소가 **전부** 사내여야 통과(풀리지 않으면 막음, 5분 기억). 서비스가 어댑터의 `base_url` 을 확인해 아니면 `llm_not_local`, 기동 경고 |
+| **호출 한 건이 몇 시간씩 스레드를 붙잡을 수 있었다**(R2 high) | OpenAI SDK 기본(시간 초과 600초 · 재시도 2회) × 어댑터 재시도(3회 = 4번 시도) → 서버가 응답을 안 하면 호출 하나가 최악 약 7,200초, 검수자 한 명의 클릭 한 번이 공유 풀 6칸을 전부 잡아 이후 요청이 모두 시간 초과 | `LocalOpenAIProvider.limit_calls` — 이 기능의 인스턴스만 호출 한도 = 문서 마감(`REGULATION_LLM_TIMEOUT_S`), 재시도 없음. 다른 기능(합성·라벨링)의 인스턴스는 그대로 |
+| **마감을 넘긴 호출이 대기열에 남아 뒤 요청을 막았다**(R2 high · R3) | 마감(60초)이 지나도 아직 시작 안 한 후보 호출·종류 확인 호출을 취소하지 않았다(독립 리뷰 R3 재현: 작업자 1·호출 0.4초·마감 0.3초·후보 3 → 호출 3건이 그 뒤 모두 실행, 요청 5건이 헛호출 15건) | 어떤 길로 끝나도(`finally`) 아직 시작 안 한 호출을 취소, 한 번에 고르기도 시간 초과 시 취소 |
+| **일부만 실패한 결과가 1시간 굳었다**(R2 · R3) | 1위 후보 호출이 일시 오류로 빠진 채 2위가 「가장 직접적인 항」으로 캐시 | 실패가 하나라도 있으면 기억하지 않는다(다음에 다시 시도) |
+| **캐시 키가 문서 뒷부분·벡터·문턱을 안 봤다**(R3) | 프롬프트에는 앞 1,500자만 들어가지만 조회는 본문 6,000자를 본다 — 뒷부분만 바뀐 문서가 옛 결과를 받는다 | 키에 조회가 보는 본문 전체·문서 벡터·최소 유사도 문턱을 더함 |
+| **추론 끄기(`reasoning_effort=none`)가 다른 기능에도 적용됐다**(R3) | 어댑터를 같이 쓰는 합성·LLM 라벨러·판정의 Ollama+Qwen3 요청이 이 기능 때문에 바뀌었다(설계서 §3.5 「꺼져 있으면 아무것도 안 바뀐다」와 어긋남) | `generate(..., no_reasoning=True)` 로 **요청한 호출에만** 보낸다. 다른 호출자의 요청은 종전과 같다 |
+| `limit`>1 에서 다른 조항이 밀려났다(R3) | 같은 등급별 목록의 줄(C2·C3)을 합치기 전에 limit 로 잘랐다 | 합친 뒤에 센다 |
+| 잘린 답을 완결로 읽었다 · 빈 문서를 그대로 물었다(R3) | `["A1` 를 A1 로(A12 일 수 있다), `{"items": [` 를 「해당 없음」으로 캐시 · 본문이 빈 문서에도 아무 항이나 고를 수 있다 | 더 긴 기호의 앞부분이면 읽지 않고, 기호 없이 끊긴 답은 읽을 수 없는 답으로 본다 · 빈 문서는 묻지 않는다 |
+| 미리보기가 문서 20건 × 마감까지 걸릴 수 있었다(R1 · R2) | 순차 판정·문서마다 새 마감 | 전체 예산(마감의 2배)을 넘으면 남은 문서는 판정하지 않는다(GPU 20건 ≈ 1분이라 예산 안) |
+| 원본 저장 키와 읽기·삭제 키가 500자 넘는 파일명에서 달랐다(R1 low) | 501자 이상 파일명이면 색인이 영구 실패하고 원본이 저장소에 남는다 | 저장 키도 500자로 자른다 |
+| 규정 원본 암호화가 꺼진 배포를 알리지 않았다(R1 medium) | `regulations-raw` 를 암호화 버킷 목록에 더해도 `storage_encryption_enabled=false` 면 평문 저장 | 기동 경고(onprem-local·full-train 은 암호화 강제) |
+| **모델 컨텍스트를 넘으면 문서를 못 본 채 골랐다**(R2 low) | Ollama 는 모델을 **4,096토큰**으로 적재한다(0.34.2 `/api/ps` 실측 — 모델은 40,960 까지 된다). 한 번에 고르기는 후보의 항을 한꺼번에 싣는데 실제 규정(조항 최대 1,200자 × 후보 5개)이면 넘쳐 서버가 **앞부분(문서)** 을 잘라 넣는다 | 항 목록에 글자 예산(문서 1,500자일 때 2,600자, 넘는 항·후보는 뒤에서부터 뺀다 — 시연 71건은 최대 1,665자라 잰 수치 그대로)과 Ollama 프롬프트 5,600자 초과 시 호출하지 않는 확인(안 보임). 후보마다 묻기는 조항이 1,200자 이하로 나뉘어 안전 |
+| 실패 원인이 로그에 안 남았다(R2) | `RuntimeError` 만 찍혀 서버 문제를 못 찾는다 | 어댑터 오류 코드(APIConnectionError 등)까지 남긴다(문서 본문이 섞일 수 있는 메시지는 안 남김) |
+| **시험이 코드를 망가뜨려도 통과했다**(R3) | 한 번에 고르기 프롬프트가 등급을 물어도 · LLM 글이 제목에 붙어도 · 캐시 키 요소·TTL·상한·설정 전달·기본값을 바꿔도 시험이 통과 | 시험 53개 추가(`test_regulation_llm_select.py` +30 · `test_regulation_service_llm.py` +21 · `test_local_llm_provider.py` +2, 파라미터 포함)와 「LLM 글 누출」 시험을 표지 글자로 다시 만듦 · 변이 시험으로 확인 |
+| 문서·주석이 코드와 달랐다(R3) | 한 번에 고르기는 「항 전체」가 아니라 **80개까지**, 시간 초과 상한 600초는 동봉 프록시(nginx 300초)가 자른다, config 주석이 「LLM 을 쓰지 않는다」 | `.env.example`·INSTALL·config 주석 정정 |
+
+**고치지 않고 문서·결정으로 둔 것.**
+- **결과 캐시·동시 호출 상한이 API 프로세스마다 따로**(R2): 워커가 여럿이면 같은 문서가 워커마다 다른 판정을 보일 수 있다(온도 0 이어도 경계 문서는 실행마다 바뀐다 — §3.6). 폐쇄망 compose(airgap·prod)는 워커 1개(`WEB_CONCURRENCY` 기본 1)라 하나이고 `docker-compose.dual.yml` 은 3개(211 배포에 쓰던 스크립트는 1로 덮어썼다 — 211 은 2026-09-26 부터 안 쓴다), Dockerfile 단독 실행 기본은 4개다. 결과를 Redis 로 공유하는 것은 만들지 않았다.
+- **`LLM_PROVIDER=ollama`·`lm_studio` 는 localhost 고정**(R2): `LOCAL_LLM_BASE_URL` 을 무시한다. 다른 GPU 서버는 `vllm`(또는 local_openai)로 가리킨다 — 그러면 Ollama 전용 추론 끄기 요청이 안 나가므로 **원격 Ollama 서버는 이 옵션에서 지원하지 않는다**(vLLM 을 쓴다).
+- **vLLM 의 컨텍스트**는 서버 설정(`max_model_len`)이라 확인하지 못했다 — 위 글자 예산은 Ollama 기본(4,096토큰) 기준이다(프롬프트 길이 확인은 공급자 이름이 ollama 일 때만).
+- **reviewer 역할이 규정 목록·조항(표시 안 하는 조항 포함)을 읽는다**(R1 medium): 설계서 §2.8 의 결정이고 시험이 잠그고 있다 — 이 기능은 운영 검수 화면에만 있고, 외부 전문가의 블라인드 골든 검수와 같은 서버에서 켜는 배포가 생기면 다시 본다.
+- 프롬프트 주입으로 규정 **표시를 없앨** 수 있다(R1 low) — 화면에는 규정 원문만 나가고 등급·저장 데이터에는 닿지 않아 참고 표시가 빠지는 데서 그친다. 공유 API 키 감사의 actor 없음 · 표시 대상 0건 파일의 문장 상한 우회 · 종료 시 실행기 대기(호출 한도로 최악 60초) — 기존 동작이거나 실피해가 작아 그대로 둔다.
+- **못 한 것**: vLLM 에서 스키마 키워드(`uniqueItems`·`maxItems`)와 16토큰 절단 동작(이 PC 에 vLLM 이 없다) · 동봉 프록시가 실제 배포 경로에 있는지.
+
+**CI 와 같은 검사를 로컬에서 돌린 결과**(같은 날). ① 작업 트리에서 `alembic`·`test_alembic_drift_free` 는 **주 저장소의 설치본 `koipa`** 를 불러와 규정 표 3개를 「지워야 할 표」로 오탐했다 — `PYTHONPATH=src` 로 작업 트리의 코드를 쓰면 통과한다(`alembic check` 무드리프트 · 시험 2개 통과). ② `openapi_consistency.py --strict` 는 기능이 꺼진 기본에서 규정 경로 10개를 「구현 없음」으로 세어 8건이던 것을 18건으로 늘렸다 — training 라우터와 같은 방식으로 기능 플래그가 꺼진 동안은 제외하게 고쳤다(꺼짐 = 종전 8건 · 켬 = 71/71 일치). 남은 8건(dashboard·metrics-prom·synth·demo purge)은 기준 커밋에서도 있는 것이다. ③ 번들 dry-run 은 학습 분류기(`artifacts/`)가 작업 트리에 없어 이번에 못 돌렸다(`build_offline_bundle.py` 변경은 `.env` 템플릿 안내문 추가뿐).
+
+---
+
 # 부록
 
 ## A. 확인하지 못한 것 (착수 시 확인)
@@ -652,26 +920,32 @@ def find(doc_id, max_items):
 | ID | 내용 |
 |---|---|
 | U-01 | 표준용어집 파일이 저장소에 없다 — 표·칼럼 표준명 후보 전부 대조 필요, 영역 코드 목록·뜻을 적은 문서를 못 찾음 |
-| U-02 | 추출기가 쪽 경계를 주는지(머리글·꼬리말 반복 제거 방식). PDF 머리글·꼬리말 별도 처리는 못 찾음 |
-| U-03 | 문장 단위 임베딩 시간(KURE-v1) — 청크당 0.51초는 청크 기준 실측 |
+| U-02 | ✅ **해소(2026-09-26)** — 추출기는 쪽 경계를 주지 않는다(PDF 추출기가 쪽 머리글·쪽 번호를 본문 줄로 낸다). 분할기가 **반복 줄**(같은 줄 5회 이상, 숫자를 뺀 뒤 8자 이상)과 쪽 번호만 있는 줄을 버리고 쪽 경계 표시로 바꾼다(§2.4) — 쪽 머리글·쪽 번호가 있는 8쪽 이상 PDF 시험(`test_regulation_extract_formats.py`)으로 확인. 규칙상 5쪽 미만 PDF 는 반복 제거가 걸리지 않는다(시험하지 않았다) |
+| U-03 | ✅ **해소(2026-09-25)** — 문장·조항 임베딩은 건당 0.278초(CPU 8스레드), §2.10 |
 | U-04 | 등급별 목록 묶음의 일반화(라벨 이름 비고정) — 시험은 라벨 고정 |
-| U-05 | 검수 큐 항목이 `doc_id`를 싣는지 |
+| U-05 | ✅ **해소(2026-09-25)** — `GET /review-queue` 항목이 `doc_id`를 싣고 콘솔 검수 대기·확정 대기 행이 모두 쓴다. 다만 붙여넣은 본문 등 저장되지 않은 분류의 `doc_id` 는 UUID 가 아니라 화면이 조회하지 않는다 |
 | U-06 | ICD의 `source_type` 값 목록(D-06 판정에 필요) |
 | U-07 | 여러 규정 동시 활성 시의 조회 품질(시험은 규정 1개) |
-| U-08 | 표시 근거 조항의 등급이 문서 정답 등급과 같은지(앵커링 위험, R-05) |
+| U-08 | 표시 근거 조항의 등급이 문서 정답 등급과 같은지(앵커링 위험, R-05) — **노출은 2026-09-26 에 쟀다**(§3.4·R-05: 오도 18건 중 14건이 문서와 다른 등급을 말함). **검수자가 표시를 보고 등급을 실제로 바꾸는지(행동 효과)는 못 쟀다** — 검수자 사람이 필요하다 |
 | U-09 | HWP·표 위주 규정에서의 분할 품질(시험 규정은 서술형·PDF/마크다운) |
 | U-10 | 회원사 규정으로는 어떤 수치도 재지 않았다 |
+| U-11 | 조항 종류 태깅 규칙을 **두 번째 규정으로 재검증하지 못했다**(W-03). 두 번째 규정(공공 「기록물관리 지침」)은 질문형 번호 항목 문서라 제목 규칙이 맞지 않는다 — 분할기만 그 규정으로 시험해 결함 1건을 찾아 고쳤다(§2.4). 태깅은 여전히 시연 규정에 맞춰 만든 규칙이다 |
+| U-12 | 문장 상한(3,000)에 대한 실제 규정 크기 — 「기록물관리 지침」(25만 자)은 분할 후 표시 대상 조항 310개의 문장이 **3,939개**라 등록이 상한으로 실패한다(나누어 올려야 한다 — 서비스 코드의 판정식으로 센 값이고, 이 규정을 실제로 올려 보지는 않았다). 상한이 적절한지는 회원사 규정으로 정해야 한다 |
 
 ## B. 시험 산출물 (재현 경로)
 
 | 무엇 | 경로 |
 |---|---|
-| 규정 텍스트 추출·조각·조회 | `poc/scripts/measure_regulation_evidence.py` (`--format pages|article`) |
+| 규정 텍스트 추출·조각·조회 | `poc/scripts/measure_regulation_evidence.py` (`--format pages` 또는 `--format article`) |
 | LLM 요약 시험 | `poc/scripts/measure_regulation_summary.py` |
 | 추출식 표시 시험 | `poc/scripts/measure_regulation_extract.py` (`--modes S1,S2,S1c`) |
 | 설계 가정 확인 | `poc/reports/CLAUDE_REGULATION_RAG_20260925/design_checks.py`, `design_checks2.py` |
 | 시연용 규정 | `poc/reports/CLAUDE_REGULATION_RAG_20260925/sample_org_regulation.md` |
 | 정답 조항 집합 | `.../sample_org/labels_71.json` |
+| 운영 엔진 적중·속도·화면에 보일 1건(+점수) | `poc/scripts/measure_regulation_runtime.py --dump-items` |
+| 판정 3명(전부 LLM) 자료·집계 | 시트 `.../sample_org/kure_v1_judgment_20260926/sheet_71.txt` · 판정 `author.json`·`A.json`·`B.json` · 집계 도구 `poc/scripts/analyze_regulation_judgments.py` · 결과 `analysis_output.txt` |
+| 교차 인코더 시험(막힌 길) | `.../kure_v1_judgment_20260926/rerank_probe.py` (결과 `rerank_probe_scores.json`) |
+| 「남은 작업은?」 세기 | `poc/reports/CLAUDE_REGULATION_RAG_20260925/count_remaining_work.py` |
 | 매핑표 채움 결과 | `.../out_A_mapping_fill.md`, `.../out_A2_sample_org_mapping_fill.md` |
 
 ## C. 이 설계가 기대는 기존 코드(조사 결과, 착수 시 재확인)
@@ -690,4 +964,4 @@ def find(doc_id, max_items):
 | 표준명 | `db/standard_names.py:34-61,340-352`, `tests/test_standard_names.py` |
 | 검수 화면 | `api/static/admin.html:1726-1864`(검토 대기·근거 패널), `api/confirm.py:133-148` |
 | 콘솔 시험 | `tests/e2e_console/`, `tests/test_e2e_console_api_contract.py:32-38,263-329` |
-| ICD 시험 | `tests/test_openapi_contract_matches_routes.py:91-98`, `tests/test_kl_openapi_schema_matches_code.py:129-156` |
+| ICD 시험 | `tests/test_openapi_contract_matches_routes.py:91-98`, `tests/test_kl_contract.py`(kl 오퍼레이션 5개 잠금) |
