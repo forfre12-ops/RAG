@@ -36,6 +36,24 @@ def test_korean_grade_expressions_are_caught():
         assert _exposes_grade_token(text), text
 
 
+def test_security_grade_phrases_are_caught():
+    """등급 코드나 "1급 비밀" 없이 등급을 말하는 표기 — 2026-09-26 에 20종 밖이라 통과하던 것.
+
+    "(보안 등급: 최고 기밀)" 제목이 게이트를 그대로 지나 검수 후보에 들어갔다(5문장 중 3개 통과).
+    합성 코퍼스 11폴더 31,435건에서 실제로 나오는 문장이다.
+    """
+    for text in (
+        "Root CA 개인키 보관 및 긴급 복구 절차 (보안 등급: 최고 기밀)",
+        "보안 등급을 정리하였습니다.",
+        "이 문서는 최고 보안 수준으로 관리됩니다.",
+        "핵심 원천기술의 외부 유출 방지를 위해 보안등급을 상향 조정했다.",
+        "설계도는 최고기밀로 취급한다.",
+        "1급 비밀 자료입니다.",
+        "S1 등급입니다.",
+    ):
+        assert _exposes_grade_token(text), text
+
+
 def test_english_grade_expressions_are_caught():
     for text in (
         "This document is material for [Company A] classified as Level 1 Secret.",
@@ -65,6 +83,10 @@ def test_ordinary_business_text_passes():
         "원가 구조와 수율 개선 방안을 정리한 내부 검토 자료이다.",
         "협력사 단가 협상 경과와 후속 조치를 기록한다.",
         "2024년 3분기 설비 투자 계획과 집행 실적을 대조한다.",
+        # 등급을 말하지 않는 보안 낱말 — 게이트를 넓히면서 같이 막히면 안 된다.
+        "정보 보안 점검 결과와 후속 조치를 정리한다.",
+        "보안 수준을 높이기 위한 교육 계획을 수립했다.",
+        "접근 권한을 재정비하고 보호 대책을 마련했다.",
     ):
         assert not _exposes_grade_token(text), text
 
@@ -79,6 +101,19 @@ def test_gate_vocabulary_comes_from_the_generator():
     assert "대외비" in FORBIDDEN_GRADE_TERMS
     for term in FORBIDDEN_GRADE_TERMS:
         assert _exposes_grade_token("앞말 %s 뒷말" % term), term
+
+
+def test_new_gate_terms_are_also_forbidden_in_the_prompts():
+    """게이트만 넓히고 프롬프트를 두면 생성기는 계속 쓰고 게이트가 계속 걸러낸다 — 처음부터 안 쓰게 한다."""
+    from koipa.modules.m1_synthesis.generator import (
+        CRITIQUE_SYSTEM_PROMPT,
+        OUTLINE_SYSTEM_PROMPT,
+        SYSTEM_PROMPT,
+    )
+
+    for prompt in (SYSTEM_PROMPT, OUTLINE_SYSTEM_PROMPT, CRITIQUE_SYSTEM_PROMPT):
+        for phrase in ("최고 기밀", "최고 보안 수준", "보안 등급"):
+            assert phrase in prompt, phrase
 
 
 def test_batch_flags_exposed_documents_without_dropping_them():
