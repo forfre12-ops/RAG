@@ -331,11 +331,11 @@ class ModelVersion(Base):
     metrics: Mapped[dict] = mapped_column("idct_info_cn", _JSON_PORTABLE, nullable=False, default=dict, server_default=text("'{}'"))
     model_uri: Mapped[str | None] = mapped_column("mdl_strg_path_nm", String(500))
     is_active: Mapped[bool] = mapped_column("actvtn_yn", Boolean, default=False, server_default=text("false"), nullable=True)
-    # [2026-09] MariaDB 는 부분 인덱스(WHERE)가 없다. "활성은 최대 1개" 불변식을 두 dialect
-    # 모두에서 같은 방식으로 지키도록, is_active 대신 파생 칼럼에 유니크를 건다 — 활성일 때만
-    # 1, 아니면 NULL. UNIQUE 인덱스는 NULL 을 여러 개 허용하므로 비활성 행은 몇 개든 공존하고
-    # 활성 행만 하나로 묶인다. Postgres·MariaDB 양쪽에서 GENERATED ALWAYS AS ... STORED 로
-    # 동일하게 동작함을 실측 확인했다(둘 다 두 번째 활성 삽입에서 IntegrityError).
+    # [2026-09] "활성은 최대 1개" 불변식을 부분 인덱스(WHERE) 대신 is_active 의 파생 칼럼에 건
+    # 유니크로 지킨다 — 활성일 때만 1, 아니면 NULL. UNIQUE 인덱스는 NULL 을 여러 개 허용하므로
+    # 비활성 행은 몇 개든 공존하고 활성 행만 하나로 묶인다. GENERATED ALWAYS AS ... STORED 로
+    # 두 번째 활성 삽입에서 IntegrityError 가 나는 것을 실측 확인했다. (MariaDB 이식용으로 넣은
+    # 방식이며 PostgreSQL 로 되돌린 뒤에도 그대로 둔다 — 동작이 같다.)
     active_key: Mapped[int | None] = mapped_column(
         "actvtn_sn", SmallInteger, Computed("CASE WHEN actvtn_yn THEN 1 END", persisted=True)
     )
@@ -544,9 +544,8 @@ class AuditLog(Base):
         # [2026-09-05] 시간축 선두 인덱스. 감사 체인 검증(verify_chain)은
         # `WHERE occurred_at BETWEEN .. ORDER BY occurred_at, audit_id` 로 읽는데,
         # PK 는 (audit_id, occurred_at) 이고 나머지 인덱스는 occurred_at 이 두 번째라
-        # 날짜 범위만으로는 어느 것도 못 탄다. PostgreSQL 에서는 파티션 프루닝이 그
-        # 자리를 받고 있었으나 MariaDB 는 파티션을 쓰지 않기로 했다(2026-09-05) —
-        # 프루닝이 없어진 자리를 이 인덱스가 받는다. 보존기간 삭제도 이걸 탄다.
+        # 날짜 범위만으로는 어느 것도 못 탄다. PostgreSQL 은 파티션 프루닝이 범위를 좁혀 주지만
+        # 파티션 안에서는 이 인덱스가 필요하다. 보존기간 삭제도 이걸 탄다.
         Index("idx_audit_occurred", "ocrn_dt", "adt_sn"),
         Index("idx_audit_actor", "actr_id", desc("ocrn_dt")),
         Index("idx_audit_target", "trgt_type_cd", "trgt_id"),
@@ -562,10 +561,9 @@ class AdvisoryLock(Base):
     """전역 직렬화 잠금 전용 표 — 행 하나가 논리 잠금 하나다(db/locks.py).
 
     [2026-09-05] 감사 체인·모델 활성 전환은 `pg_advisory_xact_lock` 으로만 잠겨 있어
-    MariaDB 에서 조용히 꺼졌다. MariaDB 의 GET_LOCK 은 커넥션 단위라 PostgreSQL 의
-    트랜잭션 단위 수명을 흉내 낼 수 없었다(실측 근거는 db/locks.py 머리말).
-    `SELECT ... FOR UPDATE` 행 잠금은 두 dialect 모두 트랜잭션 단위라 호출부가 이미
-    전제하던 수명(commit/rollback 에 자동 해제)과 정확히 맞는다.
+    PostgreSQL 이 아닌 dialect 에서 조용히 꺼졌다(실측 근거는 db/locks.py 머리말).
+    `SELECT ... FOR UPDATE` 행 잠금은 트랜잭션 단위라 호출부가 이미 전제하던 수명
+    (commit/rollback 에 자동 해제)과 정확히 맞는다.
 
     데이터를 담지 않는다 — 행의 존재 자체가 잠금 지점이다. 행은 처음 쓸 때 자동 생성된다.
     """

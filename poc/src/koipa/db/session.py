@@ -39,8 +39,8 @@ def _engine_connect_args() -> dict:
 
     DB가 일시 불가일 때 GradeRegistry·FactorRegistry·세션이 연결 대기로 워커 부팅·
     추론기 생성을 무한 블록하는 것을 막는다 — 타임아웃 후 빠르게 예외 → 각 호출부의
-    try/except가 폴백 처리한다. connect_timeout(초)은 네트워크 dialect(PostgreSQL·
-    MariaDB/MySQL) 드라이버 URL에만 주입한다(SQLite 등에는 미적용).
+    try/except가 폴백 처리한다. connect_timeout(초)은 네트워크 dialect(PostgreSQL)
+    드라이버 URL에만 주입한다(SQLite 등에는 미적용).
     """
     url = settings.database_url or ""
     timeout = int(getattr(settings, "db_connect_timeout", 5) or 0)

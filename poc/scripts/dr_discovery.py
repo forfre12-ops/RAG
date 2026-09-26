@@ -70,10 +70,8 @@ def group_stacks(
     반환: {project: {"postgres": <name>, "storage": <name>, "engine": <엔진명>}} —
     각 스택에 DB 와 storage(worker 우선, 없으면 api) 컨테이너가 모두 있을 때만 포함.
 
-    [2026-09-05] DB 서비스로 `postgres` 뿐 아니라 `mariadb` 도 본다. 종전에는 postgres
-    만 찾아, MariaDB 스택은 백업 대상 목록에서 **통째로 빠졌다**(오류가 아니라 조용한
-    누락이라 더 나쁘다). 키 이름 "postgres" 는 호출부 호환으로 유지하고, 어느 엔진인지는
-    "engine" 으로 함께 싣는다.
+    키 이름 "postgres" 는 호출부 호환으로 유지하고, 어느 엔진인지는 "engine" 으로 함께 싣는다
+    (지금은 postgresql 하나다 — 2026-09-09 MariaDB 폐기).
     """
     containers = list_koipa_containers() if containers is None else containers
     by_project: dict[str, dict[str, list[str]]] = {}
@@ -85,12 +83,7 @@ def group_stacks(
         storage = svcs.get("worker") or svcs.get("api") or []
         if not storage:
             continue
-        # 한 스택에 둘이 함께 있으면 고를 수 없다 — 추측하지 않고 건너뛴다.
-        pg, maria = svcs.get("postgres", []), svcs.get("mariadb", [])
-        if pg and maria:
-            continue
+        pg = svcs.get("postgres", [])
         if pg:
             stacks[project] = {"postgres": pg[0], "storage": storage[0], "engine": "postgresql"}
-        elif maria:
-            stacks[project] = {"postgres": maria[0], "storage": storage[0], "engine": "mariadb"}
     return stacks

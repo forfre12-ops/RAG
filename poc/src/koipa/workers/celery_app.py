@@ -174,7 +174,7 @@ celery_app.conf.beat_schedule = {
         "kwargs": {"months_ahead": 3},
     },
     # 보존기간 삭제 — 매일 02:40(파티션 롤오버 30분 뒤). 기본 OFF 라 켜기 전엔 no-op.
-    # 파티션을 쓰지 않는 배포에서 감사로그·LLM 사용량이 무한히 자라는 것을 막는다.
+    # 오래된 파티션을 떼는 코드가 없어 감사로그·LLM 사용량이 무한히 자라는 것을 막는다.
     "retention-purge-daily": {
         "task": "koipa.retention_purge_tick",
         "schedule": crontab(minute=40, hour=2),

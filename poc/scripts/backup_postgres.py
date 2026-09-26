@@ -1,12 +1,11 @@
 """DB 일별 백업 → 로컬FS `backups/pg/` (선택: 두 번째 매체 / MinIO).
 
-[2026-09-05] PostgreSQL 전용이던 것을 **PostgreSQL·MariaDB 양쪽**으로 넓혔다. 종전에는
-pg_dump 를 직접 불러 MariaDB 배포에서 백업이 아예 돌지 않았다. 엔진 판정과 명령 생성은
-scripts/db_engine.py 가 맡는다(--engine 으로 명시 가능·못 정하면 추측하지 않고 실패).
-파일명은 그대로 둔다 — 운영 런북·cron·내부 문서가 이 이름으로 참조한다.
+엔진 판정과 명령 생성은 scripts/db_engine.py 가 맡는다(--engine 으로 명시 가능·못 정하면
+추측하지 않고 실패 — 지금은 postgresql 하나). 파일명은 그대로 둔다 — 운영 런북·cron·내부
+문서가 이 이름으로 참조한다.
 
-덤프 형식이 엔진마다 다르다: PostgreSQL custom(*.dump) · MariaDB SQL 텍스트(*.sql).
-확장자가 갈려 있어 잘못된 엔진에 잘못된 덤프를 밀어 넣는 사고를 목록에서 먼저 막는다.
+덤프 형식은 PostgreSQL custom(*.dump)이다. 확장자로 엔진을 가려 잘못된 엔진에 잘못된 덤프를
+밀어 넣는 사고를 목록에서 먼저 막는다.
 
 설계:
 - 덤프는 docker exec 로 실행 (호스트에 클라이언트 설치 불요)
@@ -61,7 +60,7 @@ def run_pg_dump(
     engine=None,
     password: str | None = None,
 ) -> Path:
-    """docker exec 로 덤프 → 호스트 파일. PostgreSQL·MariaDB 양쪽.
+    """docker exec 로 덤프 → 호스트 파일. PostgreSQL.
 
     이름은 하위호환으로 유지한다(backup_dr.py 가 bp.run_pg_dump 로 부른다).
     engine 미지정이면 db_engine.detect_engine() 이 정한다.

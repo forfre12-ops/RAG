@@ -34,11 +34,11 @@ logger = logging.getLogger(__name__)
 
 
 def _advisory_xact_lock(db, _key=None) -> None:
-    """모델 활성 전환 직렬화 — 트랜잭션 단위 잠금(PostgreSQL·MariaDB 동일).
+    """모델 활성 전환 직렬화 — 트랜잭션 단위 잠금(전용 표의 행 잠금, db/locks.py).
 
-    [2026-09-05] 종전에는 pg_advisory_xact_lock 을 쏘고 예외를 흡수했다 — MariaDB 에서
-    **조용히 열려** 두 재학습이 동시에 활성을 다툴 수 있었다. db/locks.py 가 두 dialect 를
-    같게 만든다. 못 얻어도 진행한다(모델 등록 자체를 막는 것이 더 큰 사고) — 경고가 남는다.
+    [2026-09-05] 종전에는 pg_advisory_xact_lock 을 쏘고 예외를 흡수했다 — PostgreSQL 이 아닌
+    dialect 에서 **조용히 열려** 두 재학습이 동시에 활성을 다툴 수 있었다. 지금은 dialect 와
+    무관하게 행 잠금을 건다. 못 얻어도 진행한다(모델 등록 자체를 막는 것이 더 큰 사고) — 경고가 남는다.
 
     _key 는 옛 호출부 호환용이며 쓰이지 않는다(잠금 이름은 db/locks.MODEL_ACTIVATION).
     """

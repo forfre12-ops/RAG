@@ -293,13 +293,13 @@ def verify_chain(
 
 
 def _advisory_xact_lock(db) -> None:
-    """전역 audit 체인 직렬화 — 트랜잭션 단위 잠금 획득(PostgreSQL·MariaDB 동일).
+    """전역 audit 체인 직렬화 — 트랜잭션 단위 잠금 획득(전용 표의 행 잠금, db/locks.py).
 
     같은 잠금 아래에서 prev-read+insert 를 수행하면 동시 요청이 같은 prev 를 읽어 체인이
     분기(fork)하는 race 를 막는다. 잠금은 트랜잭션 종료(commit/rollback)에 자동 해제된다.
 
-    [2026-09-05] 종전에는 `dialect == "postgresql"` 일 때만 잠갔다 — MariaDB 에서
-    **조용히 열리는** 상태였다. db/locks.py 가 두 dialect 를 같게 만든다.
+    [2026-09-05] 종전에는 `dialect == "postgresql"` 일 때만 잠갔다 — 다른 dialect 에서
+    **조용히 열리는** 상태였다. 지금은 dialect 와 무관하게 db/locks.py 의 행 잠금을 건다.
     못 얻어도 진행한다(감사 기록 자체를 막는 것이 더 큰 사고) — 대신 경고가 남는다.
     """
     from koipa.db.locks import AUDIT_CHAIN, advisory_xact_lock  # noqa: PLC0415
@@ -320,7 +320,6 @@ def last_hash_in_session(db) -> str:
     어긋난다. 그 상태로 occurred_at 순 마지막 행을 prev 로 고르면 **잠금이 제대로 걸려도
     체인이 분기한다**(24건 동시 삽입에서 6건 끊김). audit_id 는 INSERT 시점에 매겨지고
     그 INSERT 는 잠금 안에서 일어나므로 삽입 순서와 정확히 같다.
-    MariaDB 의 NOW() 는 문장 시작 시각이라 원래 어긋나지 않았다 — dialect 차이였다.
 
     tenant 제거: 격리는 KL 포털 전담 — 전역 단일 체인.
     """

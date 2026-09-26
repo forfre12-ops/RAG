@@ -1566,8 +1566,7 @@ def s14_store_dr(ctx: ScenarioContext) -> None:
 
     docker_bin = _os.environ.get("PSH_S14_DOCKER_BIN", "docker")
     # [2026-09-05] 기본 컨테이너를 **설정에서 유도한다**. 종전에는 koipa-jjw-postgres-1 이
-    # 박혀 있어 DB 를 바꿔도 안 따라왔다 — MariaDB 로 옮긴 뒤에도 PostgreSQL 을 재고
-    # "DR 을 확인했다"고 보고할 수 있는 모양이었다.
+    # 박혀 있어 DB 를 바꿔도 안 따라왔다.
     #
     # ⚠ 어느 DB 를 재야 하는지(폐쇄망 번들의 DB 결정)는 여기서 정하지 않는다. 지금 도는
     #   DATABASE_URL 이 가리키는 쪽을 잰다. 그것이 "이 배포의 DR"이다.

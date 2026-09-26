@@ -100,7 +100,7 @@ class AvailableResources:
         svc = env.services
         return cls(
             # pg 라는 이름은 KPI 정의(requires="pg")와의 호환으로 유지한다 —
-            # 재는 대상은 설정된 DB 다(MariaDB 또는 PostgreSQL).
+            # 재는 대상은 설정된 DB 다(PostgreSQL).
             pg=svc.db == "UP",
             # es·minio 는 쓰지 않는 백엔드라 재지 않는다. 요구하는 KPI 도 없다.
             es=False,

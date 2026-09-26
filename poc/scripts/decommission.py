@@ -50,7 +50,7 @@ force_utf8_stdio()
 
 _POC = Path(__file__).resolve().parents[1]
 
-# 배포가 만드는 named volume. docker-compose.airgap.yml + mariadb 오버레이 기준.
+# 배포가 만드는 named volume. docker-compose.airgap.yml 기준.
 # 볼륨 이름은 compose 가 `<프로젝트>_<이름>` 으로 만든다.
 _VOLUMES = (
     ("pgdata", "PostgreSQL - 문서 메타·분류 이력·감사 로그·벡터(pgvector)"),

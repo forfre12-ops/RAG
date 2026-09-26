@@ -3,9 +3,8 @@
 dr_restore_check.py(백업 recency/인프라 readiness 점검)와 역할이 다르다: 이 스크립트는
 **실제 복원을 수행**한다. RTO 4h 드릴(dr_drill.py)의 restore_* 단계가 호출한다.
 
-[2026-09-05] PostgreSQL 전용이던 것을 **PostgreSQL·MariaDB 양쪽**으로 넓혔다. 엔진 판정과
-명령 생성은 scripts/db_engine.py 가 맡는다(--engine 으로 명시 가능). 파일명·CLI 는 그대로
-둔다 — 운영 런북·dr_drill 이 이 이름으로 부른다.
+엔진 판정과 명령 생성은 scripts/db_engine.py 가 맡는다(--engine 으로 명시 가능 — 지금은
+postgresql 하나). 파일명·CLI 는 그대로 둔다 — 운영 런북·dr_drill 이 이 이름으로 부른다.
 
 fail-closed 원칙(안전하게 틀리고 명확히 멈춘다):
   - dump 부재 / 복구 도구 미탑재 / 컨테이너 미가동 / 복원 실패 → 항상 non-zero.
@@ -18,8 +17,8 @@ fail-closed 원칙(안전하게 틀리고 명확히 멈춘다):
 
 대상(--target):
   postgres : backups/pg 의 최신 덤프를 docker exec 로 복원(--target 이름은 하위호환).
-             PostgreSQL `*.dump`(custom, pg_restore --clean) · MariaDB `*.sql`(mariadb).
-             확장자가 엔진을 가르므로 같은 폴더에 섞여 있어도 자기 것만 집는다.
+             PostgreSQL `*.dump`(custom, pg_restore --clean).
+             확장자가 엔진을 가르므로 같은 폴더에 다른 형식이 섞여 있어도 자기 것만 집는다.
   storage  : backup_storage.py 가 만든 `backups/storage/storage-*.tar.gz`(최신)를 storage 경로로
              전개 복원(아카이브 없으면 평문 디렉터리 미러도 백-호환). MinIO 미사용 — 로컬FS 결정.
              주의: 원문은 at-rest 암호문 그대로라 STORAGE_ENCRYPTION_KEY 를 별도 보관해야 평문 복원.
@@ -60,8 +59,8 @@ _STAGING_PG_CONTAINER = "koipa-dr-postgres-1"
 def _latest_dump(pg_dir: Path, suffix: str = ".dump") -> Path | None:
     """backup_postgres.py 산출물 중 최신 파일.
 
-    확장자가 엔진을 가른다(PostgreSQL `.dump` custom · MariaDB `.sql` 텍스트).
-    같은 폴더에 둘이 섞여 있어도 **자기 엔진 것만** 집는다 — 잘못된 엔진에 잘못된
+    확장자가 엔진을 가른다(PostgreSQL `.dump` custom).
+    같은 폴더에 다른 형식이 섞여 있어도 **자기 엔진 것만** 집는다 — 잘못된 엔진에 잘못된
     덤프를 밀어 넣으면 복구가 아니라 파괴다(2026-09-05).
     """
     if not pg_dir.exists():
@@ -101,7 +100,7 @@ def restore_postgres(
     *, pg_dir: Path, container: str, db: str, user: str, dry_run: bool,
     engine=None, password: str | None = None,
 ) -> int:
-    """덤프를 실제로 복원한다. PostgreSQL·MariaDB 양쪽.
+    """덤프를 실제로 복원한다. PostgreSQL.
 
     이름은 하위호환으로 유지한다(dr_drill.py·runbook 이 이 이름으로 부른다).
     """
@@ -234,7 +233,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--target-dir", type=Path, default=Path(".storage"),
                    help="storage 복원 대상 경로")
     p.add_argument("--engine", default=None,
-                   help="postgresql | mariadb (미지정 시 DATABASE_URL·실행 컨테이너로 판정)")
+                   help="postgresql (미지정 시 DATABASE_URL·실행 컨테이너로 판정)")
     p.add_argument("--db", default="koipa")
     p.add_argument("--user", default="koipa")
     p.add_argument("--container", default=None,

@@ -253,7 +253,7 @@ def main() -> int:
                     continue
                 if abs(float(got) - float(T[key])) > 1e-9:
                     findings.append((rel, s[:m.start()].count("\n") + 1, name, got, T[key]))
-        # [2026-09-08] head 는 **여럿일 수 있다**(PostgreSQL 계열 · MariaDB 계열이 독립 계보).
+        # [2026-09-08] head 는 **여럿일 수 있다**(계열이 갈릴 때 — 지금은 postgres 하나).
         # 참값을 '|' 로 이어 붙여 두고 문자열 통째로 비교하면, 문서가 그중 하나를 정확히
         # 적어도 어긋남으로 잡힌다. 집합으로 나눠 대조한다.
         _heads = {h.strip() for h in str(T["alembic_head"]).split("|") if h.strip()}

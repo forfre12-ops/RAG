@@ -88,7 +88,7 @@ if str(_HERE) not in sys.path:
 def _check_postgres() -> bool:
     """DB 가용성 — 판정은 _pg_probe 한 곳에만 둔다(같은 검사를 복제하지 않는다).
 
-    PostgreSQL·MariaDB 양쪽을 본다(함수 이름은 호출부 호환으로 유지).
+    (함수 이름은 호출부 호환으로 유지한다.)
     """
     from _pg_probe import postgres_available
 
@@ -111,8 +111,8 @@ def pytest_collection_modifyitems(config, items):
             markers = [m.name for m in item.iter_markers()]
             if "fullstack" in markers:
                 # [2026-09-05] 메시지에 실제 엔드포인트를 싣는다. "postgres not available"
-                # 만 뜨면 MariaDB 기본값에서 DB 가 떠 있는데도 왜 건너뛰는지 알 수 없다
-                # (실측: 그 상태로 fullstack 52건이 조용히 skip 됐다).
+                # 만 뜨면 DB 가 떠 있는데도 왜 건너뛰는지 알 수 없다
+                # (실측: 기본 DB 를 바꿨을 때 fullstack 52건이 조용히 skip 됐다).
                 from _pg_probe import pg_endpoint  # noqa: PLC0415
 
                 _h, _p = pg_endpoint()

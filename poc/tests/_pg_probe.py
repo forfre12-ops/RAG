@@ -27,11 +27,11 @@ from urllib.parse import urlparse
 
 DEFAULT_HOST = "localhost"
 # dialect 별 기본 포트 — URL 에 포트가 없을 때만 쓴다.
-_DEFAULT_PORT = {"postgresql": 5432, "postgres": 5432, "mariadb": 3306, "mysql": 3306}
+_DEFAULT_PORT = {"postgresql": 5432, "postgres": 5432}
 _FALLBACK_PORT = 5432
 
 # 드라이버 접미사를 떼야 urlparse 가 스킴을 읽는다.
-_DRIVER_SUFFIXES = ("+psycopg", "+asyncpg", "+psycopg2", "+pymysql", "+mysqldb", "+asyncmy")
+_DRIVER_SUFFIXES = ("+psycopg", "+asyncpg", "+psycopg2")
 
 
 def _configured_url() -> str:
@@ -67,7 +67,7 @@ def pg_endpoint() -> tuple[str, int]:
 def postgres_available(timeout: float = 0.5) -> bool:
     """접속 가능하면 True. 판정 실패는 '없음'으로 본다(시험을 막지 않는다).
 
-    이름은 호출부 호환으로 유지한다 — 실제로는 PostgreSQL·MariaDB 양쪽을 본다.
+    이름은 호출부 호환으로 유지한다.
     """
     host, port = pg_endpoint()
     try:

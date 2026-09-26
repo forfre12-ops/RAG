@@ -59,8 +59,7 @@ def plan_targets(stacks: dict[str, dict[str, str]], backups_root: Path) -> list[
         targets.append({
             "project": project,
             "pg_container": names["postgres"],
-            # [2026-09-05] 스택마다 DB 엔진이 다를 수 있다(PostgreSQL·MariaDB).
-            # dr_discovery 가 실어 준 값을 그대로 백업 명령에 넘긴다.
+            # dr_discovery 가 실어 준 엔진 값을 그대로 백업 명령에 넘긴다(지금은 postgresql).
             "engine": names.get("engine", "postgresql"),
             "storage_container": names["storage"],
             "pg_dir": pg_dir,

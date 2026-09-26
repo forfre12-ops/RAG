@@ -927,7 +927,7 @@ def ensure_partitions_tick(months_ahead: int = 3) -> dict:
 def retention_purge_tick() -> dict:
     """운영 로그 보존기간 삭제 — beat 가 매일 호출. 기본 OFF(설정으로 켠다).
 
-    파티션을 쓰지 않기로 하면서(2026-09-05) 오래된 감사로그·LLM 사용량을 지우는 자리가
+    오래된 파티션을 떼는 코드가 없어(2026-09-05) 오래된 감사로그·LLM 사용량을 지우는 자리가
     비었다. services/retention.purge_expired 가 월 단위로 끊어 앞에서부터 연속 삭제한다.
 
     status='disabled' 면 아무것도 안 한다 — 그것이 기본값이다(감사 증빙 보호).
