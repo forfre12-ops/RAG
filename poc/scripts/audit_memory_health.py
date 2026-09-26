@@ -213,8 +213,9 @@ def main() -> int:
     # ── I. 복사용 명령 블록이 든 위험 ────────────────────────────────
     # 서술은 고치면서 복사용 명령은 그대로 두기 쉽다 — 주소·compose 파일이 그렇게 낡는다.
     print("== I. 코드 블록 안의 옛 서버 주소 / 죽은 파일 ==")
-    # 211.233.204.32 는 2026-09-26 사용자 지시("211은 이제 안 쓸 거야")로 더했다 — 그 주소가 든 복사용 명령은 머리말에 「대상 아님」 표시가 있어야 한다.
-    DEAD_HOSTS = ["223.130.156.134", "182.212.163.182", "211.233.204.32"]
+    # 대상이 아닌 서버 주소 → 표지에서 그 서버를 짚는 앞자리. 211.233.204.32 는 2026-09-26 사용자 지시("211은 이제 안 쓸 거야")로 더했다.
+    # 표지는 **그 서버를 짚는 줄**이어야 한다 — 낱말이 머리말 어디에든 있으면 통과시켰더니, 223·182 를 가리키는 표지로 211 명령이 통과했다(9/26 실측).
+    DEAD_HOSTS = {"223.130.156.134": "223", "182.212.163.182": "182", "211.233.204.32": "211"}
     BANNER = ["대상 아님", "대상이 아니다", "그대로 돌리지 말", "옛 서버", "이력"]
     risky = []
     for f in files:
@@ -223,12 +224,14 @@ def main() -> int:
         hosts = sorted({h for h in DEAD_HOSTS if h in joined})
         if not hosts:
             continue
-        head = bodies[f][:1600]
-        if any(b in head for b in BANNER):
+        head_lines = bodies[f][:1600].splitlines()
+        bare = [h for h in hosts
+                if not any(DEAD_HOSTS[h] in ln and any(b in ln for b in BANNER) for ln in head_lines)]
+        if not bare:
             continue
-        risky.append((f, hosts))
+        risky.append((f, bare))
     for f, hosts in risky:
-        print(f"   {f}  :: {', '.join(hosts)}  (머리말에 '대상 아님' 표시 없음)")
+        print(f"   {f}  :: {', '.join(hosts)}  (머리말에 이 서버를 짚은 '대상 아님' 줄 없음)")
     print(f"   소계 {len(risky)}\n")
     findings += len(risky)
 
