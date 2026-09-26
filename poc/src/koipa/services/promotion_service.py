@@ -30,7 +30,6 @@ from koipa.modules.m6_evaluation.corrections_rebuild import _correction_admissib
 from koipa.repositories import ClassifyRepo
 from koipa.schemas.common import Grade
 from koipa.schemas.promotion import (
-    PendingPromotionItem,
     PromoteRequest,
     PromoteResponse,
 )
@@ -104,74 +103,6 @@ def _grade_ok(code: str | None) -> bool:
 
 class PromotionService:
     """교정 → 검증라벨 승급 (사람 승인 게이트 유지)."""
-
-    def list_pending(self, *, limit: int = 100) -> list[PendingPromotionItem]:
-        """승급 대기 큐 — admission 통과 교정이 있으나 같은 등급의 검증라벨이 아직 없는 문서.
-
-        문서별 '최신 admissible 교정'을 제안 등급으로 한다(corrections_rebuild와 동일 규칙:
-        corrected_at desc, correction_id desc 정렬에서 첫 admissible). 이미 같은 등급으로
-        검증된 문서는 제외(멱등). DB 미가용/오류 → 빈 리스트(best-effort).
-        """
-        items: list[PendingPromotionItem] = []
-        try:
-            with session_scope() as db:
-                repo = ClassifyRepo(db)
-                code_by_id = {
-                    lv.level_id: lv.level_code
-                    for lv in db.execute(select(ClassificationLevel)).scalars()
-                }
-                rows = db.execute(
-                    select(Correction, Classification.doc_id, Classification.status)
-                    .join(
-                        Classification,
-                        Correction.classification_id == Classification.classification_id,
-                    )
-                    .order_by(
-                        Correction.corrected_at.desc(),
-                        Correction.correction_id.desc(),
-                    )
-                ).all()
-                # 문서별 최신 admissible 교정 1건 선택(머신/미확정은 건너뛰되 더 옛 human이 승계).
-                chosen: dict = {}  # doc_id -> (Correction, status)
-                for corr, doc_id, status in rows:
-                    if doc_id in chosen:
-                        continue
-                    if not _correction_admissible(corr.corrected_by, status):
-                        continue
-                    chosen[doc_id] = (corr, status)
-
-                for doc_id, (corr, _status) in chosen.items():
-                    proposed = code_by_id.get(corr.corrected_level_id)
-                    if not _grade_ok(proposed):
-                        continue
-                    dl = repo.get_document_label(doc_id)
-                    cur_code = None
-                    if dl is not None and dl.is_verified:
-                        cur_code = code_by_id.get(dl.level_id)
-                        if cur_code == proposed:
-                            continue  # 이미 같은 등급으로 검증됨 → 큐에서 제외
-                    items.append(
-                        PendingPromotionItem(
-                            doc_id=str(doc_id),
-                            proposed_label=Grade(proposed),
-                            corrected_by=corr.corrected_by,
-                            corrected_at=(
-                                corr.corrected_at.isoformat()
-                                if corr.corrected_at is not None
-                                else ""
-                            ),
-                            reason=corr.reason,
-                            current_verified_label=(
-                                Grade(cur_code) if _grade_ok(cur_code) else None
-                            ),
-                            classification_id=str(corr.classification_id),
-                        )
-                    )
-                    if len(items) >= limit:
-                        break
-        except SQLAlchemyError as exc:
-            logger.debug("list_pending skipped (db): %s", exc)
-        return items
 
     def promote(self, req: PromoteRequest) -> PromoteResult:
         """단일 문서의 최신 admissible 교정을 검증 DocumentLabel로 승급(사람 승인)."""

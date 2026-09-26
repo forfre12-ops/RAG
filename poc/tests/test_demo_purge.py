@@ -79,3 +79,43 @@ def test_demo_purge_disabled_returns_404(monkeypatch):
         admin_mod.purge_demo_data()
     assert ei.value.status_code == 404
     assert not log, "비활성 시 DB 접근조차 없어야 함"
+
+
+def _postgres_available() -> bool:
+    from sqlalchemy import text  # noqa: PLC0415
+
+    from koipa.db import engine  # noqa: PLC0415
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+@pytest.mark.fullstack
+def test_demo_purge_sql_is_valid_against_the_real_schema(monkeypatch):
+    """초기화 SQL 을 **실제 스키마**에 실행해 본다(2026-09-26). 트랜잭션을 되돌리므로 남는 것이 없다.
+
+    위의 시험은 가짜 DB 라 SQL 을 실행하지 않는다. 그래서 지운 표·칼럼을 가리키는 DELETE 두 줄
+    (학습 문서 표·합성 문서의 doc_id)이 남아 있어도 초록이었다. 표·칼럼 이름은 행이 없어도 문장을
+    해석하는 순간 검사되므로, 데이터를 넣지 않아도 어긋나면 여기서 죽는다.
+    """
+    if not _postgres_available():
+        pytest.skip("Postgres 에 연결할 수 없다 — docker compose up -d postgres")
+
+    from koipa.db import SessionLocal  # noqa: PLC0415
+
+    @contextlib.contextmanager
+    def _rollback_scope():
+        session = SessionLocal()
+        try:
+            yield session
+        finally:
+            session.rollback()
+            session.close()
+
+    monkeypatch.setattr("koipa.db.session_scope", _rollback_scope)
+    resp = admin_mod.purge_demo_data()
+    assert resp.purged is True

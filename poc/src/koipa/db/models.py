@@ -3,9 +3,9 @@
 도메인 그룹:
   B 등급체계:     ClassificationLevel, EvaluationFactor, LevelKeyword
   C 문서:         Document, Chunk
-  D 라벨링:       DocumentLabel, DocumentFactorScore
+  D 라벨링:       DocumentLabel
   E 추론:         Classification, ClassificationEvidence
-  F 학습:         ModelVersion, TrainingRun, TrainingEpoch, TrainingDataset
+  F 학습:         ModelVersion, TrainingRun
   G 보정:         Correction
   H 샘플 생성:    PromptVersion, SampleDocument
   I 비용:         LlmUsage  (월별 파티션 부모)
@@ -34,6 +34,8 @@
      ⚠ NOT NULL 로 **조일지는 별도 방침 결정**이다(de8088b9). 조이려면 poc/scripts/sql/check_not_null_readiness.sql 로
      대상 DB 의 NULL 을 먼저 센 뒤, NULL 이 있으면 멈추는 마이그레이션을 새로 쓰고 이 칼럼들을
      nullable=False 로 되돌린다(5c1d9e0a7b34 방식). 정의서는 그때 재생성한다.
+- [2026-09-26] 안 쓰는 표 4개(요건점수·학습 에폭·학습 문서·가이드)와 칼럼 18개를 뺐다(migration b7d3f5a19c24).
+  쓰는 코드가 없거나 값을 넣지도 읽지도 않던 것이다 — 목록과 근거는 poc/scripts/audit_unused_fields.py.
 """
 
 from __future__ import annotations
@@ -45,14 +47,12 @@ from sqlalchemy import (
     Identity,
     BigInteger,
     Boolean,
-    CheckConstraint,
     Computed,
     DateTime,
     ForeignKey,
     Index,
     Integer,
     Numeric,
-    REAL,
     PrimaryKeyConstraint,
     Uuid,
     SmallInteger,
@@ -109,7 +109,6 @@ class EvaluationFactor(Base):
 
     factor_id: Mapped[int] = mapped_column("rqmt_sn", Integer, Identity(always=True), primary_key=True)
     factor_code: Mapped[str] = mapped_column("rqmt_cd", String(30), nullable=False, unique=True)
-    factor_name: Mapped[str] = mapped_column("rqmt_nm", String(100), nullable=False)
     description: Mapped[str | None] = mapped_column("evl_rqmt_expln", Text)
     weight: Mapped[float] = mapped_column("wgvl_cfc", Numeric(3, 2), nullable=False, default=0.25, server_default=text("0.25"))
     is_active: Mapped[bool] = mapped_column("actvtn_yn", Boolean, default=True, server_default=text("true"), nullable=True)
@@ -150,7 +149,6 @@ class Document(Base):
     __tablename__ = "tad_dm_doc_mng"
 
     doc_id: Mapped[uuid.UUID] = mapped_column("doc_id", Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=func.gen_random_uuid())
-    external_ref: Mapped[str | None] = mapped_column("otsd_rfrnc_no", String(100))
     filename: Mapped[str] = mapped_column("file_nm", String(500), nullable=False)
     source_format: Mapped[str] = mapped_column("orgnl_frmat_nm", String(10), nullable=False)
     file_size_bytes: Mapped[int | None] = mapped_column("file_sz", BigInteger)
@@ -165,8 +163,6 @@ class Document(Base):
 
     extraction_method: Mapped[str | None] = mapped_column("extr_mth_nm", String(30), default="parser", server_default=text("'parser'"))
     extraction_quality: Mapped[float | None] = mapped_column("extr_qlty_scr", Numeric(3, 2))
-    # OCR 는 제거했다(2026-09-26) — 이 컬럼은 더는 채우지 않는다(항상 false). 컬럼 삭제는 마이그레이션으로 따로 한다.
-    ocr_used: Mapped[bool] = mapped_column("ocr_use_yn", Boolean, default=False, server_default=text("false"), nullable=True)
 
     processing_status: Mapped[str] = mapped_column("prcs_stts_nm", String(20), default="pending", server_default=text("'pending'"), nullable=True)
     error_message: Mapped[str | None] = mapped_column("err_stts_msg_cn", Text)
@@ -247,7 +243,6 @@ class DocumentLabel(Base):
     # [2026-09-10] (3,2)→(5,4). 같은 이름의 tad_cm_clsf_rslt_mng.confidence 와 정밀도를 맞춘다
     # (감리 도표 75 · migration 5c1d9e0a7b34).
     confidence: Mapped[float | None] = mapped_column("rlbl_scr", Numeric(5, 4))
-    total_score: Mapped[float | None] = mapped_column("tot_scr", Numeric(4, 2))
     notes: Mapped[str | None] = mapped_column("memo_dtl_cn", Text)
     is_verified: Mapped[bool] = mapped_column("vrfc_cmptn_yn", Boolean, default=False, server_default=text("false"), nullable=True)
     verified_by: Mapped[str | None] = mapped_column("vrfr_id", String(50))
@@ -257,20 +252,6 @@ class DocumentLabel(Base):
     __table_args__ = (
         Index("idx_dl_level", "grd_sn"),
         Index("idx_dl_labeled_by", "lbl_mnbd_nm"),
-    )
-
-
-class DocumentFactorScore(Base):
-    __tablename__ = "tad_dm_doc_rqmt_scr_mng"
-
-    doc_id: Mapped[uuid.UUID] = mapped_column("doc_id", Uuid(as_uuid=True), ForeignKey("tad_dm_doc_mng.doc_id", ondelete="CASCADE"), primary_key=True)
-    factor_id: Mapped[int] = mapped_column("rqmt_sn", ForeignKey("tad_em_evl_rqmt_mng.rqmt_sn", ondelete="RESTRICT"), primary_key=True)
-    score: Mapped[float] = mapped_column("scr", Numeric(4, 2), nullable=False)
-
-    __table_args__ = (
-        # 정본 B안 3요건(S·V·M)은 0·1·2점 — migration c7d8e9f0a1b2가 DB CHECK를
-        # 0~5에서 0~2로 교체. ORM도 동기화(이전엔 0~5로 drift). 제약명도 DB와 일치.
-        CheckConstraint("scr >= 0 AND scr <= 2", name="ck_dfs_score_0_2"),
     )
 
 
@@ -289,13 +270,11 @@ class Classification(Base):
     alternatives: Mapped[list] = mapped_column("nxtrnk_grd_list_cn", _JSON_PORTABLE, nullable=False, default=list, server_default=text("'[]'"))
     # 자동확정 정책 학습용 결정 시점 스냅샷. 기존 행은 원본 신호를 복원할 수 없어 NULL 유지.
     automation_assessment: Mapped[dict | None] = mapped_column("auto_cfmtn_evl_info_cn", _JSON_PORTABLE)
-    aggregation_method: Mapped[str | None] = mapped_column("tot_mth_cd", String(20), default="hybrid", server_default=text("'hybrid'"))
     chunk_count: Mapped[int | None] = mapped_column("chnk_cnt", SmallInteger)
     status: Mapped[str] = mapped_column("clsf_stts_nm", String(20), default="staging", server_default=text("'staging'"), nullable=True)
     # 게이트 최종 결정을 생성 시점에 동결(status와 달리 이후 confirm/correction이 건드리지 않음).
     # nullable: 이 컬럼 도입 이전 행은 최초값을 복원할 수 없어 NULL로 남는다.
     initial_status: Mapped[str | None] = mapped_column("clsf_frst_stts_nm", String(20))
-    inference_ms: Mapped[int | None] = mapped_column("infr_req_hr", Integer)
     classified_at: Mapped[dt.datetime] = mapped_column("clsf_dt", DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
@@ -322,7 +301,6 @@ class ClassificationEvidence(Base):
     classification_id: Mapped[uuid.UUID] = mapped_column("clsf_id", Uuid(as_uuid=True), ForeignKey("tad_cm_clsf_rslt_mng.clsf_id", ondelete="CASCADE"), nullable=False)
     chunk_id: Mapped[uuid.UUID] = mapped_column("chnk_id", Uuid(as_uuid=True), nullable=False)
     evidence_type: Mapped[str] = mapped_column("bss_type_nm", String(20), nullable=False)
-    factor_id: Mapped[int | None] = mapped_column("rqmt_sn", ForeignKey("tad_em_evl_rqmt_mng.rqmt_sn", ondelete="RESTRICT"))
     excerpt: Mapped[str] = mapped_column("exct_cn", Text, nullable=False)
     excerpt_start: Mapped[int | None] = mapped_column("exct_bgng_pstn_nm", Integer)
     excerpt_end: Mapped[int | None] = mapped_column("exct_end_pstn_nm", Integer)
@@ -351,7 +329,6 @@ class ModelVersion(Base):
     training_data_count: Mapped[int | None] = mapped_column("lrn_data_nocs", Integer)
     metrics: Mapped[dict] = mapped_column("idct_info_cn", _JSON_PORTABLE, nullable=False, default=dict, server_default=text("'{}'"))
     model_uri: Mapped[str | None] = mapped_column("mdl_strg_path_nm", String(500))
-    mlflow_run_id: Mapped[str | None] = mapped_column("flw_excn_id", String(64))
     is_active: Mapped[bool] = mapped_column("actvtn_yn", Boolean, default=False, server_default=text("false"), nullable=True)
     # [2026-09] MariaDB 는 부분 인덱스(WHERE)가 없다. "활성은 최대 1개" 불변식을 두 dialect
     # 모두에서 같은 방식으로 지키도록, is_active 대신 파생 칼럼에 유니크를 건다 — 활성일 때만
@@ -365,12 +342,10 @@ class ModelVersion(Base):
     deactivated_at: Mapped[dt.datetime | None] = mapped_column("dsbl_dt", DateTime(timezone=True))
     rolled_back_from: Mapped[uuid.UUID | None] = mapped_column("rlbk_src_ver_id", Uuid(as_uuid=True), ForeignKey("tad_mm_mdl_ver_mng.mdl_ver_id"))
     rollback_reason: Mapped[str | None] = mapped_column("rlbk_rsn", Text)
-    level_snapshot: Mapped[dict | None] = mapped_column("grd_system_hstry_cn", _JSON_PORTABLE)
     created_at: Mapped[dt.datetime] = mapped_column("crt_dt", DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
         Index("idx_mv_active", "actvtn_sn", unique=True),
-        Index("idx_mv_mlflow", "flw_excn_id"),
     )
 
 
@@ -385,21 +360,14 @@ class TrainingRun(Base):
     model_version: Mapped[uuid.UUID | None] = mapped_column(
         "mdl_ver_id", Uuid(as_uuid=True), ForeignKey("tad_mm_mdl_ver_mng.mdl_ver_id")
     )
-    mlflow_run_id: Mapped[str | None] = mapped_column("flw_excn_id", String(64))
     status: Mapped[str] = mapped_column("lrn_excn_stts_cd", String(20), default="queued", server_default=text("'queued'"), nullable=True)
     started_at: Mapped[dt.datetime | None] = mapped_column("bgng_dt", DateTime(timezone=True))
     completed_at: Mapped[dt.datetime | None] = mapped_column("end_dt", DateTime(timezone=True))
     duration_sec: Mapped[int | None] = mapped_column("req_hr", Integer)
     total_samples: Mapped[int] = mapped_column("whol_sample_cnt", Integer, nullable=False)
-    train_count: Mapped[int | None] = mapped_column("lrn_nocs", Integer)
-    val_count: Mapped[int | None] = mapped_column("vrfc_nocs", Integer)
-    test_count: Mapped[int | None] = mapped_column("test_nocs", Integer)
-    split_method: Mapped[str | None] = mapped_column("prttn_mth_cd", String(30), default="stratified", server_default=text("'stratified'"))
-    split_seed: Mapped[int | None] = mapped_column("prttn_seed", Integer)
     hyperparameters: Mapped[dict] = mapped_column("hprprm_info_cn", _JSON_PORTABLE, nullable=False, default=dict, server_default=text("'{}'"))
     final_metrics: Mapped[dict | None] = mapped_column("last_idct_info_cn", _JSON_PORTABLE)
     trigger_type: Mapped[str | None] = mapped_column("boot_mth_cd", String(30), default="manual", server_default=text("'manual'"))
-    trigger_ref: Mapped[str | None] = mapped_column("boot_bss_idntfr_nm", String(100))
     error_message: Mapped[str | None] = mapped_column("err_stts_msg_cn", Text)
     created_at: Mapped[dt.datetime] = mapped_column("crt_dt", DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by: Mapped[str | None] = mapped_column("creatr_id", String(50))
@@ -411,36 +379,6 @@ class TrainingRun(Base):
         Index("idx_tr_date", desc("bgng_dt")),
         # N4 신규 — list_recent_runs() ORDER BY created_at DESC hot path
         Index("idx_tr_created", "crt_dt"),
-    )
-
-
-class TrainingEpoch(Base):
-    __tablename__ = "tad_lm_lrn_epoch_mng"
-
-    run_id: Mapped[uuid.UUID] = mapped_column("excn_id", Uuid(as_uuid=True), ForeignKey("tad_lm_lrn_excn_mng.excn_id", ondelete="CASCADE"), primary_key=True)
-    epoch: Mapped[int] = mapped_column("epoch_sn", Integer, primary_key=True)
-    train_loss: Mapped[float | None] = mapped_column("lrn_loss_nvl", REAL)
-    val_loss: Mapped[float | None] = mapped_column("vrfc_loss_nvl", REAL)
-    val_metrics: Mapped[dict] = mapped_column("vrfc_idct_info_cn", _JSON_PORTABLE, nullable=False, default=dict, server_default=text("'{}'"))
-    learning_rate: Mapped[float | None] = mapped_column("lrnr", REAL)
-    logged_at: Mapped[dt.datetime] = mapped_column("rcd_dt", DateTime(timezone=True), server_default=func.now(), nullable=True)
-
-
-class TrainingDataset(Base):
-    __tablename__ = "tad_lm_lrn_datst_mng"
-
-    id: Mapped[int] = mapped_column("lrn_datst_sn", BigInteger, Identity(always=True), primary_key=True)
-    run_id: Mapped[uuid.UUID] = mapped_column("excn_id", Uuid(as_uuid=True), ForeignKey("tad_lm_lrn_excn_mng.excn_id", ondelete="CASCADE"), nullable=False)
-    doc_id: Mapped[uuid.UUID] = mapped_column("doc_id", Uuid(as_uuid=True), ForeignKey("tad_dm_doc_mng.doc_id", ondelete="RESTRICT"), nullable=False)
-    split_type: Mapped[str] = mapped_column("prttn_se_nm", String(10), nullable=False)
-    level_id: Mapped[int] = mapped_column("grd_sn", ForeignKey("tad_cm_clsf_grd_mng.grd_sn", ondelete="RESTRICT"), nullable=False)
-
-    __table_args__ = (
-        # DB 실명은 PG 가 자동 생성한 tb_training_datasets_run_id_doc_id_key 다(실측 pg_constraint).
-        # 이름을 바꾸는 것은 DB 변경이므로 선언을 실제에 맞춘다.
-        UniqueConstraint("excn_id", "doc_id", name="tb_training_datasets_run_id_doc_id_key"),
-        Index("idx_td_run_split", "excn_id", "prttn_se_nm"),
-        Index("idx_td_doc", "doc_id"),
     )
 
 
@@ -504,7 +442,6 @@ class SampleDocument(Base):
     __tablename__ = "tad_sm_syn_doc_mng"
 
     sample_id: Mapped[uuid.UUID] = mapped_column("syn_doc_id", Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=func.gen_random_uuid())
-    doc_id: Mapped[uuid.UUID | None] = mapped_column("doc_id", Uuid(as_uuid=True), ForeignKey("tad_dm_doc_mng.doc_id"))
     target_level_id: Mapped[int] = mapped_column("goal_grd_sn", ForeignKey("tad_cm_clsf_grd_mng.grd_sn", ondelete="RESTRICT"), nullable=False)
     # 검수자가 승인하면서 고친 등급. NULL=교정 없음(target_level_id 그대로).
     # target_level_id 를 덮어쓰지 않는 이유: "생성 때 요구한 등급"과 "사람이 고친 등급"이
@@ -559,7 +496,6 @@ class LlmUsage(Base):
     reference_id: Mapped[str | None] = mapped_column("rfrnc_trgt_id", String(100))
     input_tokens: Mapped[int] = mapped_column("inpt_tkn_cnt", Integer, nullable=False)
     output_tokens: Mapped[int] = mapped_column("otpt_tkn_cnt", Integer, nullable=False)
-    # total_tokens는 DB측 generated column. ORM은 server_default 미설정으로 read-only처럼 처리.
     cost_usd: Mapped[float] = mapped_column("usd_cst", Numeric(10, 6), nullable=False)
     cost_krw: Mapped[float | None] = mapped_column("kcur_cst", Numeric(12, 2))
     billing_phase: Mapped[str] = mapped_column("bllng_se_cd", String(20), nullable=False, default="development", server_default=text("'development'"))
@@ -676,30 +612,6 @@ class SampleDatasetMembership(Base):
     )
 
 
-class Guide(Base):
-    """가이드 문서 업로드 이력 — GuideService in-memory 대체."""
-    __tablename__ = "tad_gm_guide_ver_mng"
-
-    id: Mapped[int] = mapped_column("guide_ver_sn", BigInteger, Identity(always=True), primary_key=True)
-    guide_id: Mapped[str] = mapped_column("guide_id", String(200), nullable=False)
-    version: Mapped[str] = mapped_column("guide_ver_nm", String(50), nullable=False)
-    effective_date: Mapped[str | None] = mapped_column("enfc_dt", String(30))
-    change_summary: Mapped[str | None] = mapped_column("chg_smry_cn", Text)
-    doc_type: Mapped[str | None] = mapped_column("doc_knd_nm", String(50))
-    filename: Mapped[str | None] = mapped_column("file_nm", String(500))
-    # nullable=False 는 동작을 바꾸지 않는다(마이그레이션이 NOT NULL · Mapped 표기도 같다) — 정의서 표기를 맞추려고 명시.
-    registered_at: Mapped[dt.datetime] = mapped_column("reg_dt", DateTime(timezone=True), nullable=False, server_default=func.now())
-
-    __table_args__ = (
-        # 동시 업로드 시 중복 버전 행 방지(최종 방어선) — GuideRepo.upsert의
-        # select-then-insert는 락이 없어 race에서 중복을 만들 수 있다.
-        # tenant 제거: (guide_id, version) 전역 UNIQUE. 격리는 KL 포털 전담.
-        UniqueConstraint("guide_id", "guide_ver_nm", name="uq_guides_id_version"),
-        Index("idx_guides_guide_id", "guide_id"),
-        Index("idx_guides_registered", "reg_dt"),
-    )
-
-
 __all__ = [
     "ClassificationLevel",
     "EvaluationFactor",
@@ -707,17 +619,13 @@ __all__ = [
     "Document",
     "Chunk",
     "DocumentLabel",
-    "DocumentFactorScore",
     "Classification",
     "ClassificationEvidence",
     "ModelVersion",
     "TrainingRun",
-    "TrainingEpoch",
-    "TrainingDataset",
     "Correction",
     "PromptVersion",
     "SampleDocument",
     "LlmUsage",
     "AuditLog",
-    "Guide",
 ]

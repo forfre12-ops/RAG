@@ -63,7 +63,6 @@ class _FakeRepo:
                 confidence=0.83,
                 alternatives=[],
                 model_version="v-test",
-                inference_ms=236,
                 status="confirmed",
             )
         ]

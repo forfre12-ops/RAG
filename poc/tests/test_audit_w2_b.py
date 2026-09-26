@@ -4,7 +4,6 @@
   - api/app.py             — M-schema-perm: PUT /schema/grades admin 전용(GET은 broad)
   - api/rate_limit.py      — M-ratelimit-key: 검증된 신원(KL cred/actor) 우선 키, 미검증 헤더 단독 키 금지
   - schemas/common.py      — M-cache: GradeRegistry/FactorRegistry TTL 재로드(멀티워커)
-  - services/guide_service.py — 가이드 이력 in-memory/DB 영속
 
 tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진). per-tenant 스코프 검증 케이스는
 기능 제거로 삭제·전역(global)으로 단순화됨.
@@ -191,62 +190,3 @@ def test_registry_ttl_env_parsing(monkeypatch):
     assert _registry_ttl_sec() == 30.0  # 파싱 실패 → 기본값
     monkeypatch.delenv("KOIPA_REGISTRY_CACHE_TTL_SEC", raising=False)
     assert _registry_ttl_sec() == 30.0
-
-
-# ===========================================================================
-# Guide 이력 — 전역(global) 네임스페이스 (DB 미가용 in-memory 경로)
-# tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진). guide_id 단독으로 키.
-# ===========================================================================
-def _svc_with_stub():
-    from koipa.services.guide_service import GuideService
-
-    return GuideService()
-
-
-def test_persist_records_guide_in_memory():
-    """업로드가 in-memory 레코드까지 guide_id로 전달된다(전역 네임스페이스)."""
-    svc = _svc_with_stub()
-    svc.upload(
-        guide_id="g1", version="v1", effective_date=None, change_summary=None,
-        content_bytes=b"hello guide", actor_user_id="u1",
-        filename="g1.txt",
-    )
-    # in-memory 레코드가 guide_id로 키됨
-    assert "g1" in svc._guides
-    rec = svc._guides["g1"][0]
-    assert rec.guide_id == "g1"
-    assert rec.version == "v1"
-
-
-def test_list_versions_accumulates_history_in_memory():
-    """같은 guide_id의 여러 버전이 이력으로 누적된다(전역 조회)."""
-    svc = _svc_with_stub()
-    svc.upload(guide_id="shared", version="vA", effective_date=None, change_summary="A",
-               content_bytes=b"a", actor_user_id="u", filename="s.txt")
-    svc.upload(guide_id="shared", version="vB", effective_date=None, change_summary="B",
-               content_bytes=b"b", actor_user_id="u", filename="s.txt")
-
-    res = svc.list_versions("shared")
-    assert res is not None
-    versions = [v.version for v in res.versions]
-    assert versions == ["vA", "vB"]
-
-
-def test_list_versions_unknown_guide_returns_none():
-    svc = _svc_with_stub()
-    svc.upload(guide_id="g", version="v", effective_date=None, change_summary=None,
-               content_bytes=b"x", actor_user_id="u", filename="g.txt")
-    # 존재하지 않는 guide_id 조회하면 None
-    assert svc.list_versions("ghost") is None
-
-
-def test_guide_record_fields():
-    """_GuideRecord 기본 생성 — tenant 필드 없음(전역 네임스페이스)."""
-    from koipa.services.guide_service import _GuideRecord
-
-    rec = _GuideRecord(
-        guide_id="g", version="v", effective_date=None, change_summary=None,
-        registered_at="now",
-    )
-    assert rec.guide_id == "g"
-    assert not hasattr(rec, "tenant_id")

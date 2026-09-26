@@ -19,7 +19,7 @@ import time
 import uuid
 from typing import Callable, Optional
 
-from koipa.schemas.classify import ClassifyRequest, ClassifyResponse
+from koipa.schemas.classify import ClassifyJobResult, ClassifyRequest
 from koipa.schemas.classify_async import (
     ClassifyAsyncRequest,
     ClassifyAsyncResponse,
@@ -177,7 +177,7 @@ class AsyncClassifyService:
         callback_payload: dict
         try:
             result = self.classify.classify(self._strip_async_fields(req))
-            result_json = result.model_dump(mode="json")
+            result_json = result.job_result()
             self.jobs.update(job_id, status="done", completed=1, results=[result_json])
             callback_payload = {
                 "job_id": str(job_id),
@@ -225,7 +225,7 @@ class AsyncClassifyService:
 
         def _handle(doc: ClassifyRequest) -> dict:
             res = self.classify.classify(doc)
-            return res.model_dump(mode="json")
+            return res.job_result()
 
         # 진행 카운터 업데이트용 wrapper — 매 건 완료 시 jobs.update.
         completed_counter = {"n": 0}
@@ -311,7 +311,7 @@ class AsyncClassifyService:
         raw_results = job.get("results")
         results = None
         if raw_results:
-            results = [ClassifyResponse.model_validate(r) for r in raw_results]
+            results = [ClassifyJobResult.model_validate(r) for r in raw_results]
         return ClassifyJobStatus(
             job_id=job_id,
             status=job.get("status", "queued"),

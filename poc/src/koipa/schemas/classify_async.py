@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .classify import ClassifyRequest, ClassifyResponse
+from .classify import ClassifyJobResult, ClassifyRequest
 
 
 class ClassifyAsyncRequest(ClassifyRequest):
@@ -51,5 +51,5 @@ class ClassifyJobStatus(BaseModel):
     failed: Optional[int] = None
     failed_doc_ids: list[str] = Field(default_factory=list)
     errors: list[dict] = Field(default_factory=list)
-    results: Optional[list[ClassifyResponse]] = None
+    results: Optional[list[ClassifyJobResult]] = None
     error: Optional[str] = None

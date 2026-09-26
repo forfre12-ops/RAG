@@ -39,7 +39,7 @@ def _svc(store) -> TrainingService:
 
 
 def _run(status="running"):
-    return SimpleNamespace(status=status, started_at=None, error_message=None)
+    return SimpleNamespace(status=status, started_at=None, error_message=None, model_version=None)
 
 
 def test_progress_comes_from_job_store_while_running(monkeypatch):
@@ -123,3 +123,15 @@ def test_epoch_is_one_based_and_clamped(hf_epoch, total, shown):
     if total:
         cur = min(cur, total)
     assert cur == shown
+
+
+def test_finished_run_reports_the_model_version_label(monkeypatch):
+    """학습 실행 행이 가리키는 모델버전(UUID)을 라벨(v-…)로 풀어 상태 응답에 싣는다 — 종전에는 항상 null 이었다."""
+    vid = uuid.uuid4()
+    run = _run("completed")
+    run.model_version = vid
+    svc = _svc(_FakeStore())
+    monkeypatch.setattr(TrainingService, "_get_run", lambda self, i: run)
+    monkeypatch.setattr(TrainingService, "_version_label", lambda self, v: "v-24c7c02c" if v == vid else None)
+
+    assert svc.status(uuid.uuid4()).model_version == "v-24c7c02c"

@@ -8,7 +8,7 @@
 다시 돌리면 되고, 설명이 빠진 컬럼은 생성 때 경고로 드러난다.
 
 진실 소스(이 스크립트가 직접 읽는 파일):
-    poc/src/koipa/db/models.py                          ORM 20테이블 · 컬럼·타입·키·인덱스
+    poc/src/koipa/db/models.py                          ORM 매핑 표 · 컬럼·타입·키·인덱스
     (RAG 2표 DDL 파서는 남겨 두었으나 2026-09-05 부로 생성물에 넣지 않는다)
     scripts/table_spec_meta.py                          한국어 논리명·용도·컬럼 설명
 
@@ -143,7 +143,7 @@ REVISIONS = [
      '<code>NUMERIC(5,4)</code> 통일, 학습실행 모델버전 칼럼명 정리를 반영했습니다'
      '(<code>a8aa5414</code> · <code>5c1d9e0a7b34</code>).<br>'
      '월별 RANGE 파티션 3종(감사로그·청크·LLM 사용량)을 실제 DB 대로 다시 적었습니다.'),
-    ("9", "2026-09-11", _HEAD_MARKER,
+    ("9", "2026-09-11", "6bec3a4b",
      '<b>NULL 표기를 실제 DB 와 맞췄습니다</b> — 마이그레이션을 끝까지 적용한 PostgreSQL 의 '
      'information_schema 와 칼럼 230개를 대조하니 6칼럼이 달랐습니다. 표 단위 기본키'
      '(청크·LLM 사용량·감사로그)를 NULL 허용으로 적던 생성기를 고치고, 모델에 NOT NULL 을 적지 않았던 '
@@ -152,6 +152,19 @@ REVISIONS = [
      '<b>같은 칼럼ID 인데 표마다 NOT NULL 이 다른 8건에 사유를 적었습니다</b> — 나중에 정해지는 값'
      '(추출 전 글자 수, 학습 완료 전 모델 버전)이거나 선택 참조·선택값(요건, 키워드 가중치, 가이드 파일명, '
      '라벨 확신도 등)이어서 설계상 NULL 을 허용합니다. 8건 모두 칼럼 설명에 사유가 있습니다.'),
+    ("10", "2026-09-26", _HEAD_MARKER,
+     '<b>안 쓰는 표 4개와 칼럼 18개를 ORM 과 DB 에서 지웠습니다</b>(마이그레이션 '
+     '<code>b7d3f5a19c24</code>). 표: <code>tb_document_factor_scores</code>(요건 점수) · '
+     '<code>tb_training_epochs</code>(학습 에폭) · <code>tb_training_datasets</code>(학습 문서 목록) · '
+     '<code>tb_guides</code>(가이드 버전 — 가이드 업로드 API 를 함께 걷었다). 앞의 셋은 행을 만드는 코드가 '
+     '없거나 시험에서만 부르던 것이고, 가이드 버전 표는 그 API 전용이었습니다. 로컬 시험 DB 실측 네 표 모두 '
+     '0행입니다.<br>'
+     '칼럼 18개는 값을 넣는 코드가 없거나, 넣어도 읽는 곳이 없던 것입니다 — 문서 <code>otsd_rfrnc_no</code>·<code>ocr_use_yn</code>, '
+     '학습 실행 7개(건수 3 · 분할 방식·시드 · 기동 근거 · 흐름 실행 ID), 모델 버전 2개, 분류 결과 2개, '
+     '문서 라벨 <code>tot_scr</code>, 분류 근거 <code>rqmt_sn</code>, 합성 문서 <code>doc_id</code>, '
+     '평가 요건 <code>rqmt_nm</code>, LLM 사용량 생성열 <code>whol_tkn_cnt</code>.<br>'
+     '<b>지우지 않은 것</b> — 문서 벡터 표(유사문서 조회 — 9/9 고객사 요청으로 pgvector 로 되돌리며 신설)와, 값은 채우지만 읽는 곳이 없는 26개 '
+     '칼럼(감사·이력 성격).'),
 ]
 
 
@@ -523,20 +536,16 @@ LAYOUT = [
     ("tb_prompt_versions", 0, 356),
     ("tb_level_keywords", 1, 40),
     ("tb_document_labels", 1, 104),
-    ("tb_document_factor_scores", 1, 144),
     ("tb_chunks", 1, 184),
     ("tb_classifications", 1, 232),
     ("tb_training_runs", 1, 300),
     ("tb_sample_documents", 1, 356),
     ("tb_classification_evidence", 2, 208),
     ("tb_corrections", 2, 256),
-    ("tb_training_epochs", 2, 304),
-    ("tb_training_datasets", 2, 352),
     ("tb_llm_usage", 3, 40),
     ("tb_audit_log", 3, 80),
-    ("tb_guides", 3, 120),
-    ("tb_advisory_locks", 3, 160),
-    ("tb_document_vectors", 3, 200),
+    ("tb_advisory_locks", 3, 120),
+    ("tb_document_vectors", 3, 160),
 ]
 # [2026-09-11] 표준 명명 — 위 배치는 옛 물리명으로 적어 두었다. models.py 의 새 이름으로 옮긴다.
 LAYOUT = [(META.RENAMED_TABLES.get(n, n), c, y) for n, c, y in LAYOUT]
@@ -863,9 +872,9 @@ table.spec td.c-nn{text-align:center;}
     # ── 범위 밖
     A('<section id="scope"><h2><span class="num">06</span> 범위</h2>')
     A('<p class="spec-note">본 시스템이 생성·소유하는 개체만 수록합니다. '
-      "KL 원천 문서 저장소·EDMS·회원/권한·자가진단은 외부 시스템이며, 연동 키는 "
-      f"<code>{META._t('tb_documents')}.{META._c('tb_documents', 'external_ref')}</code> · "
-      f"<code>{META._t('tb_documents')}.{META._c('tb_documents', 'metadata')}</code> 입니다.</p>")
+      "KL 원천 문서 저장소·EDMS·회원/권한·자가진단은 외부 시스템이며, 이들의 문서번호는 저장하지 않습니다. "
+      f"연동 키는 <code>{META._t('tb_documents')}.{META._c('tb_documents', 'doc_id')}</code>(등록 응답의 문서 ID)이고, "
+      "KL 쪽에서 자기 문서번호와 짝지어 보관합니다.</p>")
     A("</section>")
 
     # ── 개정 이력

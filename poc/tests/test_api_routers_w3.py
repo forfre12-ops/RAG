@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import io
 import sys
 import uuid
 
@@ -192,59 +191,6 @@ class TestSynthesisRouter:
                 json={"decision": "approve", "actor": ACTOR},
             )
             assert r.status_code in (404, 503)  # PG 미가용 시 service None → 404
-
-
-# ============================================================
-# /guide/documents
-# ============================================================
-
-class TestGuideRouter:
-    def test_upload_then_list_versions(self):
-        gid = f"guide-{uuid.uuid4().hex[:6]}"
-        with TestClient(app) as cli:
-            # [2026-09-05] 파일을 받지 않는다 — 버전 메타만 JSON 으로 등록한다.
-            r = cli.post(
-                "/api/v1/guide/documents",
-                headers=HDR,
-                json={
-                    "guide_id": gid,
-                    "version": "v1.0",
-                    "effective_date": "2026-06-01",
-                    "change_summary": "initial",
-                    "actor": ACTOR,
-                },
-            )
-            assert r.status_code == 201, r.text
-            body = r.json()
-            assert body["guide_id"] == gid
-            assert body["version"] == "v1.0"
-            assert body["triggers_retraining"] is False
-
-            # 목록 조회
-            r2 = cli.get(f"/api/v1/guide/documents/{gid}", headers=HDR)
-            assert r2.status_code == 200
-            vlist = r2.json()
-            assert vlist["guide_id"] == gid
-            assert len(vlist["versions"]) >= 1
-
-    def test_list_unknown_guide_404(self):
-        with TestClient(app) as cli:
-            r = cli.get(f"/api/v1/guide/documents/does-not-exist-{uuid.uuid4().hex[:6]}", headers=HDR)
-            assert r.status_code == 404
-
-    def test_upload_invalid_actor_json_422(self):
-        with TestClient(app) as cli:
-            r = cli.post(
-                "/api/v1/guide/documents",
-                headers=HDR,
-                data={
-                    "guide_id": "g",
-                    "version": "v",
-                    "actor": "{not json",
-                },
-                files={"file": ("g.txt", io.BytesIO(b"x"), "text/plain")},
-            )
-            assert r.status_code == 422
 
 
 # ============================================================

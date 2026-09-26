@@ -11,7 +11,7 @@ from koipa.api._jwt_auth import require_auth
 from koipa.api.rate_limit import limiter
 from koipa.db import session_scope
 from koipa.repositories import ClassifyRepo
-from koipa.schemas.classify import ClassifyResponse
+from koipa.schemas.classify import StoredClassificationResponse
 from koipa.schemas.classify_async import (
     ClassifyAsyncRequest,
     ClassifyAsyncResponse,
@@ -52,7 +52,7 @@ def classify_job_status(job_id: UUID):
     return res
 
 
-@router.get("/classify/{doc_id}", response_model=ClassifyResponse)
+@router.get("/classify/{doc_id}", response_model=StoredClassificationResponse)
 def classify_recent_for_doc(doc_id: str):
     """doc_id의 최근 분류 결과 1건 (DB 진실 소스)."""
     try:
@@ -87,14 +87,13 @@ def classify_recent_for_doc(doc_id: str):
                 confirmed_by = corr.corrected_by
                 confirmed_at = corr.corrected_at.isoformat() if corr.corrected_at else None
 
-            return ClassifyResponse(
+            return StoredClassificationResponse(
                 inference_id=cls.classification_id,
                 doc_id=doc_id,
                 label=label,
                 confidence=float(cls.confidence),
                 scores=scores,
                 model_version=cls.model_version,
-                elapsed_ms=cls.inference_ms or 0,
                 status=cls.status,
                 confirmed_label=confirmed_label,
                 confirmed_by=confirmed_by,

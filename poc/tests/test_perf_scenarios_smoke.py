@@ -15,14 +15,14 @@ from koipa.perf.harness import AvailableResources, ScenarioContext
 
 class TestImports:
     def test_specs_registered(self):
-        """SPECS 리스트에 18개 시나리오가 등록.
+        """SPECS 리스트에 17개 시나리오가 등록.
 
-        S13(멀티테넌트 격리)은 tenant 제거로 삭제됐다.
+        S13(멀티테넌트 격리)은 tenant 제거로 삭제됐다. S5(가이드 업로드)는 가이드 기능을 없애면서(2026-09-26) 삭제됐다.
         S19(대용량 단일 문서)는 2026-09-13 신설 — PER-002 의 대용량 조항을 재는 지표가
         하니스에 하나도 없었다(단일 문서 지연은 짧은 문서 기준·S12 는 여러 건의 처리량).
         """
         scenario_ids = {s.id for s in sc.SPECS}
-        expected = {f"S{i}" for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19]}
+        expected = {f"S{i}" for i in [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19]}
         assert scenario_ids == expected, f"missing: {expected - scenario_ids}, extra: {scenario_ids - expected}"
 
     def test_all_runners_callable(self):

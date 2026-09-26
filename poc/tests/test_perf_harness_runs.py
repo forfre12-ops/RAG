@@ -72,7 +72,7 @@ def test_capture_env_runs_without_probing_services():
 def test_partial_run_does_not_overwrite_the_canonical_report():
     """`--only`/`--skip` 은 정본 옆에 `.partial` 로 쓴다.
 
-    [2026-09-06] 실측: `--only S5` 한 번으로 doc/20_시나리오_성능_보고서.html 이
+    [2026-09-06] 실측: `--only S4` 한 번으로 doc/20_시나리오_성능_보고서.html 이
     전수 64개짜리에서 **KPI 2개짜리 0/2 문서**로 바뀌었다. JSON 쪽은 partial_run
     표식으로 이미 막고 있었는데 HTML 만 그대로 덮어썼다.
     """
@@ -80,7 +80,7 @@ def test_partial_run_does_not_overwrite_the_canonical_report():
 
     base = pathlib.Path("doc/20_시나리오_성능_보고서.html")
     assert html_output_path(base) == base, "전수 실행은 정본에 쓴다"
-    for kwargs in ({"only": "S5"}, {"skip": "S1"}, {"only": "S5", "skip": "S1"}):
+    for kwargs in ({"only": "S4"}, {"skip": "S1"}, {"only": "S4", "skip": "S1"}):
         out = html_output_path(base, **kwargs)
         assert out != base, "부분 실행(%s)이 정본을 덮는다" % kwargs
         assert out.name.endswith(".partial.html"), out.name
@@ -99,10 +99,10 @@ def test_harness_actually_runs_a_scenario():
     """
     from run_perf_scenarios import build_report
 
-    report = build_report(mode="dryrun", probe_services=False, only="S5")
+    report = build_report(mode="dryrun", probe_services=False, only="S16")
     assert report["summary"]["total_kpis"] >= 1, "KPI 를 하나도 못 쟀다"
     assert report["mode"] == "dryrun"
-    assert report.get("partial_run") is None or report["partial_run"]["only"] == "S5"
+    assert report.get("partial_run") is None or report["partial_run"]["only"] == "S16"
 
 
 def test_scenario_specs_are_not_empty():

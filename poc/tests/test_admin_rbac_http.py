@@ -5,7 +5,7 @@ lite 런(-m "not fullstack …")에서 제외됐다 → "admin 전용 게이트�
 fake-green 상태였다. 이 테스트는 admin-only 라우트에 무인증·비-admin·admin 요청을 보내
 401/403 강제와 admin 통과를 실제 HTTP 스택으로 확인한다.
 
-- read-only best-effort GET(dashboard·escalation-held·locked-readiness)은 admin 200까지 검증
+- read-only best-effort GET(dashboard·locked-readiness)은 admin 200까지 검증
   (DB 없어도 각 섹션 best-effort로 degraded 구조를 200으로 반환).
 - 쓰기 라우트(model/activate)는 거부(403/401)만 확인 — 실제 배포 로직 검증은 fullstack.
 
@@ -25,7 +25,6 @@ client = TestClient(app)
 API = "/api/v1"
 ADMIN_GET_ROUTES = [
     "/admin/dashboard",
-    "/admin/escalation-held",
     "/admin/locked-readiness",
 ]
 

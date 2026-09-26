@@ -1,9 +1,7 @@
 """POST /documents — 분류 대상 문서 업로드·ingestion.
 
 협력사가 실제 업무 파일(HWP/PDF/DOCX 등)을 업로드하는 입구.
-GuideService(/guide/documents)와 완전 분리 — 도메인이 다름:
-  - /guide/documents : 영업비밀보호 가이드라인 → ES 지식베이스
-  - /documents       : 등급 판정 대상 비밀문서 → documents/chunks/classifications
+등급 판정 대상 비밀문서 → documents/chunks/classifications
 """
 
 from __future__ import annotations
@@ -43,9 +41,7 @@ class DocumentUploadResponse(BaseModel):
     extraction_quality: float
     char_count: int
     chunk_count: int
-    pages_processed: Optional[int] = None
     pages_total: Optional[int] = None
-    extraction_complete: bool = True
     classification_job_id: Optional[str] = None
     classification_status: Optional[str] = None
     classification_status_url: Optional[str] = None
@@ -60,8 +56,6 @@ class DocumentUploadResponse(BaseModel):
 @router.post("/documents", response_model=DocumentUploadResponse, status_code=201)
 async def upload_document(
     actor: str = Form(..., description="Actor JSON 문자열 (multipart 제약)"),
-    doc_type: Optional[str] = Form(default=None),
-    external_ref: Optional[str] = Form(default=None, description="외부 문서 ID (EDMS 등)"),
     # [ICD §3.1] 서비스는 source_type 을 받아 metadata_ 에 저장하고 분류 때 Gate-1(출처
     # prior)이 그것을 읽는다. 그런데 이 HTTP 경로에 파라미터가 없어서 **업로드로 들어온
     # 문서는 출처를 영영 줄 수 없었다** — 서비스 인자가 코드 안에서만 도달 가능했다.
@@ -130,11 +124,9 @@ async def upload_document(
     result = svc.ingest(
         filename=filename,
         content_bytes=body,
-        doc_type=doc_type,
         source_type=source_type,
         security_marking=security_marking,
         access_scope=access_scope,
-        external_ref=external_ref,
         created_by=actor_obj.user_id,
     )
 
@@ -172,9 +164,7 @@ async def upload_document(
         extraction_quality=result.extraction_quality,
         char_count=result.char_count,
         chunk_count=result.chunk_count,
-        pages_processed=result.pages_processed,
         pages_total=result.pages_total,
-        extraction_complete=result.extraction_complete,
         classification_job_id=classification_job_id,
         classification_status=classification_status,
         classification_status_url=classification_status_url,
@@ -205,9 +195,7 @@ class AnalyzeParseInfo(BaseModel):
     content_quality: float
     char_count: int
     chunk_count: int
-    pages_processed: Optional[int] = None
     pages_total: Optional[int] = None
-    extraction_complete: bool = True
     table_coverage: Optional[str] = None
     table_count: int = 0
     table_cell_count: int = 0
@@ -343,16 +331,7 @@ async def analyze_document(
         content_quality=round(pre.quality, 3),
         char_count=len(pre.text),
         chunk_count=len(pre.chunks),
-        pages_processed=getattr(ex, "pages", None),
         pages_total=(getattr(ex, "total_pages", None) or getattr(ex, "pages", None)),
-        extraction_complete=(
-            not any("truncated" in str(w).lower() for w in extraction_warnings)
-            and not (
-                getattr(ex, "pages", None) is not None
-                and getattr(ex, "total_pages", None) is not None
-                and getattr(ex, "pages") < getattr(ex, "total_pages")
-            )
-        ),
         table_coverage=getattr(ex, "table_coverage", None),
         table_count=len(extracted_tables),
         table_cell_count=table_cell_count,

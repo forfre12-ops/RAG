@@ -14,31 +14,13 @@ from pydantic import BaseModel, Field
 from .common import Actor, Grade
 
 
-class PendingPromotionItem(BaseModel):
-    doc_id: str
-    proposed_label: Grade = Field(description="최신 admissible 교정이 제안하는 등급")
-    corrected_by: str = Field(description="등급을 교정한 사람 검수자 id")
-    corrected_at: str
-    reason: Optional[str] = None
-    current_verified_label: Optional[Grade] = Field(
-        default=None,
-        description="이미 검증된 라벨이 있고 제안과 다르면 그 등급(없거나 동일이면 None)",
-    )
-    classification_id: str
-
-
-class PendingPromotionResponse(BaseModel):
-    count: int
-    items: list[PendingPromotionItem]
-
-
 class PromoteRequest(BaseModel):
     doc_id: str
     actor: Actor
     expected_label: Optional[Grade] = Field(
         default=None,
         description=(
-            "큐에서 본 제안 등급. 지정 시 현재 최신 교정 등급과 다르면 승급을 거부한다"
+            "화면에서 본 제안 등급. 지정 시 현재 최신 교정 등급과 다르면 승급을 거부한다"
             " (승급 직전 등급이 새 교정으로 바뀌는 race 가드)."
         ),
     )

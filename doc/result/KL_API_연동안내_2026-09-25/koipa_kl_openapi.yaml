@@ -138,10 +138,8 @@ paths:
       - classify
       summary: 문서별 최근 분류 결과 조회
       description: |
-        문서의 가장 최근 분류 결과를 **저장된 값으로 만들어** 돌려준다. 채워지는 필드는 label·confidence·
-        scores·model_version·elapsed_ms·status·confirmed_* 뿐이고, evaluation_factors·evidence·warnings·
-        rule_grade·model_grade·decision_path·grade_candidates·automation_assessment 는 비어 있다
-        (factors_source 는 기본값이라 의미가 없다). 근거·경고까지 필요하면 IF-05 작업 결과를 쓴다.
+        문서의 가장 최근 분류 결과를 **저장된 값으로 만들어** 돌려준다. 근거(evidence)·평가요소·경고·룰/모델 판정까지
+        필요하면 IF-05 작업 결과를 쓴다.
         사람이 검수로 등급을 확정해도 label(예측 등급)은 바뀌지 않고, 확정 등급은
         confirmed_label·confirmed_by·confirmed_at 으로 따로 온다(확정 전에는 null).
         doc_id 는 POST /documents 가 돌려준 UUID 여야 한다(아니면 422). 분류 이력이 없으면
@@ -159,7 +157,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ClassifyResponse'
+                $ref: '#/components/schemas/StoredClassificationResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -182,10 +180,9 @@ paths:
         {"doc_id": "<doc_id>"} 에 실어 등급을 요청한다(쿼리 파라미터는 받지 않는다).
         enqueue_classification=true 로 보내면 등록과 동시에 비동기 분류를 큐에 걸고, 응답에
         classification_job_id 가 담긴다.
-        /guide/documents(지식베이스용 가이드 문서)와 완전 분리된 도메인.
 
         같은 내용(SHA-256 동일)의 파일을 다시 등록하면 새 문서를 만들지 않고 기존 doc_id 를
-        돌려준다. 이때 함께 보낸 메타데이터·external_ref 는 갱신되지 않는다.
+        돌려준다. 이때 함께 보낸 메타데이터는 갱신되지 않는다.
         지원하지 않는 형식이거나 본문이 추출되지 않아도 201 로 등록된다 — 응답의 char_count·
         warnings·requires_review 를 확인한다.
       requestBody:
@@ -201,13 +198,6 @@ paths:
                 actor:
                   type: string
                   description: Actor JSON 문자열 (user_id, role)
-                doc_type:
-                  type: string
-                  nullable: true
-                external_ref:
-                  type: string
-                  nullable: true
-                  description: 외부 문서 ID (EDMS 등). KL 자체 문서번호는 여기에 넣는다.
                 source_type:
                   type: string
                   nullable: true
@@ -304,17 +294,10 @@ components:
         chunk_count:
           type: integer
           description: 본문을 나눈 조각 수
-        pages_processed:
-          type: integer
-          nullable: true
-          description: 처리한 쪽수. 쪽 개념이 없는 형식은 null
         pages_total:
           type: integer
           nullable: true
           description: 전체 쪽수. 쪽 개념이 없는 형식은 null
-        extraction_complete:
-          type: boolean
-          description: 전체 본문을 추출했는지 여부
         classification_job_id:
           type: string
           nullable: true
@@ -361,11 +344,6 @@ components:
             POST /documents 가 돌려준 doc_id(UUID). 등록하지 않은 값을 content 없이 보내면 오류가
             아니라 최고 등급(TS)·needs_review 결과가 오고 사유는 warnings 에 담긴다(fail-secure).
             등록되지 않은 doc_id 의 결과는 검수 목록·판정 이력에 저장되지 않는다.
-            KL 자체 문서번호는 등록 때 external_ref 로 보낸다.
-        title:
-          type: string
-          nullable: true
-          description: 문서 제목. 없어도 된다.
         content:
           type: string
           nullable: true
@@ -428,7 +406,7 @@ components:
               완료·실패 시 엔진이 결과 JSON 을 POST 할 주소(선택). http/https 만 허용하고 loopback·
               link-local 주소는 거부한다 — 거부돼도 요청은 202 로 접수되므로 상태는 IF-05 로도 확인한다.
               응답이 2xx 가 아니면 최대 5회 재시도하고 그래도 실패하면 엔진 쪽 DLQ 에 보관한다.
-              본문은 완료 시 {"job_id","status":"done","results":[ClassifyResponse]},
+              본문은 완료 시 {"job_id","status":"done","results":[ClassifyJobResult]},
               실패 시 {"job_id","status":"failed","error"} 이다. 서명 헤더는 붙이지 않는다.
     EvaluationFactors:
       type: object
@@ -472,8 +450,9 @@ components:
         tag:
           type: string
           nullable: true
-    ClassifyResponse:
+    ClassifyOutcome:
       type: object
+      description: 분류 결과의 공통 항목 — 동기 응답(ClassifyResponse)과 비동기 작업 결과(ClassifyJobResult)가 같이 쓴다.
       required:
       - inference_id
       - doc_id
@@ -481,7 +460,6 @@ components:
       - confidence
       - scores
       - model_version
-      - elapsed_ms
       properties:
         inference_id:
           type: string
@@ -531,9 +509,6 @@ components:
         model_version:
           type: string
           description: 판정에 쓴 모델 버전
-        elapsed_ms:
-          type: integer
-          description: 처리 시간(ms). 비동기 작업 결과에서는 측정하지 않아 0 이다.
         status:
           type: string
           enum:
@@ -574,6 +549,55 @@ components:
           nullable: true
           additionalProperties: true
           description: 자동확정 정책 검증용 관측치(그림자 모드). 연동에 쓰지 않으며 필드는 예고 없이 바뀔 수 있다.
+    ClassifyJobResult:
+      description: GET /classify/jobs/{job_id} 의 results[] 한 건 — 분류 결과 그대로이며 처리 시간은 없다(비동기 결과는 재지 않는다).
+      allOf:
+      - $ref: '#/components/schemas/ClassifyOutcome'
+    StoredClassificationResponse:
+      type: object
+      description: GET /classify/{doc_id} — 저장된 최근 분류 결과와 사람이 확정한 등급.
+      required:
+      - inference_id
+      - doc_id
+      - label
+      - confidence
+      - scores
+      - model_version
+      properties:
+        inference_id:
+          type: string
+          format: uuid
+          description: 분류 결과 식별자
+        doc_id:
+          type: string
+          description: 분류한 문서의 doc_id
+        label:
+          $ref: '#/components/schemas/Grade'
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.87
+          description: 선택한 등급(label)의 확률(0~1)
+        scores:
+          type: object
+          description: 등급별 확률 분포
+          additionalProperties:
+            type: number
+            minimum: 0
+            maximum: 1
+        model_version:
+          type: string
+          description: 판정에 쓴 모델 버전
+        status:
+          type: string
+          enum:
+          - staging
+          - needs_review
+          - needs_second_review
+          default: staging
+          description: staging=자동확정 후보 · needs_review/needs_second_review=검수 라우팅. 검수가 필요한지만 나타내며 'confirmed' 값은
+            나오지 않는다(사람 확정은 confirmed_* 로 따로 온다).
         confirmed_label:
           type: string
           nullable: true
@@ -660,7 +684,7 @@ components:
           nullable: true
           description: 분류 결과. done 이면 채워지고 단건 요청은 길이 1 이다.
           items:
-            $ref: '#/components/schemas/ClassifyResponse'
+            $ref: '#/components/schemas/ClassifyJobResult'
         error:
           type: string
           nullable: true

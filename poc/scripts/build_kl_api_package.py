@@ -59,11 +59,6 @@ KL_INTERFACES: dict[tuple[str, str], str] = {
 HTTP_METHODS = ("get", "post", "put", "delete", "patch")
 GRADE_NAMES = {"TS": "특급기밀", "S1": "1급 비밀", "S2": "2급 대외비", "S3": "3급 공개"}
 
-# GET /classify/{doc_id} 는 저장된 값으로 응답을 만든다(api/async_classify.py:classify_recent_for_doc).
-IF06_FILLED = {"inference_id", "doc_id", "label", "confidence", "scores", "model_version", "elapsed_ms",
-               "status", "confirmed_label", "confirmed_by", "confirmed_at"}
-IF06_DEFAULT_ONLY = {"factors_source"}
-
 SAMPLES = {
     "upload": "01_documents_response.json",
     "async": "02_classify_async_response.json",
@@ -278,12 +273,11 @@ def _inline(text: str) -> str:
     return re.sub(r"[`]([^`]+)[`]", lambda m: "<code>" + m.group(1) + "</code>", out)
 
 
-def field_table(spec: dict, schema: dict, *, overrides: dict[str, str] | None = None, if06: bool = False,
-                request: bool = False) -> str:
+def field_table(spec: dict, schema: dict, *, overrides: dict[str, str] | None = None, request: bool = False) -> str:
     """스키마의 필드를 표로. request=True 면 '· null 가능' 을 뺀다(요청에서는 안 보내는 것과 같다)."""
     props, required = flat(spec, schema)
     overrides = overrides or {}
-    head = ["필드", "형식", "필수", "설명"] + (["문서 조회(IF-06)"] if if06 else [])
+    head = ["필드", "형식", "필수", "설명"]
     rows = []
     for name, node in props.items():
         desc = overrides.get(name) or _describe(spec, node)
@@ -292,11 +286,8 @@ def field_table(spec: dict, schema: dict, *, overrides: dict[str, str] | None = 
             kind = kind.replace(" · null 가능", "")
         cells = [f"<code>{html.escape(name)}</code>", html.escape(kind),
                  "필수" if name in required else "선택", _inline(desc)]
-        if if06:
-            cells.append("채워짐" if name in IF06_FILLED else ("기본값(의미 없음)" if name in IF06_DEFAULT_ONLY else "비어 있음"))
         rows.append(cells)
-    widths = [19, 17, 6, 42, 16] if if06 else [22, 20, 7, 51]
-    return _table(head, rows, center={2, 4} if if06 else {2}, widths=widths)
+    return _table(head, rows, center={2}, widths=[22, 20, 7, 51])
 
 
 def _table(head: list[str], rows: list[list[str]], *, center: set[int] | None = None, widths: list[int] | None = None) -> str:
@@ -444,16 +435,14 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
         'curl -X POST "$BASE/documents" \\\n'
         '  -H "X-API-Key: $KOIPA_API_KEY" \\\n'
         '  -F \'actor={"user_id":"kl-portal","role":"kl_backend"}\' \\\n'
-        "  -F 'external_ref=KL-2026-000123' \\\n"
         "  -F 'source_type=internal' \\\n"
         "  -F 'security_marking=confidential' \\\n"
         "  -F 'access_scope=department' \\\n"
         "  -F 'file=@cost_report.txt;type=text/plain'"))
     b.append(p("<code>actor</code> 는 JSON 문자열이며 <code>role</code> 은 <code>admin · reviewer · system · kl_backend</code> 중 하나입니다. "
-               "KL 자체 문서번호는 <code>external_ref</code> 에 넣습니다."))
+               "KL 자체 문서번호는 엔진에 저장하지 않습니다 — 응답의 <code>doc_id</code> 와 KL 문서번호의 대응은 KL 쪽에서 보관하십시오."))
     b.append(field_table(spec, upload_form, request=True, overrides={
         "actor": "호출자 정보 JSON 문자열: {\"user_id\": \"...\", \"role\": \"...\"}. 감사 기록에 남습니다.",
-        "doc_type": "문서 유형(선택)",
         "file": "등록할 원본 파일. 지원 형식은 아래 '등록에서 알아 둘 점'을 봅니다.",
     }))
     b.append(p("응답(201) 예시:"))
@@ -462,7 +451,7 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
     b.append(h3("등록에서 알아 둘 점"))
     b.append(ul([
         "<b>같은 내용의 파일을 다시 등록</b>하면 새 문서를 만들지 않고 <b>기존 <code>doc_id</code></b> 를 돌려줍니다(파일 내용의 SHA-256 기준). "
-        "이때 함께 보낸 메타데이터와 <code>external_ref</code> 는 갱신되지 않습니다. 바꿀 값은 분류 요청의 <code>metadata</code> 로 보냅니다(5장).",
+        "이때 함께 보낸 메타데이터는 갱신되지 않습니다. 바꿀 값은 분류 요청의 <code>metadata</code> 로 보냅니다(5장).",
         "<b>지원하지 않는 형식이거나 본문이 추출되지 않아도 201</b> 로 등록됩니다. 이때 <code>char_count</code> 가 0 이고 <code>warnings</code> 에 사유가 담깁니다"
         "(예: <code>[\"extract: unsupported: exe\", \"no text extracted\"]</code>). 분류를 요청하기 전에 <code>char_count</code> 를 확인하십시오.",
         "지원 형식: <code>txt · md · log · csv</code> / <code>hwp · hwpx</code> / <code>docx · doc</code> / <code>xlsx · xlsm · xls</code> / <code>pptx · pptm</code> / <code>pdf</code>. "
@@ -510,15 +499,17 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
     b.append(h3("3-4. 문서 단위 조회 — IF-06"))
     b.append(_pre(f'curl "$BASE/classify/{doc_id}" -H "X-API-Key: $KOIPA_API_KEY"'))
     b.append(p("<code>doc_id</code> 는 등록이 돌려준 UUID 여야 합니다(아니면 422). 분류 이력이 없으면 404 입니다. "
-               "IF-06 은 <b>저장된 값으로 응답을 만들기 때문에</b> 근거(<code>evidence</code>) · 경고(<code>warnings</code>) · 룰/모델 판정 등은 비어 있습니다. "
-               "그 내용이 필요하면 IF-05 의 작업 결과를 사용합니다. 대신 사람이 확정한 등급(<code>confirmed_*</code>)은 IF-06 에서 조회합니다."))
+               "IF-06 은 <b>저장된 값으로 응답을 만들기 때문에</b> 등급 · 확률 · 모델 버전 · 상태와 사람이 확정한 등급(<code>confirmed_*</code>)만 담습니다. "
+               "근거(<code>evidence</code>) · 경고(<code>warnings</code>) · 룰/모델 판정이 필요하면 IF-05 의 작업 결과를 사용합니다."))
+    b.append(field_table(spec, {"$ref": "#/components/schemas/StoredClassificationResponse"}, overrides={
+        "label": "예측 등급 코드. 사람이 확정한 등급은 confirmed_label 입니다.",
+    }))
     b.append(_details("응답 예시 보기 (04_classify_by_doc_response.json)", _json_pre(by_doc)))
 
     # ── 4. 결과 읽는 법 ─────────────────────────────────────────────────
     b.append(h2("4. 결과 읽는 법"))
-    b.append(p("IF-05 의 <code>results[0]</code> 와 IF-06 의 응답은 같은 모양(<code>ClassifyResponse</code>)입니다. "
-               "아래 표의 마지막 열은 IF-06 에서 그 필드가 채워지는지를 나타냅니다."))
-    b.append(field_table(spec, {"$ref": "#/components/schemas/ClassifyResponse"}, if06=True, overrides={
+    b.append(p("IF-05 의 <code>results[]</code> 한 건(<code>ClassifyJobResult</code>)의 필드입니다. IF-06 은 이 중 등급 · 확률 · 모델 버전 · 상태만 담고 확정 등급을 더합니다(3-4)."))
+    b.append(field_table(spec, {"$ref": "#/components/schemas/ClassifyJobResult"}, overrides={
         "label": "예측 등급 코드. 사람이 확정한 등급은 confirmed_label 입니다.",
         "automation_assessment": "내부 검증용 관측치입니다. 연동에 쓰지 않으며 필드는 예고 없이 바뀔 수 있습니다.",
     }))
@@ -582,7 +573,7 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
     # ── 7. 콜백 ─────────────────────────────────────────────────────────
     b.append(h2("7. 완료 통보(IF-04) — 선택"))
     b.append(p("분류 요청(IF-03)에 <code>callback_url</code> 을 넣으면, 작업이 끝났을 때 엔진이 그 주소로 JSON 을 <code>POST</code> 합니다. 넣지 않으면 통보는 없고 IF-05 로 조회합니다."))
-    b.append(_pre('완료   {"job_id": "…", "status": "done",   "results": [ { …ClassifyResponse… } ]}\n'
+    b.append(_pre('완료   {"job_id": "…", "status": "done",   "results": [ { …ClassifyJobResult… } ]}\n'
                   '실패   {"job_id": "…", "status": "failed", "error": "…"}'))
     b.append(ul([
         "발송은 <b>60초 주기</b>로 처리되므로 완료 후 최대 약 1분 뒤에 도착할 수 있습니다. 즉시성이 필요하면 IF-05 조회를 사용하십시오.",
@@ -619,10 +610,10 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
             ["2", "분류 접수(IF-03) 응답", "<code>job_id</code> · <code>status_url</code> · <code>estimated_sec</code>", "<code>estimated_sec</code> 없음. <code>status</code> 가 있고 <code>status_url</code> 은 호스트 없는 경로입니다"],
             ["3", "분류 요청의 <code>content</code>", "필수", "선택. 생략하면 등록 때 저장한 본문을 씁니다"],
             ["4", "등록 후 분류 호출", "<code>POST /classify?doc_id=…</code>", "본문 <code>{\"doc_id\": …}</code> 로 보냅니다(쿼리 파라미터는 받지 않음)"],
-            ["5", "등록 폼 필드", "<code>doc_type</code> · <code>external_ref</code>", "<code>source_type</code> · <code>security_marking</code> · <code>access_scope</code> · <code>enqueue_classification</code> 추가"],
-            ["6", "분류 결과 필드", "15개", "22개 — <code>rule_evaluation_factors</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> · <code>automation_assessment</code> · <code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> 추가"],
+            ["5", "등록 폼 필드", "<code>doc_type</code> · <code>external_ref</code>", "<code>doc_type</code> · <code>external_ref</code> 는 받지 않습니다(보내도 무시). <code>source_type</code> · <code>security_marking</code> · <code>access_scope</code> · <code>enqueue_classification</code> 추가"],
+            ["6", "분류 결과 필드", "15개", "IF-05 결과 한 건은 18개 — <code>rule_evaluation_factors</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> · <code>automation_assessment</code> 추가. 사람이 확정한 등급 <code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> 은 IF-06 에서만 옵니다"],
             ["7", "오류 본문", "<code>{code, message, …}</code>", "대부분 <code>{\"detail\": …}</code>. <code>code</code> 는 413·429·500 에만 있고 값은 <code>KOIPA_BODY_TOO_LARGE</code> · <code>KOIPA_RATE_LIMIT</code> · <code>KOIPA_INTERNAL</code> 셋뿐입니다"],
-            ["8", "문서 조회(IF-06)", "분류 결과 전체", "저장된 요약만 채워집니다(4장 표의 마지막 열)"],
+            ["8", "문서 조회(IF-06)", "분류 결과 전체", "저장된 요약 10개 항목만 담습니다(3-4장 표)"],
         ],
         center={0}, widths=[4, 20, 30, 46],
     ))

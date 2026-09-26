@@ -188,7 +188,7 @@ def test_ingest_empty_extraction_counts_empty_not_review():
     assert _metric("empty") >= before + 1
 
 
-def test_complete_100_page_text_extraction_reports_full_coverage():
+def test_complete_100_page_text_extraction_reports_the_page_count():
     res = _ingest(ExtractResult(
         text="텍스트 PDF 본문 " * 100,
         method="parser",
@@ -197,9 +197,7 @@ def test_complete_100_page_text_extraction_reports_full_coverage():
         total_pages=100,
     ))
 
-    assert res.pages_processed == 100
     assert res.pages_total == 100
-    assert res.extraction_complete is True
     assert res.requires_review is False
 
 

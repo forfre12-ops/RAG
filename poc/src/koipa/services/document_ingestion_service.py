@@ -11,7 +11,6 @@
   이후 ClassifyService.classify(doc_id) 가 "이미 존재하는 documents"를 소비.
 
 설계 노트:
-- 가이드 문서(GuideService)와는 별도 도메인 — 이쪽은 등급 판정 대상 비밀문서.
 - DB·object storage 미가용 시 best-effort: persisted=False + warnings 로 안전 반환
   (classify_service 의 best-effort 영속화 패턴과 동일 철학).
 - extract()는 path를 받으므로 임시파일 경유. 원본 진실 소스는 storage(raw_text_uri).
@@ -137,9 +136,7 @@ class IngestResult:
     extraction_quality: float
     char_count: int
     chunk_count: int
-    pages_processed: int | None
     pages_total: int | None
-    extraction_complete: bool
     raw_text_uri: str
     normalized_text_uri: Optional[str]
     persisted: bool
@@ -178,14 +175,12 @@ class DocumentIngestionService:
         *,
         filename: str,
         content_bytes: bytes,
-        doc_type: Optional[str] = None,
         source_type: Optional[str] = None,
         # [ICD §3.2·§3.3] 관리성(M)의 근거. 본문에서 관측되지 않는 축이라 여기서 받지
         # 않으면 영영 못 받는다. metadata_ 에 저장해 두면 분류 때 _effective_metadata 가
         # 읽어 Gate 로 넘긴다.
         security_marking: Optional[str] = None,
         access_scope: Optional[str] = None,
-        external_ref: Optional[str] = None,
         created_by: Optional[str] = None,
         db=None,
         persist: bool = True,
@@ -224,20 +219,9 @@ class DocumentIngestionService:
         if not text:
             warns.append("no text extracted")
 
-        pages_processed = getattr(ext, "pages", None) if ext else None
         pages_total = getattr(ext, "total_pages", None) if ext else None
         if pages_total is None:
-            pages_total = pages_processed
-        extraction_complete = not any(
-            "truncated" in str(w).lower()
-            for w in (getattr(ext, "warnings", None) or [])
-        )
-        if (
-            pages_processed is not None
-            and pages_total is not None
-            and pages_processed < pages_total
-        ):
-            extraction_complete = False
+            pages_total = getattr(ext, "pages", None) if ext else None
 
         # [P0#3] 저품질 추출 → 검수 라우팅 판정 + 열화 메트릭(무음 오분류 방지).
         review_decision, degrade_reasons = self._extraction_review(
@@ -270,16 +254,12 @@ class DocumentIngestionService:
                 raw_uri=raw_uri,
                 norm_uri=norm_uri,
                 pre=pre,
-                doc_type=doc_type,
                 source_type=source_type,
                 security_marking=security_marking,
                 access_scope=access_scope,
-                external_ref=external_ref,
                 created_by=created_by,
                 requires_review=review_decision.requires_review,
-                pages_processed=pages_processed,
                 pages_total=pages_total,
-                extraction_complete=extraction_complete,
             )
             warns.extend(pwarns)
 
@@ -312,9 +292,7 @@ class DocumentIngestionService:
             extraction_quality=(float(ext.quality) if ext else 0.0),
             char_count=len(text),
             chunk_count=(len(pre.chunks) if pre else 0),
-            pages_processed=pages_processed,
             pages_total=pages_total,
-            extraction_complete=extraction_complete,
             raw_text_uri=raw_uri,
             normalized_text_uri=norm_uri,
             persisted=persisted,
@@ -444,17 +422,13 @@ class DocumentIngestionService:
         raw_uri: str,
         norm_uri: Optional[str],
         pre: Optional[PreprocessResult],
-        doc_type: Optional[str],
         source_type: Optional[str],
         # ICD §3.2·§3.3 — metadata_ 에 저장해야 분류 때 _effective_metadata 가 읽는다
         security_marking: Optional[str] = None,
         access_scope: Optional[str] = None,
-        external_ref: Optional[str] = None,
         created_by: Optional[str] = None,
         requires_review: bool = False,
-        pages_processed: int | None = None,
         pages_total: int | None = None,
-        extraction_complete: bool = True,
     ) -> tuple[object, bool, list[str]]:
         warns: list[str] = []
         ext = pre.extraction if pre else None
@@ -498,19 +472,15 @@ class DocumentIngestionService:
                 extraction_method=(ext.method if ext else None),
                 extraction_quality=(float(ext.quality) if ext else None),
                 processing_status=status,
-                external_ref=external_ref,
                 metadata=(
                     {
                         k: v
                         for k, v in {
-                            "doc_type": doc_type,
                             "source_type": source_type,
                             # ICD §3.2·§3.3 — 분류 때 _effective_metadata 가 읽어 게이트로 넘긴다
                             "security_marking": security_marking,
                             "access_scope": access_scope,
-                            "pages_processed": pages_processed,
                             "pages_total": pages_total,
-                            "extraction_complete": extraction_complete,
                         }.items()
                         if v is not None
                     }

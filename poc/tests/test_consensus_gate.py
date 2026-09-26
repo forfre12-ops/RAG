@@ -89,7 +89,3 @@ def test_require_evidence_false_admits_agree_without_evidence():
     assert not r3.is_gold and r3.status == "needs_review_no_evidence"
 
 
-def test_legacy_keyword_args_swallowed():
-    # 구 keyword 인자(min_rule_conf/min_llm_conf)는 **_legacy로 흡수 — TypeError 안 남(1릴리스 한시).
-    r = evaluate_consensus("S2", "S2", has_real_evidence=True, min_rule_conf=0.5, min_llm_conf=0.7)
-    assert r.is_gold

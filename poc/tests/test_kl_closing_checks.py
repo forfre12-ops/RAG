@@ -2,12 +2,11 @@
 
 기존 test_kl_integration.py가 시나리오 흐름을 커버하고
 test_kl_contract.py가 OpenAPI ↔ pydantic 정합을 커버.
-본 모듈은 doc/19 §4에 남아 있던 closing 4건만 보강:
+본 모듈은 doc/19 §4에 남아 있던 closing 3건만 보강:
 
 1. OpenAPI 응답코드 200/201/202/404가 8 시나리오 라우터와 1:1 일치
-2. /guide/documents 업로드 시 ES alias가 새 인덱스로 스왑 (rag_indexer 계약)
-3. /schema/grades PUT 시 빠진 등급 is_active=false cascade 안전
-4. 분류 → 보정 → 재학습 사이클 corrections.consumed_in_run 닫힘
+2. /schema/grades PUT 시 빠진 등급 is_active=false cascade 안전
+3. 분류 → 보정 → 재학습 사이클 corrections.consumed_in_run 닫힘
 
 PG/ES 미가용 시 자동 skip — CI는 docker compose service로 가용.
 """
@@ -66,7 +65,6 @@ class TestOpenAPIResponseCodes:
         ("/confirm", "post"): {"200"},
         ("/schema/grades", "get"): {"200"},
         ("/schema/grades", "put"): {"200"},
-        ("/guide/documents", "post"): {"201"},
         ("/synth/generate", "post"): {"202"},
         ("/metrics/latest", "get"): {"200"},
     }

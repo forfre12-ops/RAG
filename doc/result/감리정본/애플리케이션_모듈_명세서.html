@@ -190,7 +190,6 @@ footer strong{color:var(--text-dim);}
       <tr><td class="nowrap"><code>metrics.py</code> · <code>explain.py</code></td><td>모델 지표·혼동행렬 조회 · 분류 설명가능성(근거)</td><td class="center">FUN-024</td></tr>
       <tr><td class="nowrap"><code>keyword_admin.py</code> · <code>schema_admin.py</code></td><td>키워드 사전 관리 · 등급체계(레벨) 관리</td><td class="center"><strong>FUN-023·005a</strong></td></tr>
       <tr><td class="nowrap"><code>synthesis.py</code> · <code>training.py</code> · <code>promotion.py</code></td><td>합성 생성 잡 · 재학습 트리거 · 검증라벨 승급</td><td class="center">FUN-003·004</td></tr>
-      <tr><td class="nowrap"><code>guide.py</code></td><td>규정 가이드 등록·버전 조회</td><td class="center">—</td></tr>
       <tr><td class="nowrap"><code>health.py</code></td><td>헬스체크(live/ready/deep) — 운영 probe</td><td class="center">NFR</td></tr>
       <tr><td class="nowrap"><code>app.py</code> · <code>middleware.py</code> · <code>rate_limit.py</code> · <code>prom_metrics.py</code></td><td>앱 부트·라우터 마운트 · 감사/요청ID 미들웨어 · 레이트리밋 · Prometheus 노출</td><td class="center">NFR</td></tr>
     </tbody>
@@ -208,7 +207,6 @@ footer strong{color:var(--text-dim);}
       <tr><td class="nowrap"><code>confirm_service.py</code></td><td>검수 확정/재라벨 · 검수 큐 질의 · 2인검토 게이트 · 교정 기록</td></tr>
       <tr><td class="nowrap"><code>golden_build_service.py</code> · <code>promotion_service.py</code></td><td>골든셋 후보 빌드/검수/서명 · 검증라벨(문서별) 승급</td></tr>
       <tr><td class="nowrap"><code>training_service.py</code> · <code>synthesis_service.py</code></td><td>모델 등록·배포 게이트·활성화 · 합성 생성 오케스트레이션</td></tr>
-      <tr><td class="nowrap"><code>guide_service.py</code></td><td>가이드 문서 등록·버전 관리</td></tr>
       <tr><td class="nowrap"><code>audit_chain.py</code></td><td>감사 로그 hash-chain 무결성(NFR-SEC-01)</td></tr>
       <tr><td class="nowrap"><code>outbox.py</code> · <code>idempotency.py</code> · <code>_retry.py</code></td><td>웹훅 신뢰전달(outbox·재시도·DLQ) · 멱등성 · 재시도 유틸</td></tr>
       <tr><td class="nowrap"><code>drift_monitor.py</code> · <code>metrics_service.py</code> · <code>worker_metrics_bridge.py</code></td><td>임베딩 드리프트 · 지표 서비스 · 워커→API 메트릭 브리지</td></tr>
@@ -227,8 +225,8 @@ footer strong{color:var(--text-dim);}
     <tbody>
       <tr><td class="nowrap"><code>classify_repo.py</code></td><td><code>tb_classifications</code> · <code>tb_classification_evidence</code> · <code>tb_corrections</code></td></tr>
       <tr><td class="nowrap"><code>document_repo.py</code> · <code>chunk_repo.py</code></td><td><code>tb_documents</code> · <code>tb_document_labels</code> · <code>tb_chunks</code></td></tr>
-      <tr><td class="nowrap"><code>training_repo.py</code></td><td><code>tb_model_versions</code> · <code>tb_training_runs</code> · <code>tb_training_epochs</code> · <code>tb_training_datasets</code></td></tr>
-      <tr><td class="nowrap"><code>synth_repo.py</code> · <code>guide_repo.py</code></td><td><code>tb_sample_documents</code> · <code>tb_prompt_versions</code> · <code>tb_guides</code></td></tr>
+      <tr><td class="nowrap"><code>training_repo.py</code></td><td><code>tb_model_versions</code> · <code>tb_training_runs</code></td></tr>
+      <tr><td class="nowrap"><code>synth_repo.py</code></td><td><code>tb_sample_documents</code> · <code>tb_prompt_versions</code></td></tr>
       <tr><td class="nowrap"><code>audit_repo.py</code> · <code>llm_usage_repo.py</code></td><td><code>tb_audit_log</code> · <code>tb_llm_usage</code> (월별 파티션)</td></tr>
     </tbody>
   </table>

@@ -20,8 +20,6 @@ class GoldenBuildRequest(BaseModel):
         pattern=r"^(anthropic|openai|google|gemini|vllm_qwen|vllm_exaone|local_openai|noop)$",
     )
     sensitive: bool = Field(default=False)  # True=실고객 비밀 → airgap(Qwen), 공개 클라우드 금지
-    min_rule_conf: float = Field(default=0.5, ge=0.0, le=1.0)        # 레거시(게이트 미사용)
-    min_llm_conf: float = Field(default=0.7, ge=0.0, le=1.0)         # 레거시(게이트 미사용)
     min_self_consistency: float = Field(default=0.67, ge=0.0, le=1.0)
     # False=합성 빌드 모드 — 룰 시드 근거(has_real_evidence) 미요구, rule==llm 합의+self-consistency만으로
     # admission(leakage-free 합성이 no_evidence로 무더기 탈락하던 문제 완화·레버3). 운영 기본=True.

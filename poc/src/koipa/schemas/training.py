@@ -13,7 +13,6 @@ from .common import Actor
 class TrainRequest(BaseModel):
     training_type: str = Field(pattern=r"^(full|incremental|hyperparam_search)$")
     base_model: str = "kf-deberta-base"
-    dataset_version: Optional[str] = None
     hyperparams: dict[str, Any] = Field(default_factory=dict)
     actor: Actor
 
@@ -32,7 +31,6 @@ class TrainStatus(BaseModel):
     progress: float = Field(ge=0.0, le=1.0, default=0.0)
     current_epoch: Optional[int] = None
     total_epochs: Optional[int] = None
-    metrics_so_far: Optional[dict[str, Any]] = None
     started_at: Optional[str] = None
     estimated_finish_at: Optional[str] = None
     model_version: Optional[str] = None

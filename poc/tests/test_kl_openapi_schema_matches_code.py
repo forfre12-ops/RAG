@@ -163,7 +163,7 @@ def test_the_grade_codes_match_the_code(doc, code):
 def test_the_job_result_items_are_the_classification_result(doc):
     """코드는 results 를 타입 없는 배열로 내므로 규약서가 결과 모양을 약속하는 유일한 곳이다."""
     results = doc["components"]["schemas"]["JobStatus"]["properties"]["results"]
-    assert results["items"] == {"$ref": "#/components/schemas/ClassifyResponse"}
+    assert results["items"] == {"$ref": "#/components/schemas/ClassifyJobResult"}
 
 
 def test_the_documented_healthz_fields_exist_in_the_real_response(doc):

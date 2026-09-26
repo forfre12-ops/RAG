@@ -359,8 +359,6 @@ def main() -> int:
             return fail(f"재학습 미완료 (status={ts.get('status') if ts else '?'} error={ts.get('error') if ts else ''})")
         version = ts.get("model_version")
         print(f"  • 산출 모델 버전     : {version}")
-        if ts.get("metrics_so_far"):
-            print(f"  • 학습 지표          : {json.dumps(ts['metrics_so_far'], ensure_ascii=False)}")
 
         if not do_activate:
             line("═")

@@ -9,7 +9,7 @@ dependencies = [
   # 웹 프레임워크
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
-  "python-multipart>=0.0.9",  # /guide/documents multipart 업로드
+  "python-multipart>=0.0.9",  # /documents multipart 업로드
   "prometheus-client>=0.20",  # W7 관측성 — Prometheus exposition
   "pdfminer.six>=20240706",   # W8 PDF 추출 (BSD-3, AGPL 회피) — PyMuPDF 대체 1순위
   "slowapi>=0.1.9",           # J4 API rate-limit (분당/시간당 한도, 429 + Retry-After)

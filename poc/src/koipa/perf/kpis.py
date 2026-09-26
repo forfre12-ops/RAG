@@ -137,12 +137,6 @@ KPIS: list[KPI] = [
     KPI("S4.3", "S4", "신규 코드 → retrain", "bool", "ge", True, "bool_all", requires=["pg"]),
     KPI("S4.4", "S4", "PUT p95 latency", "ms", "le", 500, "p95", requires=["pg"]),
 
-    # S5
-    KPI("S5.1", "S5", "가이드 업로드 p95 latency", "ms", "le", 30000, "p95"),
-    # dryrun: hash 임베딩 + InMemory 백엔드. full: KURE-v1 + ES. 합격선은 보수적 0.3 (도달 검증 + full 시 회귀 추적)
-    # Recall@5는 실 PG 벡터스토어(pgvector) + 학습된 모델(또는 풀 임베딩) 전제. dryrun(hash 임베딩)에선 SKIP.
-    KPI("S5.5", "S5", "후속 GET 200", "bool", "ge", True, "bool_all"),
-
     # S6
     KPI("S6.1", "S6", "generate 202 latency", "ms", "le", 500, "p95"),
     # full_only(2026-09-11): dryrun 은 noop 공급자로 합성해 본문이 자리표시 더미다. 더미에 룰 라벨러를
@@ -288,8 +282,6 @@ _SCENARIO_MODULES: dict[str, tuple[str, ...]] = {
             "src/koipa/workers"),
     "S3":  ("src/koipa/services/confirm_service.py", "src/koipa/api/confirm.py"),
     "S4":  ("src/koipa/services/schema_admin_service.py", "src/koipa/api/schema_admin.py"),
-    "S5":  ("src/koipa/services/guide_service.py",
-            "src/koipa/api/documents.py"),
     "S6":  ("src/koipa/services/synthesis_service.py", "src/koipa/modules/m1_synthesis"),
     "S7":  ("src/koipa/modules/m4_training", "src/koipa/workers"),
     "S8":  ("src/koipa/modules/m6_evaluation",),

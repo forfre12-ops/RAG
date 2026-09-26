@@ -21,20 +21,26 @@ from koipa.db.standard_names import (
     logical_names,
 )
 
-_MIG = Path(__file__).resolve().parents[1] / "alembic" / "versions" / "7b3e9d2a4f10_standard_naming.py"
+_VERSIONS = Path(__file__).resolve().parents[1] / "alembic" / "versions"
+_MIG = _VERSIONS / "7b3e9d2a4f10_standard_naming.py"
+# 표준 명명 뒤에 안 쓰는 표·칼럼을 지운 판(2026-09-26). 무엇을 지웠는지의 정본은 이 판이다.
+_DROP_MIG = _VERSIONS / "b7d3f5a19c24_drop_unused_tables_and_columns.py"
 
 # ORM 에 선언하지 않는 것 — 마이그레이션이 raw SQL 로 만든다(alembic/env.py 와 같은 목록).
 _MIGRATION_ONLY_TABLES = {"tad_dm_doc_vctr_mng"}
-_GENERATED_COLUMNS = {("tad_lm_llm_usqty_mng", "whol_tkn_cnt")}
 
 _NAME = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 
 
-def _load_migration():
-    spec = importlib.util.spec_from_file_location("mig_7b3e9d2a4f10", _MIG)
+def _load(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def _load_migration():
+    return _load(_MIG, "mig_7b3e9d2a4f10")
 
 
 def test_orm_tables_are_exactly_the_standard_tables():
@@ -44,13 +50,13 @@ def test_orm_tables_are_exactly_the_standard_tables():
 
 
 def test_orm_columns_match_standard_columns():
-    """표마다 ORM 의 DB 칼럼명 집합 == 대응표의 표준 칼럼 집합(DB 생성 칼럼은 ORM 밖)."""
+    """표마다 ORM 의 DB 칼럼명 집합 == 대응표의 표준 칼럼 집합."""
     for old, cols in COLUMNS.items():
         new_table = TABLES[old][0]
         if new_table in _MIGRATION_ONLY_TABLES:
             continue
         orm = {c.name for c in Base.metadata.tables[new_table].columns}
-        std = {new for _, new, _ in cols if (new_table, new) not in _GENERATED_COLUMNS}
+        std = {new for _, new, _ in cols}
         assert orm == std, f"{new_table}: ORM 에만 {orm - std} · 대응표에만 {std - orm}"
 
 
@@ -59,10 +65,17 @@ def test_migration_copy_matches_standard_names():
 
     ⚠ 7b3e9d2a4f10 은 **이미 서버에서 돈 판**이라 고치지 않는다. 그 뒤에 다시 바꾼 이름은
       뒤 마이그레이션이 처리하고 `POST_BASE_RENAMES` 에 남는다. 그래서 대조 전에 그
-      나중 이름을 되돌려 **그 판이 만든 이름**으로 맞춘다.
+      나중 이름을 되돌려 **그 판이 만든 이름**으로 맞춘다. 그 뒤에 **지운** 표·칼럼은
+      사본에 남아 있다 — 지운 판(b7d3f5a19c24)의 목록으로 사본에서 빼고 대조한다.
     """
     mig = _load_migration()
-    assert mig.TABLES == {old: new for old, (new, _) in TABLES.items()}
+    drop = _load(_DROP_MIG, "mig_b7d3f5a19c24")
+    dropped_tables = set(drop.TABLES)
+    dropped_cols = {(table, column) for table, column, _ in drop.COLUMNS}
+    assert dropped_tables <= set(mig.TABLES.values()), "지운 표가 표준 명명 사본에 없다"
+    assert {old: new for old, new in mig.TABLES.items() if new not in dropped_tables} == {
+        old: new for old, (new, _) in TABLES.items()
+    }
     later = {
         (table, now): made_by_base
         for table, rows in POST_BASE_RENAMES.items()
@@ -73,7 +86,32 @@ def test_migration_copy_matches_standard_names():
                    if a != later.get((old, b), b))
         for old, cols in COLUMNS.items()
     }
-    assert mig.COLUMNS == {k: v for k, v in changed.items() if v}
+    surviving = {}
+    for old, pairs in mig.COLUMNS.items():
+        table = mig.TABLES[old]
+        if table in dropped_tables:
+            continue
+        kept = tuple((a, b) for a, b in pairs if (table, b) not in dropped_cols)
+        if kept:
+            surviving[old] = kept
+    assert surviving == {k: v for k, v in changed.items() if v}
+
+
+def test_dropped_tables_and_columns_are_gone_from_orm_and_standard_names():
+    """b7d3f5a19c24 가 지운 것이 ORM 에도 정본 대응표에도 남아 있지 않다.
+
+    지웠다고 하면서 한쪽에 선언이 남으면 정의서·ERD 가 실DB 에 없는 이름을 적는다.
+    """
+    drop = _load(_DROP_MIG, "mig_b7d3f5a19c24")
+    std_tables = {new for new, _ in TABLES.values()}
+    std_cols = {(TABLES[old][0], new) for old, cols in COLUMNS.items() for _, new, _ in cols}
+    orm_cols = {(name, c.name) for name, table in Base.metadata.tables.items() for c in table.columns}
+    for table in drop.TABLES:
+        assert table not in std_tables, f"{table}: 대응표에 남아 있다"
+        assert table not in Base.metadata.tables, f"{table}: ORM 에 남아 있다"
+    for table, column, _definition in drop.COLUMNS:
+        assert (table, column) not in std_cols, f"{table}.{column}: 대응표에 남아 있다"
+        assert (table, column) not in orm_cols, f"{table}.{column}: ORM 에 남아 있다"
 
 
 def test_post_base_renames_have_a_migration_and_a_reason():

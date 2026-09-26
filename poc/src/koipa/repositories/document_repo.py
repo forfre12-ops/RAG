@@ -51,7 +51,6 @@ class DocumentRepo:
         extraction_method: str | None = None,
         extraction_quality: float | None = None,
         processing_status: str = "ready",
-        external_ref: str | None = None,
         metadata: dict | None = None,
         created_by: str | None = None,
     ) -> Document:
@@ -83,7 +82,6 @@ class DocumentRepo:
                 if processing_status in ("ready", "needs_review", "failed")
                 else None
             ),
-            external_ref=external_ref,
             metadata_=metadata or {},
             created_by=created_by,
         )

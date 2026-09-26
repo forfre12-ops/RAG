@@ -102,14 +102,7 @@ def test_every_documented_field_appears_in_the_guide(spec):
     if not (PACKAGE / pkg.GUIDE_NAME).exists():
         pytest.skip("안내서가 없다")
     text = (PACKAGE / pkg.GUIDE_NAME).read_text(encoding="utf-8")
-    for schema in ("ClassifyResponse", "JobStatus", "DocumentUploadResponse", "ClassifyAsyncResponse", "ClassifyAsyncRequest"):
+    for schema in ("ClassifyJobResult", "StoredClassificationResponse", "JobStatus", "DocumentUploadResponse", "ClassifyAsyncResponse", "ClassifyAsyncRequest"):
         props, _ = pkg.flat(spec, {"$ref": f"#/components/schemas/{schema}"})
         missing = [p for p in props if f"<code>{p}</code>" not in text]
         assert not missing, f"{schema} 의 필드가 안내서에 없다: {missing}"
-
-
-def test_the_iF06_fill_markers_name_only_real_fields(spec):
-    """IF-06 이 채운다고 적은 필드가 응답 모델에 실제로 있는지 — 오타로 표가 거짓말하지 않게."""
-    props, _ = pkg.flat(spec, {"$ref": "#/components/schemas/ClassifyResponse"})
-    assert pkg.IF06_FILLED <= set(props)
-    assert pkg.IF06_DEFAULT_ONLY <= set(props)

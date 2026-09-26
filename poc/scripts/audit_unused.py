@@ -85,7 +85,6 @@ EXPLAINED_COLS = {
     "logged_at": "server_default now() — DB 가 채운다",
     "active_key": "Computed 칼럼 — is_active 에서 DB 가 계산. UNIQUE 인덱스가 활성 1건 제약을 만든다",
     "model_type": "server_default 'classifier' — 코드가 넣는 값이 하나뿐이고 읽지 않는다(기록용)",
-    "split_method": "실 데이터에 값이 있어 보류(2026-08-29 판단 유지)",
 }
 # [2026-09-11] 키는 models.py 의 __tablename__ — 표준 명명(7b3e9d2a4f10) 이후 이름. 옛 이름은 주석.
 EXPLAINED_TABLES = {
@@ -97,9 +96,6 @@ EXPLAINED_TABLES = {
     "tad_pm_prmpt_ver_mng": "합성 프롬프트 버전 — 워커가 등록하고 sample 행이 FK 로 참조(2026-09-05 배선)",
     # tb_advisory_locks
     "tad_sy_lck_mng": "잠금 행 — 마이그레이션이 미리 넣고 런타임은 FOR UPDATE 로 잡기만",
-    # tb_document_factor_scores
-    "tad_dm_doc_rqmt_scr_mng": "쓰기 0(영원히 빈다) · 실 DB 0행 — 정의서에서도 뺐다(EXCLUDED_TABLES). "
-                               "읽기는 1(모델 select 자체는 있음, 대상 행이 없을 뿐)",
 }
 
 

@@ -26,7 +26,6 @@ from koipa.api import promotion as promotion_api
 from koipa.api import training as training_api
 from koipa.api import synthesis as synthesis_api
 from koipa.api import golden as golden_api
-from koipa.api import guide as guide_api
 from koipa.api import documents as documents_api
 from koipa.api import schema_admin as schema_admin_api
 from koipa.api import metrics as metrics_api
@@ -363,7 +362,7 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # #13: JSON 본문 크기 DoS 가드 — 가장 마지막 add_middleware = 스택 최외곽.
 # body 파싱·다른 미들웨어보다 먼저 Content-Length를 검사해 대용량 body를 즉시 차단한다.
-# 멀티파트 업로드(documents/guide)는 라우터에서 max_upload_mb로 처리되므로, 이 한도는
+# 멀티파트 업로드(documents)는 라우터에서 max_upload_mb로 처리되므로, 이 한도는
 # 일반 JSON에 적용되되 정상 요청·dryrun/테스트는 통과하도록 충분히 크게(기본 25MB) 잡는다.
 app.add_middleware(
     BodySizeLimitMiddleware,
@@ -426,7 +425,6 @@ else:
 # FastAPI 는 등록 순서대로 매칭하므로 정적 경로를 가변 경로보다 앞에 둔다.
 app.include_router(golden_api.html_router, prefix="/api/v1")
 app.include_router(golden_api.router, prefix="/api/v1")
-app.include_router(guide_api.router, prefix="/api/v1")
 app.include_router(documents_api.router, prefix="/api/v1")
 app.include_router(
     schema_admin_api.router, prefix="/api/v1",

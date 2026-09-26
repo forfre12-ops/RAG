@@ -221,8 +221,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#ep-documents"><span class="toc-method post">POST</span> /documents</a>
     <a class="toc-item" href="#ep-documents-analyze"><span class="toc-method post">POST</span> /documents/analyze</a>
     <a class="toc-item" href="#ep-golden-build"><span class="toc-method post">POST</span> /golden/build</a>
-    <a class="toc-item" href="#ep-guide-documents"><span class="toc-method post">POST</span> /guide/documents</a>
-    <a class="toc-item" href="#ep-promotions"><span class="toc-method get">GET</span> /promotions/pending</a>
+    <a class="toc-item" href="#ep-promotions"><span class="toc-method post">POST</span> /promotions/promote</a>
     <a class="toc-item" href="#ep-schema-get"><span class="toc-method get">GET</span> /schema/grades</a>
     <a class="toc-item" href="#ep-schema-put"><span class="toc-method put" style="background:var(--put)">PUT</span> /schema/grades</a>
     <a class="toc-item" href="#ep-keywords-get"><span class="toc-method get">GET</span> /admin/keywords</a>
@@ -270,7 +269,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <h3 style="margin-top:16px;">인증 모드</h3>
         <p style="font-size:13px;"><code>AUTH_MODE</code> 설정: <code>jwt</code>(JWT 전용) · <code>api_key</code>(API 키 전용) · <code>both</code>(둘 다 허용). 설정한 모드가 모든 라우터에 일괄 적용된다. API 키 검증은 타이밍 사이드채널을 차단하도록 수행된다.</p>
         <h3 style="margin-top:16px;">신뢰 경계 — KL 단일 연동 (고객사 격리는 KL 포털)</h3>
-        <p style="font-size:13px;"><strong>KL이 고객사(회원사) 페이지를 일원 구축</strong>하므로, 고객사 간 데이터 격리(어느 회원사가 어느 문서를 보는지)는 <strong>KL 포털 계층</strong>에서 처리한다. Koipa는 KL 백엔드를 단일 신뢰 클라이언트로 받는 분류 엔진이다. 인증 신원(actor_id·role)은 <code>request.state</code>에 저장되어 <strong>역할 기반 권한(RBAC)</strong>과 감사 로그 actor 식별에만 쓰인다. 감사 로그의 actor_id는 위조 가능 헤더 대신 인증 컨텍스트에서 도출된다. <span class="nego-chip">협의 필요</span> 고객사 식별자(예: <code>external_ref</code> 규약)를 Koipa 응답·감사에 어느 수준까지 남길지는 KL과 합의.</p>
+        <p style="font-size:13px;"><strong>KL이 고객사(회원사) 페이지를 일원 구축</strong>하므로, 고객사 간 데이터 격리(어느 회원사가 어느 문서를 보는지)는 <strong>KL 포털 계층</strong>에서 처리한다. Koipa는 KL 백엔드를 단일 신뢰 클라이언트로 받는 분류 엔진이다. 인증 신원(actor_id·role)은 <code>request.state</code>에 저장되어 <strong>역할 기반 권한(RBAC)</strong>과 감사 로그 actor 식별에만 쓰인다. 감사 로그의 actor_id는 위조 가능 헤더 대신 인증 컨텍스트에서 도출된다. <span class="nego-chip">협의 필요</span> 고객사 식별자(예: KL 문서번호)를 Koipa 응답·감사에 어느 수준까지 남길지는 KL과 합의.</p>
         <h3 style="margin-top:16px;">Rate Limit</h3>
         <p style="font-size:13px;">기본 <strong>120 req/min</strong>, 라우터별 별도 한도 (분류 동기 60/분 · /classify/explain 30/분 · /synth/generate 10/분 · /train <strong>10/시간</strong>). 한도 키는 <strong>인증된 신원</strong>(actor) 우선, 미인증 시 IP 폴백이다. 초과 시 <code>429</code> + <code>Retry-After</code> 헤더로 응답한다.</p>
         <h3 style="margin-top:16px;">감사 · 추적</h3>
@@ -640,7 +639,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       </div>
       <div class="ep-body">
         <p class="ep-desc"><strong>KL 자료등록(FUN-001)이 받은 원본 파일</strong>(HWP/PDF/DOCX/TXT)을 이 엔드포인트로 전달하면, Koipa가 <strong>추출·정규화·PII 마스킹·청킹(FUN-022)</strong>을 수행해 <code>tb_chunks</code>를 생성한다. <code>multipart/form-data</code>. 포맷 자동 감지 → 텍스트 추출 → 정규화·마스킹 → 청킹. 이후 <code>POST /classify?doc_id=...</code>로 등급 판정. <em>(FUN-022 요건은 <b>전자문서</b>(HWP/DOCX/PDF) 텍스트 추출이며, 스캔/이미지 PDF 는 OCR 을 하지 않는다 — 본문이 없으면 failed 로 격리하고, 열화 추출은 needs_review 로 라우팅한다.)</em></p>
-        <p style="font-size:12.5px;color:var(--text-dim);">※ 현재 소스 기준 Koipa가 업로드 파일을 추출·정규화하고 <code>tb_documents</code>와 <code>tb_chunks</code>에 저장한다. KL 원천 문서/EDMS 키는 <code>external_ref</code>와 메타데이터로 연결하는 외부 참조다.</p>
+        <p style="font-size:12.5px;color:var(--text-dim);">※ 현재 소스 기준 Koipa가 업로드 파일을 추출·정규화하고 <code>tb_documents</code>와 <code>tb_chunks</code>에 저장한다. KL 원천 문서/EDMS 번호는 엔진에 저장하지 않는다 — 등록 응답의 <code>doc_id</code> 와 KL 쪽 문서번호의 대응은 KL 이 보관한다(<code>doc_type</code>·<code>external_ref</code> 입력은 받지 않으며 보내도 무시된다).</p>
         <p style="font-size:12.5px;color:var(--text-dim);">KL 자료등록이 고객사 입력 <strong>메타데이터(보안표시·접근범위·출처, 아래 굵게)</strong>를 함께 전달하면, 등급 판정(FUN-024)의 메타데이터 기반 격리 판단에 사용된다. 이 메타데이터와 원본/정규화 URI는 문서 레코드에 함께 보존된다.</p>
         <h4>Request (multipart/form-data)</h4>
         <table class="ftbl">
@@ -648,8 +647,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tbody>
             <tr><td class="f-name">file</td><td class="f-type">binary</td><td class="f-req yes">●</td><td>HWP · DOCX · PDF · TXT (최대 <strong>20MB</strong>)</td></tr>
             <tr><td class="f-name">actor</td><td class="f-type">string (JSON)</td><td class="f-req yes">●</td><td>Actor JSON 문자열 (multipart 제약)</td></tr>
-            <tr><td class="f-name">doc_type</td><td class="f-type">string</td><td></td><td>문서 유형 태그 (자유 형식)</td></tr>
-            <tr><td class="f-name">external_ref</td><td class="f-type">string</td><td></td><td>외부 EDMS 연계 ID · KL 고객사 원천 문서 키 (고객사 식별/연계는 KL 측 관리)</td></tr>
             <tr><td class="f-name"><b>security_marking</b></td><td class="f-type">string</td><td></td><td><b>KL 보안표시</b>(ICD §3.2) — <code>top_secret·secret·confidential·none</code>. 표시 등급이 내용 예측보다 높으면 격리 등급 상향(floor) 입력이 된다 <span class="nego-chip">협의 필요</span></td></tr>
             <tr><td class="f-name"><b>access_scope</b></td><td class="f-type">string</td><td></td><td><b>KL 접근범위</b>(ICD §3.3) — <code>approved_only·designated·department·all_employees</code>. 제한적이면 검수 라우팅 <span class="nego-chip">협의 필요</span></td></tr>
             <tr><td class="f-name"><b>source_type</b></td><td class="f-type">string</td><td></td><td>출처 provenance — <code>public·registered_patent·academic·internal·external_confidential</code>. 공개 출처면 S3로 cap된다</td></tr>
@@ -720,30 +717,15 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       </div>
     </div>
 
-    <div class="ep" id="ep-guide-documents">
-      <div class="ep-header">
-        <span class="method post">POST</span>
-        <span class="ep-path">/api/v1/guide/documents · GET /api/v1/guide/documents/{guide_id}</span>
-        <span class="ep-summary">가이드 문서 등록·버전 조회</span>
-        <span class="ep-auth">JWT (POST admin · kl_backend / GET 인증)</span>
-      </div>
-      <div class="ep-body">
-        <p class="ep-desc">가이드 문서를 등록하고 등록 결과를 반환한다. 버전 조회는 특정 <code>guide_id</code>의 현재 학습 버전과 등록 버전 목록을 반환한다.</p>
-        <p style="font-size:13px;"><code>GuideUploadResponse = {guide_id, version, triggers_retraining}</code></p>
-        <p style="font-size:13px;"><code>GuideVersionList = {guide_id, current_training_version, versions:[{version, effective_date, change_summary, registered_at}]}</code></p>
-      </div>
-    </div>
-
     <div class="ep" id="ep-promotions">
       <div class="ep-header">
-        <span class="method get">GET</span>
-        <span class="ep-path">/api/v1/promotions/pending · POST /api/v1/promotions/promote</span>
-        <span class="ep-summary">검증 라벨 승격 후보 조회·승격</span>
+        <span class="method post">POST</span>
+        <span class="ep-path">/api/v1/promotions/promote</span>
+        <span class="ep-summary">검증 라벨 승격</span>
         <span class="ep-auth">JWT (admin · reviewer)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">사람 검수로 확정된 교정을 검증 라벨로 승격할 후보 목록을 조회하고, 선택한 문서를 승격한다. 자동 학습 데이터 편입이 아니라 검토자가 명시적으로 확정하는 경로다.</p>
-        <p style="font-size:13px;"><code>GET /promotions/pending</code> → <code>{count, items:[{doc_id, proposed_label, corrected_by, corrected_at, reason, current_verified_label, classification_id}]}</code></p>
+        <p class="ep-desc">사람 검수로 확정된 교정을, 선택한 문서에 한해 검증 라벨로 승격한다. 자동 학습 데이터 편입이 아니라 검토자가 명시적으로 확정하는 경로다. 승격 대기 목록을 따로 조회하는 경로는 없다 — 확정 등급은 <code>GET /classify/{doc_id}</code> 의 <code>confirmed_*</code> 로 읽는다.</p>
         <p style="font-size:13px;"><code>POST /promotions/promote</code> body <code>{doc_id, actor, expected_label, note}</code> → <code>{doc_id, status, promoted_label, labeler_id, warnings}</code></p>
       </div>
     </div>
@@ -947,17 +929,16 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <div class="ep" id="ep-admin-status">
       <div class="ep-header">
         <span class="method get">GET</span>
-        <span class="ep-path">/api/v1/admin/escalation-held · /admin/locked-readiness · /admin/dashboard</span>
-        <span class="ep-summary">운영 상태·락드 평가 준비도·대시보드</span>
+        <span class="ep-path">/api/v1/admin/locked-readiness · /admin/dashboard</span>
+        <span class="ep-summary">락드 평가 준비도·대시보드</span>
         <span class="ep-auth">JWT (admin role)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">현재 구현된 admin 조회 API는 키 발급/모델 목록이 아니라 운영 상태 진단이다. <code>/admin/escalation-held</code>는 게이트 보류 건수, <code>/admin/locked-readiness</code>는 등급별 locked eval 준비도, <code>/admin/dashboard</code>는 운영 대시보드 요약을 반환한다.</p>
+        <p class="ep-desc">현재 구현된 admin 조회 API는 키 발급/모델 목록이 아니라 운영 상태 진단이다. <code>/admin/locked-readiness</code>는 등급별 locked eval 준비도, <code>/admin/dashboard</code>는 게이트 보류 건수(<code>escalation_held</code>)를 포함한 운영 대시보드 요약을 반환한다.</p>
         <h4>Response 요약</h4>
         <table class="ftbl">
           <thead><tr><th>엔드포인트</th><th>주요 필드</th></tr></thead>
           <tbody>
-            <tr><td class="f-name">/admin/escalation-held</td><td><code>{by_grade,total}</code></td></tr>
             <tr><td class="f-name">/admin/locked-readiness</td><td><code>{ready, per_grade, missing, min_per_grade, require_locked_eval, deploy_locked_gate_passed, reason}</code></td></tr>
             <tr><td class="f-name">/admin/dashboard</td><td><code>{generated_at, escalation_held, locked_readiness, active_learning, kill_gate, drift, degraded}</code></td></tr>
           </tbody>
@@ -1213,7 +1194,7 @@ koipa_embedding_cache_miss_total</pre>
           <tr><td>400</td><td>—</td><td>요청 바디 검증 실패 — <code>documents must not be empty</code></td><td>detail 메시지 확인</td></tr>
           <tr><td>401</td><td>—</td><td>인증 실패 — <code>missing bearer token</code> · <code>missing authorization</code> · <code>invalid api key</code> · <code>unauthenticated</code></td><td>Authorization 헤더 · API 키 확인</td></tr>
           <tr><td>403</td><td>—</td><td>권한 부족 · 서명 URL 토큰 무효 — <code>invalid or missing signed-URL token (?t=)</code></td><td>admin 역할 · 서명 URL 확인</td></tr>
-          <tr><td>404</td><td>—</td><td>리소스 없음 — <code>job not found</code> · <code>no classification for doc_id</code> · <code>guide_id not found</code> · <code>model_version not found</code> · <code>no active model</code> 등</td><td>식별자 확인</td></tr>
+          <tr><td>404</td><td>—</td><td>리소스 없음 — <code>job not found</code> · <code>no classification for doc_id</code> · <code>model_version not found</code> · <code>no active model</code> 등</td><td>식별자 확인</td></tr>
           <tr><td>409</td><td>—</td><td>동일 <code>Idempotency-Key</code> 요청이 처리 중(in-flight) · 데모 마커 문서의 물리삭제 거부(fail-safe)</td><td>완료 후 재시도 · 관리자 확인</td></tr>
           <tr><td>413</td><td>—</td><td>업로드 파일 크기 초과(<code>max_upload_mb</code>, 기본 20MB) · 배치 크기 초과(<code>batch size &gt; 1000</code>)</td><td>파일 · 배치 크기 축소</td></tr>
           <tr><td>413</td><td><code>KOIPA_BODY_TOO_LARGE</code></td><td>요청 본문 크기 초과 (일반 JSON)</td><td>본문 25MB 이하로</td></tr>
@@ -1224,7 +1205,7 @@ koipa_embedding_cache_miss_total</pre>
       </table>
     </div>
 
-    <p style="margin-top:32px;font-size:13px;color:var(--text-dim);">실제 응답 바디 예시: <code>{"detail":"guide_id not found"}</code> · 본문 초과 시 <code>{"detail":"…","code":"KOIPA_BODY_TOO_LARGE"}</code>. 데모 콘솔(<code>/demo/</code>)은 영문 <code>detail</code>이 발주처에 그대로 노출되지 않도록 정적 매핑 파일 <code>api/static/errors_ko.js</code>로 한국어 문구를 <b>화면 표시 시점에</b> 치환한다 — 서버 응답 자체를 한국어로 바꾸는 것이 아니며, 오류코드 카탈로그도 아니다.</p>
+    <p style="margin-top:32px;font-size:13px;color:var(--text-dim);">실제 응답 바디 예시: <code>{"detail":"job not found"}</code> · 본문 초과 시 <code>{"detail":"…","code":"KOIPA_BODY_TOO_LARGE"}</code>. 데모 콘솔(<code>/demo/</code>)은 영문 <code>detail</code>이 발주처에 그대로 노출되지 않도록 정적 매핑 파일 <code>api/static/errors_ko.js</code>로 한국어 문구를 <b>화면 표시 시점에</b> 치환한다 — 서버 응답 자체를 한국어로 바꾸는 것이 아니며, 오류코드 카탈로그도 아니다.</p>
 
   </article>
 </div>

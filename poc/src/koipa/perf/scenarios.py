@@ -537,61 +537,6 @@ def s4_schema_grades(ctx: ScenarioContext) -> None:
 
 
 # ----------------------------------------------------------------
-# S5. guide upload + RAG
-# ----------------------------------------------------------------
-
-def s5_guide_upload(ctx: ScenarioContext) -> None:
-    # [2026-09] 유사문서 검색(RAG) 폐기로 가이드 업로드의 색인 단계가 없어졌다.
-    # 색인 산출을 재던 KPI 3개(벡터 수·색인 throughput·Recall@5)는 잴 대상이 사라져
-    # 함께 걷었다. 남는 것은 업로드 지연(s5_1)과 후속 버전조회 200(s5_5)이다.
-    make = _client_factory()
-    warmup = 2
-    N = 5
-    actor = {"user_id": "psh-admin", "role": "admin"}
-
-    latencies: list[float] = []
-    list_ok = True
-    last_gid = ""
-
-    with make() as cli:
-        for i in range(warmup + N):
-            gid = f"psh-s5-{uuid.uuid4().hex[:8]}"
-            last_gid = gid
-            # [2026-09-06] JSON 본문으로 고쳤다. 2026-09-05 에 이 API 가 파일을 안 받게
-            # 바뀌었는데(원문이 우리 메모리를 지나는 경로를 없앴다) 여기는 multipart 를
-            # 계속 보내 **전건 422** 였다. 하니스가 그 전날부터 죽어 있어 아무도 못 봤다.
-            elapsed, r = _time_call(
-                lambda: cli.post(
-                    "/api/v1/guide/documents",
-                    headers=_hdr(role="admin"),
-                    json={
-                        "guide_id": gid,
-                        "version": "v1.0",
-                        "effective_date": "2026-06-01",
-                        "change_summary": "PSH S5",
-                        "actor": actor,
-                        "doc_type": "guideline",
-                        # 파일은 안 보낸다 — 파일명은 사람이 읽는 메타로만 남는다.
-                        "filename": "guide.txt",
-                    },
-                )
-            )
-            if i < warmup:
-                continue
-            if r.status_code != 201:
-                continue
-            latencies.append(elapsed)
-
-        if last_gid:
-            rg = cli.get(f"/api/v1/guide/documents/{last_gid}", headers=_hdr(role="admin"))
-            list_ok = rg.status_code == 200
-
-    for lat in latencies:
-        ctx.record("s5_1", lat)
-    ctx.record("s5_5", list_ok)
-
-
-# ----------------------------------------------------------------
 # S6. synth flow
 # ----------------------------------------------------------------
 
@@ -1744,7 +1689,6 @@ SPECS: list[ScenarioSpec] = [
     ScenarioSpec("S2", "대용량 비동기 분류", s2_async_batch),
     ScenarioSpec("S3", "관리자 확정·재라벨", s3_confirm_relabel),
     ScenarioSpec("S4", "등급체계 변경", s4_schema_grades),
-    ScenarioSpec("S5", "가이드 업로드·버전조회", s5_guide_upload),
     ScenarioSpec("S6", "합성 생성→검수", s6_synth),
     ScenarioSpec("S7", "URGENT_RETRAIN", s7_urgent_retrain, requires=["pg"]),
     ScenarioSpec("S8", "운영 지표·CM", s8_metrics),

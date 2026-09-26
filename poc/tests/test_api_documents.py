@@ -68,6 +68,8 @@ class TestDocumentUploadBasic:
         # DB 가용 환경 → persisted=True
         assert isinstance(j["persisted"], bool)
         assert isinstance(j["warnings"], list)
+        # 2026-09-26 에 뺀 항목 — 추출이 잘렸는지(extraction_complete)·처리 쪽수(pages_processed)는 응답에 없다
+        assert "extraction_complete" not in j and "pages_processed" not in j
 
     def test_docx_upload_201(self, client):
         docx = pytest.importorskip("docx")
@@ -96,13 +98,19 @@ class TestDocumentUploadBasic:
 
 
 # ---------------------------------------------------------------------------
-# doc_type / external_ref 메타 전달
+# 등록 때 받는 메타(ICD §3.1~3.3)
 # ---------------------------------------------------------------------------
 class TestDocumentUploadMeta:
-    def test_doc_type_forwarded(self, client):
+    def test_icd_metadata_forwarded(self, client):
         body = b"test metadata forwarding"
-        r = _post(client, "m.txt", body, doc_type="기술보고서", external_ref="EDMS-001")
+        r = _post(client, "m.txt", body, source_type="internal", security_marking="confidential", access_scope="department")
         assert r.status_code == 201, r.text
+
+    def test_removed_form_fields_are_ignored(self, client):
+        """doc_type·external_ref 는 2026-09-26 에 없앴다(저장만 하고 아무도 안 읽었다). 옛 안내서대로 보내도 무시되고 201 이다."""
+        r = _post(client, "m.txt", b"legacy form fields", doc_type="기술보고서", external_ref="EDMS-001")
+        assert r.status_code == 201, r.text
+        assert "doc_type" not in r.json() and "external_ref" not in r.json()
 
     def test_same_content_same_hash(self, client):
         body = b"same content document"

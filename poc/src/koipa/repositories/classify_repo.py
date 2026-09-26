@@ -73,9 +73,7 @@ class ClassifyRepo:
         alternatives: list[dict],
         automation_assessment: dict | None = None,
         chunk_count: int | None = None,
-        aggregation_method: str = "hybrid",
         status: str = "staging",
-        inference_ms: int | None = None,
     ) -> Classification:
         cls = Classification(
             doc_id=doc_id,
@@ -85,16 +83,15 @@ class ClassifyRepo:
             alternatives=alternatives,
             automation_assessment=automation_assessment,
             chunk_count=chunk_count,
-            aggregation_method=aggregation_method,
             status=status,
             # 생성 시점 status = 게이트의 최종 판정 그 자체. 이후 confirm/correction이
             # status를 바꿔도 initial_status는 update_status()가 손대지 않아 동결 보존된다.
             initial_status=status,
-            inference_ms=inference_ms,
         )
         self.db.add(cls)
         self.db.flush()
         return cls
+
     def add_evidence_from_spans(
         self,
         classification_id: uuid.UUID,

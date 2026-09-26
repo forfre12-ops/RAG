@@ -1,4 +1,4 @@
-"""Training/Model 도메인 — TrainingRun · TrainingEpoch · TrainingDataset · ModelVersion."""
+"""Training/Model 도메인 — TrainingRun · ModelVersion."""
 
 from __future__ import annotations
 
@@ -11,8 +11,6 @@ from sqlalchemy.orm import Session
 
 from koipa.db.models import (
     ModelVersion,
-    TrainingDataset,
-    TrainingEpoch,
     TrainingRun,
 )
 
@@ -29,22 +27,14 @@ class TrainingRepo:
         self,
         *,
         total_samples: int,
-        train_count: int | None = None,
-        val_count: int | None = None,
-        test_count: int | None = None,
         hyperparameters: dict | None = None,
         trigger_type: str = "manual",
-        trigger_ref: str | None = None,
         created_by: str | None = None,
     ) -> TrainingRun:
         run = TrainingRun(
             total_samples=total_samples,
-            train_count=train_count,
-            val_count=val_count,
-            test_count=test_count,
             hyperparameters=hyperparameters or {},
             trigger_type=trigger_type,
-            trigger_ref=trigger_ref,
             created_by=created_by,
         )
         self.db.add(run)
@@ -114,6 +104,16 @@ class TrainingRepo:
         if duration_sec is not None:
             run.duration_sec = duration_sec
 
+    def version_labels(self, version_ids: Iterable[uuid.UUID | None]) -> dict[uuid.UUID, str]:
+        """모델버전 UUID → 라벨 문자열(v-…). 학습 작업 응답이 어떤 모델이 나왔는지를 라벨로 보여 주는 데 쓴다."""
+        ids = [i for i in version_ids if i is not None]
+        if not ids:
+            return {}
+        rows = self.db.execute(
+            select(ModelVersion.version_id, ModelVersion.version_label).where(ModelVersion.version_id.in_(ids))
+        ).all()
+        return {vid: label for vid, label in rows}
+
     def get_run(self, run_id: uuid.UUID) -> TrainingRun | None:
         return self.db.get(TrainingRun, run_id)
 
@@ -137,63 +137,6 @@ class TrainingRepo:
         return int(self.db.execute(stmt).scalar_one())
 
     # ------------------------------------------------------------
-    # TrainingEpoch
-    # ------------------------------------------------------------
-
-    def log_epoch(
-        self,
-        run_id: uuid.UUID,
-        epoch: int,
-        *,
-        train_loss: float | None = None,
-        val_loss: float | None = None,
-        val_metrics: dict | None = None,
-        learning_rate: float | None = None,
-    ) -> TrainingEpoch:
-        ep = TrainingEpoch(
-            run_id=run_id,
-            epoch=epoch,
-            train_loss=train_loss,
-            val_loss=val_loss,
-            val_metrics=val_metrics or {},
-            learning_rate=learning_rate,
-        )
-        self.db.add(ep)
-        return ep
-
-    def epochs_for_run(self, run_id: uuid.UUID) -> list[TrainingEpoch]:
-        return list(
-            self.db.execute(
-                select(TrainingEpoch)
-                .where(TrainingEpoch.run_id == run_id)
-                .order_by(TrainingEpoch.epoch)
-            ).scalars()
-        )
-
-    # ------------------------------------------------------------
-    # TrainingDataset
-    # ------------------------------------------------------------
-
-    def register_dataset_rows(
-        self,
-        run_id: uuid.UUID,
-        rows: Iterable[tuple[uuid.UUID, str, int]],
-    ) -> int:
-        """rows: iterable of (doc_id, split_type, level_id)."""
-        count = 0
-        for doc_id, split_type, level_id in rows:
-            self.db.add(
-                TrainingDataset(
-                    run_id=run_id,
-                    doc_id=doc_id,
-                    split_type=split_type,
-                    level_id=level_id,
-                )
-            )
-            count += 1
-        return count
-
-    # ------------------------------------------------------------
     # ModelVersion
     # ------------------------------------------------------------
 
@@ -204,18 +147,14 @@ class TrainingRepo:
         base_model: str,
         metrics: dict,
         training_run_id: uuid.UUID | None = None,
-        mlflow_run_id: str | None = None,
         model_uri: str | None = None,
-        level_snapshot: dict | None = None,
     ) -> ModelVersion:
         mv = ModelVersion(
             version_label=version_label,
             base_model=base_model,
             metrics=metrics,
             training_run_id=training_run_id,
-            mlflow_run_id=mlflow_run_id,
             model_uri=model_uri,
-            level_snapshot=level_snapshot,
             trained_at=dt.datetime.now(dt.timezone.utc),
         )
         self.db.add(mv)

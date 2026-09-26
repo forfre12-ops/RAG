@@ -49,7 +49,6 @@
         }
       ],
       "model_version": "v-fe4b386b",
-      "elapsed_ms": 0,
       "status": "needs_review",
       "warnings": [
         "factors aligned to model grade S2 (rule under-detected S/V/M)",
@@ -82,10 +81,7 @@
         "review_gate_hits": [
           "agreement-gate"
         ]
-      },
-      "confirmed_label": null,
-      "confirmed_by": null,
-      "confirmed_at": null
+      }
     }
   ],
   "error": null

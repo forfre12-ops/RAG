@@ -242,7 +242,6 @@ class TestPersistence:
         res = svc.ingest(
             filename="a.txt",
             content_bytes=body,
-            doc_type="가이드",
             created_by="u1",
             db=sess,
             persist=True,
@@ -263,9 +262,9 @@ class TestPersistence:
         assert doc.extraction_method == "plain"
         assert doc.processing_status == "ready"
         assert doc.created_by == "u1"
-        # extraction_complete 는 추출이 중간에 잘렸는지를 소비자가 볼 수 있게 항상 남긴다
-        # (페이지 절단 감지). txt 는 페이지 개념이 없어 pages_* 는 기록되지 않는다.
-        assert doc.metadata_ == {"doc_type": "가이드", "extraction_complete": True}
+        # 선택 메타(source_type·security_marking·access_scope)를 안 주면 metadata_ 는 비어 있다.
+        # txt 는 페이지 개념이 없어 pages_total 도 기록되지 않는다.
+        assert doc.metadata_ == {}
         # chunks 적재
         assert len(chunks) >= 1
         assert all(c.doc_id == doc.doc_id for c in chunks)

@@ -205,8 +205,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#ep-explain"><span class="toc-method post">POST</span> /classify/explain</a>
     <a class="toc-item" href="#ep-confirm"><span class="toc-method post">POST</span> /confirm</a>
     <a class="toc-item" href="#ep-relabel"><span class="toc-method post">POST</span> /relabel</a>
-    <a class="toc-item" href="#ep-guide-upload"><span class="toc-method post">POST</span> /guide/documents</a>
-    <a class="toc-item" href="#ep-guide-list"><span class="toc-method get">GET</span> /guide/documents/{id}</a>
     <a class="toc-item" href="#ep-training"><span class="toc-method post">POST</span> /train</a>
     <a class="toc-item" href="#ep-train-jobs"><span class="toc-method get">GET</span> /train/jobs</a>
     <a class="toc-item" href="#ep-synthesis"><span class="toc-method post">POST</span> /synth/generate</a>
@@ -253,7 +251,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <h3 style="margin-top:16px;">미들웨어</h3>
         <p style="font-size:13px;">모든 요청은 <code>api/middleware.py</code>를 통해 감사 로그(tb_audit_log)에 기록되고, OTel span이 생성된다.</p>
         <h3 style="margin-top:16px;">요청 본문 크기 한도 (DoS 가드)</h3>
-        <p style="font-size:13px;">전역 ASGI 가드(<code>BodySizeLimitMiddleware</code>)가 <strong>본문 파싱 전</strong>에 요청 본문 크기를 검사한다. <code>Content-Length</code> 헤더가 한도를 초과하면 본문을 읽기도 전에 즉시 <code>413</code>, <code>Content-Length</code> 없는 chunked 요청은 누적 바이트가 한도를 넘는 순간 <code>413</code>을 반환한다(대용량 JSON body OOM 차단). 한도는 설정 <code>max_request_body_mb</code>(기본 <strong>25MB</strong>, 환경변수 <code>KOIPA_MAX_REQUEST_BODY_MB</code>)로 조정한다. 응답 바디: <code>{"detail":"request body too large","code":"KOIPA_BODY_TOO_LARGE"}</code>. 멀티파트 업로드(<code>/documents</code>·<code>/guide/documents</code>)는 라우터의 <code>max_upload_mb</code>(기본 20MB)로 별도 처리되므로 이 한도는 일반 JSON 본문에 적용된다. 스택 최외곽에 등록되어 다른 미들웨어·핸들러보다 먼저 차단한다.</p>
+        <p style="font-size:13px;">전역 ASGI 가드(<code>BodySizeLimitMiddleware</code>)가 <strong>본문 파싱 전</strong>에 요청 본문 크기를 검사한다. <code>Content-Length</code> 헤더가 한도를 초과하면 본문을 읽기도 전에 즉시 <code>413</code>, <code>Content-Length</code> 없는 chunked 요청은 누적 바이트가 한도를 넘는 순간 <code>413</code>을 반환한다(대용량 JSON body OOM 차단). 한도는 설정 <code>max_request_body_mb</code>(기본 <strong>25MB</strong>, 환경변수 <code>KOIPA_MAX_REQUEST_BODY_MB</code>)로 조정한다. 응답 바디: <code>{"detail":"request body too large","code":"KOIPA_BODY_TOO_LARGE"}</code>. 멀티파트 업로드(<code>/documents</code>)는 라우터의 <code>max_upload_mb</code>(기본 20MB)로 별도 처리되므로 이 한도는 일반 JSON 본문에 적용된다. 스택 최외곽에 등록되어 다른 미들웨어·핸들러보다 먼저 차단한다.</p>
         <h3 style="margin-top:16px;">멱등성 (Idempotency-Key) <span style="font-size:11px;color:var(--text-dim);font-weight:400;">— 선택 헤더 · 발주처 요건 외 운영 강화</span></h3>
         <p style="font-size:13px;">변경성 요청(POST/PUT/PATCH)에 <code>Idempotency-Key</code> 헤더를 붙이면 동일 키 재요청을 <strong>1회만 처리</strong>하고 저장된 응답을 재현한다(응답에 <code>X-Idempotent-Replay: true</code>). 처리 중 동일 키 재요청은 <code>409</code>. 네트워크 타임아웃 재시도로 인한 <code>confirm·relabel·train</code> 중복 실행을 방지한다. <strong>헤더 미전달 시 무영향</strong>(기존 동작 유지). 저장소는 redis(미가용 시 in-memory 폴백, TTL 24h). 멱등성 키는 <strong>주체(자격증명)별 네임스페이스로 격리</strong>된다 — 가용한 자격증명 헤더(<code>Authorization</code>/<code>X-API-Key</code>)를 SHA-256으로 해시해 키 prefix로 사용하므로, 같은 키 값이라도 다른 주체는 다른 네임스페이스로 분리되어 <strong>교차 주체 응답 replay가 차단</strong>된다(원시 비밀은 키에 노출하지 않음). <em>요건에 명시된 기능은 아니며, 변경성 API 재시도 안전을 위한 운영 강화로 본개발 정식 채택을 전제로 한다.</em></p>
       </div>
@@ -556,62 +554,6 @@ data: {"elapsed_ms":380}</pre>
       </div>
     </div>
 
-    <div class="ep" id="ep-guide-upload">
-      <div class="ep-header">
-        <span class="method post">POST</span>
-        <span class="ep-path">/api/v1/guide/documents</span>
-        <span class="ep-summary">학습 가이드 문서 업로드 (버전 등록)</span>
-        <span class="ep-auth">JWT (admin · kl_backend)</span>
-      </div>
-      <div class="ep-body">
-        <p class="ep-desc">KOIPA 영업비밀보호 가이드라인을 업로드하여 ES 지식베이스 색인·키워드 시드 갱신·합성 다양화에 활용한다. <code>multipart/form-data</code>. <code>/documents</code>(등급 판정 대상 비밀문서)와 도메인이 완전히 분리된다. 업로드 본문은 <code>max_upload_mb</code>(기본 20MB) 한도 검증.</p>
-        <h4>Request (multipart/form-data)</h4>
-        <table class="ftbl">
-          <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">file</td><td class="f-type">binary</td><td class="f-req yes">●</td><td>HWP · DOCX · PDF</td></tr>
-            <tr><td class="f-name">guide_id</td><td class="f-type">string</td><td class="f-req yes">●</td><td>가이드 식별자</td></tr>
-            <tr><td class="f-name">version</td><td class="f-type">string</td><td class="f-req yes">●</td><td>가이드 버전 (예: v2)</td></tr>
-            <tr><td class="f-name">actor</td><td class="f-type">string (JSON)</td><td class="f-req yes">●</td><td>Actor JSON 문자열 (multipart 제약)</td></tr>
-            <tr><td class="f-name">effective_date / change_summary / doc_type</td><td class="f-type">string</td><td></td><td>시행일·변경요약·문서유형(선택)</td></tr>
-          </tbody>
-        </table>
-        <h4>Response 201 — GuideUploadResponse</h4>
-        <table class="ftbl">
-          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">guide_id / version</td><td class="f-type">string</td><td>등록된 가이드·버전</td></tr>
-            <tr><td class="f-name">indexed</td><td class="f-type">boolean</td><td>ES 색인 성공 여부</td></tr>
-            <tr><td class="f-name">embedding_vector_count</td><td class="f-type">integer</td><td>생성된 임베딩 벡터 수</td></tr>
-            <tr><td class="f-name">triggers_retraining</td><td class="f-type">boolean</td><td>키워드 시드 변경으로 재학습 권고 여부</td></tr>
-          </tbody>
-        </table>
-        <div class="status-chips"><span class="sc s2xx">201 Created</span><span class="sc s4xx">413 파일 크기 초과</span><span class="sc s4xx">422 actor JSON 오류</span></div>
-      </div>
-    </div>
-
-    <div class="ep" id="ep-guide-list">
-      <div class="ep-header">
-        <span class="method get">GET</span>
-        <span class="ep-path">/api/v1/guide/documents/{guide_id}</span>
-        <span class="ep-summary">가이드 버전 이력 조회</span>
-        <span class="ep-auth">API Key</span>
-      </div>
-      <div class="ep-body">
-        <p class="ep-desc">특정 guide_id의 등록된 버전 이력을 조회한다.</p>
-        <h4>Response 200 — GuideVersionList</h4>
-        <table class="ftbl">
-          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">guide_id</td><td class="f-type">string</td><td></td></tr>
-            <tr><td class="f-name">current_training_version</td><td class="f-type">string | null</td><td>현재 학습에 반영된 버전</td></tr>
-            <tr><td class="f-name">versions</td><td class="f-type">GuideVersionItem[]</td><td>[{version, effective_date, change_summary, registered_at}]</td></tr>
-          </tbody>
-        </table>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">404 guide_id 없음</span></div>
-      </div>
-    </div>
-
     <div class="ep" id="ep-training">
       <div class="ep-header">
         <span class="method post">POST</span>
@@ -693,15 +635,13 @@ data: {"elapsed_ms":380}</pre>
       </div>
       <div class="ep-body">
         <p class="ep-desc">실제 업무 파일(HWP/PDF/DOCX/TXT)을 업로드하여 자동 전처리·인덱싱한다. <code>multipart/form-data</code>. 포맷 자동 감지 → 텍스트 추출 → 원본 Object Storage 저장 → documents/tb_chunks DB 적재. 이후 <code>POST /classify?doc_id=...</code>로 등급 판정 요청.</p>
-        <p style="font-size:12.5px;color:var(--text-dim);">※ <code>/guide/documents</code>(가이드라인 → ES 지식베이스)와 완전 분리. 이 엔드포인트는 등급 판정 대상 문서 전용.</p>
+        <p style="font-size:12.5px;color:var(--text-dim);">※ 이 엔드포인트는 등급 판정 대상 문서 전용.</p>
         <h4>Request (multipart/form-data)</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
           <tbody>
             <tr><td class="f-name">file</td><td class="f-type">binary</td><td class="f-req yes">●</td><td>HWP · DOCX · PDF · TXT (최대 <strong>20MB</strong>, <code>max_upload_mb</code>)</td></tr>
             <tr><td class="f-name">actor</td><td class="f-type">string (JSON)</td><td class="f-req yes">●</td><td>Actor JSON 문자열 (multipart 제약)</td></tr>
-            <tr><td class="f-name">doc_type</td><td class="f-type">string</td><td></td><td>문서 유형 태그 (자유 형식)</td></tr>
-            <tr><td class="f-name">external_ref</td><td class="f-type">string</td><td></td><td>외부 EDMS 연계 ID</td></tr>
             <tr><td class="f-name">index_for_rag</td><td class="f-type">boolean</td><td></td><td>true면 업로드 문서를 RAG 검색 컬렉션에도 적재 (기본 false)</td></tr>
             <tr><td class="f-name">rag_namespace</td><td class="f-type">string</td><td></td><td>RAG 적재 컬렉션 (미지정 시 settings.rag_upload_collection="uploads")</td></tr>
           </tbody>

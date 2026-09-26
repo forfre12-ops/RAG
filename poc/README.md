@@ -33,7 +33,6 @@
 
 | 요건 | 무엇 | API 진입점 | 서비스 | 코어 모듈 |
 |---|---|---|---|---|
-| **FUN-002** | 가이드 문서 업로드·버전관리 | [api/guide.py](src/koipa/api/guide.py) | `guide_service.py` | — |
 | **FUN-003** | 합성 샘플 · 골든셋 구축 | [api/synthesis.py](src/koipa/api/synthesis.py)<br>[api/golden.py](src/koipa/api/golden.py) | `synthesis_service.py`<br>`golden_build_service.py` | [m1_synthesis/](src/koipa/modules/m1_synthesis/)<br>`golden_tiers.py` · `golden_signoff.py` |
 | **FUN-004** | 학습 · 재학습 | [api/training.py](src/koipa/api/training.py) | `training_service.py` | [m4_training/](src/koipa/modules/m4_training/) |
 | **FUN-005** | 등급 분류 · 등급체계 | [api/classify.py](src/koipa/api/classify.py)<br>[api/schema_admin.py](src/koipa/api/schema_admin.py) | `classify_service.py`<br>`schema_admin_service.py` | [m5_inference/](src/koipa/modules/m5_inference/) |

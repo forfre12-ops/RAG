@@ -111,7 +111,7 @@ def classify_async(
         req = ClassifyRequest(**payload)
         svc = ClassifyService.get_instance()
         result = svc.classify(req)
-        result_json = result.model_dump(mode="json")
+        result_json = result.job_result()
         _record_job_done(job_id, results=[result_json], completed=1)
         _publish_callback_webhook(callback_url, {"job_id": job_id, "status": "done", "results": [result_json]})
         return result_json

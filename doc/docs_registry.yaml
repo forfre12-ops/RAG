@@ -1,5 +1,5 @@
 schema_version: 1
-updated_at: 2026-09-25
+updated_at: 2026-09-26
 
 policy:
   active_public_root: doc/result/감리정본
@@ -565,7 +565,8 @@ documents:
     # [2026-09-24] 9/22 이후 누락된 검수 배정·승격 API 4건 반영(개정 이력 판2). 순수 내부운영
     # 4건(유사문서·Prometheus·합성 커버리지/작업조회)은 KL 연동과 무관해 의도적으로 미기재 —
     # 아래 버전도 그때로 갱신
-    version: 2026-09-24
+    # [2026-09-26] 호출자가 없던 4건(가이드 2·승격 대기·이중검토 보류)을 걷어 68→64건(개정 이력 판3).
+    version: 2026-09-26
 
   - id: DOC-GAMRI-003
     title: ERD 개체관계도

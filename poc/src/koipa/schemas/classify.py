@@ -6,7 +6,6 @@ from .common import FactorRegistry, Grade
 
 class DocumentInput(BaseModel):
     doc_id: str
-    title: Optional[str] = None
     content: Optional[str] = Field(default=None, max_length=1_048_576)
     metadata: Optional[dict] = None
     text_already_preprocessed: bool = False
@@ -101,7 +100,9 @@ class AutomationAssessment(BaseModel):
     review_gate_hits: list[str] = Field(default_factory=list)
 
 
-class ClassifyResponse(BaseModel):
+class ClassifyOutcome(BaseModel):
+    """분류 결과의 공통 항목 — 동기 응답(ClassifyResponse)과 비동기 작업 결과(ClassifyJobResult)가 같이 쓴다."""
+
     inference_id: UUID
     doc_id: str
     label: Grade
@@ -122,7 +123,6 @@ class ClassifyResponse(BaseModel):
     rule_evaluation_factors: Optional[EvaluationFactors] = None
     evidence: list[EvidenceSpan] = []
     model_version: str
-    elapsed_ms: int
     status: str = "staging"
     warnings: list[str] = []
     # [투명성/시연] 하이브리드 서빙의 각 엔진 원시 판정 — 룰·모델·최종을 대조 표시.
@@ -143,6 +143,37 @@ class ClassifyResponse(BaseModel):
     grade_candidates_reason: Optional[str] = None
     # 자동확정 위험도 보정 전의 그림자 관측치. 정책을 바꾸지 않고 검수 결과와 연결한다.
     automation_assessment: Optional[AutomationAssessment] = None
+
+
+class ClassifyResponse(ClassifyOutcome):
+    """POST /classify · /classify/stream · /classify/explain 의 응답 — 요청을 처리한 시간을 잰다."""
+
+    elapsed_ms: int
+
+    def job_result(self) -> dict:
+        """비동기 작업 결과(IF-05 results[] · 콜백 본문)로 저장할 JSON. 비동기 결과는 시간을 재지 않으므로 elapsed_ms 는 싣지 않는다."""
+        return self.model_dump(mode="json", exclude={"elapsed_ms"})
+
+
+class ClassifyJobResult(ClassifyOutcome):
+    """GET /classify/jobs/{job_id} 의 results[] 한 건 — 분류 결과 그대로이고 경과 시간만 없다."""
+
+
+class StoredClassificationResponse(BaseModel):
+    """GET /classify/{doc_id} — DB 에 저장된 최근 분류 결과(진실 소스)와 사람이 확정한 등급.
+
+    저장값만으로 응답을 만들므로 근거(evidence)·평가요소·룰/모델 판정·경고는 여기에 없다. 그것들은 분류를
+    실행한 응답(POST /classify)과 비동기 작업 결과(GET /classify/jobs/{job_id})에만 있다. 예전에는
+    ClassifyResponse 를 그대로 써서 그 항목들이 항상 빈 채로 나갔다.
+    """
+
+    inference_id: UUID
+    doc_id: str
+    label: Grade
+    confidence: float
+    scores: dict[str, float]
+    model_version: str
+    status: str = "staging"
 
     # [KL 연동 2026-08-26] 사람이 확정한 등급. 예측(label)과 별개다.
     #

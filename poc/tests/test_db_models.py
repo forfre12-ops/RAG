@@ -65,7 +65,6 @@ def test_orm_metadata_has_expected_tables():
         "tad_dm_doc_mng",             # tb_documents
         "tad_cm_chnk_mng",            # tb_chunks
         "tad_dm_doc_lbl_mng",         # tb_document_labels
-        "tad_dm_doc_rqmt_scr_mng",    # tb_document_factor_scores
         # [2026-09-05] 승인본 ↔ 학습셋 판 연결(append-only). 칼럼 하나로는 한 문서가
         # 여러 판에 들어간 이력을 잃는다.
         "tad_sm_syn_datst_cpst_mng",  # tb_sample_dataset_membership
@@ -73,14 +72,11 @@ def test_orm_metadata_has_expected_tables():
         "tad_cm_clsf_bss_mng",        # tb_classification_evidence
         "tad_mm_mdl_ver_mng",         # tb_model_versions
         "tad_lm_lrn_excn_mng",        # tb_training_runs
-        "tad_lm_lrn_epoch_mng",       # tb_training_epochs
-        "tad_lm_lrn_datst_mng",       # tb_training_datasets
         "tad_cm_crct_mng",            # tb_corrections
         "tad_pm_prmpt_ver_mng",       # tb_prompt_versions
         "tad_sm_syn_doc_mng",         # tb_sample_documents
         "tad_lm_llm_usqty_mng",       # tb_llm_usage
         "tad_am_adt_log_mng",         # tb_audit_log
-        "tad_gm_guide_ver_mng",       # tb_guides — N5: GuideService DB 이전
         # [2026-09-05] 전역 직렬화 잠금 전용 표(db/locks.py). 행 하나가 논리 잠금
         # 하나이고 데이터를 담지 않는다. pg_advisory_xact_lock 이 MariaDB 에서
         # 조용히 꺼지던 것을 두 dialect 공통 행 잠금으로 바꾸며 들어왔다.

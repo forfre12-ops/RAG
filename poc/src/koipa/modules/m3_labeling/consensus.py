@@ -57,7 +57,6 @@ def evaluate_consensus(
     min_self_consistency: float = 0.67,
     sort_conf: float = 0.0,
     require_evidence: bool = True,
-    **_legacy,  # 구 keyword 인자(min_rule_conf 등) 흡수 — 1 릴리스 한시. (위치인자는 못 막음!)
 ) -> ConsensusResult:
     """룰·LLM 판정을 합의+근거 게이트로 평가해 gold_candidate 편입 여부 판정.
 

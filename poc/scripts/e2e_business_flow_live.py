@@ -143,8 +143,6 @@ def run(dry: bool = False) -> int:
             headers=_hdr(),
             data={
                 "actor": json.dumps(ACTOR),
-                "doc_type": "기술문서",
-                "external_ref": DOC_ID,
                 "source_type": "internal",
                 "security_marking": "confidential",
                 "access_scope": "approved_only",

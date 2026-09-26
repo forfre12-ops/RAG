@@ -1,15 +1,13 @@
-"""KL ↔ Koipa 통합 8시나리오 — doc/19 명세 자동화.
+"""KL ↔ Koipa 통합 7시나리오 — doc/19 명세 자동화.
 
 설계:
-- 8 시나리오 (S1~S8) 1:1 매핑된 테스트 클래스
+- 7 시나리오 (S1~S4 · S6~S8) 1:1 매핑된 테스트 클래스. S5(가이드 업로드)는 그 기능을 없애면서(2026-09-26) 뺐다
 - PG/ES/LLM 가용성에 따라 자동 skip (best-effort)
 - 모든 시나리오는 TestClient로 in-process — KL 측은 mock (headers로 actor 전달)
 """
 
 from __future__ import annotations
 
-import io
-import json
 import sys
 import uuid
 
@@ -181,65 +179,6 @@ class TestS4SchemaGrades:
         body = r.json()
         assert body["requires_retraining"] is False
         assert isinstance(body["reason"], str)
-
-
-# ============================================================
-# S5. 가이드 문서 업로드 → RAG 인덱싱
-# ============================================================
-
-class TestS5GuideVersionRegister:
-    """S5 — 가이드 **버전 등록**. 2026-09-05 부로 파일을 받지 않는다.
-
-    종전 계약은 multipart 로 파일을 필수로 받았는데 구현은 그 바이트를 버렸다
-    (services/guide_service.py 머리말이 그렇게 적고 있었다). 발주처 원문이 우리 서버
-    메모리를 한 번 지나는 경로였고 RTM 요건도 아니다.
-    """
-
-    def test_register_version(self):
-        gid = f"kl-guide-{uuid.uuid4().hex[:6]}"
-        with TestClient(app) as cli:
-            r = cli.post(
-                "/api/v1/guide/documents",
-                headers=_hdr(),
-                json={
-                    "guide_id": gid,
-                    "version": "v1.0",
-                    "effective_date": "2026-06-01",
-                    "change_summary": "S5 시나리오 가이드",
-                    "actor": _actor(role="admin"),
-                    "doc_type": "guideline",
-                    "filename": "guide.txt",
-                },
-            )
-        assert r.status_code == 201, r.text
-        body = r.json()
-        assert body["guide_id"] == gid
-        assert body["triggers_retraining"] is False
-
-    def test_file_upload_is_refused(self):
-        """파일을 보내면 받지 않는다 — 원문이 서버로 들어오는 경로를 남기지 않는다."""
-        gid = f"kl-file-{uuid.uuid4().hex[:6]}"
-        with TestClient(app) as cli:
-            r = cli.post(
-                "/api/v1/guide/documents",
-                headers=_hdr(),
-                data={"guide_id": gid, "version": "v1.0",
-                      "actor": json.dumps(_actor(role="admin"))},
-                files={"file": ("g.txt", io.BytesIO(b"x" * 100), "text/plain")},
-            )
-        assert r.status_code == 422, r.text
-
-    def test_list_versions_after_register(self):
-        gid = f"kl-list-{uuid.uuid4().hex[:6]}"
-        with TestClient(app) as cli:
-            cli.post(
-                "/api/v1/guide/documents",
-                headers=_hdr(),
-                json={"guide_id": gid, "version": "v1.0", "actor": _actor(role="admin")},
-            )
-            r = cli.get(f"/api/v1/guide/documents/{gid}", headers=_hdr())
-        assert r.status_code == 200
-        assert r.json()["guide_id"] == gid
 
 
 # ============================================================

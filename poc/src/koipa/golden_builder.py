@@ -104,7 +104,6 @@ def build_golden_set(
     require_evidence: bool = True,
     text_key: str = "text",
     id_key: str = "doc_id",
-    **_legacy,  # 구 min_rule_conf/min_llm_conf 흡수(게이트 미사용; 서비스 호출 호환)
 ) -> GoldenBuildResult:
     """후보 docs를 골든후보(gold_candidate)/검수대상(needs_review)으로 분류.
 

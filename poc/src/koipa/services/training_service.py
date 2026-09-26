@@ -148,7 +148,6 @@ def register_and_gate_model(
     training_run_id: uuid.UUID | None = None,
     training_data_count: int | None = None,
     model_uri: str | None = None,
-    mlflow_run_id: str | None = None,
     eval_ready: bool | None = None,
 ) -> dict:
     """재학습 모델을 ModelVersion으로 **등록(C-ver)** 하고 배포 합격선 **게이트** 평가 (A2-②).
@@ -217,7 +216,6 @@ def register_and_gate_model(
                     base_model=base_model,
                     metrics=metrics,
                     training_run_id=training_run_id,
-                    mlflow_run_id=mlflow_run_id,
                     model_uri=model_uri,
                 )
                 if training_data_count is not None:
@@ -635,6 +633,8 @@ class TrainingService:
                 total_epochs=prog.get("total_epochs"),
                 estimated_finish_at=prog.get("estimated_finish_at"),
                 started_at=run.started_at.isoformat() if run.started_at else None,
+                # 학습이 끝나면 워커가 실행 행에 남긴 모델 버전(UUID) — 라벨로 풀어 싣는다. 종전에는 안 실어 항상 null 이었다.
+                model_version=self._version_label(run.model_version),
                 error=run.error_message,
             )
         job = self.jobs.get(train_job_id)
@@ -662,6 +662,7 @@ class TrainingService:
                     limit=limit, offset=offset, status_filter=status_filter
                 )
                 total = repo.count_runs(status_filter=status_filter)
+                labels = repo.version_labels(r.model_version for r in runs)
                 items = [
                     TrainJobSummary(
                         train_job_id=r.run_id,
@@ -669,7 +670,7 @@ class TrainingService:
                         started_at=r.started_at.isoformat() if r.started_at else None,
                         completed_at=r.completed_at.isoformat() if r.completed_at else None,
                         duration_sec=r.duration_sec,
-                        model_version=None,
+                        model_version=labels.get(r.model_version),
                         trigger_type=r.trigger_type,
                         # 실패 사유를 목록에 실어 화면이 "왜 실패했는지"를 답할 수 있게 한다.
                         # 성공 잡의 잔여 메시지까지 노출하지는 않는다.
@@ -701,6 +702,17 @@ class TrainingService:
         except SQLAlchemyError as exc:
             logger.warning("training run create skipped (DB unavailable): %s", exc)
             return uuid.uuid4()
+
+    def _version_label(self, version_id: Optional[uuid.UUID]) -> Optional[str]:
+        """실행 행이 가리키는 모델버전 UUID → 라벨. 못 찾거나 DB 가 안 되면 None(상태 조회를 막지 않는다)."""
+        if version_id is None:
+            return None
+        try:
+            with session_scope() as db:
+                return TrainingRepo(db).version_labels([version_id]).get(version_id)
+        except SQLAlchemyError as exc:
+            logger.warning("model version label lookup failed: version_id=%s err=%s", version_id, exc)
+            return None
 
     def _get_run(self, run_id: uuid.UUID):
         try:

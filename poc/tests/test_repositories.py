@@ -246,7 +246,6 @@ class TestTrainingRepo:
         repo = TrainingRepo(db)
         run = repo.create_run(
             total_samples=500,
-            train_count=350, val_count=75, test_count=75,
             hyperparameters={"lr": 2e-5, "epochs": 5},
             trigger_type="manual",
         )
@@ -257,12 +256,6 @@ class TestTrainingRepo:
         run_refreshed = repo.get_run(run.run_id)
         assert run_refreshed.status == "running"
         assert run_refreshed.started_at is not None
-
-        repo.log_epoch(run.run_id, 1, train_loss=0.5, val_loss=0.6, val_metrics={"f1": 0.7})
-        repo.log_epoch(run.run_id, 2, train_loss=0.3, val_loss=0.4, val_metrics={"f1": 0.85})
-        db.flush()
-        epochs = repo.epochs_for_run(run.run_id)
-        assert [e.epoch for e in epochs] == [1, 2]
 
         repo.mark_completed(run.run_id, final_metrics={"f1_macro": 0.85, "fnr": 0.04}, duration_sec=1234)
         db.flush()
@@ -287,16 +280,6 @@ class TestTrainingRepo:
         active = repo.get_active()
         assert active is not None
         assert active.version_id == mv.version_id
-
-    def test_register_dataset_rows(self, db, document, levels):
-        repo = TrainingRepo(db)
-        run = repo.create_run(total_samples=1)
-        # 같은 문서를 한 split에만 등록 (UNIQUE(run_id, doc_id))
-        count = repo.register_dataset_rows(
-            run.run_id, [(document.doc_id, "train", levels["S2"])]
-        )
-        assert count == 1
-
 
 # ============================================================
 # SynthRepo

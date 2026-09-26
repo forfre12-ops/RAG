@@ -60,7 +60,6 @@ class KeywordUpdateRequest(BaseModel):
     factor: Optional[str] = None
     weight: Optional[float] = Field(default=None, gt=0.0, le=_WEIGHT_MAX)
     is_active: Optional[bool] = None
-    actor: Actor
 
 
 class KeywordMutationResponse(BaseModel):

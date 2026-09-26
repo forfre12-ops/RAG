@@ -317,31 +317,6 @@ def audit_log(
     )
 
 
-# ── [번들 B] 고등급 이중검토 보류 가시화 ──────────────────────────────────────
-class EscalationHeldResponse(BaseModel):
-    by_grade: dict[str, int]
-    total: int
-
-
-@router.get(
-    "/escalation-held",
-    response_model=EscalationHeldResponse,
-    dependencies=_ADMIN_ONLY,
-    summary="이중검토 보류(needs_second_review) 등급별 건수",
-    description=(
-        "high_grade_dual_review ON 시 1인 동의 고등급 교정은 needs_second_review로 보류된다. "
-        "운영자가 능동 쿼리해야만 보이던 '안 보이는 보류큐'를 등급별 건수로 노출(가시화). "
-        "DB 미가용 시 빈 집계."
-    ),
-)
-def escalation_held() -> EscalationHeldResponse:
-    from koipa.services.confirm_service import (  # noqa: PLC0415
-        count_needs_second_review_by_grade,
-    )
-    counts = count_needs_second_review_by_grade()
-    return EscalationHeldResponse(by_grade=counts, total=sum(counts.values()))
-
-
 # ── [번들 D] locked_gold_eval readiness 가시화 ───────────────────────────────
 class LockedReadinessResponse(BaseModel):
     ready: bool
@@ -550,8 +525,6 @@ def purge_demo_data() -> DemoPurgeResponse:
     # 관계형 물리삭제 — 원자적(하나라도 실패하면 전체 롤백).
     relational = [
         ("classifications", f"DELETE FROM tad_cm_clsf_rslt_mng WHERE doc_id IN ({_sub})"),
-        (None, f"DELETE FROM tad_lm_lrn_datst_mng WHERE doc_id IN ({_sub})"),
-        (None, f"DELETE FROM tad_sm_syn_doc_mng WHERE doc_id IN ({_sub})"),
         ("chunks", f"DELETE FROM tad_cm_chnk_mng WHERE doc_id IN ({_sub})"),
         ("documents", "DELETE FROM tad_dm_doc_mng WHERE creatr_id = :marker"),
     ]

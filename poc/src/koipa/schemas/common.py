@@ -209,8 +209,6 @@ class FactorRegistry:
 class Actor(BaseModel):
     user_id: str
     role: str = Field(pattern=r"^(admin|reviewer|system|kl_backend)$")
-    # tenant 제거: 격리는 KL 포털 전담 (단일 KL 인증). actor=KL cred 기준.
-    ip: Optional[str] = None
 
 
 class Error(BaseModel):

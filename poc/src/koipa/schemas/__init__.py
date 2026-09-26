@@ -3,6 +3,8 @@ from .classify import (
     DocumentInput,
     ClassifyRequest,
     ClassifyResponse,
+    ClassifyJobResult,
+    StoredClassificationResponse,
     EvidenceSpan,
     EvaluationFactors,
 )
@@ -34,11 +36,6 @@ from .synthesis import (
     SynthReviewRequest,
     SynthReviewResponse,
 )
-from .guide import (
-    GuideUploadResponse,
-    GuideVersionItem,
-    GuideVersionList,
-)
 from .schema_admin import (
     GradesGetResponse,
     GradesPutRequest,
@@ -52,7 +49,7 @@ from .metrics import (
 
 __all__ = [
     "Grade", "GradeDefinition", "Actor", "Error",
-    "DocumentInput", "ClassifyRequest", "ClassifyResponse",
+    "DocumentInput", "ClassifyRequest", "ClassifyResponse", "ClassifyJobResult", "StoredClassificationResponse",
     "EvidenceSpan", "EvaluationFactors",
     "ClassifyAsyncRequest", "ClassifyAsyncResponse",
     "ClassifyBatchRequest", "ClassifyBatchResponse", "ClassifyJobStatus",
@@ -60,7 +57,6 @@ __all__ = [
     "TrainRequest", "TrainResponse", "TrainStatus", "TrainJobSummary", "TrainJobList",
     "SynthGenerateRequest", "SynthGenerateResponse", "SyntheticDocItem",
     "SynthQueueResponse", "SynthReviewRequest", "SynthReviewResponse",
-    "GuideUploadResponse", "GuideVersionItem", "GuideVersionList",
     "GradesGetResponse", "GradesPutRequest", "GradesPutResponse",
     "MetricsReport", "MetricsHistory", "ConfusionMatrix",
 ]

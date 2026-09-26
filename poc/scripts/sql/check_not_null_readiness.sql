@@ -1,6 +1,6 @@
 -- KL 운영 DB 사전 점검 — NOT NULL 승격 안전성 확인 (읽기 전용)
 --
--- 배경. ORM 모델은 아래 28개 컬럼을 nullable=False 로 선언하는데 DB 는 NULL 을 허용한다.
+-- 배경. ORM 모델은 아래 26개 컬럼을 nullable=False 로 선언하는데 DB 는 NULL 을 허용한다.
 -- 즉 **DB 가 모델의 전제를 강제하지 않는다**(감사로그 성공여부 tad_am_adt_log_mng.scs_yn 포함).
 -- 이를 맞추려면 ALTER ... SET NOT NULL 이 필요한데, 대상 컬럼에 NULL 이 한 건이라도 있으면
 -- 마이그레이션이 실패한다. 그래서 **쓰기 전에 먼저 센다.**
@@ -25,6 +25,7 @@
 -- ⚠ [2026-09-11 이력] 옛 이름 판을 실제로 돌려 보기 전에는 두 가지가 틀려 있었다 — 이미 지워진 칼럼
 --   (분류결과 rag_used)을 찾다 오류로 한 줄도 판정하지 못했고, 5c1d9e0a7b34 가 보는 9개 표 중
 --   합성데이터셋구성(멤버십)의 생성일시가 빠져 있었다. 둘 다 고친 뒤 28칸이 됐고, 이 판은 그것을 이어받는다.
+-- ⚠ [2026-09-26] 28칸 중 두 칸(문서 ocr_use_yn · 학습에폭 rcd_dt)은 그 칼럼·표를 지워서(migration b7d3f5a19c24) 뺐다. 지금은 26칸이다.
 
 WITH counts AS (
   SELECT 'tad_am_adt_log_mng'::text AS tbl, 'scs_yn'::text AS col,
@@ -69,10 +70,6 @@ WITH counts AS (
   UNION ALL
   SELECT 'tad_dm_doc_mng'::text AS tbl, 'mtdt_dsctn'::text AS col,
          count(*) FILTER (WHERE mtdt_dsctn IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tad_dm_doc_mng
-  UNION ALL
-  SELECT 'tad_dm_doc_mng'::text AS tbl, 'ocr_use_yn'::text AS col,
-         count(*) FILTER (WHERE ocr_use_yn IS NULL) AS null_rows, count(*) AS total_rows
     FROM tad_dm_doc_mng
   UNION ALL
   SELECT 'tad_dm_doc_mng'::text AS tbl, 'prcs_stts_nm'::text AS col,
@@ -126,10 +123,6 @@ WITH counts AS (
   SELECT 'tad_sm_syn_datst_cpst_mng'::text AS tbl, 'crt_dt'::text AS col,
          count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
     FROM tad_sm_syn_datst_cpst_mng
-  UNION ALL
-  SELECT 'tad_lm_lrn_epoch_mng'::text AS tbl, 'rcd_dt'::text AS col,
-         count(*) FILTER (WHERE rcd_dt IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tad_lm_lrn_epoch_mng
   UNION ALL
   SELECT 'tad_lm_lrn_excn_mng'::text AS tbl, 'lrn_excn_stts_cd'::text AS col,
          count(*) FILTER (WHERE lrn_excn_stts_cd IS NULL) AS null_rows, count(*) AS total_rows
@@ -193,10 +186,6 @@ WITH counts AS (
          count(*) FILTER (WHERE mtdt_dsctn IS NULL) AS null_rows, count(*) AS total_rows
     FROM tad_dm_doc_mng
   UNION ALL
-  SELECT 'tad_dm_doc_mng'::text AS tbl, 'ocr_use_yn'::text AS col,
-         count(*) FILTER (WHERE ocr_use_yn IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tad_dm_doc_mng
-  UNION ALL
   SELECT 'tad_dm_doc_mng'::text AS tbl, 'prcs_stts_nm'::text AS col,
          count(*) FILTER (WHERE prcs_stts_nm IS NULL) AS null_rows, count(*) AS total_rows
     FROM tad_dm_doc_mng
@@ -248,10 +237,6 @@ WITH counts AS (
   SELECT 'tad_sm_syn_datst_cpst_mng'::text AS tbl, 'crt_dt'::text AS col,
          count(*) FILTER (WHERE crt_dt IS NULL) AS null_rows, count(*) AS total_rows
     FROM tad_sm_syn_datst_cpst_mng
-  UNION ALL
-  SELECT 'tad_lm_lrn_epoch_mng'::text AS tbl, 'rcd_dt'::text AS col,
-         count(*) FILTER (WHERE rcd_dt IS NULL) AS null_rows, count(*) AS total_rows
-    FROM tad_lm_lrn_epoch_mng
   UNION ALL
   SELECT 'tad_lm_lrn_excn_mng'::text AS tbl, 'lrn_excn_stts_cd'::text AS col,
          count(*) FILTER (WHERE lrn_excn_stts_cd IS NULL) AS null_rows, count(*) AS total_rows

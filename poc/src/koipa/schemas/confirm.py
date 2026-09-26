@@ -12,7 +12,6 @@ from .common import Actor, Grade
 
 class ConfirmRequest(BaseModel):
     doc_id: str
-    model_version: Optional[str] = None
     inference_id: Optional[UUID] = None
     confirmed_label: Grade
     actor: Actor

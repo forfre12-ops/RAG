@@ -1,8 +1,6 @@
 """교정→검증라벨 승급 테스트 — Option 2(비모수 안전 레버).
 
 핵심 계약:
-  · 큐(list_pending): admission 통과(사람+finalized) 교정이 있고 같은 등급의 검증라벨이 없는
-    문서만. 머신/미확정/이중검수대기 교정은 제외.
   · promote: 최신 admissible 교정을 검증 DocumentLabel(is_verified=True,
     labeled_by='human_review')로 써서 서빙 override(get_verified_document_label)가 그 등급을
     반환하게 한다. 재학습·가중치 변경·전파 없음(폭발반경=문서 1건).
@@ -295,9 +293,6 @@ class TestPromotionLive:
                 PromoteRequest(doc_id=str(doc.doc_id), actor=_actor())
             )
             assert res.status == "not_promotable"
-            # 큐에도 없다.
-            pending_docs = {it.doc_id for it in PromotionService().list_pending(limit=1000)}
-            assert str(doc.doc_id) not in pending_docs
             # 검증라벨도 안 생겼다.
             with session_scope() as s:
                 assert ClassifyRepo(s).get_verified_document_label(doc.doc_id) is None
@@ -316,8 +311,6 @@ class TestPromotionLive:
                 PromoteRequest(doc_id=str(doc.doc_id), actor=_actor())
             )
             assert res.status == "not_promotable"
-            pending_docs = {it.doc_id for it in PromotionService().list_pending(limit=1000)}
-            assert str(doc.doc_id) not in pending_docs
         finally:
             _cleanup(version, [doc.doc_id], [c.correction_id])
 
@@ -379,31 +372,6 @@ class TestPromotionLive:
         finally:
             _cleanup(version, [doc.doc_id], [c_human.correction_id, c_machine.correction_id])
 
-    def test_list_pending_includes_admissible_excludes_promoted(self, db, levels):
-        version = f"v-list-{uuid.uuid4().hex[:6]}"
-        doc1 = _seed_doc(db)
-        cls1 = _seed_cls(db, levels, doc1, "S3", version, status="confirmed")
-        c1 = _add_corr(db, cls1, levels, "S3", "S1", "qa_human")
-        doc2 = _seed_doc(db)
-        cls2 = _seed_cls(db, levels, doc2, "S3", version, status="confirmed")
-        c2 = _add_corr(db, cls2, levels, "S3", "TS", "qa_human")
-        db.commit()
-        try:
-            svc = PromotionService()
-            before = {it.doc_id: it for it in svc.list_pending(limit=1000)}
-            assert str(doc1.doc_id) in before
-            assert str(doc2.doc_id) in before
-            assert before[str(doc1.doc_id)].proposed_label == Grade.S1
-            assert before[str(doc1.doc_id)].corrected_by == "qa_human"
-
-            # doc1 승급 후엔 큐에서 빠지고, doc2는 남는다.
-            svc.promote(PromoteRequest(doc_id=str(doc1.doc_id), actor=_actor()))
-            after = {it.doc_id for it in svc.list_pending(limit=1000)}
-            assert str(doc1.doc_id) not in after
-            assert str(doc2.doc_id) in after
-        finally:
-            _cleanup(version, [doc1.doc_id, doc2.doc_id], [c1.correction_id, c2.correction_id])
-
 
 # ── API 라우터 (TestClient — RBAC·파싱·response_model) ────────────────────────
 
@@ -416,37 +384,6 @@ def _hdr(role="admin"):
 
 @pytest.mark.slow
 class TestPromotionAPI:
-    def test_pending_requires_auth(self):
-        from fastapi.testclient import TestClient
-
-        from koipa.api.app import app
-
-        with TestClient(app) as cli:
-            r = cli.get("/api/v1/promotions/pending")
-            assert r.status_code in (401, 422)
-
-    @pytest.mark.parametrize("role", ["admin", "reviewer"])
-    def test_pending_allowed_roles_ok(self, role):
-        from fastapi.testclient import TestClient
-
-        from koipa.api.app import app
-
-        with TestClient(app) as cli:
-            r = cli.get("/api/v1/promotions/pending", headers=_hdr(role))
-            assert r.status_code == 200, r.text
-            body = r.json()
-            assert "count" in body and "items" in body
-            assert body["count"] == len(body["items"])
-
-    def test_pending_forbidden_role(self):
-        from fastapi.testclient import TestClient
-
-        from koipa.api.app import app
-
-        with TestClient(app) as cli:
-            r = cli.get("/api/v1/promotions/pending", headers=_hdr("system"))
-            assert r.status_code == 403, r.text
-
     def test_promote_non_uuid_not_promotable(self):
         from fastapi.testclient import TestClient
 

@@ -10,11 +10,12 @@
     v1.1 의 칼럼ID 193개는 전부 표준단어 약어로만 되어 있고 논리명도 전부 표준용어에 있다(실측).
   - v1.1 에 없던 것 — 새로 지었다. 쓴 단어는 전부 표준단어에 있다:
       tad_dm_doc_vctr_mng · tad_sm_syn_datst_cpst_mng · tad_sy_lck_mng 세 표,
-      tad_mm_mdl_ver_mng.actvtn_sn · tad_lm_llm_usqty_mng.whol_tkn_cnt(DB 생성 칼럼).
-    본문해시내용·잠금명·데이터셋버전명·합성작업아이디·활성키·전체토큰수 는 표준용어로는
+      tad_mm_mdl_ver_mng.actvtn_sn.
+    본문해시내용·잠금명·데이터셋버전명·합성작업아이디·활성키 는 표준용어로는
     미등록이라 용어집에 자체표준 용어로 올려야 한다.
   - v1.1 을 고친 것 — tad_mm_mdl_ver_mng.mlflow_run_id 를 v1.1 은 EXCN_ID 로 적었으나
     EXCN_ID 는 다른 세 표에서 학습실행 run_id 다. 학습실행 표의 같은 값(FLW_EXCN_ID)에 맞췄다.
+    (두 칼럼 모두 2026-09-26 에 지웠다 — 아래 ⚠ 참조.)
   - 영역 코드 sy(시스템)는 새로 둔 것이다. 접두 규칙은 설계서·용어집 어디에도 적혀 있지 않고,
     기존 이름의 "영역 첫 글자 + m" 으로는 잠금 표에 맞는 자리가 없었다(s·c·l 모두 사용 중).
 
@@ -26,6 +27,10 @@
   컬럼정의서는 PK/FK/UK 를 **여부(Y)로만** 적는다 — 어느 칼럼이 키인지를 보지, 제약 이름은 다루지 않는다.
   용어집도 용어·단어·도메인·코드만 다룬다.
   입력 지문(sha256 앞16): 설계서 8bbef501d670f276 · 용어집 aecef1111eb1f1da
+⚠ [2026-09-26] 쓰이지 않던 표 4개와 칼럼 18개를 지웠다(migration b7d3f5a19c24) — 이 대응표에서도 뺐다.
+  실DB 에 없는 이름을 정의서·ERD 에 싣지 않으려는 것이다. 지운 목록은 그 마이그레이션이 갖고 있다.
+  7b3e9d2a4f10 의 사본에는 이름이 그대로 남는다(이미 서버에서 돈 판이라 고치지 않는다) —
+  tests/test_standard_names.py 가 이 관계를 지킨다.
 """
 
 from __future__ import annotations
@@ -38,15 +43,11 @@ TABLES: dict[str, tuple[str, str]] = {
     "tb_classification_levels": ("tad_cm_clsf_grd_mng", "분류등급관리"),
     "tb_classifications": ("tad_cm_clsf_rslt_mng", "분류결과관리"),
     "tb_corrections": ("tad_cm_crct_mng", "보정관리"),
-    "tb_document_factor_scores": ("tad_dm_doc_rqmt_scr_mng", "문서요건점수관리"),
     "tb_document_labels": ("tad_dm_doc_lbl_mng", "문서라벨관리"),
     "tb_documents": ("tad_dm_doc_mng", "문서관리"),
     "tb_evaluation_factors": ("tad_em_evl_rqmt_mng", "평가요건관리"),
     "tb_level_keywords": ("tad_gm_grd_kywd_mng", "등급키워드관리"),
-    "tb_guides": ("tad_gm_guide_ver_mng", "가이드버전관리"),
     "tb_llm_usage": ("tad_lm_llm_usqty_mng", "LLM사용량관리"),
-    "tb_training_datasets": ("tad_lm_lrn_datst_mng", "학습데이터셋관리"),
-    "tb_training_epochs": ("tad_lm_lrn_epoch_mng", "학습에폭관리"),
     "tb_training_runs": ("tad_lm_lrn_excn_mng", "학습실행관리"),
     "tb_model_versions": ("tad_mm_mdl_ver_mng", "모델버전관리"),
     "tb_prompt_versions": ("tad_pm_prmpt_ver_mng", "프롬프트버전관리"),
@@ -91,7 +92,6 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("classification_id", "clsf_id", "분류아이디"),
         ("chunk_id", "chnk_id", "청크아이디"),
         ("evidence_type", "bss_type_nm", "근거유형명"),
-        ("factor_id", "rqmt_sn", "요건일련번호"),
         ("excerpt", "exct_cn", "발췌내용"),
         ("excerpt_start", "exct_bgng_pstn_nm", "발췌시작위치명"),
         ("excerpt_end", "exct_end_pstn_nm", "발췌종료위치명"),
@@ -119,11 +119,9 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("confidence", "rlbl_scr", "신뢰점수"),
         ("alternatives", "nxtrnk_grd_list_cn", "차순위등급목록내용"),
         ("automation_assessment", "auto_cfmtn_evl_info_cn", "자동확정평가정보내용"),
-        ("aggregation_method", "tot_mth_cd", "집계방식코드"),
         ("chunk_count", "chnk_cnt", "청크수"),
         ("status", "clsf_stts_nm", "분류상태명"),
         ("initial_status", "clsf_frst_stts_nm", "분류최초상태명"),
-        ("inference_ms", "infr_req_hr", "추론소요시간"),
         ("classified_at", "clsf_dt", "분류일시"),
     ),
     "tb_corrections": (
@@ -138,18 +136,12 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("consumed_in_run", "rflt_lrn_excn_id", "반영학습실행아이디"),
         ("consumed_at", "rflt_dt", "반영일시"),
     ),
-    "tb_document_factor_scores": (
-        ("doc_id", "doc_id", "문서아이디"),
-        ("factor_id", "rqmt_sn", "요건일련번호"),
-        ("score", "scr", "점수"),
-    ),
     "tb_document_labels": (
         ("doc_id", "doc_id", "문서아이디"),
         ("level_id", "grd_sn", "등급일련번호"),
         ("labeled_by", "lbl_mnbd_nm", "라벨주체명"),
         ("labeler_id", "lbl_wrtr_id", "라벨작성자아이디"),
         ("confidence", "rlbl_scr", "신뢰점수"),
-        ("total_score", "tot_scr", "집계점수"),
         ("notes", "memo_dtl_cn", "메모상세내용"),
         ("is_verified", "vrfc_cmptn_yn", "검증완료여부"),
         ("verified_by", "vrfr_id", "검증자아이디"),
@@ -158,7 +150,6 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "tb_documents": (
         ("doc_id", "doc_id", "문서아이디"),
-        ("external_ref", "otsd_rfrnc_no", "외부참조번호"),
         ("filename", "file_nm", "파일명"),
         ("source_format", "orgnl_frmat_nm", "원본포맷명"),
         ("file_size_bytes", "file_sz", "파일크기"),
@@ -170,7 +161,6 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("char_count", "char_cnt", "글자수"),
         ("extraction_method", "extr_mth_nm", "추출방식명"),
         ("extraction_quality", "extr_qlty_scr", "추출품질점수"),
-        ("ocr_used", "ocr_use_yn", "OCR사용여부"),
         ("processing_status", "prcs_stts_nm", "처리상태명"),
         ("error_message", "err_stts_msg_cn", "오류상태메시지내용"),
         ("uploaded_at", "uld_dt", "업로드일시"),
@@ -181,7 +171,6 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "tb_evaluation_factors": (
         ("factor_id", "rqmt_sn", "요건일련번호"),
         ("factor_code", "rqmt_cd", "요건코드"),
-        ("factor_name", "rqmt_nm", "요건명"),
         ("description", "evl_rqmt_expln", "평가요건설명"),
         ("weight", "wgvl_cfc", "가중치계수"),
         ("is_active", "actvtn_yn", "활성여부"),
@@ -199,16 +188,6 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("is_active", "actvtn_yn", "활성여부"),
         ("created_at", "crt_dt", "생성일시"),
     ),
-    "tb_guides": (
-        ("id", "guide_ver_sn", "가이드버전일련번호"),
-        ("guide_id", "guide_id", "가이드아이디"),
-        ("version", "guide_ver_nm", "가이드버전명"),
-        ("effective_date", "enfc_dt", "시행일시"),
-        ("change_summary", "chg_smry_cn", "변경요약내용"),
-        ("doc_type", "doc_knd_nm", "문서종류명"),
-        ("filename", "file_nm", "파일명"),
-        ("registered_at", "reg_dt", "등록일시"),
-    ),
     "tb_llm_usage": (
         ("usage_id", "use_rcd_sn", "사용기록일련번호"),
         ("provider", "offr_id", "제공자아이디"),
@@ -218,7 +197,6 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("reference_id", "rfrnc_trgt_id", "참조대상아이디"),
         ("input_tokens", "inpt_tkn_cnt", "입력토큰수"),
         ("output_tokens", "otpt_tkn_cnt", "출력토큰수"),
-        ("total_tokens", "whol_tkn_cnt", "전체토큰수"),
         ("cost_usd", "usd_cst", "미화비용"),
         ("cost_krw", "kcur_cst", "원화비용"),
         ("billing_phase", "bllng_se_cd", "과금구분코드"),
@@ -227,40 +205,17 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("error_code", "err_cd", "오류코드"),
         ("called_at", "clot_dt", "호출일시"),
     ),
-    "tb_training_datasets": (
-        ("id", "lrn_datst_sn", "학습데이터셋일련번호"),
-        ("run_id", "excn_id", "실행아이디"),
-        ("doc_id", "doc_id", "문서아이디"),
-        ("split_type", "prttn_se_nm", "분할구분명"),
-        ("level_id", "grd_sn", "등급일련번호"),
-    ),
-    "tb_training_epochs": (
-        ("run_id", "excn_id", "실행아이디"),
-        ("epoch", "epoch_sn", "에폭일련번호"),
-        ("train_loss", "lrn_loss_nvl", "학습손실수치"),
-        ("val_loss", "vrfc_loss_nvl", "검증손실수치"),
-        ("val_metrics", "vrfc_idct_info_cn", "검증지표정보내용"),
-        ("learning_rate", "lrnr", "학습률"),
-        ("logged_at", "rcd_dt", "기록일시"),
-    ),
     "tb_training_runs": (
         ("run_id", "excn_id", "실행아이디"),
         ("model_version_id", "mdl_ver_id", "모델버전아이디"),
-        ("mlflow_run_id", "flw_excn_id", "흐름실행아이디"),
         ("status", "lrn_excn_stts_cd", "학습실행상태코드"),
         ("started_at", "bgng_dt", "시작일시"),
         ("completed_at", "end_dt", "종료일시"),
         ("duration_sec", "req_hr", "소요시간"),
         ("total_samples", "whol_sample_cnt", "전체표본수"),
-        ("train_count", "lrn_nocs", "학습건수"),
-        ("val_count", "vrfc_nocs", "검증건수"),
-        ("test_count", "test_nocs", "시험건수"),
-        ("split_method", "prttn_mth_cd", "분할방식코드"),
-        ("split_seed", "prttn_seed", "분할시드"),
         ("hyperparameters", "hprprm_info_cn", "하이퍼파라미터정보내용"),
         ("final_metrics", "last_idct_info_cn", "최종지표정보내용"),
         ("trigger_type", "boot_mth_cd", "기동방식코드"),
-        ("trigger_ref", "boot_bss_idntfr_nm", "기동근거식별자명"),
         ("error_message", "err_stts_msg_cn", "오류상태메시지내용"),
         ("created_at", "crt_dt", "생성일시"),
         ("created_by", "creatr_id", "생성자아이디"),
@@ -275,14 +230,12 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("training_data_count", "lrn_data_nocs", "학습자료건수"),
         ("metrics", "idct_info_cn", "지표정보내용"),
         ("model_uri", "mdl_strg_path_nm", "모델저장경로명"),
-        ("mlflow_run_id", "flw_excn_id", "흐름실행아이디"),
         ("is_active", "actvtn_yn", "활성여부"),
         ("active_key", "actvtn_sn", "활성일련번호"),
         ("activated_at", "vtlz_dt", "활성화일시"),
         ("deactivated_at", "dsbl_dt", "비활성화일시"),
         ("rolled_back_from", "rlbk_src_ver_id", "롤백출처버전아이디"),
         ("rollback_reason", "rlbk_rsn", "롤백사유"),
-        ("level_snapshot", "grd_system_hstry_cn", "등급체계이력내용"),
         ("created_at", "crt_dt", "생성일시"),
     ),
     "tb_prompt_versions": (
@@ -295,7 +248,6 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "tb_sample_documents": (
         ("sample_id", "syn_doc_id", "합성문서아이디"),
-        ("doc_id", "doc_id", "문서아이디"),
         ("target_level_id", "goal_grd_sn", "목표등급일련번호"),
         ("corrected_level_id", "cfmtn_grd_sn", "확정등급일련번호"),
         ("doc_type", "doc_knd_nm", "문서종류명"),
