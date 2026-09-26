@@ -58,6 +58,15 @@ class SimilarDocument:
         return 1.0 - self.distance
 
 
+@dataclass(frozen=True)
+class DocumentVector:
+    """문서 대표 벡터 한 건 — 질의 벡터로 쓸 때 어느 모델이 만들었는지 함께 필요하다."""
+
+    doc_id: str
+    embedding: list[float]
+    model: str
+
+
 class DocumentVectorStore:
     """tad_dm_doc_vctr_mng 읽기·쓰기. 지연 연결 — 생성 시 DB 에 붙지 않는다."""
 
@@ -132,6 +141,27 @@ class DocumentVectorStore:
         if row is None:
             return True
         return content_sha256 is None or row[0] != content_sha256
+
+    def get(self, doc_id: str) -> "DocumentVector | None":
+        """문서 대표 벡터와 만든 모델명을 읽는다(규정 참고 표시가 질의 벡터로 쓴다).
+
+        색인 전이거나 soft delete 된 문서는 None — "색인 전"과 "벡터가 없음"은 같은 취급이다.
+        `similar()` 와 같이 `del_dt IS NULL` 을 조인으로 건다(soft delete 는 CASCADE 가 안 잡는다).
+        """
+        stmt = text(
+            """
+            SELECT v.embd_vctr_cn::text AS emb, v.embd_mdl_nm AS model
+              FROM tad_dm_doc_vctr_mng v
+              JOIN tad_dm_doc_mng d ON d.doc_id = v.doc_id
+             WHERE v.doc_id = :d AND d.del_dt IS NULL
+            """
+        )
+        with self._engine.connect() as conn:
+            row = conn.execute(stmt, {"d": str(doc_id)}).first()
+        if row is None:
+            return None
+        vec = [float(x) for x in row[0].strip("[]").split(",")]
+        return DocumentVector(doc_id=str(doc_id), embedding=vec, model=row[1])
 
     def exists(self, doc_id: str) -> bool:
         """이 문서의 벡터가 있는가 — "색인 전"과 "비슷한 문서가 없음"을 가르는 데 쓴다.

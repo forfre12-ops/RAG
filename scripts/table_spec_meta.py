@@ -368,3 +368,69 @@ PLACEMENT = {_t(k): v for k, v in PLACEMENT.items()}
 TABLES = {_t(k): v for k, v in TABLES.items()}
 COMMON = {_uniform(k): v for k, v in COMMON.items()}
 COLS = {_t(t): {_c(t, c): d for c, d in cols.items()} for t, cols in COLS.items()}
+
+# ── 규정 참고 표시 (2026-09-25) ────────────────────────────────────────────
+# 옛 이름(tb_*)이 없는 표라 위 변환을 거치지 않고 표준 물리명으로 바로 적는다.
+# 정본 = poc/src/koipa/db/standard_names.py 의 POST_BASE_TABLES/COLUMNS. 이름은 표준용어집 대조 전 후보다.
+GROUPS.append(("I", "규정", "회원사 규정 원문·조항·문장. 검수 화면이 문서와 관련된 규정 원문 문장을 참고로 보여 준다(등급 판정과 무관)."))
+PLACEMENT.update({
+    "tad_rm_rgltn_mng":       ("둘 다", "회원사 규정 한 판. 규정을 올리는 곳은 고객사 서버다"),
+    "tad_rm_rgltn_artcl_mng": ("둘 다", "규정의 조항. 표시 대상 조항만 임베딩이 채워진다"),
+    "tad_rm_rgltn_stc_mng":   ("둘 다", "조항의 문장(원문 그대로). 검수 화면이 이 중 하나를 보여 준다"),
+})
+TABLES.update({
+    "tad_rm_rgltn_mng": ("I", "규정", "회원사 규정 한 판(版). 같은 규정명의 판들 중 활성은 하나뿐이다. 등급을 바꾸지 않는 참고 표시용이다."),
+    "tad_rm_rgltn_artcl_mng": ("I", "규정 조항", "규정의 조항 한 행. 종류(총칙·절차·등급정의·취급기준)와 표시 대상 여부를 가진다. 벡터는 BYTEA 다(pgvector 아님)."),
+    "tad_rm_rgltn_stc_mng": ("I", "규정 문장", "조항의 문장 한 행. 서두 문장은 선택 후보에서 빼고, 등급별 목록의 줄은 같은 묶음으로 표시한다."),
+})
+COLS.update({
+    "tad_rm_rgltn_mng": {
+        "rgltn_id": "규정 판 PK(UUID)",
+        "rgltn_nm": "규정명. 같은 규정명의 판들이 한 계열이다",
+        "ver_lbl_nm": "판 표기(예 v3.1)",
+        "enfc_dt": "시행일(ISO 날짜 문자열). 선택",
+        "prcs_stts_cd": "상태 — indexing · ready · active · archived · failed. 같은 규정명의 active 는 하나뿐이다",
+        "file_hash_nm": "원본 파일 SHA-256. 삭제하지 않은 판끼리 부분 UNIQUE(중복 등록 방지)",
+        "orgtxt_path_nm": "원본 파일 저장 위치(암호화 버킷 regulations-raw)",
+        "orgnl_frmat_nm": "원본 파일 형식(확장자)",
+        "file_nm": "원본 파일명",
+        "prttn_mth_cd": "분할 방식 — article(제N조) · numbered(번호 제목) · paragraph(문단, 정확도 낮음)",
+        "artcl_cnt": "조항 수",
+        "stc_cnt": "문장 수",
+        "embd_mdl_nm": "임베딩 모델명. 문서 대표 벡터의 모델과 다르면 표시하지 않는다",
+        "embd_trgt_cnt": "임베딩할 조항·문장 수(진행률의 분모)",
+        "embd_cmptn_cnt": "임베딩을 마친 수(진행률의 분자)",
+        "aplcn_trgt_dscrp_cn": "관리자가 적은 적용 대상 한 줄 설명",
+        "aplcn_trgt_cnfrm_yn": "적용 대상 확인 여부. 활성화의 조건이다",
+        "wrn_stts_msg_cn": "분할 경고(예: 조 단위 구분이 없어 정확도가 낮을 수 있다)",
+        "err_stts_msg_cn": "색인 실패 사유",
+        "creatr_id": "등록한 사람(JWT sub)",
+        "crt_dt": "생성 시각",
+        "mdfcn_dt": "수정 시각",
+        "vtlz_dt": "활성화 시각",
+        "dsbl_dt": "보관(비활성화) 시각",
+        "del_dt": "삭제 시각. NULL 이면 삭제 안 됨",
+    },
+    "tad_rm_rgltn_artcl_mng": {
+        "artcl_id": "조항 PK(UUID)",
+        "rgltn_id": "소속 규정 판(FK, 규정 삭제 시 함께 삭제)",
+        "artcl_sn": "규정 안 순번. (규정, 순번) UNIQUE",
+        "artcl_no_nm": "조 번호 표기(예 제34조, 부칙 제2조, 문단 12)",
+        "artcl_ttl_nm": "조 제목",
+        "chpt_nm": "장 제목",
+        "artcl_cn": "조항 원문",
+        "artcl_knd_cd": "종류 — general(총칙·부칙) · procedure(절차) · grade_def(등급 정의) · handling(취급 기준) · other",
+        "artcl_knd_src_cd": "종류를 정한 주체 — auto(규칙) · admin(관리자)",
+        "dsply_yn": "표시 대상 여부. 기본은 취급 기준만 true",
+        "embd_vctr_cn": "조항 임베딩(float32 little-endian). 표시 대상 조항만 채운다",
+    },
+    "tad_rm_rgltn_stc_mng": {
+        "stc_id": "문장 PK(UUID)",
+        "artcl_id": "소속 조항(FK, 조항 삭제 시 함께 삭제)",
+        "stc_sn": "조항 안 순번. (조항, 순번) UNIQUE",
+        "stc_cn": "문장 원문",
+        "lead_yn": "서두 문장 여부(\"다음 각 호…\" 류). 선택 후보에서 제외한다",
+        "list_grp_sn": "등급별 목록 묶음 번호. 같은 번호의 줄은 목록 전체를 함께 보여 준다",
+        "embd_vctr_cn": "문장 임베딩(float32 little-endian)",
+    },
+})

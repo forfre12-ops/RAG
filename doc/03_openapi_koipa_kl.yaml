@@ -1948,6 +1948,265 @@ paths:
         '403': { description: "admin role required" }
         '404': { description: "데모 콘솔 비활성(운영 기본)" }
 
+  /regulations:
+    post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 규정 파일 등록 (색인은 비동기 — 기본 꺼짐 기능)
+      description: |
+        회원사가 올리는 사내 규정 파일을 받아 조항·문장으로 나누고 임베딩한다. 검수 화면이 문서와 관련된 규정 **원문 문장**을
+        참고로 보여 주기 위한 재료다. **등급을 바꾸지 않는다.** `regulation_reference_enabled` 가 꺼져 있으면(기본) 이 경로는 404 다.
+
+        - 지원 형식: txt · md · docx · pdf · hwp · hwpx (크기 한도 MAX_UPLOAD_MB)
+        - **같은 파일(SHA-256)이 이미 있으면 새 판을 만들지 않고 기존 reg_id 를 200 으로 돌려준다.**
+        - 색인은 워커가 한다. 상태는 `GET /regulations/{reg_id}` 로 본다(indexing → ready · failed).
+        - 원본은 암호화 버킷에 보관하며 내려받는 경로는 없다. 삭제하면 원본·조항·문장이 함께 지워진다.
+        - 권한: admin · kl_backend.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, name, version_label]
+              properties:
+                file: { type: string, format: binary }
+                name: { type: string, maxLength: 200, description: "규정명. 같은 규정명의 판들이 한 계열이다" }
+                version_label: { type: string, maxLength: 50, description: "판 표기(예 v3.1)" }
+                effective_date: { type: string, description: "시행일 YYYY-MM-DD (선택)" }
+      responses:
+        '202':
+          description: 접수됨 — 색인 중
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegulationRegisterResponse' }
+        '200':
+          description: 같은 파일이 이미 있다(duplicate=true) — 기존 reg_id
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegulationRegisterResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin 또는 kl_backend 역할이 필요하다" }
+        '413': { description: "파일 크기 초과 (MAX_UPLOAD_MB)" }
+        '422': { description: "지원하지 않는 형식 · 빈 파일 · 규정명/판 표기 누락 · 시행일 형식 오류" }
+        '503': { description: "색인 작업 큐를 쓸 수 없다(브로커 없음)" }
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 규정 목록
+      parameters:
+        - { in: query, name: status, schema: { type: string, enum: [indexing, ready, active, archived, failed] } }
+        - { in: query, name: limit, schema: { type: integer, default: 50, minimum: 1, maximum: 200 } }
+        - { in: query, name: offset, schema: { type: integer, default: 0, minimum: 0 } }
+      responses:
+        '200':
+          description: 삭제하지 않은 판, 최신 등록순
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegulationListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin · reviewer · kl_backend 역할이 필요하다" }
+        '422': { description: "알 수 없는 status" }
+
+  /regulations/{reg_id}:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 규정 상세 · 색인 진행
+      description: |
+        `embedded_count / embed_target_count` 가 색인 진행률이다. `warnings` 에 분할 경고가 담긴다
+        (예: "조 단위 구분이 없어 정확도가 낮을 수 있습니다."). 실패하면 `error_message` 에 사유가 있다.
+      parameters:
+        - { in: path, name: reg_id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: 규정 상세
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegulationDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin · reviewer · kl_backend 역할이 필요하다" }
+        '404': { description: "규정 없음(삭제한 판 포함)" }
+    delete:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 규정 삭제 — 조항·문장·원본이 함께 지워진다
+      description: |
+        보관·색인 실패·활성화 전(ready) 판만 지운다. **사용 중(active)이거나 색인 중인 판은 지우지 못한다(409).**
+        판 행은 삭제 표시(tombstone)만 남고 같은 파일을 다시 올릴 수 있다.
+      parameters:
+        - { in: path, name: reg_id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: 삭제됨 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin 또는 kl_backend 역할이 필요하다" }
+        '404': { description: "규정 없음" }
+        '409': { description: "사용 중이거나 색인 중인 판은 삭제할 수 없다" }
+
+  /regulations/{reg_id}/clauses:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 규정의 조항 표 (종류·표시 대상)
+      description: |
+        종류 — general(총칙·부칙) · procedure(절차) · grade_def(등급 정의) · handling(취급 기준) · other.
+        **기본 표시 대상은 handling 뿐이다.** 등급 정의·절차 조항은 검수자를 그 등급 쪽으로 끄는 오도의 원인이라 뺐다.
+      parameters:
+        - { in: path, name: reg_id, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: kind, schema: { type: string, enum: [general, procedure, grade_def, handling, other] } }
+        - { in: query, name: display, schema: { type: boolean } }
+        - { in: query, name: limit, schema: { type: integer, default: 200, minimum: 1, maximum: 500 } }
+        - { in: query, name: offset, schema: { type: integer, default: 0, minimum: 0 } }
+      responses:
+        '200':
+          description: 조항 목록(순번 순)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegulationClauseList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin · reviewer · kl_backend 역할이 필요하다" }
+        '404': { description: "규정 없음" }
+        '422': { description: "알 수 없는 kind" }
+
+  /regulations/{reg_id}/clauses/{clause_id}:
+    patch:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 조항의 표시 대상·종류 수정
+      description: |
+        표시 대상을 **켜면 그 자리에서 그 조항(과 문장)을 임베딩한다**(요청 안에서, 조항 하나 분량). 활성 판을 고치면
+        이 프로세스의 조회 캐시를 즉시 버리고 다른 프로세스는 최대 30초 안에 따라온다. 색인 중에는 409.
+      parameters:
+        - { in: path, name: reg_id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: clause_id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegulationClausePatchRequest' }
+      responses:
+        '200':
+          description: 수정된 조항
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegulationClauseItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin 또는 kl_backend 역할이 필요하다" }
+        '404': { description: "규정 또는 조항 없음" }
+        '409': { description: "색인 중이라 수정할 수 없다" }
+        '422': { description: "display·kind 모두 없음 · 알 수 없는 kind" }
+        '503': { description: "임베더를 쓸 수 없다(표시 대상을 켤 때)" }
+
+  /regulations/{reg_id}/preview:
+    post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 활성화 전 미리보기 — 이 규정 하나로 문서마다 어떻게 보이는지
+      description: |
+        후보 규정 **하나만**으로 문서(최대 20건)마다 검수 화면에 무엇이 보일지 계산한다(캐시를 쓰지 않는다). 규정이 문서에
+        적용되는지는 점수로 판별되지 않으므로(시험에서 적용 안 되는 규정이 오히려 점수가 높았다) 활성화 전에 사람이 이 결과를 본다.
+        문서가 없거나 색인 전이면 그 문서만 reason 이 달린다(요청 전체는 실패하지 않는다).
+      parameters:
+        - { in: path, name: reg_id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegulationPreviewRequest' }
+      responses:
+        '200':
+          description: 문서별 결과
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegulationPreviewResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin 또는 kl_backend 역할이 필요하다" }
+        '404': { description: "규정 없음" }
+        '422': { description: "doc_ids 가 비었거나 20건을 넘는다" }
+        '503': { description: "미리보기를 계산할 수 없다" }
+
+  /regulations/{reg_id}/activate:
+    post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 활성화 — 적용 대상 확인 필수
+      description: |
+        `scope_confirmed=true`(이 규정이 검수 대상 문서의 취급 기준임을 확인함)여야 한다. **같은 규정명의 이전 활성 판은 같은
+        트랜잭션에서 보관으로 바뀐다.** 보관 판을 다시 활성화할 수 있다. 서로 다른 규정명의 활성 수는 상한
+        (`regulation_active_max`, 기본 5)을 넘지 못한다.
+      parameters:
+        - { in: path, name: reg_id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegulationActivateRequest' }
+      responses:
+        '200':
+          description: 활성화된 규정
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegulationDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin 또는 kl_backend 역할이 필요하다" }
+        '404': { description: "규정 없음" }
+        '409': { description: "활성화할 수 없는 상태 · 표시할 수 있는 조항이 없다 · 활성 규정 수 상한 초과" }
+        '422': { description: "scope_confirmed 가 true 가 아니다" }
+
+  /regulations/{reg_id}/archive:
+    post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 보관(사용 중지)
+      description: 활성 판만 보관한다. 검수 화면의 조회에서 즉시 빠진다(다른 프로세스는 최대 30초).
+      parameters:
+        - { in: path, name: reg_id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: 보관된 규정
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegulationDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin 또는 kl_backend 역할이 필요하다" }
+        '404': { description: "규정 없음" }
+        '409': { description: "활성 판이 아니다" }
+
+  /documents/{doc_id}/regulation-evidence:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 이 문서와 관련된 규정 원문 문장 (참고용 — 등급 판정 근거가 아니다)
+      description: |
+        활성 규정에서 문서 대표 벡터(유사 문서 조회와 같은 것)와 본문 앞부분으로 조항을 고르고, 그 조항 안에서 문서와
+        가장 가까운 문장 **하나**를 원문 그대로 돌려준다(등급별 목록의 한 줄이면 목록 전체). 생성·요약이 없다.
+        **점수·유사도·신뢰도 필드가 없다.**
+
+        `items` 가 비어 있어도 **오류가 아니다** — `reason` 이 이유다: no_active_regulation · document_not_indexed ·
+        embedder_mismatch · below_floor · no_sentence · not_applicable · public_document · llm_unavailable · llm_not_local
+        (뒤의 넷은 서버가 로컬 LLM 판정 옵션을 켰을 때만 나온다). 문서가 없을 때만 404, 조회 인프라를 쓸 수 없을 때만 503 이다.
+        검수 화면은 이 실패로 멈추면 안 된다.
+
+        로컬 LLM 판정 옵션을 켠 서버는 조회가 준 후보 조항 상위 몇 개를 LLM 에게 보이고 문서에 직접 적용되는 항을 **고르게** 한다 —
+        돌려주는 글은 여전히 규정 원문뿐이고 LLM 이 만든 글은 없다. 해당하는 항이 없으면 `items` 가 비고 `reason` 이 `not_applicable` 이다.
+        이 옵션에서는 응답에 몇 초가 걸릴 수 있다.
+
+        등급을 바꾸지 않으며 검수 라우팅에도 쓰이지 않는다. 골든셋 검수 화면에는 붙지 않는다(독립 판정 보호).
+      parameters:
+        - { in: path, name: doc_id, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: max_items, schema: { type: integer, minimum: 1, maximum: 3 }, description: "기본은 서버 설정(1)" }
+      responses:
+        '200':
+          description: 관련 규정 문장(없으면 items=[] + reason)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegulationEvidenceResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin · reviewer · kl_backend 역할이 필요하다" }
+        '404': { description: "문서 없음" }
+        '429': { description: "레이트리밋(분당 120)" }
+        '503': { description: "조회 인프라를 쓸 수 없다" }
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -2430,6 +2689,162 @@ components:
         retryable:
           type: boolean
           description: true 면 같은 요청을 다시 보내 성공할 수 있다(미처리 500 은 true).
+
+    # ── 규정 참고 표시 (2026-09-25) — 전부 x-audience: internal 경로가 쓴다 ────────────
+    RegulationRegisterResponse:
+      type: object
+      required: [reg_id, status, duplicate]
+      properties:
+        reg_id: { type: string, format: uuid }
+        status: { type: string, enum: [indexing, ready, active, archived, failed] }
+        duplicate: { type: boolean, description: "같은 파일이 이미 있으면 true — 새 판을 만들지 않고 기존 reg_id 를 돌려준다" }
+
+    RegulationSummary:
+      type: object
+      required: [reg_id, name, version_label, status, clause_count, sentence_count]
+      properties:
+        reg_id: { type: string, format: uuid }
+        name: { type: string }
+        version_label: { type: string }
+        status: { type: string, enum: [indexing, ready, active, archived, failed] }
+        clause_count: { type: integer }
+        sentence_count: { type: integer }
+        effective_date: { type: string, nullable: true }
+        created_at: { type: string, nullable: true }
+        activated_at: { type: string, nullable: true }
+
+    RegulationListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RegulationSummary' }
+        total: { type: integer }
+
+    RegulationDetail:
+      allOf:
+        - $ref: '#/components/schemas/RegulationSummary'
+        - type: object
+          properties:
+            filename: { type: string, nullable: true }
+            source_format: { type: string, nullable: true }
+            split_mode: { type: string, nullable: true, description: "article | numbered | paragraph(정확도 낮음)" }
+            embed_model: { type: string, nullable: true }
+            embed_target_count: { type: integer }
+            embedded_count: { type: integer }
+            display_clause_count: { type: integer }
+            scope_note: { type: string, nullable: true }
+            scope_confirmed: { type: boolean }
+            warnings:
+              type: array
+              items: { type: string }
+            error_message: { type: string, nullable: true }
+
+    RegulationClauseItem:
+      type: object
+      required: [clause_id, seq, article_no, title, chapter, kind, kind_source, display, text]
+      properties:
+        clause_id: { type: string, format: uuid }
+        seq: { type: integer }
+        article_no: { type: string, description: "제34조 · 부칙 제2조 · 문단 12" }
+        title: { type: string }
+        chapter: { type: string }
+        kind: { type: string, enum: [general, procedure, grade_def, handling, other] }
+        kind_source: { type: string, enum: [auto, admin] }
+        display: { type: boolean }
+        text: { type: string, description: "조항 원문" }
+
+    RegulationClauseList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RegulationClauseItem' }
+        total: { type: integer }
+
+    RegulationClausePatchRequest:
+      type: object
+      properties:
+        display: { type: boolean }
+        kind: { type: string, enum: [general, procedure, grade_def, handling, other] }
+
+    RegulationActivateRequest:
+      type: object
+      required: [scope_confirmed]
+      properties:
+        scope_confirmed: { type: boolean, description: "이 규정이 검수 대상 문서의 취급 기준임을 확인했다 — true 여야 활성화된다" }
+        scope_note: { type: string, maxLength: 500, nullable: true, description: "적용 대상 한 줄 설명" }
+
+    RegulationEvidenceItem:
+      type: object
+      required: [regulation, clause, sentences, is_grade_list]
+      properties:
+        regulation:
+          type: object
+          required: [reg_id, name, version_label]
+          properties:
+            reg_id: { type: string, format: uuid }
+            name: { type: string }
+            version_label: { type: string }
+        clause:
+          type: object
+          required: [clause_id, article_no, title]
+          properties:
+            clause_id: { type: string, format: uuid }
+            article_no: { type: string }
+            title: { type: string }
+        sentences:
+          type: array
+          items: { type: string }
+          description: "규정 원문 문장 그대로. 등급별 목록이면 목록 전체(순서대로)"
+        is_grade_list: { type: boolean }
+
+    RegulationEvidenceResponse:
+      type: object
+      required: [doc_id, items]
+      properties:
+        doc_id: { type: string }
+        indexed:
+          type: boolean
+          nullable: true
+          description: "문서 대표 벡터가 있는가. null 은 확인하지 않았다는 뜻(활성 규정이 없음)"
+        reason:
+          type: string
+          nullable: true
+          description: "items 가 비었을 때 이유 — no_active_regulation | document_not_indexed | embedder_mismatch | below_floor | no_sentence | not_applicable | public_document | llm_unavailable | llm_not_local. 오류가 아니라 정상 응답이다(뒤의 넷은 로컬 LLM 판정 옵션을 켰을 때만 나온다)"
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RegulationEvidenceItem' }
+
+    RegulationPreviewRequest:
+      type: object
+      required: [doc_ids]
+      properties:
+        doc_ids:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { type: string }
+
+    RegulationPreviewResponse:
+      type: object
+      required: [reg_id, results]
+      properties:
+        reg_id: { type: string, format: uuid }
+        results:
+          type: array
+          items:
+            type: object
+            required: [doc_id, items]
+            properties:
+              doc_id: { type: string }
+              indexed: { type: boolean, nullable: true }
+              reason: { type: string, nullable: true }
+              items:
+                type: array
+                items: { $ref: '#/components/schemas/RegulationEvidenceItem' }
 
   responses:
     BadRequest:

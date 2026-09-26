@@ -304,9 +304,88 @@ POST_BASE_RENAMES: dict[str, tuple[tuple[str, str, str, str], ...]] = {
 }
 
 
+# 7b3e9d2a4f10 **뒤에 새로 만든** 표(2026-09-25 신설 — 이 구조가 없어 새 표를 넣을 수 없었다).
+# TABLES·COLUMNS 는 그 마이그레이션의 사본과 정확히 같아야 하므로(이미 서버에서 돈 판이라 고치지 않는다)
+# 새 표는 여기에 둔다. 옛 이름(tb_*)이 없는 표라 표준 물리명이 그대로 키다.
+#
+#   표준 표 이름: (논리명, 만든 마이그레이션 id)
+#   ⚠ 아래 이름은 **표준용어집과 대조 전**이다(용어집 파일이 저장소에 없다). 기존 이름을 최대한 재사용했고
+#     (ver_lbl_nm · enfc_dt · file_hash_nm · orgtxt_path_nm · orgnl_frmat_nm · prttn_mth_cd · embd_mdl_nm ·
+#     err_stts_msg_cn · creatr_id · crt_dt · mdfcn_dt · vtlz_dt · dsbl_dt · del_dt · embd_vctr_cn),
+#     새로 지은 단어는 아래 NEW_TERMS_FOR_GLOSSARY 다 — 용어집에 자체표준 용어로 올려야 한다.
+POST_BASE_TABLES: dict[str, tuple[str, str]] = {
+    "tad_rm_rgltn_mng": ("규정관리", "a1d4c7e9b302"),
+    "tad_rm_rgltn_artcl_mng": ("규정조항관리", "a1d4c7e9b302"),
+    "tad_rm_rgltn_stc_mng": ("규정문장관리", "a1d4c7e9b302"),
+}
+
+# 표준 표 이름 → ((표준 칼럼, 논리명), ...) — DB 칼럼 순서
+POST_BASE_COLUMNS: dict[str, tuple[tuple[str, str], ...]] = {
+    "tad_rm_rgltn_mng": (
+        ("rgltn_id", "규정아이디"),
+        ("rgltn_nm", "규정명"),
+        ("ver_lbl_nm", "버전라벨명"),
+        ("enfc_dt", "시행일시"),
+        ("prcs_stts_cd", "처리상태코드"),
+        ("file_hash_nm", "파일해시명"),
+        ("orgtxt_path_nm", "원문경로명"),
+        ("orgnl_frmat_nm", "원본포맷명"),
+        ("file_nm", "파일명"),
+        ("prttn_mth_cd", "분할방식코드"),
+        ("artcl_cnt", "조항수"),
+        ("stc_cnt", "문장수"),
+        ("embd_mdl_nm", "임베딩모델명"),
+        ("embd_trgt_cnt", "임베딩대상수"),
+        ("embd_cmptn_cnt", "임베딩완료수"),
+        ("aplcn_trgt_dscrp_cn", "적용대상설명내용"),
+        ("aplcn_trgt_cnfrm_yn", "적용대상확인여부"),
+        ("wrn_stts_msg_cn", "경고상태메시지내용"),
+        ("err_stts_msg_cn", "오류상태메시지내용"),
+        ("creatr_id", "생성자아이디"),
+        ("crt_dt", "생성일시"),
+        ("mdfcn_dt", "수정일시"),
+        ("vtlz_dt", "활성화일시"),
+        ("dsbl_dt", "비활성화일시"),
+        ("del_dt", "삭제일시"),
+    ),
+    "tad_rm_rgltn_artcl_mng": (
+        ("artcl_id", "조항아이디"),
+        ("rgltn_id", "규정아이디"),
+        ("artcl_sn", "조항일련번호"),
+        ("artcl_no_nm", "조항번호명"),
+        ("artcl_ttl_nm", "조항제목명"),
+        ("chpt_nm", "장명"),
+        ("artcl_cn", "조항내용"),
+        ("artcl_knd_cd", "조항종류코드"),
+        ("artcl_knd_src_cd", "조항종류출처코드"),
+        ("dsply_yn", "표시여부"),
+        ("embd_vctr_cn", "임베딩벡터내용"),
+    ),
+    "tad_rm_rgltn_stc_mng": (
+        ("stc_id", "문장아이디"),
+        ("artcl_id", "조항아이디"),
+        ("stc_sn", "문장일련번호"),
+        ("stc_cn", "문장내용"),
+        ("lead_yn", "서두문장여부"),
+        ("list_grp_sn", "목록묶음일련번호"),
+        ("embd_vctr_cn", "임베딩벡터내용"),
+    ),
+}
+
+# 위 표가 새로 만든 단어(약어 → 뜻). 표준용어집에 없으면 자체표준 용어로 올려야 한다(감리 지적 재발 방지).
+NEW_TERMS_FOR_GLOSSARY: dict[str, str] = {
+    "rgltn": "규정", "artcl": "조항", "stc": "문장", "dsply": "표시", "aplcn": "적용", "dscrp": "설명",
+    "cnfrm": "확인", "lead": "서두", "list": "목록", "grp": "묶음", "wrn": "경고", "chpt": "장",
+    "embd_trgt_cnt": "임베딩대상수 = 임베딩 + 대상 + 수(기존 단어의 조합)",
+}
+
+
 def logical_names() -> dict[str, tuple[str, dict[str, str]]]:
     """표준 표 이름 → (표 논리명, {표준 칼럼: 칼럼 논리명}). 정의서·ERD 생성기가 쓴다."""
-    return {
+    out = {
         TABLES[old][0]: (TABLES[old][1], {new: ko for _, new, ko in cols})
         for old, cols in COLUMNS.items()
     }
+    for table, (ko, _rev) in POST_BASE_TABLES.items():
+        out[table] = (ko, {col: ck for col, ck in POST_BASE_COLUMNS[table]})
+    return out

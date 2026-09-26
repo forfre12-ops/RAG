@@ -179,8 +179,18 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .why-t{font-size:10.5px;color:var(--text-dim);white-space:nowrap;min-width:118px;}
 .why-x{flex:1;word-break:break-all;}
 .why-w{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);white-space:nowrap;}
+/* 관련 규정(참고) — 검수 근거 펼침 안에 한 블록으로 붙는다. 규정 원문 그대로이고 등급 판정 근거가 아니다. */
+.reg-ref{margin-top:10px;padding-top:9px;border-top:1px solid var(--border-mid);}
+.reg-ref-h{font-size:12px;font-weight:700;margin-bottom:2px;}
+.reg-ref-src{font-size:11.5px;color:var(--text-soft);margin:6px 0 3px;}
+.reg-ref-q{margin:0;padding:6px 10px;border-left:3px solid var(--border-strong);background:#fff;font-size:12.5px;line-height:1.6;}
+.reg-ref-q div{white-space:pre-wrap;word-break:break-word;}
+.reg-pv{border:1px solid var(--border);padding:8px 10px;margin-top:8px;background:var(--bg-surface);}
+.reg-pv-t{font-size:12.5px;font-weight:600;}
 /* 프로파일에 맞지 않는 카드 — showPane 의 인라인 display 보다 우선해야 하므로 !important. */
 .pf-hidden{display:none !important;}
+/* 규정 기능이 꺼진 서버·볼 권한이 없는 사용자에게는 카드를 숨긴다 — 같은 이유로 !important. */
+.reg-off{display:none !important;}
 .profile-banner{margin:10px 0 4px;padding:9px 13px;border-radius:8px;font-size:12.5px;font-weight:600;border-left:4px solid;}
 .profile-banner.jjw{background:var(--bg-surface);border-color:var(--accent);}
 .profile-banner.cust{background:var(--bg-surface);border-color:#b8860b;}
@@ -1066,6 +1076,73 @@ details.adv[open]{padding-bottom:12px;}
       </div>
     </section>
 
+    <!-- ===== R. 사내 규정(참고 표시) (FUN-004) — 서버에서 이 기능을 켠 경우에만 보인다(reg-off) ===== -->
+    <section class="card col-span reg-off" id="reg-card" data-pane="config" style="order:3">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no aux">설정</span> 사내 규정(참고 표시) <span class="reqtag" data-tech>FUN-004</span></div>
+        <span class="ep" data-tech>GET · POST /regulations · POST /regulations/{reg_id}/activate · GET /documents/{doc_id}/regulation-evidence</span>
+      </div>
+      <div class="card-body">
+        <p class="sec-note" style="margin:0">올려 둔 규정에서 검수 중인 문서와 관련된 원문 문장을 참고로 보여 줍니다. 등급을 바꾸지 않습니다.</p>
+
+        <div class="btn-row">
+          <button class="btn sec sm" onclick="loadRegulations()">규정 목록 불러오기</button>
+          <span id="reg-info" class="hint" style="margin:0;"></span>
+        </div>
+        <div id="reg-notice" role="status" aria-live="polite"></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>규정명</th><th>판</th><th>상태</th><th>조항</th><th>시행일</th><th></th></tr></thead>
+            <tbody id="reg-body"><tr><td colspan="6" style="color:var(--text-dim)">「규정 목록 불러오기」를 누르면 올려 둔 규정이 나옵니다</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="field" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <label class="fld">규정 올리기</label>
+          <div class="row3">
+            <div class="field"><input id="reg-name" type="text" placeholder="규정명 — 예: 문서보안 규정" maxlength="200" /></div>
+            <div class="field"><input id="reg-ver" type="text" placeholder="판 — 예: v3.1" maxlength="50" /></div>
+            <div class="field"><input id="reg-date" type="text" placeholder="시행일(선택) — 예: 2026-09-01" maxlength="10" /></div>
+          </div>
+          <div class="btn-row" style="margin-top:8px;align-items:center;">
+            <input id="reg-file" type="file" accept=".txt,.md,.docx,.pdf,.hwp,.hwpx" onchange="regFilePicked()" />
+            <button class="btn" id="reg-upload" onclick="uploadRegulation()">규정 올리기</button>
+          </div>
+          <p class="sec-note">txt · md · docx · pdf · hwp · hwpx 파일을 올릴 수 있습니다. 같은 규정명으로 새 판을 올리면 판이 하나 더 쌓이고, 사용 중인 판은 활성화할 때 바뀝니다.</p>
+        </div>
+
+        <div id="reg-detail" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <label class="fld">선택한 규정</label>
+          <div id="reg-detail-head" class="kv"></div>
+          <div id="reg-detail-note" style="margin-top:6px;"></div>
+          <div id="reg-clause-wrap" style="display:none;">
+            <div class="tbl-wrap" style="margin-top:8px;max-height:360px;overflow:auto;">
+              <table>
+                <thead><tr><th>번호</th><th>제목</th><th>종류</th><th>표시</th><th></th></tr></thead>
+                <tbody id="reg-clauses"></tbody>
+              </table>
+            </div>
+            <p class="sec-note" style="margin-top:6px;">「표시」를 켠 조항만 검수 화면에 나옵니다. 총칙·절차처럼 문서 한 건에 직접 적용되지 않는 조항은 처음부터 꺼져 있습니다.</p>
+            <div class="btn-row" style="margin-top:8px;">
+              <button class="btn sec sm" onclick="previewRegulation()">미리보기</button>
+              <span class="hint" style="margin:0;">지금 목록에 올라와 있는 검수 대기·확정 대기 문서로, 이 규정이 문서마다 어떻게 보일지 미리 봅니다.</span>
+            </div>
+            <div id="reg-preview"></div>
+          </div>
+          <div id="reg-activate-box" class="field" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+            <label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;cursor:pointer;">
+              <input type="checkbox" id="reg-scope-ok" style="margin-top:3px;" />
+              <span>이 규정은 검수 대상 문서의 취급 기준입니다.</span>
+            </label>
+            <input id="reg-scope-note" type="text" placeholder="적용 대상 설명(선택) — 예: 사내 업무 문서 전체" maxlength="500" style="margin-top:8px;" />
+            <div class="btn-row" style="margin-top:8px;">
+              <button class="btn" id="reg-activate" onclick="activateRegulation()">활성화</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </div>
 
   <details style="margin-top:16px">
@@ -1867,11 +1944,11 @@ async function toggleWhy(i){
   if(box.style.display!=='none'){ box.style.display='none'; btn.textContent='왜 이 등급인가?'; return; }
   box.style.display=''; btn.textContent='근거 접기';
   const id=it.inference_id;
-  if(WHY_CACHE[id]){ box.innerHTML=renderWhy(WHY_CACHE[id]); return; }
+  if(WHY_CACHE[id]){ box.innerHTML=renderWhy(WHY_CACHE[id]); fillRegRef(box, it.doc_id); return; }
   box.innerHTML='<div class="sec-note">근거를 불러오는 중…</div>';
   try{
     const d=await api('GET',`/review-queue/${encodeURIComponent(id)}/evidence`);
-    WHY_CACHE[id]=d; box.innerHTML=renderWhy(d);
+    WHY_CACHE[id]=d; box.innerHTML=renderWhy(d); fillRegRef(box, it.doc_id);
   }catch(e){
     box.innerHTML=`<div class="warnbox">근거 조회 실패: ${errKo(e)} `
       + `${esc(e.data?.detail||e.message||'')}</div>`;
@@ -2132,11 +2209,11 @@ async function toggleWhyStaging(key){
   if(box.style.display!=='none'){ box.style.display='none'; btn.textContent='왜 이 등급인가?'; return; }
   box.style.display=''; btn.textContent='근거 접기';
   const id=it.inference_id;
-  if(WHY_CACHE[id]){ box.innerHTML=renderWhy(WHY_CACHE[id]); return; }
+  if(WHY_CACHE[id]){ box.innerHTML=renderWhy(WHY_CACHE[id]); fillRegRef(box, it.doc_id); return; }
   box.innerHTML='<div class="sec-note">근거를 불러오는 중…</div>';
   try{
     const d=await api('GET',`/review-queue/${encodeURIComponent(id)}/evidence`);
-    WHY_CACHE[id]=d; box.innerHTML=renderWhy(d);
+    WHY_CACHE[id]=d; box.innerHTML=renderWhy(d); fillRegRef(box, it.doc_id);
   }catch(e){
     box.innerHTML=`<div class="warnbox">근거 조회 실패: ${esc(stgErrText(e))}</div>`;
   }
@@ -3279,6 +3356,393 @@ async function toggleKeyword(i){
   }catch(e){ alert('상태 변경 실패: '+(e.data?.detail||e.message)); }
 }
 
+/* ---- 사내 규정(참고 표시) — 올려 둔 규정에서 문서와 관련된 원문 문장을 검수 화면에 참고로 붙인다 ------------
+ * [2026-09-25] 처음 넣었다(FUN-004). 화면은 둘이다.
+ *   ① 설정 탭의 「사내 규정(참고 표시)」 카드 — 규정을 올리고, 어떻게 나뉘었는지 보고, 미리 본 뒤 활성화한다.
+ *   ② 검수 화면(문서 검토 대기·확정 대기)의 「왜 이 등급인가?」 아래 「관련 규정(참고)」 블록.
+ *
+ * 설계 결정(이유를 적어 둔다).
+ *  ① 이 기능은 서버에서 꺼져 있을 수 있다(기본 꺼짐 — 라우트 자체가 없다). 화면을 열 때 GET /regulations 를 한 번
+ *     물어 200 이면 카드를 보이고, 404·403 이면 카드를 숨기고 검수 화면에도 아무것도 붙이지 않는다. 이 물음은
+ *     api() 를 거치지 않는다 — 꺼진 서버에서는 정상인 404 가 요청 로그에 오류로 남으면 안 된다.
+ *  ② 등급을 바꾸지 않는다. 블록에는 규정명·판·조항 번호와 규정 원문 문장만 있다. 유사도·신뢰도 같은 수치는
+ *     서버가 주지도 않고 화면도 그리지 않는다(2026-08-24 지시). 고정 문구로 참고용임을 밝힌다.
+ *  ③ 결과가 비면 블록 자체를 그리지 않는다. 「관련 규정 없음」이라고 적으면 규정에 그런 내용이 없다는 뜻으로
+ *     읽힌다 — 실제로는 조회가 못 찾은 것일 뿐이다. 조회 기반이 없을 때(503)만 흐린 한 줄을 남긴다.
+ *  ④ 규정 본문·규정명·설명은 전부 **사용자 입력**이다 — 화면에 넣는 모든 자리에서 esc() 를 거친다.
+ *  ⑤ 분석 중인 규정의 진행은 조용히(요청 로그·원본 응답 칸을 건드리지 않고) 3초 간격으로 읽는다.
+ *     끝나거나 실패하면 멈춘다. 오래 끝나지 않으면 간격을 늘린다.
+ * ------------------------------------------------------------------------------------------------ */
+const REG_STATUS_KO={indexing:'분석 중', ready:'사용 전', active:'사용 중', archived:'보관', failed:'분석 실패'};
+const REG_KIND_KO={general:'일반', procedure:'절차', grade_def:'등급 정의', handling:'취급 기준', other:'기타'};
+const REG_EMPTY_KO={
+  no_active_regulation:'사용 중인 규정이 없습니다',
+  document_not_indexed:'이 문서는 아직 분석되지 않아 비교하지 못했습니다',
+  embedder_mismatch:'문서와 규정의 분석 방식이 달라 비교하지 못했습니다',
+  below_floor:'관련도가 기준에 못 미쳐 표시하지 않았습니다',
+  no_sentence:'표시할 관련 문장이 없습니다',
+  not_applicable:'이 문서에 직접 해당하는 규정이 없다고 판단했습니다',
+  public_document:'이미 공개된 자료라 사내 규정을 붙이지 않았습니다',
+  llm_unavailable:'해당 여부를 확인하지 못해 표시하지 않았습니다',
+  llm_not_local:'사내 AI 서버가 설정되지 않아 표시하지 않았습니다',
+};
+let REG_ON=null;            // null=아직 모름 · true=이 서버에 기능이 있다 · false=없다(꺼져 있거나 이 사용자는 볼 수 없다)
+let REGS=[];                // 규정 목록 행
+let REG_SEL_ID=null;        // 선택한 규정 id
+let REG_SEL=null;           // 선택한 규정 상세(진행·경고·오류 문구 포함)
+let REG_CLAUSES=[];         // 선택한 규정의 조항 행
+let REG_CLAUSES_TOTAL=0;
+let REG_TIMER=null;         // 분석 중일 때 상태를 다시 읽는 타이머
+let REG_TICKS=0;            // 이번 분석에서 다시 읽은 횟수 — 오래 끝나지 않으면 간격을 늘린다
+let REG_POLL_MS=3000;
+const REGREF_CACHE={};      // 문서 id → {at, d}. 규정이 나온 결과는 이 화면이 열려 있는 동안, 빈 결과는 1분만 믿는다
+const REGREF_EMPTY_TTL_MS=60000;
+
+/* 요청 로그·원본 응답 칸을 건드리지 않는 조용한 읽기 — 꺼진 서버의 404 와 분석 진행 갱신용이다. */
+async function regQuiet(path){
+  const c=cfg();
+  try{
+    const r=await fetch(`${c.base}${path}`,{method:'GET', headers:authHeaders(c), credentials:'same-origin'});
+    if(!r.ok) return {ok:false, status:r.status, data:null};
+    const t=await r.text(); let d=null; try{ d=t?JSON.parse(t):null; }catch(e){ d=null; }
+    return {ok:d!==null && typeof d==='object', status:r.status, data:d};
+  }catch(e){ return {ok:false, status:0, data:null}; }
+}
+function regStatusPill(s){
+  const cls = s==='active' ? 'ok' : (s==='failed' ? 'err' : (s==='indexing' ? 'warn' : ''));
+  return `<span class="pill ${cls}">${esc(REG_STATUS_KO[s]||'알 수 없음')}</span>`;
+}
+/* 마지막 처리 결과 한 줄. 로그바는 접혀 있을 수 있어 카드 안에 남긴다(kind: 'ok' | 'warn' | ''=지움). */
+function regNotice(kind, msg){
+  const el=$('reg-notice'); if(!el) return;
+  el.innerHTML = !msg ? '' : (kind==='ok'
+    ? `<div class="hint" style="margin:0 0 8px"><span class="pill ok">처리됨</span> ${esc(msg)}</div>`
+    : `<div class="warnbox" style="margin:0 0 8px">${esc(msg)}</div>`);
+}
+function regClearRefCache(){ Object.keys(REGREF_CACHE).forEach(k=>{ delete REGREF_CACHE[k]; }); }
+
+/* 화면을 열 때 한 번 — 이 서버에 규정 기능이 있고 이 사용자가 볼 수 있으면 카드를 보인다. */
+async function initRegulationCard(){
+  const card=$('reg-card'); if(!card) return;
+  const r=await regQuiet('/regulations?limit=100');
+  if(!r.ok || !Array.isArray(r.data.items)){ REG_ON=false; return; }
+  REG_ON=true;
+  card.classList.remove('reg-off');
+  PANE_NOTE.config='설정 — 등급 체계·태깅 규칙과 사내 규정(참고 표시)입니다. 보통 도입 시 한 번 정하고 이후에는 거의 바꾸지 않습니다.';
+  const tab=document.querySelector('.tab.active'), note=$('pane-note');
+  if(note && tab && tab.dataset.tab==='config') note.textContent=PANE_NOTE.config;
+  setRegList(r.data);
+  syncRegPoll();
+}
+async function loadRegulations(){
+  try{
+    setRegList(await api('GET','/regulations?limit=100'));
+    syncRegPoll();
+  }catch(e){ regNotice('warn', `규정 목록을 불러오지 못했습니다: ${errKoText(e)}`); }
+}
+function setRegList(d){
+  REGS=(d && Array.isArray(d.items)) ? d.items.filter(x=>x && UUID_RE.test(String(x.reg_id))) : [];
+  renderRegList();
+}
+function renderRegList(){
+  const body=$('reg-body'), info=$('reg-info'); if(!body) return;
+  if(!REGS.length){
+    body.innerHTML='<tr><td colspan="6" style="color:var(--text-dim)">올려 둔 규정이 없습니다 — 아래에서 규정 파일을 올리십시오</td></tr>';
+  }else{
+    body.innerHTML=REGS.map(r=>{
+      const id=esc(r.reg_id);                       // 목록에 넣기 전에 UUID 모양을 확인했다 — 따옴표가 낄 수 없다
+      const btns=[`<button class="btn sec sm" onclick="selectRegulation('${id}')">조항 보기</button>`];
+      if(r.status==='active') btns.push(`<button class="btn sec sm" onclick="archiveRegulation('${id}')">보관</button>`);
+      if(r.status==='ready' || r.status==='archived' || r.status==='failed')
+        btns.push(`<button class="btn red sm" onclick="deleteRegulation('${id}')">삭제</button>`);
+      return `<tr${REG_SEL_ID===r.reg_id?' style="background:var(--bg-surface)"':''}>`
+        + `<td>${esc(r.name)}</td><td>${esc(r.version_label)}</td><td>${regStatusPill(r.status)}</td>`
+        + `<td>${Number(r.clause_count)||0}</td><td>${esc(r.effective_date||'-')}</td>`
+        + `<td><div class="btn-row">${btns.join('')}</div></td></tr>`;
+    }).join('');
+  }
+  if(info) info.textContent = REGS.length
+    ? `규정 ${REGS.length}건 · 사용 중 ${REGS.filter(r=>r.status==='active').length}건` : '';
+}
+
+/* ---- 선택한 규정 — 색인 진행 · 경고 · 조항 표 ---- */
+async function selectRegulation(id){
+  if(!UUID_RE.test(String(id))) return;
+  REG_SEL_ID=id; REG_SEL=null; REG_CLAUSES=[]; REG_CLAUSES_TOTAL=0;
+  const ok=$('reg-scope-ok'), sn=$('reg-scope-note'), pv=$('reg-preview');
+  if(ok) ok.checked=false; if(sn) sn.value=''; if(pv) pv.innerHTML='';
+  renderRegList(); renderRegDetail();
+  await refreshRegDetail(true);
+}
+async function refreshRegDetail(withClauses){
+  const id=REG_SEL_ID; if(!id) return;
+  let det;
+  try{ det=await api('GET',`/regulations/${encodeURIComponent(id)}`); }
+  catch(e){ regNotice('warn', `규정 정보를 불러오지 못했습니다: ${errKoText(e)}`); return; }
+  if(id!==REG_SEL_ID) return;                       // 그 사이 다른 규정을 골랐다 — 이 응답은 버린다
+  REG_SEL=det;
+  if(withClauses && ['ready','active','archived'].indexOf(det.status)>=0){
+    try{
+      const d=await api('GET',`/regulations/${encodeURIComponent(id)}/clauses?limit=500`);
+      if(id!==REG_SEL_ID) return;
+      REG_CLAUSES=(d && Array.isArray(d.items) ? d.items : []).filter(c=>c && UUID_RE.test(String(c.clause_id)));
+      REG_CLAUSES_TOTAL=Number(d && d.total)||REG_CLAUSES.length;
+    }catch(e){ regNotice('warn', `조항 표를 불러오지 못했습니다: ${errKoText(e)}`); }
+  }
+  renderRegDetail();
+  syncRegPoll();
+}
+function renderRegDetail(){
+  const box=$('reg-detail'); if(!box) return;
+  box.style.display = REG_SEL_ID ? '' : 'none';
+  const head=$('reg-detail-head'), note=$('reg-detail-note'), wrap=$('reg-clause-wrap'), act=$('reg-activate-box');
+  const r=REG_SEL;
+  if(!r){
+    if(head) head.innerHTML='<div><span>규정 정보를 불러오는 중…</span></div>';
+    if(note) note.innerHTML='';
+    if(wrap) wrap.style.display='none';
+    if(act) act.style.display='none';
+    return;
+  }
+  const n=x=>Number(x)||0;
+  head.innerHTML=`<div><span>규정</span> <b>${esc(r.name)} ${esc(r.version_label)}</b></div>`
+    + `<div><span>상태</span> ${regStatusPill(r.status)}</div>`
+    + `<div><span>조항</span> <b>${n(r.clause_count)}개</b></div>`
+    + `<div><span>표시 대상</span> <b>${n(r.display_clause_count)}개</b></div>`
+    + `<div><span>문장</span> <b>${n(r.sentence_count)}개</b></div>`;
+  const notes=[];
+  if(r.status==='indexing'){
+    const t=n(r.embed_target_count);
+    notes.push(`<div class="hint"><span class="pill warn">규정을 분석하는 중…</span>${t?` (${n(r.embedded_count)}/${t})`:''} 끝나면 이 화면이 자동으로 바뀝니다</div>`);
+  }
+  if(r.status==='failed')
+    notes.push(`<div class="warnbox">규정 분석에 실패했습니다${r.error_message?': '+esc(r.error_message):''}</div>`);
+  (Array.isArray(r.warnings)?r.warnings:[]).forEach(w=>notes.push(`<div class="warnbox">${esc(w)}</div>`));
+  if(r.status==='active')
+    notes.push(`<div class="hint">검수 화면에 이 규정의 원문이 참고로 표시되고 있습니다${r.scope_note?' · 적용 대상: '+esc(r.scope_note):''}</div>`);
+  note.innerHTML=notes.join('');
+  const table = ['ready','active','archived'].indexOf(r.status)>=0;
+  wrap.style.display = table ? '' : 'none';
+  act.style.display = (r.status==='ready' || r.status==='archived') ? '' : 'none';
+  if(table) renderRegClauses();
+}
+function renderRegClauses(){
+  const tb=$('reg-clauses'); if(!tb) return;
+  if(!REG_CLAUSES.length){
+    tb.innerHTML='<tr><td colspan="5" style="color:var(--text-dim)">조항이 없습니다 — 파일에 규정 본문이 있는지 확인하십시오</td></tr>';
+    return;
+  }
+  tb.innerHTML=REG_CLAUSES.map(c=>{
+    const cid=esc(c.clause_id);                     // 불러오면서 UUID 모양을 확인했다
+    return `<tr><td>${esc(c.article_no)}</td><td>${esc(c.title||'-')}</td>`
+      + `<td>${esc(REG_KIND_KO[c.kind]||'기타')}${c.kind_source==='admin'?' <span class="pill">수정됨</span>':''}</td>`
+      + `<td><input type="checkbox" ${c.display?'checked':''} onchange="toggleRegClause('${cid}', this.checked)" title="검수 화면에 표시" /></td>`
+      + `<td><button class="btn sec sm" onclick="toggleRegClauseText('${cid}')">원문</button></td></tr>`
+      + `<tr id="reg-ct-${cid}" style="display:none"><td colspan="5"><blockquote class="reg-ref-q"><div>${esc(c.text)}</div></blockquote></td></tr>`;
+  }).join('') + (REG_CLAUSES_TOTAL>REG_CLAUSES.length
+    ? `<tr><td colspan="5" style="color:var(--text-dim)">조항 ${REG_CLAUSES_TOTAL}개 중 ${REG_CLAUSES.length}개만 표시했습니다</td></tr>` : '');
+}
+function toggleRegClauseText(cid){
+  const row=document.getElementById(`reg-ct-${cid}`); if(!row) return;
+  row.style.display = row.style.display==='none' ? '' : 'none';
+}
+async function toggleRegClause(cid, on){
+  const rid=REG_SEL_ID; if(!rid) return;
+  if(!guardWrite('조항 표시 수정')){ renderRegClauses(); return; }   // 체크 표시를 서버 값으로 되돌린다
+  try{
+    const d=await api('PATCH',`/regulations/${encodeURIComponent(rid)}/clauses/${encodeURIComponent(cid)}`,{display:!!on});
+    if(rid!==REG_SEL_ID) return;
+    const i=REG_CLAUSES.findIndex(x=>x.clause_id===cid);
+    if(i>=0 && d && typeof d==='object') REG_CLAUSES[i]=d;
+    regClearRefCache();                             // 사용 중인 규정이면 검수 화면의 결과가 달라질 수 있다
+    await refreshRegDetail(false);
+  }catch(e){
+    regNotice('warn', `조항 표시를 바꾸지 못했습니다: ${errKoText(e)}`);
+    renderRegClauses();
+  }
+}
+
+/* ---- 올리기 · 활성화 · 보관 · 삭제 ---- */
+function regFilePicked(){
+  const el=$('reg-file'), nm=$('reg-name'); if(!el || !nm) return;
+  const f=el.files && el.files[0];
+  if(f && !nm.value.trim()) nm.value=String(f.name||'').replace(/\.[^.]+$/,'');   // 규정명 초안 — 고치면 그대로 쓴다
+}
+async function uploadRegulation(){
+  if(!guardWrite('규정 올리기')) return;
+  const fileEl=$('reg-file'), f=fileEl && fileEl.files && fileEl.files[0];
+  const name=($('reg-name').value||'').trim(), ver=($('reg-ver').value||'').trim(), date=($('reg-date').value||'').trim();
+  if(!f){ regNotice('warn','올릴 규정 파일을 고르십시오'); return; }
+  if(!name){ regNotice('warn','규정명을 입력하십시오'); return; }
+  if(!ver){ regNotice('warn','판 표기를 입력하십시오 — 예: v3.1'); return; }
+  const btn=$('reg-upload'); if(btn) btn.disabled=true;
+  regNotice('', '');
+  const c=cfg(), fd=new FormData();
+  fd.append('file', f); fd.append('name', name); fd.append('version_label', ver);
+  if(date) fd.append('effective_date', date);
+  log('POST /regulations','req');
+  try{
+    const r=await fetch(`${c.base}/regulations`,{method:'POST', headers:authHeaders(c), body:fd, credentials:'same-origin'});
+    const t=await r.text(); let d; try{ d=t?JSON.parse(t):null; }catch(e){ d=t; }
+    if(!r.ok){
+      log(`← ${r.status} /regulations :: ${String(t).slice(0,200)}`,'err');
+      throw Object.assign(new Error((d&&(d.detail||d.message))||String(t).slice(0,200)), {status:r.status, data:d});
+    }
+    log(`← ${r.status} /regulations`,'ok');
+    if(!d || typeof d!=='object' || !UUID_RE.test(String(d.reg_id||''))) throw Object.assign(new Error('malformed'), {malformed:true, status:0});
+    fileEl.value=''; $('reg-name').value=''; $('reg-ver').value=''; $('reg-date').value='';
+    REG_TICKS=0;
+    await loadRegulations();
+    await selectRegulation(d.reg_id);
+    regNotice('ok', d.duplicate
+      ? '같은 파일이 이미 올라 있습니다 — 새로 만들지 않고 기존 규정을 열었습니다'
+      : '규정을 올렸습니다 — 규정을 분석하는 중… 끝나면 이 화면이 자동으로 바뀝니다');
+  }catch(e){
+    regNotice('warn', `규정을 올리지 못했습니다: ${e && e.malformed ? '서버 응답을 읽지 못했습니다' : errKoText(e)}`);
+  }finally{ if(btn) btn.disabled=false; }
+}
+async function activateRegulation(){
+  if(!guardWrite('규정 활성화')) return;
+  const r=REG_SEL; if(!r) return;
+  if(!$('reg-scope-ok').checked){
+    regNotice('warn','활성화하려면 「이 규정은 검수 대상 문서의 취급 기준입니다」를 확인하고 체크하십시오');
+    return;
+  }
+  if(!confirm(`"${r.name} ${r.version_label}" 규정을 활성화합니다.\n\n검수 화면의 「관련 규정(참고)」에 이 규정의 원문이 표시됩니다. `
+    +'같은 규정명으로 사용 중인 이전 판은 보관 처리됩니다. 등급 판정에는 쓰이지 않습니다.')) return;
+  const note=($('reg-scope-note').value||'').trim();
+  try{
+    await api('POST',`/regulations/${encodeURIComponent(r.reg_id)}/activate`,{scope_confirmed:true, scope_note:note||null});
+    regClearRefCache();
+    regNotice('ok', `${r.name} ${r.version_label} 을(를) 활성화했습니다 — 이제 검수 화면에 관련 규정이 참고로 표시됩니다`);
+    await loadRegulations();
+    if(r.reg_id===REG_SEL_ID) await refreshRegDetail(false);
+  }catch(e){ regNotice('warn', `활성화하지 못했습니다: ${errKoText(e)}`); }
+}
+async function archiveRegulation(id){
+  if(!guardWrite('규정 보관')) return;
+  const r=REGS.find(x=>x.reg_id===id); if(!r) return;
+  if(!confirm(`"${r.name} ${r.version_label}" 규정을 보관합니다.\n\n검수 화면에 이 규정의 원문이 더 표시되지 않습니다. 보관한 규정은 다시 활성화할 수 있습니다.`)) return;
+  try{
+    await api('POST',`/regulations/${encodeURIComponent(id)}/archive`);
+    regClearRefCache();
+    regNotice('ok', `${r.name} ${r.version_label} 을(를) 보관했습니다 — 검수 화면에 더 표시되지 않습니다`);
+    await loadRegulations();
+    if(id===REG_SEL_ID) await refreshRegDetail(false);
+  }catch(e){ regNotice('warn', `보관하지 못했습니다: ${errKoText(e)}`); }
+}
+async function deleteRegulation(id){
+  if(!guardWrite('규정 삭제')) return;
+  const r=REGS.find(x=>x.reg_id===id); if(!r) return;
+  if(!confirm(`"${r.name} ${r.version_label}" 규정을 삭제합니다.\n\n조항·문장과 올린 원본 파일이 함께 지워지며 되돌릴 수 없습니다.`)) return;
+  try{
+    await api('DELETE',`/regulations/${encodeURIComponent(id)}`);
+    regClearRefCache();
+    if(id===REG_SEL_ID){ REG_SEL_ID=null; REG_SEL=null; REG_CLAUSES=[]; REG_CLAUSES_TOTAL=0; renderRegDetail(); }
+    regNotice('ok', `${r.name} ${r.version_label} 을(를) 삭제했습니다`);
+    await loadRegulations();
+  }catch(e){ regNotice('warn', `삭제하지 못했습니다: ${errKoText(e)}`); }
+}
+
+/* ---- 분석 진행 갱신 — 분석 중인 규정이 있는 동안만 돈다 ---- */
+function syncRegPoll(){
+  const need = REG_ON===true && (REGS.some(r=>r.status==='indexing') || (REG_SEL && REG_SEL.status==='indexing'));
+  if(need && !REG_TIMER) REG_TIMER=setTimeout(regPollTick, REG_POLL_MS * (REG_TICKS>100 ? 5 : 1));
+  if(!need && REG_TIMER){ clearTimeout(REG_TIMER); REG_TIMER=null; }
+}
+async function regPollTick(){
+  REG_TIMER=null; REG_TICKS+=1;
+  const before=new Map(REGS.map(r=>[r.reg_id, r.status]));
+  const l=await regQuiet('/regulations?limit=100');
+  if(l.ok && Array.isArray(l.data.items)){
+    setRegList(l.data);
+    REGS.forEach(r=>{
+      if(before.get(r.reg_id)!=='indexing' || r.status==='indexing') return;
+      if(r.status==='failed') regNotice('warn', `규정 분석에 실패했습니다: ${r.name} ${r.version_label}`);
+      else regNotice('ok', `규정 분석이 끝났습니다: ${r.name} ${r.version_label} — 미리보기로 확인한 뒤 활성화하십시오`);
+    });
+  }
+  const id=REG_SEL_ID;
+  if(id && REG_SEL && REG_SEL.status==='indexing'){
+    const d=await regQuiet(`/regulations/${encodeURIComponent(id)}`);
+    if(id===REG_SEL_ID && d.ok){
+      if(d.data.status!=='indexing') await refreshRegDetail(true);    // 끝났다 — 조항 표까지 다시 읽는다
+      else{ REG_SEL=d.data; renderRegDetail(); }
+    }
+  }
+  syncRegPoll();
+}
+
+/* ---- 미리보기 — 활성화 전에 이 규정이 문서마다 어떻게 보일지 본다 ----
+ * 규정이 문서에 **적용되는지**는 점수로 가릴 수 없다(같은 문서에서 맞는 규정과 안 맞는 규정의 점수가 같은 범위였다).
+ * 그래서 관리자가 눈으로 확인하는 자리를 둔다 — 지금 목록에 올라와 있는 문서로 결과를 보고 활성화를 결정한다. */
+function regPreviewDocs(){
+  const seen=new Set(), out=[];
+  QUEUE.concat(STAGING).forEach(it=>{
+    const id=String((it && it.doc_id) || '');
+    if(!UUID_RE.test(id) || seen.has(id)) return;
+    seen.add(id); out.push({doc_id:id, title:it.title||id});
+  });
+  return out.slice(0,20);
+}
+async function previewRegulation(){
+  const r=REG_SEL, box=$('reg-preview'); if(!r || !box) return;
+  const docs=regPreviewDocs();
+  if(!docs.length){
+    box.innerHTML='<div class="warnbox" style="margin-top:8px">미리볼 문서가 없습니다 — 운영 탭에서 「검토할 문서 보기」로 문서를 불러온 뒤 다시 누르십시오</div>';
+    return;
+  }
+  box.innerHTML='<div class="sec-note" style="margin-top:8px">불러오는 중…</div>';
+  try{
+    const d=await api('POST',`/regulations/${encodeURIComponent(r.reg_id)}/preview`,{doc_ids:docs.map(x=>x.doc_id)});
+    if(r.reg_id!==REG_SEL_ID) return;
+    const titleOf={}; docs.forEach(x=>{ titleOf[x.doc_id]=x.title; });
+    const results=(d && Array.isArray(d.results)) ? d.results : [];
+    const withItems=results.filter(x=>x && Array.isArray(x.items) && x.items.length).length;
+    box.innerHTML='<div class="sec-note" style="margin-top:8px">이 규정만 적용했을 때의 표시입니다. 적용 대상이 맞는지 확인한 뒤 활성화하십시오. 등급을 바꾸지 않습니다.</div>'
+      + `<div class="hint">문서 ${results.length}건 중 ${withItems}건에 규정 문장이 표시됩니다</div>`
+      + results.map(x=>{
+        const inner=regRefBlocks((x&&x.items)||[])
+          || `<div class="sec-note">${esc(REG_EMPTY_KO[x&&x.reason]||'표시할 관련 문장이 없습니다')}</div>`;
+        return `<div class="reg-pv"><div class="reg-pv-t">${esc(titleOf[x&&x.doc_id]||(x&&x.doc_id)||'')}</div>${inner}</div>`;
+      }).join('');
+  }catch(e){ box.innerHTML=`<div class="warnbox" style="margin-top:8px">미리보기를 하지 못했습니다: ${errKo(e)}</div>`; }
+}
+
+/* ---- 검수 화면의 「관련 규정(참고)」 — 「왜 이 등급인가?」를 펼칠 때 따로 읽어 붙인다 ---- */
+function regRefBlocks(items){
+  return (Array.isArray(items)?items:[]).map(it=>{
+    const reg=(it && it.regulation) || {}, cl=(it && it.clause) || {};
+    const src=esc(`${reg.name||''}${reg.version_label?' '+reg.version_label:''} · ${cl.article_no||''}${cl.title?'('+cl.title+')':''}`);
+    const sents=(it && Array.isArray(it.sentences) ? it.sentences : []).map(s=>`<div>${esc(s)}</div>`).join('');
+    return `<div class="reg-ref-src">${src}</div><blockquote class="reg-ref-q">${sents}</blockquote>`;
+  }).join('');
+}
+function regRefHtml(d){
+  const body=regRefBlocks(d && d.items);
+  if(!body) return '';                              // 비면 블록을 그리지 않는다(설계 결정 ③)
+  return `<div class="reg-ref-h">관련 규정(참고)</div>${body}`
+    + '<div class="sec-note">이 내용은 참고용이며 등급 판정 근거가 아닙니다.</div>';
+}
+async function fillRegRef(box, docId){
+  if(REG_ON!==true || !box || !UUID_RE.test(String(docId||''))) return;   // 붙여넣은 본문 등 저장되지 않은 문서는 대상이 아니다
+  const slot=document.createElement('div');
+  slot.className='reg-ref'; slot.style.display='none';
+  box.appendChild(slot);
+  const paint=h=>{ slot.innerHTML=h; slot.style.display=h?'':'none'; };
+  const hit=REGREF_CACHE[docId];
+  if(hit && (hit.d.items.length || Date.now()-hit.at<REGREF_EMPTY_TTL_MS)){ paint(regRefHtml(hit.d)); return; }
+  try{
+    const d=await api('GET',`/documents/${encodeURIComponent(docId)}/regulation-evidence`);
+    if(!d || typeof d!=='object' || !Array.isArray(d.items)) return;        // 형식이 다르면 그리지 않는다
+    REGREF_CACHE[docId]={at:Date.now(), d};
+    if(slot.isConnected) paint(regRefHtml(d));
+  }catch(e){
+    // 503 = 조회 기반이 없다 → 흐린 한 줄. 그 밖의 실패(404·403 등)는 규정을 붙일 자리가 아니라는 뜻이라 아무것도 그리지 않는다.
+    if(e && e.status===503 && slot.isConnected) paint('<div class="sec-note">규정 참고를 불러오지 못했습니다</div>');
+  }
+}
+
 /* ---- 등급 목록 동기화 — 등급체계가 DB 주도이므로 셀렉트를 실제 활성 등급으로 채운다 ---- */
 let ACTIVE_GRADES = GRADES.slice();
 function syncActiveGrades(codes){
@@ -3391,6 +3855,9 @@ loadReviewQueue();
 /* [2026-09-21] 확정 대기(자동 확정된 분류) 목록도 열 때 한 번 읽는다 — 검수 큐와 같은 이유(새로고침해도
    화면이 빈 안내문으로 돌아가지 않게)이고, 읽기 전용 조회다. 실패하면 #stg-info·#stg-queue 에 사유를 적는다. */
 loadStagingQueue();
+/* [2026-09-25] 사내 규정(참고 표시) — 이 서버에 기능이 있고 이 사용자가 볼 수 있으면 설정 탭에 카드를 보이고,
+   검수 화면의 「왜 이 등급인가?」에 관련 규정을 붙인다. 꺼진 서버에서는 아무 화면도 바뀌지 않는다. */
+initRegulationCard();
 setAutoStatus('paused');
 log('거버넌스 콘솔 준비 완료.','info');
 </script>

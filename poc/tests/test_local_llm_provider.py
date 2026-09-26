@@ -182,6 +182,57 @@ class TestRequestParameters:
         msgs = mock_client.chat.completions.create.call_args.kwargs["messages"]
         assert "/no_think" in msgs[-1]["content"]
 
+    def test_ollama_qwen_turns_reasoning_off_with_reasoning_effort_none(self):
+        """Ollama /v1 은 think·/no_think 를 무시하고 추론을 돌린다(0.34.2 실측: 완성 토큰 247·추론 909자, 짧은 max_tokens 면 답이 빈 문자열).
+
+        `reasoning_effort: "none"` 만 추론을 끈다(완성 토큰 60·추론 0자). 이 값이 안 나가면 규정 LLM 판정이 매번 빈 답으로 실패한다.
+        규정 참고 표시가 `no_reasoning=True` 로 요청할 때만 나간다.
+        """
+        mock_client = _build_mock_openai_client()
+        with patch("openai.OpenAI", return_value=mock_client):
+            p = ollama_provider(model="qwen3:14b")
+            p.enable_thinking = False
+            _ = p.generate("질문", max_tokens=64, no_reasoning=True)
+        extra = mock_client.chat.completions.create.call_args.kwargs["extra_body"]
+        assert extra == {"think": False, "reasoning_effort": "none"}
+
+    def test_reasoning_effort_is_only_sent_when_the_caller_asks_so_other_callers_are_unchanged(self):
+        """합성·라벨링·판정이 같은 어댑터를 쓴다 — 요청하지 않은 호출의 요청 본문은 종전과 같아야 한다(독립 리뷰 R3, 2026-09-26)."""
+        mock_client = _build_mock_openai_client()
+        with patch("openai.OpenAI", return_value=mock_client):
+            p = ollama_provider(model="qwen3:14b")
+            p.enable_thinking = False
+            _ = p.generate("질문", max_tokens=64)
+            assert mock_client.chat.completions.create.call_args.kwargs["extra_body"] == {"think": False}
+            _ = p.generate("질문", max_tokens=64, no_reasoning=False)
+            assert mock_client.chat.completions.create.call_args.kwargs["extra_body"] == {"think": False}
+
+    def test_the_base_url_is_exposed_and_call_limits_apply_only_to_that_instance(self):
+        """규정 참고 표시는 서버 주소(base_url)를 확인하고, 자기 인스턴스의 호출 한도(시간 초과·재시도)만 조인다."""
+        with patch("openai.OpenAI") as factory:
+            factory.side_effect = lambda **kw: _build_mock_openai_client()
+            a = LocalOpenAIProvider(base_url="http://10.0.0.5:8001/v1", model="m", api_key="EMPTY", provider_label="vllm")
+            b = LocalOpenAIProvider(base_url="http://10.0.0.5:8001/v1", model="m", api_key="EMPTY", provider_label="vllm")
+            assert a.base_url == "http://10.0.0.5:8001/v1"
+            b_retries = b._max_retries
+            original_client = MagicMock()
+            a._client = original_client
+            a.limit_calls(timeout_s=45)
+            original_client.with_options.assert_called_once_with(timeout=45.0, max_retries=0)      # SDK 기본(시간 초과 600초·재시도 2회)을 끈다
+            assert a._client is original_client.with_options.return_value
+            assert a._max_retries == 0 and b._max_retries == b_retries
+
+    def test_reasoning_effort_is_not_sent_when_thinking_is_on_or_to_other_servers(self):
+        for label, thinking in (("ollama", True), ("vllm", False), ("local_openai", False), ("lm_studio", False)):
+            mock_client = _build_mock_openai_client()
+            with patch("openai.OpenAI", return_value=mock_client):
+                p = LocalOpenAIProvider(base_url="http://x/v1", model="Qwen/Qwen3-14B", api_key="EMPTY",
+                                        provider_label=label, enable_thinking=thinking)
+                _ = p.generate("질문", max_tokens=64)
+            extra = mock_client.chat.completions.create.call_args.kwargs["extra_body"]
+            assert "reasoning_effort" not in extra, (label, thinking)
+            assert extra["think"] is thinking
+
 
 # ============================================================================
 # 검증 3: ChatCompletion 응답 파싱

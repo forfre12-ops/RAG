@@ -261,13 +261,20 @@ def main() -> int:
     try:
         from koipa.config import settings as _s  # noqa: PLC0415
         _training_enabled = getattr(_s, "enable_training", False)
+        _regulation_enabled = getattr(_s, "regulation_reference_enabled", False)
     except Exception:  # noqa: BLE001
         _training_enabled = False
+        _regulation_enabled = False
 
     skip_prefixes: tuple[str, ...] = ()
     if not _training_enabled:
         skip_prefixes = (f"{server_prefix}/train", "/api/v1/train", "/train")
         print("  ℹ training 라우터 비활성 (enable_training=False) — /train/* YAML 경로 제외")
+    # 규정 참고 표시 라우터도 기능 플래그(regulation_reference_enabled, 기본 꺼짐)일 때만 등록된다 — 꺼진 프로파일에서는 YAML 의 규정 경로 10개를
+    # training 과 같은 방식으로 제외한다. REGULATION_REFERENCE_ENABLED=1 로 돌리면 10개가 모두 라우터와 일치한다(2026-09-26 확인).
+    if not _regulation_enabled:
+        skip_prefixes += (f"{server_prefix}/regulations", f"{server_prefix}/documents/{{doc_id}}/regulation-evidence")
+        print("  ℹ 규정 참고 표시 라우터 비활성 (regulation_reference_enabled=False) — 규정 YAML 경로 제외")
 
     result = diff(yaml_paths, router_paths, skip_yaml_prefixes=skip_prefixes)
 

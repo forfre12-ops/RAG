@@ -86,6 +86,15 @@ celery_app.conf.task_annotations = {
         "soft_time_limit": max(settings.celery_task_soft_time_limit, 64800),
         "time_limit": max(settings.celery_task_time_limit, 68400),
     },
+    # [2026-09-25] 규정 색인은 (표시 대상 조항 + 서두 아닌 문장) × 임베딩 시간이다. 실측(KURE-v1, CPU 8스레드,
+    # scripts/measure_regulation_runtime.py): 시연 규정 203건에 56.4초(건당 0.278초). 문장 상한
+    # (regulation_max_sentences=3,000)까지 외삽하면 약 14분 — 전역 한도(900/1200초)에 걸리는 크기다.
+    # 외삽이라 느린 CPU·조항 임베딩 몫을 넉넉히 두어 하한을 1시간으로 둔다(상한 규모 규정은 재지 않았다).
+    # ⚠ 위 학습 태스크와 같이 시간제한은 발행자 값이 메시지에 실려 가므로 api 와 worker 를 함께 재기동한다.
+    "koipa.index_regulation": {
+        "soft_time_limit": max(settings.celery_task_soft_time_limit, 3300),
+        "time_limit": max(settings.celery_task_time_limit, 3600),
+    },
 }
 
 # P1-D3: 큐 분리 — classify/index/synthesis/learning.
@@ -106,6 +115,8 @@ celery_app.conf.task_routes = {
     # [2026-09-09] 문서 벡터 색인 — 유사 문서 조회의 재료. classify 와 격리하는 것이
     #   요점이다(임베딩은 청크당 0.51초라 분류 큐에 섞이면 검수 화면이 밀린다).
     "koipa.index_document_vector": {"queue": "index"},
+    # [2026-09-25] 규정 참고 표시 — 규정 문장 임베딩. 같은 index 큐를 쓴다(새 큐 이름은 워커 기동 명령 넷을 고쳐야 한다).
+    "koipa.index_regulation": {"queue": "index"},
     "koipa.deliver_outbox_tick": {"queue": "index"},  # I/O-bound, classify와 격리
     "koipa.ensure_partitions_tick": {"queue": "index"},  # DDL, 경량 I/O
     "koipa.retention_purge_tick": {"queue": "index"},  # DELETE, 경량 I/O

@@ -53,6 +53,34 @@ const WRITES = [
     async setup(page) { page.set('gold-build-path', 'datasets/golden_review/ff5a822c/candidates.jsonl'); },
     press: (p) => p.$('gold-reg'),
   },
+  /* 사내 규정(참고 표시, 2026-09-25) — 카드의 쓰기 다섯 가지. 미리보기(POST)는 상태를 바꾸지 않아 여기 없다. */
+  {
+    name: '규정 올리기', pane: 'config', endpoint: 'POST /regulations',
+    async setup(page) {
+      page.attachFile('reg-file', { name: 'guide.md', type: 'text/markdown', size: 64 });
+      page.set('reg-name', '안전 시험'); page.set('reg-ver', 'v0');
+    },
+    press: (p) => p.$('reg-upload'),
+  },
+  {
+    name: '규정 활성화', pane: 'config', endpoint: 'POST /regulations/',
+    async setup(page) {
+      page.click(page.q('button[onclick^="selectRegulation("]:not([onclick*="aaaaaaaa"])'));
+      await page.settle();
+      page.check('reg-scope-ok', true);
+    },
+    press: (p) => p.$('reg-activate'),
+  },
+  { name: '규정 보관', pane: 'config', endpoint: 'POST /regulations/', press: (p) => p.q('button[onclick^="archiveRegulation("]') },
+  { name: '규정 삭제', pane: 'config', endpoint: 'DELETE /regulations/', press: (p) => p.q('button[onclick^="deleteRegulation("]') },
+  {
+    name: '조항 표시 수정', pane: 'config', endpoint: 'PATCH /regulations/',
+    async setup(page) {
+      page.click(page.q('button[onclick^="selectRegulation("]'));
+      await page.settle();
+    },
+    press: (p) => p.q('#reg-clauses input[type="checkbox"]'),
+  },
 ];
 
 export const scenarios = [

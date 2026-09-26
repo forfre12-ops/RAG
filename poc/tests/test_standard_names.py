@@ -16,7 +16,9 @@ from koipa.db import Base
 from koipa.db import models  # noqa: F401 — 표 등록
 from koipa.db.standard_names import (
     COLUMNS,
+    POST_BASE_COLUMNS,
     POST_BASE_RENAMES,
+    POST_BASE_TABLES,
     TABLES,
     logical_names,
 )
@@ -45,7 +47,7 @@ def _load_migration():
 
 def test_orm_tables_are_exactly_the_standard_tables():
     orm = set(Base.metadata.tables)
-    std = {new for new, _ in TABLES.values()} - _MIGRATION_ONLY_TABLES
+    std = ({new for new, _ in TABLES.values()} | set(POST_BASE_TABLES)) - _MIGRATION_ONLY_TABLES
     assert orm == std, f"ORM 에만 {orm - std} · 대응표에만 {std - orm}"
 
 
@@ -58,6 +60,10 @@ def test_orm_columns_match_standard_columns():
         orm = {c.name for c in Base.metadata.tables[new_table].columns}
         std = {new for _, new, _ in cols}
         assert orm == std, f"{new_table}: ORM 에만 {orm - std} · 대응표에만 {std - orm}"
+    for table, cols in POST_BASE_COLUMNS.items():          # 마이그레이션 사본 뒤에 새로 만든 표
+        orm = {c.name for c in Base.metadata.tables[table].columns}
+        std = {name for name, _ in cols}
+        assert orm == std, f"{table}: ORM 에만 {orm - std} · 대응표에만 {std - orm}"
 
 
 def test_migration_copy_matches_standard_names():
@@ -130,6 +136,25 @@ def test_post_base_renames_have_a_migration_and_a_reason():
             assert now_name in std, f"{table}: 정본이 {now_name} 을 쓰지 않는다"
 
 
+def test_post_base_tables_are_separate_from_the_migration_copy():
+    """사후 추가 표는 7b3e9d2a4f10 사본과 대조하지 않는다(그 판은 고치지 않는다) — 기준판 표와 겹치면 안 된다.
+
+    새 표는 `POST_BASE_TABLES` 에 두고 자기 마이그레이션 id 를 적는다. 그 마이그레이션이 실제로 그 표를 만드는지 본다.
+    """
+    base = {new for new, _ in TABLES.values()}
+    assert not (set(POST_BASE_TABLES) & base), "사후 추가 표가 기준판 표와 같은 이름이다"
+    assert set(POST_BASE_COLUMNS) == set(POST_BASE_TABLES), "표마다 칼럼 대응이 있어야 한다"
+    versions = Path(__file__).resolve().parents[1] / "alembic" / "versions"
+    for table, (ko, rev) in POST_BASE_TABLES.items():
+        assert ko, f"{table} 논리명 없음"
+        files = list(versions.glob(f"{rev}_*.py"))
+        assert len(files) == 1, f"{table}: 마이그레이션 {rev} 이 없거나 둘 이상이다"
+        src = files[0].read_text(encoding="utf-8")
+        assert table in src, f"{table}: 마이그레이션 {rev} 이 이 표를 만들지 않는다"
+        for col, _ko in POST_BASE_COLUMNS[table]:
+            assert f'"{col}"' in src, f"{table}.{col}: 마이그레이션 {rev} 에 없는 칼럼이다"
+
+
 def test_names_are_valid_lowercase_identifiers_and_unique_per_table():
     for old, (new, ko) in TABLES.items():
         assert _NAME.match(new), new
@@ -141,9 +166,16 @@ def test_names_are_valid_lowercase_identifiers_and_unique_per_table():
         for _, new, ko in cols:
             assert _NAME.match(new), f"{old}.{new}"
             assert ko, f"{old}.{new} 논리명 없음"
+    for table in POST_BASE_TABLES:
+        assert _NAME.match(table) and table.startswith("tad_") and table.endswith("_mng"), table
+        names = [n for n, _ in POST_BASE_COLUMNS[table]]
+        assert len(names) == len(set(names)), f"{table}: 표준 칼럼명 중복"
+        for n, ko in POST_BASE_COLUMNS[table]:
+            assert _NAME.match(n) and ko, f"{table}.{n}"
 
 
 def test_logical_names_cover_every_table():
     ln = logical_names()
-    assert set(ln) == {new for new, _ in TABLES.values()}
-    assert sum(len(cols) for _, cols in ln.values()) == sum(len(c) for c in COLUMNS.values())
+    assert set(ln) == {new for new, _ in TABLES.values()} | set(POST_BASE_TABLES)
+    assert sum(len(cols) for _, cols in ln.values()) == (
+        sum(len(c) for c in COLUMNS.values()) + sum(len(c) for c in POST_BASE_COLUMNS.values()))

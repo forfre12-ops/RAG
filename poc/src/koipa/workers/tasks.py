@@ -1196,6 +1196,33 @@ def nightly_incremental_retrain_tick() -> dict:
 
 
 @celery_app.task(
+    name="koipa.index_regulation",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=10,
+)
+def index_regulation(self: Any, reg_id: str) -> dict:
+    """회원사 규정을 조항·문장으로 나누고 표시 대상을 임베딩한다(규정 참고 표시, 설계서 §2.4).
+
+    ⛔ 등급 판정과 무관하다. 결정형 실패(조항 없음·문장 상한·임베더 없음)는 서비스가 판을 failed 로 남긴다.
+    일시 실패(임베더 로드 등)는 여기서 재시도하고, **마지막 재시도에서도 실패하면 판을 failed 로 남긴다** —
+    안 그러면 판이 영원히 indexing 으로 남아 화면이 진행 중이라고 말한다.
+    멱등: 판 상태가 indexing 이 아니면 즉시 반환하고, 재시도는 이미 저장된 조항·문장·임베딩을 이어서 채운다.
+    """
+    from koipa.services.regulation_service import RegulationService  # noqa: PLC0415
+
+    svc = RegulationService.get_instance()
+    try:
+        return svc.index(reg_id)
+    except Exception as exc:  # noqa: BLE001
+        if self.request.retries >= self.max_retries:
+            svc.mark_failed(reg_id, f"색인에 실패했습니다: {exc}")
+            return {"status": "failed", "error": str(exc)}
+        logger.warning("규정 색인 재시도 — reg_id=%s err=%s", reg_id, exc)
+        raise self.retry(exc=exc, countdown=10 * (self.request.retries + 1)) from exc
+
+
+@celery_app.task(
     name="koipa.index_document_vector",
     bind=True,
     max_retries=2,

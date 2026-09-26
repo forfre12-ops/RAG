@@ -78,6 +78,7 @@ class LocalOpenAIProvider:
         effective_key = api_key or settings.local_llm_api_key or "EMPTY"
 
         self._client = OpenAI(base_url=effective_base, api_key=effective_key)
+        self.base_url = effective_base          # 호출부가 「이 서버가 사내인가」를 확인할 수 있게 드러낸다(규정 참고 표시의 반출 확인)
         self.model = effective_model
         self.enable_thinking = (
             enable_thinking
@@ -91,6 +92,13 @@ class LocalOpenAIProvider:
         self._base_delay = float(getattr(settings, "llm_retry_base_delay", 0.5))
         self._max_delay = float(getattr(settings, "llm_retry_max_delay", 8.0))
 
+    def limit_calls(self, *, timeout_s: float, max_retries: int = 0) -> None:
+        """이 인스턴스의 호출 한도를 조인다 — 사람이 화면에서 기다리는 호출이 OpenAI SDK 기본(시간 초과 600초 · 재시도 2회)에
+        어댑터 재시도(기본 3회)까지 겹쳐 서버가 응답을 안 할 때 스레드를 몇 시간씩 붙잡지 않게 한다(최악 약 7,200초 — 설계서 §3.6).
+        이 인스턴스만 바뀐다 — 합성·라벨링이 쓰는 다른 인스턴스와 기본값은 그대로다."""
+        self._client = self._client.with_options(timeout=float(timeout_s), max_retries=0)
+        self._max_retries = max(0, int(max_retries))
+
     def generate(
         self,
         prompt: str,
@@ -99,8 +107,12 @@ class LocalOpenAIProvider:
         max_tokens: int = 1024,
         temperature: float = 0.7,
         json_schema: Optional[dict] = None,
+        no_reasoning: bool = False,
     ) -> LLMResponse:
         """json_schema 를 주면 서버에 구조화 출력(response_format)을 요구한다.
+
+        no_reasoning=True 는 Ollama+Qwen3 의 추론을 끄라고 요청한다(규정 참고 표시 전용 — 아래 ⚠). 기본 False 라 다른 호출자
+        (합성·라벨링·판정)의 요청은 종전과 똑같다.
 
         종전에는 프롬프트로 "JSON 만 출력하라"고 부탁만 했고, 모델이 인사말·코드펜스를
         덧붙이면 호출부가 파싱에 실패해 재시도했다. 스키마를 넘기면 서버(vLLM guided
@@ -133,6 +145,13 @@ class LocalOpenAIProvider:
             extra: dict = {}
             if "qwen" in self.model.lower():
                 extra["think"] = bool(self.enable_thinking)
+                # ⚠ Ollama 의 OpenAI 호환 endpoint(/v1)는 think·chat_template_kwargs·`/no_think` 를 **무시하고 추론을 돌린다**
+                #   (0.34.2 실측, qwen3:14b: 완성 토큰 247·추론 909자 — max_tokens 가 작으면 추론에 다 쓰여 내용이 빈 문자열로 끝난다,
+                #   finish_reason=length). `reasoning_effort: "none"` 만 추론을 끈다(완성 토큰 60·추론 0자). Ollama 로 부를 때만 넣는다 —
+                #   vLLM 은 이 값의 허용 범위가 달라 "none" 을 400 으로 거절할 수 있다.
+                #   ⚠ **요청한 호출만** 보낸다(no_reasoning) — 어댑터를 같이 쓰는 합성·라벨링의 출력이 이 기능 때문에 바뀌지 않게(독립 리뷰 R3).
+                if no_reasoning and self.name == "ollama" and not self.enable_thinking:
+                    extra["reasoning_effort"] = "none"
 
             # 구조화 출력 — OpenAI 호환 서버 공통 형식.
             kwargs: dict = {}

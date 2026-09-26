@@ -267,7 +267,8 @@ class Settings(BaseSettings):
     # 기본 False(비파괴) — 운영 진입 시 enabled=True면 키가 필수(startup fail-fast).
     storage_encryption_enabled: bool = False
     storage_encryption_key: str = ""          # 고엔트로피 시크릿(SHA-256으로 32B 키 유도)
-    storage_encrypted_buckets: list[str] = ["documents-raw"]  # 암호화 대상 버킷
+    # regulations-raw = 회원사 규정 원본(규정 참고 표시). 규정 자체가 기밀이라 함께 암호화한다.
+    storage_encrypted_buckets: list[str] = ["documents-raw", "regulations-raw"]  # 암호화 대상 버킷
 
     # [QW SSRF] webhook outbox 대상 URL 가드. 스킴(http/https 외)·loopback은 항상 거부(SSRF
     # 차단: file://·gopher://·127.0.0.1로 내부 서비스 타격). 사설IP(RFC1918/4193)는 폐쇄망에선
@@ -852,6 +853,37 @@ class Settings(BaseSettings):
 
     embedding_model: str = "nlpai-lab/KURE-v1"
 
+    # --- 규정 참고 표시 (2026-09-25, 설계서 docs/CLAUDE_REGULATION_REFERENCE_DESIGN_20260925.md) ---
+    # 회원사가 올린 사내 규정에서 검수 중인 문서와 관련된 **원문 문장**을 참고로 보여 준다.
+    # ⛔ 등급 판정·자동 확정·검수 라우팅에 관여하지 않는다. 기본은 LLM 을 쓰지 않는다(결정형 조회) — 선택 옵션 regulation_llm_select_enabled 는 아래.
+    # regulation_reference_enabled: 기본 False — 꺼져 있으면 라우터·화면이 없고 아무도 부르지 않는다(색인 워커 태스크는 등록만 돼 있고 부르는 곳이 없어 무동작).
+    #   켜려면 임베더가 실제여야 한다(embedding_provider != "hash", require_real_embedder) — 해시 임베딩은 의미가 없다.
+    #   비용: 분류·검수 라우팅 경로에는 이 기능의 코드가 없다 — 회귀 게이트(regression_gate.py)에서 켜짐·꺼짐 모두 판정 변화 0
+    #   (2026-09-25). 검수 화면이 「왜 이 등급인가?」를 펼칠 때만 GET /documents/{id}/regulation-evidence 가 한 번 나가고
+    #   (실측: 서비스 계층 p95 13.5ms · HTTP 계층 p95 47.1ms, 예산 200ms — scripts/measure_regulation_latency.py),
+    #   규정 색인은 워커 index 큐에서 조항·문장마다 임베딩을 한 번씩 돈다(실측: KURE-v1 CPU 8스레드에서 시연 규정 203건에
+    #   56.4초 — scripts/measure_regulation_runtime.py). 큰 규정·다중 워커·메모리는 재지 않았다.
+    regulation_reference_enabled: bool = False
+    regulation_evidence_max_items: int = 1     # 검수 화면 표시 개수(1~3). 시험: 1번째 정밀도 39%·2번째 13%·3번째 7%
+    regulation_min_similarity: float = 0.0     # 0 이면 끔. 종류가 전혀 다른 문서를 거르는 문턱 — 값은 파일럿에서 정한다
+    regulation_max_sentences: int = 3000       # 색인 상한(문장). 넘으면 등록이 failed
+    regulation_active_max: int = 5             # 동시에 활성인 규정 수
+    # 후보 조항에서 「이 문서에 직접 적용되는 항」을 **로컬 LLM** 으로 고르게 한다(2026-09-26, 설계서 §3.6) — 조회 점수로는 해당 여부를 못 가른다.
+    #   꺼짐(기본)이면 종전처럼 조회 1위를 결정형으로 보인다. 켜면 LLM 이 「해당 항 없음」이라 한 문서에는 아무것도 보이지 않는다.
+    #   화면에는 LLM 이 만든 글이 아니라 고른 항의 규정 원문만 나간다. 등급은 묻지 않는다.
+    #   ⛔ 문서 본문이 프롬프트에 들어가므로 llm_provider 가 로컬(ollama·vllm·local_openai·lm_studio)일 때만 부른다 — 그 밖이면 안 보인다(fail-closed).
+    #   비용: 검수자가 「왜 이 등급인가?」를 펼칠 때 후보 수만큼 LLM 을 동시에 부른다(같은 문서·규정 판·모델은 캐시). CPU 만 있는 서버는 느리다(qwen3:14b 는 호출당 수십 초).
+    regulation_llm_select_enabled: bool = False
+    regulation_llm_candidates: int = 5         # 조회 순위 상위 몇 개 조항을 LLM 에게 물을지(1~10)
+    regulation_llm_doc_chars: int = 1500       # 프롬프트에 넣는 문서 앞부분 글자 수(300~6000)
+    regulation_llm_timeout_s: float = 60.0     # 문서 하나의 판정 제한 시간(초) — 넘으면 안 보인다. 호출 하나의 한도이기도 하다(재시도 없음). 동봉 프록시(nginx)가 경로에 있으면 300초에서 잘린다
+    regulation_llm_max_concurrency: int = 6    # 프로세스 안에서 동시에 나가는 LLM 호출 수(1~32) — 한 문서의 후보 5개 + 문서 종류 확인 1개가 한 번에 나가는 수
+    regulation_llm_cache_ttl_s: int = 3600     # 같은 문서·규정 판·모델의 결과를 기억하는 시간(초, 0 = 기억 안 함)
+    regulation_llm_skip_public: bool = True    # 문서가 이미 공개된 외부 자료(판결문·법령·보도·공시)이면 아무것도 안 보인다 — 호출 하나가 더 든다
+    #   고르는 방식(설계서 §3.6, 같은 71건·판정자 3명): per_candidate(기본) = 후보 조항마다 따로 묻는다 — 정밀도 78%·해당 규정이 뜬 문서 14·틀린 것이 뜬 문서 4, 호출 6번, 문서당 약 2.9초
+    #   single = 문서를 한 번만 보이고 후보의 항 전체에서 가장 직접적인 항을 고르게 한다 — 정밀도 70%·해당 30·틀린 것 13, 호출 2번, 문서당 약 1.1초(GPU) (더 많이 찾지만 틀린 것도 더 뜬다)
+    regulation_llm_mode: str = "per_candidate"
+
     # 임베딩 어댑터 선택:
     #   hash : hash_embedding (결정론, GPU·다운로드 불필요, lite-noapi 기본)
     #   hf   : hf_embedding (sentence-transformers, KURE/BGE 로컬 캐시, full/onprem 기본)
@@ -975,11 +1007,68 @@ class Settings(BaseSettings):
         return v
 
     # 2) 양수/음수 제약 — 풀·업로드·청크·시퀀스·타임리밋 등.
-    @field_validator("db_pool_size", "max_upload_mb", "max_request_body_mb", "chunk_size", "max_seq_len")
+    @field_validator("db_pool_size", "max_upload_mb", "max_request_body_mb", "chunk_size", "max_seq_len",
+                     "regulation_max_sentences", "regulation_active_max")
     @classmethod
     def _check_ge_one(cls, v: int, info) -> int:  # noqa: ANN001
         if v < 1:
             raise ValueError(f"{info.field_name}는 1 이상이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator("regulation_evidence_max_items")
+    @classmethod
+    def _check_regulation_max_items(cls, v: int) -> int:
+        if not 1 <= v <= 3:
+            raise ValueError(f"regulation_evidence_max_items는 1~3 이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator("regulation_min_similarity")
+    @classmethod
+    def _check_regulation_min_similarity(cls, v: float) -> float:
+        if not 0.0 <= v <= 1.0:
+            raise ValueError(f"regulation_min_similarity는 0~1 이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator("regulation_llm_candidates")
+    @classmethod
+    def _check_regulation_llm_candidates(cls, v: int) -> int:
+        if not 1 <= v <= 10:
+            raise ValueError(f"regulation_llm_candidates는 1~10 이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator("regulation_llm_doc_chars")
+    @classmethod
+    def _check_regulation_llm_doc_chars(cls, v: int) -> int:
+        if not 300 <= v <= 6000:
+            raise ValueError(f"regulation_llm_doc_chars는 300~6000 이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator("regulation_llm_timeout_s")
+    @classmethod
+    def _check_regulation_llm_timeout(cls, v: float) -> float:
+        if not 1.0 <= v <= 600.0:
+            raise ValueError(f"regulation_llm_timeout_s는 1~600 이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator("regulation_llm_max_concurrency")
+    @classmethod
+    def _check_regulation_llm_concurrency(cls, v: int) -> int:
+        if not 1 <= v <= 32:
+            raise ValueError(f"regulation_llm_max_concurrency는 1~32 이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator("regulation_llm_cache_ttl_s")
+    @classmethod
+    def _check_regulation_llm_cache_ttl(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError(f"regulation_llm_cache_ttl_s는 0 이상이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator("regulation_llm_mode")
+    @classmethod
+    def _check_regulation_llm_mode(cls, v: str) -> str:
+        if v not in ("per_candidate", "single"):
+            raise ValueError(f"regulation_llm_mode는 per_candidate 또는 single 이어야 합니다 (got {v!r}).")
         return v
 
     @field_validator("db_max_overflow")
@@ -1094,6 +1183,15 @@ class Settings(BaseSettings):
         if self.chunk_overlap >= self.chunk_size:
             raise ValueError(
                 f"chunk_overlap < chunk_size 이어야 합니다 (overlap={self.chunk_overlap}, size={self.chunk_size})."
+            )
+        # 규정 참고 표시를 켰다면 규정 원본 버킷은 반드시 암호화 대상이다(services/regulation_service.RAW_BUCKET 과 같은 이름).
+        # STORAGE_ENCRYPTED_BUCKETS 를 직접 지정한 배포는 기본값이 통째로 대체된다 — 예전 .env 예시가 ["documents-raw"] 였다 —
+        # 그대로 두면 회원사 규정 원본이 평문으로 저장된다. 기동을 막지 않고(서버가 안 뜨는 쪽이 더 나쁘다) 더한 뒤 알린다.
+        if self.regulation_reference_enabled and "regulations-raw" not in self.storage_encrypted_buckets:
+            self.storage_encrypted_buckets = [*self.storage_encrypted_buckets, "regulations-raw"]
+            logger.warning(
+                "regulation_reference_enabled=true 인데 storage_encrypted_buckets 에 regulations-raw 가 없어 더했다 "
+                "(규정 원본이 평문으로 저장되는 것을 막는다). .env 의 STORAGE_ENCRYPTED_BUCKETS 를 확인할 것."
             )
         return self
 

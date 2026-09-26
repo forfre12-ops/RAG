@@ -172,6 +172,46 @@ class BodySizeLimitMiddleware:
             pass
 
 
+def _warn_regulation_prerequisites(settings_obj) -> None:
+    """규정 참고 표시를 켰는데 쓸 수 없는 구성이면 기동 로그로 알린다(막지는 않는다).
+
+    문서와 규정을 **같은 실제 임베더**로 비교한다. 해시 임베딩이면 규정 등록이 거절되므로(services/regulation_service)
+    켜 놓고도 쓸 수 없는 상태다 — 등록을 눌러 보기 전에 알려야 한다. 개발·시험은 해시 임베더에 이 기능을 켠 채로
+    라우트 계약만 보기도 하므로 기동을 막지는 않는다.
+    """
+    if settings_obj.regulation_reference_enabled and settings_obj.embedding_provider == "hash":
+        logger.warning(
+            "regulation_reference_enabled=true 인데 embedding_provider=hash — 규정 등록이 거절된다"
+            "(해시 임베딩은 의미 비교가 안 된다). EMBEDDING_PROVIDER=hf 로 바꾸거나 이 기능을 끈다."
+        )
+    if settings_obj.regulation_reference_enabled and not getattr(settings_obj, "storage_encryption_enabled", True):
+        # 규정 원본 버킷(regulations-raw)을 암호화 대상 목록에 더해도(config 검증기) 암호화 자체가 꺼져 있으면 평문 저장소가 쓰인다(독립 리뷰 R1).
+        logger.warning(
+            "regulation_reference_enabled=true 인데 storage_encryption_enabled=false — 규정 원본(regulations-raw)이 평문으로 저장된다. "
+            "onprem-local·full-train 프로파일은 암호화를 강제한다. 그 밖의 배포는 STORAGE_ENCRYPTION_ENABLED=true 와 키를 설정한다."
+        )
+    if settings_obj.regulation_reference_enabled and settings_obj.regulation_llm_select_enabled:
+        from urllib.parse import urlsplit  # noqa: PLC0415
+
+        from koipa.regulation.llm_select import endpoint_is_local, is_local_provider  # noqa: PLC0415
+
+        if not is_local_provider(settings_obj.llm_provider):
+            logger.warning(
+                "regulation_llm_select_enabled=true 인데 llm_provider=%s — 로컬 LLM 공급자(ollama·vllm·local_openai·lm_studio)가 "
+                "아니면 문서 본문을 보내지 않으므로 관련 규정이 표시되지 않는다(reason=llm_not_local). LLM_PROVIDER=ollama 로 바꾸거나 이 옵션을 끈다.",
+                settings_obj.llm_provider,
+            )
+        elif str(settings_obj.llm_provider).strip().lower() in ("vllm", "local_openai"):
+            # 이 두 이름은 LOCAL_LLM_BASE_URL 을 그대로 쓴다(ollama·lm_studio 는 코드가 localhost 로 고정) — 주소가 사내가 아니면 보내지 않는다.
+            base_url = getattr(settings_obj, "local_llm_base_url", None) or getattr(settings_obj, "vllm_base_url", None)
+            if base_url and not endpoint_is_local(base_url):
+                logger.warning(
+                    "regulation_llm_select_enabled=true 인데 LOCAL_LLM_BASE_URL 의 호스트(%r)가 사내가 아니거나 이름이 풀리지 않는다 — "
+                    "문서 본문을 보내지 않으므로 관련 규정이 표시되지 않는다(reason=llm_not_local). 사내 서버 주소로 바꾸거나 이 옵션을 끈다.",
+                    urlsplit(str(base_url)).hostname,
+                )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # #30: 구조화(JSON) 로깅 — opt-in. KOIPA_LOG_JSON truthy일 때만 root logger 교체.
@@ -201,6 +241,7 @@ async def lifespan(app: FastAPI):
         settings.llm_provider, settings.embedding_provider,
         settings.storage_backend, settings.enable_training,
     )
+    _warn_regulation_prerequisites(settings)
     # J1: 운영 모드에서 빈 자격증명 차단 (dryrun/테스트는 우회)
     assert_production_credentials()
     # L-jwt-aud / L-apikey-honor: 운영 인증모드 confused-deputy 차단 설정 강제.
@@ -434,6 +475,16 @@ app.include_router(metrics_api.router, prefix="/api/v1")
 app.include_router(prom_metrics_api.router, prefix="/api/v1")
 app.include_router(admin_api.router, prefix="/api/v1")
 app.include_router(keyword_admin_api.router, prefix="/api/v1")
+
+# [2026-09-25] 규정 참고 표시 — 회원사 규정에서 검수 중인 문서와 관련된 **원문 문장**을 참고로 보여 준다.
+# ⛔ 등급을 바꾸지 않는다. 기본 꺼짐 — 꺼져 있으면 라우트가 없다(404). 켜려면 임베더가 실제여야 한다
+# (embedding_provider != hash). 설계서 docs/CLAUDE_REGULATION_REFERENCE_DESIGN_20260925.md.
+if settings.regulation_reference_enabled:
+    from koipa.api import regulation as regulation_api  # noqa: E402
+
+    app.include_router(regulation_api.router, prefix="/api/v1")
+else:
+    logger.info("regulation reference router disabled (regulation_reference_enabled=false)")
 
 # 백그라운드 메트릭 refresh — TESTING=1 또는 pytest 환경이면 자동 skip.
 prom_metrics_api.register_background_refresh(app)

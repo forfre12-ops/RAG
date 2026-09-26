@@ -1326,7 +1326,17 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "LOCAL_LLM_API_KEY=EMPTY\n"
         "\n"
         "# --- 배포 게이트 · locked_gold_eval (사람서명 평가정답 누적 경로) ---\n"
-        "LOCKED_EVAL_JSONL=datasets/gold_real/locked_gold_eval.jsonl\n",
+        "LOCKED_EVAL_JSONL=datasets/gold_real/locked_gold_eval.jsonl\n"
+        "\n"
+        # [2026-09-25] 선택 기능은 여기 적어 둬야 설치자가 안다 — 블라인드 손잡이가 이 템플릿에 없어 배포 전에
+        # 손으로 더해야 했던 전례가 있다. 기본 꺼짐이라 주석으로만 싣는다(주석을 풀어야 켜진다).
+        "# --- 사내 규정 참고 표시 (선택 기능 · 기본 꺼짐) ---\n"
+        "# 회원사가 올린 사내 규정에서 검수 중인 문서와 관련된 원문 문장을 검수 화면에 참고로 보여 준다.\n"
+        "# 등급 판정·자동 확정에는 쓰이지 않고 LLM 도 쓰지 않는다. 켜면 콘솔 설정 탭에 「사내 규정(참고 표시)」\n"
+        "# 카드가 생기고, 끄면 그 화면·API 가 사라진다(올려 둔 규정 데이터는 남는다).\n"
+        "# 전제: 문서와 규정을 같은 실제 임베더(EMBEDDING_MODEL=KURE-v1)로 비교한다 — 번들에 임베더 모델이 들어 있어야\n"
+        "# 하고, 해시 임베더면 규정 등록이 거절된다.\n"
+        "# REGULATION_REFERENCE_ENABLED=1\n",
         encoding="utf-8",
     )
 

@@ -1395,5 +1395,215 @@
     "published": true,
     "publish_note": null,
     "dry_run": false
+  },
+  "GET /regulations": {
+    "items": [
+      {
+        "reg_id": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+        "name": "문서보안 규정",
+        "version_label": "v3.1",
+        "status": "active",
+        "clause_count": 53,
+        "sentence_count": 210,
+        "effective_date": "2026-09-01",
+        "created_at": "2026-09-20T01:00:00+00:00",
+        "activated_at": "2026-09-20T02:00:00+00:00"
+      },
+      {
+        "reg_id": "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+        "name": "개인정보 처리 지침",
+        "version_label": "v1.0",
+        "status": "ready",
+        "clause_count": 3,
+        "sentence_count": 9,
+        "effective_date": null,
+        "created_at": "2026-09-20T01:00:00+00:00",
+        "activated_at": null
+      },
+      {
+        "reg_id": "cccccccc-3333-4333-8333-cccccccccccc",
+        "name": "문서보안 규정",
+        "version_label": "v3.0",
+        "status": "archived",
+        "clause_count": 51,
+        "sentence_count": 198,
+        "effective_date": "2026-08-02",
+        "created_at": "2026-09-20T01:00:00+00:00",
+        "activated_at": null
+      }
+    ],
+    "total": 3
+  },
+  "POST /regulations": {
+    "reg_id": "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+    "status": "indexing",
+    "duplicate": false
+  },
+  "GET /regulations/{reg_id}": {
+    "reg_id": "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+    "name": "개인정보 처리 지침",
+    "version_label": "v1.0",
+    "status": "ready",
+    "clause_count": 3,
+    "sentence_count": 9,
+    "effective_date": null,
+    "created_at": "2026-09-20T01:00:00+00:00",
+    "activated_at": null,
+    "filename": "privacy_guideline.md",
+    "source_format": "md",
+    "split_mode": "article",
+    "embed_model": "e2e-embedder",
+    "embed_target_count": 6,
+    "embedded_count": 6,
+    "display_clause_count": 1,
+    "scope_note": null,
+    "scope_confirmed": false,
+    "warnings": [],
+    "error_message": null
+  },
+  "DELETE /regulations/{reg_id}": null,
+  "GET /regulations/{reg_id}/clauses": {
+    "items": [
+      {
+        "clause_id": "c1c1c1c1-0000-4000-8000-000000000001",
+        "seq": 0,
+        "article_no": "제1조",
+        "title": "목적",
+        "chapter": "제1장 총칙",
+        "kind": "general",
+        "kind_source": "auto",
+        "display": false,
+        "text": "제1조(목적)\n이 지침은 개인정보의 처리에 관한 기준을 정한다."
+      },
+      {
+        "clause_id": "c1c1c1c1-0000-4000-8000-000000000002",
+        "seq": 1,
+        "article_no": "제10조",
+        "title": "등급의 구분",
+        "chapter": "제3장 분류",
+        "kind": "grade_def",
+        "kind_source": "auto",
+        "display": false,
+        "text": "제10조(등급의 구분)\n문서는 극비·기밀·대외비·공개로 구분한다."
+      },
+      {
+        "clause_id": "c1c1c1c1-0000-4000-8000-000000000003",
+        "seq": 2,
+        "article_no": "제12조",
+        "title": "극비 문서의 취급",
+        "chapter": "제4장 취급",
+        "kind": "handling",
+        "kind_source": "auto",
+        "display": true,
+        "text": "제12조(극비 문서의 취급)\n① 극비 문서는 사전 승인 없이 사외로 반출할 수 없다.\n② 극비 문서의 사본은 만들지 않는다."
+      }
+    ],
+    "total": 3
+  },
+  "PATCH /regulations/{reg_id}/clauses/{clause_id}": {
+    "clause_id": "c1c1c1c1-0000-4000-8000-000000000003",
+    "seq": 2,
+    "article_no": "제12조",
+    "title": "극비 문서의 취급",
+    "chapter": "제4장 취급",
+    "kind": "handling",
+    "kind_source": "auto",
+    "display": true,
+    "text": "제12조(극비 문서의 취급)\n① 극비 문서는 사전 승인 없이 사외로 반출할 수 없다.\n② 극비 문서의 사본은 만들지 않는다."
+  },
+  "POST /regulations/{reg_id}/preview": {
+    "reg_id": "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+    "results": [
+      {
+        "doc_id": "d0d0d0d0-0000-4000-8000-000000000001",
+        "indexed": true,
+        "reason": null,
+        "items": [
+          {
+            "regulation": {
+              "reg_id": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+              "name": "문서보안 규정",
+              "version_label": "v3.1"
+            },
+            "clause": {
+              "clause_id": "c1c1c1c1-0000-4000-8000-000000000003",
+              "article_no": "제12조",
+              "title": "극비 문서의 취급"
+            },
+            "sentences": [
+              "① 극비 문서는 사전 승인 없이 사외로 반출할 수 없다."
+            ],
+            "is_grade_list": false
+          }
+        ]
+      }
+    ]
+  },
+  "POST /regulations/{reg_id}/activate": {
+    "reg_id": "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+    "name": "개인정보 처리 지침",
+    "version_label": "v1.0",
+    "status": "active",
+    "clause_count": 3,
+    "sentence_count": 9,
+    "effective_date": null,
+    "created_at": "2026-09-20T01:00:00+00:00",
+    "activated_at": "2026-09-25T02:00:00+00:00",
+    "filename": "privacy_guideline.md",
+    "source_format": "md",
+    "split_mode": "article",
+    "embed_model": "e2e-embedder",
+    "embed_target_count": 6,
+    "embedded_count": 6,
+    "display_clause_count": 1,
+    "scope_note": null,
+    "scope_confirmed": true,
+    "warnings": [],
+    "error_message": null
+  },
+  "POST /regulations/{reg_id}/archive": {
+    "reg_id": "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+    "name": "개인정보 처리 지침",
+    "version_label": "v1.0",
+    "status": "archived",
+    "clause_count": 3,
+    "sentence_count": 9,
+    "effective_date": null,
+    "created_at": "2026-09-20T01:00:00+00:00",
+    "activated_at": null,
+    "filename": "privacy_guideline.md",
+    "source_format": "md",
+    "split_mode": "article",
+    "embed_model": "e2e-embedder",
+    "embed_target_count": 6,
+    "embedded_count": 6,
+    "display_clause_count": 1,
+    "scope_note": null,
+    "scope_confirmed": false,
+    "warnings": [],
+    "error_message": null
+  },
+  "GET /documents/{doc_id}/regulation-evidence": {
+    "doc_id": "d0d0d0d0-0000-4000-8000-000000000001",
+    "indexed": true,
+    "reason": null,
+    "items": [
+      {
+        "regulation": {
+          "reg_id": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+          "name": "문서보안 규정",
+          "version_label": "v3.1"
+        },
+        "clause": {
+          "clause_id": "c1c1c1c1-0000-4000-8000-000000000003",
+          "article_no": "제12조",
+          "title": "극비 문서의 취급"
+        },
+        "sentences": [
+          "① 극비 문서는 사전 승인 없이 사외로 반출할 수 없다."
+        ],
+        "is_grade_list": false
+      }
+    ]
   }
 }

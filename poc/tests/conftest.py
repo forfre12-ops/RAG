@@ -43,6 +43,10 @@ os.environ.setdefault("ENABLE_TRAINING", "true")
 # 환경변수를 세워 따로 확인하므로 이 기본값에 영향받지 않는다.
 os.environ.setdefault("ENABLE_SYNTHETIC_GENERATION", "true")
 
+# [2026-09-25] 규정 참고 표시 라우터도 자기 스위치(regulation_reference_enabled, 코드 기본 False)로 붙는다.
+# 시험 환경은 라우트·콘솔 계약을 검증하므로 켠다. **코드 기본값이 False 인지**는 test_regulation_api 가 필드 기본값으로 잠근다.
+os.environ.setdefault("REGULATION_REFERENCE_ENABLED", "true")
+
 # 벡터 백엔드 기본 inmemory — 테스트는 실 PG/ES 불요(이전 es→inmemory 폴백과 동일 효과).
 # 기본을 pg로 바꾼 뒤(§03 ⓑ) pg는 지연연결이라 폴백이 없으므로, 테스트는 명시적 inmemory로.
 # 실 백엔드 테스트(test_default_backend_is_pg 등)는 자체 delenv/setenv로 override.

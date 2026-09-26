@@ -52,6 +52,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     PrimaryKeyConstraint,
     Uuid,
@@ -612,6 +613,94 @@ class SampleDatasetMembership(Base):
     )
 
 
+# ============================================================
+# [K] 규정 참고 표시 (2026-09-25, migration a1d4c7e9b302)
+# ============================================================
+# 회원사 규정 → 조항 → 문장. 검수 화면이 문서와 관련된 규정 원문 문장을 참고로 보여 준다.
+# ⛔ 등급 판정·검수 라우팅과 무관하다(설계서 P1). 벡터는 pgvector 가 아니라 BYTEA — 규정은 작아서
+#    프로세스 메모리에서 정확 검색한다(regulation/vectors.py). 그래서 이 표들은 일반 ORM 표다.
+# 표준명은 db/standard_names.py 의 POST_BASE_TABLES/COLUMNS(표준용어집 대조 전 후보명).
+# 격리: 배포 하나 = 회원사 하나라 org 키가 없다(테넌트 제거 결정).
+
+class Regulation(Base):
+    """규정 한 판(版). 같은 규정명의 판들 중 활성은 하나뿐이다(활성화 트랜잭션이 이전 판을 보관으로 돌린다)."""
+    __tablename__ = "tad_rm_rgltn_mng"
+
+    id: Mapped[uuid.UUID] = mapped_column("rgltn_id", Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=func.gen_random_uuid())
+    name: Mapped[str] = mapped_column("rgltn_nm", String(200), nullable=False)
+    version_label: Mapped[str] = mapped_column("ver_lbl_nm", String(50), nullable=False)
+    # 시행일 — ISO 날짜 문자열("2026-09-25"). 옛 가이드 표와 타입을 맞추던 감리 R3 근거는 그 표를 지우며 없어졌다
+    effective_date: Mapped[str | None] = mapped_column("enfc_dt", String(30), nullable=True)
+    # indexing → ready → active ⇄ archived · indexing → failed. 상태 이름은 regulation/status.py 가 정본이다.
+    status: Mapped[str] = mapped_column("prcs_stts_cd", String(20), nullable=False, server_default=text("'indexing'"))
+    file_hash: Mapped[str] = mapped_column("file_hash_nm", String(64), nullable=False)
+    raw_uri: Mapped[str | None] = mapped_column("orgtxt_path_nm", String(500), nullable=True)
+    source_format: Mapped[str] = mapped_column("orgnl_frmat_nm", String(10), nullable=False)
+    filename: Mapped[str] = mapped_column("file_nm", String(500), nullable=False)
+    split_mode: Mapped[str | None] = mapped_column("prttn_mth_cd", String(30), nullable=True)
+    clause_count: Mapped[int] = mapped_column("artcl_cnt", Integer, nullable=False, server_default=text("0"))
+    sentence_count: Mapped[int] = mapped_column("stc_cnt", Integer, nullable=False, server_default=text("0"))
+    embed_model: Mapped[str | None] = mapped_column("embd_mdl_nm", String(200), nullable=True)
+    embed_target_count: Mapped[int] = mapped_column("embd_trgt_cnt", Integer, nullable=False, server_default=text("0"))
+    embedded_count: Mapped[int] = mapped_column("embd_cmptn_cnt", Integer, nullable=False, server_default=text("0"))
+    scope_note: Mapped[str | None] = mapped_column("aplcn_trgt_dscrp_cn", Text, nullable=True)
+    scope_confirmed: Mapped[bool] = mapped_column("aplcn_trgt_cnfrm_yn", Boolean, nullable=False, server_default=text("false"))
+    warnings_text: Mapped[str | None] = mapped_column("wrn_stts_msg_cn", Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column("err_stts_msg_cn", Text, nullable=True)
+    created_by: Mapped[str | None] = mapped_column("creatr_id", String(50), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column("crt_dt", DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[dt.datetime | None] = mapped_column("mdfcn_dt", DateTime(timezone=True), nullable=True, server_default=func.now(), onupdate=func.now())
+    activated_at: Mapped[dt.datetime | None] = mapped_column("vtlz_dt", DateTime(timezone=True), nullable=True)
+    archived_at: Mapped[dt.datetime | None] = mapped_column("dsbl_dt", DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[dt.datetime | None] = mapped_column("del_dt", DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("idx_rgltn_status", "prcs_stts_cd"),
+        # 같은 파일을 두 번 등록하지 않는다(삭제한 판은 제외) — 문서 업로드의 file_hash 중복 관례와 같다.
+        Index("uq_rgltn_hash_live", "file_hash_nm", unique=True, postgresql_where=text("del_dt IS NULL")),
+    )
+
+
+class RegulationClause(Base):
+    """규정의 조항 한 행. 표시 대상(dsply_yn)인 조항만 벡터가 채워진다."""
+    __tablename__ = "tad_rm_rgltn_artcl_mng"
+
+    id: Mapped[uuid.UUID] = mapped_column("artcl_id", Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=func.gen_random_uuid())
+    regulation_id: Mapped[uuid.UUID] = mapped_column("rgltn_id", Uuid(as_uuid=True), ForeignKey("tad_rm_rgltn_mng.rgltn_id", ondelete="CASCADE"), nullable=False)
+    seq: Mapped[int] = mapped_column("artcl_sn", Integer, nullable=False)
+    article_no: Mapped[str] = mapped_column("artcl_no_nm", String(50), nullable=False)
+    title: Mapped[str] = mapped_column("artcl_ttl_nm", String(300), nullable=False, server_default=text("''"))
+    chapter: Mapped[str] = mapped_column("chpt_nm", String(300), nullable=False, server_default=text("''"))
+    text_: Mapped[str] = mapped_column("artcl_cn", Text, nullable=False)
+    kind: Mapped[str] = mapped_column("artcl_knd_cd", String(20), nullable=False)
+    kind_source: Mapped[str] = mapped_column("artcl_knd_src_cd", String(10), nullable=False, server_default=text("'auto'"))
+    display: Mapped[bool] = mapped_column("dsply_yn", Boolean, nullable=False, server_default=text("false"))
+    embedding: Mapped[bytes | None] = mapped_column("embd_vctr_cn", LargeBinary, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("rgltn_id", "artcl_sn", name="uq_rgltn_artcl_seq"),
+        Index("idx_rgltn_artcl_reg", "rgltn_id"),
+    )
+
+
+class RegulationSentence(Base):
+    """조항의 문장 한 행(원문 그대로). 선택 후보에서 서두 문장은 뺀다."""
+    __tablename__ = "tad_rm_rgltn_stc_mng"
+
+    id: Mapped[uuid.UUID] = mapped_column("stc_id", Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=func.gen_random_uuid())
+    clause_id: Mapped[uuid.UUID] = mapped_column("artcl_id", Uuid(as_uuid=True), ForeignKey("tad_rm_rgltn_artcl_mng.artcl_id", ondelete="CASCADE"), nullable=False)
+    seq: Mapped[int] = mapped_column("stc_sn", Integer, nullable=False)
+    text_: Mapped[str] = mapped_column("stc_cn", Text, nullable=False)
+    is_lead: Mapped[bool] = mapped_column("lead_yn", Boolean, nullable=False, server_default=text("false"))
+    list_group: Mapped[int | None] = mapped_column("list_grp_sn", Integer, nullable=True)
+    embedding: Mapped[bytes | None] = mapped_column("embd_vctr_cn", LargeBinary, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("artcl_id", "stc_sn", name="uq_rgltn_stc_seq"),
+        Index("idx_rgltn_stc_clause", "artcl_id"),
+    )
+
+
 __all__ = [
     "ClassificationLevel",
     "EvaluationFactor",
@@ -628,4 +717,7 @@ __all__ = [
     "SampleDocument",
     "LlmUsage",
     "AuditLog",
+    "Regulation",
+    "RegulationClause",
+    "RegulationSentence",
 ]

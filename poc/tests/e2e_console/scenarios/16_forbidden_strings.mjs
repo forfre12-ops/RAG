@@ -14,7 +14,7 @@ import { openPage } from '../lib/page.mjs';
 import { assertNoScriptErrors } from '../lib/expect.mjs';
 
 /** 기본 화면에 나오면 안 되는 것 — (문자열, 왜) */
-const FORBIDDEN = [
+export const FORBIDDEN = [
   ['demo-secret-key', '실제 키와 달라 사용자를 401 로 유도한다'],
   ['insufficient_per_grade', '서버 내부 사유 코드'],
   ['locked_gold_eval', 'DB/코드 식별자'],
@@ -44,7 +44,7 @@ const FORBIDDEN = [
  * ⚠ 화면에서 감춘 것(pf-hidden·display:none)도 뺀다 — 프로파일·탭으로 숨긴 카드는 지금
  *   화면에 없는 글자다.
  */
-function visibleText(page) {
+export function visibleText(page) {
   const doc = page.win.document;
   const clone = doc.body.cloneNode(true);
   clone.querySelectorAll('script, style, details, [data-tech]').forEach((el) => el.remove());

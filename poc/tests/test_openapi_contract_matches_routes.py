@@ -58,12 +58,15 @@ KNOWN_GAPS = {
 
 def _live_paths() -> set[str]:
     """실제로 서빙되는 경로 + 조건부 마운트되는 학습 경로."""
+    from koipa.api import regulation as regulation_api
     from koipa.api import training as training_api
     from koipa.api.app import app
 
     paths = set(app.openapi()["paths"])
     # 배포 프로파일에 따라 안 붙는 라우터 — 계약서 기준으로는 존재하는 경로다.
     paths.update(PREFIX + r.path for r in training_api.router.routes if hasattr(r, "path"))
+    # [2026-09-25] 규정 참고 표시 — 자기 스위치(regulation_reference_enabled, 기본 꺼짐)로 붙는다.
+    paths.update(PREFIX + r.path for r in regulation_api.router.routes if hasattr(r, "path"))
     return {p[len(PREFIX):] for p in paths if p.startswith(PREFIX)}
 
 

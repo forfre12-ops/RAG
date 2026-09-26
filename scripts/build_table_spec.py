@@ -546,6 +546,10 @@ LAYOUT = [
     ("tb_audit_log", 3, 80),
     ("tb_advisory_locks", 3, 120),
     ("tb_document_vectors", 3, 160),
+    # [2026-09-25] 규정 참고 표시 — 옛 이름이 없는 표라 표준 물리명으로 바로 적는다. 규정(부모) → 조항 → 문장.
+    ("tad_rm_rgltn_mng", 1, 408),
+    ("tad_rm_rgltn_artcl_mng", 2, 408),
+    ("tad_rm_rgltn_stc_mng", 3, 408),
 ]
 # [2026-09-11] 표준 명명 — 위 배치는 옛 물리명으로 적어 두었다. models.py 의 새 이름으로 옮긴다.
 LAYOUT = [(META.RENAMED_TABLES.get(n, n), c, y) for n, c, y in LAYOUT]
@@ -568,8 +572,10 @@ def build_erd(tables: list[dict]) -> str:
     for ch, pa, col in edges:
         merged.setdefault((ch, pa), []).append(col)
 
+    # [2026-09-26] 높이는 배치에서 계산한다. 420 으로 고정돼 있어 규정 표 3상자(y=408, 하단 434)가 잘렸다.
+    svg_h = max(420, max(y for _n, _c, y in LAYOUT) + BOX_H + 14)
     parts = [
-        '<svg viewBox="0 0 1080 420" width="100%" role="img" '
+        f'<svg viewBox="0 0 1080 {svg_h}" width="100%" role="img" '
         'aria-label="전체 테이블 관계도" style="min-width:940px">',
         '<defs><marker id="tsarr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" '
         'markerHeight="7" orient="auto-start-reverse">'

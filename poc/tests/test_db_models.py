@@ -81,6 +81,10 @@ def test_orm_metadata_has_expected_tables():
         # 하나이고 데이터를 담지 않는다. pg_advisory_xact_lock 이 MariaDB 에서
         # 조용히 꺼지던 것을 두 dialect 공통 행 잠금으로 바꾸며 들어왔다.
         "tad_sy_lck_mng",             # tb_advisory_locks
+        # [2026-09-25] 규정 참고 표시 — 옛 이름이 없는 표(standard_names.POST_BASE_TABLES).
+        "tad_rm_rgltn_mng",           # 규정 한 판
+        "tad_rm_rgltn_artcl_mng",     # 규정 조항
+        "tad_rm_rgltn_stc_mng",       # 규정 문장
     }
     actual = set(Base.metadata.tables.keys())
     missing = expected - actual
