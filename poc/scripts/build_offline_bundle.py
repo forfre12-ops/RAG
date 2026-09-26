@@ -483,7 +483,7 @@ def expected_files(
     models: list[ModelEntry],
     observability_images: list[str] | None = None,
 ) -> list[str]:
-    files: list[str] = ["README.md", "preflight_host.sh", "setup.sh", "install.sh", "verify.sh", "deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh", "manifest.yaml", "CHECKSUMS.sha256"]
+    files: list[str] = ["README.md", "preflight_host.sh", "setup.sh", "install.sh", "verify.sh", "deploy.sh", "deploy_airgap.sh", "db_probe.sh", "verify_install.sh", "deploy_rollback.sh", "manifest.yaml", "CHECKSUMS.sha256"]
     # 런타임 RPM 은 스테이징된 경우에만 기대 목록에 넣는다. 없는데 선언하면
     # verify_install 이 항상 실패해 진짜 결손과 구분이 안 된다.
     if staged_rpms():
@@ -1504,7 +1504,10 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     # 수행하므로 현장에서 처음 만나는 실패를 줄이려면 이 스크립트가 번들에 함께 있어야 한다.
     # setup.sh — 원커맨드 설치기. 설치를 발주처(지재원)·고객사가 직접 수행하므로
     # 번들 안에 없으면 원커맨드 경로 자체가 존재하지 않는다.
-    for _script in ("preflight_host.sh", "setup.sh", "deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh"):
+    # db_probe.sh — deploy_airgap.sh 가 4단계(DB 헬시 대기)에서 `. "$SELF/db_probe.sh"` 로 읽는다.
+    # 이 목록에 없어 번들에 안 실렸고, 실제 설치기를 돌려 보니 "No such file or directory" 로 4단계 직전에
+    # 설치가 멈췄다(2026-09-27 실설치 리허설). 리포에서 직접 돌릴 때는 scripts/ 에 있어 가려져 있었다.
+    for _script in ("preflight_host.sh", "setup.sh", "deploy.sh", "deploy_airgap.sh", "db_probe.sh", "verify_install.sh", "deploy_rollback.sh"):
         _src = _REPO_ROOT / "scripts" / _script
         if _src.exists():
             _dst = out_dir / _script

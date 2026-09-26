@@ -359,6 +359,59 @@ def test_expected_files_lists_required_artifacts():
     assert not any(f == "models/foo-bar/" for f in files)  # 옛 잘못된 경로 재발 방지
 
 
+def test_bundle_root_scripts_ship_every_script_they_source(tmp_path: Path):
+    """번들 루트의 셸 스크립트가 읽는(source) 스크립트가 번들에 실제로 실리는가.
+
+    deploy_airgap.sh 는 4단계에서 `. "$SELF/db_probe.sh"` 로 읽는데 빌더의 복사 목록에 없어
+    번들에 안 실렸다. 리포에서 직접 돌리면 scripts/ 에 있어 안 드러났고, 실제 설치기를 번들
+    형태 폴더에서 돌리자 "No such file or directory" 로 설치가 멈췄다(2026-09-27).
+    """
+    import re
+
+    from build_offline_bundle import _copy_infra
+
+    _copy_infra(tmp_path, version="t")
+    shipped = {p.name for p in tmp_path.glob("*.sh")}
+    assert {"setup.sh", "deploy_airgap.sh"} <= shipped  # 검사가 빈 껍데기가 아닌지
+
+    sourced: dict[str, set[str]] = {}
+    for script in tmp_path.glob("*.sh"):
+        text = script.read_text(encoding="utf-8")
+        for m in re.finditer(
+            r'(?m)^\s*(?:\.|source)\s+"?\$\{?(?:SELF|BUNDLE|ROOT)\}?/([A-Za-z0-9_.-]+\.sh)', text
+        ):
+            sourced.setdefault(script.name, set()).add(m.group(1))
+    assert sourced, "source 하는 스크립트를 하나도 못 찾았다 — 이 시험의 정규식이 낡았다"
+    missing = {
+        f"{owner} -> {name}" for owner, names in sourced.items() for name in names if name not in shipped
+    }
+    assert not missing, f"번들 루트 스크립트가 읽는데 번들에 없다: {sorted(missing)}"
+
+
+def test_verify_install_follows_api_port_when_base_url_is_not_given():
+    """setup.sh 8단계는 `API_PORT=… bash verify_install.sh` 로 부른다 — 이 스크립트가 그 값을 따라야 한다.
+
+    읽지 않으면 기본 포트가 아닌 설치에서 엉뚱한 서버(8000)를 검사한다(2026-09-27 실설치 리허설).
+    """
+    import re
+
+    scripts = Path(__file__).resolve().parents[1] / "scripts"
+    setup = (scripts / "setup.sh").read_text(encoding="utf-8")
+    verify = (scripts / "verify_install.sh").read_text(encoding="utf-8")
+    assert re.search(r"API_PORT='\$API_PORT'\s+bash\s+'\$BUNDLE/verify_install\.sh'", setup), (
+        "setup.sh 가 verify_install.sh 에 API_PORT 를 넘기지 않는다 — 이 시험의 전제가 바뀌었다"
+    )
+    assert re.search(r'^BASE_URL="\$\{BASE_URL:-http://127\.0\.0\.1:\$\{API_PORT:-8000\}\}"', verify, re.M), (
+        "verify_install.sh 가 API_PORT 로 BASE_URL 을 만들지 않는다"
+    )
+
+
+def test_expected_files_lists_db_probe():
+    """설치 확인(verify_install)이 기대 목록으로 db_probe.sh 의 결손을 잡을 수 있어야 한다."""
+    files = expected_files({"postgres": ComponentEntry("postgres:16", "16")}, [])
+    assert "db_probe.sh" in files
+
+
 # ─────────────────────────────────────────────────────────────
 # build_manifest 통합
 # ─────────────────────────────────────────────────────────────

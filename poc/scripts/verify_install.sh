@@ -9,11 +9,17 @@
 # 사용:
 #   bash scripts/verify_install.sh                              # .env.cloud 에서 키 추출·임시샘플
 #   API_KEY=<키> BASE_URL=http://호스트:8000 bash scripts/verify_install.sh
+#   API_PORT=18000 bash verify_install.sh                       # 기본 포트가 아닐 때(BASE_URL 을 안 주면 이 값으로 만든다)
 #   FILE=문서.pdf bash scripts/verify_install.sh                # 내 문서로 파싱·분류 확인
 # ============================================================================
 set -uo pipefail
 
-BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"
+# BASE_URL 을 안 주면 API_PORT 로 만든다. setup.sh 8단계는 `API_PORT=… bash verify_install.sh` 로 부르는데
+# 종전에는 이 스크립트가 API_PORT 를 읽지 않고 8000 을 그대로 검사했다 — 8000 이 이미 쓰여 다른 포트로
+# 설치한 호스트에서는 **엉뚱한 서버를 검사하고 결과를 보고**했다(2026-09-27 실설치 리허설: 18000 에 설치하고
+# 8000 의 다른 스택을 검증해 "missing authorization" 으로 실패). preflight_host.sh 가 바로 그 상황에서
+# API_PORT 를 바꾸라고 안내하므로 흔한 경로다.
+BASE_URL="${BASE_URL:-http://127.0.0.1:${API_PORT:-8000}}"
 FILE="${FILE:-}"
 API_KEY="${API_KEY:-}"
 
