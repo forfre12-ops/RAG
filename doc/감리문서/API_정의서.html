@@ -138,23 +138,26 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:12%">코드</th><th style="width:14%">사용 횟수</th><th>의미</th></tr></thead>
     <tbody>
-      <tr><td class="c">404</td><td class="n">19</td><td>대상 없음(문서, 작업, 모델 버전)</td></tr>
-      <tr><td class="c">422</td><td class="n">12</td><td>요청 값이 스키마·규약에 맞지 않음</td></tr>
-      <tr><td class="c">413</td><td class="n">9</td><td>본문 또는 파일 크기 초과</td></tr>
-      <tr><td class="c">403</td><td class="n">8</td><td>권한 없음(역할 불충분)</td></tr>
-      <tr><td class="c">401</td><td class="n">6</td><td>인증 실패. 화면 경로는 로그인 화면으로 이동시킨다</td></tr>
-      <tr><td class="c">202</td><td class="n">5</td><td>비동기 접수</td></tr>
-      <tr><td class="c">201</td><td class="n">4</td><td>생성됨</td></tr>
-      <tr><td class="c">409</td><td class="n">2</td><td>상태 충돌(중복 서명, 중복 등록)</td></tr>
-      <tr><td class="c">503</td><td class="n">2</td><td>의존 자원 미가용</td></tr>
+      <tr><td class="c">404</td><td class="n">22</td><td>대상 없음(문서, 작업, 모델 버전, 규정)</td></tr>
+      <tr><td class="c">422</td><td class="n">14</td><td>요청 값이 스키마·규약에 맞지 않음</td></tr>
+      <tr><td class="c">403</td><td class="n">10</td><td>권한 없음(역할 불충분)</td></tr>
+      <tr><td class="c">413</td><td class="n">8</td><td>본문 또는 파일 크기 초과</td></tr>
+      <tr><td class="c">202</td><td class="n">6</td><td>비동기 접수</td></tr>
+      <tr><td class="c">503</td><td class="n">5</td><td>의존 자원 미가용(DB, pgvector, 감사 기록 실패 시 고위험 작업 차단, 규정 조회 실패)</td></tr>
+      <tr><td class="c">401</td><td class="n">4</td><td>인증 실패. 화면 경로는 로그인 화면으로 이동시킨다</td></tr>
+      <tr><td class="c">409</td><td class="n">4</td><td>상태 충돌·거부(같은 멱등 키의 동시 요청, 서빙 모델을 멈추게 하는 등급체계 변경·모델 리로드, 데모 초기화 안전캡 초과)</td></tr>
+      <tr><td class="c">201</td><td class="n">3</td><td>생성됨</td></tr>
+      <tr><td class="c">500</td><td class="n">3</td><td>서버 내부 오류(미처리 예외, 골든셋 저장 실패)</td></tr>
+      <tr><td class="c">204</td><td class="n">2</td><td>삭제 성공(응답 본문 없음)</td></tr>
+      <tr><td class="c">400</td><td class="n">2</td><td>요청 내용 오류(빈 문서 목록, 등급체계에 없는 교정 등급)</td></tr>
       <tr><td class="c">429</td><td class="n">1</td><td>속도 제한</td></tr>
     </tbody>
   </table>
   </div>
-  <p class="src">집계 대상: <code>poc/src/koipa/api/*.py</code> 의 <code>HTTPException</code> 상태 코드</p>
+  <p class="src">집계 방법(2026-09-26 재계수): <code>poc/src/koipa/api/</code> 의 파이썬 소스 24개를 AST 로 읽어 <code>status_code=</code> 로 상태 코드를 직접 지정한 지점 84곳을 코드별로 센다 (<code>HTTPException</code> · <code>JSONResponse</code> · <code>HTMLResponse</code> · 라우트 데코레이터). 다시 세려면 <code>python poc/scripts/audit_status_codes.py</code>, 이 표와 맞는지 보려면 <code>--check</code>. 200(기본 성공 응답)과 FastAPI 가 요청 검증 실패에 자동으로 내는 422 는 세지 않는다. 이 숫자는 코드가 그 상태를 <b>낼 수 있는 지점의 수</b>이며 운영 중 실제로 나간 횟수가 아니다.</p>
 
   <h2>3. 엔드포인트 목록</h2>
-  <p>총 <b>64건</b>이다(메서드와 경로의 조합 기준, 요건 외 2건 + 순수 내부 운영·관측 전용 4건 제외 · 2026-09-26 재계수). 2026-09-24 에 검수 배정·승격 4건(<code>/golden/assignments</code> GET/POST·<code>/golden/assignments/revoke</code>·<code>/golden/candidates/promote</code>, 커밋 <code>dadbb554</code>)을 더했고(68건), 2026-09-26 에 호출자가 없던 4건(가이드 2 · 승격 대기 · 이중검토 보류)을 걷었다(64건) — 연동·검수 협의와 직결된 것만 남겼다. 반면 유사문서 조회·Prometheus 메트릭·합성 커버리지/작업조회 4건은 KL 연동과 무관한 순수 내부 도구라 이 문서에는 신지 않는다(전부 <code>x-audience: internal</code>, 전체 목록은 <code>doc/03_openapi_koipa_kl.yaml</code> 참고). 비고의 <span class="part">full-train</span> 표시는 학습 프로파일에서만 노출되는 경로를 뜻한다. 고객사 배포(<code>onprem-local</code>)에서는 해당 라우터가 등록되지 않으므로 스펙에도 나타나지 않는다.</p>
+  <p>총 <b>64건</b>이다(메서드와 경로의 조합 기준, 요건 외 2건 + 순수 내부 운영·관측 전용 4건 + 규정 참고 표시 10건 제외 · 2026-09-27 재계수). 2026-09-24 에 검수 배정·승격 4건(<code>/golden/assignments</code> GET/POST·<code>/golden/assignments/revoke</code>·<code>/golden/candidates/promote</code>, 커밋 <code>dadbb554</code>)을 더했고(68건), 2026-09-26 에 호출자가 없던 4건(가이드 2 · 승격 대기 · 이중검토 보류)을 걷었다(64건) — 연동·검수 협의와 직결된 것만 남겼다. 반면 유사문서 조회·Prometheus 메트릭·합성 커버리지/작업조회 4건과 규정 참고 표시 10건(기본 꺼짐)은 KL 연동과 무관한 순수 내부 도구라 이 문서에는 신지 않는다(전부 <code>x-audience: internal</code>, 전체 목록은 <code>doc/03_openapi_koipa_kl.yaml</code> 참고). 비고의 <span class="part">full-train</span> 표시는 학습 프로파일에서만 노출되는 경로를 뜻한다. 고객사 배포(<code>onprem-local</code>)에서는 해당 라우터가 등록되지 않으므로 스펙에도 나타나지 않는다.</p>
   <h3>3-1. 상태 점검 <code>health</code> · 4건</h3>
   <div class="tw">
   <table>
