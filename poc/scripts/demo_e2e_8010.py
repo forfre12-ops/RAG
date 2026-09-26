@@ -150,7 +150,7 @@ def main() -> int:
         up = r.json()
         doc_id = up["doc_id"]
         print(f"  • doc_id           : {doc_id}")
-        print(f"  • 추출방식/품질     : {up['extraction_method']} / {up['extraction_quality']}  (OCR={up['ocr_used']})")
+        print(f"  • 추출방식/품질     : {up['extraction_method']} / {up['extraction_quality']}")
         print(f"  • 추출 글자수       : {up['char_count']}자")
         print(f"  • 청크 개수         : {up['chunk_count']}")
         # 폐쇄망 스토리지는 로컬 파일시스템(LocalStorage + AES-256-GCM 암호화)이다.

@@ -50,7 +50,6 @@ class DocumentRepo:
         char_count: int | None = None,
         extraction_method: str | None = None,
         extraction_quality: float | None = None,
-        ocr_used: bool = False,
         processing_status: str = "ready",
         external_ref: str | None = None,
         metadata: dict | None = None,
@@ -75,7 +74,6 @@ class DocumentRepo:
             char_count=char_count,
             extraction_method=extraction_method,
             extraction_quality=extraction_quality,
-            ocr_used=ocr_used,
             processing_status=processing_status,
             # [2026-08-29] 추출·적재가 끝난 시각. 세팅하는 곳이 없어 영원히 NULL 이었다
             # (전수조사에서 확인). 아직 처리 중인 상태에는 넣지 않는다 — 값이 있으면

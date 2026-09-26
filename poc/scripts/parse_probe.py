@@ -74,10 +74,8 @@ def _review(pre):
     ex = pre.extraction
     return extraction_review_decision(
         quality=ex.quality,
-        ocr_used=ex.ocr_used,
         error=ex.error,
         min_quality=float(getattr(settings, "extraction_review_min_quality", 0.6)),
-        ocr_requires_review=bool(getattr(settings, "extraction_ocr_requires_review", True)),
         content_quality=pre.quality,
         table_coverage=getattr(ex, "table_coverage", None),
     )
@@ -96,7 +94,6 @@ def probe_one(pipe, svc, path: Path, do_classify: bool) -> dict:
         method=ex.method,
         ex_quality=round(ex.quality, 3),
         content_quality=round(pre.quality, 3),
-        ocr=ex.ocr_used,
         chars=len(pre.text),
         chunks=len(pre.chunks),
         table_cov=getattr(ex, "table_coverage", None),

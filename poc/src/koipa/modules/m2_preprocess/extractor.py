@@ -1,44 +1,20 @@
 """포맷별 텍스트 추출 라우터.
 
 라이브러리 로드 실패는 graceful degrade — 라이브러리가 없는 환경에서도 .txt/.md는 처리.
-extractor가 반환하는 ExtractResult는 추출 메서드·품질·OCR 사용 여부를 포함해
-DB `documents.extraction_method/quality/ocr_used` 와 1:1.
+extractor가 반환하는 ExtractResult는 추출 메서드·품질을 포함해 DB `documents.extraction_method/quality` 와 1:1.
 
-OCR 엔진: Tesseract 5.x + 한국어팩 (kor.traineddata) — Apache 2.0.
-  - 시스템 경로 자동 탐지 후 환경변수 TESSERACT_CMD 로 override 가능.
-  - 폐쇄망 초기 설치: winget install UB-Mannheim.TesseractOCR 후 kor.traineddata 복사.
+OCR 은 하지 않는다(요건 밖 — 2026-09-26 제거). 텍스트 레이어가 없는 스캔 PDF 와 이미지 파일은 본문을 못 얻은
+문서로 등록된다(경고 pdf_no_text_layer · 이미지는 unsupported).
 """
 
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Tesseract 실행파일 경로 — 환경변수 > Windows 기본 경로 > PATH
-_TESS_DEFAULT = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-TESSERACT_CMD = os.environ.get("TESSERACT_CMD") or (
-    _TESS_DEFAULT if Path(_TESS_DEFAULT).exists() else "tesseract"
-)
-
-# poppler 경로 (pdf2image가 사용) — 환경변수 > 사용자 tools > None(PATH 탐색)
-_POPPLER_CANDIDATES = [
-    os.environ.get("POPPLER_PATH", ""),
-    str(Path.home() / "tools" / "poppler" / "bin"),
-    r"C:\Program Files\poppler\bin",
-]
-POPPLER_PATH: str | None = next(
-    (p for p in _POPPLER_CANDIDATES if p and (Path(p) / "pdftoppm.exe").exists()),
-    None,
-)
-
-# OCR DoS 가드 — 수백쪽 스캔 PDF 한 건이 pdf2image/Tesseract를 수십분~OOM으로 몰지
-# 않도록 변환 페이지 수에 보수적 상한을 둔다. settings.ocr_max_pages가 있으면 그 값을,
-# 없으면 모듈 상수(50)를 사용. 0 이하면 무제한으로 본다(명시적 opt-out).
-_OCR_MAX_PAGES_DEFAULT = 50
 
 
 SUPPORTED_FORMAT_GROUPS: dict[str, tuple[str, ...]] = {
@@ -48,24 +24,12 @@ SUPPORTED_FORMAT_GROUPS: dict[str, tuple[str, ...]] = {
     "excel": ("xlsx", "xlsm", "xls"),
     "powerpoint": ("pptx", "pptm"),
     "pdf": ("pdf",),
-    "image_ocr": ("jpg", "jpeg", "png", "tiff", "tif", "bmp", "webp"),
 }
 SUPPORTED_PARSE_EXTENSIONS: tuple[str, ...] = tuple(
     ext for group in SUPPORTED_FORMAT_GROUPS.values() for ext in group
 )
 
 
-def _ocr_max_pages() -> int:
-    try:
-        from koipa.config import settings  # noqa: PLC0415
-
-        v = getattr(settings, "ocr_max_pages", None)
-        if v is not None:
-            return int(v)
-    except Exception as exc:  # noqa: BLE001 — 폴백 유지
-        logger.warning("설정 ocr_max_pages 를 읽지 못해 기본값으로 진행 (%s: %s)",
-                       type(exc).__name__, exc)
-    return _OCR_MAX_PAGES_DEFAULT
 
 
 # ── zip bomb(압축폭탄) 가드 ────────────────────────────────────────────────────
@@ -112,12 +76,10 @@ class ExtractedTable:
 @dataclass
 class ExtractResult:
     text: str
-    method: str           # parser/rhwp/ocr/ocr_llm/libreoffice/plain
+    method: str           # parser/rhwp/libreoffice/plain 등 추출 방법 이름
     quality: float        # 0.0~1.0 (추정)
-    ocr_used: bool = False
     pages: int | None = None
-    # pages is the number actually extracted.  For a scanned PDF this can be
-    # lower than total_pages when the OCR safety cap stops processing early.
+    # pages is the number actually extracted; total_pages is the page count of the source.
     # Keeping both numbers makes incomplete extraction visible to callers.
     total_pages: int | None = None
     error: str | None = None
@@ -192,8 +154,6 @@ def _dispatch_extract(path: str | Path) -> ExtractResult:
         return _extract_ppt_legacy(p)
     if suffix == "pdf":
         return _extract_pdf(p)
-    if suffix in SUPPORTED_FORMAT_GROUPS["image_ocr"]:
-        return _extract_image_ocr(p)
     return ExtractResult(text="", method="plain", quality=0.0, error=f"unsupported: {suffix}")
 
 
@@ -307,61 +267,6 @@ def _zip_names(path: Path) -> list[str]:
             return zf.namelist()
     except Exception:  # noqa: BLE001
         return []
-
-
-_PACKAGE_IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp")
-_PACKAGE_OCR_LIMIT = 30
-
-
-def _ocr_package_images(
-    p: Path,
-    *,
-    prefix: str,
-    label: str,
-    warnings: list[str],
-) -> list[str]:
-    import io
-    import zipfile
-
-    names = [
-        n for n in _zip_names(p)
-        if n.startswith(prefix) and n.lower().endswith(_PACKAGE_IMAGE_SUFFIXES)
-    ]
-    if not names:
-        return []
-    try:
-        from PIL import Image  # type: ignore
-        import pytesseract  # type: ignore  # noqa: F401
-    except ImportError:
-        _warn_once(warnings, f"{label}_media_ocr_unavailable")
-        return []
-
-    parts: list[str] = []
-    try:
-        with zipfile.ZipFile(p) as zf:
-            _guard_zip_bomb(zf, source="office-zip")
-            for name in names[:_PACKAGE_OCR_LIMIT]:
-                try:
-                    with Image.open(io.BytesIO(zf.read(name))) as img:
-                        text = _tess_image(img)
-                except Exception:  # noqa: BLE001
-                    continue
-                if text and text.strip():
-                    parts.append(f"[{label} image OCR {name}]\n{text.strip()}")
-                    try:
-                        warnings.remove(f"{label}_media_not_ocrd")
-                    except ValueError:
-                        pass
-                    _warn_once(warnings, f"{label}_media_ocr_extracted")
-    except Exception as exc:  # noqa: BLE001
-        _warn_once(warnings, f"{label}_media_ocr_error:{type(exc).__name__}")
-        return parts
-
-    if len(names) > _PACKAGE_OCR_LIMIT:
-        _warn_once(warnings, f"{label}_media_ocr_truncated")
-    if not parts:
-        _warn_once(warnings, f"{label}_media_ocr_empty")
-    return parts
 
 
 def _xml_text(xml: str) -> str:
@@ -860,8 +765,7 @@ def _docx_ooxml_extras(p: Path, warnings: list[str]) -> list[str]:
     extras: list[str] = []
     names = _zip_names(p)
     if any(n.startswith("word/media/") for n in names):
-        _warn_once(warnings, "docx_media_not_ocrd")
-        extras.extend(_ocr_package_images(p, prefix="word/media/", label="docx", warnings=warnings))
+        _warn_once(warnings, "docx_media_not_extracted")
     if any(n.startswith("word/charts/") for n in names):
         _warn_once(warnings, "docx_charts_not_extracted")
     if any(n.startswith("word/embeddings/") for n in names):
@@ -1058,7 +962,7 @@ def _extract_docx(p: Path) -> ExtractResult:
 def _excel_package_warnings(p: Path, warnings: list[str]) -> None:
     names = _zip_names(p)
     if any(n.startswith("xl/media/") for n in names):
-        _warn_once(warnings, "excel_media_not_ocrd")
+        _warn_once(warnings, "excel_media_not_extracted")
     if any(n.startswith("xl/charts/") for n in names):
         _warn_once(warnings, "excel_charts_not_extracted")
     if any(n.startswith("xl/drawings/") for n in names):
@@ -1197,7 +1101,6 @@ def _extract_excel(p: Path) -> ExtractResult:
         # 값 누락. read_only 워크북은 셀 데이터타입을 못 보므로 별도 워크북을
         # data_only=False로 재오픈해 수식 존재 여부만 가볍게 점검한다(실패는 무시).
         parts.extend(_excel_auxiliary_texts(str(p), warnings))
-        parts.extend(_ocr_package_images(p, prefix="xl/media/", label="excel", warnings=warnings))
         warn = _excel_formula_cache_warning(str(p))
         if warn:
             _warn_once(warnings, "excel_formula_cached_values_missing")
@@ -1448,7 +1351,7 @@ def _extract_pptx(p: Path) -> ExtractResult:
                 _warn_once(warnings, "pptx_charts_not_extracted")
             shape_type = str(getattr(shape, "shape_type", "")).upper()
             if "PICTURE" in shape_type:
-                _warn_once(warnings, "pptx_media_not_ocrd")
+                _warn_once(warnings, "pptx_media_not_extracted")
             if "OLE" in shape_type or "EMBEDDED" in shape_type:
                 _warn_once(warnings, "pptx_embedded_objects_not_extracted")
         if getattr(slide, "has_notes_slide", False):
@@ -1460,7 +1363,6 @@ def _extract_pptx(p: Path) -> ExtractResult:
                     _warn_once(warnings, "pptx_notes_extracted")
             except Exception:  # noqa: BLE001
                 pass
-    parts.extend(_ocr_package_images(p, prefix="ppt/media/", label="pptx", warnings=warnings))
     return ExtractResult(
         text="\n".join(parts),
         method="pptx",
@@ -1521,12 +1423,12 @@ def _pdf_text_page_count(text: str) -> int:
 
 
 def _pdf_sparse_signal(text: str, pages: int, base_quality: float) -> tuple[float, list[str]]:
-    """부분 텍스트레이어(표지/워터마크/머리말)가 스캔 본문의 OCR 을 가로채는 것 방지(#10).
+    """부분 텍스트레이어(표지/워터마크/머리말)만 있는 준스캔 PDF 를 걸러낸다(#10).
 
-    pdfminer/PyMuPDF 는 텍스트가 조금이라도 있으면 즉시 채택하고 OCR 로 안 내려간다. 다수 페이지에
+    pdfminer/PyMuPDF 는 텍스트가 조금이라도 있으면 즉시 채택한다. 다수 페이지에
     문자밀도가 매우 낮으면(준스캔 의심) quality 를 검수 임계(extraction_review_min_quality 기본 0.6)
     아래로 낮춰 자동확정 대신 검수 라우팅되게 한다(table_coverage 와 동형 FNR-safe 신호, 등급·본문
-    불변). 정상 밀도면 base_quality 유지. 순수 스캔(레이어 0)은 이 분기 전에 OCR 로 처리된다.
+    불변). 정상 밀도면 base_quality 유지. 순수 스캔(레이어 0)은 이 분기 전에 본문 없음으로 돌려준다.
     """
     density = len(text.strip()) / max(1, pages)
     if pages >= 3 and density < 80:
@@ -1539,7 +1441,7 @@ def _extract_pdf(p: Path) -> ExtractResult:
 
     1) pdfminer.six (BSD-3) — 텍스트 레이어 있는 경우
     2) PyMuPDF (AGPL) — 설치된 경우 fallback
-    3) Tesseract OCR — 텍스트 레이어 없는 스캔본
+    텍스트 레이어가 없는 스캔본은 OCR 을 하지 않으므로 본문 없이 돌려준다(_pdf_without_text_layer).
     """
     # 1순위: pdfminer.six
     try:
@@ -1589,110 +1491,20 @@ def _extract_pdf(p: Path) -> ExtractResult:
                 tables=tables,
                 warnings=table_warnings + sparse_w,
             )
-        # 텍스트 레이어 없음 → OCR 시도
-        return _ocr_pdf_pages(p, n_pages)
+        # 텍스트 레이어 없음 → 본문 없이 돌려준다(OCR 안 함)
+        return _pdf_without_text_layer(n_pages)
     except Exception as exc:  # noqa: BLE001 — 폴백 유지(빈 결과 반환)
         logger.warning("PDF 텍스트 추출 실패 — 빈 결과로 진행한다 (%s: %s)", type(exc).__name__, exc)
 
-    # 3순위: pdfminer로 읽혔지만 빈 텍스트 → OCR 시도
-    return _ocr_pdf_pages(p, None)
+    # pdfminer 로 읽었지만 빈 텍스트(또는 읽기 실패) → 본문 없이 돌려준다
+    return _pdf_without_text_layer(None)
 
 
-def _ocr_pdf_pages(p: Path, n_pages: int | None) -> ExtractResult:
-    """PDF 페이지를 이미지로 변환 후 Tesseract OCR.
-
-    DoS 가드: convert_from_path를 first_page/last_page로 [1, max_pages] 범위만
-    렌더한다. 상한을 넘는 페이지는 변환·OCR하지 않고 경고를 error에 남긴다(잘림 표기).
-    상한이 0 이하면 무제한(opt-out).
-    """
-    try:
-        from pdf2image import convert_from_path  # type: ignore
-
-        kwargs: dict = {"dpi": 200}
-        if POPPLER_PATH:
-            kwargs["poppler_path"] = POPPLER_PATH
-
-        max_pages = _ocr_max_pages()
-        truncated = False
-        last_page: int | None = None
-        if max_pages and max_pages > 0:
-            # n_pages를 아는 경우 초과 여부를 미리 판정, 모르면 상한까지만 렌더.
-            last_page = max_pages
-            if n_pages is not None and n_pages > max_pages:
-                truncated = True
-            kwargs["first_page"] = 1
-            kwargs["last_page"] = last_page
-
-        images = convert_from_path(str(p), **kwargs)
-        # n_pages를 몰랐어도 렌더 결과가 상한과 같으면 잘렸을 수 있음(보수적 표기).
-        if last_page is not None and len(images) >= last_page and n_pages is None:
-            truncated = True
-        texts = [_tess_image(img) for img in images]
-        text = "\n".join(t for t in texts if t)
-        if text.strip():
-            note = (
-                f"OCR truncated to first {last_page} of {n_pages or '?'} pages (DoS guard)"
-                if truncated else None
-            )
-            warnings = ["pdf_ocr_text_may_be_noisy"]
-            if truncated:
-                warnings.append("pdf_ocr_truncated")
-            return ExtractResult(
-                text=text, method="ocr", quality=0.75,
-                ocr_used=True, pages=len(images), total_pages=n_pages,
-                error=note, warnings=warnings,
-            )
-    except Exception as exc:  # noqa: BLE001 — 폴백 유지(빈 결과 반환)
-        # 스캔 PDF OCR 경로가 통째로 실패해도 흔적이 없었다. 아래 빈 ExtractResult 가
-        # 나가면 본문 0자 → 수집 격리로 이어지지만, 왜 실패했는지가 사라진다.
-        logger.warning("PDF OCR 추출 실패 — 빈 결과로 진행한다 (%s: %s)", type(exc).__name__, exc)
+def _pdf_without_text_layer(n_pages: int | None) -> ExtractResult:
+    """텍스트를 못 얻은 PDF(스캔본 등) — OCR 은 하지 않으므로 본문 없이 돌려준다."""
     return ExtractResult(
-        text="", method="ocr", quality=0.0, ocr_used=False,
+        text="", method="parser", quality=0.0,
         pages=n_pages, total_pages=n_pages,
-        error="OCR failed (no text layer, pdf2image/tesseract unavailable)",
-        warnings=["pdf_ocr_unavailable"],
+        error="no text extracted from PDF (scanned or unreadable) — OCR is not supported",
+        warnings=["pdf_no_text_layer"],
     )
-
-
-def _extract_image_ocr(p: Path) -> ExtractResult:
-    """이미지 파일(jpg/png/tiff 등) 직접 OCR."""
-    try:
-        from PIL import Image  # type: ignore
-
-        img = Image.open(str(p))
-        text = _tess_image(img)
-        if text.strip():
-            return ExtractResult(
-                text=text,
-                method="ocr",
-                quality=0.75,
-                ocr_used=True,
-                warnings=["image_ocr_text_may_be_noisy"],
-            )
-        return ExtractResult(text="", method="ocr", quality=0.0, ocr_used=True,
-                             error="OCR produced empty text")
-    except Exception as exc:  # noqa: BLE001
-        return ExtractResult(text="", method="ocr", quality=0.0,
-                             ocr_used=True, error=str(exc))
-
-
-def _tess_image(img) -> str:
-    """PIL Image → Tesseract OCR 텍스트. kor+eng 병행 인식."""
-    import pytesseract  # type: ignore
-
-    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
-    langs = "+".join(_available_tess_langs(["kor", "eng"]))
-    return pytesseract.image_to_string(img, lang=langs, config="--psm 3")
-
-
-def _available_tess_langs(preferred: list[str]) -> list[str]:
-    """설치된 언어팩 중 preferred 교집합. 없으면 eng 폴백."""
-    try:
-        import pytesseract  # type: ignore
-
-        pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
-        installed = set(pytesseract.get_languages())
-        result = [lg for lg in preferred if lg in installed]
-        return result if result else ["eng"]
-    except Exception:  # noqa: BLE001
-        return ["eng"]

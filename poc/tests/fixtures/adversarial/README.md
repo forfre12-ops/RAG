@@ -9,7 +9,7 @@
 | 접두사 | 기대 사유(하나 이상 포함) | 대표 위험 |
 |---|---|---|
 | `hwp_table_*` | `table_incomplete` | HWP/HWPX 표 셀 텍스트 미추출 → 표 속 비밀 미탐 |
-| `scan_*` / `ocr_*` | `ocr`, `low_quality` | 스캔본(텍스트 레이어 없음) → OCR 품질 저하 |
+| `scan_*` | (빈 본문) | 스캔본(텍스트 레이어 없음) → OCR 을 안 하므로 본문 0자, no-text 경로 |
 | `corrupt_*` | `extract_error`, `low_quality` | 손상·암호화·깨진 파일 |
 | `thin_*` | `low_quality` | 본문이 얇거나 깨진 추출 |
 | `empty_*` | (게이트 아님) 빈 본문 → failed 경로 | 추출 0자 |

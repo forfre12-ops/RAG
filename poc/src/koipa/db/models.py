@@ -165,6 +165,7 @@ class Document(Base):
 
     extraction_method: Mapped[str | None] = mapped_column("extr_mth_nm", String(30), default="parser", server_default=text("'parser'"))
     extraction_quality: Mapped[float | None] = mapped_column("extr_qlty_scr", Numeric(3, 2))
+    # OCR 는 제거했다(2026-09-26) — 이 컬럼은 더는 채우지 않는다(항상 false). 컬럼 삭제는 마이그레이션으로 따로 한다.
     ocr_used: Mapped[bool] = mapped_column("ocr_use_yn", Boolean, default=False, server_default=text("false"), nullable=True)
 
     processing_status: Mapped[str] = mapped_column("prcs_stts_nm", String(20), default="pending", server_default=text("'pending'"), nullable=True)

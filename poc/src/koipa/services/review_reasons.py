@@ -64,7 +64,7 @@ REVIEW_GATES: tuple[tuple[str, tuple[str, ...]], ...] = (
     # :546  kill-gate tripped 중 고등급 자동확정 억제
     ("kill-gate-brake", ("kill-gate-brake",)),
     # [업로드 경로 전용] api/documents.py:553 - 파일 업로드(POST /documents/analyze)는 추출
-    # 검수게이트(표누락·OCR·저품질)를 classify 뒤에 적용해 status 를 needs_review 로 올린다.
+    # 검수게이트(표누락·저품질)를 classify 뒤에 적용해 status 를 needs_review 로 올린다.
     # classify_service 의 게이트가 아니라 **그 뒤**에 오므로 표의 맨 끝이다(앞이 걸렸으면
     # 그게 원인). 실측 2026-08-22: 시연 문서 05_S1_tech_transfer.pdf 가 이 경로로 검수행인데
     # 표에 없어 사유가 unmapped 로 나왔다.

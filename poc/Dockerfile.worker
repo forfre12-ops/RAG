@@ -12,7 +12,7 @@ ENV KOIPA_BUILD_SHA=${KOIPA_BUILD_SHA} KOIPA_BUILD_AT=${KOIPA_BUILD_AT}
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
 # 워커는 classify/index 태스크에서 문서를 파싱한다 → api 와 동일한 OS 파서 바이너리 필요
-# (없으면 HWP/PDF 파싱이 무성 실패). libfreetype6(rhwp LD_PRELOAD)만 유지 — OCR(tesseract/poppler=GPL)은 배포 제외.
+# (없으면 HWP/PDF 파싱이 무성 실패). libfreetype6(rhwp LD_PRELOAD)만 유지.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential libpq-dev libfreetype6 libexpat1 \
     && rm -rf /var/lib/apt/lists/*
@@ -34,8 +34,7 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 # 파싱 글루(hwp/hwp-tables/xls) 포함 — 워커가 무성 파싱 실패하지 않도록(api.prod 와 동일 extras).
 # [hwp-tables] unhwp(MIT) — 배치 경로도 .hwp 표 셀을 회수해야 API 경로와 등급이 일치한다.
 # [xls] xlrd 누락 시 구형 .xls 가 0글자로 추출됨(511dbfb 배치경로 재발 방지).
-# [라이선스] OCR([ocr], GPL poppler)은 요건 외라 배포 이미지에서 제외(코드·extra 정의만 리포 존치).
-# 2026-08-02: dev(Dockerfile.api)·에어갭 번들에서도 동일 제거 — 전 빌드 경로가 GPL-free.
+# [라이선스] GPL 바이너리는 싣지 않는다 — dev(Dockerfile.api)·에어갭 번들도 동일해서 전 빌드 경로가 GPL-free.
 # [재현성] api.prod 와 동일하게 uv.lock 고정 설치. 워커와 api 가 다른 버전으로 돌면
 # 같은 문서가 경로에 따라 다른 등급을 받을 수 있다 — 두 이미지의 의존성은 한 lock 에서 나와야 한다.
 RUN pip install --upgrade pip && \

@@ -874,17 +874,16 @@ class Settings(BaseSettings):
     # 노출 경계에서. True로 켜면 (고신뢰 마스킹으로 학습·평가도 마스킹한 모델 배포 시) 정합 가능.
     pii_mask_classifier_input: bool = False
 
-    # [P0#3] 저품질/OCR 추출 검수 라우팅 — 추출 품질이 낮거나 OCR/추출오류인 문서를 자동분류
+    # [P0#3] 저품질 추출 검수 라우팅 — 추출 품질이 낮거나 추출오류인 문서를 자동분류
     # 그대로 통과시키지 않고 processing_status='needs_review'로 격리(무음 오분류 방지). 깨끗한
-    # 텍스트와 OCR/스캔본이 동일 입력으로 분류기에 진입해 표 누락·깨진 문자가 조용히 오분류되던 것을 차단.
+    # 텍스트와 열화 추출이 동일 입력으로 분류기에 진입해 표 누락·깨진 문자가 조용히 오분류되던 것을 차단.
     extraction_review_min_quality: float = 0.6  # 정규화 품질(0~1) 이 미만이면 검수 라우팅
-    extraction_ocr_requires_review: bool = True  # OCR 사용 추출은 검수 라우팅(스캔본 신뢰 낮음)
     # HWP/HWPX 표 셀 미추출(rhwp의 조용한 표 흘림) 의심 문서를 검수 라우팅. 본문만 분류기에
     # 들어가 표 속 등급·원가·임원보상 같은 영업비밀이 미탐되는 것을 차단(등급 불변·FNR-safe).
     # 기본 ON. 표 다수 HWP 고객사에서 과라우팅 시 0으로 끄거나 [hwp-tables]로 표를 회수.
     extraction_table_coverage_review: bool = True
-    # docx/pptx/xlsx의 차트·도형·임베디드 OLE·미디어(OCR 불가/미설치)처럼 추출본에서 조용히
-    # 빠진 콘텐츠를 추출기가 warning(*_not_extracted·*_not_ocrd·*_may_be_missing·media_ocr_*)
+    # docx/pptx/xlsx의 차트·도형·임베디드 OLE·미디어처럼 추출본에서 조용히
+    # 빠진 콘텐츠를 추출기가 warning(*_not_extracted·*_may_be_missing)
     # 으로만 남기던 것을, 검수 게이트가 소비해 needs_review로 라우팅(등급 불변·FNR-safe). 표(HWP)
     # 커버리지와 동일 취지를 OOXML 손실 신호로 확장. 기본 ON. 미디어 다수 문서에서 과라우팅 시 0.
     extraction_content_loss_review: bool = True
@@ -919,12 +918,6 @@ class Settings(BaseSettings):
     # ≈9페이지. CPU 한도를 바꾸면 scripts/probe_ingest_capacity.py 로 재고 이 값도 조정할 것.
     # 0 이하면 검사 비활성(측정·디버깅용).
     analyze_sync_max_chunks: int = 34
-
-    # OCR DoS 가드 — 스캔 PDF 한 건을 OCR할 때 변환·인식할 최대 페이지 수.
-    # 수백쪽 스캔본 한 건이 pdf2image/Tesseract를 수십분~OOM으로 모는 것을 차단.
-    # 초과 페이지는 변환하지 않고 '잘림' 경고를 남긴다. 0 이하면 무제한(명시적 opt-out).
-    # 보수적 기본 50쪽 — 대부분의 정상 문서를 커버하면서 악성·사고성 대용량은 차단.
-    ocr_max_pages: int = 50
 
     # --- 동작 모드 ---
     # dryrun: 무거운 모델 다운로드 없이 mock으로 검증
@@ -989,11 +982,9 @@ class Settings(BaseSettings):
             raise ValueError(f"{info.field_name}는 1 이상이어야 합니다 (got {v}).")
         return v
 
-    @field_validator("db_max_overflow", "ocr_max_pages")
+    @field_validator("db_max_overflow")
     @classmethod
     def _check_ge_zero(cls, v: int, info) -> int:  # noqa: ANN001
-        # ocr_max_pages는 0 이하=무제한(명시적 opt-out)이라 음수도 의미상 허용되지만,
-        # 혼란을 줄이기 위해 음수는 금지(0=무제한으로 통일).
         if v < 0:
             raise ValueError(f"{info.field_name}는 0 이상이어야 합니다 (got {v}).")
         return v

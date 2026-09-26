@@ -22,7 +22,7 @@
        이지 softmax 파생값의 소수점이 아니다. 원 수치는 API 응답·DB·감사로그에 그대로 있다. */
     [/low-confidence: confidence=[\d.]+ < [\d.]+/,
       function () { return "판정 근거가 자동 확정 기준에 못 미칩니다"; }],
-    [/document flagged at ingestion/, function () { return "추출 품질이 낮은 문서입니다(스캔·OCR 등)"; }],
+    [/document flagged at ingestion/, function () { return "추출 품질이 낮은 문서입니다(스캔 등)"; }],
     [/body_below_classifiable_threshold/, function () { return "판정할 본문이 사실상 없습니다"; }],
     [/cap-conflict/, function () { return "출처 기준 하향과 내용 기준 상향이 충돌합니다"; }],
     [/sparse-evidence/, function () { return "룰 판정이 약한 근거 하나에 기대고 있습니다"; }],
@@ -34,13 +34,13 @@
     [/s2-underclass-risk/, function () { return "내부 문서 신호가 있는데 공개 등급으로 예측되었습니다"; }],
     /* [2026-08-24 사용자 실측] 파일을 올려 분류했는데 사유 자리에 기본 문구
        ("자동 확정하지 않고 사람 검수로 라우팅")만 떴다. 경고에는 사유가 있었다:
-           extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (table_incomplete, content_dropped)
+           extraction_gate: 열화 추출(표누락/저품질)→검수 라우팅 (table_incomplete, content_dropped)
        이 게이트는 **업로드 경로 전용**이고(api/documents.py — classify 뒤에 status 를 올린다)
        이 표에만 빠져 있었다. 서버측 표(services/review_reasons.py:69)에는 진작 있었다.
        ⚠ 자리는 **맨 끝**이다 — 앞의 게이트가 걸렸으면 그게 원인이고, 이것은 분류가 끝난
        뒤에 붙는 마지막 관문이다(서버 표와 같은 순서). */
     /* 탐욕 `.*` 로 **마지막** 괄호를 잡는다. 경고 문구에는 괄호가 둘이다 —
-       앞의 "(표누락/OCR/저품질)" 은 게이트 이름 설명이고, 실제 사유 코드는 맨 끝
+       앞의 "(표누락/저품질)" 은 게이트 이름 설명이고, 실제 사유 코드는 맨 끝
        "(table_incomplete, content_dropped)" 다. 앞을 잡으면 사유가 아니라 게이트 설명이 뜬다. */
     [/extraction_gate:.*\(([^()]*)\)\s*$/,
       function (m) { return "본문 추출이 온전하지 않습니다 — " + _extractionReasons(m[1]); }],
@@ -52,7 +52,6 @@
      사라지는 것보다 영문이라도 보이는 편이 낫다. */
   var EXTRACTION_REASON_KO = {
     extract_error: "추출 오류",
-    ocr: "OCR 로 읽은 문서",
     low_quality: "추출 품질이 낮음",
     table_incomplete: "표 일부가 안 읽힘",
     content_dropped: "차트·이미지 등 본문 일부가 빠짐"
@@ -183,7 +182,7 @@
    */
   var TAG_TEXT = {
     "low-confidence": "판정 근거가 자동 확정 기준에 못 미칩니다",
-    "ingestion-degraded": "추출 품질이 낮은 문서입니다(스캔·OCR 등)",
+    "ingestion-degraded": "추출 품질이 낮은 문서입니다(스캔 등)",
     "cap-conflict": "출처 기준 하향과 내용 기준 상향이 충돌합니다",
     "sparse-evidence": "룰 판정이 약한 근거 하나에 기대고 있습니다",
     "abbrev-only-escalation": "영문 약어 밀도만으로 높은 등급이 나왔습니다",

@@ -762,7 +762,7 @@ footer strong{color:var(--text-dim);}
     <tbody>
       <tr><td><strong>등급 결정에 LLM을 쓰지 않는다</strong></td><td>고객사 대부분이 GPU 없는 CPU 런타임이다. LLM은 합성 문서 생성과 라벨링 보조에만 쓴다</td></tr>
       <tr><td><strong>분류기가 S·V·M을 예측하지 않는다</strong></td><td>파인튜닝은 등급 단일 지도학습이다. 요소 판독은 룰 엔진 몫이고, 설명 계층에서 합쳐진다</td></tr>
-      <tr><td><strong>스캔 이미지 OCR은 요건이 아니다</strong></td><td>FUN-022는 전자문서 텍스트 추출까지다. 이미지 경로 코드는 있으나 요건 밖 부가 기능이다</td></tr>
+      <tr><td><strong>스캔 이미지 OCR은 요건이 아니다</strong></td><td>FUN-022는 전자문서 텍스트 추출까지다. OCR 코드는 2026-09-26 에 제거했다 — 스캔 PDF·이미지는 본문 없이 등록되어 격리된다</td></tr>
       <tr><td><strong>등급을 무인으로 내리지 않는다</strong></td><td>보정은 상향, 게이트는 상태 변경만 한다. 유일한 하향인 출처 cap도 고등급 신호와 충돌하면 검수로 보낸다</td></tr>
       <tr><td><strong>평가 정답을 학습에 넣지 않는다</strong></td><td><code>locked_gold_eval</code>은 학습 금지, <code>silver_train</code>은 평가 금지. 청크 확장도 TRAIN 분할에만 한다</td></tr>
       <tr><td><strong>지식재산보호원 단계에서 실문서를 다루지 않는다</strong></td><td>실문서·검수자·반출 0이 확정된 운영 전제다. 실데이터는 고객사 폐쇄망에만 있다</td></tr>

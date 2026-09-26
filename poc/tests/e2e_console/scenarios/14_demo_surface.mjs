@@ -75,7 +75,7 @@ export const scenarios = [
       server.overrides['POST /documents/analyze'] = {
         filename: '설계 초안.docx',
         file_size_bytes: 4096,
-        parse: { source_format: 'docx', extraction_method: 'python-docx', extraction_quality: 0.72, content_quality: 0.7, ocr_used: false, char_count: 900, chunk_count: 2, warnings: [], pii_masked_count: 0, extract_error: null },
+        parse: { source_format: 'docx', extraction_method: 'python-docx', extraction_quality: 0.72, content_quality: 0.7, char_count: 900, chunk_count: 2, warnings: [], pii_masked_count: 0, extract_error: null },
         gate: { requires_review: true, reasons: ['low_extraction_quality'] },
         classification: {
           label: 'S1', confidence: 0.42, scores: { TS: 0.1, S1: 0.42, S2: 0.3, S3: 0.18 },

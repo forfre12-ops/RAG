@@ -171,8 +171,8 @@ class TestExtractionReviewWiring:
 
     def _base(self, **kw):
         args = dict(
-            quality=0.95, ocr_used=False, error=None,
-            min_quality=0.6, ocr_requires_review=True, content_quality=1.0,
+            quality=0.95, error=None,
+            min_quality=0.6, content_quality=1.0,
         )
         args.update(kw)
         return extraction_review_decision(**args)
@@ -194,8 +194,8 @@ class TestExtractionReviewWiring:
         assert d.reasons == ["table_incomplete"]
 
     def test_combines_with_other_reasons(self):
-        d = self._base(table_coverage="incomplete", ocr_used=True, error="boom")
-        assert set(d.reasons) >= {"extract_error", "ocr", "table_incomplete"}
+        d = self._base(table_coverage="incomplete", error="boom")
+        assert set(d.reasons) >= {"extract_error", "table_incomplete"}
 
 
 class TestExtractResultField:
@@ -386,8 +386,8 @@ class TestCoverageUnknownStillRecovers:
         r = ex._extract_hwp(p)
 
         d = extraction_review_decision(
-            quality=float(r.quality), ocr_used=False, error=r.error, min_quality=0.6,
-            ocr_requires_review=True, content_quality=None,
+            quality=float(r.quality), error=r.error, min_quality=0.6,
+            content_quality=None,
             table_coverage=r.table_coverage, warnings=r.warnings,
         )
         assert d.requires_review is True

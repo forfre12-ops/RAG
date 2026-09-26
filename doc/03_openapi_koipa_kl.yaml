@@ -785,7 +785,7 @@ paths:
       summary: 분류 대상 문서 업로드·ingestion
       description: |
         등급 판정을 받을 업무 문서(HWP/PDF/DOCX/TXT 등)를 업로드한다.
-        포맷 자동 감지 → 텍스트 추출(필요 시 OCR) → 원본 스토리지 저장 →
+        포맷 자동 감지 → 텍스트 추출 → 원본 스토리지 저장 →
         documents/chunks 테이블 적재. 응답의 doc_id 를 POST /classify/async 본문
         {"doc_id": "<doc_id>"} 에 실어 등급을 요청한다(쿼리 파라미터는 받지 않는다).
         enqueue_classification=true 로 보내면 등록과 동시에 비동기 분류를 큐에 걸고, 응답에
@@ -833,7 +833,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: "원본 파일. 지원 형식: TXT·MD·LOG·CSV / HWP·HWPX / DOC·DOCX / XLS·XLSM·XLSX / PPTX·PPTM / PDF. 이미지는 OCR 로 처리하며 품질이 낮으면 requires_review 가 켜진다. 그 밖의 형식도 201 로 등록되지만 본문이 추출되지 않는다(char_count 0)."
+                  description: "원본 파일. 지원 형식: TXT·MD·LOG·CSV / HWP·HWPX / DOC·DOCX / XLS·XLSM·XLSX / PPTX·PPTM / PDF(텍스트 레이어가 있는 것). 이미지와 스캔 PDF 는 OCR 을 하지 않으므로 그 밖의 형식과 같이 201 로 등록되지만 본문이 추출되지 않는다(char_count 0)."
       responses:
         '201':
           description: ingestion 완료
@@ -903,7 +903,7 @@ paths:
         추출 → 정규화·PII 마스킹 → 청킹 → 검수게이트 → 분류 결과를 한 번에 반환한다.
         parse에는 table_coverage, table_count, table_cell_count, warnings가 포함되어
         표 구조화 여부와 잠재 누락 경고를 확인할 수 있다.
-        HWP/HWPX/Office/PDF 표 구조화와 Office 내부 이미지 OCR은 설치된 optional extractor에 따라
+        HWP/HWPX/Office/PDF 표 구조화는 설치된 optional extractor에 따라
         수행되며, 미설치 또는 미검출 항목은 warnings로 노출된다.
       requestBody:
         required: true
@@ -2081,7 +2081,7 @@ components:
     DocumentUploadResponse:
       type: object
       required: [doc_id, filename, source_format, file_hash, file_size_bytes, extraction_method,
-                 extraction_quality, ocr_used, char_count, chunk_count, persisted, warnings]
+                 extraction_quality, char_count, chunk_count, persisted, warnings]
       properties:
         doc_id:
           type: string
@@ -2094,7 +2094,6 @@ components:
         file_size_bytes: { type: integer, description: "파일 크기(바이트)" }
         extraction_method: { type: string, example: "pdfminer", description: "본문 추출 방식" }
         extraction_quality: { type: number, format: float, minimum: 0, maximum: 1, description: "추출 품질(0~1). 낮으면 requires_review 가 켜질 수 있다." }
-        ocr_used: { type: boolean, description: "OCR 사용 여부" }
         char_count:
           type: integer
           description: "추출된 글자 수. 0 이면 분류할 본문이 없다(지원하지 않는 형식 등) — warnings 를 확인한다."
@@ -2114,7 +2113,7 @@ components:
           items: { type: string }
         requires_review:
           type: boolean
-          description: "저품질·OCR 추출 등으로 분류 전 검수가 필요하면 true. 자동분류를 그대로 통과하지 않는다."
+          description: "저품질 추출 등으로 분류 전 검수가 필요하면 true. 자동분류를 그대로 통과하지 않는다."
         review_reasons:
           type: array
           items: { type: string }

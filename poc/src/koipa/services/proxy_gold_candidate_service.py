@@ -899,7 +899,7 @@ class ProxyGoldCandidateService:
             raise ValueError(f"extraction failed: {extracted.error}")
         text = (extracted.text or "").strip()
         if len(text) < 80:
-            raise ValueError("extracted text is too short; scan/OCR or source file review is required")
+            raise ValueError("extracted text is too short; source file review is required")
 
         doc_id = f"GOLD-UPL-{uuid4().hex[:12].upper()}"
         safe_stem = re.sub(r"[^0-9A-Za-z가-힣._-]+", "_", Path(safe_name).stem).strip("._") or "uploaded"
@@ -936,7 +936,6 @@ class ProxyGoldCandidateService:
             "extraction": {
                 "method": extracted.method,
                 "quality": extracted.quality,
-                "ocr_used": extracted.ocr_used,
                 "pages_processed": extracted.pages,
                 "pages_total": extracted.total_pages,
                 "warnings": extracted.warnings,

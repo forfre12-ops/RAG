@@ -156,23 +156,30 @@ class TestDocumentUploadValidation:
 
 
 # ---------------------------------------------------------------------------
-# 이미지 OCR 경로
+# 이미지 — OCR 을 하지 않으므로 본문 없이 등록된다
 # ---------------------------------------------------------------------------
-class TestDocumentUploadOcr:
-    def test_image_ocr_upload(self, client):
-        PIL = pytest.importorskip("PIL.Image")
-        ImageDraw = pytest.importorskip("PIL.ImageDraw")
-        pytest.importorskip("pytesseract")
+def _tiny_png() -> bytes:
+    """1x1 흰색 PNG. 이미지 내용은 읽지 않으므로(OCR 안 함) Pillow 없이 만든다."""
+    import struct
+    import zlib
 
-        img = PIL.new("RGB", (600, 80), color="white")
-        ImageDraw.Draw(img).text((10, 20), "Trade Secret ALD process recipe", fill="black")
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        body = buf.getvalue()
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
 
-        r = _post(client, "scan.png", body)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"\x00\xff\xff\xff"))
+        + chunk(b"IEND", b"")
+    )
+
+
+class TestDocumentUploadImage:
+    def test_image_upload_is_registered_without_text(self, client):
+        r = _post(client, "scan.png", _tiny_png())
         assert r.status_code == 201, r.text
         j = r.json()
         assert j["source_format"] == "png"
-        assert j["ocr_used"] is True
-        assert j["char_count"] > 0
+        assert j["char_count"] == 0
+        assert "ocr_used" not in j
+        assert any("unsupported" in w for w in j["warnings"])

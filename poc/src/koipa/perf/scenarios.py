@@ -838,7 +838,7 @@ def s9_adversarial(ctx: ScenarioContext) -> None:
 
     make = _client_factory()
 
-    # 10 케이스 × 3 변형 (원문·동의어·OCR 띄어쓰기 노이즈).
+    # 10 케이스 × 3 변형 (원문·동의어·띄어쓰기 노이즈).
     # 부분 마스킹은 룰 fallback에 너무 가혹해 W11 이후로 미룸.
     base_cases: list[tuple[str, str]] = [
         ("특급기밀 자료 — 본 문서는 특급기밀에 해당함", "TS"),
@@ -860,8 +860,8 @@ def s9_adversarial(ctx: ScenarioContext) -> None:
             .replace("1급 비밀", "1급 비밀 자료")
         )
         # 띄어쓰기 노이즈 — 보조 텍스트만 변형, 키워드 자체는 보존
-        v_ocr = text + " — 사 본 보 관 용"
-        return [text, v_synonym, v_ocr]
+        v_spaced = text + " — 사 본 보 관 용"
+        return [text, v_synonym, v_spaced]
 
     matches = 0
     total_pairs = 0

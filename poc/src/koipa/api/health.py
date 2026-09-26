@@ -135,11 +135,11 @@ def _check_embedder() -> dict:
 
 
 def _check_extractors() -> dict:
-    """[C22] 포맷별 추출기/OCR 외부 의존성 가용성 진단 (best-effort, 실행 없이 탐지).
+    """[C22] 포맷별 추출기 외부 의존성 가용성 진단 (best-effort, 실행 없이 탐지).
 
     추출기는 도구 부재 시 graceful degrade(quality=0.0 + error)라 서비스는 죽지 않지만,
-    그 degrade가 startup/health에 안 떠서 'HWP 표 누락·PDF 스캔 OCR 불가'가 문서 단위
-    무음 실패였다. import-가능성(find_spec)·바이너리 경로만 확인해 가시화한다(.txt/.md는
+    그 degrade가 startup/health에 안 떠서 'HWP 표 누락'이 문서 단위 무음 실패였다.
+    import-가능성(find_spec)·바이너리 경로만 확인해 가시화한다(.txt/.md는
     의존 없이 항상 가능). optional이므로 ok=True 고정 — unavailable 목록만 노출.
     """
     import importlib.util  # noqa: PLC0415
@@ -151,15 +151,6 @@ def _check_extractors() -> dict:
         except Exception:  # noqa: BLE001
             return False
 
-    try:
-        from koipa.modules.m2_preprocess.extractor import (  # noqa: PLC0415
-            POPPLER_PATH,
-            TESSERACT_CMD,
-        )
-    except Exception:  # noqa: BLE001
-        POPPLER_PATH, TESSERACT_CMD = None, "tesseract"
-
-    _tess_ok = (shutil.which(TESSERACT_CMD) is not None or Path(TESSERACT_CMD).exists()) and _mod("pytesseract")
     probes: dict[str, dict] = {
         "hwp_body(rhwp)": {"available": _mod("rhwp")},
         # .hwp 표 셀 회수(unhwp/MIT). 미설치면 rhwp 본문만 남아 표 속 등급·원가가
@@ -171,9 +162,7 @@ def _check_extractors() -> dict:
         "pptx(python-pptx)": {"available": _mod("pptx")},
         "pdf_text(pdfminer)": {"available": _mod("pdfminer")},
         "pdf_table(pdfplumber)": {"available": _mod("pdfplumber")},
-        "pdf_render(fitz/pdf2image)": {"available": _mod("fitz") or _mod("pdf2image")},
-        "pdf_scan(poppler)": {"available": POPPLER_PATH is not None, "path": POPPLER_PATH},
-        "ocr(tesseract)": {"available": bool(_tess_ok), "cmd": TESSERACT_CMD},
+        "pdf_fallback(fitz)": {"available": _mod("fitz")},
         "doc(antiword)": {"available": shutil.which("antiword") is not None},
     }
     unavailable = [k for k, v in probes.items() if not v["available"]]

@@ -52,7 +52,6 @@ def evaluate(indir: Path) -> dict:
                 "file": str(p.relative_to(indir)),
                 "suffix": p.suffix.lower(),
                 "method": ext.method,
-                "ocr_used": ext.ocr_used,
                 "raw_len": len(ext.text),
                 "clean_len": len(norm),
                 "noise_ratio": round(1 - len(norm) / max(len(ext.text), 1), 4),

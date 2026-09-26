@@ -692,7 +692,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">실제 업무 파일(HWP/PDF/DOCX/TXT)을 업로드하여 자동 전처리·인덱싱한다. <code>multipart/form-data</code>. 포맷 자동 감지 → 텍스트 추출(필요 시 OCR) → 원본 Object Storage 저장 → documents/tb_chunks DB 적재. 이후 <code>POST /classify?doc_id=...</code>로 등급 판정 요청.</p>
+        <p class="ep-desc">실제 업무 파일(HWP/PDF/DOCX/TXT)을 업로드하여 자동 전처리·인덱싱한다. <code>multipart/form-data</code>. 포맷 자동 감지 → 텍스트 추출 → 원본 Object Storage 저장 → documents/tb_chunks DB 적재. 이후 <code>POST /classify?doc_id=...</code>로 등급 판정 요청.</p>
         <p style="font-size:12.5px;color:var(--text-dim);">※ <code>/guide/documents</code>(가이드라인 → ES 지식베이스)와 완전 분리. 이 엔드포인트는 등급 판정 대상 문서 전용.</p>
         <h4>Request (multipart/form-data)</h4>
         <table class="ftbl">
@@ -717,10 +717,9 @@ data: {"elapsed_ms":380}</pre>
             <tr><td class="f-name">file_size_bytes</td><td class="f-type">integer</td><td>원본 바이트 크기</td></tr>
             <tr><td class="f-name">char_count</td><td class="f-type">integer</td><td>추출된 전체 문자 수</td></tr>
             <tr><td class="f-name">chunk_count</td><td class="f-type">integer</td><td>생성된 청크 수</td></tr>
-            <tr><td class="f-name">extraction_method</td><td class="f-type">string</td><td>parser / ocr</td></tr>
+            <tr><td class="f-name">extraction_method</td><td class="f-type">string</td><td>추출기 이름(parser · rhwp · plain 등)</td></tr>
             <tr><td class="f-name">extraction_quality</td><td class="f-type">float</td><td>0.0~1.0 M2 품질 점수</td></tr>
-            <tr><td class="f-name">ocr_used</td><td class="f-type">boolean</td><td>OCR 사용 여부</td></tr>
-            <tr><td class="f-name">persisted</td><td class="f-type">boolean</td><td>DB 저장 성공 여부</td></tr>
+                        <tr><td class="f-name">persisted</td><td class="f-type">boolean</td><td>DB 저장 성공 여부</td></tr>
             <tr><td class="f-name">rag_indexed / rag_collection / rag_vector_count</td><td class="f-type">bool / string / int</td><td><code>index_for_rag=true</code> 시 RAG 적재 결과</td></tr>
             <tr><td class="f-name">warnings</td><td class="f-type">string[]</td><td>처리 중 발생한 경고 메시지 목록</td></tr>
           </tbody>

@@ -5,7 +5,7 @@
 셋뿐이었고 둘은 대가가 컸다.
 
     catppt / antiword   GPL-2.0    배포 이미지 GPL-free 정책 위반
-                                   (Dockerfile.api.prod §라이선스 — OCR/poppler 도 같은 이유로 제외)
+                                   (Dockerfile.api.prod §라이선스)
     LibreOffice         MPL-2.0    ~500MB · 폐쇄망 번들 동봉 부담
     순수 파이썬          의존 없음   ← 채택. olefile 은 이미 들어 있다
 

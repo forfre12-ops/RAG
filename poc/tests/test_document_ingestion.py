@@ -2,7 +2,7 @@
 
 OSS 코퍼스(정제된 JSON)가 아니라 "현장처럼" 실제 .txt/.docx 바이너리를 올려서:
   추출 → 원본 보관(storage) → provenance → 청크 까지 전 구간을 검증.
-HWP/PDF(스캔)·OCR 은 라이브러리 미설치 — 별도 increment 에서 추가.
+스캔 PDF·이미지는 OCR 을 하지 않는다 — 본문 없이 등록된다(아래 TestImageIsNotOcrd).
 """
 
 from __future__ import annotations
@@ -167,7 +167,6 @@ class TestPdfIngestion:
         )
         assert res.source_format == "pdf"
         assert res.extraction_method == "parser"
-        assert res.ocr_used is False
         norm = storage.get(svc.NORM_BUCKET, f"{res.file_hash}/normalized.txt").decode("utf-8")
         assert "Trade Secret" in norm
 
@@ -177,32 +176,32 @@ class TestPdfIngestion:
 # tests/fixtures/sample.{hwp,hwpx,pdf} 가 있으면 자동 실행, 없으면 skip.
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-# 이미지 파일 OCR (Tesseract + kor 팩)
+# 이미지 파일 — OCR 을 하지 않으므로 본문 없이 등록된다
 # ---------------------------------------------------------------------------
-class TestImageOcr:
-    def test_image_ocr_extracts_text(self, tmp_path):
-        PIL = pytest.importorskip("PIL.Image")
-        ImageDraw = pytest.importorskip("PIL.ImageDraw")
-        pytest.importorskip("pytesseract")
+def _tiny_png() -> bytes:
+    """1x1 흰색 PNG. 이미지 내용은 읽지 않으므로(OCR 안 함) Pillow 없이 만든다."""
+    import struct
+    import zlib
 
-        img = PIL.new("RGB", (600, 80), color="white")
-        ImageDraw.Draw(img).text((10, 20), "Trade Secret ALD process", fill="black")
-        png = tmp_path / "scan.png"
-        img.save(str(png))
-        body = png.read_bytes()
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
 
-        storage = _storage(tmp_path)
-        svc = DocumentIngestionService(storage=storage)
-        res = svc.ingest(
-            filename="scan.png", content_bytes=body, persist=False
-        )
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"\x00\xff\xff\xff"))
+        + chunk(b"IEND", b"")
+    )
+
+
+class TestImageIsNotOcrd:
+    def test_image_is_registered_without_text(self, tmp_path):
+        svc = DocumentIngestionService(storage=_storage(tmp_path))
+        res = svc.ingest(filename="scan.png", content_bytes=_tiny_png(), persist=False)
 
         assert res.source_format == "png"
-        assert res.ocr_used is True
-        assert res.extraction_method == "ocr"
-        assert "Trade Secret" in storage.get(
-            svc.NORM_BUCKET, f"{res.file_hash}/normalized.txt"
-        ).decode("utf-8")
+        assert res.char_count == 0
+        assert any("unsupported" in w for w in res.warnings)
 
 
 class TestRealFixtures:
@@ -265,7 +264,7 @@ class TestPersistence:
         assert doc.processing_status == "ready"
         assert doc.created_by == "u1"
         # extraction_complete 는 추출이 중간에 잘렸는지를 소비자가 볼 수 있게 항상 남긴다
-        # (OCR 상한·페이지 절단 감지). txt 는 페이지 개념이 없어 pages_* 는 기록되지 않는다.
+        # (페이지 절단 감지). txt 는 페이지 개념이 없어 pages_* 는 기록되지 않는다.
         assert doc.metadata_ == {"doc_type": "가이드", "extraction_complete": True}
         # chunks 적재
         assert len(chunks) >= 1

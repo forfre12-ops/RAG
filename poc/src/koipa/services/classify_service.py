@@ -348,7 +348,7 @@ class ClassifyService:
             review_flagged = False
             if not content:
                 content, _doc_status = self._fetch_content_by_doc_id(req.doc_id)
-                # [P0#3 후속] ingestion 열화추출(OCR/저품질)로 격리된 문서(processing_status)를
+                # [P0#3 후속] ingestion 열화추출(저품질)로 격리된 문서(processing_status)를
                 # 서빙 진입에서 존중 — 자동확정 금지(무음 자동분류 방지).
                 review_flagged = self._ingestion_review_flagged(_doc_status)
             else:
@@ -478,7 +478,7 @@ class ClassifyService:
             if review_flagged:
                 status = "needs_review"
                 warnings_acc.append(
-                    "document flagged at ingestion (degraded extraction: OCR/low-quality) —"
+                    "document flagged at ingestion (degraded extraction: low-quality) —"
                     " routed to human review, not auto-confirmed"
                 )
 
@@ -1357,7 +1357,7 @@ class ClassifyService:
 
     @staticmethod
     def _ingestion_review_flagged(processing_status: str | None) -> bool:
-        """저장된 문서 상태가 ingestion 단계 검수 격리(OCR/저품질 열화추출)인지 — 순수 판정.
+        """저장된 문서 상태가 ingestion 단계 검수 격리(저품질 열화추출)인지 — 순수 판정.
 
         needs_review/failed = 열화추출로 격리된 문서 → 서빙 진입에서 자동확정 금지(무음 자동분류
         방지). 그 외(processed 등)·None(상태 미상)은 격리 아님(과차단 방지).

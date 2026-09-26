@@ -289,7 +289,7 @@ export const scenarios = [
       server.overrides['POST /documents/analyze'] = {
         filename: 'scan.pdf',
         file_size_bytes: 100,
-        parse: { source_format: 'pdf', extraction_method: 'pdfminer', extraction_quality: 0.0, content_quality: 0.0, ocr_used: false, char_count: 0, chunk_count: 0, warnings: ['텍스트 레이어 없음'], pii_masked_count: 0 },
+        parse: { source_format: 'pdf', extraction_method: 'pdfminer', extraction_quality: 0.0, content_quality: 0.0, char_count: 0, chunk_count: 0, warnings: ['텍스트 레이어 없음'], pii_masked_count: 0 },
         gate: { requires_review: true, reasons: ['thin_text'] },
         classification: null,
         evidence: [],

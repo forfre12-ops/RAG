@@ -62,10 +62,8 @@ def test_thin_body_routes_to_review_not_ready():
     """
     dec = extraction_review_decision(
         quality=0.95,          # 메서드 고정 품질 - 얇은 본문을 못 잡는다
-        ocr_used=False,
         error=None,
         min_quality=0.6,
-        ocr_requires_review=True,
         content_quality=0.05,  # 콘텐츠 기반 품질은 낮다
     )
     assert dec.requires_review, "얇은 본문이 검수 라우팅되지 않는다"

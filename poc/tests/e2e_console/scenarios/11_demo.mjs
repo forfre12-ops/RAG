@@ -298,14 +298,14 @@ export const scenarios = [
       server.overrides['POST /documents/analyze'] = {
         filename: '공사지명원.xls', file_size_bytes: 18432,
         parse: { source_format: 'xls', extraction_method: 'xlrd', extraction_quality: 0.9,
-                 content_quality: 0.7, ocr_used: false, char_count: 421, chunk_count: 1,
+                 content_quality: 0.7, char_count: 421, chunk_count: 1,
                  warnings: [], pii_masked_count: 0, extract_error: null, table_count: 1 },
         gate: { requires_review: true, reasons: ['table_incomplete', 'content_dropped'] },
         classification: {
           label: 'S3', confidence: 0.93, scores: { S3: 0.93 }, status: 'needs_review',
           model_version: 'v-fe4b386b', factors: { secrecy: 0, value: 0, management: 0 },
           factors_source: 'rule_evidenced', rule_factors: null,
-          warnings: ['extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (table_incomplete, content_dropped)'],
+          warnings: ['extraction_gate: 열화 추출(표누락/저품질)→검수 라우팅 (table_incomplete, content_dropped)'],
           elapsed_ms: 845, rule_grade: 'S3', model_grade: 'S3',
           decision_path: '룰·모델 모두 S3 로 일치 (검수 사유는 아래 경고 참조)',
         },
@@ -390,7 +390,7 @@ export const scenarios = [
       server.overrides['POST /documents/analyze'] = {
         filename: '설계 초안.docx',
         file_size_bytes: 4096,
-        parse: { source_format: 'docx', extraction_method: 'python-docx', extraction_quality: 0.72, content_quality: 0.7, ocr_used: false, char_count: 900, chunk_count: 2, warnings: [], pii_masked_count: 1, extract_error: null },
+        parse: { source_format: 'docx', extraction_method: 'python-docx', extraction_quality: 0.72, content_quality: 0.7, char_count: 900, chunk_count: 2, warnings: [], pii_masked_count: 1, extract_error: null },
         gate: { requires_review: true, reasons: ['low_extraction_quality'] },
         classification: {
           label: 'S1', confidence: 0.42, scores: { TS: 0.1, S1: 0.42, S2: 0.3, S3: 0.18 },

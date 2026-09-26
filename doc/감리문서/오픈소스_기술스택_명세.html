@@ -153,7 +153,6 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:20%">extra</th><th style="width:22%">패키지</th><th style="width:16%">라이선스 쟁점</th><th>제외 사유</th></tr></thead>
     <tbody>
-      <tr><td><code>ocr</code></td><td>pytesseract · pdf2image (+poppler-utils)</td><td class="part">GPL (poppler)</td><td>OCR 은 요건 범위 밖이다(<code>FUN-022</code> 는 전자문서 텍스트 추출까지를 규정한다). 개발·워커·폐쇄망 이미지 모두 미포함이므로 어느 이미지로 빌드해도 GPL 코드가 반출되지 않는다. 코드와 선택 묶음 정의만 남겨 두었다</td></tr>
       <tr><td><code>pdf-agpl</code></td><td>pymupdf</td><td class="part">AGPL</td><td>미설치. PDF 는 pdfminer.six 와 pdfplumber 로 처리한다</td></tr>
       <tr><td><code>orchestration</code></td><td>langchain · langgraph</td><td>—</td><td>미사용. 자체 어댑터로 구현했다</td></tr>
       <tr><td><code>minio</code></td><td>minio</td><td>—</td><td>폐쇄망 저장소는 로컬 파일시스템을 사용하며 저장 시 AES-256-GCM 으로 암호화한다</td></tr>

@@ -687,7 +687,7 @@ function renderParseDetail(j) {
     <div style="font:600 13.5px/1.45 var(--font-sans,sans-serif);word-break:break-all">${escapeHtml(j.filename || "")}</div>
     <div style="font-size:12px;color:var(--text-dim,#8f9498);margin:2px 0 12px">
       ${escapeHtml((p.source_format || "?").toUpperCase())} · ${(j.file_size_bytes || 0).toLocaleString()}B ·
-      추출기 ${escapeHtml(p.extraction_method || "—")}${p.ocr_used ? " (OCR)" : ""}
+      추출기 ${escapeHtml(p.extraction_method || "—")}
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px">
       ${tile("추출 품질", _pdFmt(p.extraction_quality), "콘텐츠 " + _pdFmt(p.content_quality), q > 0 && q < 0.8)}
@@ -709,7 +709,7 @@ function renderParseDetail(j) {
     ? window.KOIPA_EXTRACTION_REASONS : (r) => r;
   gateBox.innerHTML = g.requires_review
     ? `<div class="gate-review"><b>검수 필요</b> — 자동 확정하지 않고 사람 검수로 라우팅됩니다.<div>${(g.reasons || []).map((r) => `<span class="reason-chip">${escapeHtml(_reasonKo(r))}</span>`).join("")}</div></div>`
-    : `<div class="gate-ok"><b>자동 경로 통과</b> — 추출 품질·표·OCR 이상 없음(무오탐).</div>`;
+    : `<div class="gate-ok"><b>자동 경로 통과</b> — 추출 품질·표 이상 없음(무오탐).</div>`;
   fold.open = true;
 }
 
@@ -902,7 +902,7 @@ async function analyzeLargeAsync(file, cap) {
     // 동기 경로와 같은 승격 규칙 — 추출 게이트가 검수를 요구하면 needs_review 로 올린다.
     if (gate.requires_review && status !== "needs_review") {
       status = "needs_review";
-      warns.push(`extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (${(gate.reasons || []).join(", ")})`);
+      warns.push(`extraction_gate: 열화 추출(표누락/저품질)→검수 라우팅 (${(gate.reasons || []).join(", ")})`);
     }
     j.classification = {
       label: res.label, confidence: Math.round((res.confidence || 0) * 1000) / 1000,

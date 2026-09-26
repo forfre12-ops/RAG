@@ -92,10 +92,8 @@ def _review_decision(pre):
     ex = pre.extraction
     return extraction_review_decision(
         quality=ex.quality,
-        ocr_used=ex.ocr_used,
         error=ex.error,
         min_quality=float(getattr(settings, "extraction_review_min_quality", 0.6)),
-        ocr_requires_review=bool(getattr(settings, "extraction_ocr_requires_review", True)),
         content_quality=pre.quality,
         table_coverage=getattr(ex, "table_coverage", None),
     )
@@ -147,7 +145,7 @@ class TestParseSuccess:
             assert pre.chunks or len(pre.text.strip()) == 0, f"{p.name}: 본문 있는데 청크 0"
         assert not failures, f"파싱 실패 {len(failures)}건:\n" + "\n".join(failures)
         assert not empties, f"빈 본문 {len(empties)}건:\n" + "\n".join(empties)
-        # 라우팅 방식이 통째로 바뀌면(예: 전부 OCR로) 알아채도록 기록
+        # 라우팅 방식이 통째로 바뀌면 알아채도록 기록
         assert methods["parser"] >= len(files) * 0.9, f"parser 경로 이탈: {dict(methods)}"
 
 
@@ -321,8 +319,7 @@ class TestFnrSafetyInvariants:
 _ADVERSARIAL_EXPECT = {
     # 파일명 접두사 → 기대되는 게이트 사유(하나라도 포함되면 통과)
     "hwp_table": {"table_incomplete"},
-    "scan": {"ocr", "low_quality"},
-    "ocr": {"ocr", "low_quality"},
+    "scan": set(),  # 스캔본(텍스트 레이어 없음)은 OCR 을 안 하므로 본문 0자 — no-text 경로
     "corrupt": {"extract_error", "low_quality"},
     "thin": {"low_quality"},
     "empty": set(),  # 빈 본문은 별도 failed 경로 — 게이트가 아니라 no-text
@@ -345,7 +342,7 @@ class TestAdversarialFixturesGateFires:
     """실제 위험 문서(표 포함 HWP, 스캔 PDF, 손상/암호화 파일)를
     tests/fixtures/adversarial/ 에 두면 자동 검증. 파일명 접두사로 기대 사유를 표기:
         hwp_table_*.hwp  → table_incomplete 발동
-        scan_*.pdf       → ocr/low_quality 발동
+        scan_*.pdf       → 본문 0자(no-text 경로, 게이트 대상 아님)
         corrupt_*.*      → extract_error/low_quality 발동
     파일이 없으면 skip (실파일 제공 대기). 도착 즉시 회귀 방어에 편입된다.
     """
@@ -374,7 +371,7 @@ class TestAdversarialFixturesGateFires:
             assert len(pre.text.strip()) == 0, f"{path.name}: 빈 본문 기대인데 추출됨"
             return
         assert dec.requires_review, (
-            f"{path.name}: 위험 문서인데 게이트 미발동 — 표/OCR/손상 미탐 위험. "
+            f"{path.name}: 위험 문서인데 게이트 미발동 — 표/손상 미탐 위험. "
             f"method={pre.extraction.method} q={pre.extraction.quality} "
             f"table_cov={getattr(pre.extraction, 'table_coverage', None)} err={pre.extraction.error}"
         )

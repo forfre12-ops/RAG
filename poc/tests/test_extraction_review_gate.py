@@ -1,7 +1,7 @@
-"""[P0#3] 저품질/OCR 추출 → 분류 전 검수(needs_review) 라우팅 게이트.
+"""[P0#3] 저품질 추출 → 분류 전 검수(needs_review) 라우팅 게이트.
 
-배경: extraction_quality/ocr_used 는 계산·저장되나 소비하는 review 트리거가 0건이라, 깨끗한
-파서 추출과 OCR/스캔본이 동일 입력으로 분류기에 진입해 표 누락·깨진 문자로 조용히 오분류됐다.
+배경: extraction_quality 는 계산·저장되나 소비하는 review 트리거가 0건이라, 깨끗한
+파서 추출과 열화 추출이 동일 입력으로 분류기에 진입해 표 누락·깨진 문자로 조용히 오분류됐다.
 본 게이트가 (1) 순수 판정 (2) ingest() 통합(requires_review·warning·processing_status·메트릭)을
 검증한다. DB 불요 — 스토리지/전처리 스텁 + persist=False(processing_status는 _persist 단위로 별도 검증).
 """
@@ -21,45 +21,29 @@ from koipa.services.document_ingestion_service import (
 
 def test_clean_parser_extraction_no_review():
     d = extraction_review_decision(
-        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True
+        quality=0.95, error=None, min_quality=0.6
     )
     assert d.requires_review is False and d.reasons == []
 
 
-def test_ocr_routes_to_review():
-    d = extraction_review_decision(
-        quality=0.9, ocr_used=True, error=None, min_quality=0.6, ocr_requires_review=True
-    )
-    assert d.requires_review is True and "ocr" in d.reasons
-
-
 def test_low_quality_routes_to_review():
     d = extraction_review_decision(
-        quality=0.4, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True
+        quality=0.4, error=None, min_quality=0.6
     )
     assert d.requires_review is True and d.reasons == ["low_quality"]
 
 
 def test_extract_error_routes_to_review():
     d = extraction_review_decision(
-        quality=0.9, ocr_used=False, error="table cells missing", min_quality=0.6,
-        ocr_requires_review=True,
+        quality=0.9, error="table cells missing", min_quality=0.6,
     )
     assert d.requires_review is True and "extract_error" in d.reasons
-
-
-def test_ocr_review_can_be_disabled():
-    # OCR 검수 라우팅을 끄면(고신뢰 OCR 환경) ocr 사유는 빠진다 — 저품질은 여전히 잡힘.
-    d = extraction_review_decision(
-        quality=0.9, ocr_used=True, error=None, min_quality=0.6, ocr_requires_review=False
-    )
-    assert d.requires_review is False and d.reasons == []
 
 
 def test_boundary_quality_at_threshold_passes():
     # quality == min_quality 는 통과(미만일 때만 라우팅).
     d = extraction_review_decision(
-        quality=0.6, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True
+        quality=0.6, error=None, min_quality=0.6
     )
     assert d.requires_review is False
 
@@ -69,8 +53,8 @@ def test_boundary_quality_at_threshold_passes():
 def test_thin_content_routes_despite_high_method_quality():
     # docx 메서드 품질 0.97(고정)이지만 콘텐츠가 얇음(0.2, <50자/깨짐) → 검수 라우팅.
     d = extraction_review_decision(
-        quality=0.97, ocr_used=False, error=None, min_quality=0.6,
-        ocr_requires_review=True, content_quality=0.2,
+        quality=0.97, error=None, min_quality=0.6,
+        content_quality=0.2,
     )
     assert d.requires_review is True and d.reasons == ["low_quality"]
 
@@ -78,8 +62,8 @@ def test_thin_content_routes_despite_high_method_quality():
 def test_english_clean_content_not_over_routed():
     # 영어 클린 문서는 한글가중 부재로 콘텐츠 품질 ~0.5 → 얇음(0.3) 임계 미달 = 과라우팅 안 함.
     d = extraction_review_decision(
-        quality=0.95, ocr_used=False, error=None, min_quality=0.6,
-        ocr_requires_review=True, content_quality=0.5,
+        quality=0.95, error=None, min_quality=0.6,
+        content_quality=0.5,
     )
     assert d.requires_review is False and d.reasons == []
 
@@ -87,8 +71,8 @@ def test_english_clean_content_not_over_routed():
 def test_low_quality_reason_not_duplicated():
     # 메서드 저품질 + 얇은 콘텐츠가 동시에 성립해도 low_quality 사유는 1개만.
     d = extraction_review_decision(
-        quality=0.4, ocr_used=False, error=None, min_quality=0.6,
-        ocr_requires_review=True, content_quality=0.1,
+        quality=0.4, error=None, min_quality=0.6,
+        content_quality=0.1,
     )
     assert d.reasons == ["low_quality"]
 
@@ -96,7 +80,7 @@ def test_low_quality_reason_not_duplicated():
 def test_content_quality_default_none_preserves_behavior():
     # content_quality 미지정(기본 None) = 기존 동작 보존.
     d = extraction_review_decision(
-        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True
+        quality=0.95, error=None, min_quality=0.6
     )
     assert d.requires_review is False
 
@@ -104,10 +88,9 @@ def test_content_quality_default_none_preserves_behavior():
 # ── 콘텐츠 손실 경고 라우팅(차트/미디어/임베디드 OLE 미추출 — OOXML 손실) ──────────
 
 def test_content_loss_warning_routes_to_review():
-    # pptx가 전부 이미지 슬라이드라 본문은 헤더뿐이고 미디어 미OCR — 자동분류되면 비밀 무음 유실.
+    # pptx가 전부 이미지 슬라이드라 본문은 헤더뿐이고 미디어 미추출 — 자동분류되면 비밀 무음 유실.
     d = extraction_review_decision(
-        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True,
-        warnings=["pptx_media_not_ocrd"],
+        quality=0.95, error=None, min_quality=0.6, warnings=["pptx_media_not_extracted"],
     )
     assert d.requires_review is True and "content_dropped" in d.reasons
 
@@ -117,12 +100,12 @@ def test_content_loss_variants_all_route():
         "docx_charts_not_extracted",
         "excel_embedded_objects_not_extracted",
         "excel_drawings_text_may_be_missing",
-        "docx_media_ocr_unavailable",
-        "pdf_ocr_truncated",
+        "docx_media_not_extracted",
+        "excel_media_not_extracted",
     ]:
         d = extraction_review_decision(
-            quality=0.95, ocr_used=False, error=None, min_quality=0.6,
-            ocr_requires_review=True, warnings=[w],
+            quality=0.95, error=None, min_quality=0.6,
+            warnings=[w],
         )
         assert d.requires_review is True and "content_dropped" in d.reasons, w
 
@@ -130,9 +113,8 @@ def test_content_loss_variants_all_route():
 def test_benign_success_warnings_not_routed():
     # 성공 warning(추출 완료)은 손실 아님 → 과라우팅 금지.
     d = extraction_review_decision(
-        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True,
-        warnings=[
-            "docx_media_ocr_extracted", "docx_ooxml_tables_extracted",
+        quality=0.95, error=None, min_quality=0.6, warnings=[
+            "docx_ooxml_tables_extracted",
             "docx_comments_extracted", "docx_textboxes_extracted", "plain_decoded_as_cp949",
             # 실제 추출기가 내는 성공 warning 명(구 pyhwp/hwp5html 경로는 폐기, unhwp/MIT 로 대체).
             "hwp_tables_recovered_by_unhwp", "hwpx_tables_structured",
@@ -145,8 +127,7 @@ def test_benign_success_warnings_not_routed():
 def test_warnings_default_none_preserves_behavior():
     # warnings 미전달(기본 None) = 기존 동작 보존(opt-out 경로).
     d = extraction_review_decision(
-        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True,
-    )
+        quality=0.95, error=None, min_quality=0.6, )
     assert d.requires_review is False and d.reasons == []
 
 
@@ -186,21 +167,12 @@ def test_ingest_clean_doc_not_flagged():
     assert not any("degraded" in w for w in res.warnings)
 
 
-def test_ingest_ocr_doc_flagged_and_metric():
-    before = _metric("ocr")
-    res = _ingest(ExtractResult(text="OCR 로 뽑은 본문", method="ocr", quality=0.75, ocr_used=True))
-    assert res.requires_review is True
-    assert "ocr" in res.review_reasons
-    assert any("degraded" in w for w in res.warnings)          # 무음 아님 — 경고 노출
-    assert _metric("ocr") >= before + 1                        # 열화 메트릭 증가
-
-
 def test_ingest_content_loss_doc_flagged_and_metric():
     # 본문은 비어있지 않으나(슬라이드 헤더) 미디어/차트가 미추출된 pptx — content_dropped 라우팅.
     before = _metric("content_dropped")
     res = _ingest(ExtractResult(
         text="[슬라이드 1]\n[슬라이드 2]\n[슬라이드 3]", method="parser", quality=0.95,
-        warnings=["pptx_media_not_ocrd", "pptx_charts_not_extracted"],
+        warnings=["pptx_media_not_extracted", "pptx_charts_not_extracted"],
     ))
     assert res.requires_review is True
     assert "content_dropped" in res.review_reasons
@@ -210,29 +182,10 @@ def test_ingest_content_loss_doc_flagged_and_metric():
 
 def test_ingest_empty_extraction_counts_empty_not_review():
     before = _metric("empty")
-    res = _ingest(ExtractResult(text="", method="ocr", quality=0.0, ocr_used=False, error="unreadable"))
+    res = _ingest(ExtractResult(text="", method="parser", quality=0.0, error="unreadable"))
     # 빈 본문은 processing_status='failed'로 별도 격리 — requires_review 판정 대상 아님.
     assert res.requires_review is False
     assert _metric("empty") >= before + 1
-
-
-def test_truncated_100_page_ocr_is_exposed_as_incomplete_ingest():
-    """앞 50페이지만 OCR한 100페이지 문서는 완료·자동확정으로 보이면 안 된다."""
-    res = _ingest(ExtractResult(
-        text="OCR 본문 " * 100,
-        method="ocr",
-        quality=0.75,
-        ocr_used=True,
-        pages=50,
-        total_pages=100,
-        warnings=["pdf_ocr_truncated"],
-    ))
-
-    assert res.pages_processed == 50
-    assert res.pages_total == 100
-    assert res.extraction_complete is False
-    assert res.requires_review is True
-    assert "content_dropped" in res.review_reasons
 
 
 def test_complete_100_page_text_extraction_reports_full_coverage():
@@ -262,8 +215,7 @@ def test_hwp_table_warning_does_not_double_count():
     표 셀 미회수는 table_incomplete 가 이미 말한다 — content_dropped 는 붙지 않아야 한다.
     """
     d = extraction_review_decision(
-        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True,
-        table_coverage="incomplete", warnings=["hwp_table_cells_may_be_missing"],
+        quality=0.95, error=None, min_quality=0.6, table_coverage="incomplete", warnings=["hwp_table_cells_may_be_missing"],
     )
     assert d.reasons == ["table_incomplete"], d.reasons
 
@@ -274,7 +226,6 @@ def test_excel_drawing_loss_still_routes_as_content_dropped():
     표 경로(table_coverage)가 못 보는 손실이라 여기서 빠지면 무음 미탐이 된다.
     """
     d = extraction_review_decision(
-        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True,
-        warnings=["excel_drawings_text_may_be_missing"],
+        quality=0.95, error=None, min_quality=0.6, warnings=["excel_drawings_text_may_be_missing"],
     )
     assert d.reasons == ["content_dropped"], d.reasons

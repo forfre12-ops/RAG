@@ -1,6 +1,6 @@
 """[P0#3 후속] ingestion 열화추출 격리를 서빙 진입에서 존중 — 격리문서 자동분류 방지.
 
-배경: ingestion 이 OCR/저품질 추출을 processing_status='needs_review'로 격리하지만, 서빙
+배경: ingestion 이 저품질 추출을 processing_status='needs_review'로 격리하지만, 서빙
 경로(_fetch_content_by_doc_id)가 그 상태를 읽지 않아 격리문서도 POST /classify?doc_id 로
 자동확정될 수 있었다(하프와이어링). 저장된 processing_status 를 서빙 진입에서 존중해 needs_review
 로 라우팅(등급은 산출하되 자동확정만 격리).

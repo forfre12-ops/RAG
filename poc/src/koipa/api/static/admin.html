@@ -1641,7 +1641,6 @@ async function classifyFromFile(alsoClassify){
     if(pi.source_format) meta.push(esc(pi.source_format));
     if(pi.extraction_method) meta.push(`추출 ${esc(pi.extraction_method)}`);
     if(pi.extraction_quality!=null) meta.push(`품질 ${pi.extraction_quality}`);
-    if(pi.ocr_used!=null) meta.push(`OCR ${pi.ocr_used?'사용':'미사용'}`);
     if(pi.table_count) meta.push(`표 ${pi.table_count}`);
     if(pi.pii_masked_count) meta.push(`PII 마스킹 ${pi.pii_masked_count}`);
     meta.push(`${text.length}자`);

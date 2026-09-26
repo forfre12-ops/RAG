@@ -639,7 +639,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc"><strong>KL 자료등록(FUN-001)이 받은 원본 파일</strong>(HWP/PDF/DOCX/TXT)을 이 엔드포인트로 전달하면, Koipa가 <strong>추출·정규화·PII 마스킹·청킹(FUN-022)</strong>을 수행해 <code>tb_chunks</code>를 생성한다. <code>multipart/form-data</code>. 포맷 자동 감지 → 텍스트 추출 → 정규화·마스킹 → 청킹. 이후 <code>POST /classify?doc_id=...</code>로 등급 판정. <em>(FUN-022 요건은 <b>전자문서</b>(HWP/DOCX/PDF) 텍스트 추출이며, 스캔/이미지 PDF의 OCR은 요건 외 부가 방어 — 열화 추출 시 needs_review 라우팅.)</em></p>
+        <p class="ep-desc"><strong>KL 자료등록(FUN-001)이 받은 원본 파일</strong>(HWP/PDF/DOCX/TXT)을 이 엔드포인트로 전달하면, Koipa가 <strong>추출·정규화·PII 마스킹·청킹(FUN-022)</strong>을 수행해 <code>tb_chunks</code>를 생성한다. <code>multipart/form-data</code>. 포맷 자동 감지 → 텍스트 추출 → 정규화·마스킹 → 청킹. 이후 <code>POST /classify?doc_id=...</code>로 등급 판정. <em>(FUN-022 요건은 <b>전자문서</b>(HWP/DOCX/PDF) 텍스트 추출이며, 스캔/이미지 PDF 는 OCR 을 하지 않는다 — 본문이 없으면 failed 로 격리하고, 열화 추출은 needs_review 로 라우팅한다.)</em></p>
         <p style="font-size:12.5px;color:var(--text-dim);">※ 현재 소스 기준 Koipa가 업로드 파일을 추출·정규화하고 <code>tb_documents</code>와 <code>tb_chunks</code>에 저장한다. KL 원천 문서/EDMS 키는 <code>external_ref</code>와 메타데이터로 연결하는 외부 참조다.</p>
         <p style="font-size:12.5px;color:var(--text-dim);">KL 자료등록이 고객사 입력 <strong>메타데이터(보안표시·접근범위·출처, 아래 굵게)</strong>를 함께 전달하면, 등급 판정(FUN-024)의 메타데이터 기반 격리 판단에 사용된다. 이 메타데이터와 원본/정규화 URI는 문서 레코드에 함께 보존된다.</p>
         <h4>Request (multipart/form-data)</h4>
@@ -666,10 +666,9 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
             <tr><td class="f-name">file_size_bytes</td><td class="f-type">integer</td><td>원본 바이트 크기</td></tr>
             <tr><td class="f-name">char_count</td><td class="f-type">integer</td><td>추출된 전체 문자 수</td></tr>
             <tr><td class="f-name">chunk_count</td><td class="f-type">integer</td><td>생성된 청크 수</td></tr>
-            <tr><td class="f-name">extraction_method</td><td class="f-type">string</td><td>parser / ocr</td></tr>
+            <tr><td class="f-name">extraction_method</td><td class="f-type">string</td><td>추출기 이름(parser · rhwp · plain 등)</td></tr>
             <tr><td class="f-name">extraction_quality</td><td class="f-type">float</td><td>0.0~1.0 M2 품질 점수</td></tr>
-            <tr><td class="f-name">ocr_used</td><td class="f-type">boolean</td><td>OCR 사용 여부</td></tr>
-            <tr><td class="f-name">persisted</td><td class="f-type">boolean</td><td>DB 저장 성공 여부</td></tr>
+                        <tr><td class="f-name">persisted</td><td class="f-type">boolean</td><td>DB 저장 성공 여부</td></tr>
             <tr><td class="f-name">warnings</td><td class="f-type">string[]</td><td>처리 중 발생한 경고 메시지 목록</td></tr>
           </tbody>
         </table>
@@ -689,13 +688,13 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">시연·관리자 콘솔용 read-only 엔드포인트. 파일을 저장하지 않고 추출 → 정규화·PII 마스킹 → 청킹 → 검수게이트 → 분류까지 실행해 단계별 결과를 반환한다. HWP/HWPX·Office·PDF 표 구조화와 Office 내부 이미지 OCR 상태는 <code>parse.table_count</code>, <code>parse.table_cell_count</code>, <code>parse.warnings</code>로 확인한다. 운영 적재 경로(<code>POST /documents</code>)와 분리된 진단 API다.</p>
+        <p class="ep-desc">시연·관리자 콘솔용 read-only 엔드포인트. 파일을 저장하지 않고 추출 → 정규화·PII 마스킹 → 청킹 → 검수게이트 → 분류까지 실행해 단계별 결과를 반환한다. HWP/HWPX·Office·PDF 표 구조화 상태는 <code>parse.table_count</code>, <code>parse.table_cell_count</code>, <code>parse.warnings</code>로 확인한다. 운영 적재 경로(<code>POST /documents</code>)와 분리된 진단 API다.</p>
         <table class="ftbl">
           <thead><tr><th>방향</th><th>필드</th><th>타입</th><th>설명</th></tr></thead>
           <tbody>
             <tr><td>REQ</td><td class="f-name">file</td><td class="f-type">binary</td><td>분석할 원본 파일</td></tr>
             <tr><td>REQ</td><td class="f-name">return_evidence</td><td class="f-type">boolean</td><td>근거 스팬 반환 여부, 기본 true</td></tr>
-            <tr><td>RES 200</td><td class="f-name">parse</td><td class="f-type">object</td><td>source_format, extraction_method, extraction_quality, content_quality, ocr_used, table_coverage, table_count, table_cell_count, warnings 등</td></tr>
+            <tr><td>RES 200</td><td class="f-name">parse</td><td class="f-type">object</td><td>source_format, extraction_method, extraction_quality, content_quality, table_coverage, table_count, table_cell_count, warnings 등</td></tr>
             <tr><td>RES 200</td><td class="f-name">gate</td><td class="f-type">object</td><td>requires_review, reasons</td></tr>
             <tr><td>RES 200</td><td class="f-name">classification</td><td class="f-type">object | null</td><td>label, confidence, scores, status, model_version</td></tr>
             <tr><td>RES 200</td><td class="f-name">stages</td><td class="f-type">array</td><td>업로드·추출·정규화·청킹·검수게이트·분류 단계 로그</td></tr>

@@ -78,13 +78,13 @@ bash install.sh                # docker images 적재 (+ .env 초안 생성)
 docker images | grep -E 'koipa|postgres|redis|nginx'   # 적재 확인
 ```
 
-- 컨테이너 배포(본 절차)에서는 의존성이 **이미지에 이미 포함**되어 별도 설치가 불필요하다. `install.sh`는 호스트 파이썬 deps 설치를 **기본적으로 실행하지 않는다** — 번들 wheel은 컨테이너 인터프리터(cp311) 전용이라 Ubuntu 22.04 기본 파이썬(3.10)에서는 반드시 실패한다. 호스트에서 스크립트를 직접 구동해야 할 때만 python3.11 환경에서 `INSTALL_HOST_DEPS=1 bash install.sh`로 켠다. **OCR은 어떤 이미지·번들에도 포함되지 않는다**(요건 외 + poppler=GPL, 2026-08-02 제거).
+- 컨테이너 배포(본 절차)에서는 의존성이 **이미지에 이미 포함**되어 별도 설치가 불필요하다. `install.sh`는 호스트 파이썬 deps 설치를 **기본적으로 실행하지 않는다** — 번들 wheel은 컨테이너 인터프리터(cp311) 전용이라 Ubuntu 22.04 기본 파이썬(3.10)에서는 반드시 실패한다. 호스트에서 스크립트를 직접 구동해야 할 때만 python3.11 환경에서 `INSTALL_HOST_DEPS=1 bash install.sh`로 켠다.
 - **torch**: GPU 환경에 맞는 휠은 이미지에 포함된다. 호스트 직접 실행 시에만 별도 설치:
   `pip install --no-index --find-links=python-deps/wheels torch-*.whl`
 - **문서 파싱 선택 의존성**: HWP 표 셀은 `.[hwp-tables]`(unhwp, MIT — 구 pyhwp/AGPL 대체),
   PDF 표 행열은 `.[pdf-tables]`/`pdfplumber`가 있어야 구조화된다. 둘 다 배포 이미지에 포함된다.
   미설치 시 API는 추출을 계속하되 `parse.warnings`와 `/healthz/deep` extractor probe에 누락 사유를 표시한다.
-  Office 내부 이미지 OCR(`.[ocr]`)은 **요건 외 + GPL이라 배포하지 않는다** — 해당 입력은 검수 라우팅된다.
+  OCR 은 하지 않는다(요건 외). 스캔 PDF·이미지는 본문 0자로 등록되어 `processing_status='failed'` 로 격리된다.
 
 ---
 

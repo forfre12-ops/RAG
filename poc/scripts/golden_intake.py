@@ -75,7 +75,6 @@ WARN_KO = {
     "hwp_table_check_unavailable": "표 유무 확인 불가",
     "hwpx_tables_structured": "표를 구조로 인식함(정상)",
     "pdf_tables_may_be_missing": "PDF 표 일부를 못 읽었을 수 있음",
-    "ocr_used": "스캔 문서라 OCR 로 읽음",
     "xls_hidden_sheet": "숨김 시트 있음",
     "formula_cache_missing": "엑셀 수식 결과가 비어 있음",
 }

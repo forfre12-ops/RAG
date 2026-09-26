@@ -3,7 +3,7 @@
 각 테스트는 본 트랙이 고친 데이터-손실/DoS/드리프트-무력화 버그가 재발하면 실패한다.
 대상 파일:
   - modules/m2_preprocess/normalizer.py  ([M-normalizer] 비밀 수치 단독줄 소실)
-  - modules/m2_preprocess/extractor.py   ([M-ocr-limit] OCR DoS, [M-excel] 숨김시트/수식캐시)
+  - modules/m2_preprocess/extractor.py   ([M-excel] 숨김시트/수식캐시)
   - modules/m2_preprocess/chunker.py     ([M-chunker] 숫자 헤딩 과민 → 과분절)
   - services/drift_monitor.py            ([M-drift] centroid 델타함수 → 드리프트 항상 0)
 
@@ -14,8 +14,6 @@
 from __future__ import annotations
 
 import random
-import sys
-import types
 
 import pytest
 
@@ -65,62 +63,6 @@ class TestNormalizerNumberPreservation:
         out = normalize("본문\n- 3 -\n더 본문")
         assert "- 3 -" not in out
         assert "본문" in out and "더 본문" in out
-
-
-# ---------------------------------------------------------------------------
-# [M-ocr-limit] OCR 페이지 상한 — 수백쪽 스캔 PDF의 DoS/OOM 차단.
-# ---------------------------------------------------------------------------
-class TestOcrPageLimit:
-    @pytest.fixture
-    def mock_pdf2image(self, monkeypatch):
-        """convert_from_path를 모킹: 호출 kwargs를 기록하고 last_page만큼 이미지 반환."""
-        import koipa.modules.m2_preprocess.extractor as ex
-
-        captured: dict = {}
-
-        class _FakeImg:
-            pass
-
-        fake_mod = types.ModuleType("pdf2image")
-
-        def _fake_convert(path, **kw):
-            captured.update(kw)
-            last = kw.get("last_page")
-            n = last if last else 7
-            return [_FakeImg() for _ in range(n)]
-
-        fake_mod.convert_from_path = _fake_convert
-        monkeypatch.setitem(sys.modules, "pdf2image", fake_mod)
-        # Tesseract 호출 회피
-        monkeypatch.setattr(ex, "_tess_image", lambda img: "ocr text")
-        return ex, captured
-
-    def test_ocr_caps_pages_and_marks_truncation(self, mock_pdf2image, tmp_path):
-        ex, captured = mock_pdf2image
-        max_pages = ex._ocr_max_pages()
-        assert max_pages > 0
-        # n_pages가 상한을 크게 초과
-        result = ex._ocr_pdf_pages(tmp_path / "big.pdf", n_pages=max_pages * 10)
-        assert captured.get("first_page") == 1
-        assert captured.get("last_page") == max_pages, "OCR이 페이지 상한으로 잘리지 않음 (DoS 회귀)"
-        assert result.pages == max_pages
-        assert result.ocr_used is True
-        assert result.error and "truncat" in result.error.lower(), "잘림 표기 누락"
-
-    def test_ocr_no_truncation_when_small(self, mock_pdf2image, tmp_path):
-        ex, captured = mock_pdf2image
-        # n_pages가 상한 이하 → 잘림 없음, 경고 없음
-        result = ex._ocr_pdf_pages(tmp_path / "small.pdf", n_pages=3)
-        # last_page는 상한으로 설정되지만 실제 렌더 이미지는 3장이어야 함을 보장하기 위해
-        # 모킹은 last_page만큼 반환하므로 여기서는 잘림 표기가 없어야 한다는 점만 확인.
-        assert result.error is None or "truncat" not in (result.error or "").lower()
-
-    def test_ocr_max_pages_reads_settings(self):
-        """settings.ocr_max_pages가 모듈 fallback보다 우선 — 운영 튜닝 가능."""
-        from koipa.config import settings
-        from koipa.modules.m2_preprocess.extractor import _ocr_max_pages
-
-        assert _ocr_max_pages() == settings.ocr_max_pages
 
 
 # ---------------------------------------------------------------------------

@@ -59,15 +59,6 @@
       "structured_tables": "optional",
       "sheet_level": false,
       "review_on_partial_table_loss": true
-    },
-    {
-      "group": "image_ocr",
-      "extensions": ["jpg", "jpeg", "png", "tiff", "tif", "bmp", "webp"],
-      "commercial_default": false,
-      "optional_extras": ["ocr"],
-      "structured_tables": false,
-      "sheet_level": false,
-      "review_on_partial_table_loss": false
     }
   ]
 }

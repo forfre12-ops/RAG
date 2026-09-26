@@ -475,7 +475,7 @@ _FORMATTERS = {
 
 # 발주처 제출 SBOM의 기본 extras — 배포 런타임 + 운영 + 평가/성능 도구.
 # dev/lint(개발 전용)·pdf-agpl(선택적 AGPL)은 제외. --extras로 재정의 가능.
-_DEFAULT_SBOM_EXTRAS = ("full", "jwt", "otel", "ocr", "hwp", "evaluation", "psh")
+_DEFAULT_SBOM_EXTRAS = ("full", "jwt", "otel", "hwp", "evaluation", "psh")
 
 
 # ─────────────────────────────────────────────────────────────

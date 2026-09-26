@@ -11,9 +11,8 @@ ENV KOIPA_BUILD_SHA=${KOIPA_BUILD_SHA} KOIPA_BUILD_AT=${KOIPA_BUILD_AT}
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
-# [라이선스] OCR OS 바이너리(poppler-utils=GPL, tesseract-ocr)는 설치하지 않는다. OCR 은 요건
-# 외(FUN-022=전자문서 텍스트추출뿐)이고, dev 이미지로 반출본을 빌드하는 사고를 막으려면 dev/prod
-# 가 동일하게 GPL-free 여야 한다. libfreetype6(rhwp LD_PRELOAD)·libexpat1 만 유지.
+# [라이선스] GPL OS 바이너리는 설치하지 않는다. dev 이미지로 반출본을 빌드하는
+# 사고를 막으려면 dev/prod 가 동일하게 GPL-free 여야 한다. libfreetype6(rhwp LD_PRELOAD)·libexpat1 만 유지.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential libpq-dev curl libfreetype6 libexpat1 \
     && rm -rf /var/lib/apt/lists/*
@@ -31,7 +30,7 @@ COPY alembic.ini ./
 #   [hwp]=rhwp-python (.hwp/.hwpx), [jwt]=PyJWT+cryptography (운영 JWT 인증),
 #   [xls]=xlrd (구형 .xls, 511dbfb 재발 방지).
 #   [hwp-tables] unhwp(MIT) — .hwp 표 셀 회수. rhwp 단독은 표를 통째로 흘린다(FUN-022 갭).
-# 의도적 제외: [ocr](요건 외 + poppler=GPL), [pdf-agpl](PyMuPDF=AGPL, 기본은 pdfminer.six).
+# 의도적 제외: [pdf-agpl](PyMuPDF=AGPL, 기본은 pdfminer.six).
 # → api.prod/worker 와 동일한 파싱 extras. 스캔 PDF 는 본문 0자 → processing_status='failed' 격리.
 # [재현성] uv.lock 고정 설치 — api.prod·worker 와 같은 잠금에서 나온다. dev 이미지가 다른
 # 버전으로 돌면 여기서 재현한 결함이 배포본에서 재현되지 않는다.

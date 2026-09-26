@@ -338,7 +338,7 @@ article .callout.live .cl{font-family:var(--font-mono);font-size:10.5px;font-wei
           <tr><td></td><td class="td-code">witness_taxonomy.py</td><td><span class="sev">BATCH</span></td><td>등급-결정 사실(witness) 카탈로그 (법령근거)</td></tr>
 
           <tr class="grp"><td colspan="4">M2 — 전처리 (추출→정규화→PII→청크) · 서빙 핫패스</td></tr>
-          <tr><td>m2_preprocess</td><td class="td-code">extractor.py</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>HWP/PDF/Word/Excel/PPTX 추출 + Tesseract OCR</td></tr>
+          <tr><td>m2_preprocess</td><td class="td-code">extractor.py</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>HWP/PDF/Word/Excel/PPTX 추출</td></tr>
           <tr><td></td><td class="td-code">normalizer · pii_masker · chunker · pipeline</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>한국어 정규화 · PII 마스킹 · 청킹 · 조립</td></tr>
 
           <tr class="grp"><td colspan="4">M3 — 라벨링 (룰 + LLM 합의)</td></tr>
@@ -422,7 +422,7 @@ article .callout.live .cl{font-family:var(--font-mono);font-size:10.5px;font-wei
           <tr><td>5</td><td><b>분류 모델</b></td><td class="td-code">kakaobank/kf-deberta-base + 학습가중치</td><td><code>CLASSIFIER_MODEL_DIR=/models/classifier-trained</code> (safetensors, <b>경로 없으면 startup 실패</b>)</td></tr>
           <tr><td>6</td><td><b>로컬 LLM</b></td><td class="td-code">Qwen/Qwen3-14B (또는 qwen3:14b)</td><td>vLLM <code>:8001/v1</code> 또는 Ollama <code>:11434/v1</code>. GPU 필요 · <code>LLM_PROVIDER=local_openai|vllm|ollama</code></td></tr>
           <tr><td>7</td><td><b>문서 저장소</b></td><td class="td-code">로컬 FS (MinIO 미사용)</td><td><code>/app/.storage</code> (api↔worker 공유) · <code>STORAGE_ENCRYPTION_KEY</code>(64-hex)로 AES-256-GCM</td></tr>
-          <tr><td>8</td><td><b>OS 바이너리</b></td><td class="td-code">tesseract(+kor) · poppler · libreoffice</td><td>Dockerfile.api 포함 · GPU 시 NVIDIA Container Toolkit</td></tr>
+          <tr><td>8</td><td><b>OS 바이너리</b></td><td class="td-code">libfreetype6 · libexpat1</td><td>Dockerfile.api 포함(HWP 파서용) · GPU 시 NVIDIA Container Toolkit</td></tr>
         </tbody>
       </table>
       <div class="callout info">

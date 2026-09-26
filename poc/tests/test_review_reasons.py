@@ -109,7 +109,7 @@ def test_upload_path_extraction_gate_is_mapped():
     표에 없어 unmapped 로 나왔다. classify_service 게이트가 아니라 그 뒤에 오는 경로라
     표의 맨 끝에 둔다 - 앞 게이트가 이미 걸렸으면 그쪽이 원인이다.
     """
-    warn = "extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (table_incomplete)"
+    warn = "extraction_gate: 열화 추출(표누락/저품질)→검수 라우팅 (table_incomplete)"
     assert causal_review_reason([warn], "needs_review") == "extraction-gate"
     assert causal_review_reason([_LOWCONF, warn], "needs_review") == "low-confidence"
 

@@ -2,7 +2,7 @@
 
 현장 흐름 (지금까지 코드에 없던 본체):
   파일 bytes
-    → extract() 포맷 라우팅 (txt/md/csv/docx/pdf/hwp/hwpx, 미지원/스캔본은 OCR 대상 표시)
+    → extract() 포맷 라우팅 (txt/md/csv/docx/pdf/hwp/hwpx — 미지원 형식·스캔본은 본문 없이 등록)
     → 원본 bytes를 object storage 저장 (raw_text_uri = 감사·증빙 원본)
     → 정규화 + PII 마스킹 + 청크 (PreprocessPipeline.run_file)
     → 정규화 텍스트도 storage 저장 (normalized_text_uri)
@@ -38,10 +38,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ExtractionReviewDecision:
-    """[P0#3] 저품질/OCR 추출을 분류 전 검수로 라우팅할지 판정 결과."""
+    """[P0#3] 저품질 추출을 분류 전 검수로 라우팅할지 판정 결과."""
 
     requires_review: bool
-    reasons: list[str]  # extract_error | ocr | low_quality
+    reasons: list[str]  # extract_error | low_quality | table_incomplete | content_dropped
 
 
 # 콘텐츠 파생 품질(normalizer.quality_score)이 이 값 미만이면 '얇은/깨진 본문'으로 보고
@@ -53,14 +53,13 @@ _THIN_CONTENT_QUALITY = 0.3
 
 
 # 추출기가 "조용히 빠진 콘텐츠"를 알리는 손실 신호 마커. docx/pptx/xlsx의 차트·도형·임베디드
-# OLE·미디어(OCR 불가/미설치)는 표(HWP)의 table_coverage 와 달리 warning 으로만 남아 게이트가
+# OLE·미디어(추출 안 함)는 표(HWP)의 table_coverage 와 달리 warning 으로만 남아 게이트가
 # 못 읽었다 → 본문(슬라이드 헤더·미끼 문단)만으로 자동분류되며 표/차트 속 비밀이 무음 유실.
 # 이 마커에 해당하는 warning 이 있으면 content_dropped 로 검수 라우팅(등급 불변·FNR-safe).
-# 성공 warning(*_media_ocr_extracted·*_tables_extracted·*_comments_extracted·*_textboxes_extracted·
+# 성공 warning(*_tables_extracted·*_comments_extracted·*_textboxes_extracted·
 # plain_decoded_as_*)과는 부분문자열이 겹치지 않게 손실 전용 토큰만 매칭.
 _CONTENT_LOSS_WARNING_MARKERS = (
-    "not_ocrd",              # {docx,pptx,excel}_media_not_ocrd
-    "not_extracted",         # {docx,pptx,excel}_charts_not_extracted, *_embedded_objects_not_extracted
+    "not_extracted",         # {docx,pptx,excel}_media/charts_not_extracted, *_embedded_objects_not_extracted
     # [2026-08-24] "may_be_missing" → "excel_drawings_text_may_be_missing" 으로 좁혔다.
     # 종전에는 hwp_table_cells_may_be_missing 이 여기에도 걸려 **같은 신호 하나가 사유 둘**을
     # 만들었다: 그 경고가 table_incomplete 를 만들고(위 table_coverage 분기), 동시에
@@ -69,11 +68,6 @@ _CONTENT_LOSS_WARNING_MARKERS = (
     # 표 셀 미회수는 table_incomplete 가 이미 말한다. 여기서는 빼고, 엑셀 도형 텍스트처럼
     # **표 경로가 못 잡는 손실**만 남긴다.
     "excel_drawings_text_may_be_missing",
-    "media_ocr_unavailable", # OCR 라이브러리/엔진 미설치로 미디어 미처리
-    "media_ocr_error",       # OCR 처리 중 예외
-    "media_ocr_truncated",   # OCR 상한 절단
-    "media_ocr_empty",       # OCR 결과 공백
-    "ocr_truncated",         # pdf_ocr_truncated
 )
 
 
@@ -89,17 +83,15 @@ def _has_content_loss_warning(warnings) -> bool:
 def extraction_review_decision(
     *,
     quality: float | None,
-    ocr_used: bool,
     error: str | None,
     min_quality: float,
-    ocr_requires_review: bool,
     content_quality: float | None = None,
     table_coverage: str | None = None,
     warnings: list[str] | None = None,
 ) -> ExtractionReviewDecision:
     """본문이 존재하는(비어있지 않은) 추출이 검수 라우팅 대상인지 순수 판정.
 
-    깨끗한 파서 추출과 OCR/저품질 추출이 동일 입력으로 분류기에 진입해 표 누락·깨진 문자로
+    깨끗한 파서 추출과 저품질 추출이 동일 입력으로 분류기에 진입해 표 누락·깨진 문자로
     조용히 오분류되는 것을 막기 위한 게이트. FNR-safe 지향(의심스러우면 검수). 빈 본문(no_text)은
     호출부에서 processing_status='failed'로 별도 처리하므로 여기서는 다루지 않는다.
 
@@ -111,20 +103,18 @@ def extraction_review_decision(
     조용한 표 미추출) — 본문만 보면 표 속 영업비밀이 미탐되므로 검수 라우팅한다. 메서드 고정
     quality 로는 안 잡히는 사각(0.95로 통과)이라 별도 신호로 받는다.
 
-    warnings="손실 신호(*_not_extracted·*_not_ocrd·media_ocr_* 등)"가 포함된 추출 경고 목록.
+    warnings="손실 신호(*_not_extracted 등)"가 포함된 추출 경고 목록.
     docx/pptx/xlsx의 차트·도형·임베디드 OLE·미디어가 추출본에서 빠졌음을 나타내면 content_dropped
     로 검수 라우팅한다(table_coverage 가 HWP 표에 대해 하는 것을 OOXML 손실로 확장). None(미전달)
     이면 기존 동작 보존 — 호출부가 설정으로 opt-out 가능.
 
-    reasons(우선순위 무관, 복수 가능): extract_error(추출 경고), ocr(OCR 사용),
+    reasons(우선순위 무관, 복수 가능): extract_error(추출 경고),
     low_quality(품질 미만), table_incomplete(표 셀 미추출 의심), content_dropped(차트/미디어/
     임베디드 객체 미추출 — OOXML 손실).
     """
     reasons: list[str] = []
     if error:
         reasons.append("extract_error")
-    if ocr_used and ocr_requires_review:
-        reasons.append("ocr")
     method_low = quality is not None and quality < min_quality
     content_thin = content_quality is not None and content_quality < _THIN_CONTENT_QUALITY
     if method_low or content_thin:
@@ -145,7 +135,6 @@ class IngestResult:
     file_size_bytes: int
     extraction_method: str
     extraction_quality: float
-    ocr_used: bool
     char_count: int
     chunk_count: int
     pages_processed: int | None
@@ -155,7 +144,7 @@ class IngestResult:
     normalized_text_uri: Optional[str]
     persisted: bool
     warnings: list[str] = field(default_factory=list)
-    # [P0#3] 저품질/OCR 추출 → 분류 전 검수 라우팅 신호. requires_review=True면 문서가
+    # [P0#3] 저품질 추출 → 분류 전 검수 라우팅 신호. requires_review=True면 문서가
     # processing_status='needs_review'로 격리돼 자동분류 그대로 통과하지 않는다.
     requires_review: bool = False
     review_reasons: list[str] = field(default_factory=list)
@@ -233,7 +222,7 @@ class DocumentIngestionService:
             for warning in getattr(ext, "warnings", []) or []:
                 warns.append(f"extract-warning: {warning}")
         if not text:
-            warns.append("no text extracted (parser/OCR needed)")
+            warns.append("no text extracted")
 
         pages_processed = getattr(ext, "pages", None) if ext else None
         pages_total = getattr(ext, "total_pages", None) if ext else None
@@ -250,7 +239,7 @@ class DocumentIngestionService:
         ):
             extraction_complete = False
 
-        # [P0#3] 저품질/OCR 추출 → 검수 라우팅 판정 + 열화 메트릭(무음 오분류 방지).
+        # [P0#3] 저품질 추출 → 검수 라우팅 판정 + 열화 메트릭(무음 오분류 방지).
         review_decision, degrade_reasons = self._extraction_review(
             ext, content_quality=(pre.quality if pre else None), has_text=bool(text)
         )
@@ -321,7 +310,6 @@ class DocumentIngestionService:
             file_size_bytes=size,
             extraction_method=(ext.method if ext else "none"),
             extraction_quality=(float(ext.quality) if ext else 0.0),
-            ocr_used=(bool(ext.ocr_used) if ext else False),
             char_count=len(text),
             chunk_count=(len(pre.chunks) if pre else 0),
             pages_processed=pages_processed,
@@ -386,18 +374,17 @@ class DocumentIngestionService:
         """추출 결과 → (ExtractionReviewDecision, degrade_reasons[메트릭용]).
 
         빈 본문(no_text)은 requires_review 판정 대신 processing_status='failed'로 격리되므로
-        여기서는 메트릭 reason 'empty'만 집계한다. 설정 미가용 시 합리적 기본(0.6 / OCR 검수).
+        여기서는 메트릭 reason 'empty'만 집계한다. 설정 미가용 시 합리적 기본(0.6).
         content_quality=전처리 콘텐츠 기반 품질(pre.quality) — 메서드 고정 품질이 못 잡는 얇은/깨진
         본문을 보완 포착한다.
         """
         try:
             from koipa.config import settings  # noqa: PLC0415
             min_q = float(getattr(settings, "extraction_review_min_quality", 0.6))
-            ocr_req = bool(getattr(settings, "extraction_ocr_requires_review", True))
             table_review = bool(getattr(settings, "extraction_table_coverage_review", True))
             loss_review = bool(getattr(settings, "extraction_content_loss_review", True))
         except Exception:  # noqa: BLE001
-            min_q, ocr_req, table_review, loss_review = 0.6, True, True, True
+            min_q, table_review, loss_review = 0.6, True, True
         if not has_text:
             return ExtractionReviewDecision(requires_review=False, reasons=[]), ["empty"]
         # 표 커버리지 라우팅은 기본 ON이나, HWP 표 다수 고객사에서 과라우팅 시 끌 수 있게 토글.
@@ -406,10 +393,8 @@ class DocumentIngestionService:
         warnings = (getattr(ext, "warnings", None) if ext else None) if loss_review else None
         decision = extraction_review_decision(
             quality=(float(ext.quality) if ext else None),
-            ocr_used=(bool(ext.ocr_used) if ext else False),
             error=(ext.error if ext else None),
             min_quality=min_q,
-            ocr_requires_review=ocr_req,
             content_quality=content_quality,
             table_coverage=coverage,
             warnings=warnings,
@@ -474,7 +459,7 @@ class DocumentIngestionService:
         warns: list[str] = []
         ext = pre.extraction if pre else None
         text = pre.text if pre else ""
-        # [P0#3] 저품질/OCR 추출은 'ready'로 바로 열지 않고 needs_review로 격리(자동분류 전 검수).
+        # [P0#3] 저품질 추출은 'ready'로 바로 열지 않고 needs_review로 격리(자동분류 전 검수).
         status = "needs_review" if (text and requires_review) else ("ready" if text else "failed")
 
         def _do(session) -> object:
@@ -512,7 +497,6 @@ class DocumentIngestionService:
                 char_count=(len(text) or None),
                 extraction_method=(ext.method if ext else None),
                 extraction_quality=(float(ext.quality) if ext else None),
-                ocr_used=(bool(ext.ocr_used) if ext else False),
                 processing_status=status,
                 external_ref=external_ref,
                 metadata=(

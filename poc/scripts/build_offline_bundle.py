@@ -1197,7 +1197,7 @@ def select_review_batch_files(src: Path, excluded: set[str]) -> list[Path]:
 
 
 def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
-    """docker-compose(airgap 포함), env template, alembic, OCR 바이너리 복사. (ES 설정 폐기 — §03)"""
+    """docker-compose(airgap 포함), env template, alembic 복사. (ES 설정 폐기 — §03)"""
     import shutil
 
     infra = out_dir / "infra-config"
@@ -1353,11 +1353,6 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
             file=sys.stderr,
         )
 
-    # [라이선스] OCR 시스템 바이너리(poppler=GPL, Tesseract) 번들링은 2026-08-02 제거했다.
-    # OCR 은 요건 외(FUN-022=전자문서 텍스트추출뿐)인데 반출 번들에 GPL 바이너리를 199MB 실어
-    # 보내고 있었다. 게다가 빌더가 Windows .dll/.exe 를 복사해 Linux 폐쇄망 번들에 넣던 터라
-    # 설치도 되지 않는 사양이었다. 스캔 PDF 는 본문 0자 → processing_status='failed' 격리된다.
-
     # 컨테이너 런타임 RPM 스테이징. 없으면 경고만 하고 계속한다 — 런타임이 이미 깔린
     # 호스트도 있고, 번들 빌드 자체를 막으면 나머지 산출물 검증까지 못 하게 된다.
     _rpms = staged_rpms()
@@ -1458,9 +1453,7 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "    pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" $HASHFLAG -r \"$REQ\"\n"
         "  fi\n"
         "fi\n\n"
-        "# 3) OCR 바이너리 설치 — 제거됨(2026-08-02). OCR 은 요건 외이고 poppler 는 GPL 이라\n"
-        "#    반출 번들에서 소거했다. 스캔 PDF 는 본문 0자로 'failed' 격리되어 무음 통과하지 않는다.\n\n"
-        "# 4) env 설정\n"
+        "# 3) env 설정\n"
         "# 비밀값 파일이다 — 생성 시점부터 소유자 전용으로 만든다(umask + 명시 chmod).\n"
         "if [ ! -f .env ]; then (umask 077; cp \"$BUNDLE_DIR/infra-config/.env.template\" .env); fi\n"
         "chmod 600 .env 2>/dev/null || true\n"

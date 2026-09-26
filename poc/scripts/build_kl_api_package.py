@@ -464,9 +464,9 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
         "<b>같은 내용의 파일을 다시 등록</b>하면 새 문서를 만들지 않고 <b>기존 <code>doc_id</code></b> 를 돌려줍니다(파일 내용의 SHA-256 기준). "
         "이때 함께 보낸 메타데이터와 <code>external_ref</code> 는 갱신되지 않습니다. 바꿀 값은 분류 요청의 <code>metadata</code> 로 보냅니다(5장).",
         "<b>지원하지 않는 형식이거나 본문이 추출되지 않아도 201</b> 로 등록됩니다. 이때 <code>char_count</code> 가 0 이고 <code>warnings</code> 에 사유가 담깁니다"
-        "(예: <code>[\"extract: unsupported: exe\", \"no text extracted (parser/OCR needed)\"]</code>). 분류를 요청하기 전에 <code>char_count</code> 를 확인하십시오.",
+        "(예: <code>[\"extract: unsupported: exe\", \"no text extracted\"]</code>). 분류를 요청하기 전에 <code>char_count</code> 를 확인하십시오.",
         "지원 형식: <code>txt · md · log · csv</code> / <code>hwp · hwpx</code> / <code>docx · doc</code> / <code>xlsx · xlsm · xls</code> / <code>pptx · pptm</code> / <code>pdf</code>. "
-        "이미지(<code>jpg · png</code> 등)는 OCR 로 처리하며 품질이 낮으면 <code>requires_review</code> 가 켜집니다.",
+        "이미지(<code>jpg · png</code> 등)와 스캔 PDF 는 OCR 을 하지 않으므로 본문 없이 등록됩니다(<code>char_count</code> 0).",
         "<code>requires_review</code> 가 <code>true</code> 이면 추출 품질이 낮아 분류 전에 검수가 필요하다는 표시이며, 자동분류를 그대로 통과하지 않습니다.",
     ]))
 

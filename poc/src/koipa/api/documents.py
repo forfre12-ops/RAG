@@ -41,7 +41,6 @@ class DocumentUploadResponse(BaseModel):
     file_size_bytes: int
     extraction_method: str
     extraction_quality: float
-    ocr_used: bool
     char_count: int
     chunk_count: int
     pages_processed: Optional[int] = None
@@ -52,7 +51,7 @@ class DocumentUploadResponse(BaseModel):
     classification_status_url: Optional[str] = None
     persisted: bool
     warnings: list[str]
-    # [P0#3] 저품질/OCR 추출 → 분류 전 검수 라우팅 신호. True면 processing_status='needs_review'로
+    # [P0#3] 저품질 추출 → 분류 전 검수 라우팅 신호. True면 processing_status='needs_review'로
     # 격리돼 자동분류를 그대로 통과하지 않는다(호출측이 검수 유도).
     requires_review: bool = False
     review_reasons: list[str] = []
@@ -97,7 +96,7 @@ async def upload_document(
 ):
     """분류 대상 문서 업로드.
 
-    파일을 받아 포맷 자동 감지(HWP/PDF/DOCX/TXT) → 텍스트 추출(필요 시 OCR) →
+    파일을 받아 포맷 자동 감지(HWP/PDF/DOCX/TXT) → 텍스트 추출 →
     원본 object storage 저장 → documents/chunks 적재.
     이후 POST /classify 본문에 {"doc_id": ...} 를 실어 등급 판정 요청
     (/classify 는 쿼리 파라미터를 받지 않는다). enqueue_classification=True 면 업로드와
@@ -171,7 +170,6 @@ async def upload_document(
         file_size_bytes=result.file_size_bytes,
         extraction_method=result.extraction_method,
         extraction_quality=result.extraction_quality,
-        ocr_used=result.ocr_used,
         char_count=result.char_count,
         chunk_count=result.chunk_count,
         pages_processed=result.pages_processed,
@@ -205,7 +203,6 @@ class AnalyzeParseInfo(BaseModel):
     extraction_method: str
     extraction_quality: float
     content_quality: float
-    ocr_used: bool
     char_count: int
     chunk_count: int
     pages_processed: Optional[int] = None
@@ -344,7 +341,6 @@ async def analyze_document(
         extraction_method=ex.method,
         extraction_quality=round(ex.quality, 3),
         content_quality=round(pre.quality, 3),
-        ocr_used=ex.ocr_used,
         char_count=len(pre.text),
         chunk_count=len(pre.chunks),
         pages_processed=getattr(ex, "pages", None),
@@ -367,7 +363,7 @@ async def analyze_document(
     stages.append(AnalyzeStage(
         name="추출", status="fail" if ex.error else "done",
         detail=f"{ex.method} · 품질 {ex.quality:.2f} · {len(pre.text):,}자"
-        + (" · OCR" if ex.ocr_used else "") + (f" · {ex.error}" if ex.error else ""),
+        + (f" · {ex.error}" if ex.error else ""),
         ms=_parse_ms,
     ))
 
@@ -402,10 +398,8 @@ async def analyze_document(
     # --- 검수 게이트(운영 ingest와 동일 함수) ---
     dec = extraction_review_decision(
         quality=ex.quality,
-        ocr_used=ex.ocr_used,
         error=ex.error,
         min_quality=float(getattr(settings, "extraction_review_min_quality", 0.6)),
-        ocr_requires_review=bool(getattr(settings, "extraction_ocr_requires_review", True)),
         content_quality=pre.quality,
         table_coverage=getattr(ex, "table_coverage", None),
         warnings=(getattr(ex, "warnings", None)
@@ -472,7 +466,7 @@ async def analyze_document(
         cls.rule_evaluation_factors.model_dump()
         if getattr(cls, "rule_evaluation_factors", None) else None
     )
-    # 추출 검수게이트(표누락/OCR/저품질/추출오류)를 최종 status 로 조정 — content 경로 분류는
+    # 추출 검수게이트(표누락/저품질/추출오류)를 최종 status 로 조정 — content 경로 분류는
     # review_flagged 를 안 태우므로, 게이트가 검수를 요구하면 여기서 needs_review 로 승격해
     # box4('검수 필요')와 box5(최종 status)가 모순되지 않게 하고 실 doc_id 서빙과 일치시킨다.
     # [2026-08-21] `persistence skipped: doc_id=... is not a UUID` 를 화면 경고에서 뺀다.
@@ -490,7 +484,7 @@ async def analyze_document(
     if dec.requires_review and cls.status != "needs_review":
         eff_status = "needs_review"
         cls_warnings.append(
-            "extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (" + ", ".join(dec.reasons) + ")"
+            "extraction_gate: 열화 추출(표누락/저품질)→검수 라우팅 (" + ", ".join(dec.reasons) + ")"
         )
 
     # [2026-08-24] 이 게이트는 classify 뒤에 와서 status 만 올리고 decision_path 는 분류기
