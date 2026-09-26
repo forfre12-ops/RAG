@@ -1005,6 +1005,14 @@ documents:
     status: current
     version: 2026-08-28-회신묶음
 
+  - id: DOC-KLR-013
+    title: 등급분류_알고리즘_쉬운설명서
+    path: doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_쉬운설명서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
   - id: DOC-KLR-011
     title: AI 분류 엔진 연동 안내서
     path: doc/result/KL_API_연동안내_2026-09-25/KL_API_연동_안내서.html
@@ -1031,7 +1039,7 @@ documents:
 
   - id: DOC-INT-014
     title: KL서버 배포절차서
-    path: doc/internal/KL서버_배포절차서_1ae9054a.html
+    path: doc/internal/KL서버_배포절차서_0a814bd8.html
     owner: engineering
     audience: internal
     status: current
