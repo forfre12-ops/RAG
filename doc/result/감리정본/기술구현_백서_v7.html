@@ -448,7 +448,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <table>
           <thead><tr><th>서비스</th><th>버전</th><th>역할</th><th>포트</th><th>특이사항</th></tr></thead>
           <tbody>
-            <tr><td class="td-code">DB</td><td>MariaDB 10.11 · 폐쇄망 번들은 PostgreSQL 16</td><td>문서·분류·학습 메타</td><td>5432</td><td>시간축 인덱스 · 보존기간 삭제(파티션 없음)</td></tr>
+            <tr><td class="td-code">DB</td><td>PostgreSQL 16 + pgvector</td><td>문서·분류·학습 메타 · 문서 벡터</td><td>5432</td><td>월별 범위 파티션(청크·LLM 사용량·감사 로그) · 시간축 인덱스 · 보존기간 삭제</td></tr>
             <tr><td class="td-code">로컬FS</td><td>—</td><td>문서·모델·아티팩트 스토리지(file://)</td><td>—</td><td>원본 AES-256-GCM 암호화 · MinIO 미사용</td></tr>
             <tr><td class="td-code">redis</td><td>7.2</td><td>Celery 브로커·백엔드 · 잡상태·아웃박스/DLQ</td><td>6379</td><td>폐쇄망 적합 · 임베딩 캐시는 인메모리 LRU</td></tr>
             <tr><td class="td-code">mlflow</td><td>2.16.2</td><td>학습 실험 추적</td><td>5000</td><td>모델 버전·지표 이력 관리</td></tr>
@@ -583,7 +583,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <rect x="372" y="76" width="208" height="34" rx="5" fill="#fafafa" stroke="rgba(0,0,0,.08)" stroke-width="1"/>
           <text x="476" y="97" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist Mono,monospace">API + worker · 룰엔진</text>
           <rect x="372" y="118" width="208" height="34" rx="5" fill="#fafafa" stroke="rgba(0,0,0,.08)" stroke-width="1"/>
-          <text x="476" y="139" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist Mono,monospace">DB (MariaDB / PostgreSQL)</text>
+          <text x="476" y="139" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist Mono,monospace">DB (PostgreSQL + pgvector)</text>
           <rect x="372" y="160" width="208" height="34" rx="5" fill="#fafafa" stroke="rgba(0,0,0,.08)" stroke-width="1"/>
           <text x="476" y="181" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist Mono,monospace">qwen3 LLM · 분류기(추론)</text>
           <text x="476" y="216" text-anchor="middle" font-size="9.5" fill="#a3a3a3" font-family="Geist,sans-serif">없음: ES · MLflow · 학습 파이프라인 · 웹</text>

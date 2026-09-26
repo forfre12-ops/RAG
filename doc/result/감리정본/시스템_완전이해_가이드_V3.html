@@ -553,19 +553,16 @@ footer strong{color:var(--text-dim);}
     <div class="reason-a">
       한국어 의미 유사도에서 Recall@5 = 0.808로 BGE-M3(0.790)보다 높습니다(프로토타입 측정).
       <strong>한국어 특화 임베딩 모델로, 판례·기술 문서에서 의미적 유사도를 더 정확히 계산합니다.</strong>
-      지금 이 모델이 쓰이는 곳은 <strong>검색이 아니라</strong> 룰 1차 판정의 시드 키워드 유사도와
-      학습 데이터 분포 변화 감시입니다 — 유사문서 조회는 2026-09-05 미채택으로 걷었습니다.
+      지금 이 모델이 쓰이는 곳은 룰 1차 판정의 시드 키워드 유사도, 학습 데이터 분포 변화 감시,
+      문서 대표 벡터(유사문서 조회 API), 규정 참고 표시(선택 기능·기본 꺼짐)입니다.
     </div>
   </div>
   <div class="reason-row">
-    <div class="reason-q">📦 왜 MariaDB / PostgreSQL?</div>
+    <div class="reason-q">📦 왜 PostgreSQL + pgvector?</div>
     <div class="reason-a">
-      납품 정본 DB 는 <strong>MariaDB 10.11</strong> 입니다 — 발주처(KL) 포털이 쓰는 DB 가 MariaDB 라
-      거기에 전용 데이터베이스를 만들어 씁니다. 폐쇄망 오프라인 번들은 <strong>PostgreSQL 16</strong> 을 담습니다.
-      <strong>같은 코드가 두 DB 에서 모두 돕니다</strong> — ORM 을 두 방언 모두에 맞춰 두었고, 전체 시험이
-      양쪽에서 같게 통과합니다. 갈리는 것은 스키마 마이그레이션 계열뿐입니다
-      (<code>alembic upgrade mariadb@head</code> / <code>postgres@head</code>).
-      감사장부와 확정·보정 트랜잭션을 같은 DB 가 담당하므로 이중쓰기 정합 문제가 없습니다.
+      납품 DB 는 <strong>PostgreSQL 16 + pgvector</strong> 입니다(2026-09-09 고객사 요청으로 확정). 폐쇄망 오프라인 번들도
+      같은 PostgreSQL 16 을 담습니다. 문서 벡터를 등급·라벨과 같은 DB 에 두어 유사문서 조회가 한 쿼리로 끝나고,
+      감사장부와 확정·보정 트랜잭션도 같은 DB 가 담당하므로 이중쓰기 정합 문제가 없습니다.
     </div>
   </div>
   <div class="reason-row">
@@ -941,7 +938,7 @@ footer strong{color:var(--text-dim);}
 <tbody>
 <tr><td><strong>API 서버</strong></td><td>FastAPI (Python)</td><td>8000</td><td>모든 HTTP 요청을 받아서 처리하는 메인 서버</td></tr>
 <tr><td><strong>Worker</strong></td><td>Celery + Redis</td><td>—</td><td>시간이 오래 걸리는 작업을 백그라운드에서 처리</td></tr>
-<tr><td><strong>DB</strong></td><td>MariaDB 10.11 (폐쇄망 번들은 PostgreSQL 16)</td><td>3306 / 5432</td><td>문서·분류결과·사용자정보 관계형 저장 · 감사 장부</td></tr>
+<tr><td><strong>DB</strong></td><td>PostgreSQL 16 + pgvector</td><td>5432</td><td>문서·분류결과·사용자정보 관계형 저장 · 감사 장부</td></tr>
 <tr><td><strong>로컬 스토리지</strong></td><td>파일시스템(file://)</td><td>—</td><td>원본 문서 파일(HWP, PDF 등) 저장 — AES-256-GCM 암호화 (MinIO 미사용)</td></tr>
 <tr><td><strong>Redis</strong></td><td>Redis 7.2</td><td>6379</td><td>임베딩 결과 캐시, Celery 작업 큐</td></tr>
 <tr><td><strong>MLflow</strong> (지재원 전용)</td><td>MLflow 2.16</td><td>—</td><td>모델 학습 추적 — <strong>지재원에서만</strong>, 고객사 번들 미포함</td></tr>
@@ -1479,8 +1476,8 @@ footer strong{color:var(--text-dim);}
   <thead><tr><th>층</th><th>범위</th><th>결과</th><th>의미</th></tr></thead>
   <tbody>
   <tr><td>① 단위 테스트</td><td>pytest 전체</td><td>약 1,200건</td><td>로직 단위 정합 · 회귀 0</td></tr>
-  <tr><td>② DB 연동</td><td>실 DB(MariaDB · PostgreSQL 양쪽)</td><td>20/20</td><td>저장·조회 경로 검증</td></tr>
-  <tr><td>③ 풀스택</td><td>실 DB(MariaDB · PostgreSQL 양쪽)</td><td>103/103</td><td>분류·저장 통합 동작</td></tr>
+  <tr><td>② DB 연동</td><td>실 DB(PostgreSQL)</td><td>20/20</td><td>저장·조회 경로 검증</td></tr>
+  <tr><td>③ 풀스택</td><td>실 DB(PostgreSQL)</td><td>103/103</td><td>분류·저장 통합 동작</td></tr>
   <tr><td>④ 실 GPU E2E</td><td>능동학습 폐곡선 전 과정</td><td>7/7</td><td>정정→재학습→배포→핫리로드 실증</td></tr>
   <tr><td>⑤ 라이브 API 데모</td><td>실서버 호출</td><td>통과</td><td>PDF→S1(0.997)→confirm/relabel→재학습 큐</td></tr>
   </tbody>
@@ -1618,7 +1615,7 @@ footer strong{color:var(--text-dim);}
 </div>
 
 <h2 id="db">데이터는 어떻게 저장되나요?</h2>
-<p>DB 에 <strong>표 21개</strong>가 있습니다(제공 정의서에 싣는 것은 20표 221칼럼 — 코드가 읽고 쓰지 않는 표 1개를 뺐습니다). 핵심 흐름만 설명합니다. 납품 정본 DB 는 <strong>MariaDB 10.11</strong> 이고 폐쇄망 번들은 PostgreSQL 16 을 담습니다. 고객사별 폐쇄망 분리배포로 격리하며, <strong>파티션은 두지 않고</strong> 시간축 인덱스와 보존기간 삭제를 씁니다.</p>
+<p>DB 에 <strong>표 21개</strong>(칼럼 233개)가 있고, 제공 정의서(「테이블_정의서」)와 같은 범위입니다. 핵심 흐름만 설명합니다. 납품 DB 는 <strong>PostgreSQL 16 + pgvector</strong> 입니다. 고객사별 폐쇄망 분리배포로 격리하며, 청크·LLM 사용량·감사 로그 3개 표는 월별 범위(RANGE) 파티션으로 두고 보존기간이 지난 행은 삭제합니다.</p>
 
 <div style="margin:18px 0;display:flex;flex-direction:column;gap:8px;">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -1671,7 +1668,7 @@ footer strong{color:var(--text-dim);}
   <div class="callout-label">🔁 스키마가 3요건 곱셈으로 바뀐 점 (alembic 마이그레이션)</div>
   <ul>
     <li><strong>evaluation_factors</strong>: 정본 3요건(SECRECY·VALUE·MANAGEMENT)만 활성. 옛 4요소는 비활성으로 보존. 곱셈식이라 가중치(weight)는 미사용.</li>
-    <li><strong>tb_document_factor_scores</strong>: 점수 제약을 <strong>0~5 → 0~2</strong>로 변경(각 요건 0·1·2). 가중치 합계=1.0 검사 트리거 제거.</li>
+    <li><strong>tb_document_factor_scores</strong>: 점수 제약을 <strong>0~5 → 0~2</strong>로 변경(각 요건 0·1·2). 가중치 합계=1.0 검사 트리거 제거. (이 표는 행을 만드는 코드가 없어 2026-09-26 에 지웠습니다.)</li>
     <li><strong>tb_model_versions</strong>: 롤백 추적용 <code>rolled_back_from</code>·<code>rollback_reason</code> 추가. 활성 버전은 항상 1개만(부분 유니크 인덱스).</li>
     <li><strong>tb_corrections</strong>: 능동학습 소비 추적용 <code>consumed_in_run</code>·<code>consumed_at</code> 추가. 미소비 정정만 빠르게 찾는 부분 인덱스가 재학습 핫패스.</li>
   </ul>
