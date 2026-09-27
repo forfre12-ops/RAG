@@ -1401,13 +1401,25 @@ class InferencePipeline:
         # [B3 검토 후 보류] 짧은 노이즈 청크 과분류를 막으려 최소길이 필터를 시도했으나,
         # 짧은 *비밀* 청크(예: "마스터 키: …")도 함께 배제돼 미탐(FNR)을 유발 → 영업비밀
         # 시스템은 과분류가 안전 방향이므로 필터 미적용. 전체 청크 severe-max 유지(FNR 우선).
-        chunk_max = chunk_probs.max(dim=0).values
+        #
+        # [2026-09-27] 종전엔 chunk_max = chunk_probs.max(dim=0) — 그 청크 **자신의 1등**이
+        # 아니어도(예: 그 청크 1등은 S3인데 TS에도 곁가지로 확률이 뜬 경우) 열마다 최댓값을
+        # 그대로 채택했다. 공개 시황 논평(HBM·DRAM 등 트리거워드)에서 그 청크 자체는 S3를
+        # 확신하는데 TS 열의 잔여 확률이 escalation τ=0.30 을 우연히 넘겨 과분류로 이어지는
+        # 사례를 이번 세션에서 실측 확인([[s3-agreement-low-confidence-rare-2026-09-27]] 계열).
+        # 그 청크 자신이 해당 등급을 1등(own-argmax)으로 뽑았을 때만 후보로 인정한다 —
+        # 단일 진짜비밀청크 보호(tests/test_audit_w2_a.py::test_magg_single_secret_chunk_*)는
+        # 그 청크의 own-argmax가 이미 그 등급이므로 그대로 보존된다(4개 가드 테스트 전부 재확인).
+        chunk_argmax = chunk_probs.argmax(dim=1)
         severe_idx = {
             i for i, g in self._id2label.items()
             if (g.value if hasattr(g, "value") else str(g)) in self._SEVERE_AGG_CODES
         }
         for i in severe_idx:
-            doc_prob[i] = torch.maximum(doc_prob[i], chunk_max[i])
+            own_top_mask = chunk_argmax == i
+            if bool(own_top_mask.any()):
+                eligible_max = chunk_probs[own_top_mask, i].max()
+                doc_prob[i] = torch.maximum(doc_prob[i], eligible_max)
         return doc_prob
 
     def _encode_windows(self, batch: list[str]):
