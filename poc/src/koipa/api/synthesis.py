@@ -15,11 +15,14 @@ from koipa.schemas.synthesis import (
     SynthGenerateRequest,
     SynthGenerateResponse,
     SynthJobStatus,
+    SynthPlaybookResponse,
+    SynthProvidersStatusResponse,
     SynthQueueResponse,
     SynthReviewRequest,
     SynthReviewResponse,
 )
 from koipa.services.synth_coverage import DEFAULT_MIN_PER_CELL, coverage_report
+from koipa.services.synth_provider_status import provider_status
 from koipa.services.synthesis_service import SynthesisService
 
 router = APIRouter(tags=["synthesis"], dependencies=[Depends(require_auth)])
@@ -75,6 +78,50 @@ def synth_coverage(
     사람이 한다 — caveat 를 화면에 그대로 띄운다.
     """
     return coverage_report(min_per_cell=min_per_cell)
+
+
+@router.get("/synth/providers/status", response_model=SynthProvidersStatusResponse)
+def synth_providers_status():
+    """제공자별 가용성 — 콘솔이 "우리가 실제로 가진 것만" 드롭다운에 보이는 데 쓴다.
+
+    [2026-09-28] healthz.llm_providers_supported 는 스키마가 받는 값 9개를 전부 내려줘서
+    "고를 수 있다"와 "지금 이 서버가 실제로 그 provider 로 생성할 수 있는가"가 갈렸다.
+    상용은 키 설정 여부, 로컬은 그 주소가 응답하는지만 본다(실제 생성 호출은 하지 않는다 —
+    비용 없이 빠르게 재확인할 수 있어야 한다). 조회는 broad(라우터의 require_auth 만) —
+    /synth/coverage 와 같은 이유로 본문을 내지 않고 가용성 불리언뿐이다.
+    """
+    from koipa.config import settings  # noqa: PLC0415
+
+    return {
+        "active": getattr(settings, "llm_provider", "") or "",
+        "providers": provider_status(),
+    }
+
+
+@router.get("/synth/playbook", response_model=SynthPlaybookResponse)
+def synth_playbook():
+    """지금 생성에 기본 적용되는 규칙 — 관리자가 화면에서 확인한다.
+
+    [2026-09-28] 규칙(m1_synthesis/generation_playbook.py)은 이제 리포에 추적되고
+    생성기가 기본으로 참고하지만, "무엇이 적용되고 있는지"를 관리자가 화면 밖에서 소스를
+    열어야만 알 수 있었다. 이 경로가 그 자리를 메운다. 조회는 broad — 비밀이 아니라
+    생성 안내문이다.
+    """
+    from koipa.config import settings  # noqa: PLC0415
+    from koipa.modules.m1_synthesis.generation_playbook import (  # noqa: PLC0415
+        AVOID_PHRASES,
+        GENERATION_RULES,
+        playbook_text,
+        playbook_version,
+    )
+
+    return {
+        "enabled": bool(getattr(settings, "synth_use_generation_playbook", True)),
+        "version": playbook_version(),
+        "rules": list(GENERATION_RULES),
+        "avoid_phrases": list(AVOID_PHRASES),
+        "text": playbook_text(),
+    }
 
 
 @router.get("/synth/jobs/{synth_job_id}", response_model=SynthJobStatus)

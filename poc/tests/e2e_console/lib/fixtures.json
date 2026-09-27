@@ -1605,5 +1605,28 @@
         "is_grade_list": false
       }
     ]
+  },
+  "GET /synth/providers/status": {
+    "active": "noop",
+    "providers": [
+      { "name": "noop", "kind": "deterministic", "available": true, "reason": "" },
+      { "name": "anthropic", "kind": "commercial", "available": false, "reason": "서버에 ANTHROPIC_API_KEY 미설정" },
+      { "name": "openai", "kind": "commercial", "available": false, "reason": "서버에 OPENAI_API_KEY 미설정" },
+      { "name": "ollama", "kind": "local", "available": false, "reason": "http://localhost:11434/v1 응답 없음" },
+      { "name": "vllm", "kind": "local", "available": false, "reason": "http://localhost:8001/v1 응답 없음" },
+      { "name": "local_openai", "kind": "local", "available": false, "reason": "http://localhost:8001/v1 응답 없음" },
+      { "name": "lm_studio", "kind": "local", "available": false, "reason": "http://localhost:1234/v1 응답 없음" }
+    ]
+  },
+  "GET /synth/playbook": {
+    "enabled": true,
+    "version": "pb1-00000000",
+    "rules": [
+      "문서가 자기 자신의 기밀·보안 수준을 말하지 않는다."
+    ],
+    "avoid_phrases": [
+      "명단"
+    ],
+    "text": "[작성 지침 — 앞선 생성 시행에서 얻은 규칙. 아래를 반드시 지킨다]"
   }
 }

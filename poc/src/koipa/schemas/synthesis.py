@@ -129,6 +129,41 @@ class SynthCoverageCell(BaseModel):
     real: int
 
 
+class SynthProviderStatus(BaseModel):
+    """provider 하나의 가용성 — 화면이 "고를 수 있는 것"만 보여주는 데 쓴다."""
+
+    name: str
+    kind: str  # "deterministic" | "commercial" | "local"
+    available: bool
+    reason: str = ""
+
+
+class SynthProvidersStatusResponse(BaseModel):
+    """[2026-09-28] 콘솔의 제공자 드롭다운이 "우리가 실제로 가진 것만" 보이게 한다.
+
+    healthz.llm_providers_supported 는 스키마가 받는 값 전부(9개)를 그대로 내려줘서
+    "고를 수 있다"와 "지금 이 서버에서 실제로 되는가"가 갈렸다. active 는 서버가 기본으로
+    쓰는 provider(설정값)이고, providers 는 advertise 대상(상용 GPT·Claude + 로컬 4종 +
+    noop)의 실측 가용성이다.
+    """
+
+    active: str
+    providers: list[SynthProviderStatus]
+
+
+class SynthPlaybookResponse(BaseModel):
+    """[2026-09-28] 지금 생성에 기본 적용되는 규칙 — 관리자가 화면에서 확인한다.
+
+    m1_synthesis.generation_playbook 이 정본이고 이 응답은 그것을 읽기 전용으로 노출한다.
+    """
+
+    enabled: bool
+    version: str
+    rules: list[str]
+    avoid_phrases: list[str]
+    text: str
+
+
 class SynthCoverageResponse(BaseModel):
     """합성으로 채울 자리 — 등급 × 도메인 격자.
 
