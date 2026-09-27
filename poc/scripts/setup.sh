@@ -291,7 +291,7 @@ _load_review_batch() {
     inf "golden_review_batch/ 없음 — 검수 문서 적재를 건너뛴다(전문가 검수를 안 하는 번들이면 정상)"
     return 0
   fi
-  _want="$(find "$_src" -maxdepth 1 -name 'MD-*.metadata.json' | wc -l | tr -d ' ')"
+  _want="$(ls "$_src"/MD-*.metadata.json 2>/dev/null | wc -l | tr -d ' ')"
   _got="$(_review_batch_into_volume "$_src")" || _got=""
   if [ -n "$_got" ] && [ "$_got" -ge "$_want" ] 2>/dev/null; then
     ok "검수 문서 적재 — 볼륨에 후보 ${_got}건(번들 ${_want}건). 이미 있던 후보·검수 원장은 덮어쓰지 않았다"
