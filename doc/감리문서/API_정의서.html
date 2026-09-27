@@ -157,13 +157,14 @@ a{color:#0a0a0a}
   <p class="src">집계 방법(2026-09-26 재계수): <code>poc/src/koipa/api/</code> 의 파이썬 소스 24개를 AST 로 읽어 <code>status_code=</code> 로 상태 코드를 직접 지정한 지점 84곳을 코드별로 센다 (<code>HTTPException</code> · <code>JSONResponse</code> · <code>HTMLResponse</code> · 라우트 데코레이터). 다시 세려면 <code>python poc/scripts/audit_status_codes.py</code>, 이 표와 맞는지 보려면 <code>--check</code>. 200(기본 성공 응답)과 FastAPI 가 요청 검증 실패에 자동으로 내는 422 는 세지 않는다. 이 숫자는 코드가 그 상태를 <b>낼 수 있는 지점의 수</b>이며 운영 중 실제로 나간 횟수가 아니다.</p>
 
   <h2>3. 엔드포인트 목록</h2>
-  <p>총 <b>64건</b>이다(메서드와 경로의 조합 기준, 요건 외 2건 + 순수 내부 운영·관측 전용 4건 + 규정 참고 표시 10건 제외 · 2026-09-27 재계수). 2026-09-24 에 검수 배정·승격 4건(<code>/golden/assignments</code> GET/POST·<code>/golden/assignments/revoke</code>·<code>/golden/candidates/promote</code>, 커밋 <code>dadbb554</code>)을 더했고(68건), 2026-09-26 에 호출자가 없던 4건(가이드 2 · 승격 대기 · 이중검토 보류)을 걷었다(64건) — 연동·검수 협의와 직결된 것만 남겼다. 반면 유사문서 조회·Prometheus 메트릭·합성 커버리지/작업조회 4건과 규정 참고 표시 10건(기본 꺼짐)은 KL 연동과 무관한 순수 내부 도구라 이 문서에는 신지 않는다(전부 <code>x-audience: internal</code>, 전체 목록은 <code>doc/03_openapi_koipa_kl.yaml</code> 참고). 비고의 <span class="part">full-train</span> 표시는 학습 프로파일에서만 노출되는 경로를 뜻한다. 고객사 배포(<code>onprem-local</code>)에서는 해당 라우터가 등록되지 않으므로 스펙에도 나타나지 않는다.</p>
+  <p>총 <b>64건</b>이다(메서드와 경로의 조합 기준, 요건 외 2건 + 순수 내부 운영·관측 전용 4건 + 규정 참고 표시 10건 제외 · 2026-09-27 재계수). 2026-09-24 에 검수 배정·승격 4건(<code>/golden/assignments</code> GET/POST·<code>/golden/assignments/revoke</code>·<code>/golden/candidates/promote</code>, 커밋 <code>dadbb554</code>)을 더했고(68건), 2026-09-26 에 호출자가 없던 4건(가이드 2 · 승격 대기 · 이중검토 보류)을 걷었다(64건) — 연동·검수 협의와 직결된 것만 남겼다. 반면 유사문서 조회·Prometheus 메트릭·합성 커버리지/작업조회 4건과 규정 참고 표시 10건(기본 꺼짐)은 KL 연동과 무관한 순수 내부 도구라 이 문서에는 신지 않는다(전부 <code>x-audience: internal</code>, 전체 목록은 <code>doc/03_openapi_koipa_kl.yaml</code> 참고). 비고의 <span class="part">full-train</span> 표시는 학습 프로파일에서만 노출되는 경로를 뜻한다. 고객사 배포(<code>onprem-local</code>)에서는 해당 라우터가 등록되지 않으므로 스펙에도 나타나지 않는다.
+  <b>이 64건 가운데 KL 웹시스템이 실제로 호출하는 것은 비고에 <span class="ok">KL</span> 표시가 붙은 5건뿐이다</b>(「API 통신 방안 검토 회신」의 IF-01·02·03·05·06, <code>doc/03_openapi_koipa_kl.yaml</code> 의 <code>x-audience: kl</code> 기준). 나머지 59건은 우리 관리자·검수 콘솔·학습·합성용 내부 도구다 — Lloydk 기능요건(FUN-005·023·024)이 등급체계 관리·검수·분석 화면을 우리 몫으로 명시해 두어서, KL 이 안 쓴다고 없앨 항목이 아니다. IF-04(콜백)는 엔진→KL 방향(우리가 부른다)이라 이 문서(우리가 받는 요청) 대상이 아니다.</p>
   <h3>3-1. 상태 점검 <code>health</code> · 4건</h3>
   <div class="tw">
   <table>
     <thead><tr><th style="width:7%">메서드</th><th style="width:27%">경로</th><th style="width:26%">기능</th><th style="width:15%">요청 스키마</th><th style="width:15%">응답 스키마</th><th style="width:10%">비고</th></tr></thead>
     <tbody>
-      <tr><td class="c">GET</td><td><code>/api/v1/healthz</code></td><td>상태 점검</td><td class="src">—</td><td class="src">application/json</td><td class="c">200</td></tr>
+      <tr><td class="c">GET</td><td><code>/api/v1/healthz</code></td><td>상태 점검</td><td class="src">—</td><td class="src">application/json</td><td class="c">200 <span class="ok">KL</span></td></tr>
       <tr><td class="c">GET</td><td><code>/api/v1/healthz/deep</code></td><td>의존 자원을 포함한 심층 점검</td><td class="src">—</td><td class="src">application/json</td><td class="c">200</td></tr>
       <tr><td class="c">GET</td><td><code>/api/v1/healthz/live</code></td><td>프로세스 생존 확인</td><td class="src">—</td><td class="src">application/json</td><td class="c">200</td></tr>
       <tr><td class="c">GET</td><td><code>/api/v1/healthz/ready</code></td><td>요청 수신 준비 확인</td><td class="src">—</td><td class="src">application/json</td><td class="c">200</td></tr>
@@ -175,7 +176,7 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:7%">메서드</th><th style="width:27%">경로</th><th style="width:26%">기능</th><th style="width:15%">요청 스키마</th><th style="width:15%">응답 스키마</th><th style="width:10%">비고</th></tr></thead>
     <tbody>
-      <tr><td class="c">POST</td><td><code>/api/v1/documents</code></td><td>문서 업로드</td><td class="src">Body_upload_document_api_v1_documents_post</td><td class="src">DocumentUploadResponse</td><td class="c">201</td></tr>
+      <tr><td class="c">POST</td><td><code>/api/v1/documents</code></td><td>문서 업로드</td><td class="src">Body_upload_document_api_v1_documents_post</td><td class="src">DocumentUploadResponse</td><td class="c">201 <span class="ok">KL</span></td></tr>
       <tr><td class="c">POST</td><td><code>/api/v1/documents/analyze</code></td><td>문서 업로드와 동시에 추출·분류 수행</td><td class="src">Body_analyze_document_api_v1_documents_analyze_post</td><td class="src">DocumentAnalysisResponse</td><td class="c">200</td></tr>
     </tbody>
   </table>
@@ -186,12 +187,12 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:7%">메서드</th><th style="width:27%">경로</th><th style="width:26%">기능</th><th style="width:15%">요청 스키마</th><th style="width:15%">응답 스키마</th><th style="width:10%">비고</th></tr></thead>
     <tbody>
       <tr><td class="c">POST</td><td><code>/api/v1/classify</code></td><td>문서 분류 실행(동기)</td><td class="src">ClassifyRequest</td><td class="src">ClassifyResponse</td><td class="c">200</td></tr>
-      <tr><td class="c">POST</td><td><code>/api/v1/classify/async</code></td><td>문서 분류 비동기 요청</td><td class="src">ClassifyAsyncRequest</td><td class="src">ClassifyAsyncResponse</td><td class="c">202</td></tr>
+      <tr><td class="c">POST</td><td><code>/api/v1/classify/async</code></td><td>문서 분류 비동기 요청</td><td class="src">ClassifyAsyncRequest</td><td class="src">ClassifyAsyncResponse</td><td class="c">202 <span class="ok">KL</span></td></tr>
       <tr><td class="c">POST</td><td><code>/api/v1/classify/batch</code></td><td>문서 분류 일괄 실행</td><td class="src">ClassifyBatchRequest</td><td class="src">ClassifyBatchResponse</td><td class="c">202</td></tr>
       <tr><td class="c">POST</td><td><code>/api/v1/classify/explain</code></td><td>동기 분류 실행 및 판정 근거 상세 반환</td><td class="src">ClassifyRequest</td><td class="src">application/json</td><td class="c">200</td></tr>
-      <tr><td class="c">GET</td><td><code>/api/v1/classify/jobs/{job_id}</code></td><td>비동기 분류 작업 상태 조회</td><td class="src">—</td><td class="src">ClassifyJobStatus</td><td class="c">200</td></tr>
+      <tr><td class="c">GET</td><td><code>/api/v1/classify/jobs/{job_id}</code></td><td>비동기 분류 작업 상태 조회</td><td class="src">—</td><td class="src">ClassifyJobStatus</td><td class="c">200 <span class="ok">KL</span></td></tr>
       <tr><td class="c">POST</td><td><code>/api/v1/classify/stream</code></td><td>분류 결과 스트리밍 반환</td><td class="src">ClassifyRequest</td><td class="src">application/json</td><td class="c">200</td></tr>
-      <tr><td class="c">GET</td><td><code>/api/v1/classify/{doc_id}</code></td><td>문서의 최근 분류 결과 조회</td><td class="src">—</td><td class="src">ClassifyResponse</td><td class="c">200</td></tr>
+      <tr><td class="c">GET</td><td><code>/api/v1/classify/{doc_id}</code></td><td>문서의 최근 분류 결과 조회</td><td class="src">—</td><td class="src">StoredClassificationResponse</td><td class="c">200 <span class="ok">KL</span></td></tr>
     </tbody>
   </table>
   </div>
@@ -346,6 +347,7 @@ a{color:#0a0a0a}
       <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. OpenAPI 스펙(경로 64 · 스키마 92)에서 생성했으며 백서 부록B 에서 독립 산출물로 승격했다</td></tr>
       <tr><td class="c">2</td><td class="n">2026-09-24</td><td><code>3529e1af</code></td><td>9/22 이후 누락돼 있던 검수 배정·승격 4건 반영 — GET/POST <code>/golden/assignments</code>·POST <code>/golden/assignments/revoke</code>·POST <code>/golden/candidates/promote</code>(커밋 <code>dadbb554</code>). 유사문서 조회·Prometheus 메트릭·합성 커버리지/작업조회 4건은 순수 내부 운영 도구라 이 문서 범위에서 의도적으로 제외(전체 목록은 <code>doc/03_openapi_koipa_kl.yaml</code>). 총 64→68건(경로 59/65, OpenAPI yaml 대조 재계수로 확인)</td></tr>
   <tr><td class="c">3</td><td class="n">2026-09-26</td><td><code>aaea98c3</code></td><td>호출자가 없던 엔드포인트 4건 삭제 — <code>POST /guide/documents</code> · <code>GET /guide/documents/{guide_id}</code>(가이드 버전 이력. 콘솔·스크립트·인프라 어디서도 부르지 않았고 요건 번호도 없었다) · <code>GET /promotions/pending</code>(KL 이 확정 등급을 읽으려고 돌아가던 목록 — <code>GET /classify/{doc_id}</code> 의 <code>confirmed_*</code> 로 대체됨) · <code>GET /admin/escalation-held</code>(같은 값이 <code>GET /admin/dashboard</code> 에 들어 있다). 총 68→64건(경로 65/59 → 61/55, 규약서 대조 재계수). <code>POST /documents</code> 가 받던 <code>doc_type</code> · <code>external_ref</code> 입력(저장만 하고 아무도 읽지 않았다)과 응답의 <code>pages_processed</code> · <code>extraction_complete</code> 도 함께 걷었다. 근거 목록 <code>poc/reports/unused_api_db_items_20260926.md</code></td></tr>
+  <tr><td class="c">4</td><td class="n">2026-09-27</td><td>(미커밋)</td><td>3-1·3-2·3-3 표에 KL 이 실제로 호출하는 5건(IF-01·02·03·05·06)을 <span class="ok">KL</span> 표로 밝히고, §3 머리 문단에 그 사실을 명시 — 나머지 59건과의 구분이 표에 없어 "정의서가 KL 연동치고 과하다"는 오독을 낳았다(2026-09-27 사용자 확인 요청). <code>GET /classify/{doc_id}</code> 의 응답 스키마를 코드(<code>api/async_classify.py:55</code>)와 맞춰 <code>ClassifyResponse</code> → <code>StoredClassificationResponse</code> 로 정정 — 실제로는 10필드인데 19필드짜리로 적혀 있었다.</td></tr>
     </tbody>
   </table>
   </div>

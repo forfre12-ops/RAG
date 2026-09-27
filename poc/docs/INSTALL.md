@@ -22,7 +22,7 @@
 | Docker | `docker version` (Engine 24+), `docker compose version` (v2) |
 | GPU | **불요**(기본 CPU). GPU 노드에서만 §5의 GPU 오버레이를 덧붙인다 |
 | 커널 | `sysctl vm.max_map_count` ≥ 262144 (미만 시 `sudo sysctl -w vm.max_map_count=262144`) |
-| 디스크 | Data SSD 여유 ≥ 40GB (번들 ~6GB + 적재 이미지 ~10GB + 데이터/메트릭 볼륨) |
+| 디스크 | Data SSD 여유 ≥ 80GB (번들 ~19.6GB — `scripts/build_offline_bundle.py --dry-run` manifest 실측 — + `docker load` 적재 이미지 + 데이터/메트릭 볼륨. 설치 중에는 번들 파일과 적재된 이미지가 동시에 디스크를 차지한다) |
 | 포트 | 5432·6379·8000 (+ mTLS 443, + 관측성 9090·9093·3000·3100) 내부 가용 — **이미 쓰는 중이면 `.env`의 `API_PORT`·`PG_PORT`·`REDIS_PORT`로 바꾼다**(YAML 수정 불요) |
 
 **GPU**: 본 시스템의 운영(추론·야간 증분재학습) 경로는 **CPU 전용으로 성립**한다. compose 기본값에 GPU 예약이 없으므로 GPU 없는 서버에서 그대로 기동된다. GPU 노드(학습 공장)만 §5에서 `-f infra-config/docker-compose.gpu.yml`을 추가한다.
@@ -159,7 +159,7 @@ $COMPOSE ps        # postgres healthy 까지 대기 (~30s)
 
 ---
 
-## 6. DB 마이그레이션 (19테이블 + 파티션 백필)
+## 6. DB 마이그레이션 (21테이블 + 파티션 백필)
 
 ```bash
 $COMPOSE run --rm api alembic upgrade head
@@ -173,8 +173,8 @@ $COMPOSE run --rm api alembic upgrade head
 ## 7. 스토리지 · 검색 인덱스 초기화
 
 - 스토리지: 별도 초기화 불요. `docker-compose.airgap.yml`의 `storagedata` named volume이 `/app/.storage`에 마운트되며, 원본은 설정에 따라 AES-256-GCM으로 암호화 저장된다.
-- 벡터검색: 별도 초기화 불요. `tb_rag_vectors`(pgvector dense + bigram tsvector `ts_rank`)는 §6 `alembic upgrade`가 생성한다(vector 확장 포함). 가이드/문서 색인은 앱이 적재 시 자동 채움.
-- 검색엔진(ES)·Nori 분석기·인덱스 템플릿 제거(의사결정_대장 §03 ⓑ) — pgvector + bigram-tsvector `ts_rank` 하이브리드로 통합. postgres 이미지(`pgvector/pgvector:pg16`)에 vector 확장 포함.
+- 벡터 색인: 별도 초기화 불요. 문서 대표 벡터 표 `tad_dm_doc_vctr_mng`(pgvector 1024차원, 코사인 HNSW)는 §6 `alembic upgrade`가 생성한다(vector 확장 포함). 색인은 문서를 등록할 때 앱이 자동으로 채운다(유사 문서 조회·규정 참고 표시가 쓴다).
+- 검색엔진(ES)·Nori 분석기·인덱스 템플릿 제거(의사결정_대장 §03 ⓑ) — 별도 검색엔진 없이 PostgreSQL(pgvector 포함)로 통합. postgres 이미지(`pgvector/pgvector:pg16`)에 vector 확장 포함.
 
 ---
 

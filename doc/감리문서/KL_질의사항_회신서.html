@@ -113,7 +113,7 @@ a{color:#0a0a0a}
       <tr><td class="c">가-2</td><td>전체 워크플로우</td><td><b>귀사 파악 정확</b></td><td>6단계 그대로 맞습니다. 전후 보정 2건만 보강</td></tr>
       <tr><td class="c">가-2-1</td><td>GPU 환경 변경점</td><td>회신</td><td>등급 결정 경로는 GPU 유무와 무관하게 동일합니다</td></tr>
       <tr><td class="c">가-2-2</td><td>100쪽 문서 처리 시간</td><td>회신</td><td>실문서 100쪽을 만들어 <b>파싱부터 판정까지 종단 실측</b>했습니다. 6 CPU 기준 <b>약 5분</b> · 텍스트 문서는 파싱이 전체의 1~4%. <b>스캔 문서는 납품 번들에서 처리되지 않습니다</b>(OCR 미동봉)</td></tr>
-      <tr><td class="c">가-3</td><td>반환 항목</td><td>회신</td><td>현행 20필드. GPU 유무로 달라지지 않습니다</td></tr>
+      <tr><td class="c">가-3</td><td>반환 항목</td><td>회신</td><td>현행 19필드(2026-09-27 정정 &mdash; &sect;5 참조). GPU 유무로 달라지지 않습니다</td></tr>
       <tr><td class="c">가-3-1</td><td>SVM 점수 산정</td><td><b>정정</b></td><td>3요건은 독립 판독되지 않습니다. 곱셈은 교차 확인입니다</td></tr>
       <tr><td class="c">가-3-2</td><td>XAI 방법</td><td><b>정정</b></td><td>Attention·Gradient Saliency 를 쓰지 않습니다</td></tr>
       <tr><td class="c">가-4</td><td>룰 기반 방식</td><td><b>정정</b></td><td>출현 빈도가 아니라 가중합 argmax 다. 시드 404개</td></tr>
@@ -187,7 +187,7 @@ a{color:#0a0a0a}
       </tr>
       <tr>
         <td>최종 &mdash; 검수 라우팅</td>
-        <td>등급이 정해진 뒤 <b>게이트 14개</b>가 &ldquo;이 건을 사람에게 보낼지&rdquo;를 판정합니다.
+        <td>등급이 정해진 뒤 <b>게이트 15개</b>(회신 당시 14개 &mdash; 2026-09-10 에 1개를 더했습니다)가 &ldquo;이 건을 사람에게 보낼지&rdquo;를 판정합니다.
         <b>게이트는 등급을 바꾸지 않습니다</b> &mdash; 라우팅만 합니다</td>
       </tr>
     </tbody>
@@ -321,7 +321,13 @@ a{color:#0a0a0a}
 <h2>5. 가-3 &mdash; 반환 항목</h2>
   <div class="q">현행 반환 항목이 최종 확정인가 · GPU 여부에 따른 구분</div>
 
-  <p>현행 <code>ClassifyResponse</code> 는 <b>20필드</b>다. GPU 유무로 달라지지 않습니다.</p>
+  <p>현행 <code>ClassifyResponse</code> 는 <b>19필드</b>다. GPU 유무로 달라지지 않습니다.</p>
+
+  <div class="note">
+    <b>정정(2026-09-27).</b> <code>ClassifyResponse</code>(19필드, 아래 표)는 저희 내부 화면 전용 응답입니다. 귀사가 실제로 받는 IF-05 작업 결과·콜백 본문은
+    <b>17필드</b>(elapsed_ms 없음 + 2026-09-27 부터 <code>automation_assessment</code> 도 없음 — 자동확정 정책 검증용 내부 관측치라 연동에 쓰지 않습니다)이며,
+    상세는 「API 통신 방안 검토 회신」 &sect;3 을 참고하시기 바랍니다.
+  </div>
 
   <div class="tw">
   <table>
@@ -340,8 +346,19 @@ a{color:#0a0a0a}
       <tr><td><code>automation_assessment</code></td><td class="c">&mdash;</td><td>자동확정 판단 근거(마진·순위 등)</td></tr>
       <tr><td><code>evidence</code></td><td class="c">&mdash;</td><td>근거 구간(&sect;7 참조)</td></tr>
       <tr><td><code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>factors_source</code></td><td class="c">&mdash;</td><td>3요건 표시값과 그 출처</td></tr>
+      <tr><td><code>grade_candidates</code> · <code>grade_candidates_reason</code></td><td class="c">&mdash;</td><td>비밀관리성(M)을 받지 못해 아직 하나로 정해지지 않은 등급 후보와 그 사유. 비어 있으면 <code>label</code> 이 유일한 답입니다(2026-09-10 추가)</td></tr>
     </tbody>
   </table>
+  </div>
+
+  <div class="note">
+    <b>정정(2026-09-27).</b> 이 회신 당시(2026-08-28)에는 반환 항목을 20필드로 적었습니다. 그 뒤 세 가지가 바뀌었습니다.
+    ① 2026-09-10 에 등급 후보집합 <code>grade_candidates</code> · <code>grade_candidates_reason</code> 두 필드를 더했습니다(위 표 마지막 행).
+    ② 2026-09-26 에 확정 등급 세 필드(<code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code>)를 분류 응답에서 뺐습니다 &mdash;
+    확정은 분류 뒤에 사람이 하는 일이라 분류 응답과 완료 통보에는 값이 채워진 적이 없습니다.
+    ③ 같은 날 문서 단위 조회(<code>GET /classify/{doc_id}</code>)의 응답을 저장된 값만 담는 10필드(확정 등급 세 필드 포함)로 갈랐습니다.
+    그래서 현행 분류 응답(<code>POST /classify</code>)은 19필드이고, 완료 통보(<code>POST {callback_url}</code>)와
+    작업 조회(<code>GET /classify/jobs/{job_id}</code>)의 결과 항목은 처리 시간 <code>elapsed_ms</code> 를 뺀 18필드입니다.
   </div>
 
   <div class="note">
@@ -354,7 +371,7 @@ a{color:#0a0a0a}
 
   <h3>5-1. 확정 여부와 추가 항목</h3>
 
-  <p>위 20필드는 <b>현재 배포본의 확정 규격</b>이며, 연동 규약서(ICD)에 그대로 반영되어 있습니다.
+  <p>위 19필드는 <b>현재 배포본의 확정 규격</b>이며, 연동 규약서(ICD)에 그대로 반영되어 있습니다.
   당사가 임의로 필드를 빼거나 이름을 바꾸지 않습니다.</p>
 
   <div class="tw">
@@ -491,7 +508,7 @@ a{color:#0a0a0a}
 
   <div class="note">
     <b>정정(2026-09-09).</b> 고객사 요청으로 납품 DB 는 <b>PostgreSQL 16 + pgvector</b> 로 확정되었습니다. 위 표기(Vector DB 제외 · MariaDB 10.11)는
-    이 회신 당시(2026-08-28)의 것이며, 유사문서 조회용 문서 벡터 표를 다시 두었고 현행 「테이블_정의서」는 21표 233칼럼입니다.
+    이 회신 당시(2026-08-28)의 것이며, 유사문서 조회용 문서 벡터 표를 다시 두었고 현행 「테이블_정의서」는 21표 232칼럼입니다.
   </div>
 
   <div class="tw">

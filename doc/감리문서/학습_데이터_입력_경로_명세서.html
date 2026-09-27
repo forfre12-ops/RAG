@@ -446,7 +446,7 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
         이유다(&sect;4-3) &mdash; <code>enable_nightly_retrain_schedule</code> 기본값 <code>False</code></td>
       </tr>
       <tr>
-        <td>코드 스키마 head</td><td class="c"><code>d1a2b3c4e5f7</code></td>
+        <td>코드 스키마 head<br><span class="meta">2026-08-29 실측 당시</span></td><td class="c"><code>d1a2b3c4e5f7</code></td>
         <td>마이그레이션 18판 중 자식이 없는 판(<code>alembic/versions/</code>) &mdash;
         2026-08-29 에 미사용 칼럼 10개를 뺀 판이 head 다</td>
       </tr>
@@ -466,7 +466,7 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
       </tr>
       <tr>
         <td>운영 서버의 마이그레이션 적용 여부</td>
-        <td><b>적용돼 있다</b>(2026-08-29 실측). 시험서버(223)의 alembic 판은 <code>d1a2b3c4e5f7</code> 로 <b>코드 head 와 같다</b> &mdash; &sect;2 경로와 합성 검수 화면의 전제가 갖춰져 있다. 확인 명령 — <code>psql -tAc "select version_num from alembic_version"</code></td>
+        <td><b>적용돼 있었다</b>(2026-08-29 실측 당시). 시험서버(223)의 alembic 판은 <code>d1a2b3c4e5f7</code> 로 <b>그때의 코드 head 와 같았다</b> &mdash; &sect;2 경로와 합성 검수 화면의 전제가 갖춰져 있었다. 확인 명령 — <code>psql -tAc "select version_num from alembic_version"</code></td>
       </tr>
       <tr>
         <td>재학습 소요 시간의 <b>시스템 자동 기록</b></td>

@@ -213,14 +213,20 @@ a{color:#0a0a0a}
       <tr><td class="c">6</td><td>무음 빈본문</td><td>추출은 되었으나 판정할 본문이 없는 문서</td><td class="c ok">ON</td></tr>
       <tr><td class="c">7</td><td>metadata-access-conflict</td><td>ICD 접근범위가 제한적인데 본문 기준 예측 등급이 낮은 경우</td><td class="c ok">ON</td></tr>
       <tr><td class="c">8</td><td>metadata-management-conflict</td><td>M=0(관리 부재 입증)과 내용 예측이 충돌하는 경우</td><td class="c ok">ON</td></tr>
-      <tr><td class="c">9</td><td>ICD 규약값 부적합</td><td>규약을 벗어난 메타데이터 값. 요청을 거부(422)하지 않고 미탐 위험으로 표시한다</td><td class="c ok">ON</td></tr>
-      <tr><td class="c">10</td><td>s2-underclass-risk</td><td>내부·비공개 신호가 있는데 S3 로 예측한 경우</td><td class="c ok">ON</td></tr>
-      <tr><td class="c">11</td><td>gate-fail-open</td><td>미탐 방향 게이트가 예외로 미적용된 경우. 게이트가 동작하지 않은 채 자동확정되는 것을 막는다</td><td class="c ok">ON</td></tr>
-      <tr><td class="c">12</td><td>룰·모델 합의</td><td>비공개 등급 예측이면서 룰이 실제 근거를 냈고, 룰 등급과 모델 등급이 다른 경우</td><td class="c ok">ON</td></tr>
-      <tr><td class="c">13</td><td>LLM 2차 의견</td><td>LLM 이 더 높은 등급을 제시하면 검수로 보낸다. 등급은 바꾸지 않는다</td><td class="c off">OFF</td></tr>
-      <tr><td class="c">14</td><td>kill-gate 안전브레이크</td><td>배포 차단 신호가 발동된 동안 고등급 자동확정을 억제</td><td class="c off">OFF</td></tr>
+      <tr><td class="c">9</td><td>metadata-management-underclass</td><td>ICD 메타데이터로 확인된 관리성(M)을 반영해 정본 공식을 돌리면 예측 등급보다 높은 등급이 나오는 경우. 등급은 바꾸지 않고 자동확정만 막는다</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">10</td><td>ICD 규약값 부적합</td><td>규약을 벗어난 메타데이터 값. 요청을 거부(422)하지 않고 미탐 위험으로 표시한다</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">11</td><td>s2-underclass-risk</td><td>내부·비공개 신호가 있는데 S3 로 예측한 경우</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">12</td><td>gate-fail-open</td><td>미탐 방향 게이트가 예외로 미적용된 경우. 게이트가 동작하지 않은 채 자동확정되는 것을 막는다</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">13</td><td>룰·모델 합의</td><td>비공개 등급 예측이면서 룰이 실제 근거를 냈고, 룰 등급과 모델 등급이 다른 경우</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">14</td><td>LLM 2차 의견</td><td>LLM 이 더 높은 등급을 제시하면 검수로 보낸다. 등급은 바꾸지 않는다</td><td class="c off">OFF</td></tr>
+      <tr><td class="c">15</td><td>kill-gate 안전브레이크</td><td>배포 차단 신호가 발동된 동안 고등급 자동확정을 억제</td><td class="c off">OFF</td></tr>
     </tbody>
   </table>
+  </div>
+  <div class="note">
+    <b>정정(2026-09-27).</b> 이 회신 당시(2026-08-28)에는 위 표가 14개였습니다. 2026-09-10 에 9번 <code>metadata-management-underclass</code>
+    (확인된 관리성이 예측 등급보다 높은 등급을 가리키면 검수로 보내는 게이트)를 더해 15개가 되었고, 종전 9~14번은 10~15번이 되었습니다.
+    도식의 게이트 수도 15개입니다.
   </div>
   <p>게이트는 예외가 발생해도 분류를 중단하지 않고 기존 동작을 유지하며, 미적용 사실을 경고와 지표 카운터로 남긴다. 미탐 방향 게이트가 이렇게 미적용된 경우는 11 번 게이트가 다시 검수로 보낸다.</p>
   <div class="note">관리 화면에서 등록한 <strong>태깅 규칙 하나가 게이트 전체를 멈추던 경로를 차단했다</strong>(<code>02b660ef</code>). 정규식 규칙이 컴파일되지 않으면 룰 라벨링이 문서마다 예외로 중단됐고, 호출부가 그것을 위 fail-open 으로 흡수해 <strong>미탐 방지 상향과 룰·모델 합의(12 번)가 함께 정지</strong>했다. 현재는 등록 시점에 정규식을 검사해 거부(400)하고, 이미 저장된 규칙이 깨져 있으면 해당 규칙만 미매치로 처리하고 나머지 판정은 유지한다.</div>

@@ -9,7 +9,7 @@
 ## 가장 쉬운 경로 (권장 · TL;DR)
 
 **아티팩트 1개 + 명령 1개 + `.env` 몇 줄.** 고객사·지재원 모두 같은 `dist/koipa-airgap-bundle/`
-(약 12GB — 도커 이미지·**분류 모델(v-dd3abab9+temperature)**·wheel·DB 마이그레이션·인수팩까지 자립)을 쓰고,
+(약 19.6GB — `scripts/build_offline_bundle.py --dry-run` manifest 실측, 도커 이미지·**분류 모델(v-fe4b386b+temperature)**·wheel·DB 마이그레이션·인수팩까지 자립)을 쓰고,
 `bash deploy.sh`(폐쇄망/연결망 **자동감지**) 한 명령으로 마이그레이션+기동+스모크까지 끝난다.
 **대상별로 다른 건 `.env` 프로파일뿐이다.**
 
@@ -64,7 +64,7 @@ bash deploy.sh                                      # 자동감지 → 배포, �
 | OS | Ubuntu 22.04 LTS | `cat /etc/os-release` |
 | Docker | Engine 24+, compose v2 | `docker version && docker compose version` |
 | GPU (지재원/GPU고객) | nvidia-smi + Container Toolkit | `docker run --rm --gpus all nvidia/cuda:12.4.0-base nvidia-smi` |
-| 디스크 | 여유 ≥ 70GB (번들 ~12GB + 볼륨/적재) | `df -h /` |
+| 디스크 | 여유 ≥ 80GB (번들 ~19.6GB + 볼륨/적재) | `df -h /` |
 | RAM | ≥ 16GB (권장 32GB+) | `free -h` |
 | 포트(내부) | 5432·6379·8000 (+ 관측성 9090·3000) | — |
 
@@ -94,7 +94,7 @@ sudo apt-get install -y nvidia-container-toolkit && sudo nvidia-ctk runtime conf
 ```
 
 ### A1. 번들 반입 · 무결성 검증
-번들: `dist/koipa-airgap-bundle/` (약 12GB — docker 이미지 11GB + 모델 0.7GB).
+번들: `dist/koipa-airgap-bundle/` (약 19.6GB — `--dry-run` manifest 실측 총량. docker 이미지·모델별 세부 내역은 실빌드 뒤 확인).
 ```bash
 # (로컬 PC → 서버) 전체:
 scp -P <PORT> -r dist/koipa-airgap-bundle <user>@<host>:~/
@@ -164,7 +164,7 @@ grep -n "nvidia" infra-config/docker-compose.airgap.yml
 export COMPOSE="docker compose --env-file .env -f infra-config/docker-compose.airgap.yml"
 $COMPOSE up -d postgres redis
 $COMPOSE ps                                   # postgres healthy(~30s)
-$COMPOSE run --rm api alembic upgrade head    # 19테이블 + 파티션 백필
+$COMPOSE run --rm api alembic upgrade head    # 21테이블 + 파티션 백필
 ```
 
 ### A7. 애플리케이션 기동

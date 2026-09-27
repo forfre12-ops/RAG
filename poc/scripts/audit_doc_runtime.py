@@ -66,7 +66,7 @@ _DEFAULT_ROOT = _REPO / "doc" / "result" / "KL_회신_2026-08-28"
 def truth() -> dict:
     """코드·구성 파일에서 참값을 읽는다. 문서는 보지 않는다."""
     from koipa.config import _PROFILE_DEFAULTS, Settings  # noqa: PLC0415
-    from koipa.schemas.classify import ClassifyRequest, ClassifyResponse  # noqa: PLC0415
+    from koipa.schemas.classify import ClassifyJobResult, ClassifyRequest, ClassifyResponse  # noqa: PLC0415
     from koipa.services.review_reasons import REVIEW_GATE_TAGS  # noqa: PLC0415
 
     fields = Settings.model_fields
@@ -81,7 +81,10 @@ def truth() -> dict:
         "classifier_temperature": prof.get("classifier_temperature"),
         "classifier_escalation_tau": prof.get("classifier_escalation_tau"),
         "content_max_length": _content_max_length(ClassifyRequest),
+        # 동기 응답 POST /classify(ClassifyResponse)와 KL 이 완료 통보·조회로 받는 결과 항목(ClassifyJobResult, IF-05)은
+        # 다른 모델이다 — 처리 시간(elapsed_ms) 하나가 다르다(aaea98c3 · 2026-09-26). 문서가 어느 쪽을 말하는지에 따라 참값이 갈린다.
         "response_fields": len(ClassifyResponse.model_fields),
+        "job_result_fields": len(ClassifyJobResult.model_fields),
         # extraction-gate 는 진단·시연 엔드포인트(/documents/analyze) 전용이라
         # 운영 분류 경로의 게이트 수에서 뺀다 — 문서도 15 로 적고 그 사실을 밝힌다.
         "review_gates": len([t for t in REVIEW_GATE_TAGS if t != "extraction-gate"]),
@@ -158,7 +161,12 @@ CHECKS = [
     ("본문 상한(자)", "content_max_length",
      r"(?:본문 상한|content[^<]{0,12}상한)[^<]{0,20}?(\d{1,3}(?:,\d{3})+)\s*자",
      lambda v: int(v.replace(",", ""))),
-    ("응답 필드 수", "response_fields", r"현행\s*(\d+)\s*필드|(\d+)\s*필드다", int),
+    ("응답 필드 수", "response_fields",
+     r"현행\s*(\d+)\s*필드|(\d+)\s*필드다|ClassifyResponse(?:</code>)?[^<]{0,12}<b>\s*(\d+)\s*필드", int),
+    # 완료 통보 본문 results[] 의 항목 — 예시 JSON(`{ ... N필드 ... }`) · 도식 속 글자("결과 N필드") · "응답은 N필드이며" 문장.
+    # 도식은 build_reply_figures.py 가 만들지만, 그 글자를 문서 본문 문장과 함께 여기서도 한 번 더 본다.
+    ("완료 통보 결과 필드 수", "job_result_fields",
+     r"results[^\n<]{0,12}\[\s*\{\s*\.\.\.\s*(\d+)\s*필드|결과\s*(\d+)\s*필드|응답은\s*<b>\s*(\d+)\s*필드", int),
     # "게이트 N개"만 보면 재학습 배포 게이트(7종)까지 걸린다 — 검수 문맥일 때만 센다.
     ("검수 게이트 수", "review_gates", r"(?:검수|라우팅)[^<]{0,20}게이트\s*(\d+)\s*개|게이트\s*(\d+)\s*개가[^<]{0,24}검수", int),
     ("프록시 read timeout(초)", "proxy_read_timeout_s",
@@ -196,6 +204,22 @@ def _in_source(path: str) -> bool:
     return path in _SRC_BLOB or path.replace("/api/v1", "") in _SRC_BLOB
 
 
+def _matches_template(path: str, routes: set) -> bool:
+    """예시 값이 든 경로(`/classify/jobs/aea27889-…`)를 `{param}` 자리가 있는 라우트 템플릿과 대조한다.
+
+    [2026-09-27] 안내서의 호출 예시는 실제 UUID 를 넣어 적는다. 템플릿(`/classify/jobs/{job_id}`)과 글자가
+    다르다는 이유로 "없는 경로"로 잡히던 거짓 경보다 — 검사기가 거짓 경보를 내면 사람이 목록을 안 연다.
+    """
+    segs = path.strip("/").split("/")
+    for route in routes:
+        rsegs = route.strip("/").split("/")
+        if len(rsegs) != len(segs):
+            continue
+        if all(r == g or (r.startswith("{") and r.endswith("}")) for r, g in zip(rsegs, segs)):
+            return True
+    return False
+
+
 def _blank_but_newlines(text: str) -> str:
     """줄 번호를 유지한 채 내용만 지운다 — 줄바꿈만 남기고 나머지는 공백."""
     return "".join(ch if ch == chr(10) else " " for ch in text)
@@ -220,7 +244,7 @@ def main() -> int:
     print("=" * 74)
     for k in ("max_upload_mb", "max_request_body_mb", "review_confidence_threshold",
               "classifier_temperature", "classifier_escalation_tau", "content_max_length",
-              "response_fields", "review_gates", "alembic_head",
+              "response_fields", "job_result_fields", "review_gates", "alembic_head",
               "proxy_read_timeout_s", "client_max_body_size_mb"):
         if T.get(k) is not None:
             print("  %-32s %s" % (k, T[k]))
@@ -293,6 +317,7 @@ def main() -> int:
                     continue
                 if (path not in T["routes"]
                         and not any(p.startswith(path) for p in T["routes"])
+                        and not _matches_template(path, T["routes"])
                         and not _in_source(path)):
                     findings.append(
                         (rel, s[:m.start()].count("\n") + 1, "없는 경로", path, "앱 라우트에 없음"))

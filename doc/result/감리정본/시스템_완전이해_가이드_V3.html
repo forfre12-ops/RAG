@@ -1615,7 +1615,7 @@ footer strong{color:var(--text-dim);}
 </div>
 
 <h2 id="db">데이터는 어떻게 저장되나요?</h2>
-<p>DB 에 <strong>표 21개</strong>(칼럼 233개)가 있고, 제공 정의서(「테이블_정의서」)와 같은 범위입니다. 핵심 흐름만 설명합니다. 납품 DB 는 <strong>PostgreSQL 16 + pgvector</strong> 입니다. 고객사별 폐쇄망 분리배포로 격리하며, 청크·LLM 사용량·감사 로그 3개 표는 월별 범위(RANGE) 파티션으로 두고 보존기간이 지난 행은 삭제합니다.</p>
+<p>DB 에 <strong>표 21개</strong>(칼럼 232개)가 있고, 제공 정의서(「테이블_정의서」)와 같은 범위입니다. 핵심 흐름만 설명합니다. 납품 DB 는 <strong>PostgreSQL 16 + pgvector</strong> 입니다. 고객사별 폐쇄망 분리배포로 격리하며, 청크·LLM 사용량·감사 로그 3개 표는 월별 범위(RANGE) 파티션으로 두고 보존기간이 지난 행은 삭제합니다.</p>
 
 <div style="margin:18px 0;display:flex;flex-direction:column;gap:8px;">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">

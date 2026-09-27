@@ -113,7 +113,7 @@ a{color:#0a0a0a}
       <tr><td class="c">가-2</td><td>전체 워크플로우</td><td><b>기재 정확</b></td><td>6단계 그대로 맞습니다. 전후 보정 2건만 보강</td></tr>
       <tr><td class="c">가-2-1</td><td>GPU 환경 변경점</td><td>회신</td><td>등급 결정 경로는 GPU 유무와 무관하게 동일합니다</td></tr>
       <tr><td class="c">가-2-2</td><td>100쪽 문서 처리 시간</td><td>회신</td><td>100쪽 문서를 <b>파싱부터 판정까지 종단 실측</b>했습니다. 6 CPU 기준 <b>약 5분</b>. 스캔 문서는 납품 번들에서 처리되지 않습니다(OCR 미동봉)</td></tr>
-      <tr><td class="c">가-3</td><td>반환 항목</td><td>회신</td><td>현행 20필드. GPU 유무로 달라지지 않습니다</td></tr>
+      <tr><td class="c">가-3</td><td>반환 항목</td><td>회신</td><td>현행 19필드(2026-09-27 정정 &mdash; &sect;5 참조). GPU 유무로 달라지지 않습니다</td></tr>
       <tr><td class="c">가-3-1</td><td>SVM 점수 산정</td><td>회신</td><td>키워드 등급이 먼저 정해지고, 곱셈(S&times;V&times;M)은 그 위의 교차 확인입니다</td></tr>
       <tr><td class="c">가-3-2</td><td>XAI 방법</td><td>회신</td><td>Attention·Gradient Saliency 는 쓰지 않습니다. 매칭 구간·판정 경로로 근거를 제시합니다</td></tr>
       <tr><td class="c">가-4</td><td>룰 기반 방식</td><td><b>기재 정확</b></td><td>출현 횟수 &times; 가중치의 등급별 합산 argmax 입니다. 시드 404개</td></tr>
@@ -168,7 +168,7 @@ a{color:#0a0a0a}
   </table>
   </div>
 
-  <div class="tw"><!-- FIG:flow --><svg viewBox="0 0 940 578" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="서빙 경로 다섯 단계를 세로로 그린 도식. 등급을 산출하거나 바꾸는 단계는 둘뿐이다"><style>.t{font:12px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 13px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.d{font:11px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.n{font:700 12px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.bg{font:700 10.5px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.bgo{font:700 10.5px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}</style><text class="th" x="8" y="26">문서 한 건이 등급을 받기까지 &#8212; 서빙 경로 다섯 단계</text><text class="d" x="8" y="46">등급을 <tspan class="th">산출하거나 바꾸는 단계는 2·4 둘뿐</tspan>이다. 3 은 등급을 정하지 않고, 5 는 자동확정 여부만 정한다.</text><rect x="150" y="66" width="470" height="24" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="t" x="162" y="83">입력 &#8212; 문서 또는 텍스트 + ICD 메타데이터</text><line x1="174" y1="90" x2="174" y2="102" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="104" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="104" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="120" text-anchor="middle">1</text><text class="th" x="184" y="120">전처리</text><text class="d" x="162" y="138">텍스트 추출 → 정규화 → PII 마스킹 → 청크 분할</text><line x1="174" y1="160" x2="174" y2="172" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="174" width="470" height="62" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="174" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="190" text-anchor="middle">2</text><text class="th" x="184" y="190">분류기 추론</text><text class="d" x="162" y="208">KF-DeBERTa 청크별 softmax · 온도 보정 2.03 · TS·S1 은</text><text class="d" x="162" y="223">최댓값, 그 외 길이 가중 평균 · 위험도 순 선택 τ=0.30</text><rect x="646" y="174" width="86" height="20" fill="#0a0a0a" stroke="#0a0a0a"/><text class="bg" x="689" y="188" text-anchor="middle">등급 결정</text><line x1="174" y1="248" x2="174" y2="260" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="262" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="262" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="278" text-anchor="middle">3</text><text class="th" x="184" y="278">룰 등급 산출</text><text class="d" x="162" y="296">키워드 argmax → 요소 정합 → 상위 등급 채택</text><rect x="646" y="262" width="86" height="20" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="bgo" x="689" y="276" text-anchor="middle">등급 결정 아님</text><line x1="174" y1="318" x2="174" y2="330" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="332" width="470" height="62" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="332" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="348" text-anchor="middle">4</text><text class="th" x="184" y="348">등급 보정</text><text class="d" x="162" y="366">미탐 방지 상향(올림); 출처 상한(내림); 보안표시 하한(올림) · 룰 상향 임계</text><text class="d" x="162" y="381">TS 3.0 · S1 2.2 · S2 1.6</text><rect x="646" y="332" width="86" height="20" fill="#0a0a0a" stroke="#0a0a0a"/><text class="bg" x="689" y="346" text-anchor="middle">등급 변경</text><line x1="174" y1="406" x2="174" y2="418" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="420" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="420" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="436" text-anchor="middle">5</text><text class="th" x="184" y="436">검수 라우팅</text><text class="d" x="162" y="454">게이트 14개를 순서대로 · 신뢰도 임계 0.50</text><rect x="646" y="420" width="86" height="20" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="bgo" x="689" y="434" text-anchor="middle">라우팅</text><line x1="174" y1="476" x2="174" y2="488" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="490" width="470" height="26" fill="#0a0a0a"/><text class="n" x="162" y="508">출력 &#8212; 등급 · 신뢰도 · 근거 · 상태(staging / needs_review)</text><defs><marker id="fah" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#0a0a0a"/></marker></defs><text class="d" x="8" y="542">값은 배포 프로파일(full-train)에서 읽어 그린다 &#8212; 설정이 바뀌면 이 그림도 함께 바뀐다.</text></svg><!-- /FIG:flow --></div>
+  <div class="tw"><!-- FIG:flow --><svg viewBox="0 0 940 578" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="서빙 경로 다섯 단계를 세로로 그린 도식. 등급을 산출하거나 바꾸는 단계는 둘뿐이다"><style>.t{font:12px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 13px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.d{font:11px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.n{font:700 12px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.bg{font:700 10.5px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.bgo{font:700 10.5px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}</style><text class="th" x="8" y="26">문서 한 건이 등급을 받기까지 &#8212; 서빙 경로 다섯 단계</text><text class="d" x="8" y="46">등급을 <tspan class="th">산출하거나 바꾸는 단계는 2·4 둘뿐</tspan>이다. 3 은 등급을 정하지 않고, 5 는 자동확정 여부만 정한다.</text><rect x="150" y="66" width="470" height="24" fill="#f4f4f5" stroke="rgba(0,0,0,.18)"/><text class="t" x="162" y="83">입력 &#8212; 문서 또는 텍스트 + ICD 메타데이터</text><line x1="174" y1="90" x2="174" y2="102" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="104" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="104" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="120" text-anchor="middle">1</text><text class="th" x="184" y="120">전처리</text><text class="d" x="162" y="138">텍스트 추출 → 정규화 → PII 마스킹 → 청크 분할</text><line x1="174" y1="160" x2="174" y2="172" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="174" width="470" height="62" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="174" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="190" text-anchor="middle">2</text><text class="th" x="184" y="190">분류기 추론</text><text class="d" x="162" y="208">KF-DeBERTa 청크별 softmax · 온도 보정 2.03 · TS·S1 은</text><text class="d" x="162" y="223">최댓값, 그 외 길이 가중 평균 · 위험도 순 선택 τ=0.30</text><rect x="646" y="174" width="86" height="20" fill="#0a0a0a" stroke="#0a0a0a"/><text class="bg" x="689" y="188" text-anchor="middle">등급 결정</text><line x1="174" y1="248" x2="174" y2="260" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="262" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="262" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="278" text-anchor="middle">3</text><text class="th" x="184" y="278">룰 등급 산출</text><text class="d" x="162" y="296">키워드 argmax → 요소 정합 → 상위 등급 채택</text><rect x="646" y="262" width="86" height="20" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="bgo" x="689" y="276" text-anchor="middle">등급 결정 아님</text><line x1="174" y1="318" x2="174" y2="330" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="332" width="470" height="62" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="332" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="348" text-anchor="middle">4</text><text class="th" x="184" y="348">등급 보정</text><text class="d" x="162" y="366">미탐 방지 상향(올림); 출처 상한(내림); 보안표시 하한(올림) · 룰 상향 임계</text><text class="d" x="162" y="381">TS 3.0 · S1 2.2 · S2 1.6</text><rect x="646" y="332" width="86" height="20" fill="#0a0a0a" stroke="#0a0a0a"/><text class="bg" x="689" y="346" text-anchor="middle">등급 변경</text><line x1="174" y1="406" x2="174" y2="418" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="420" width="470" height="44" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="150" y="420" width="24" height="22" fill="#0a0a0a"/><text class="n" x="162" y="436" text-anchor="middle">5</text><text class="th" x="184" y="436">검수 라우팅</text><text class="d" x="162" y="454">게이트 15개를 순서대로 · 신뢰도 임계 0.50</text><rect x="646" y="420" width="86" height="20" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="bgo" x="689" y="434" text-anchor="middle">라우팅</text><line x1="174" y1="476" x2="174" y2="488" stroke="#0a0a0a" marker-end="url(#fah)"/><rect x="150" y="490" width="470" height="26" fill="#0a0a0a"/><text class="n" x="162" y="508">출력 &#8212; 등급 · 신뢰도 · 근거 · 상태(staging / needs_review)</text><defs><marker id="fah" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#0a0a0a"/></marker></defs><text class="d" x="8" y="542">값은 배포 프로파일(full-train)에서 읽어 그린다 &#8212; 설정이 바뀌면 이 그림도 함께 바뀐다.</text></svg><!-- /FIG:flow --></div>
 
   <p>기재되지 않은 것이 <b>둘</b> 있어 보강합니다.</p>
 
@@ -183,7 +183,7 @@ a{color:#0a0a0a}
       </tr>
       <tr>
         <td>최종 &mdash; 검수 라우팅</td>
-        <td>등급이 정해진 뒤 <b>게이트 14개</b>가 &ldquo;이 건을 사람에게 보낼지&rdquo;를 판정합니다.
+        <td>등급이 정해진 뒤 <b>게이트 15개</b>(회신 당시 14개 &mdash; 2026-09-10 에 1개를 더했습니다)가 &ldquo;이 건을 사람에게 보낼지&rdquo;를 판정합니다.
         <b>게이트는 등급을 바꾸지 않습니다</b> &mdash; 라우팅만 합니다</td>
       </tr>
     </tbody>
@@ -320,7 +320,13 @@ a{color:#0a0a0a}
 <h2>5. 가-3 &mdash; 반환 항목</h2>
   <div class="q">현행 반환 항목이 최종 확정인가 · GPU 여부에 따른 구분</div>
 
-  <p>현행 <code>ClassifyResponse</code> 는 <b>20필드</b>입니다. GPU 유무로 달라지지 않습니다. 아래 표의 18개와, 사람이 확정한 등급을 담는 3개(<code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> &mdash; &sect;5-1)를 합한 것입니다.</p>
+  <p>현행 <code>ClassifyResponse</code> 는 <b>19필드</b>입니다. GPU 유무로 달라지지 않습니다. 아래 표가 그 19필드입니다. 사람이 확정한 등급을 담는 3개(<code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> &mdash; &sect;5-1)는 이 응답에 없고 문서 단위 조회에서 나옵니다.</p>
+
+  <div class="note">
+    <b>정정(2026-09-27).</b> <code>ClassifyResponse</code>(19필드, 아래 표)는 저희 내부 화면 전용 응답입니다. 귀사가 실제로 받는 IF-05 작업 결과·콜백 본문은
+    <b>17필드</b>(elapsed_ms 없음 + 2026-09-27 부터 <code>automation_assessment</code> 도 없음 — 자동확정 정책 검증용 내부 관측치라 연동에 쓰지 않습니다)이며,
+    상세는 「API 통신 방안 검토 회신」 &sect;3 을 참고하시기 바랍니다.
+  </div>
 
   <div class="tw">
   <table>
@@ -339,8 +345,19 @@ a{color:#0a0a0a}
       <tr><td><code>automation_assessment</code></td><td class="c">&mdash;</td><td>자동확정 판단 근거(마진·순위 등)</td></tr>
       <tr><td><code>evidence</code></td><td class="c">&mdash;</td><td>근거 구간(&sect;7 참조)</td></tr>
       <tr><td><code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>factors_source</code></td><td class="c">&mdash;</td><td>3요건 표시값과 그 출처</td></tr>
+      <tr><td><code>grade_candidates</code> · <code>grade_candidates_reason</code></td><td class="c">&mdash;</td><td>비밀관리성(M)을 받지 못해 아직 하나로 정해지지 않은 등급 후보와 그 사유. 비어 있으면 <code>label</code> 이 유일한 답입니다(2026-09-10 추가)</td></tr>
     </tbody>
   </table>
+  </div>
+
+  <div class="note">
+    <b>정정(2026-09-27).</b> 이 회신 당시(2026-08-28)에는 반환 항목을 20필드로 적었습니다. 그 뒤 세 가지가 바뀌었습니다.
+    ① 2026-09-10 에 등급 후보집합 <code>grade_candidates</code> · <code>grade_candidates_reason</code> 두 필드를 더했습니다(위 표 마지막 행).
+    ② 2026-09-26 에 확정 등급 세 필드(<code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code>)를 분류 응답에서 뺐습니다 &mdash;
+    확정은 분류 뒤에 사람이 하는 일이라 분류 응답과 완료 통보에는 값이 채워진 적이 없습니다.
+    ③ 같은 날 문서 단위 조회(<code>GET /classify/{doc_id}</code>)의 응답을 저장된 값만 담는 10필드(확정 등급 세 필드 포함)로 갈랐습니다.
+    그래서 현행 분류 응답(<code>POST /classify</code>)은 19필드이고, 완료 통보(<code>POST {callback_url}</code>)와
+    작업 조회(<code>GET /classify/jobs/{job_id}</code>)의 결과 항목은 처리 시간 <code>elapsed_ms</code> 를 뺀 18필드입니다.
   </div>
 
   <div class="note">
@@ -354,7 +371,7 @@ a{color:#0a0a0a}
   <h3>5-1. 확정 여부와 추가 항목</h3>
 
   <p>결과 수신 항목과 연계 방식이 협의로 확정되면 <b>연동 규약서에 반영해 정본으로 관리</b>합니다.
-  그때까지는 위 20필드가 배포본 기준 규격입니다.</p>
+  그때까지는 위 19필드가 배포본 기준 규격입니다.</p>
 
   <div class="tw">
   <table>

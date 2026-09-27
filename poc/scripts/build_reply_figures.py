@@ -42,16 +42,21 @@ _HERE = Path(__file__).resolve().parent
 _REPO = _HERE.parent.parent
 
 def _response_field_count() -> int:
-    """분류 응답 필드 수 — 스키마에서 센다.
+    """완료 통보(IF-05)로 나가는 결과 항목의 필드 수 — 스키마에서 센다.
 
     [2026-09-05] 종전에는 도식에 "21필드"라고 손으로 적혀 있었다. 같은 문서 본문은
     "20필드"라고 적고 코드도 20 이었다 — 그림만 하나 더 세고 있었다. 그림 속 글자는
     audit_doc_runtime.py 가 못 읽으므로 아무도 잡지 못한다. 그래서 여기서 센다.
+
+    [2026-09-27] 세는 모델을 ClassifyResponse(동기 응답) 에서 ClassifyJobResult(비동기 작업 결과 항목) 로
+    바꿨다. 이 그림이 그리는 것은 KL 이 완료 통보 본문 results[] 로 받는 항목인데, aaea98c3(9/26)이
+    둘을 갈랐다 — 동기 응답에는 처리 시간 elapsed_ms 가 더 있고 비동기 결과에는 없다. 옛 모델을 그대로 세면
+    도식이 KL 이 받지 않는 값(19)을 적는다.
     """
     sys.path.insert(0, str(_REPO / "poc" / "src"))
-    from koipa.schemas.classify import ClassifyResponse  # noqa: PLC0415
+    from koipa.schemas.classify import ClassifyJobResult  # noqa: PLC0415
 
-    return len(ClassifyResponse.model_fields)
+    return len(ClassifyJobResult.model_fields)
 
 INK, DIM, LINE, MID = "#0a0a0a", "#71717a", "rgba(0,0,0,.18)", "#f4f4f5"
 BAR_LIGHT = "#d4d4d8"

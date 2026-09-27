@@ -288,7 +288,7 @@ POST /regulations ──▶ RegulationService ◀── RegulationEvidenceServic
 | id | rgltn_id | 규정아이디 | UUID PK | |
 | name | rgltn_nm | 규정명 | VARCHAR(200) NOT NULL | 같은 규정명의 판들은 한 계열 |
 | version_label | ver_lbl_nm | 버전라벨명 | VARCHAR(50) NOT NULL | 예 "v3.1" |
-| effective_date | enfc_dt | 시행일시 | VARCHAR(30) NULL | 가이드 표(`tad_gm_guide_ver_mng.enfc_dt`)와 칼럼 ID 가 같아 타입을 맞췄다(감리 R3) — ISO 날짜 문자열 |
+| effective_date | enfc_dt | 시행일시 | VARCHAR(30) NULL | 가이드 표(`tad_gm_guide_ver_mng.enfc_dt`, 2026-09-26 삭제)와 칼럼 ID 가 같아 타입을 맞췄다(감리 R3) — ISO 날짜 문자열 |
 | status | prcs_stts_cd | 처리상태코드 | VARCHAR(20) NOT NULL | `indexing`·`ready`·`active`·`archived`·`failed` |
 | file_hash | file_hash_nm | 파일해시명 | VARCHAR(64) NOT NULL | SHA-256. 부분 UNIQUE `uq_rgltn_hash_live`(삭제 제외). 다른 표는 NULL 허용이라 감리 R4 에 정당 사유로 등록 |
 | raw_uri | orgtxt_path_nm | 원문경로명 | VARCHAR(500) | 기존 칼럼명 재사용 |

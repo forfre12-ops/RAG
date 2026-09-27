@@ -44,7 +44,7 @@ $COMPOSE down                          # 전체 정지 (named 볼륨은 보존)
 
 - 서빙은 의도적으로 **안전방향 과분류**(고등급 미탐 0 우선)다 — 정확 등급일치가 아니라 미탐 없음이 합격 기준.
 - 스모크: `POST /api/v1/classify` (`{"doc_id":..,"content":..}`) → 등급 + confidence + `status`(needs_review면 검수 큐).
-- 검수 대기 목록: `GET /api/v1/admin/escalation-held`. 관제: `GET /api/v1/admin/dashboard`.
+- 검수 대기 목록: `GET /api/v1/review-queue`. 관제: `GET /api/v1/admin/dashboard`(검수 대기 건수는 그 응답의 `escalation_held`).
 
 ---
 
@@ -132,12 +132,11 @@ beat가 발행하는 정기 작업 — 누락 시 아래가 전부 정지:
 ## 8. 시연·리허설 데이터 정리
 
 시연 스크립트(`scripts/demo_e2e_8010.py` · `demo_e2e_golden.py`)와 화면 경로
-(분류 콘솔의 `#sec-parse` 구역)로 만든 데이터는 **두 마커**로 식별됩니다.
+(분류 콘솔의 `#sec-parse` 구역)로 만든 데이터는 **문서 소유자 마커** 하나로 식별됩니다.
 
 | 마커 | 값 |
 |---|---|
-| 문서 소유자 | `tb_documents.created_by = 'demo-console'` |
-| RAG 컬렉션 | `tb_rag_vectors.collection = 'demo'` |
+| 문서 소유자 | `tad_dm_doc_mng.creatr_id = 'demo-console'` |
 
 **`POST /admin/demo/purge`는 지재원·고객사 배포에서 404입니다.** 고장이 아니라
 하드닝 프로파일(`onprem-local` · `full-train`)이 `demo_console_enabled=False`로
@@ -155,18 +154,16 @@ beat가 발행하는 정기 작업 — 누락 시 아래가 전부 정지:
 
 ### 정리 절차
 
-FK 순서를 지켜야 합니다(`evidence`·`corrections`는 CASCADE로 함께 삭제 —
-재학습 큐 오염도 여기서 해소됩니다).
+FK 순서를 지켜야 합니다 — 분류 결과(`tad_cm_clsf_rslt_mng`)가 문서를 RESTRICT 로 참조하므로 분류 결과부터 지웁니다.
+근거·교정은 분류 결과와, 라벨·문서 벡터는 문서와 함께 CASCADE 로 삭제됩니다(재학습 큐 오염도 여기서 해소됩니다).
+이 블록은 `POST /admin/demo/purge` 가 실행하는 문장과 같은 순서입니다.
 
 ```bash
 $COMPOSE exec postgres psql -U koipa -d koipa <<'SQL'
 BEGIN;
-DELETE FROM tb_classifications   WHERE doc_id IN (SELECT doc_id FROM tb_documents WHERE created_by='demo-console');
-DELETE FROM tb_training_datasets WHERE doc_id IN (SELECT doc_id FROM tb_documents WHERE created_by='demo-console');
-DELETE FROM tb_sample_documents  WHERE doc_id IN (SELECT doc_id FROM tb_documents WHERE created_by='demo-console');
-DELETE FROM tb_chunks            WHERE doc_id IN (SELECT doc_id FROM tb_documents WHERE created_by='demo-console');
-DELETE FROM tb_documents         WHERE created_by='demo-console';
-DELETE FROM tb_rag_vectors       WHERE collection='demo';
+DELETE FROM tad_cm_clsf_rslt_mng WHERE doc_id IN (SELECT doc_id FROM tad_dm_doc_mng WHERE creatr_id='demo-console');
+DELETE FROM tad_cm_chnk_mng      WHERE doc_id IN (SELECT doc_id FROM tad_dm_doc_mng WHERE creatr_id='demo-console');
+DELETE FROM tad_dm_doc_mng       WHERE creatr_id='demo-console';
 COMMIT;
 SQL
 ```
@@ -177,26 +174,25 @@ SQL
 curl -s "http://localhost:8000/api/v1/review-queue?limit=50" -H "X-API-Key: $API_KEY"
 ```
 
-> **실행 전 스코프 확인** — `SELECT count(*) FROM tb_documents WHERE created_by='demo-console';`
+> **실행 전 스코프 확인** — `SELECT count(*) FROM tad_dm_doc_mng WHERE creatr_id='demo-console';`
 > 가 예상 리허설 횟수보다 크게 많으면 실 데이터가 데모 마커로 오태깅됐을 신호이므로
 > 삭제하지 말고 원인을 먼저 확인합니다(API 경로에도 같은 취지의 안전캡 1000건이 있습니다).
 
 ### 배포 검증 스크립트가 남기는 것
 
-`scripts/verify_deploy_live.sh`는 문서를 `created_by='verify'`로 적재합니다
+`scripts/verify_deploy_live.sh`는 문서를 `creatr_id='verify'`로 적재합니다
 (`actor={"user_id":"verify"}`). **데모 마커가 아니므로 위 절차로는 지워지지 않고**,
 재배포 검증을 반복할수록 검수 큐에 쌓입니다. 같이 정리하려면 마커만 바꿔 실행합니다.
 
 ```sql
 -- 위 블록의 'demo-console' 을 'verify' 로 바꿔 동일 순서로 실행
--- (RAG 벡터는 컬렉션이 다르므로 마지막 DELETE 는 생략)
 ```
 
 현재 남은 건수 확인:
 
 ```bash
 $COMPOSE exec postgres psql -U koipa -d koipa \
-  -c "SELECT created_by, count(*) FROM tb_documents GROUP BY created_by ORDER BY 2 DESC;"
+  -c "SELECT creatr_id, count(*) FROM tad_dm_doc_mng GROUP BY creatr_id ORDER BY 2 DESC;"
 ```
 
 **교정 단계를 아예 만들지 않으려면** 시나리오 A를 기본값으로 돌리십시오 —
