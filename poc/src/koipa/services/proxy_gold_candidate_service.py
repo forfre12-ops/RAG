@@ -1190,7 +1190,12 @@ class ProxyGoldCandidateService:
             document_path = str(source)
         row = {
             "doc_id": doc_id,
-            "title": str(meta.get("document_type") or source.stem),
+            # [2026-09-27] document_type 는 "사실우선 모의문서(R7)" 처럼 생성 회차 표식이지
+            # 문서별 제목이 아니다 — 사실우선 1~9차 배치 1,711건이 title 값 9종(R1~R9)뿐이라
+            # 목록에서 문서를 구분할 수 없었다(실측: 실치설치 리허설 콘솔 화면). 본문 첫 줄은
+            # 문서마다 실제 제목이라(예: "법무실 새 식구를 위한 안내 — 분쟁 비용 자료 편") 별도
+            # title 메타 필드를 우선 쓴다. 없는 후보(옛 배치)는 document_type 로 그대로 물러난다.
+            "title": str(meta.get("title") or meta.get("document_type") or source.stem),
             "proposed_grade": proposed,
             "proposed_grade_basis": proposed_basis,
             "final_grade": None,                    # 결정 덮어쓰기에서 채운다(_load_candidates)

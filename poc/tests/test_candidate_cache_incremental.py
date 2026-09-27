@@ -231,3 +231,27 @@ def test_summary_and_quality_follow_the_selected_batch(tmp_path):
     svc.decide(doc_id="C-002", action="approve", actor_id="admin")
     assert svc.list_candidates(review_batch="B1")["summary"]["fixed"] == 1
     assert svc.list_candidates(review_batch="B2")["summary"]["fixed"] == 0
+
+
+def test_title_prefers_metadata_title_over_document_type(tmp_path):
+    """document_type 은 생성 회차 표식("사실우선 모의문서(R7)")이지 문서 제목이 아니다 — 실측
+    2026-09-27: 사실우선 배치 1,711건이 이 필드로 title 을 채워서 목록에 제목이 9종뿐이었다
+    (본문마다 있는 실제 첫 줄 제목이 안 쓰였다). title 메타 필드가 있으면 그걸 우선한다.
+    """
+    _candidate(tmp_path, "C-001")  # document_type 만 있고 title 없음 — 옛 배치 그대로
+    meta_path = tmp_path / "C-001.metadata.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    assert "title" not in meta
+    svc = ProxyGoldCandidateService(tmp_path)
+    row = svc.list_candidates()["candidates"][0]
+    assert row["title"] == "검토 문서"  # 폴백: document_type 그대로(회귀 방지)
+
+    _candidate(tmp_path, "C-002")
+    meta_path2 = tmp_path / "C-002.metadata.json"
+    meta2 = json.loads(meta_path2.read_text(encoding="utf-8"))
+    meta2["title"] = "법무실 새 식구를 위한 안내 — 분쟁 비용 자료 편"
+    meta_path2.write_text(json.dumps(meta2, ensure_ascii=False), encoding="utf-8")
+    pgs._CANDIDATE_CACHE.clear()
+    svc2 = ProxyGoldCandidateService(tmp_path)
+    row2 = next(c for c in svc2.list_candidates()["candidates"] if c["doc_id"] == "C-002")
+    assert row2["title"] == "법무실 새 식구를 위한 안내 — 분쟁 비용 자료 편"
