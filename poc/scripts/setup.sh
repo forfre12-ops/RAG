@@ -328,21 +328,29 @@ else
   # 우선한다. 없으면 gpu.yml 로 내려가되 — 이번에 함정을 실제로 경고한다.
   _gpu_overlay=""
   if [ "$NODE" = "jjw" ] && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
-    if "$CRT" image inspect koipa-gpu:cu130 >/dev/null 2>&1 || "$CRT" images -q "koipa-gpu" 2>/dev/null | grep -q .; then
-      for _c in "$BUNDLE/infra-config/docker-compose.gpu-train.yml" "$BUNDLE/docker-compose.gpu-train.yml"; do
-        [ -f "$_c" ] && { _gpu_overlay="$_c"; break; }
-      done
-    fi
-    if [ -z "$_gpu_overlay" ]; then
-      for _c in "$BUNDLE/infra-config/docker-compose.gpu.yml" "$BUNDLE/docker-compose.gpu.yml"; do
-        [ -f "$_c" ] && { _gpu_overlay="$_c"; break; }
-      done
-      [ -n "$_gpu_overlay" ] && inf "[주의] koipa-gpu:cu130 이미지가 안 보인다 — 장치만 예약되고 학습은 CPU 휠로 돈다(느림, 실패는 아님). CUDA 이미지 빌드 후 재기동하면 gpu-train.yml 로 올라간다 — $(basename "$_gpu_overlay") 자체 주석 참고."
-    fi
-    if [ -n "$_gpu_overlay" ]; then
-      inf "GPU 감지 — 오버레이 적용: $(basename "$_gpu_overlay")"
+    # nvidia-smi 는 드라이버 유무만 본다 — 컨테이너 런타임에 nvidia 런타임이 등록돼 있는지는
+    # 별개다(nvidia-container-toolkit 설치 필요). 실측 2026-09-28: 드라이버는 있는데 런타임이
+    # 없는 호스트에서 오버레이를 그대로 적용하니 "could not select device driver nvidia" 로
+    # 마이그레이션 단계째 배포가 멈췄다 — 장치예약 실패는 "느리게 CPU 로 돈다"가 아니라 하드 크래시다.
+    if ! "$CRT" info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia":'; then
+      inf "[주의] GPU 는 보이는데(nvidia-smi) 이 호스트의 컨테이너 런타임에 nvidia 런타임이 등록돼 있지 않다(nvidia-container-toolkit 미설치로 추정) — CPU 로 기동한다. 오버레이를 적용했다면 이 자리에서 배포 전체가 멈췄을 것이다."
     else
-      inf "[주의] GPU 는 있는데 docker-compose.gpu.yml 이 번들에 없다 — CPU 로 기동한다"
+      if "$CRT" image inspect koipa-gpu:cu130 >/dev/null 2>&1 || "$CRT" images -q "koipa-gpu" 2>/dev/null | grep -q .; then
+        for _c in "$BUNDLE/infra-config/docker-compose.gpu-train.yml" "$BUNDLE/docker-compose.gpu-train.yml"; do
+          [ -f "$_c" ] && { _gpu_overlay="$_c"; break; }
+        done
+      fi
+      if [ -z "$_gpu_overlay" ]; then
+        for _c in "$BUNDLE/infra-config/docker-compose.gpu.yml" "$BUNDLE/docker-compose.gpu.yml"; do
+          [ -f "$_c" ] && { _gpu_overlay="$_c"; break; }
+        done
+        [ -n "$_gpu_overlay" ] && inf "[주의] koipa-gpu:cu130 이미지가 안 보인다 — 장치만 예약되고 학습은 CPU 휠로 돈다(느림, 실패는 아님). CUDA 이미지 빌드 후 재기동하면 gpu-train.yml 로 올라간다 — $(basename "$_gpu_overlay") 자체 주석 참고."
+      fi
+      if [ -n "$_gpu_overlay" ]; then
+        inf "GPU 감지 — 오버레이 적용: $(basename "$_gpu_overlay")"
+      else
+        inf "[주의] GPU 는 있는데 docker-compose.gpu.yml 이 번들에 없다 — CPU 로 기동한다"
+      fi
     fi
   fi
   _run_deploy
