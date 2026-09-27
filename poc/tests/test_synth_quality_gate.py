@@ -123,8 +123,10 @@ def test_single_grade_batch_still_blocks_grade_token():
     docs[3] = ("S1", "본 문서는 1급 비밀로 분류된 자료입니다. " + "본문 " * 200)
     result = screen_batch(docs)
 
+    # 이 문장은 등급 낱말('1급 비밀')과 자기 진술 문장 구조를 둘 다 갖고 있어
+    # 두 사유가 함께 붙는다(2026-09-28, self_grade_declaration 추가).
     reasons = {f["reason"] for f in result["flagged"]}
-    assert reasons == {"grade_token_exposed"}
+    assert reasons == {"grade_token_exposed+self_grade_declaration"}
     assert 3 not in result["admit"]
     assert len(result["admit"]) == len(docs) - 1
 

@@ -443,6 +443,10 @@ def synthesize_batch(
                 "domain": d.domain,
                 "llm_provider": d.llm_provider,
                 "cost_usd": d.usage.cost_usd if d.usage else 0.0,
+                # [2026-09-28] 이 문서를 만들 때 생성규칙(playbook)을 적용했는지와 그 판.
+                # 빈 문자열="미적용". job 조회(GET /synth/jobs/{id})로 "이 배치는 규칙을
+                # 썼는가"를 되짚을 수 있다 — DB 스키마 변경 없이 잡 결과에만 남긴다.
+                "playbook_version": getattr(d, "playbook_version", "") or "",
             }
             for d in docs
         ]

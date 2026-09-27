@@ -438,6 +438,9 @@ class Settings(BaseSettings):
     # [3] 다단계 생성(개요→본문→자체검토→수정). False 면 종전과 같은 1회 호출이다.
     #     켜면 문서 1건당 LLM 호출이 3~4회로 늘어난다 — 비용·시간이 그만큼 는다.
     synth_multi_step: bool = False
+    # [4] 생성규칙(m1_synthesis/generation_playbook.py) 적용 여부. 2026-09-26 A/B 시험에서
+    #     규칙 없이 만들면 자기 기밀 진술·등급 표기 노출이 더 잦다는 게 확인돼 기본 True.
+    synth_use_generation_playbook: bool = True
 
     # 하위호환 alias (vllm_*) — 기존 코드·테스트가 참조 중
     vllm_base_url: str = "http://localhost:8001/v1"

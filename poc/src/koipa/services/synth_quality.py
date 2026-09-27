@@ -23,6 +23,17 @@
 
 ⚠ 이 게이트는 **버리지 않는다.** 걸린 문서는 flagged 로 표시해 돌려주고, 호출부가
   검수큐 적재에서 뺀다. 생성 비용은 이미 들었으므로 무엇이 왜 걸렸는지는 남긴다.
+
+[2026-09-28] self_grade_declaration 을 더했다. grade_token_exposed 는 낱말(TS·대외비 등)만
+보는데, 9/25~26 실측(로컬 Ollama qwen3:14b)에서 "이 문서는 핵심 기술 자료의 유출 방지를
+위해 작성되었으며 … 공유 가능합니다" 처럼 **등급 낱말 없이 문장 구조로 자기 기밀성을
+진술**하는 문서가 나왔다 — 낱말 검사만으론 못 잡는다. 정규식은 "본/이 문서는 …"
+주어 뒤 60자 안에 확산 통제 서술(외부 유출·유출 방지·공유 금지 등)이 있는지만 본다.
+과탐 점검(datasets/labeled_p1_retrain_v4_clean/train.jsonl 합성 3,187행): 315건 히트,
+**전부** grade_token_exposed 와 겹친다(새로 거르는 것 0건) — 기존 학습셋을 소급 적용해도
+추가로 떨어지는 문서가 없다. "본 문서는 보도자료 형태로 …외부에 배포"처럼 **공개를
+알리는** 문장은 금지·제한·방지류 서술이 없어 걸리지 않도록 확산 통제 낱말에 접미사를
+요구했다(배포 단독이 아니라 "배포 금지/제한"만 본다).
 """
 
 from __future__ import annotations
@@ -117,6 +128,27 @@ def _exposes_grade_token(text: str) -> bool:
     return bool(_grade_term_pattern().search(_fold_for_match(text)))
 
 
+# [2026-09-28] 낱말이 아니라 문장 구조로 자기 기밀성을 진술하는 문서를 잡는다.
+# "본/이 문서는" 주어 뒤 60자 안에 확산 통제 서술이 있으면 잡는다. "배포"·"공유"·"유출"
+# 단독이 아니라 금지·제한·불가·주의·방지 접미사가 붙었을 때만 본다 — 접미사 없이 두면
+# "본 문서는 보도자료로 …외부에 배포"(공개를 알리는 정상 S3 문장)까지 걸린다(실측: 아래 참조).
+_SELF_GRADE_DECLARATION = re.compile(
+    r"(본|이)\s?문서(는|가)[^.\n]{0,60}("
+    r"기밀|비밀|대외비|극비|보안\s?등급|보안\s?수준|"
+    r"외부\s?유출|유출\s?(금지|주의|불가|방지)|"
+    r"공유\s?(금지|불가|제한)|"
+    r"열람\s?(금지|제한)|"
+    r"배포\s?(금지|제한)|"
+    r"취급\s?주의"
+    r")"
+)
+
+
+def _exposes_self_grade_declaration(text: str) -> bool:
+    """본문이 스스로 "이 문서는 …기밀/유출금지…"라고 진술하는가(낱말이 아니라 문장 구조)."""
+    return bool(_SELF_GRADE_DECLARATION.search(_fold_for_match(text)))
+
+
 def screen_batch(
     docs: Sequence[tuple[str, str]],
     *,
@@ -137,9 +169,19 @@ def screen_batch(
     flagged: list[dict[str, Any]] = []
 
     # ① 문서 단위 — 등급명 노출. 표본 수와 무관하게 항상 본다.
-    exposed_idx = {i for i, (_g, t) in enumerate(rows) if _exposes_grade_token(t)}
+    grade_token_idx = {i for i, (_g, t) in enumerate(rows) if _exposes_grade_token(t)}
+    # ①-1 [2026-09-28] 등급 낱말 없이 문장 구조로 자기 기밀성을 진술하는 문서.
+    self_decl_idx = {
+        i for i, (_g, t) in enumerate(rows) if _exposes_self_grade_declaration(t)
+    }
+    exposed_idx = grade_token_idx | self_decl_idx
     for i in sorted(exposed_idx):
-        flagged.append({"index": i, "reason": "grade_token_exposed"})
+        reasons = []
+        if i in grade_token_idx:
+            reasons.append("grade_token_exposed")
+        if i in self_decl_idx:
+            reasons.append("self_grade_declaration")
+        flagged.append({"index": i, "reason": "+".join(reasons)})
 
     # ①-2 문서 품질 하한 — 한 건으로 판정 가능하므로 표본 수와 무관하게 본다.
     #

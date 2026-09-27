@@ -21,7 +21,11 @@
 from __future__ import annotations
 
 from koipa.modules.m1_synthesis.generator import FORBIDDEN_GRADE_TERMS
-from koipa.services.synth_quality import _exposes_grade_token, screen_batch
+from koipa.services.synth_quality import (
+    _exposes_grade_token,
+    _exposes_self_grade_declaration,
+    screen_batch,
+)
 
 
 def test_korean_grade_expressions_are_caught():
@@ -117,15 +121,75 @@ def test_new_gate_terms_are_also_forbidden_in_the_prompts():
 
 
 def test_batch_flags_exposed_documents_without_dropping_them():
-    """걸린 문서는 flagged 로 돌려주고 버리지 않는다 — 생성 비용은 이미 들었다."""
+    """걸린 문서는 flagged 로 돌려주고 버리지 않는다 — 생성 비용은 이미 들었다.
+
+    이 문장은 등급 낱말('1급 비밀')과 자기 진술 문장 구조를 둘 다 갖고 있어
+    두 사유가 함께 붙는다(2026-09-28, self_grade_declaration 추가).
+    """
     docs = [
         ("S1", "본 문서는 [가상기업A]의 1급 비밀로 분류된 자료입니다. " * 4),
         ("S2", "협력사 단가 협상 경과와 후속 조치를 정리한 문서이다. " * 4),
     ]
     res = screen_batch(docs)
     assert res["admit"] == [1], res
-    assert [f["reason"] for f in res["flagged"]] == ["grade_token_exposed"]
+    assert [f["reason"] for f in res["flagged"]] == [
+        "grade_token_exposed+self_grade_declaration"
+    ]
     assert res["flagged"][0]["index"] == 0
+
+
+# ── 자기 기밀 진술(문장 구조) — 2026-09-28 ──────────────────────────────────
+#
+# grade_token_exposed 는 낱말만 본다. 9/25~26 실측(로컬 Ollama qwen3:14b)에서 등급
+# 낱말 없이 "이 문서는 …유출 방지를 위해…공유 가능합니다" 처럼 문장으로만 기밀성을
+# 진술하는 문서가 나왔다 — 낱말 검사로는 못 잡는 자리다.
+
+
+def test_self_declaration_without_grade_word_is_caught():
+    """등급 낱말이 전혀 없어도 '이 문서는 …유출/공유…' 자기 진술은 잡는다."""
+    text = (
+        "이 문서는 핵심 기술 자료의 유출 방지를 위해 작성되었으며, "
+        "임원·팀장급 이상에 한해 공유 가능합니다."
+    )
+    assert not _exposes_grade_token(text), "등급 낱말 자체는 없어야 이 시험의 취지가 산다"
+    assert _exposes_self_grade_declaration(text)
+
+
+def test_public_disclosure_sentence_is_not_a_self_declaration():
+    """'공개를 알리는' 문장은 자기 기밀 진술이 아니다 — 실측 과탐 사례(학습셋 합성 3,187건 중).
+
+    금지·제한 접미사 없는 '배포'·'공유' 단독은 잡지 않는다. 접미사를 요구하지 않으면
+    S3(공개) 문서의 정상 서술까지 걸린다.
+    """
+    for text in (
+        "본 문서는 보도자료 형태로 구성되어 있으며, 임직원과 외부 이해관계자 모두에게 "
+        "투명한 보상 구조를 공유한다.",
+        "본 문서는 공시 의무사항을 준수하며, 보도자료 형식으로 외부에 배포한다.",
+    ):
+        assert not _exposes_self_grade_declaration(text), text
+
+
+def test_ordinary_text_is_not_a_self_declaration():
+    for text in (
+        "협력사 단가 협상 경과와 후속 조치를 정리한 문서이다.",
+        "정보 보안 점검 결과와 후속 조치를 정리한다.",
+    ):
+        assert not _exposes_self_grade_declaration(text), text
+
+
+def test_batch_admits_by_self_declaration_alone():
+    """등급 낱말은 없지만 자기 진술만으로 걸리는 문서를 배치가 뺀다."""
+    docs = [
+        (
+            "S1",
+            "이 문서는 핵심 기술 자료의 외부 유출을 엄격히 금지하며 관계자 외 열람을 "
+            "제한합니다. " * 4,
+        ),
+        ("S2", "협력사 단가 협상 경과와 후속 조치를 정리한 문서이다. " * 4),
+    ]
+    res = screen_batch(docs)
+    assert res["admit"] == [1], res
+    assert [f["reason"] for f in res["flagged"]] == ["self_grade_declaration"]
 
 
 # ── 골든 콘솔 품질 지표 — 출처별로 어휘가 다르다 (2026-09-05) ────────────────

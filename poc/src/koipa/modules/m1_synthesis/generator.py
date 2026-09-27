@@ -46,6 +46,12 @@ from typing import Optional
 
 from koipa.adapters.llm import build_provider
 from koipa.adapters.llm.base import LLMProvider, UsageRecord, accepts_json_schema
+from koipa.modules.m1_synthesis.generation_playbook import (
+    playbook_text as _playbook_text,
+)
+from koipa.modules.m1_synthesis.generation_playbook import (
+    playbook_version as _playbook_version,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -522,6 +528,11 @@ def validate_generator_prompt_contract() -> None:
             )
     for domain, value in DOMAIN_DOC_TYPES.items():
         _require_korean_prompt_text(value, field=f"DOMAIN_DOC_TYPES[{domain!r}]")
+    # 생성규칙(9차 시행착오 이관본)도 같은 무결성 게이트를 받는다 — 인코딩이 깨지면
+    # 조용히 규칙 없는 생성으로 돌아간다.
+    _require_korean_prompt_text(
+        _playbook_text(), field="GENERATION_PLAYBOOK", min_hangul=200
+    )
 
 
 # 주민등록번호 패턴 — 마스커(m2_preprocess/pii_masker.py)와 같은 기준을 쓴다.
@@ -592,6 +603,9 @@ class SynthDoc:
     # 자체검토가 실제로 무엇을 지적했는지. 빈 리스트는 "지적 없음"이고, 단발 생성이면
     # 애초에 검토를 안 했으므로 역시 빈 리스트다 — 둘을 가르는 것은 generation_mode 다.
     critique_issues: list[str] = field(default_factory=list)
+    # [2026-09-28] 이 문서를 만들 때 생성규칙(generation_playbook)을 적용했는가와 그 판.
+    # 빈 문자열="규칙 미적용"(use_playbook=False로 만든 문서). 규칙 내용이 바뀌면 값도 바뀐다.
+    playbook_version: str = ""
 
 
 class SyntheticDocGenerator:
@@ -614,10 +628,19 @@ class SyntheticDocGenerator:
         concurrency: Optional[int] = None,
         structured_output: Optional[bool] = None,
         multi_step: Optional[bool] = None,
+        use_playbook: Optional[bool] = None,
     ) -> None:
         validate_generator_prompt_contract()
         self.llm = llm or build_provider()
         self.concurrency = self._resolve_concurrency(concurrency)
+        # [2026-09-28] 생성규칙(9차 시행착오 이관본)을 기본으로 적용한다. 규칙 없이
+        # 만들면 자기 기밀 진술·등급 표기 노출이 더 잦다는 것이 A/B로 확인돼 있다
+        # (generation_playbook 모듈 docstring). 끌 이유가 없어 기본 True.
+        self.use_playbook = (
+            bool(use_playbook)
+            if use_playbook is not None
+            else bool(getattr(_settings(), "synth_use_generation_playbook", True))
+        )
         # 구조화 출력은 **설정이 켜져 있고 provider 가 인자를 받을 때만** 쓴다.
         # 둘 중 하나만 봐도 안 된다: 설정만 보면 anthropic 에서 TypeError 가 나고,
         # provider 만 보면 설정으로 끌 수가 없다.
@@ -771,6 +794,8 @@ class SyntheticDocGenerator:
             or req.structure_requirements.strip()
             or "문서 유형에 자연스러운 여러 절과 항목을 사용하고 각 절에는 서로 다른 사실을 담는다."
         )
+        if self.use_playbook:
+            structure_requirements = f"{structure_requirements}\n\n{_playbook_text()}"
         revision_context = (revision_override or req.revision_context).strip()
         if revision_context:
             revision_context = f"[재작성 참고]\n{revision_context}"
@@ -925,6 +950,7 @@ class SyntheticDocGenerator:
                 label_source=label_source,
                 response_audit=response_audit,
                 generation_mode=generation_mode,
+                playbook_version=_playbook_version() if self.use_playbook else "",
             )
 
         body = parsed.get("body", "") or ""
@@ -942,6 +968,7 @@ class SyntheticDocGenerator:
             pii_violations=self._pii_violations(body),
             response_audit=response_audit,
             generation_mode=generation_mode,
+            playbook_version=_playbook_version() if self.use_playbook else "",
         )
 
     # ── 다단계 생성 ──────────────────────────────────────────────────────────
