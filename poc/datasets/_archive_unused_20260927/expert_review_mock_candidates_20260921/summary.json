@@ -1,0 +1,64 @@
+{
+  "selection_version": "mock-review-v1",
+  "rule": "exact-text-unique records with document-shape status=admit only",
+  "not_a_claim": "This is not a human validation of label correctness.",
+  "reviewer_safety": "Give reviewers reviewer_documents.jsonl only; do not expose internal_manifest.jsonl.",
+  "downstream_rule": "After sign-off, place each document in exactly one of training, development evaluation, or locked gold evaluation.",
+  "scanned_by_source": {
+    "selfconsistent_v3": 1000,
+    "ts_fin_hr_20260911": 19,
+    "combined_synthetic": 7741,
+    "v5_train_synthetic_grounded": 10,
+    "v5_train_public_scenario": 63,
+    "v8_factor_balance_fill": 5033
+  },
+  "outcomes_by_source": {
+    "selfconsistent_v3": {
+      "admit": 598,
+      "manual_review_priority": 171,
+      "quarantined_low_document_shape": 231
+    },
+    "ts_fin_hr_20260911": {
+      "admit": 16,
+      "manual_review_priority": 3
+    },
+    "combined_synthetic": {
+      "admit": 1,
+      "manual_review_priority": 4,
+      "quarantined_low_document_shape": 6612,
+      "excluded_hard": 1124
+    },
+    "v5_train_synthetic_grounded": {
+      "admit": 8,
+      "manual_review_priority": 1,
+      "excluded_hard": 1
+    },
+    "v5_train_public_scenario": {
+      "admit": 5,
+      "manual_review_priority": 4,
+      "quarantined_low_document_shape": 53,
+      "excluded_hard": 1
+    },
+    "v8_factor_balance_fill": {
+      "admit": 4852,
+      "manual_review_priority": 177,
+      "quarantined_low_document_shape": 4
+    }
+  },
+  "selected_by_source": {
+    "selfconsistent_v3": 598,
+    "ts_fin_hr_20260911": 16,
+    "combined_synthetic": 1,
+    "v5_train_synthetic_grounded": 8,
+    "v5_train_public_scenario": 5,
+    "v8_factor_balance_fill": 372
+  },
+  "deduplicated_after_admit_by_source": {},
+  "selected_by_provisional_label": {
+    "S1": 256,
+    "S2": 249,
+    "TS": 248,
+    "S3": 247
+  },
+  "selected_total": 1000
+}

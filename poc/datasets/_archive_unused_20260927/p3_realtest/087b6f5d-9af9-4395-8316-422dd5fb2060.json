@@ -1,0 +1,28 @@
+{
+  "synth_id": "087b6f5d-9af9-4395-8316-422dd5fb2060",
+  "target_grade": "TS",
+  "domain": "tech",
+  "title": "차세대 제품 설계도 및 M&A 계획 보안 문서",
+  "body": "이 문서는 [가상기업A]의 특급기밀로 분류되며, 차세대 제품 설계도와 핵심 원천기술을 포함합니다. 현재 진행 중인 M&A 계획과 관련한 정보가 담겨 있으며, 임직원 인사 이동에 따른 보안 절차가 엄격히 적용됩니다. 기술 개발팀과 전략기획실에서 공동으로 관리하며, 외부 유출 시 형사처벌이 따릅니다.",
+  "document_type": "설계명세",
+  "dept_hint": "기술 개발팀, 전략기획실",
+  "rationale_tags": [
+    "특급기밀",
+    "핵심 원천기술",
+    "M&A 계획",
+    "차세대 제품 설계도",
+    "임직원 인사 이동"
+  ],
+  "llm_provider": "ollama",
+  "pii_violations": [],
+  "parse_error": null,
+  "generated_at": 1780237451,
+  "usage": {
+    "input_tokens": 340,
+    "output_tokens": 735,
+    "cost_usd": 0.0,
+    "latency_ms": 42757
+  },
+  "predicted_grade": "TS",
+  "label_match": true
+}

@@ -1,0 +1,28 @@
+{
+  "synth_id": "f7b94177-7fd1-43ff-b742-dc74a7c4a52f",
+  "target_grade": "S2",
+  "domain": "tech",
+  "title": "분기 매출 분석 및 사업 계획 검토 보고서 (S2 대외비)",
+  "body": "[홍길동(가명)] 님, [가상기업A]의 2분기 매출 데이터와 2024년 상반기 사업 계획을 내부 검토 중입니다. 거래처 명단 기반 고객 분석 결과, 신규 시장 진출 전략이 필요하다는 결론을 도출했습니다. 본 문서는 대외비로 분류되어 외부 공유 금지이며, R&D팀의 기술 개발 방향성과 연계된 핵심 정보를 담고 있습니다.",
+  "document_type": "연구노트",
+  "dept_hint": "R&D",
+  "rationale_tags": [
+    "대외비",
+    "내부 검토",
+    "분기 매출",
+    "사업 계획",
+    "거래처 명단"
+  ],
+  "llm_provider": "ollama",
+  "pii_violations": [],
+  "parse_error": null,
+  "generated_at": 1780237513,
+  "usage": {
+    "input_tokens": 332,
+    "output_tokens": 584,
+    "cost_usd": 0.0,
+    "latency_ms": 30417
+  },
+  "predicted_grade": "S2",
+  "label_match": true
+}
