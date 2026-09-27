@@ -642,10 +642,16 @@ def write_manifest(manifest: BundleManifest, out_dir: Path, *, also_json: bool =
         json_path.write_text(
             json.dumps(manifest.to_dict(), ensure_ascii=False, indent=2),
             encoding="utf-8",
+            newline="\n",
         )
         paths["json"] = json_path
 
     # YAML (사람 친화) — pyyaml 있으면 그걸로, 없으면 간이 변환
+    # newline="\n" 고정 — 없으면 Windows 빌드 호스트에서 CRLF 로 나가고, setup.sh 가
+    # `sed -n 's/^ *version: *//p' manifest.yaml` 로 뽑는 IMAGE_TAG_DEFAULT 에 트레일링 \r 이
+    # 섞여 `docker compose` 가 그 태그의 이미지를 못 찾는다(실측 2026-09-27: 실빌드 산출물을
+    # WSL Rocky 의 진짜 리눅스 sed 로 뽑아 `rocky-koipa-1.0.0\r` 확인 — Windows Git-Bash 의 sed 는
+    # CRLF 를 알아서 지워 이 문제를 가려서 못 보게 한다).
     yaml_path = out_dir / "manifest.yaml"
     try:
         import yaml  # noqa: PLC0415
@@ -653,7 +659,7 @@ def write_manifest(manifest: BundleManifest, out_dir: Path, *, also_json: bool =
         yaml_text = yaml.safe_dump(manifest.to_dict(), allow_unicode=True, sort_keys=False)
     except ImportError:
         yaml_text = _simple_yaml_dump(manifest.to_dict())
-    yaml_path.write_text(yaml_text, encoding="utf-8")
+    yaml_path.write_text(yaml_text, encoding="utf-8", newline="\n")
     paths["yaml"] = yaml_path
 
     return paths
@@ -721,7 +727,10 @@ def write_checksums(out_dir: Path, files: list[Path]) -> Path:
             for chunk in iter(lambda: fp.read(65536), b""):
                 h.update(chunk)
         lines.append(f"{h.hexdigest()}  {rel}")
-    cs_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # newline="\n" 고정 — 없으면 Windows 빌드 호스트에서 CRLF 로 나가고, verify.sh 의
+    # `sha256sum -c CHECKSUMS.sha256` 가 각 줄 끝 \r 을 파일명의 일부로 읽어 전 파일
+    # "No such file or directory" 로 실패한다(실측 2026-09-27: 실빌드 3,799줄 전부 CRLF).
+    cs_path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     return cs_path
 
 
@@ -826,7 +835,7 @@ def _export_locked_requirements(out_dir: Path) -> Path | None:
     if r.returncode != 0 or not r.stdout.strip():
         print(f"  [uv] export 불가(폴백 freeze): {(r.stderr or '')[-200:]}", file=sys.stderr)
         return None
-    out.write_text(r.stdout, encoding="utf-8")
+    out.write_text(r.stdout, encoding="utf-8", newline="\n")
     return out
 
 
@@ -999,7 +1008,7 @@ def _pip_download(out_dir: Path, wheel_platform: str = _DEFAULT_WHEEL_PLATFORM) 
         if locked is not None:
             locked_text = locked.read_text(encoding="utf-8")
             req = out_dir / "_requirements_download.txt"
-            req.write_text(_strip_hashes(locked_text), encoding="utf-8")
+            req.write_text(_strip_hashes(locked_text), encoding="utf-8", newline="\n")
             no_torch_text = _strip_host_excluded(locked_text)
         else:
             # 최후수단 — uv 미가용: pip freeze(비핀). git+/editable/file 의존성 제외.
@@ -1017,7 +1026,7 @@ def _pip_download(out_dir: Path, wheel_platform: str = _DEFAULT_WHEEL_PLATFORM) 
                 and not line.startswith("git+") and not line.startswith("-e ") and "@ file:" not in line
             ]
             req = out_dir / "_requirements_freeze.txt"
-            req.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            req.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
             no_torch_text = _strip_host_excluded(req.read_text(encoding="utf-8"))
 
     # 최종 요구 목록(주석·해시·빈 줄 제외) — 다운로드 완전성 자기검사용 카운트.
@@ -1026,7 +1035,7 @@ def _pip_download(out_dir: Path, wheel_platform: str = _DEFAULT_WHEEL_PLATFORM) 
         if ln.strip() and not ln.strip().startswith("#") and not ln.strip().startswith("--")
     ]
     # 호스트 설치용(torch류 제외) 목록 — install.sh 가 이 파일명을 참조하므로 항상 생성(해시 보존).
-    (out_dir / "_requirements_no_torch.txt").write_text(no_torch_text, encoding="utf-8")
+    (out_dir / "_requirements_no_torch.txt").write_text(no_torch_text, encoding="utf-8", newline="\n")
 
     r = subprocess.run(
         _pip_download_cmd(req, wheels_dir, wheel_platform),
@@ -1247,7 +1256,7 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         _txt = _airgap_dst.read_text(encoding="utf-8")
         _fixed = _txt.replace("env_file: .env", "env_file: ../.env")
         if _fixed != _txt:
-            _airgap_dst.write_text(_fixed, encoding="utf-8")
+            _airgap_dst.write_text(_fixed, encoding="utf-8", newline="\n")
             print("  [infra] airgap compose env_file → ../.env (번들 루트 .env 로드)", file=sys.stderr)
 
     # mTLS 종료 nginx 설정(opt-in `--profile mtls`). airgap/base compose 의 nginx-mtls 가
@@ -1361,6 +1370,7 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "# 하고, 해시 임베더면 규정 등록이 거절된다.\n"
         "# REGULATION_REFERENCE_ENABLED=1\n",
         encoding="utf-8",
+        newline="\n",
     )
 
     # alembic migrations

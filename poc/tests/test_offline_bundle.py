@@ -499,6 +499,25 @@ def test_write_manifest_creates_both_yaml_and_json(tmp_path: Path, sample_compos
     assert j["bundle"]["dry_run"] is True
 
 
+def test_write_manifest_yaml_has_no_crlf(tmp_path: Path, sample_compose: Path, sample_config: Path):
+    """manifest.yaml 이 CRLF 로 나가면 setup.sh 의 `sed -n 's/^ *version: *//p'` 추출값에
+    트레일링 \\r 이 섞인다. Windows Git-Bash 의 sed 는 CRLF 를 알아서 지워 가려지지만, 실제
+    타깃인 리눅스 sed 는 그대로 살려서 `rocky-koipa-1.0.0\\r` 처럼 IMAGE_TAG_DEFAULT 가 깨진다
+    (실측 2026-09-27: 실빌드 산출물을 WSL Rocky 의 진짜 sed 로 확인) — 깨진 태그로는
+    `docker compose` 가 이미지를 못 찾는다.
+    """
+    m = build_manifest(
+        version="1.0.0",
+        target_env="test",
+        dry_run=True,
+        compose_path=sample_compose,
+        config_path=sample_config,
+    )
+    paths = write_manifest(m, tmp_path / "out")
+    assert b"\r\n" not in paths["yaml"].read_bytes()
+    assert b"\r\n" not in paths["json"].read_bytes()
+
+
 def test_write_checksums_hashes_existing_files(tmp_path: Path):
     out = tmp_path / "bundle"
     out.mkdir()
@@ -510,6 +529,20 @@ def test_write_checksums_hashes_existing_files(tmp_path: Path):
     # sha256("hello") = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
     assert "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824" in content
     assert "test.txt" in content
+
+
+def test_write_checksums_has_no_crlf(tmp_path: Path):
+    """CHECKSUMS.sha256 이 CRLF 로 나가면 verify.sh 의 `sha256sum -c` 가 각 줄 끝 \\r 을
+    파일명 일부로 읽어 전 파일이 "No such file or directory" 로 실패한다(실측 2026-09-27:
+    실빌드 3,799줄 전부 CRLF — verify.sh 의 체크섬 검증이 통째로 깨졌었다).
+    """
+    out = tmp_path / "bundle"
+    out.mkdir()
+    f = out / "test.txt"
+    f.write_text("hello", encoding="utf-8")
+
+    cs_path = write_checksums(out, [f])
+    assert b"\r\n" not in cs_path.read_bytes()
 
 
 def test_write_checksums_skips_missing_files(tmp_path: Path):
