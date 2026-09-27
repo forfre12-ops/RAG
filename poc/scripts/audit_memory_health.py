@@ -9,10 +9,11 @@
 
 무엇을 세나 (기계로 판정 가능한 것만)
     A 색인에 없는 파일 / B 색인이 가리키는데 없는 파일 / C 색인 중복
-    D frontmatter 결함(name 불일치·description 없음)
+    D frontmatter 결함(name 불일치·description 없음·엄격 YAML 로 안 읽힘)
     E 깨진 [[위키링크]]
     F 파일명 날짜보다 본문 최신 날짜가 뒤인 것(= 파일명이 낡음)
     G 메모리가 언급한 리포 경로가 git추적·디스크 두 방법 모두에서 없는 것
+      (--history 를 주면 그 경로가 git 이력에 있었는지(= 지워진 파일)·이력에도 없는지(= 오타·별칭·서술형 토막)로 가른다)
 
 무엇을 못 세나 (사람이 읽어야 한다)
     본문 서술이 사실과 다른지. 그건 대상 파일·코드를 열어야 안다.
@@ -21,6 +22,7 @@
 사용
     poc/.venv/Scripts/python.exe scripts/audit_memory_health.py
     poc/.venv/Scripts/python.exe scripts/audit_memory_health.py --memory-dir <경로> --repo <경로>
+    poc/.venv/Scripts/python.exe scripts/audit_memory_health.py --history    # G 를 삭제됨/이력에도 없음으로 가른다(git log 전체를 훑어 15초쯤 더 든다)
     (윈도 콘솔이 cp949 면 PYTHONIOENCODING=utf-8 를 함께 줄 것)
 """
 from __future__ import annotations
@@ -31,6 +33,11 @@ import re
 import subprocess
 import sys
 from collections import Counter
+
+try:  # D 의 엄격 YAML 검사용 — 없으면 그 검사만 건너뛴다
+    import yaml
+except ImportError:  # pragma: no cover
+    yaml = None
 
 try:  # 스크립트로 직접 실행 - scripts/ 가 sys.path 에 들어온다
     from _cli_io import force_utf8_stdio  # noqa: E402
@@ -48,6 +55,15 @@ PATH_RE = re.compile(
     r"(?<![\w/.-])((?:[\w.-]+/)*[\w.-]+\.(?:py|yml|yaml|json|sql|html|sh|toml|csv|jsonl))(?![\w])"
 )
 DATE_RE = re.compile(r"20\d\d-\d\d-\d\d")
+
+
+def _norm_path(tok: str) -> str:
+    """메모리에 적힌 경로 토큰을 리포 상대 경로로 맞춘다 — 역슬래시는 슬래시로, 맨 앞 "./" 만 뗀다.
+
+    ⚠ 예전에는 lstrip("./") 이었는데 그건 문자 집합("." 과 "/")을 떼므로 ".github/x" 의 맨 앞 점까지 지워
+    점으로 시작하는 폴더의 파일이 늘 '없음'으로 떴다(2026-09-27).
+    """
+    return re.sub(r"^(?:\./)+", "", tok.replace(chr(92), "/"))
 
 
 def _load(memory_dir: str):
@@ -82,6 +98,8 @@ def main() -> int:
     ap.add_argument("--memory-dir", default=DEFAULT_MEMORY)
     ap.add_argument("--repo", default=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
     ap.add_argument("--today", default=None, help="F 검사의 상한 날짜(기본: 오늘)")
+    ap.add_argument("--history", action="store_true",
+                    help="G 의 없는 경로를 git 이력(git log --all)에 견줘 '지워진 파일'과 '이력에도 없음'으로 가른다")
     args = ap.parse_args()
 
     if not os.path.isdir(args.memory_dir):
@@ -124,6 +142,15 @@ def main() -> int:
             bad.append((f, f"name 불일치/누락: {nm.group(1).strip() if nm else '-'}"))
         if not de:
             bad.append((f, "description 없음"))
+        elif yaml is not None:
+            # 정규식은 낱개 큰따옴표가 든 값도 통과시킨다. YAML 표준으로는 오류(2026-09-27 에 7개가 이 모양이었다).
+            try:
+                doc = yaml.safe_load(fm)
+            except yaml.YAMLError:
+                bad.append((f, "frontmatter 가 엄격 YAML 로 안 읽힌다 — description 값 전체를 큰따옴표로 감싸고 안쪽 큰따옴표는 \\\" 로 쓴다"))
+            else:
+                if not isinstance(doc, dict) or not isinstance(doc.get("description"), str):
+                    bad.append((f, "엄격 YAML 로 읽으면 description 이 문자열이 아니다"))
     for f, why in bad:
         print(f"   {f}: {why}")
     print(f"   소계 {len(bad)}\n")
@@ -167,19 +194,36 @@ def main() -> int:
                 continue
             seen.add(tok)
             total += 1
-            norm = tok.replace(chr(92), "/").lstrip("./")
+            norm = _norm_path(tok)
             in_tracked = norm in tracked or any(p.endswith("/" + norm) for p in tracked)
             in_disk = norm in disk or any(p.endswith("/" + norm) for p in disk)
             base_ok = ("/" not in tok) and (os.path.basename(norm) in disk_base)
             if not (in_tracked or in_disk or base_ok):
                 gone.append((f, tok))
+    ever: set[str] = set()
+    if args.history:
+        log = subprocess.run(["git", "-C", args.repo, "log", "--all", "--name-only", "--pretty=format:"],
+                             capture_output=True)
+        ever = {p for p in log.stdout.decode("utf-8", "replace").splitlines() if p}
+    ever_base = {p.rsplit("/", 1)[-1] for p in ever}
+
+    def _label(tok: str) -> str:
+        if not args.history:
+            return "X"
+        norm = _norm_path(tok)
+        hit = norm in ever or any(p.endswith("/" + norm) for p in ever) or ("/" not in norm and norm in ever_base)
+        return "삭제됨" if hit else "이력에도 없음"
+
     cur = None
     for f, tok in gone:
         if f != cur:
             print(f"   [{f}]")
             cur = f
-        print(f"       X {tok}")
+        print(f"       {_label(tok):<8} {tok}" if args.history else f"       X {tok}")
     print(f"   언급 {total}건 중 두 방법 모두 없음 {len(gone)}건")
+    if args.history:
+        kinds = Counter(_label(t) for _f, t in gone)
+        print(f"   이력으로 가르면: 지워진 파일 {kinds['삭제됨']}건(그때의 서술이면 정상) · git 이력에도 없음 {kinds['이력에도 없음']}건(오타·별칭·서술형 토막 후보 — 이쪽을 열어 볼 것)")
     print("   ⚠ 여기 뜬다고 결함이 아니다 — reports/ 처럼 git 밖 산출물이거나 서술형 토막일 수 있다.")
     print("     '없다'고 말하기 전에 그 파일을 직접 찾아볼 것.\n")
 

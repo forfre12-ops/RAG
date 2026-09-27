@@ -133,6 +133,11 @@ footer strong{color:var(--text-dim);}
     <p>시간이 5분뿐이면 <strong>2절(요건) · 4절(판정) · 8절(실측)</strong>만 보면 된다.</p>
   </div>
 
+  <div class="callout inset">
+    <div class="callout-label">2026-09-27 정정 — 8/24 이후 바뀐 것</div>
+    <p>이 문서는 2026-08-24 코드 기준이고, 아래 네 가지만 그 뒤의 변경에 맞춰 고쳤다. ① <strong>지운 것</strong> — RAG 검색·질의응답(<code>/rag/search</code> · <code>/answer</code>)은 2026-09-04 에 지웠다(유사 문서 조회는 9/9 에 pgvector 로 다시 만들어 <code>GET /documents/{doc_id}/similar</code> 로 있다). 가이드 문서 업로드·버전 조회(<code>/guide/documents</code>)와 스캔 이미지 OCR 코드는 2026-09-26 에 지웠고, 그날 표 4개(<code>tb_document_factor_scores</code> · <code>tb_training_epochs</code> · <code>tb_training_datasets</code> · <code>tb_guides</code>)와 <code>tb_model_versions.level_snapshot</code> 을 포함한 칼럼 18개를 DB 에서 뺐다. ② <strong>바뀐 이름</strong> — 표 이름은 표준명(<code>tad_*_mng</code>)이다(2026-09-11). ③ <strong>바뀐 게이트</strong> — 검수 라우팅 게이트는 15개다(similarity escalation 삭제, <code>metadata-management-underclass</code> 추가). ④ <strong>더한 것</strong> — 규정 참고 표시(표 3개, 기본 꺼짐). 코드 줄 번호·건수·실측치는 8/24 값 그대로다.</p>
+  </div>
+
   <hr/>
 
   <div class="section-sep" id="s1">
@@ -209,7 +214,7 @@ footer strong{color:var(--text-dim);}
     </tbody>
   </table>
   </div>
-  <p class="src">출처: 요구사항 추적표(RTM) 기능요건 표. 가이드 문서 업로드·버전관리는 코드에서 FUN-002로 표기돼 있다(services/guide_service.py) — RTM 담당 요건 표에는 별도 행이 없다.</p>
+  <p class="src">출처: 요구사항 추적표(RTM) 기능요건 표. 가이드 문서 업로드·버전관리는 코드에서 FUN-002로 표기돼 있었다(services/guide_service.py) — 2026-09-26 에 그 기능을 지웠다. RTM 담당 요건 표에는 별도 행이 없다.</p>
 
   <div class="callout">
     <div class="callout-label">FUN-023에서 놓치기 쉬운 것</div>
@@ -226,7 +231,7 @@ footer strong{color:var(--text-dim);}
       <h4>루프 A · 일상 운영 (매일 · 현업)</h4>
       <p>문서 업로드 → 등급 분류 → 사람 검수·확정</p>
       <ul>
-        <li>교정 결과가 <code>tb_corrections</code>에 쌓인다</li>
+        <li>교정 결과가 <code>tad_cm_crct_mng</code>에 쌓인다</li>
         <li>고객사 폐쇄망에서 도는 쪽</li>
         <li>진입점 <code>POST /classify</code> · <code>/confirm</code></li>
       </ul>
@@ -263,7 +268,7 @@ footer strong{color:var(--text-dim);}
   </div>
   <h2>등급 넷과, 등급을 만드는 곱셈식</h2>
 
-  <p>등급 코드는 <code>Grade</code> 열거형에 고정돼 있고(<code>schemas/common.py:39</code>), 런타임에는 DB <code>tb_classification_levels</code>에서 다시 읽는다. 다른 등급체계를 쓰는 기관에도 등급을 등록해 대응할 수 있다(<code>GradeRegistry</code>).</p>
+  <p>등급 코드는 <code>Grade</code> 열거형에 고정돼 있고(<code>schemas/common.py:39</code>), 런타임에는 DB <code>tad_cm_clsf_grd_mng</code>에서 다시 읽는다. 다른 등급체계를 쓰는 기관에도 등급을 등록해 대응할 수 있다(<code>GradeRegistry</code>).</p>
 
   <div class="table-wrap">
   <table>
@@ -371,13 +376,13 @@ footer strong{color:var(--text-dim);}
       <tr><td>본문 부족</td><td>추출은 성공했는데 판정할 본문이 사실상 없는 문서가 조용히 S3로 확정되는 것</td><td class="center"><span class="tag on">ON</span></td></tr>
       <tr><td>metadata-access-conflict</td><td>접근범위가 제한적인데 예측 등급이 낮은 경우</td><td class="center"><span class="tag on">ON</span></td></tr>
       <tr><td>metadata-management-conflict</td><td>비밀관리성 부재가 입증됐는데(전직원 열람) 예측이 TS·S1·S2인 경우</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>metadata-management-underclass</td><td>확인된 비밀관리성(M)을 넣으면 예측보다 높은 등급이 나오는 경우 — 등급은 그대로 두고 자동확정만 막는다</td><td class="center"><span class="tag on">ON</span></td></tr>
       <tr><td>ICD 미탐 위험</td><td>연동 메타데이터 검증이 지목한 미탐 위험</td><td class="center"><span class="tag on">ON</span></td></tr>
       <tr><td>s2-underclass-risk</td><td>S2로 과소분류되기 쉬운 문서 유형</td><td class="center"><span class="tag on">ON</span></td></tr>
       <tr><td>gate-fail-open</td><td>게이트 자체가 실패해 무방비로 통과하는 것</td><td class="center"><span class="tag on">ON</span></td></tr>
       <tr><td>agreement-gate</td><td>룰과 모델의 등급이 갈리는 경우. 단 <strong>룰이 근거를 하나도 못 찾았으면 "무의견"</strong>으로 보고 통과시킨다 — 근거 없는 불일치로 전건이 검수행이 되는 것을 막는다. 공개등급 예측은 신뢰도 단독 허용</td><td class="center"><span class="tag on">ON</span></td></tr>
       <tr><td>llm-secondopinion</td><td>모델이 TS 아닌 등급을 자동확정하려 할 때 LLM 2차 의견을 받아, 더 높은 등급이면 검수행</td><td class="center"><span class="tag off">OFF</span></td></tr>
       <tr><td>kill-gate 브레이크</td><td>평가 신호 이상 시 고등급 자동확정 억제</td><td class="center"><span class="tag off">OFF</span></td></tr>
-      <tr><td>similarity escalation</td><td>사람이 더 높게 확정한 문서와 매우 유사한 경우 (가장 비싼 게이트라 맨 마지막)</td><td class="center"><span class="tag off">OFF</span></td></tr>
     </tbody>
   </table>
   </div>
@@ -426,7 +431,7 @@ footer strong{color:var(--text-dim);}
     ⚠ 3단계의 개인정보 검사는 <strong>결과를 문서에 기록할 뿐 자동 폐기하지 않는다</strong> — 그 값을 읽는 곳이 아직 없다(<code>pii_violations</code> 소비자 0). 합성 본문의 개인정보 방어는 현재 프롬프트 금지와 사람 검수 두 가지다.</div>
   </div>
 
-  <p>합성 문서는 <code>tb_sample_documents</code>에 <code>pending_review</code> 상태로 쌓이고, 콘솔에서 승인·반려한다. 다만 <strong>학습셋 편입은 파일 기반</strong>이다 — 학습은 <code>datasets/…/train.jsonl</code>을 읽고, 승인 플래그가 학습 파이프라인을 직접 발화시키지는 않는다(코드에서 <code>SampleDocument</code>를 읽는 곳은 합성 서비스 밖에 없다).</p>
+  <p>합성 문서는 <code>tad_sm_syn_doc_mng</code>에 <code>pending_review</code> 상태로 쌓이고, 콘솔에서 승인·반려한다. 다만 <strong>학습셋 편입은 파일 기반</strong>이다 — 학습은 <code>datasets/…/train.jsonl</code>을 읽고, 승인 플래그가 학습 파이프라인을 직접 발화시키지는 않는다(코드에서 <code>SampleDocument</code>를 읽는 곳은 합성 서비스 밖에 없다).</p>
 
   <h3>5-2. 골든셋 — 같은 파일 안에서 다섯 등위로 갈린다</h3>
   <p>골든셋은 물리 파일을 쪼개지 않는다. 정본 파일 하나를 두고, 각 행의 <strong>라벨 출처·검수 상태·서명자</strong>로부터 등위(tier)를 파생시킨다(<code>golden_tiers.py</code>). 파일을 쪼개면 스키마가 어긋나기 때문이다.</p>
@@ -455,11 +460,11 @@ footer strong{color:var(--text-dim);}
   </div>
   <h2>사람이 고친 것이 모델로 돌아오는 길</h2>
 
-  <p>루프 A와 루프 B가 만나는 지점이다. 현업이 검수 화면에서 등급을 고치면 <code>tb_corrections</code>에 남고, 그것이 다음 학습셋에 섞인다.</p>
+  <p>루프 A와 루프 B가 만나는 지점이다. 현업이 검수 화면에서 등급을 고치면 <code>tad_cm_crct_mng</code>에 남고, 그것이 다음 학습셋에 섞인다.</p>
 
   <div class="flow">
     <div class="flow-row">
-      <div class="flow-box"><span class="k">1</span><span class="t">검수·교정</span><span class="d">POST /confirm · /relabel<br/>tb_corrections 적재</span></div>
+      <div class="flow-box"><span class="k">1</span><span class="t">검수·교정</span><span class="d">POST /confirm · /relabel<br/>tad_cm_crct_mng 적재</span></div>
       <div class="flow-box"><span class="k">2</span><span class="t">교정 → 학습행 복원</span><span class="d">아직 학습에 안 쓴 교정만<br/>{본문, 라벨}로 되살린다</span></div>
       <div class="flow-box"><span class="k">3</span><span class="t">기존 학습셋과 병합</span><span class="d">홀드아웃과 겹치는 행은 제외</span></div>
       <div class="flow-box"><span class="k">4</span><span class="t">학습 실행</span><span class="d">Celery 워커<br/>TRAIN 분할만 청크 확장</span></div>
@@ -514,7 +519,7 @@ footer strong{color:var(--text-dim);}
       <div class="flow-box"><span class="k">3</span><span class="t">활성화</span><span class="d">활성 모델은 한 번에 하나<br/>DB 제약으로 강제</span></div>
       <div class="flow-box"><span class="k">4</span><span class="t">롤백</span><span class="d">되돌린 대상과 사유를 남긴다</span></div>
     </div>
-    <div class="flow-note"><code>tb_model_versions</code>가 각 단계를 기록한다 — 활성 여부·활성 시각·비활성 시각·되돌린 원본(<code>rolled_back_from</code>)·롤백 사유. <strong>등급체계 스냅샷</strong>(<code>level_snapshot</code>)도 함께 저장하므로, 나중에 등급체계가 바뀌어도 그 모델이 어느 체계로 학습됐는지 남는다.</div>
+    <div class="flow-note"><code>tad_mm_mdl_ver_mng</code>가 각 단계를 기록한다 — 활성 여부·활성 시각·비활성 시각·되돌린 원본(<code>rolled_back_from</code>)·롤백 사유.</div>
   </div>
 
   <h3>올린 뒤에도 감시한다 — 자동 롤백</h3>
@@ -633,19 +638,20 @@ footer strong{color:var(--text-dim);}
         <li><strong>골든셋</strong> <code>/golden/build</code> · <code>/golden/candidates</code> · <code>/golden/jobs/{id}/signoff</code></li>
         <li><strong>학습·배포</strong> <code>/train</code> · <code>/model/activate</code> · <code>/model/rollback</code></li>
         <li><strong>관리</strong> <code>/schema/grades</code> · <code>/admin/keywords</code> · <code>/admin/audit-log</code> · <code>/admin/dashboard</code></li>
-        <li><strong>검색</strong> <code>/rag/search</code> · <code>/guide/documents</code></li>
+        <li><strong>유사 문서</strong> <code>/documents/{doc_id}/similar</code></li>
         <li><strong>상태</strong> <code>/healthz</code> · <code>/healthz/ready</code> · <code>/healthz/deep</code> · <code>/metrics-prom</code></li>
       </ul>
       <p class="src">오류 계약은 HTTP 상태 코드다 — 심볼릭 오류코드 체계는 두지 않았다.</p>
     </div>
     <div>
-      <h4>데이터 — 테이블 19개</h4>
+      <h4>데이터 — 테이블 21개(2026-09-27 현행)</h4>
       <ul>
-        <li><strong>문서</strong> <code>tb_documents</code> · <code>tb_chunks</code> · <code>tb_sample_documents</code></li>
-        <li><strong>판정</strong> <code>tb_classifications</code> · <code>tb_classification_evidence</code> · <code>tb_document_labels</code> · <code>tb_document_factor_scores</code></li>
-        <li><strong>기준</strong> <code>tb_classification_levels</code> · <code>tb_level_keywords</code> · <code>tb_evaluation_factors</code> · <code>tb_guides</code></li>
-        <li><strong>학습</strong> <code>tb_training_runs</code> · <code>tb_training_datasets</code> · <code>tb_training_epochs</code> · <code>tb_model_versions</code></li>
-        <li><strong>운영</strong> <code>tb_corrections</code> · <code>tb_audit_log</code> · <code>tb_llm_usage</code> · <code>tb_prompt_versions</code></li>
+        <li><strong>문서</strong> <code>tad_dm_doc_mng</code> · <code>tad_cm_chnk_mng</code> · <code>tad_dm_doc_vctr_mng</code> · <code>tad_sm_syn_doc_mng</code> · <code>tad_sm_syn_datst_cpst_mng</code></li>
+        <li><strong>판정</strong> <code>tad_cm_clsf_rslt_mng</code> · <code>tad_cm_clsf_bss_mng</code> · <code>tad_dm_doc_lbl_mng</code></li>
+        <li><strong>기준</strong> <code>tad_cm_clsf_grd_mng</code> · <code>tad_gm_grd_kywd_mng</code> · <code>tad_em_evl_rqmt_mng</code></li>
+        <li><strong>학습</strong> <code>tad_lm_lrn_excn_mng</code> · <code>tad_mm_mdl_ver_mng</code></li>
+        <li><strong>운영</strong> <code>tad_cm_crct_mng</code> · <code>tad_am_adt_log_mng</code> · <code>tad_lm_llm_usqty_mng</code> · <code>tad_pm_prmpt_ver_mng</code> · <code>tad_sy_lck_mng</code></li>
+        <li><strong>규정 참고</strong> <code>tad_rm_rgltn_mng</code> · <code>tad_rm_rgltn_artcl_mng</code> · <code>tad_rm_rgltn_stc_mng</code></li>
       </ul>
       <h4 style="margin-top:18px">감사 로그는 해시 체인</h4>
       <p>각 행이 직전 행의 해시를 물고 있어(HMAC-SHA256, 운영에서는 키 필수) 과거 행의 삭제·삽입·재배열이 검출된다. 매일 새벽 3시 30분에 체인 전체를 자동 검증한다.</p>
@@ -671,8 +677,8 @@ footer strong{color:var(--text-dim);}
   </div>
   <p class="src">출처: workers/celery_app.py:123~200</p>
 
-  <h3>검색과 가이드 문서</h3>
-  <p>가이드 문서(등급 판단 기준 문서)를 업로드하면 버전 이력이 남고 RAG 색인에 들어간다. 검색은 <strong>키워드 검색과 벡터 검색을 함께 돌려 RRF로 융합</strong>하고, 필요하면 재정렬한다. 키워드 절반이 조용히 사라지는 것을 막기 위해, 하이브리드가 실패해 벡터 단독으로 내려가면 경고 로그와 지표로 드러낸다.</p>
+  <h3>문서 벡터와 유사 문서 조회</h3>
+  <p>문서를 등록하면 문서 대표 벡터(KURE-v1, 1024차원)를 큐에서 <code>tad_dm_doc_vctr_mng</code> 에 색인한다(pgvector 코사인 HNSW). <code>GET /documents/{doc_id}/similar</code> 가 비슷한 문서를 확정 등급과 함께 돌려주고(<code>verified_only=true</code> 면 사람이 확정한 것만), 규정 참고 표시(기본 꺼짐)가 같은 벡터를 쓴다. 가이드 문서 업로드·하이브리드 검색·질의응답은 없다.</p>
 
   <h3>인증과 권한</h3>
   <p>인증 모드는 셋이다(<code>api_key</code> · <code>jwt</code> · <code>both</code>). API 키 모드에서 역할은 <strong>서버가 고정</strong>하고 <code>X-Actor-Role</code> 헤더는 무시한다 — 클라이언트가 자기 역할을 자칭할 수 없다(<code>config.py:337~353</code>).</p>
@@ -766,8 +772,8 @@ footer strong{color:var(--text-dim);}
       <tr><td><strong>등급을 무인으로 내리지 않는다</strong></td><td>보정은 상향, 게이트는 상태 변경만 한다. 유일한 하향인 출처 cap도 고등급 신호와 충돌하면 검수로 보낸다</td></tr>
       <tr><td><strong>평가 정답을 학습에 넣지 않는다</strong></td><td><code>locked_gold_eval</code>은 학습 금지, <code>silver_train</code>은 평가 금지. 청크 확장도 TRAIN 분할에만 한다</td></tr>
       <tr><td><strong>지식재산보호원 단계에서 실문서를 다루지 않는다</strong></td><td>실문서·검수자·반출 0이 확정된 운영 전제다. 실데이터는 고객사 폐쇄망에만 있다</td></tr>
-      <tr><td><strong>RAG 질의응답은 산출물 범위 밖이다</strong></td><td><code>/answer</code> 코드는 존치하되 휴면이다. 검색(<code>/rag/search</code>)은 근거 제공까지만 쓴다</td></tr>
-      <tr><td><strong>MinIO·Elasticsearch를 기본으로 쓰지 않는다</strong></td><td>폐쇄망 기본은 로컬 파일시스템과 PostgreSQL/pgvector다. 두 백엔드 어댑터는 남아 있으나 선택 설치다</td></tr>
+      <tr><td><strong>RAG 질의응답은 하지 않는다</strong></td><td>산출물 범위 밖이다. <code>/answer</code>·<code>/rag/search</code> 코드는 2026-09-04 에 지웠다</td></tr>
+      <tr><td><strong>MinIO·Elasticsearch를 기본으로 쓰지 않는다</strong></td><td>폐쇄망 기본은 로컬 파일시스템과 PostgreSQL/pgvector다. MinIO 스토리지 어댑터는 남아 있으나 선택 설치고, Elasticsearch 어댑터는 지웠다</td></tr>
       <tr><td><strong>운영 프로파일에 물리삭제 엔드포인트를 노출하지 않는다</strong></td><td>데모용 초기화는 운영에서 404로 막는다</td></tr>
     </tbody>
   </table>
