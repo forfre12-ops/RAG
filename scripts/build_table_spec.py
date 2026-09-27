@@ -173,6 +173,11 @@ REVISIONS = [
      '등급 판정·자동 확정에는 쓰이지 않습니다.<br>'
      '<b>관계도를 고쳤습니다</b> — 도식 높이를 배치에서 계산하도록 바꿔 규정 표 3개가 잘리지 않고, 관계 목록의 '
      '외래키 칼럼을 ORM 속성명이 아니라 DB 물리명으로 적습니다(예: <code>classification_id</code> 대신 <code>clsf_id</code>).'),
+    ("12", "2026-09-27", _HEAD_MARKER,
+     '<b>LLM 사용량 표의 원화 비용 칼럼을 뺐습니다</b>(마이그레이션 <code>e3a7c9f1b5d2</code>) — '
+     '<code>tad_lm_llm_usqty_mng.kcur_cst</code>(21표 233칼럼 → 21표 232칼럼). 값을 넣는 코드도, 원화 환산 설정도, 원화 비용 요건도 없어 '
+     '늘 NULL 이었습니다. 미화 비용 <code>usd_cst</code> 는 그대로입니다. 이 칼럼을 합산하던 뷰 <code>v_monthly_llm_cost</code> 는 '
+     '<code>total_cost_krw</code> 열만 빼고 다시 만듭니다. 값이 든 행이 있으면 마이그레이션이 멈춥니다.'),
 ]
 
 

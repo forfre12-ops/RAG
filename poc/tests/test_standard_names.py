@@ -25,8 +25,12 @@ from koipa.db.standard_names import (
 
 _VERSIONS = Path(__file__).resolve().parents[1] / "alembic" / "versions"
 _MIG = _VERSIONS / "7b3e9d2a4f10_standard_naming.py"
-# 표준 명명 뒤에 안 쓰는 표·칼럼을 지운 판(2026-09-26). 무엇을 지웠는지의 정본은 이 판이다.
-_DROP_MIG = _VERSIONS / "b7d3f5a19c24_drop_unused_tables_and_columns.py"
+# 표준 명명 뒤에 안 쓰는 표·칼럼을 지운 판들. 무엇을 지웠는지의 정본은 이 판들의 TABLES · COLUMNS 이다.
+# 표·칼럼을 지우는 판을 새로 만들면 여기에 올린다 — 안 올리면 아래 시험이 "사본에는 있는데 정본에는 없다"로 실패해 알려준다.
+_DROP_MIGS = (
+    (_VERSIONS / "b7d3f5a19c24_drop_unused_tables_and_columns.py", "mig_b7d3f5a19c24"),   # 2026-09-26
+    (_VERSIONS / "e3a7c9f1b5d2_drop_llm_usage_cost_krw.py", "mig_e3a7c9f1b5d2"),          # 2026-09-27
+)
 
 # ORM 에 선언하지 않는 것 — 마이그레이션이 raw SQL 로 만든다(alembic/env.py 와 같은 목록).
 _MIGRATION_ONLY_TABLES = {"tad_dm_doc_vctr_mng"}
@@ -43,6 +47,17 @@ def _load(path: Path, name: str):
 
 def _load_migration():
     return _load(_MIG, "mig_7b3e9d2a4f10")
+
+
+def _dropped() -> tuple[set[str], set[tuple[str, str]]]:
+    """지운 판들이 지운 표와 (표, 칼럼)."""
+    tables: set[str] = set()
+    columns: set[tuple[str, str]] = set()
+    for path, name in _DROP_MIGS:
+        mod = _load(path, name)
+        tables |= set(mod.TABLES)
+        columns |= {(table, column) for table, column, _definition in mod.COLUMNS}
+    return tables, columns
 
 
 def test_orm_tables_are_exactly_the_standard_tables():
@@ -72,12 +87,10 @@ def test_migration_copy_matches_standard_names():
     ⚠ 7b3e9d2a4f10 은 **이미 서버에서 돈 판**이라 고치지 않는다. 그 뒤에 다시 바꾼 이름은
       뒤 마이그레이션이 처리하고 `POST_BASE_RENAMES` 에 남는다. 그래서 대조 전에 그
       나중 이름을 되돌려 **그 판이 만든 이름**으로 맞춘다. 그 뒤에 **지운** 표·칼럼은
-      사본에 남아 있다 — 지운 판(b7d3f5a19c24)의 목록으로 사본에서 빼고 대조한다.
+      사본에 남아 있다 — 지운 판들(`_DROP_MIGS`)의 목록으로 사본에서 빼고 대조한다.
     """
     mig = _load_migration()
-    drop = _load(_DROP_MIG, "mig_b7d3f5a19c24")
-    dropped_tables = set(drop.TABLES)
-    dropped_cols = {(table, column) for table, column, _ in drop.COLUMNS}
+    dropped_tables, dropped_cols = _dropped()
     assert dropped_tables <= set(mig.TABLES.values()), "지운 표가 표준 명명 사본에 없다"
     assert {old: new for old, new in mig.TABLES.items() if new not in dropped_tables} == {
         old: new for old, (new, _) in TABLES.items()
@@ -104,18 +117,18 @@ def test_migration_copy_matches_standard_names():
 
 
 def test_dropped_tables_and_columns_are_gone_from_orm_and_standard_names():
-    """b7d3f5a19c24 가 지운 것이 ORM 에도 정본 대응표에도 남아 있지 않다.
+    """지운 판들(`_DROP_MIGS`)이 지운 것이 ORM 에도 정본 대응표에도 남아 있지 않다.
 
     지웠다고 하면서 한쪽에 선언이 남으면 정의서·ERD 가 실DB 에 없는 이름을 적는다.
     """
-    drop = _load(_DROP_MIG, "mig_b7d3f5a19c24")
+    dropped_tables, dropped_cols = _dropped()
     std_tables = {new for new, _ in TABLES.values()}
     std_cols = {(TABLES[old][0], new) for old, cols in COLUMNS.items() for _, new, _ in cols}
     orm_cols = {(name, c.name) for name, table in Base.metadata.tables.items() for c in table.columns}
-    for table in drop.TABLES:
+    for table in dropped_tables:
         assert table not in std_tables, f"{table}: 대응표에 남아 있다"
         assert table not in Base.metadata.tables, f"{table}: ORM 에 남아 있다"
-    for table, column, _definition in drop.COLUMNS:
+    for table, column in dropped_cols:
         assert (table, column) not in std_cols, f"{table}.{column}: 대응표에 남아 있다"
         assert (table, column) not in orm_cols, f"{table}.{column}: ORM 에 남아 있다"
 

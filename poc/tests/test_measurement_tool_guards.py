@@ -97,6 +97,20 @@ def test_schema_audit_r4_rationales_cover_current_violations() -> None:
     )
 
 
+def test_schema_audit_r6_does_not_count_dropped_tables() -> None:
+    """이미 지운 표는 '정의서 밖 테이블'이 아니다.
+
+    2026-09-27 에 R6 이 8건을 냈는데 4개 표를 두 번 센 것이었다 — 만든 이력은 옛 이름(tb_*)으로, 지운 이력(b7d3f5a19c24 의
+    TABLES 목록 · f-문자열로 DROP)은 표준 이름(tad_*)으로 적혀 있어 서로 못 만났다. 지금 R6 은 0 이어야 하고, 새로 raw SQL 로 만든
+    표가 정의서에 없으면 이 시험이 알린다.
+    """
+    mod = _load("audit_schema_consistency")
+    result = mod.audit()
+    dropped_0926 = {"tad_dm_doc_rqmt_scr_mng", "tad_lm_lrn_epoch_mng", "tad_lm_lrn_datst_mng", "tad_gm_guide_ver_mng"}
+    assert dropped_0926 <= set(result["dropped_tables"]), "b7d3f5a19c24 가 지운 표를 도구가 못 읽었다"
+    assert result["R6_outside_spec"] == [], f"정의서 밖 표: {result['R6_outside_spec']}"
+
+
 # ── 등급식: 경계 쌍 유형 ──────────────────────────────────────────────────────
 
 def test_grade_boundary_pair_types_are_stable() -> None:

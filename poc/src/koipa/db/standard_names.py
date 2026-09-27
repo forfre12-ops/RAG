@@ -198,7 +198,6 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("input_tokens", "inpt_tkn_cnt", "입력토큰수"),
         ("output_tokens", "otpt_tkn_cnt", "출력토큰수"),
         ("cost_usd", "usd_cst", "미화비용"),
-        ("cost_krw", "kcur_cst", "원화비용"),
         ("billing_phase", "bllng_se_cd", "과금구분코드"),
         ("latency_ms", "rspns_dly_hr", "응답지연시간"),
         ("success", "scs_yn", "성공여부"),

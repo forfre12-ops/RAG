@@ -122,7 +122,7 @@ table.spec td.c-nn{text-align:center;}
   <div class="top">
     <div class="eyebrow">감리 산출물 · 데이터베이스 정의</div>
     <h1>테이블정의서 · ERD</h1>
-    <div class="meta">PostgreSQL 16 · pgvector · UTF-8 · 21테이블 233칼럼 · 등급체계·문서·라벨링·추론·학습·보정·합성·운영 8개 그룹 · 2026-09-27 생성</div>
+    <div class="meta">PostgreSQL 16 · pgvector · UTF-8 · 21테이블 232칼럼 · 등급체계·문서·라벨링·추론·학습·보정·합성·운영 8개 그룹 · 2026-09-27 생성</div>
   </div>
 <section id="tables-index"><h2><span class="num">01</span> 테이블 목록</h2>
 <p class="spec-note"><b>물리 타입 규약</b> — 시각은 <code>TIMESTAMPTZ</code> 로 시간대와 함께 저장합니다. 식별자는 <code>UUID</code> 형입니다. <code>JSONB</code> 는 이진 JSON 이라 키로 거르는 질의에 GIN 인덱스를 씁니다. 배열은 <code>TEXT[]</code>, 문서 대표 벡터는 pgvector 의 <code>vector(1024)</code> 입니다. 표·칼럼 물리명은 KOIPA 표준용어집(v1.1) 약어를 따릅니다(대응표 정본 <code>poc/src/koipa/db/standard_names.py</code>).</p>
@@ -142,7 +142,7 @@ table.spec td.c-nn{text-align:center;}
 <tr><td class="c-key">G 합성</td><td class="c-name"><a href="#t-tad_pm_prmpt_ver_mng">tad_pm_prmpt_ver_mng</a></td><td>프롬프트 버전</td><td class="c-nn">6</td><td class="c-type">prmpt_ver_nm</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">—</td></tr>
 <tr><td class="c-key">G 합성</td><td class="c-name"><a href="#t-tad_sm_syn_doc_mng">tad_sm_syn_doc_mng</a></td><td>합성 문서</td><td class="c-nn">20</td><td class="c-type">syn_doc_id</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">—</td></tr>
 <tr><td class="c-key">G 합성</td><td class="c-name"><a href="#t-tad_sm_syn_datst_cpst_mng">tad_sm_syn_datst_cpst_mng</a></td><td>학습셋 편입 이력</td><td class="c-nn">5</td><td class="c-type">cpst_sn</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">—</td></tr>
-<tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tad_lm_llm_usqty_mng">tad_lm_llm_usqty_mng</a></td><td>LLM 사용량</td><td class="c-nn">15</td><td class="c-type">use_rcd_sn, clot_dt</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">월별 RANGE(clot_dt)</td></tr>
+<tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tad_lm_llm_usqty_mng">tad_lm_llm_usqty_mng</a></td><td>LLM 사용량</td><td class="c-nn">14</td><td class="c-type">use_rcd_sn, clot_dt</td><td class="c-key"><span class="k-pk">지재원만</span></td><td class="c-type">월별 RANGE(clot_dt)</td></tr>
 <tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tad_am_adt_log_mng">tad_am_adt_log_mng</a></td><td>감사 로그</td><td class="c-nn">13</td><td class="c-type">adt_sn, ocrn_dt</td><td class="c-key">둘 다</td><td class="c-type">월별 RANGE(ocrn_dt)</td></tr>
 <tr><td class="c-key">H 운영</td><td class="c-name"><a href="#t-tad_sy_lck_mng">tad_sy_lck_mng</a></td><td>동시성 잠금</td><td class="c-nn">1</td><td class="c-type">lck_nm</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
 <tr><td class="c-key">I 규정</td><td class="c-name"><a href="#t-tad_rm_rgltn_mng">tad_rm_rgltn_mng</a></td><td>규정</td><td class="c-nn">25</td><td class="c-type">rgltn_id</td><td class="c-key">둘 다</td><td class="c-type">—</td></tr>
@@ -216,7 +216,7 @@ table.spec td.c-nn{text-align:center;}
 <g class="erd-box" data-t="tad_lm_llm_usqty_mng" tabindex="0">
 <rect x="26" y="558" width="208" height="46" rx="4"/>
 <text class="t1" x="36" y="577" font-size="12.5" font-weight="700" fill="#0a0a0a">LLM 사용량</text>
-<text class="t2" x="36" y="593" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_lm_llm_usqty_mng · 15칼럼</text>
+<text class="t2" x="36" y="593" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_lm_llm_usqty_mng · 14칼럼</text>
 </g>
 <g class="erd-box" data-t="tad_lm_lrn_excn_mng" tabindex="0">
 <rect x="26" y="102" width="208" height="46" rx="4"/>
@@ -547,7 +547,6 @@ table.spec td.c-nn{text-align:center;}
 <tr><td class="c-name">inpt_tkn_cnt</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>입력 토큰 수</td></tr>
 <tr><td class="c-name">otpt_tkn_cnt</td><td class="c-type">INTEGER</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>출력 토큰 수</td></tr>
 <tr><td class="c-name">usd_cst</td><td class="c-type">NUMERIC(10,6)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>비용(USD)</td></tr>
-<tr><td class="c-name">kcur_cst</td><td class="c-type">NUMERIC(12,2)</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>비용(KRW)</td></tr>
 <tr><td class="c-name">bllng_se_cd</td><td class="c-type">VARCHAR(20)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">&#x27;development&#x27;</td><td>과금 구분 — development · operation</td></tr>
 <tr><td class="c-name">rspns_dly_hr</td><td class="c-type">INTEGER</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>응답 지연(밀리초)</td></tr>
 <tr><td class="c-name">scs_yn</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">true</td><td>호출 성공 여부</td></tr>
@@ -684,6 +683,7 @@ table.spec td.c-nn{text-align:center;}
 <tr><td>9</td><td>2026-09-11</td><td><code>6bec3a4b</code></td><td><b>NULL 표기를 실제 DB 와 맞췄습니다</b> — 마이그레이션을 끝까지 적용한 PostgreSQL 의 information_schema 와 칼럼 230개를 대조하니 6칼럼이 달랐습니다. 표 단위 기본키(청크·LLM 사용량·감사로그)를 NULL 허용으로 적던 생성기를 고치고, 모델에 NOT NULL 을 적지 않았던 3칼럼(학습셋 편입 이력의 합성문서ID·학습셋 판, 가이드 등록 시각)을 명시해 불일치 0건이 되었습니다(<code>poc/scripts/audit_schema_consistency.py --db-url</code>).<br><b>같은 칼럼ID 인데 표마다 NOT NULL 이 다른 8건에 사유를 적었습니다</b> — 나중에 정해지는 값(추출 전 글자 수, 학습 완료 전 모델 버전)이거나 선택 참조·선택값(요건, 키워드 가중치, 가이드 파일명, 라벨 확신도 등)이어서 설계상 NULL 을 허용합니다. 8건 모두 칼럼 설명에 사유가 있습니다.</td></tr>
 <tr><td>10</td><td>2026-09-26</td><td><code>aaea98c3</code></td><td><b>안 쓰는 표 4개와 칼럼 18개를 ORM 과 DB 에서 지웠습니다</b>(마이그레이션 <code>b7d3f5a19c24</code>). 표: <code>tb_document_factor_scores</code>(요건 점수) · <code>tb_training_epochs</code>(학습 에폭) · <code>tb_training_datasets</code>(학습 문서 목록) · <code>tb_guides</code>(가이드 버전 — 가이드 업로드 API 를 함께 걷었다). 앞의 셋은 행을 만드는 코드가 없거나 시험에서만 부르던 것이고, 가이드 버전 표는 그 API 전용이었습니다. 로컬 시험 DB 실측 네 표 모두 0행입니다.<br>칼럼 18개는 값을 넣는 코드가 없거나, 넣어도 읽는 곳이 없던 것입니다 — 문서 <code>otsd_rfrnc_no</code>·<code>ocr_use_yn</code>, 학습 실행 7개(건수 3 · 분할 방식·시드 · 기동 근거 · 흐름 실행 ID), 모델 버전 2개, 분류 결과 2개, 문서 라벨 <code>tot_scr</code>, 분류 근거 <code>rqmt_sn</code>, 합성 문서 <code>doc_id</code>, 평가 요건 <code>rqmt_nm</code>, LLM 사용량 생성열 <code>whol_tkn_cnt</code>.<br><b>지우지 않은 것</b> — 문서 벡터 표(유사문서 조회 — 9/9 고객사 요청으로 pgvector 로 되돌리며 신설)와, 값은 채우지만 읽는 곳이 없는 26개 칼럼(감사·이력 성격).</td></tr>
 <tr><td>11</td><td>2026-09-27</td><td><code>5e2ddbd1</code></td><td><b>규정 참고 표시용 표 3개를 넣었습니다</b>(마이그레이션 <code>a1d4c7e9b302</code>) — 규정 판 <code>tad_rm_rgltn_mng</code> · 조항 <code>tad_rm_rgltn_artcl_mng</code> · 문장 <code>tad_rm_rgltn_stc_mng</code>(18표 190칼럼 → 21표 233칼럼). 회원사가 올린 규정을 조항·문장으로 나눠 색인하는 선택 기능의 저장소이며, 기능이 기본 꺼짐이라 규정을 올리기 전에는 세 표가 비어 있습니다. 등급 판정·자동 확정에는 쓰이지 않습니다.<br><b>관계도를 고쳤습니다</b> — 도식 높이를 배치에서 계산하도록 바꿔 규정 표 3개가 잘리지 않고, 관계 목록의 외래키 칼럼을 ORM 속성명이 아니라 DB 물리명으로 적습니다(예: <code>classification_id</code> 대신 <code>clsf_id</code>).</td></tr>
+<tr><td>12</td><td>2026-09-27</td><td><code>8a0d1c4f</code></td><td><b>LLM 사용량 표의 원화 비용 칼럼을 뺐습니다</b>(마이그레이션 <code>e3a7c9f1b5d2</code>) — <code>tad_lm_llm_usqty_mng.kcur_cst</code>(21표 233칼럼 → 21표 232칼럼). 값을 넣는 코드도, 원화 환산 설정도, 원화 비용 요건도 없어 늘 NULL 이었습니다. 미화 비용 <code>usd_cst</code> 는 그대로입니다. 이 칼럼을 합산하던 뷰 <code>v_monthly_llm_cost</code> 는 <code>total_cost_krw</code> 열만 빼고 다시 만듭니다. 값이 든 행이 있으면 마이그레이션이 멈춥니다.</td></tr>
 </tbody></table></div>
 </section>
 <div class="foot">테이블정의서 · ERD — 한국지식재산보호원 AI 영업비밀 등급분류 시스템 · 2026-09-27 생성</div>

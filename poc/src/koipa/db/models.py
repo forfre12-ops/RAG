@@ -498,7 +498,6 @@ class LlmUsage(Base):
     input_tokens: Mapped[int] = mapped_column("inpt_tkn_cnt", Integer, nullable=False)
     output_tokens: Mapped[int] = mapped_column("otpt_tkn_cnt", Integer, nullable=False)
     cost_usd: Mapped[float] = mapped_column("usd_cst", Numeric(10, 6), nullable=False)
-    cost_krw: Mapped[float | None] = mapped_column("kcur_cst", Numeric(12, 2))
     billing_phase: Mapped[str] = mapped_column("bllng_se_cd", String(20), nullable=False, default="development", server_default=text("'development'"))
     latency_ms: Mapped[int | None] = mapped_column("rspns_dly_hr", Integer)
     success: Mapped[bool] = mapped_column("scs_yn", Boolean, default=True, server_default=text("true"), nullable=True)

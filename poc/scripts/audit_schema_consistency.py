@@ -50,8 +50,22 @@ sys.path.insert(0, str(_POC / "src"))
 import build_table_spec as B  # noqa: E402
 from koipa.db.standard_names import TABLES as STD_TABLES, logical_names  # noqa: E402
 
+def _historical_renames() -> dict[str, str]:
+    """표준 명명 마이그레이션(7b3e9d2a4f10)이 적어 둔 옛 표 → 표준 표 대응 — 지금은 지워진 표까지 든 전체 사본.
+
+    standard_names.TABLES 는 **현행** 표만 갖는다. 2026-09-26 에 지운 4개 표(요건 점수·학습 에폭·학습 데이터셋·가이드)는
+    거기서 빠졌으므로, 이 사본이 없으면 그 표를 옛 이름(tb_*, 만든 이력)과 표준 이름(tad_*, 지운 이력)으로 따로 세어
+    정의서 밖 표 8건으로 잘못 보고한다(2026-09-27 실측: 4개 표를 두 번 센 것이었다).
+    """
+    src = (_POC / "alembic" / "versions" / "7b3e9d2a4f10_standard_naming.py").read_text(encoding="utf-8")
+    m = re.search(r"^TABLES\s*=\s*\{(.*?)\n\}", src, re.M | re.S)
+    if not m:
+        return {}
+    return dict(re.findall(r"[\"'](tb_[a-z0-9_]+)[\"']\s*:\s*[\"'](tad_[a-z0-9_]+)[\"']", m.group(1)))
+
+
 # 옛 표 이름 → 표준 표 이름. 7b3e9d2a4f10 은 이름을 f-문자열 반복문으로 바꿔 정규식으로 못 읽는다.
-_RENAMED = {old: new for old, (new, _) in STD_TABLES.items()}
+_RENAMED = {**_historical_renames(), **{old: new for old, (new, _) in STD_TABLES.items()}}
 
 _CREATE = re.compile(r"CREATE TABLE(?: IF NOT EXISTS)?\s+([a-z_][a-z0-9_]*)|op\.create_table\(\s*[\"']([a-z_][a-z0-9_]*)")
 _DROP = re.compile(r"DROP TABLE(?: IF EXISTS)?\s+([a-z_][a-z0-9_]*)|op\.drop_table\(\s*[\"']([a-z_][a-z0-9_]*)")
@@ -85,7 +99,7 @@ def _alembic_live_tables() -> tuple[set[str], set[str]]:
         # 상수 이름에 TABLE 이 든 것만 본다 — (표, 칼럼, 타입) 튜플 목록까지 지움으로 세지 않도록.
         if re.search(r"drop table[^\n]*\{", up, re.I):
             for m in re.finditer(r"^[A-Z_]*TABLE[A-Z_]*\s*=\s*[\[(](.*?)[\])]", up, re.M | re.S):
-                dropped.update(re.findall(r"[\"'](tb_[a-z0-9_]+)[\"']", m.group(1)))
+                dropped.update(re.findall(r"[\"']((?:tb|tad)_[a-z0-9_]+)[\"']", m.group(1)))
     return created, dropped
 
 
@@ -129,7 +143,8 @@ def audit() -> dict:
             return _RENAMED[m.group(1)] + n[len(m.group(1)):]
         return n
 
-    live = {_now(n) for n in (created - dropped)} - spec
+    # 만든 이력은 옛 이름(tb_*), 지운 이력은 표준 이름(tad_*)으로 적혀 있을 수 있다 — 같은 이름 체계로 맞춘 뒤 뺀다.
+    live = ({_now(n) for n in created} - {_now(n) for n in dropped}) - spec
     # 월별·기본 파티션 자식(tad_cm_chnk_mng_2026_05 · tad_am_adt_log_mng_default …)은 부모
     # 테이블의 일부다. 정의서는 부모를 적으므로 밖에 있는 테이블로 세지 않는다.
     partitions = sorted(n for n in live if (m := part.match(n)) and m.group(1) in spec)

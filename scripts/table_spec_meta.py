@@ -306,7 +306,6 @@ COLS = {
         "input_tokens": "입력 토큰 수",
         "output_tokens": "출력 토큰 수",
         "cost_usd": "비용(USD)",
-        "cost_krw": "비용(KRW)",
         "billing_phase": "과금 구분 — development · operation",
         "latency_ms": "응답 지연(밀리초)",
         "success": "호출 성공 여부",
