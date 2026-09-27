@@ -101,7 +101,21 @@ class AutomationAssessment(BaseModel):
 
 
 class ClassifyOutcome(BaseModel):
-    """분류 결과의 공통 항목 — 동기 응답(ClassifyResponse)과 비동기 작업 결과(ClassifyJobResult)가 같이 쓴다."""
+    """분류 결과의 공통 항목 — 동기 응답(ClassifyResponse)과 비동기 작업 결과(ClassifyJobResult)가 같이 쓴다.
+
+    필수는 inference_id · doc_id · label · confidence · scores · model_version 여섯이다. 나머지는 분류를 끝까지 수행했을 때만 채워진다 —
+    두 경우에는 evaluation_factors · rule_evaluation_factors · evidence · rule_grade · model_grade · decision_path · grade_candidates ·
+    grade_candidates_reason 이 비고(None 또는 빈 목록) factors_source 는 의미 없는 기본값이다
+    (services/classify_service.py 의 조기 반환 두 곳):
+      ① 본문을 읽을 수 없다(등록된 doc_id 를 못 찾고 content 도 없다) — 최고 등급·confidence 0·status=needs_review·model_version="none" 으로 검수에 격리한다.
+      ② 사람이 이미 확정한 등급이 있다 — 추론을 건너뛰고 그 등급을 돌려준다(model_version="human_review:…"·status=staging).
+    두 경우는 model_version 과 warnings 로 가른다.
+
+    [2026-09-27] automation_assessment 는 여기 없다 — KL 이 부르는 IF-05(GET /classify/jobs/{job_id})·콜백에
+    실리지 않게 ClassifyResponse 로만 옮겼다(사용자 지시 '불필요한 건 API 에서 최대한 빼자'). 그 값 자체는
+    _try_persist 가 DB(tad_cm_clsf_rslt_mng.automation_assessment)에 그대로 남기므로 우리 내부 집계
+    (scripts/analyze_auto_confirm_shadow.py --from-db)는 이 변경과 무관하다.
+    """
 
     inference_id: UUID
     doc_id: str
@@ -141,22 +155,35 @@ class ClassifyOutcome(BaseModel):
     # 척하는 것이 된다. 검수자가 확인해야 할 것이 등급이 아니라 **접근권한**임을 알린다.
     grade_candidates: list[str] = []
     grade_candidates_reason: Optional[str] = None
-    # 자동확정 위험도 보정 전의 그림자 관측치. 정책을 바꾸지 않고 검수 결과와 연결한다.
-    automation_assessment: Optional[AutomationAssessment] = None
 
 
 class ClassifyResponse(ClassifyOutcome):
-    """POST /classify · /classify/stream · /classify/explain 의 응답 — 요청을 처리한 시간을 잰다."""
+    """POST /classify · /classify/stream · /classify/explain 의 응답 — 요청을 처리한 시간을 잰다.
+
+    이 셋은 전부 x-audience: internal(우리 콘솔·리뷰 화면 전용, KL 은 호출하지 않는다)이라
+    automation_assessment(그림자 자동확정 관측치)를 여기서만 싣는다.
+    """
 
     elapsed_ms: int
+    # 자동확정 위험도 보정 전의 그림자 관측치. 정책을 바꾸지 않고 검수 결과와 연결한다.
+    # [2026-09-27] ClassifyOutcome 이 아니라 여기(내부 전용 응답)에만 둔다 — 규약서(03_openapi_koipa_kl.yaml)
+    # 가 스스로 "연동에 쓰지 않으며 예고 없이 바뀔 수 있다"고 적어 둔 값을 KL 이 받는 job_result()/ClassifyJobResult
+    # 에는 안 싣기 위해서다(사용자 지시 2026-09-27). DB 저장(_try_persist)은 이 필드를 그대로 받아 독립적으로
+    # 남기므로 scripts/analyze_auto_confirm_shadow.py 같은 내부 집계는 영향 없다.
+    automation_assessment: Optional[AutomationAssessment] = None
 
     def job_result(self) -> dict:
-        """비동기 작업 결과(IF-05 results[] · 콜백 본문)로 저장할 JSON. 비동기 결과는 시간을 재지 않으므로 elapsed_ms 는 싣지 않는다."""
-        return self.model_dump(mode="json", exclude={"elapsed_ms"})
+        """비동기 작업 결과(IF-05 results[] · 콜백 본문)로 저장할 JSON — KL 이 실제로 받는 값.
+
+        elapsed_ms 는 비동기 결과는 시간을 재지 않으므로 안 싣는다. automation_assessment 는 내부 전용
+        그림자 관측치라 안 싣는다(2026-09-27) — 값은 DB 에 별도로 남는다(위 클래스 docstring 참고).
+        """
+        return self.model_dump(mode="json", exclude={"elapsed_ms", "automation_assessment"})
 
 
 class ClassifyJobResult(ClassifyOutcome):
-    """GET /classify/jobs/{job_id} 의 results[] 한 건 — 분류 결과 그대로이고 경과 시간만 없다."""
+    """GET /classify/jobs/{job_id} 의 results[] 한 건(IF-05, KL 이 호출) — ClassifyOutcome 그대로이며 경과 시간·
+    automation_assessment 는 없다(둘 다 ClassifyResponse 에만 있는 내부 전용 항목)."""
 
 
 class StoredClassificationResponse(BaseModel):

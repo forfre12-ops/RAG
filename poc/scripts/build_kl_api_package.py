@@ -511,7 +511,6 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
     b.append(p("IF-05 의 <code>results[]</code> 한 건(<code>ClassifyJobResult</code>)의 필드입니다. IF-06 은 이 중 등급 · 확률 · 모델 버전 · 상태만 담고 확정 등급을 더합니다(3-4)."))
     b.append(field_table(spec, {"$ref": "#/components/schemas/ClassifyJobResult"}, overrides={
         "label": "예측 등급 코드. 사람이 확정한 등급은 confirmed_label 입니다.",
-        "automation_assessment": "내부 검증용 관측치입니다. 연동에 쓰지 않으며 필드는 예고 없이 바뀔 수 있습니다.",
     }))
     b.append(h3("등급 코드"))
     b.append(_table(["label", "이름"], [[f"<code>{c}</code>", GRADE_NAMES[c]] for c in schemas["Grade"]["enum"]], center={0}, widths=[20, 80]))
@@ -532,6 +531,16 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
         "<code>grade_candidates</code> 는 비밀관리성(M)을 판단할 접근범위·보안표시를 받지 못해 등급이 하나로 정해지지 않을 때 남는 후보입니다. 비어 있으면 <code>label</code> 이 유일한 답입니다. "
         "<code>label</code> 을 대체하지 않으며, 접근범위·보안표시를 보내면(5장) 줄어듭니다.",
         "<code>confidence</code> 는 선택한 등급(<code>label</code>)의 확률(0~1)이고 <code>scores</code> 는 등급별 확률입니다.",
+        "필수는 <code>inference_id</code> · <code>doc_id</code> · <code>label</code> · <code>confidence</code> · <code>scores</code> · <code>model_version</code> 여섯입니다. "
+        "<code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>evidence</code> · <code>rule_grade</code> · <code>model_grade</code> · "
+        "<code>decision_path</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> 은 "
+        "분류를 끝까지 수행했을 때만 채워지는 <b>선택 항목</b>이라 두 경우에는 비어 있습니다(<code>null</code> 또는 빈 배열이며 <code>factors_source</code> 는 의미 없는 기본값입니다). "
+        "① 본문을 읽을 수 없어(등록된 <code>doc_id</code> 를 찾지 못하고 <code>content</code> 도 없음) 사람 검수로 격리한 경우 — <code>label</code> 은 최고 등급(<code>TS</code>), "
+        "<code>confidence</code> 는 0, <code>status</code> 는 <code>needs_review</code>, <code>model_version</code> 은 <code>none</code> 입니다. "
+        "② 사람이 이미 확정한 등급이 있어 추론을 건너뛴 경우 — <code>model_version</code> 이 <code>human_review:…</code> 로 시작하고 <code>status</code> 는 <code>staging</code> 입니다. "
+        "두 경우는 <code>model_version</code> 과 <code>warnings</code> 로 구분합니다.",
+        "<code>automation_assessment</code> 는 이 결과에 없습니다(2026-09-27 부터). 저희 내부 자동확정 정책을 검증하는 그림자 관측치라 연동에 쓰지 않으며, "
+        "동기 응답(<code>POST /classify</code>, 내부 화면 전용)에만 남겨 뒀습니다.",
     ]))
 
     # ── 5. 메타데이터 ───────────────────────────────────────────────────
@@ -611,7 +620,8 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
             ["3", "분류 요청의 <code>content</code>", "필수", "선택. 생략하면 등록 때 저장한 본문을 씁니다"],
             ["4", "등록 후 분류 호출", "<code>POST /classify?doc_id=…</code>", "본문 <code>{\"doc_id\": …}</code> 로 보냅니다(쿼리 파라미터는 받지 않음)"],
             ["5", "등록 폼 필드", "<code>doc_type</code> · <code>external_ref</code>", "<code>doc_type</code> · <code>external_ref</code> 는 받지 않습니다(보내도 무시). <code>source_type</code> · <code>security_marking</code> · <code>access_scope</code> · <code>enqueue_classification</code> 추가"],
-            ["6", "분류 결과 필드", "15개", "IF-05 결과 한 건은 18개 — <code>rule_evaluation_factors</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> · <code>automation_assessment</code> 추가. 사람이 확정한 등급 <code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> 은 IF-06 에서만 옵니다"],
+            ["6", "분류 결과 필드", "15개", "IF-05 결과 한 건은 17개 — <code>rule_evaluation_factors</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> 추가"
+             "(<code>automation_assessment</code> 는 안 실립니다 — 내부 전용이라 2026-09-27 부터 뺐습니다). 사람이 확정한 등급 <code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> 은 IF-06 에서만 옵니다"],
             ["7", "오류 본문", "<code>{code, message, …}</code>", "대부분 <code>{\"detail\": …}</code>. <code>code</code> 는 413·429·500 에만 있고 값은 <code>KOIPA_BODY_TOO_LARGE</code> · <code>KOIPA_RATE_LIMIT</code> · <code>KOIPA_INTERNAL</code> 셋뿐입니다"],
             ["8", "문서 조회(IF-06)", "분류 결과 전체", "저장된 요약 10개 항목만 담습니다(3-4장 표)"],
         ],

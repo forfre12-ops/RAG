@@ -452,7 +452,12 @@ components:
           nullable: true
     ClassifyOutcome:
       type: object
-      description: 분류 결과의 공통 항목 — 동기 응답(ClassifyResponse)과 비동기 작업 결과(ClassifyJobResult)가 같이 쓴다.
+      description: 분류 결과의 공통 항목 — 동기 응답(ClassifyResponse)과 비동기 작업 결과(ClassifyJobResult)가 같이 쓴다. 필수는 inference_id
+        · doc_id · label · confidence · scores · model_version 여섯이고, 나머지는 분류를 끝까지 수행했을 때만 채워진다. 본문을 읽을 수 없어 격리한
+        경우(label 은 최고 등급·confidence 0·status needs_review·model_version none)와 사람이 이미 확정한 등급이 있어 추론을 건너뛴 경우(model_version
+        이 human_review 로 시작·status staging)에는 evaluation_factors · rule_evaluation_factors · evidence · rule_grade
+        · model_grade · decision_path · grade_candidates · grade_candidates_reason · automation_assessment 가 비어
+        있다(null 또는 빈 배열). 두 경우는 model_version 과 warnings 로 가른다.
       required:
       - inference_id
       - doc_id
@@ -544,13 +549,10 @@ components:
           type: string
           nullable: true
           description: 후보가 남은 사유(사람이 읽는 문장)
-        automation_assessment:
-          type: object
-          nullable: true
-          additionalProperties: true
-          description: 자동확정 정책 검증용 관측치(그림자 모드). 연동에 쓰지 않으며 필드는 예고 없이 바뀔 수 있다.
     ClassifyJobResult:
-      description: GET /classify/jobs/{job_id} 의 results[] 한 건 — 분류 결과 그대로이며 처리 시간은 없다(비동기 결과는 재지 않는다).
+      description: GET /classify/jobs/{job_id} 의 results[] 한 건(IF-05, KL 이 호출) 및 콜백(IF-04) 본문 — ClassifyOutcome
+        그대로이며 처리 시간·automation_assessment 는 없다(둘 다 내부 전용 ClassifyResponse 에만 있다. 2026-09-27 automation_assessment
+        제거 — 그 전에는 그림자 관측치가 KL 에도 실려 나갔다).
       allOf:
       - $ref: '#/components/schemas/ClassifyOutcome'
     StoredClassificationResponse:

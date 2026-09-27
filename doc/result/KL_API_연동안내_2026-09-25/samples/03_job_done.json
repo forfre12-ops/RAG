@@ -58,30 +58,7 @@
       "model_grade": "S2",
       "decision_path": "룰 S1 · 모델 S2 불일치 (검수 사유는 아래 경고 참조)",
       "grade_candidates": [],
-      "grade_candidates_reason": null,
-      "automation_assessment": {
-        "schema_version": "auto-confirm-assessment-v1",
-        "shadow_mode": "collect_only",
-        "selected_label": "S2",
-        "selected_confidence": 0.8803578615188599,
-        "selected_rank": 1,
-        "top_label": "S2",
-        "top_score": 0.8803578615188599,
-        "runner_up_label": "S1",
-        "runner_up_score": 0.08763943612575531,
-        "score_margin": 0.7927184253931046,
-        "rule_grade": "S1",
-        "model_grade": "S2",
-        "rule_agrees": false,
-        "rule_has_evidence": true,
-        "evidence_count": 1,
-        "current_policy_status": "needs_review",
-        "current_policy_eligible": false,
-        "causal_review_reason": "agreement-gate",
-        "review_gate_hits": [
-          "agreement-gate"
-        ]
-      }
+      "grade_candidates_reason": null
     }
   ],
   "error": null
