@@ -18,8 +18,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from koipa.api._jwt_auth import JWTClaims, require_auth
+from koipa.api.golden import (
+    _as_reviewer_view,
+    _render_console_login_html,
+    _render_specledger_gold_console_html,
+)
 from koipa.api.app import app
-from koipa.api.golden import _render_console_login_html, _render_specledger_gold_console_html
 from koipa.golden_review_html import _nav_html
 
 ADMIN_HREF = "/console/admin.html"
@@ -39,8 +43,17 @@ def client():
 
 
 def test_review_screens_do_not_link_to_the_admin_console() -> None:
+    """검수자가 실제로 받는 화면에는 이 링크가 절대 없어야 한다 — KL 지적의 핵심.
+
+    [2026-09-27] manage 화면은 admin·kl_backend 세션에서는 관리자 콘솔로 돌아가는
+    편의 링크를 다시 허용했다(사용자 요청 — 이미 admin 권한이 있는 세션이 admin.html 을
+    직접 주소로 열 수 있는 것과 같은 일이라 새 권한이 생기지 않는다). 그래서 여기서는
+    **원시 렌더가 아니라 검수자에게 실제로 나가는 응답**(`_as_reviewer_view` 을 거친 것)을
+    본다 — 그게 KL 이 지적한 대상이다. admin 세션이 링크를 보는 것 자체는 바로 아래
+    `test_admin_view_shows_a_way_back_to_the_admin_console` 이 별도로 확인·고정한다.
+    """
     for name, html in (
-        ("manage", _render_specledger_gold_console_html()),
+        ("manage(reviewer)", _as_reviewer_view(_render_specledger_gold_console_html())),
         ("login", _render_console_login_html()),
         ("review", _nav_html("검수", "full-train", "review")),
     ):
@@ -61,6 +74,23 @@ def test_admin_view_is_unchanged(client) -> None:
     assert r.status_code == 200
     assert "검수자 권한으로 열었습니다" not in r.text
     assert "#openUpload,#promote,#provBox{display:none!important}" not in r.text
+
+
+def test_admin_view_shows_a_way_back_to_the_admin_console(client) -> None:
+    """[2026-09-27, 사용자 요청] admin·kl_backend 세션은 후보 관리 화면에서 관리자 콘솔로
+    돌아가는 메뉴 링크를 본다 — 이미 그 역할이면 admin.html 을 직접 열 수 있어 새 권한이
+    생기는 게 아니다. reviewer 세션에는 이 링크가 나가면 안 된다(바로 위 시험이 잠근다).
+    """
+    for role in ("admin", "kl_backend"):
+        app.dependency_overrides[require_auth] = lambda role=role: _auth(role)
+        r = client.get("/api/v1/golden/candidates/manage.html")
+        assert r.status_code == 200
+        assert ADMIN_HREF in r.text, f"{role}: 관리자 콘솔 링크가 없다"
+
+    app.dependency_overrides[require_auth] = lambda: _auth("reviewer")
+    r = client.get("/api/v1/golden/candidates/manage.html")
+    assert r.status_code == 200
+    assert ADMIN_HREF not in r.text, "reviewer: 관리자 콘솔 링크가 새어 나갔다"
 
 
 def test_reviewer_can_record_a_decision_but_not_admin_only_actions(client) -> None:
