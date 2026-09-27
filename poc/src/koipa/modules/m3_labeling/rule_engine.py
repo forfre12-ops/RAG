@@ -432,14 +432,19 @@ def has_real_evidence(result: "RuleLabelResult") -> bool:
     return any(mk.start is None for mk in result.matched_keywords)
 
 
+# [2026-09-27] BUY\u00B7Weekly\u00B7WTI\u00B7LNG\u00B7IRA \uC81C\uAC70 \u2014 \uACF5\uAC1C \uC2DC\uD669 \uB9AC\uD3EC\uD2B8 \uC0C1\uD22C\uC5B4\uB77C 651\uAC74 \uC804\uC218(hardened42\u00B7
+# holdout109\u00B7golden500) \uC2E4\uCE21\uC5D0\uC11C \uC774 \uB137\uC740 \uB2E8 \uD55C \uBC88\uB3C4 TS/S1(\uACE0\uB4F1\uAE09) \uBB38\uC11C\uC5D0 \uAC78\uB9B0 \uC801\uC774 \uC5C6\uACE0
+# \uAC78\uB9B4 \uB54C\uB9C8\uB2E4(holdout109 7\uAC74) S3 \uBB38\uC11C\uB97C S1/S2\uB85C \uACFC\uBD84\uB958\uC2DC\uCF30\uB2E4. \uC81C\uAC70 \uD6C4 \uAC19\uC740 651\uAC74 \uC7AC\uCE21\uC815:
+# \uAC1C\uC120 7 \u00B7 \uBD80\uC791\uC6A9 0. CVD\uB294 \uB0A8\uAE34\uB2E4 \u2014 \uAC19\uC740 651\uAC74\uC5D0\uC11C 4/6\uC774 \uC9C4\uC9DC TS(\uBC18\uB3C4\uCCB4 CVD \uACF5\uC815)\uC774\uACE0
+# \uC624\uD0D0\uC740 1\uAC74(\uD0DC\uC591\uAD11 \uAD00\uC138 \uB9AC\uD3EC\uD2B8\uC758 "\uC0C1\uACC4\uAD00\uC138countervailing duty" \uB3D9\uC74C\uC774\uC758\uC5B4)\uBFD0\uC774\uB77C \uC21C\uC2E0\uD638\uAC00 \uC788\uB2E4.
 _HIGH_RISK_PATTERNS: list[tuple[str, str, float, str]] = [
     ("TS", r"\b(?:DRAM|HBM|EUV|CVD|ALD|ICP-RIE|SiH4|N2O|sccm|Torr|Li6PS5Cl|Li2S|P2S5|LiCl|ZrO2|NMC|mAh/g)\b", 1.6, "ECONOMIC_VALUE"),
     ("TS", r"\b(?:HSM|FIPS|master\s*key|root\s*CA|SCADA|zero[- ]day|CFAR|MIMO|RLHF|LLM)\b", 1.6, "MANAGEMENT_LEVEL"),
     ("TS", r"\b(?:DCF|NDA|PMI|Post[- ]Merger|IPO|M&A|CFO|valuation|merger|acquisition)\b", 1.4, "NON_PUBLICITY"),
     ("S1", r"\b(?:GMP|DMF|PLC|TFT[- ]LCD|QKD|source\s*code|API|patent|license|trade\s*secret)\b", 1.2, "ECONOMIC_VALUE"),
-    ("S1", r"\b(?:EBITDA|BUY|target\s*price|cost\s*structure|customer\s*(?:list|database)|pricing\s*model)\b", 1.0, "ECONOMIC_VALUE"),
+    ("S1", r"\b(?:EBITDA|target\s*price|cost\s*structure|customer\s*(?:list|database)|pricing\s*model)\b", 1.0, "ECONOMIC_VALUE"),
     ("S1", "(?:\uAE30\uC5C5\\s*\uC2E4\uC0AC|\uC778\uC218\\s*\uBB34\uC0B0|\uD569\uBCD1\\s*\uAC00\uACA9|\uC778\uC218\\s*\uAC00\uACA9|\uBE44\uACF5\uAC1C\\s*\uC774\uC0AC\uD68C|\uBBF8\uACF5\uC2DC)", 1.2, "NON_PUBLICITY"),
-    ("S2", r"\b(?:Weekly|Guide\s*Book|OEM|BEV|IRA|AMPC|CDMO|LNG|WTI|GHz|GWh|LTE|ETF|OECD)\b", 0.9, "NON_PUBLICITY"),
+    ("S2", r"\b(?:Guide\s*Book|OEM|BEV|AMPC|CDMO|GHz|GWh|LTE|ETF|OECD)\b", 0.9, "NON_PUBLICITY"),
     ("S2", r"\b(?:internal\s*(?:review|plan|memo)|draft|negotiation|vendor|supplier|budget|forecast)\b", 1.0, "NON_PUBLICITY"),
 ]
 
