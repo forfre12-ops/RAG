@@ -149,6 +149,7 @@ def test_unauthenticated_requests_are_rejected(client):
 @pytest.mark.parametrize("method,path,kw", [
     ("get", "/regulations", {}), ("get", f"/regulations/{RID}", {}), ("get", f"/regulations/{RID}/clauses", {}),
     ("get", f"/documents/{DID}/regulation-evidence", {}),
+    ("get", "/regulations/runtime-toggle", {}), ("get", "/regulations/llm-select-toggle", {}),
 ])
 def test_read_roles(client, method, path, kw):
     c, _, _ = client
@@ -171,6 +172,10 @@ def test_write_roles_exclude_reviewer_and_system(client):
                         json={"display": False}).status_code == 200) is ok, role
         assert (c.post(f"{API}/regulations/{RID}/preview", headers=hdr(role),
                        json={"doc_ids": [DID]}).status_code == 200) is ok, role
+        assert (c.put(f"{API}/regulations/runtime-toggle", headers=hdr(role),
+                      json={"enabled": True}).status_code == 200) is ok, role
+        assert (c.put(f"{API}/regulations/llm-select-toggle", headers=hdr(role),
+                      json={"enabled": True}).status_code == 200) is ok, role
 
 
 # ── 등록 ────────────────────────────────────────────────────────────────────

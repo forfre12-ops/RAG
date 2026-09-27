@@ -1088,7 +1088,16 @@ details.adv[open]{padding-bottom:12px;}
         <div class="btn-row">
           <button class="btn sec sm" onclick="loadRegulations()">규정 목록 불러오기</button>
           <span id="reg-info" class="hint" style="margin:0;"></span>
+          <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin-left:auto;cursor:pointer;">
+            <input type="checkbox" id="reg-runtime-toggle" onchange="toggleRegRuntime(this.checked)" />
+            검수 화면에 노출
+          </label>
+          <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;cursor:pointer;" title="후보 조항을 사내 LLM 서버가 다시 골라 정밀도를 높입니다. 사내 LLM 서버가 없으면 켜도 표시가 늘지 않습니다.">
+            <input type="checkbox" id="reg-llm-toggle" onchange="toggleRegLlm(this.checked)" />
+            로컬 LLM으로 더 정확하게 고르기
+          </label>
         </div>
+        <p class="sec-note" id="reg-llm-hint" style="display:none;margin:4px 0 0;">사내 LLM 서버(ollama 등)가 연결돼 있지 않으면 이 옵션을 켜도 표시가 늘지 않습니다 — 후보를 걸러내기만 하고 대체 표시는 없습니다.</p>
         <div id="reg-notice" role="status" aria-live="polite"></div>
         <div class="tbl-wrap">
           <table>
@@ -3376,6 +3385,7 @@ async function toggleKeyword(i){
 const REG_STATUS_KO={indexing:'분석 중', ready:'사용 전', active:'사용 중', archived:'보관', failed:'분석 실패'};
 const REG_KIND_KO={general:'일반', procedure:'절차', grade_def:'등급 정의', handling:'취급 기준', other:'기타'};
 const REG_EMPTY_KO={
+  disabled_by_admin:'관리자가 이 화면에서 껐습니다',
   no_active_regulation:'사용 중인 규정이 없습니다',
   document_not_indexed:'이 문서는 아직 분석되지 않아 비교하지 못했습니다',
   embedder_mismatch:'문서와 규정의 분석 방식이 달라 비교하지 못했습니다',
@@ -3433,6 +3443,47 @@ async function initRegulationCard(){
   if(note && tab && tab.dataset.tab==='config') note.textContent=PANE_NOTE.config;
   setRegList(r.data);
   syncRegPoll();
+  loadRegRuntimeToggle();
+  loadRegLlmToggle();
+}
+/* 검수 화면 노출 스위치 — 재시작 없이 즉시 반영(admin.regulation.runtime_toggle). */
+async function loadRegRuntimeToggle(){
+  const box=$('reg-runtime-toggle'); if(!box) return;
+  try{ const d=await api('GET','/regulations/runtime-toggle'); box.checked=!!d.enabled; }
+  catch(e){ /* 검수자 권한 등으로 못 읽으면 체크 상태를 안 바꾼다 — 쓰기 버튼도 guardWrite 가 막는다 */ }
+}
+async function toggleRegRuntime(on){
+  if(!guardWrite('규정 노출 스위치 변경')){ loadRegRuntimeToggle(); return; }
+  try{
+    await api('PUT','/regulations/runtime-toggle',{enabled:!!on});
+    regClearRefCache();
+    regNotice('ok', on ? '검수 화면에 관련 규정을 노출합니다(즉시 반영).' : '검수 화면에서 관련 규정을 숨깁니다(즉시 반영).');
+  }catch(e){
+    regNotice('warn', `스위치를 바꾸지 못했습니다: ${errKoText(e)}`);
+    loadRegRuntimeToggle();
+  }
+}
+/* 로컬 LLM 고르기 스위치 — 재시작 없이 즉시 반영. 사내 LLM 서버가 없으면 켜도 fail-closed 로 표시가 늘지 않는다. */
+async function loadRegLlmToggle(){
+  const box=$('reg-llm-toggle'); if(!box) return;
+  try{
+    const d=await api('GET','/regulations/llm-select-toggle');
+    box.checked=!!d.enabled;
+    $('reg-llm-hint').style.display = box.checked ? '' : 'none';
+  }catch(e){ /* 검수자 권한 등으로 못 읽으면 체크 상태를 안 바꾼다 */ }
+}
+async function toggleRegLlm(on){
+  if(!guardWrite('규정 LLM 스위치 변경')){ loadRegLlmToggle(); return; }
+  try{
+    await api('PUT','/regulations/llm-select-toggle',{enabled:!!on});
+    regClearRefCache();
+    $('reg-llm-hint').style.display = on ? '' : 'none';
+    regNotice('ok', on ? '로컬 LLM으로 후보를 다시 고릅니다(즉시 반영) — 사내 LLM 서버가 있어야 실제로 작동합니다.'
+                        : '로컬 LLM 고르기를 끕니다(즉시 반영).');
+  }catch(e){
+    regNotice('warn', `스위치를 바꾸지 못했습니다: ${errKoText(e)}`);
+    loadRegLlmToggle();
+  }
 }
 async function loadRegulations(){
   try{

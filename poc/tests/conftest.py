@@ -141,3 +141,23 @@ def _restore_settings():
     for k, v in saved.items():
         setattr(config_mod.settings, k, v)
     config_mod._SECRETS_FILLED = _secrets_filled
+
+
+@pytest.fixture(autouse=True)
+def _reset_regulation_runtime_toggle():
+    """규정 참고 표시의 콘솔 켬/끔 스위치(redis 키)는 프로세스 전역이라 한 시험이 켜고 안 지우면
+    같은 pytest 프로세스에서 도는 무관한 다른 시험까지 값을 물려받는다(실측 2026-09-27 —
+    test_regulation_api 의 PUT 역할 시험이 llm-select-toggle 을 켠 채 남겨 test_regulation_service_db·
+    test_regulation_service_llm 여러 건이 엉뚱하게 실패했다). redis 가 없는 환경에서도(단위 시험)
+    조용히 넘어가야 하므로 예외는 삼킨다 — 이 픽스처의 목적은 청소이지 redis 가용성 검증이 아니다.
+    """
+    def _clear():
+        try:
+            from koipa.regulation import runtime_toggle
+            c = runtime_toggle._client()
+            c.delete(runtime_toggle._KEY, runtime_toggle._LLM_KEY)
+        except Exception:  # noqa: BLE001 — redis 미가용 환경도 시험은 계속 돈다
+            pass
+    _clear()
+    yield
+    _clear()

@@ -35,6 +35,8 @@ EXPECTED_WHEN_ON = {
     "/api/v1/regulations/{reg_id}/activate",
     "/api/v1/regulations/{reg_id}/archive",
     "/api/v1/documents/{doc_id}/regulation-evidence",
+    "/api/v1/regulations/runtime-toggle",
+    "/api/v1/regulations/llm-select-toggle",
 }
 
 

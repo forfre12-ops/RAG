@@ -2125,6 +2125,69 @@ paths:
         '422': { description: "doc_ids 가 비었거나 20건을 넘는다" }
         '503': { description: "미리보기를 계산할 수 없다" }
 
+  /regulations/runtime-toggle:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 검수 화면 노출 스위치 조회
+      description: 관리 콘솔 체크박스 값 — 켜져 있어도 이 값이 꺼져 있으면 검수 화면엔 아무것도 안 보인다(등급 판정과 무관).
+      responses:
+        '200':
+          description: 현재 값
+          content:
+            application/json:
+              schema: { type: object, properties: { enabled: { type: boolean } }, required: [enabled] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 검수 화면 노출 스위치 변경 — 재시작 없이 즉시 반영
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { enabled: { type: boolean } }, required: [enabled] }
+      responses:
+        '200':
+          description: 바뀐 값
+          content:
+            application/json:
+              schema: { type: object, properties: { enabled: { type: boolean } }, required: [enabled] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin 또는 kl_backend 역할이 필요하다" }
+
+  /regulations/llm-select-toggle:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 로컬 LLM 고르기 스위치 조회
+      description: 값이 없으면(관리자가 콘솔에서 아직 안 건드림) `.env` 의 REGULATION_LLM_SELECT_ENABLED 기본값을 따른다.
+      responses:
+        '200':
+          description: 현재 값
+          content:
+            application/json:
+              schema: { type: object, properties: { enabled: { type: boolean } }, required: [enabled] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [regulation]
+      summary: 로컬 LLM 고르기 스위치 변경 — 재시작 없이 즉시 반영
+      description: 사내 LLM 서버(ollama 등)가 연결돼 있지 않으면 켜도 표시가 늘지 않는다(fail-closed, llm_not_local).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { enabled: { type: boolean } }, required: [enabled] }
+      responses:
+        '200':
+          description: 바뀐 값
+          content:
+            application/json:
+              schema: { type: object, properties: { enabled: { type: boolean } }, required: [enabled] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "admin 또는 kl_backend 역할이 필요하다" }
+
   /regulations/{reg_id}/activate:
     post:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다

@@ -52,6 +52,7 @@ LLM_CACHE_MAX_ENTRIES = 2000
 
 REASON_DOC_NOT_INDEXED = "document_not_indexed"
 REASON_EMBEDDER_MISMATCH = "embedder_mismatch"
+REASON_DISABLED_BY_ADMIN = "disabled_by_admin"
 
 
 @dataclass
@@ -201,7 +202,15 @@ class RegulationEvidenceService:
 
     # ── 조회 ──────────────────────────────────────────────────────────────
     def find_for_document(self, doc_id: str, *, max_items: int | None = None) -> EvidenceResult:
-        """문서가 없으면 LookupError(→ 404). 활성 규정이 없으면 문서를 확인하지 않고 바로 비운다."""
+        """문서가 없으면 LookupError(→ 404). 활성 규정이 없으면 문서를 확인하지 않고 바로 비운다.
+
+        검수 화면 전용 진입점이라 여기서만 런타임 스위치(콘솔 체크박스, 재시작 불필요)를 본다 —
+        관리자의 「미리보기」(preview)는 이 스위치와 무관하게 항상 동작해야 끄기 전에 확인할 수 있다.
+        """
+        from koipa.regulation import runtime_toggle  # noqa: PLC0415
+
+        if not runtime_toggle.is_enabled():
+            return EvidenceResult(doc_id, None, REASON_DISABLED_BY_ADMIN, [])
         groups = self._active_groups()
         if not groups:
             return EvidenceResult(doc_id, None, REASON_NO_CLAUSES, [])
@@ -221,7 +230,8 @@ class RegulationEvidenceService:
         limit = max(1, min(3, int(max_items if max_items is not None else s.regulation_evidence_max_items)))
         doc_vec = vectors.normalize(np.asarray(dv.embedding, dtype=np.float32))
         doc_text = self._doc_text(doc_id)
-        if getattr(s, "regulation_llm_select_enabled", False):
+        from koipa.regulation import runtime_toggle  # noqa: PLC0415
+        if runtime_toggle.is_llm_select_enabled(default=bool(getattr(s, "regulation_llm_select_enabled", False))):
             return self._find_with_llm(doc_id, index, doc_vec, doc_text, limit, s, use_cache=use_cache)
         res = index.find(doc_vec, doc_text, max_items=limit, floor=float(s.regulation_min_similarity))
         return EvidenceResult(doc_id, True, res.reason, res.items)

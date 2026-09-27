@@ -27,6 +27,22 @@ class RegulationSummary(BaseModel):
     activated_at: str | None = None
 
 
+class RuntimeToggleResponse(BaseModel):
+    enabled: bool = Field(description="검수 화면에 관련 규정을 노출할지 — 관리자가 콘솔에서 즉시 바꾼다(재시작 불필요)")
+
+
+class RuntimeToggleRequest(BaseModel):
+    enabled: bool
+
+
+class LlmSelectToggleResponse(BaseModel):
+    enabled: bool = Field(description="후보 조항을 로컬 LLM 이 다시 골라 정확도를 높일지 — 사내 LLM 서버가 없으면 켜도 표시되지 않는다")
+
+
+class LlmSelectToggleRequest(BaseModel):
+    enabled: bool
+
+
 class RegulationListResponse(BaseModel):
     items: list[RegulationSummary]
     total: int

@@ -20,6 +20,7 @@ from koipa.api._jwt_auth import require_auth
 from koipa.api._rbac import require_role
 from koipa.api.rate_limit import limiter
 from koipa.config import settings
+from koipa.regulation import runtime_toggle
 from koipa.regulation.index import EvidenceItem
 from koipa.schemas.regulation import (
     ActivateRequest,
@@ -34,8 +35,12 @@ from koipa.schemas.regulation import (
     PreviewResult,
     RegisterResponse,
     RegulationDetail,
+    LlmSelectToggleRequest,
+    LlmSelectToggleResponse,
     RegulationEvidenceResponse,
     RegulationListResponse,
+    RuntimeToggleRequest,
+    RuntimeToggleResponse,
 )
 from koipa.services.regulation_evidence_service import (
     EvidenceResult,
@@ -74,6 +79,42 @@ def _items(items: list[EvidenceItem]) -> list[EvidenceItemModel]:
 
 def _evidence_response(r: EvidenceResult) -> RegulationEvidenceResponse:
     return RegulationEvidenceResponse(doc_id=r.doc_id, indexed=r.indexed, reason=r.reason, items=_items(r.items))
+
+
+# ── 검수 화면 노출 스위치 (콘솔 체크박스 — 재시작 불필요) ──────────────────────────
+# ⚠ 이 라우터가 붙어 있다는 것 자체는 settings.regulation_reference_enabled(.env, 재시작 필요)로
+# 이미 정해진 것이다 — 이 스위치는 그 아래에서 "지금 검수 화면에 보일지"만 콘솔에서 즉시 바꾼다.
+
+
+@router.get("/regulations/runtime-toggle", response_model=RuntimeToggleResponse,
+            summary="검수 화면 노출 스위치 조회")
+def get_runtime_toggle(auth: dict = Depends(require_role(*("admin", "reviewer", "kl_backend")))) -> RuntimeToggleResponse:
+    return RuntimeToggleResponse(enabled=runtime_toggle.is_enabled())
+
+
+@router.put("/regulations/runtime-toggle", response_model=RuntimeToggleResponse,
+            summary="검수 화면 노출 스위치 변경 — 재시작 없이 즉시 반영")
+def set_runtime_toggle(req: RuntimeToggleRequest,
+                        auth: dict = Depends(require_role(*_WRITE))) -> RuntimeToggleResponse:
+    actor_id, actor_role = _who(auth)
+    runtime_toggle.set_enabled(req.enabled, actor_id=actor_id, actor_role=actor_role)
+    return RuntimeToggleResponse(enabled=req.enabled)
+
+
+@router.get("/regulations/llm-select-toggle", response_model=LlmSelectToggleResponse,
+            summary="로컬 LLM 고르기 스위치 조회")
+def get_llm_select_toggle(auth: dict = Depends(require_role(*("admin", "reviewer", "kl_backend")))) -> LlmSelectToggleResponse:
+    return LlmSelectToggleResponse(enabled=runtime_toggle.is_llm_select_enabled())
+
+
+@router.put("/regulations/llm-select-toggle", response_model=LlmSelectToggleResponse,
+            summary="로컬 LLM 고르기 스위치 변경 — 재시작 없이 즉시 반영. "
+                    "사내 LLM 서버(ollama 등)가 연결돼 있지 않으면 켜도 표시가 늘지 않는다(fail-closed)")
+def set_llm_select_toggle(req: LlmSelectToggleRequest,
+                          auth: dict = Depends(require_role(*_WRITE))) -> LlmSelectToggleResponse:
+    actor_id, actor_role = _who(auth)
+    runtime_toggle.set_llm_select_enabled(req.enabled, actor_id=actor_id, actor_role=actor_role)
+    return LlmSelectToggleResponse(enabled=req.enabled)
 
 
 # ── 규정 등록·관리 ─────────────────────────────────────────────────────────
