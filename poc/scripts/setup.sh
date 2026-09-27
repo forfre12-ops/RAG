@@ -156,7 +156,11 @@ gen_secret() {
     od -An -tx1 -N32 /dev/urandom | tr -d ' \n'
   fi
 }
-IMAGE_TAG_DEFAULT="$(sed -n 's/^ *version: *//p' "$BUNDLE/manifest.yaml" 2>/dev/null | head -1)"
+# manifest.yaml 이 없으면(예: 소스체크아웃에서 직접 실행) sed 가 rc=2 로 실패하고, pipefail 하에서
+# 그 실패가 파이프 전체 종료코드로 올라와 set -e 가 스크립트를 여기서 죽인다 — 바로 다음 줄의
+# ":-1.0.0-rc1" 폴백이 그래서 한 번도 실행되지 못했다(실측 2026-09-27: Rocky8 실치설치 리허설에서
+# manifest.yaml 없이 실행하니 트레이스 없이 조용히 멈춤). "|| true" 로 파이프 실패를 흡수한다.
+IMAGE_TAG_DEFAULT="$(sed -n 's/^ *version: *//p' "$BUNDLE/manifest.yaml" 2>/dev/null | head -1 || true)"
 IMAGE_TAG_DEFAULT="${IMAGE_TAG_DEFAULT:-1.0.0-rc1}"
 
 if [ -f "$ENV_FILE" ] && [ "$FORCE_ENV" != "1" ]; then

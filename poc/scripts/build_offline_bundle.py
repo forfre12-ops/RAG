@@ -1085,25 +1085,48 @@ _async_classify() {   # $1=파일경로 → "label|model_version" (실패 시 �
   # actor 는 multipart Form 필드(JSON 문자열) — 누락 시 422.
   up="$(curl -fsS -X POST "$BASE_URL/api/v1/documents" -H "X-API-Key: $API_KEY" \
          -F 'actor={"user_id":"acceptance","role":"admin"}' -F "file=@$1" 2>/dev/null)" || return 1
-  did="$(printf '%s' "$up" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("doc_id") or "")' 2>/dev/null)"
+  # [2026-09-27] 아래 sync 루프처럼 python3 유무를 안 가리면, python3 가 없는 호스트(Rocky 8 기본은
+  # /usr/bin/python3 가 없다 — 있는 건 /usr/libexec/platform-python 뿐)에서 doc_id 추출이 매번
+  # 빈 문자열이 되어 대용량 문서가 전부 veto(고등급 미탐) 오판정된다 — 실배포 실물확인(Rocky8
+  # +실번들)에서 재현: 백엔드는 정상 분류했는데 인수 러너만 FAIL 을 냈다.
+  if command -v python3 >/dev/null 2>&1; then
+    did="$(printf '%s' "$up" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("doc_id") or "")' 2>/dev/null)"
+  else
+    did="$(printf '%s' "$up" | grep -oE '"doc_id": *"[^"]*"' | head -1 | sed -E 's/.*"([^"]*)"$/\1/')"
+  fi
   [ -z "$did" ] && return 1
   job="$(curl -fsS -X POST "$BASE_URL/api/v1/classify/async" -H "X-API-Key: $API_KEY" \
           -H 'Content-Type: application/json' \
           -d "{\"doc_id\":\"$did\",\"actor\":{\"user_id\":\"acceptance\",\"role\":\"admin\"}}" 2>/dev/null)" || return 1
-  jid="$(printf '%s' "$job" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("job_id") or "")' 2>/dev/null)"
+  if command -v python3 >/dev/null 2>&1; then
+    jid="$(printf '%s' "$job" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("job_id") or "")' 2>/dev/null)"
+  else
+    jid="$(printf '%s' "$job" | grep -oE '"job_id": *"[^"]*"' | head -1 | sed -E 's/.*"([^"]*)"$/\1/')"
+  fi
   [ -z "$jid" ] && return 1
   i=0
   while [ "$i" -lt "${ASYNC_POLL_MAX:-60}" ]; do
     sleep 5; i=$((i+1))
     st="$(curl -fsS "$BASE_URL/api/v1/classify/jobs/$jid" -H "X-API-Key: $API_KEY" 2>/dev/null)" || continue
-    printf '%s' "$st" | python3 -c '
+    if command -v python3 >/dev/null 2>&1; then
+      printf '%s' "$st" | python3 -c '
 import json,sys
 d=json.load(sys.stdin); s=d.get("status")
 if s in ("done","partial"):
     r=(d.get("results") or [{}])[0]
     print((r.get("label") or "")+"|"+(r.get("model_version") or "")); sys.exit(0)
 sys.exit(1 if s!="failed" else 2)' 2>/dev/null && return 0
-    [ "$?" = "2" ] && return 1
+      [ "$?" = "2" ] && return 1
+    else
+      jstatus="$(printf '%s' "$st" | grep -oE '"status": *"[^"]*"' | head -1 | sed -E 's/.*"([^"]*)"$/\1/')"
+      case "$jstatus" in
+        done|partial)
+          jlabel="$(printf '%s' "$st" | grep -oE '"label": *"[^"]*"' | head -1 | sed -E 's/.*"([^"]*)"$/\1/')"
+          jmv="$(printf '%s' "$st" | grep -oE '"model_version": *"[^"]*"' | head -1 | sed -E 's/.*"([^"]*)"$/\1/')"
+          echo "${jlabel}|${jmv}"; return 0 ;;
+        failed) return 1 ;;
+      esac
+    fi
   done
   return 1
 }
@@ -1472,6 +1495,7 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "echo '  (동일: bash deploy_airgap.sh   verify→infra→alembic→app→스모크)'\n"
         "echo '  또는 수동: docker compose --env-file .env -f infra-config/docker-compose.airgap.yml up -d (docs/INSTALL.md)'\n",
         encoding="utf-8",
+        newline="\n",
     )
     install_sh.chmod(0o755)
 
@@ -1488,6 +1512,7 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "sha256sum -c CHECKSUMS.sha256 || { echo 'CHECKSUM MISMATCH — 반입 매체 손상/변조. 배포 중단.' >&2; exit 1; }\n"
         "echo 'Checksums OK'\n",
         encoding="utf-8",
+        newline="\n",
     )
     verify_sh.chmod(0o755)
 
@@ -1531,7 +1556,11 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
             _sh.rmtree(pack_dst)
         _sh.copytree(pack_src, pack_dst)
         run_sh = pack_dst / "run_acceptance.sh"
-        run_sh.write_text(_ACCEPTANCE_SH, encoding="utf-8")
+        # newline="\n" 고정 — 없으면 Windows 빌드 호스트에서 LF 가 CRLF 로 번역되어(Path.write_text
+        # 기본 동작) 리눅스 타깃에서 `set -o pipefail` 이 "invalid option name" 으로 죽는다(실측
+        # 2026-09-27: cat -A 로 전체 라인 ^M$ 확인). install.sh/verify.sh 는 out_dir 직속이라 우연히
+        # 문제가 안 드러났을 뿐 동일 위험이 있어 아래도 함께 고정한다.
+        run_sh.write_text(_ACCEPTANCE_SH, encoding="utf-8", newline="\n")
         run_sh.chmod(0o755)
         n_docs = sum(1 for _ in (pack_src / "docs").iterdir()) if (pack_src / "docs").exists() else 0
         print(f"  [accept] 인수 샘플팩({n_docs}문서) + run_acceptance.sh → {pack_dst}", file=sys.stderr)

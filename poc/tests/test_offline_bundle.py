@@ -19,6 +19,7 @@ from build_offline_bundle import (  # noqa: E402
     ComponentEntry,
     ModelEntry,
     PluginEntry,
+    _ACCEPTANCE_SH,
     _DEFAULT_WHEEL_PLATFORM,
     _MODEL_META,
     _export_locked_requirements,
@@ -749,3 +750,43 @@ def test_missing_base_model_is_reported_as_error(tmp_path, monkeypatch, capsys):
     assert B._copy_embedder_cache(_Man(), out, allow_download=False) is False
     err = capsys.readouterr().err
     assert "classifier" in err and "학습" in err, err
+
+
+# ─────────────────────────────────────────────────────────────
+# run_acceptance.sh(_ACCEPTANCE_SH) 회귀 — Rocky8 실치설치 리허설(2026-09-27)에서 발견
+# ─────────────────────────────────────────────────────────────
+
+
+def test_acceptance_pack_script_has_no_crlf(tmp_path: Path):
+    """run_acceptance.sh 는 root 스크립트(setup.sh 등)와 달리 디스크에서 복사되지 않고
+    _ACCEPTANCE_SH 문자열을 write_text 로 직접 쓴다 — root 스크립트용 CRLF 정규화 단계를
+    거치지 않는다. newline="\\n" 없이 쓰면 Windows 빌드 호스트에서 LF 가 CRLF 로 번역돼
+    (Path.write_text 기본 동작) 리눅스 타깃에서 `set -o pipefail` 이 "invalid option name" 으로
+    죽는다 — 실측 2026-09-27: Rocky8 실치설치 리허설, cat -A 로 전체 라인 ^M$ 확인.
+    """
+    from build_offline_bundle import _copy_infra
+
+    _copy_infra(tmp_path, version="t")
+    run_sh = tmp_path / "acceptance" / "run_acceptance.sh"
+    assert run_sh.exists()
+    assert b"\r\n" not in run_sh.read_bytes()
+
+
+def test_async_classify_has_python3_fallback_for_every_json_parse():
+    """_async_classify()(대용량 문서의 비동기 재시도 경로)는 바로 아래 sync 루프처럼 python3
+    유무를 가려야 한다. 안 가리면 python3 가 없는 호스트(Rocky 8 기본은 /usr/bin/python3 가
+    없다 — 있는 건 /usr/libexec/platform-python 뿐)에서 doc_id·job_id 추출이 매번 빈 문자열이
+    되어 대용량 문서가 전부 veto(고등급 미탐) 오판정된다 — 실배포 실물확인(Rocky8+실번들)에서
+    재현: 백엔드는 정상 분류(TS)했는데 인수 러너만 FAIL 을 냈다(수정 후 재현: PASS·과분류 판정).
+    """
+    start = _ACCEPTANCE_SH.index("_async_classify() {")
+    end = _ACCEPTANCE_SH.index("\n}\n", start)
+    body = _ACCEPTANCE_SH[start:end]
+
+    # doc_id 추출 · job_id 추출 · 폴링(status/label/model_version) — 세 지점 모두 가려야 한다.
+    assert body.count("command -v python3") == 3
+    assert '"doc_id": *"[^"]*"' in body
+    assert '"job_id": *"[^"]*"' in body
+    assert '"status": *"[^"]*"' in body
+    assert '"label": *"[^"]*"' in body
+    assert '"model_version": *"[^"]*"' in body
