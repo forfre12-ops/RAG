@@ -520,6 +520,10 @@ def synthesize_batch(
                     "generated": len(docs),
                     "admitted": len(admitted_docs),
                     "flagged": screen["flagged"],
+                    # [2026-09-29] 품질 하한(SYNTHETIC_QUALITY_POLICY)에 걸려 **표시만 된** 문서의
+                    # 원본 인덱스와 첫 사유. 종전에는 건수(metrics.low_quality_documents)만 남고
+                    # 어느 문서가 무엇에 걸렸는지 버려졌다. 떨어뜨리지는 않는다(admit 에 영향 없음).
+                    "low_quality": screen.get("quality_flagged", []),
                     "metrics": screen["metrics"],
                 },
             },

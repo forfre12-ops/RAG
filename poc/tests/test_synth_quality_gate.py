@@ -188,3 +188,55 @@ def test_document_shaped_text_is_not_flagged():
     assert result["admit"] == [0]
     assert result["quality_flagged"] == []
     assert result["metrics"]["low_quality_documents"] == 0
+
+
+# ── 개인정보 — 2026-09-29 ────────────────────────────────────────────────────
+# 생성기는 SynthDoc.pii_violations 에 기록만 하고, 스크립트 경로는 그 값으로 문서를 버리는데
+# 콘솔 경로(synthesize_batch)는 읽지 않아 걸린 문서가 검수 큐에 올랐다. screen_batch 가 같은
+# 정규식으로 거른다. 아래 값은 전부 지어낸 것이다.
+
+def test_pii_documents_are_flagged_and_not_admitted():
+    from koipa.services.synth_quality import screen_batch
+
+    docs = [
+        ("S1", _body("S1", 1) + " 문의: hong.gd@corp-x.example"),        # 이메일
+        ("S1", _body("S1", 2) + " 담당자 연락처 010-1234-5678"),          # 휴대전화
+        ("S1", _body("S1", 3) + " 신원 확인 900101-1234567"),             # 주민등록번호 모양
+        ("S1", _body("S1", 4)),                                           # 깨끗한 문서
+    ]
+    out = screen_batch(docs)
+
+    assert out["admit"] == [3], "개인정보가 걸린 문서가 검수 큐로 갔다"
+    assert {f["index"]: f["reason"] for f in out["flagged"]} == {
+        0: "pii_detected", 1: "pii_detected", 2: "pii_detected",
+    }
+
+
+def test_pii_reason_combines_with_grade_token():
+    from koipa.services.synth_quality import screen_batch
+
+    out = screen_batch([("S1", "등급은 S1 이다. 문의 010-1234-5678. " + _body("S1", 1))])
+
+    assert out["admit"] == []
+    assert out["flagged"][0]["reason"] == "grade_token_exposed+pii_detected"
+
+
+def test_fullwidth_pii_is_folded_before_matching():
+    from koipa.services.synth_quality import screen_batch
+
+    out = screen_batch([("S2", _body("S2", 1) + " 연락처 ０１０－１２３４－５６７８")])
+
+    assert out["admit"] == [], "전각 표기로 쓴 전화번호가 검사를 통과했다"
+
+
+def test_ordinary_numbers_are_not_pii():
+    """날짜·금액·짧은 코드는 개인정보가 아니다 — 새 검사가 정상 업무 문서를 막으면 안 된다."""
+    from koipa.services.synth_quality import screen_batch
+
+    body = _body("S2", 1) + (
+        " 점검일은 2026-09-29, 예산 1,250,000원, 로트 번호 A20260929-07, 시험 42회, 문서 번호 2026-0417."
+    )
+    out = screen_batch([("S2", body)])
+
+    assert out["admit"] == [0]
+    assert out["flagged"] == []

@@ -200,6 +200,12 @@ SYSTEM_PROMPT = """당신은 한국 조직에서 쓰이는 현실적인 사내 �
 - "이 문서는 ○급 비밀입니다" 같은 분류 표기 금지
 - 대신 문서의 내용과 맥락 자체가 민감도를 드러내도록 작성"""
 
+# 구조 요구를 받지 못했을 때의 기본 문구. 생성규칙(generation_playbook)이 꺼져 있을 때만 쓴다 —
+# 규칙이 켜져 있으면 이 문구가 규칙 2 와 부딪히므로 넣지 않는다(_build_user_prompt 주석 참조).
+_DEFAULT_STRUCTURE_REQUIREMENTS = (
+    "문서 유형에 자연스러운 여러 절과 항목을 사용하고 각 절에는 서로 다른 사실을 담는다."
+)
+
 USER_TEMPLATE_V2 = """[문서 상황]
 {situation}
 
@@ -789,13 +795,25 @@ class SyntheticDocGenerator:
         situation = GRADE_SITUATION_PROMPTS.get(
             grade_code, GRADE_SITUATION_PROMPTS["S3"]
         )
-        structure_requirements = (
-            structure_override.strip()
-            or req.structure_requirements.strip()
-            or "문서 유형에 자연스러운 여러 절과 항목을 사용하고 각 절에는 서로 다른 사실을 담는다."
+        explicit_structure = (
+            structure_override.strip() or req.structure_requirements.strip()
         )
         if self.use_playbook:
-            structure_requirements = f"{structure_requirements}\n\n{_playbook_text()}"
+            # [2026-09-29] 호출자가 구조 요구를 따로 주지 않았으면 기본 구조 문구를 **붙이지 않고**
+            # 생성규칙만 넣는다. 9/28 에는 기본 문구 뒤에 규칙을 덧붙였는데, 그 문구("여러 절과 항목을
+            # 사용하고…")가 규칙 2("모든 문서를 보고서 구조로 쓰지 않는다")와 정면으로 부딪혀 규칙 2 가
+            # 사실상 듣지 않았다 — 로컬 qwen3:14b 16건씩 A/B(scripts/ab_synth_playbook_variants.py)에서
+            # 보고서식 구조가 든 문서: 덧붙이기 9~12건 → 대체 1~2건, 번호·제목 줄 평균 3.2~4.3개 → 0.4~0.75개.
+            # 덧붙이기를 고른 근거였던 품질 하한(SYNTHETIC_QUALITY_POLICY) 미달률은 콘솔 경로에서 아무것도
+            # 막지 않는 값이다(표시만 됨). 대가: 문단 수 평균 5.3→3.4, 숫자 토큰 14.5→9.0(같은 길이).
+            # 호출자가 구조 요구를 주면(카탈로그 러너·다단계 개요) 종전처럼 그 뒤에 규칙을 붙인다.
+            structure_requirements = (
+                f"{explicit_structure}\n\n{_playbook_text()}"
+                if explicit_structure
+                else _playbook_text()
+            )
+        else:
+            structure_requirements = explicit_structure or _DEFAULT_STRUCTURE_REQUIREMENTS
         revision_context = (revision_override or req.revision_context).strip()
         if revision_context:
             revision_context = f"[재작성 참고]\n{revision_context}"

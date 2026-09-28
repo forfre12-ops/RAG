@@ -34,6 +34,13 @@
 추가로 떨어지는 문서가 없다. "본 문서는 보도자료 형태로 …외부에 배포"처럼 **공개를
 알리는** 문장은 금지·제한·방지류 서술이 없어 걸리지 않도록 확산 통제 낱말에 접미사를
 요구했다(배포 단독이 아니라 "배포 금지/제한"만 본다).
+
+[2026-09-29] pii_detected 를 더했다. 생성기의 개인정보 정규식(주민·외국인등록번호·휴대전화·
+이메일)에 걸린 문서는 검수 큐에 넣지 않는다 — 스크립트 경로는 이미 그렇게 버리고 있었고
+콘솔 경로만 걸린 문서를 그대로 올렸다. 과탐 점검: 학습셋 합성 3,187행에서 2건(0.06%,
+공매개시번호·등록번호 같은 긴 번호가 전화번호·주민등록번호 모양과 겹친 것), 검수 후보 1,731건에서 2건(0.12%,
+``.example`` 도메인의 가짜 이메일). 등급 낱말·자기 진술 검사와 달리 숫자 정규식이라 긴 번호가
+가끔 걸리는 것은 알려진 한계다.
 """
 
 from __future__ import annotations
@@ -149,6 +156,18 @@ def _exposes_self_grade_declaration(text: str) -> bool:
     return bool(_SELF_GRADE_DECLARATION.search(_fold_for_match(text)))
 
 
+def _contains_pii(text: str) -> bool:
+    """본문에 개인정보 정규식(주민·외국인등록번호·휴대전화·이메일)이 걸리는가.
+
+    정규식 정본은 생성기의 ``_PII_PATTERNS`` 다 — 생성기가 ``SynthDoc.pii_violations`` 에 기록하는
+    것과 같은 목록을 본다(두 벌을 두면 갈린다). 전각 표기까지 잡도록 접어서 검사한다.
+    """
+    from koipa.modules.m1_synthesis.generator import _PII_PATTERNS  # noqa: PLC0415
+
+    folded = _fold_for_match(text)
+    return any(p.search(folded) for p in _PII_PATTERNS)
+
+
 def screen_batch(
     docs: Sequence[tuple[str, str]],
     *,
@@ -174,13 +193,20 @@ def screen_batch(
     self_decl_idx = {
         i for i, (_g, t) in enumerate(rows) if _exposes_self_grade_declaration(t)
     }
-    exposed_idx = grade_token_idx | self_decl_idx
+    # ①-1b [2026-09-29] 개인정보 정규식에 걸리는 문서. 생성기는 SynthDoc.pii_violations 에 기록만
+    # 하고, 스크립트 경로(build_proxy_scenarios·build_synthetic_golden·p3_generate_synthetic)는
+    # 그 값으로 문서를 버리는데 **콘솔 경로(workers.tasks.synthesize_batch)만 읽지 않아** 걸린
+    # 문서가 그대로 검수 큐에 올랐다. 스크립트 경로와 같은 기준을 여기서 건다.
+    pii_idx = {i for i, (_g, t) in enumerate(rows) if _contains_pii(t)}
+    exposed_idx = grade_token_idx | self_decl_idx | pii_idx
     for i in sorted(exposed_idx):
         reasons = []
         if i in grade_token_idx:
             reasons.append("grade_token_exposed")
         if i in self_decl_idx:
             reasons.append("self_grade_declaration")
+        if i in pii_idx:
+            reasons.append("pii_detected")
         flagged.append({"index": i, "reason": "+".join(reasons)})
 
     # ①-2 문서 품질 하한 — 한 건으로 판정 가능하므로 표본 수와 무관하게 본다.
