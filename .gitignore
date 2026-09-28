@@ -277,3 +277,18 @@ poc/.tmp_capacity/
 
 # 서버 재구성용 데이터 내보내기(scripts/export_migration_data.py) — 리포에 커밋하지 않는다.
 _migration/
+
+# --- 2026-09-28 커밋·푸시 정리: git 에 넣지 않는 것(크기·비밀·임시) ---
+# WSL Rocky 리허설 배포판·이미지 tar(70GB)
+.wsl-rocky/
+# 배포 폴더(번들 8.9GB·zip 7.7GB) — poc/dist/ 와 같은 성격의 산출물
+/배포/
+# 서식 견본 모음(1.3GB)
+/서식모음/
+# 임시 작업물
+poc/tmp/
+# 콘솔 JWT 공개키 세트(환경별 생성물)
+poc/datasets/_console_jwt/
+# 참조 없는 대용량 후보 덤프 — single_document_candidates/ 와 같은 취지
+poc/datasets/new_build_candidates_2026-09-17/
+poc/datasets/proxy_gold/single_document_candidates_archive_*/
