@@ -56,6 +56,8 @@ sudo NODE=jjw      bash setup.sh   # 지재원 학습·골든 노드로 강제
 sudo NODE=customer bash setup.sh   # 고객사 운영 노드로 강제
 ```
 
+**번들은 하나이고, 두 대상이 같은 번들을 쓴다.** 이미지·모델·설치 절차는 공통이며 `NODE` 값만 다르다. `NODE=jjw` 는 프로파일 `full-train` 으로 설치하면서 전문가 검수 문서 적재(§10.3)·검수자 토큰 발급·GPU 오버레이를 더하고, `NODE=customer` 는 프로파일 `onprem-local` 로 설치하며 이 셋을 하지 않는다. 대상별로 번들을 따로 만들거나 받을 필요가 없다.
+
 **컨테이너 런타임 RPM 은 번들 안에 있다.** 위 두 대상 모두 인터넷 저장소에 닿지 못해 `dnf install docker-ce` 가 불가능하다. 런타임이 호스트에 없으면 `install.sh` 0단계가 번들의 `rpms/` 로 설치한다(`dnf install --disablerepo='*'`, root 필요). `rpms/` 가 비어 있고 런타임도 없으면 그 자리에서 멈추고 무엇을 받아 와야 하는지 출력한다 — 뒤늦게 실패하지 않는다.
 
 ### 0-3. 번들 파일 구조 (설치 전에 훑어보면 좋다)
@@ -84,7 +86,7 @@ koipa-airgap-bundle/
 └── README.md
 ```
 
-- `rpms/`·`golden_review_batch/`·`observability/`는 조건부다 — RPM 이 안 스테이징됐거나(비-Rocky 빌드), 검수 배치가 없거나(고객사 전용 번들), 관측성이 `--skip-observability`로 빠지면 안 실린다. 실렸는지는 `verify.sh`(체크섬)와 §10.3 끝의 "볼륨에 후보 N건" 출력으로 확인한다.
+- `rpms/`·`golden_review_batch/`·`observability/`는 조건부다 — RPM 이 안 스테이징됐거나(비-Rocky 빌드), 검수 배치가 없거나(빌드하는 PC 에 후보 원본이 없을 때 — 대상별로 따로 빌드하는 옵션은 없다), 관측성이 `--skip-observability`로 빠지면 안 실린다. 실렸는지는 `verify.sh`(체크섬)와 §10.3 끝의 "볼륨에 후보 N건" 출력으로 확인한다.
 - ⚠ 짝 문서 `폐쇄망_설치_배포_설계서`(설계 감리용)의 옛 트리는 `elasticsearch.tar`·`minio.tar`·`mlflow.tar`를 담고 있는데, 이 셋은 이미 제거된 예전 구조다(현재는 검색·벡터를 PostgreSQL+pgvector로 통합했고 MinIO·MLflow는 쓰지 않는다) — 위 트리가 현재 것이다.
 
 ---
