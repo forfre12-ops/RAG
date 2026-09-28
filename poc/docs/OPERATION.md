@@ -209,6 +209,35 @@ $COMPOSE exec postgres psql -U koipa -d koipa \
 
 ---
 
+## 10. 규정 참고 표시 — 콘솔에서 켜고 끄기(런타임, 재시작 불필요)
+
+`REGULATION_REFERENCE_ENABLED`(INSTALL.md §4)가 켜져 있어도, 이 기능 자체와 LLM 고르기
+옵션은 **관리자 콘솔에서 실시간으로 따로 켜고 끌 수 있다** — `.env` 를 고치고 스택을
+재기동할 필요가 없다(redis 키 기반, 재시작 없이 즉시 반영).
+
+- **콘솔 화면**: 관리 콘솔 → 「사내 규정(참고 표시)」 카드 → 체크박스 2개.
+  - **전체 켜기/끄기**(마스터) — 끄면 검수 화면의 근거 조회가 즉시 `disabled_by_admin` 사유로
+    빈 결과를 돌려준다(오류가 아니다). 기본값은 **켬**(redis 장애 시에도 fail-open으로 켬).
+  - **LLM 로 고르기** — 임베딩만으로 부족할 때 로컬 LLM(GPU 필요)으로 관련 조항을 고르게
+    한다(기본형보다 해당 문서를 더 많이 찾아낸다). §4 표의 `REGULATION_LLM_SELECT_ENABLED`
+    가 이 체크박스가 없을 때의 기본값이고, 체크박스는 그 값을 덮어쓴다.
+- **API로 켜고 끄기**(콘솔 없이 스크립트로 할 때):
+  ```bash
+  # 현재 상태 조회
+  curl -s http://127.0.0.1:8000/api/v1/regulations/runtime-toggle \
+    -H "Authorization: Bearer $ADMIN_TOKEN"
+  # 끄기/켜기
+  curl -s -X PUT http://127.0.0.1:8000/api/v1/regulations/runtime-toggle \
+    -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+    -d '{"enabled": false}'
+  # LLM 고르기 옵션은 경로만 /regulations/llm-select-toggle 로 바꾼다
+  ```
+  `$ADMIN_TOKEN` 은 화면에 붙여넣지 말고 `console_admin_token.txt`(설치 시 생성, 권한 600)에서
+  읽어 스크립트 변수로만 쓴다.
+- admin·kl_backend 역할만 켜고 끌 수 있다(reviewer·system 은 조회만).
+
+---
+
 ## 부록 — 자주 쓰는 확인 명령
 
 ```bash
