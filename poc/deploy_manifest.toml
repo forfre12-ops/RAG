@@ -1,0 +1,119 @@
+# 배포 정본 — 번들과 도커 이미지에 실리는 파일은 여기 적힌 것뿐이다.
+#
+# 빌더(scripts/build_offline_bundle.py)는 이 파일이 적은 것만 복사하고, 검사기
+# (scripts/check_deploy_manifest.py)와 시험(tests/test_deploy_manifest.py)이 실제 산출물과 대조한다.
+# 새 파일을 싣거나 빼려면 여기를 고친다. 코드에 목록을 따로 두지 않는다.
+#
+# 검사:   python scripts/check_deploy_manifest.py
+#         python scripts/check_deploy_manifest.py --bundle <번들 폴더>
+# 갱신:   python scripts/check_deploy_manifest.py --write   (Dockerfile COPY 블록·.dockerignore)
+schema = 1
+
+# ── 번들 루트 ───────────────────────────────────────────────
+[bundle.root]
+# poc/scripts 에서 번들 루트로 복사한다(줄바꿈은 LF 로 고정).
+scripts = [
+  "preflight_host.sh",   # setup.sh 가 호스트 점검에 부른다
+  "setup.sh",            # 원커맨드 설치기(INSTALL.md §0-2)
+  "deploy.sh",           # install.sh 가 안내하는 통합 진입점 → deploy_airgap.sh
+  "deploy_airgap.sh",    # setup.sh 가 부르는 전체 스택 기동
+  "db_probe.sh",         # deploy_airgap.sh 가 4단계에서 읽는다
+  "verify_install.sh",   # setup.sh 마지막 검증
+  "deploy_rollback.sh",  # 모델 롤백(운영 절차)
+]
+# 빌더가 만들어 넣는 파일
+generated = ["install.sh", "verify.sh", "manifest.yaml", "manifest.json", "CHECKSUMS.sha256"]
+# manifest.json 은 CI 아티팩트(.github/workflows/poc-ci.yml)와 EXPORT_IMPORT_RUNBOOK.md 가 읽는다.
+readme = { source = "docs/BUNDLE_README.md", dest = "README.md" }
+
+[bundle.docs]
+files = ["INSTALL.md", "OPERATION.md", "TROUBLESHOOTING.md"]
+
+[bundle.infra]                      # infra-config/
+files = ["docker-compose.airgap.yml", "docker-compose.gpu.yml", ".env.template", "mtls/nginx.mtls.conf"]
+[bundle.infra.sources]              # 리포에 원본이 있는 것(.env.template 은 빌더가 생성)
+"docker-compose.airgap.yml" = "docker-compose.airgap.yml"
+"docker-compose.gpu.yml"    = "docker-compose.gpu.yml"
+"mtls/nginx.mtls.conf"      = "infra/mtls/nginx.mtls.conf"
+
+[bundle.licenses]                   # 공급망 감사 산출물. GPL-3.0.txt 는 전문 동봉 의무(커밋 18ca5499)
+files = ["GPL-3.0.txt", "sbom.cyclonedx.json", "third-party-licenses.txt"]
+
+[bundle.acceptance]                 # acceptance/ — 표본 문서(docs/)는 expected_labels.json 이 가리키는 전부
+files = ["expected_labels.json", "run_acceptance.sh"]
+
+[bundle.observability]              # observability/ — 안전 알림 소비자(빌더 도움말: 폐쇄망 운영 필수)
+files = [
+  "alert_rules.yml", "alertmanager.yml", "docker-compose.observability.airgap.yml",
+  "prometheus.yml", "loki-config.yaml", "promtail-config.yaml", "grafana/*",
+]
+
+[bundle.review_batch]               # golden_review_batch/ — 선택은 빌더의 select_review_batch_files()
+patterns = ["*_review.md", "*.metadata.json"]
+
+[bundle.models]
+# models/classifier-trained/ 는 디렉터리째 싣는다 — 모델 신원을 디렉터리 해시(tree_sha256)로 확인하므로
+# 서빙이 안 읽는 파일(training_args.bin·val_logits.jsonl)이 있어도 골라 빼지 않는다.
+# HF 캐시로 싣는 모델. refs/main 이 가리키는 리비전 하나만 싣는다(다른 리비전은 같은 가중치의 중복).
+hf_cache = ["nlpai-lab/KURE-v1", "kakaobank/kf-deberta-base"]
+
+[bundle.images]
+# docker save 로 tar 를 만드는 이미지. beat 는 worker 와 같은 koipa-worker 이미지라 tar 가 없다.
+save = ["postgres", "redis", "api", "worker", "nginx-mtls"]
+# 관측성 이미지(docker-images/obs-<이름>.tar). redis-exporter 는 알림 규칙·대시보드가 쓰지 않아 뺐다.
+observability = [
+  "prometheus-v2.55.1", "alertmanager-v0.27.0", "grafana-11.3.0",
+  "loki-3.2.1", "promtail-3.2.1", "postgres-exporter-v0.16.0",
+]
+
+# 싣지 않기로 한 것과 이유 — 검사기가 번들에 다시 들어오는 것을 막는다(위 목록 밖은 전부 '선언 외 파일'이다).
+[excluded]
+"docker-images/beat.tar"                     = "worker.tar 와 바이트까지 같은 이미지 — compose 의 beat 는 koipa-worker 를 쓴다"
+"docker-images/obs-redis_exporter-*.tar"     = "prometheus 규칙·grafana 대시보드가 redis 메트릭을 쓰지 않는다"
+"models/hf/hub/…KURE-v1 의 refs/main 아닌 리비전" = "가중치가 refs/main 리비전과 완전히 같은 중복(2.29GB)"
+"python-deps/"                               = "컨테이너 배포는 의존성이 이미지에 있다. 호스트 pip 설치 경로(INSTALL_HOST_DEPS)를 없앴다"
+"db-migrations/"                             = "alembic 은 api 이미지 안에서 실행된다(INSTALL.md §6). 어느 스크립트도 이 사본을 읽지 않았다"
+"licenses/{third-party-licenses.md,third-party-licenses.json,sbom.json}" = "같은 내용의 다른 형식 — 공급망 산출물은 .txt 와 CycloneDX 를 기준으로 한다"
+"acceptance/{README.md,real_fixtures.json}"  = "러너가 읽지 않는다(real_fixtures 는 expected_labels.json 에 이미 병합됨)"
+
+# ── 도커 이미지(koipa-api · koipa-worker) ────────────────────
+[container.scripts]
+# Dockerfile.api.prod · Dockerfile.worker 의 COPY 는 이 목록에서 자동 생성된다(--write).
+# 근거 폐포(check_deploy_manifest.py --derive)와 정확히 같아야 한다.
+allow = [
+  "_cli_io.py",                       # dr_drill.py 가 부른다
+  "analyze_golden_run.py",            # 골든 빌드 서비스가 런타임 import
+  "backup_postgres.py",               # dr_restore.py 가 부른다
+  "calibrate_classifier.py",          # 학습기 오류 안내가 가리킨다(온도 보정을 따로 만드는 도구)
+  "check_domain_leakage_gate.py",     # 골든 빌드 서비스가 런타임 import
+  "compare_proxy_models.py",          # 프록시 모델 비교 기능이 CLI 로 부른다
+  "db_engine.py",                     # dr_restore.py 가 부른다
+  "demo_e2e_8010.py",                 # OPERATION.md §8 시연 스크립트
+  "demo_e2e_golden.py",               # OPERATION.md §8 시연 스크립트
+  "docker_install_locked.sh",         # Dockerfile.api.prod 의 RUN
+  "dr_discovery.py",                  # dr_restore.py 가 부른다
+  "dr_drill.py",                      # OPERATION.md DR 드릴
+  "dr_restore.py",                    # dr_drill.py 가 부른다
+  "eval_p1_model_gold.py",            # gate_p1_candidate.py 가 부른다
+  "eval_real_public_fpr.py",          # gate_p1_candidate.py 가 부른다
+  "eval_seal.py",                     # 평가 봉인 모듈의 안내문이 가리킨다
+  "evaluate_public_s3_challenge.py",  # 공개 S3 도전셋 평가가 부른다
+  "gate_p1_candidate.py",             # 축 게이트 연결부가 부른다
+  "import_review_corrections.py",     # OPERATION.md 검수 결과 반입
+  "p5_e2e_smoke.py",                  # dr_drill.py 가 부른다
+  "probe_ingest_capacity.py",         # 문서 처리량 초과 오류가 가리킨다
+  "promote_golden_candidates.py",     # 골든 API 가 가리킨다
+  "register_deployed_model.py",       # setup.sh 6-2 · INSTALL.md
+  "register_review_signoff_job.py",   # 골든 API 가 가리킨다
+  "setup_console_test_login.py",      # setup.sh · INSTALL.md
+  "verify_deploy_live.sh",            # OPERATION.md 배포 검증
+  "verify_infra.py",                  # INSTALL.md · OPERATION.md 인프라 점검
+]
+[container.scripts.not_in_image]
+"build_offline_bundle.py"            = "번들 빌드 호스트 전용(INSTALL.md 가 빌드 호스트에서 돌리라고 안내)"
+"cache_kure_v1.py"                   = "빌드 호스트에서 임베더 HF 캐시를 채우는 도구(INSTALL.md §임베더)"
+"block_1731_trained_docs_from_eval.py" = "저장소에서 평가 제외 목록을 만들 때 쓴다(INSTALL.md 가 번들 절차가 아니라고 명시)"
+
+[container.exclude_paths]
+# 화면(app.js)은 samples.js 의 인라인 데이터를 쓰고 이 폴더의 파일을 어디서도 부르지 않는다.
+paths = ["src/koipa/api/static/samples/"]

@@ -36,9 +36,4 @@ scrape_configs:
           service: postgres
 
   # elasticsearch job 제거 — ES→PG 단일화(§03). pgvector 는 postgres-exporter 로 커버.
-
-  - job_name: redis
-    static_configs:
-      - targets: [redis-exporter:9121]
-        labels:
-          service: redis
+  # redis job(redis-exporter) 제거 — 알림 규칙·대시보드가 redis 메트릭을 쓰지 않았다.

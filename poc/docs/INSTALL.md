@@ -3,6 +3,8 @@
 대상: KOIPA 영업비밀관리시스템 운영망(에어갭) · 번들 `koipa-airgap-bundle`
 짝 문서: 설계·인벤토리·책임경계는 `폐쇄망_설치_배포_설계서`, 운영 절차는 `운영_런북` 참조.
 
+> **처음이면 번들 루트의 `README.md` 한 쪽부터 읽는다.** 설치는 `sudo bash setup.sh` 한 줄로 끝나며(§0-2), 이 문서는 그 안에서 일어나는 일을 한 단계씩 풀어 쓴 상세판이다.
+>
 > 이 문서는 **운영자가 그대로 따라 치는 단계별 절차**다. 모든 명령은 번들 루트(`koipa-airgap-bundle/`)에서 실행한다. 폐쇄망 전용 compose는 `infra-config/docker-compose.airgap.yml`(이미지 참조·beat 포함·named 볼륨)를 사용한다.
 
 ---
@@ -62,7 +64,7 @@ sudo NODE=customer bash setup.sh   # 고객사 운영 노드로 강제
 
 ### 0-3. 번들 파일 구조 (설치 전에 훑어보면 좋다)
 
-번들 루트(`koipa-airgap-bundle/`, §0 기준 약 19.6GB)의 최상위 구성이다. 빌더의 파일 선언(`scripts/build_offline_bundle.py::expected_files()`)과 실제 복사 로직을 근거로 했고, 번들 안 `manifest.yaml`/`manifest.json` 의 파일 목록과 일치한다.
+번들 루트(`koipa-airgap-bundle/`, §0 기준 약 19.6GB)의 최상위 구성이다. 배포 정본(리포의 `deploy_manifest.toml` — 번들과 이미지에 싣는 파일은 여기 적힌 것뿐이다)을 근거로 했고, 번들 안 `manifest.yaml`/`manifest.json` 의 파일 목록과 일치한다.
 
 ```
 koipa-airgap-bundle/
@@ -70,19 +72,17 @@ koipa-airgap-bundle/
 ├── preflight_host.sh · db_probe.sh · verify_install.sh        ← 사전점검 · 내부 보조 · 설치검증
 ├── manifest.yaml · manifest.json · CHECKSUMS.sha256           ← 무결성 검증 대상(§1)
 ├── rpms/                     (Rocky 전용, 스테이징된 경우만) 컨테이너 런타임 RPM 30개(§0-2)
-├── docker-images/            docker load 대상 tar — postgres·redis·api·worker·beat·nginx-mtls
-│                             + 관측성 obs-*.tar 7개(prometheus·alertmanager·grafana·loki·promtail·exporter 2종, §10.5)
+├── docker-images/            docker load 대상 tar — postgres·redis·api·worker·nginx-mtls (beat 는 worker 와 같은 이미지라 tar 가 따로 없다)
+│                             + 관측성 obs-*.tar 6개(prometheus·alertmanager·grafana·loki·promtail·postgres-exporter, §10.5)
 ├── models/                   모델 가중치(§3)
 │   ├── classifier-trained/   분류기 학습 가중치 + temperature.json
 │   └── hf/hub/models--.../   HuggingFace 캐시 레이아웃(KURE-v1 등 — HF_HOME 이 가리키는 경로)
-├── python-deps/wheels/       오프라인 python wheel (+ _requirements_no_torch.txt)
-├── infra-config/             docker-compose.airgap.yml · .env.template(§4~5)
-├── db-migrations/alembic/    DB 마이그레이션(§6)
+├── infra-config/             docker-compose.airgap.yml · docker-compose.gpu.yml · mtls/nginx.mtls.conf · .env.template(§4~5)
 ├── golden_review_batch/      전문가 검수 배치 1,711건(지재원 노드에서만 적재, §10.3) — 조건부(있을 때만)
 ├── acceptance/               인수 샘플팩 — run_acceptance.sh · expected_labels.json · docs/(§10.1)
 ├── observability/            Prometheus/Grafana 스택 설정(관측성 이미지 동봉 시만, §10.5)
 ├── docs/                     INSTALL.md · OPERATION.md · TROUBLESHOOTING.md (이 문서 자체도 번들 안에 들어 있다)
-├── licenses/                 third-party-licenses.txt · sbom.cyclonedx.json
+├── licenses/                 third-party-licenses.txt · sbom.cyclonedx.json · GPL-3.0.txt
 └── README.md
 ```
 
@@ -100,16 +100,14 @@ bash verify.sh                 # CHECKSUMS.sha256 대조 → "Checksums OK"
 
 ---
 
-## 2. 이미지 적재 + (호스트) 의존성
+## 2. 이미지 적재
 
 ```bash
 bash install.sh                # docker images 적재 (+ .env 초안 생성)
 docker images | grep -E 'koipa|postgres|redis|nginx'   # 적재 확인
 ```
 
-- 컨테이너 배포(본 절차)에서는 의존성이 **이미지에 이미 포함**되어 별도 설치가 불필요하다. `install.sh`는 호스트 파이썬 deps 설치를 **기본적으로 실행하지 않는다** — 번들 wheel은 컨테이너 인터프리터(cp311) 전용이라 Ubuntu 22.04 기본 파이썬(3.10)에서는 반드시 실패한다. 호스트에서 스크립트를 직접 구동해야 할 때만 python3.11 환경에서 `INSTALL_HOST_DEPS=1 bash install.sh`로 켠다.
-- **torch**: GPU 환경에 맞는 휠은 이미지에 포함된다. 호스트 직접 실행 시에만 별도 설치:
-  `pip install --no-index --find-links=python-deps/wheels torch-*.whl`
+- 컨테이너 배포(본 절차)에서는 의존성(torch 포함)이 **이미지에 이미 포함**되어 호스트에 파이썬 패키지를 설치하지 않는다. 그래서 번들에는 python wheel 이 없다.
 - **문서 파싱 선택 의존성**: HWP 표 셀은 `.[hwp-tables]`(unhwp, MIT — 구 pyhwp/AGPL 대체),
   PDF 표 행열은 `.[pdf-tables]`/`pdfplumber`가 있어야 구조화된다. 둘 다 배포 이미지에 포함된다.
   미설치 시 API는 추출을 계속하되 `parse.warnings`와 `/healthz/deep` extractor probe에 누락 사유를 표시한다.
@@ -383,7 +381,7 @@ evidence/eval_independence_exclusions.jsonl` 이 1180 이면 들어 있는 것�
 
 ## 10.5 관측성 스택 기동 (권장 — 안전 알림 소비자)
 
-분류기·감사체인·서빙 게이트의 안전 신호(FNR 급증·감사체인 파손·킬게이트 발동·rule-fallback 서빙 등 알림 29종)는 **Prometheus/Grafana가 떠 있어야 소비**된다. 이 스택이 없으면 API의 `/api/v1/metrics-prom`은 노출되지만 아무도 스크랩·경보하지 않는다("안전하게 틀리고 빨리 배운다"의 관측 절반이 빈다).
+분류기·감사체인·서빙 게이트의 안전 신호(FNR 급증·감사체인 파손·킬게이트 발동·rule-fallback 서빙 등 알림 26종)는 **Prometheus/Grafana가 떠 있어야 소비**된다. 이 스택이 없으면 API의 `/api/v1/metrics-prom`은 노출되지만 아무도 스크랩·경보하지 않는다("안전하게 틀리고 빨리 배운다"의 관측 절반이 빈다).
 
 번들에는 관측성 설정과 이미지가 `observability/`·`docker-images/obs-*.tar`로 동봉된다(빌드 시 `--skip-observability`로 제외 가능 — 그 경우 이 절 생략).
 
@@ -399,7 +397,7 @@ echo "GRAFANA_PASSWORD=$(python3 -c 'import secrets;print(secrets.token_urlsafe(
 # 기준으로 풀어 `.env` 를 못 찾고 `POSTGRES_PASSWORD is missing a value` 로 죽는다(실측 2026-08-04).
 export OBS="docker compose --env-file $PWD/.env -f observability/docker-compose.observability.airgap.yml"
 $OBS up -d
-$OBS ps                                        # prometheus·grafana·loki·exporters healthy
+$OBS ps                                        # prometheus·alertmanager·grafana·loki·promtail·postgres-exporter 기동
 curl -s http://localhost:9090/-/ready          # Prometheus ready
 ```
 

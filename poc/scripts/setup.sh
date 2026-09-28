@@ -459,6 +459,8 @@ fi
 # ── 완료 ──────────────────────────────────────────────────────
 b "완료"
 ok "설치가 끝났다"
+# 안내문에 적을 .env 의 절대 경로(ENV_FILE 이 상대 경로면 번들 루트 기준)
+case "$ENV_FILE" in /*) _env_abs="$ENV_FILE" ;; *) _env_abs="$BUNDLE/$ENV_FILE" ;; esac
 cat <<DONE
 
   접속 확인 :  curl -s http://127.0.0.1:${API_PORT}/api/v1/healthz
@@ -473,8 +475,13 @@ cat <<DONE
 
   설치 대상 : ${NODE_LABEL} (프로파일 ${PROFILE})
 
-  ${ENV_FILE} 에 자동 생성된 비밀값이 들어 있다(권한 600). 백업하고 외부에 공유하지 않는다.
-  API_KEY 는 KL 포털이 호출할 때 X-API-Key 헤더에 넣는 값이다.
+  ── KL 포털 연동에 필요한 값 ──
+  호출 주소   :  http://<서버주소>:${API_PORT}/api/v1
+  인증 헤더   :  X-API-Key  (KL 포털이 호출할 때 이 헤더에 API 키를 넣는다)
+  API 키 위치 :  ${_env_abs} 의 API_KEY= 줄 (권한 600 — root 만 읽을 수 있다)
+  API 키 확인 :  sudo grep '^API_KEY=' ${_env_abs}
+  키는 설치기가 만든다. 손으로 입력하거나 화면에 붙여넣을 곳은 없고, 위 설치 확인 PASS 가 키의 적용까지 확인했다.
+  ${ENV_FILE} 에는 이 밖에도 자동 생성된 비밀값이 들어 있다. 백업하고 외부에 공유하지 않는다.
 DONE
 if [ "$_autologin_on" = "1" ]; then
   cat <<LOGIN

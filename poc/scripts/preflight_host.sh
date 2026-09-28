@@ -72,7 +72,18 @@ elif command -v podman >/dev/null 2>&1; then
   note "  · docker-ce 설치 (권장 — 스크립트 수정 불필요)"
   note "  · podman-docker + podman-compose 설치 후 연동 시험"
 else
-  bad "컨테이너 런타임이 없다 — docker 또는 podman 이 필요하다"
+  # 런타임이 없어도 번들에 RPM 이 있으면 setup.sh 2단계가 그것으로 설치한다(INSTALL.md §0-2:
+  # "사전 설치를 요구하지 않는다"). 여기서 차단하면 setup.sh 0단계가 먼저 죽어 RPM 설치 경로에
+  # 아예 도달하지 못한다 — 번들 RPM 을 싣는 이유가 바로 런타임이 없는 호스트다(2026-09-29
+  # Rocky 8.10 백지 호스트 리허설에서 setup.sh 가 0단계에서 중단됨). RPM 도 없으면 그때만 막는다.
+  _pf_self="${BASH_SOURCE[0]:-.}"; _pf_dir="${_pf_self%/*}"; [ "$_pf_dir" = "$_pf_self" ] && _pf_dir="."
+  if compgen -G "$_pf_dir/rpms/*.rpm" >/dev/null; then
+    warning "컨테이너 런타임이 아직 없다 — 번들 rpms/ 로 설치한다"
+    note "sudo bash setup.sh 가 2단계에서 오프라인 설치한다(root 권한 필요)."
+    note "직접 설치하려면: sudo dnf -y --disablerepo='*' localinstall rpms/*.rpm && sudo systemctl enable --now docker"
+  else
+    bad "컨테이너 런타임이 없다 — docker 또는 podman 이 필요하다 (번들에 rpms/ 도 없다)"
+  fi
 fi
 
 # ── 3. SELinux ──────────────────────────────────────────────────────────
@@ -122,7 +133,16 @@ else
   ok "호스트 방화벽이 활성이 아니거나 확인 대상 아님"
 fi
 if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ":${API_PORT} "; then
-  bad "포트 ${API_PORT} 이 이미 사용 중이다 — .env 의 API_PORT 를 바꾸거나 기존 프로세스를 정리한다"
+  # 그 포트를 이미 설치된 우리 스택(compose 프로젝트 koipa-airgap)이 쓰고 있으면 재실행이다 — 막지 않는다.
+  # 설치 완료 안내가 토큰 갱신·자동 로그인 전환을 "setup.sh 를 다시 실행하라"고 안내하는데, 여기서 막으면
+  # 스택이 떠 있는 상태에서는 0단계에서 중단된다(2026-09-29 Rocky 8.10 리허설). 다른 프로세스면 그대로 막는다.
+  if command -v docker >/dev/null 2>&1 \
+     && docker ps --filter "label=com.docker.compose.project=koipa-airgap" --format '{{.Ports}}' 2>/dev/null \
+        | grep -q ":${API_PORT}->"; then
+    ok "포트 ${API_PORT} 은 이미 설치된 Koipa 스택이 쓰고 있다 — 재실행으로 본다"
+  else
+    bad "포트 ${API_PORT} 이 이미 사용 중이다 — .env 의 API_PORT 를 바꾸거나 기존 프로세스를 정리한다"
+  fi
 else
   ok "포트 ${API_PORT} 사용 가능"
 fi

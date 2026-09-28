@@ -4,7 +4,7 @@ doc/12_폐쇄망_배포_설계.md §3·§4 구현.
 
 두 가지 모드:
   --dry-run : 다운로드·빌드 없이 manifest.yaml만 미리 생성 + 체크리스트·예상 크기 출력
-  (기본)    : 실제 docker save / huggingface 다운로드 / pip download 실행 (네트워크 필요)
+  (기본)    : 실제 docker save / huggingface 캐시 스테이징 실행 (네트워크 필요)
 
 핵심 설계:
   - docker-compose.yml에서 image: 라인 파싱 → 컴포넌트 자동 추출
@@ -36,6 +36,11 @@ from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 _REPO_ROOT = _HERE.parent  # poc/
+
+# 배포 정본(poc/deploy_manifest.toml). 번들에 실을 파일의 목록은 코드가 아니라 거기에 있다.
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+import deploy_manifest as _dm  # noqa: E402
 
 # [cp949 2026-08-15] 한국어 Windows 콘솔은 cp949 라서 본문의 em dash 하나에 출력이 죽는다.
 # 실측: `--help` 가 UnicodeEncodeError 로 통째로 실패했다 - 도움말조차 못 읽는 상태였다.
@@ -170,7 +175,8 @@ _OBSERVABILITY_IMAGES = (
     "grafana/loki:3.2.1",
     "grafana/promtail:3.2.1",
     "prometheuscommunity/postgres-exporter:v0.16.0",
-    "oliver006/redis_exporter:v1.66.0",
+    # redis_exporter 는 뺐다 — prometheus 알림 규칙(up{job="koipa-api"}·up{job="postgres"} 등)과
+    # grafana 대시보드가 redis 메트릭을 쓰지 않는다. 목록의 정본은 deploy_manifest.toml.
 )
 
 # docker-compose 스타일 `${NAME}` / `${NAME:-default}` 치환용.
@@ -365,23 +371,23 @@ def check_model_parity(bundled_dir: Path | None, release_model: str) -> str | No
     return None
 
 
-# 폐쇄망 타깃이 아닌 wheel 플랫폼 태그 — 있으면 런타임 ImportError.
-_NON_LINUX_WHEEL_TAGS = ("win_amd64", "win32", "-macosx", "macosx_")
+# 배포 정본(deploy_manifest.toml)에서 뺀 최상위 산출물. 예전 번들 폴더 위에 다시 빌드하면 그대로 실려 나간다.
+_RETIRED_BUNDLE_DIRS = ("python-deps", "db-migrations", "wheels")
 
 
 def check_bundle_hygiene(out_dir: Path, manifest: "BundleManifest") -> list[str]:
     """이미 존재하는 출력 디렉토리에서 stale/이질 산출물을 fail-closed 로 잡는다.
 
     핵심 함정: 재빌드 시 _docker_save/copytree 가 'already exists' 로 SKIP → 예전(ES시대)
-    번들 위에 덮어쓰면 elasticsearch/minio/mlflow.tar 와 win_amd64 wheel 이 그대로 실려나간다.
-      - docker-images/ 의 tar 중 매니페스트 컴포넌트/관측성에 없는 것(=이질 이미지)
-      - wheel 중 비-Linux 플랫폼 태그(win_amd64/win32/macosx)
-    반환: 위반 목록(빈 리스트=청결). docker-images/·wheels 가 없으면 no-op(순수 dry-run 안전).
+    번들 위에 덮어쓰면 elasticsearch/minio/mlflow.tar 와 정본에서 뺀 산출물이 그대로 실려나간다.
+      - docker-images/ 의 tar 중 매니페스트 컴포넌트/관측성에 없는 것(=이질 이미지, 예: 같은 이미지의 beat.tar)
+      - 정본에서 뺀 최상위 폴더(python-deps/·db-migrations/)와 HF 캐시의 리비전 중복
+    반환: 위반 목록(빈 리스트=청결). 해당 폴더가 없으면 no-op(순수 dry-run 안전).
     """
     violations: list[str] = []
     images_dir = out_dir / "docker-images"
     if images_dir.is_dir():
-        allowed = {f"{svc}.tar" for svc in manifest.components}
+        allowed = {f"{svc}.tar" for svc in image_tar_plan(manifest.components)}
         allowed |= {f"obs-{_obs_tar_name(img)}.tar" for img in manifest.observability_images}
         for tar in sorted(images_dir.glob("*.tar")):
             if tar.name not in allowed:
@@ -406,15 +412,20 @@ def check_bundle_hygiene(out_dir: Path, manifest: "BundleManifest") -> list[str]
                 "다르다 - 예전 번들 잔존. 그 디렉토리를 지우고 재빌드하라."
             )
 
-    for wheels_dir in (out_dir / "wheels", out_dir / "python-deps" / "wheels"):
-        if wheels_dir.is_dir():
-            for whl in sorted(wheels_dir.glob("*.whl")):
-                low = whl.name.lower()
-                if any(tag in low for tag in _NON_LINUX_WHEEL_TAGS):
-                    violations.append(
-                        f"non-Linux wheel: {whl.relative_to(out_dir).as_posix()} "
-                        "(폐쇄망 타깃=Linux — win/mac wheel 은 런타임 ImportError)"
-                    )
+    for retired in _RETIRED_BUNDLE_DIRS:
+        if (out_dir / retired).exists():
+            violations.append(
+                f"retired artifact: {retired}/ — 배포 정본(deploy_manifest.toml)에서 뺀 산출물이 예전 번들에 남아 있다. "
+                "출력 디렉토리를 비우고 재빌드하라."
+            )
+    hf_hub = out_dir / "models" / "hf" / "hub"
+    if hf_hub.is_dir():
+        for cache in sorted(hf_hub.glob("models--*")):
+            snaps = cache / "snapshots"
+            if snaps.is_dir() and len([s for s in snaps.iterdir() if s.is_dir()]) > 1:
+                violations.append(
+                    f"duplicate HF revision: {cache.name} 스냅샷이 둘 이상이다 — refs/main 하나만 실어야 한다"
+                )
     return violations
 
 
@@ -478,17 +489,37 @@ def staged_rpms() -> list[Path]:
     return sorted(d.glob("*.rpm")) if d.is_dir() else []
 
 
+def image_tar_plan(components: dict[str, ComponentEntry]) -> dict[str, str]:
+    """docker save 로 만들 tar 이름(확장자 제외) → 이미지. 같은 이미지를 쓰는 서비스는 tar 하나로 합친다.
+
+    beat 는 worker 와 같은 koipa-worker 이미지다. 서비스마다 저장하면 바이트까지 같은 796MB 짜리
+    tar 가 하나 더 실린다(20260928 번들에서 cmp 로 확인). 먼저 나온 서비스(worker)의 이름을 쓴다.
+    """
+    plan: dict[str, str] = {}
+    seen: set[str] = set()
+    for svc, entry in components.items():
+        image = getattr(entry, "image", None) or svc  # 이미지 정보가 없는 항목은 서비스 하나당 tar 하나
+        if image in seen:
+            continue
+        seen.add(image)
+        plan[svc] = image
+    return plan
+
+
 def expected_files(
     components: dict[str, ComponentEntry],
     models: list[ModelEntry],
     observability_images: list[str] | None = None,
 ) -> list[str]:
-    files: list[str] = ["README.md", "preflight_host.sh", "setup.sh", "install.sh", "verify.sh", "deploy.sh", "deploy_airgap.sh", "db_probe.sh", "verify_install.sh", "deploy_rollback.sh", "manifest.yaml", "CHECKSUMS.sha256"]
+    """번들에 있어야 할 파일 선언. 정본(deploy_manifest.toml)의 [bundle] 을 그대로 옮기고,
+    compose·config 에서 나오는 이미지·모델만 여기서 보탠다."""
+    b = _dm.load()["bundle"]
+    files: list[str] = [b["root"]["readme"]["dest"], *b["root"]["scripts"], *b["root"]["generated"]]
     # 런타임 RPM 은 스테이징된 경우에만 기대 목록에 넣는다. 없는데 선언하면
     # verify_install 이 항상 실패해 진짜 결손과 구분이 안 된다.
     if staged_rpms():
         files.append("rpms/")
-    for svc in components:
+    for svc in image_tar_plan(components):
         files.append(f"docker-images/{svc}.tar")
     for m in models:
         # [2026-09-05] classifier 도 HF 캐시 레이아웃이다 — 런타임이 hub id 로 찾는다.
@@ -500,35 +531,22 @@ def expected_files(
             # 종전엔 models/<org>-<name>/ 로 잘못 선언돼 실제 스테이징 경로와 어긋났고(그나마
             # 스테이징 자체가 없었다), verify_install 이 엉뚱한 경로를 기대했다.
             files.append(f"models/hf/hub/models--{m.name.replace('/', '--')}/")
-        else:
+        elif m.role == "classifier_trained":
             files.append(f"models/{m.name.replace('/', '-')}/")
-    files.extend([
-        "python-deps/wheels/",
-        "python-deps/_requirements_no_torch.txt",
-        "infra-config/docker-compose.airgap.yml",
-        "infra-config/.env.template",
-        "db-migrations/alembic/",  # baseline + 후속 revision 전체 (init.sql 폐기)
-        "docs/INSTALL.md",
-        "docs/OPERATION.md",
-        "docs/TROUBLESHOOTING.md",
-        "licenses/third-party-licenses.txt",
-        "licenses/sbom.cyclonedx.json",  # 공급망 SBOM (CycloneDX) — 번들 동봉
-        "acceptance/expected_labels.json",  # 고객 인수 샘플팩 매니페스트(등급·기대숫자)
-        "acceptance/docs/",                 # 전 포맷 인수 표본(TXT/PDF/DOCX/XLSX/XLS/PPTX/HWPX)
-        "acceptance/run_acceptance.sh",     # 고객 인수 러너(bash+curl, severity floor)
-    ])
+        # 그 밖의 역할(llm·embedding_fallback)은 번들에 싣지 않는다 — 종전엔 models/Qwen-Qwen3-14B/ 를
+        # 선언했지만 그걸 담는 코드가 없어 실물이 없는 선언이었다(20260928 번들: 48개 중 2개).
+    files += [f"infra-config/{f}" for f in b["infra"]["files"]]
+    files += [f"docs/{f}" for f in b["docs"]["files"]]
+    files += [f"licenses/{f}" for f in b["licenses"]["files"]]
+    files += [f"acceptance/{f}" for f in b["acceptance"]["files"]]
+    files.append("acceptance/docs/")  # 전 포맷 인수 표본(TXT/PDF/DOCX/XLSX/XLS/PPTX/HWPX)
     # 관측성 스택(동봉 시) — 설정은 항상, 이미지는 best-effort.
     if observability_images:
-        files.extend([
-            "observability/docker-compose.observability.airgap.yml",
-            "observability/prometheus.yml",
-            "observability/alert_rules.yml",
-            "observability/alertmanager.yml",
-            "observability/grafana/",
-        ])
+        for f in b["observability"]["files"]:
+            files.append("observability/" + (f[:-1] if f.endswith("/*") else f))
         for img in observability_images:
             files.append(f"docker-images/obs-{_obs_tar_name(img)}.tar")
-    return files
+    return list(dict.fromkeys(files))
 
 
 def _obs_tar_name(image: str) -> str:
@@ -769,7 +787,7 @@ def print_checklist(manifest: BundleManifest, *, stream=sys.stdout) -> None:
         p(f"  - {f}")
 
     if manifest.dry_run:
-        p("\n* DRY-RUN: no docker save / huggingface download / pip download executed.")
+        p("\n* DRY-RUN: no docker save / huggingface download executed.")
         p("* Use without --dry-run on an external network host to build the actual bundle.")
 
 
@@ -808,53 +826,6 @@ def _docker_save(image: str, dest: Path) -> bool:
     return True
 
 
-# 호스트 오프라인 설치 대상에서 제외할 패키지 접두어. torch/nvidia/triton 은 CUDA·플랫폼
-# 특정이고 이미지에 구워지므로 호스트 pip 설치 목록(_requirements_no_torch.txt)에서 뺀다.
-_HOST_EXCLUDE_PREFIXES = ("torch", "nvidia", "triton")
-
-# 폐쇄망 타깃 플랫폼 — 빌드 호스트가 Windows/macOS여도 Linux wheel 을 받는다
-# (win_amd64 wheel 이 리눅스 airgap 에서 런타임 ImportError 로 깨지던 구멍).
-_DEFAULT_WHEEL_PLATFORM = "manylinux2014_x86_64"
-
-
-def _export_locked_requirements(out_dir: Path) -> Path | None:
-    """uv.lock(해시핀·CI강제)에서 requirements를 export → out_dir/_requirements_locked.txt.
-
-    번들 wheel의 출처를 빌드호스트 venv(pip freeze)가 아니라 CI-게이트된 uv.lock으로 고정한다
-    (폐쇄망 재현성·공급망 감사 = uv.lock 도입 목적). uv 미가용/실패 시 None → 호출부가
-    기존 pip freeze 폴백으로 안전 강등한다.
-    """
-    out = out_dir / "_requirements_locked.txt"
-    cmd = [sys.executable, "-m", "uv", "export", "--format", "requirements-txt",
-           "--no-emit-project", "--no-dev"]
-    try:
-        r = subprocess.run(cmd, cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=180)
-    except Exception as exc:  # noqa: BLE001
-        print(f"  [uv] export 실패(폴백 freeze): {exc}", file=sys.stderr)
-        return None
-    if r.returncode != 0 or not r.stdout.strip():
-        print(f"  [uv] export 불가(폴백 freeze): {(r.stderr or '')[-200:]}", file=sys.stderr)
-        return None
-    out.write_text(r.stdout, encoding="utf-8", newline="\n")
-    return out
-
-
-# 다운로드 타깃(폐쇄망 Linux 런타임) 환경 — 마커 평가 기준. pip download 의
-# --python-version 311 / --platform manylinux_x86_64 와 반드시 일치(이미지 python 3.11.15).
-# python 버전 승급/이미지 베이스 변경 시 여기와 _pip_download_cmd 를 함께 갱신.
-_TARGET_MARKER_ENV = {
-    "os_name": "posix",
-    "sys_platform": "linux",
-    "platform_system": "Linux",
-    "platform_machine": "x86_64",
-    "platform_python_implementation": "CPython",
-    "implementation_name": "cpython",
-    "python_version": "3.11",
-    "python_full_version": "3.11.15",
-    "implementation_version": "3.11.15",
-}
-
-
 def _readiness_evaluated_model(readiness_path: str) -> str:
     """readiness 리포트가 '무슨 모델을 평가한' 것인지 — 없으면 빈 문자열."""
     try:
@@ -862,203 +833,6 @@ def _readiness_evaluated_model(readiness_path: str) -> str:
     except Exception:  # noqa: BLE001 - 부재/파손은 상위 게이트가 판정
         return ""
     return str(data.get("evaluated_model") or data.get("deployed_model") or "")
-
-
-def _require_packaging_for_markers() -> None:
-    """빌드 전제 검사 — packaging 없이 돌리면 조용히 깨진 wheel 목록이 나온다(fail-loud).
-
-    _marker_true_for_target 은 packaging 부재 시 '보수적으로 포함'으로 폴백하는데, 그러면
-    python_version 분기(numpy 2.4.6 vs 2.5.0)가 동시에 남아 pip download 가 ResolutionImpossible
-    로 죽는다. 실측(2026-08-02): 빌드 호스트에 packaging 이 없어 첫 번들 빌드가 이 지점에서
-    partial 로 끝났고, 원인이 로그 어디에도 드러나지 않았다. 전제를 앞에서 명시적으로 막는다.
-    """
-    try:
-        from packaging.markers import Marker  # noqa: F401,PLC0415
-    except ImportError as exc:  # pragma: no cover - 환경 의존
-        raise SystemExit(
-            "[bundle] 빌드 전제 미충족: packaging 미설치.\n"
-            "  환경마커(python_version·sys_platform)를 타깃 기준으로 평가할 수 없어\n"
-            "  wheel 목록이 조용히 깨진다(numpy 이중 핀 → pip ResolutionImpossible).\n"
-            f"  해결: {sys.executable} -m pip install packaging   (원인: {exc})"
-        ) from exc
-
-
-def _marker_true_for_target(marker_str: str) -> bool:
-    """환경마커가 타깃(Linux/cp311)에서 참인지. packaging 미가용 시 보수적으로 포함(True)."""
-    marker_str = marker_str.strip()
-    if not marker_str:
-        return True
-    try:
-        from packaging.markers import Marker
-        return bool(Marker(marker_str).evaluate(_TARGET_MARKER_ENV))
-    except ImportError:
-        # packaging 미가용 → 알려진 Windows 전용 마커만 수동 배제, 그 외는 포함(보수).
-        low = marker_str.lower().replace('"', "'")
-        return "sys_platform == 'win32'" not in low
-    except Exception:
-        return True   # 파싱 실패 → 포함(누락 wheel 로 런타임 죽는 것보다 과다포함이 안전)
-
-
-def _strip_hashes(text: str) -> str:
-    """uv export(해시·`\\` 연속줄·환경마커) → pip download용 버전핀 목록.
-
-    두 가지를 처리한다:
-    1) 해시 제거 — 크로스플랫폼 pip download(--platform manylinux)는 요구파일에 해시가 있으면
-       hash-check 가 켜져, 빌드호스트(Windows) export 해시가 타깃 wheel 과 안 맞아 깨진다.
-       무결성 검증은 타깃 install.sh 의 --require-hashes(네이티브 wheel)로 미룬다.
-    2) 환경마커를 *타깃(Linux/cp311)* 기준으로 평가 — 빌드호스트(Windows) 기준으로 두면
-       Linux 패키지(gunicorn·uvloop)가 배제되고 Windows 패키지(pywin32·waitress)가 포함된다.
-       반대로 마커를 전부 제거하면 python_version 분기(numpy 2.4.6 vs 2.5.0)가 동시 포함돼
-       ResolutionImpossible. → 타깃 환경으로 평가해 정확히 한 버전만 남긴다.
-    설치 매니페스트(_requirements_no_torch.txt)는 마커 보존(타깃서 정상 평가)이라 별개.
-    """
-    out: list[str] = []
-    for line in text.splitlines():
-        s = line.strip()
-        if not s or s.startswith("#") or s.startswith("--hash"):
-            continue
-        s = s.rstrip("\\").strip()   # 'pkg==ver \\' → 'pkg==ver'
-        if ";" in s:                 # 'pkg==ver ; sys_platform == ...'
-            req, marker = s.split(";", 1)
-            if not _marker_true_for_target(marker):
-                continue             # 타깃서 거짓 → 배제(pywin32·waitress·numpy 반대분기)
-            s = req.rstrip()         # 타깃서 참 → 마커 떼고 버전핀만
-        if not s:
-            continue
-        # torch/nvidia/triton: 이미지에 구워짐 → 호스트 wheel 불필요. 다운로드 리스트도 install
-        # 매니페스트(no_torch)와 동일 집합이어야 한다. nvidia-* CUDA 휠은 표준 태그로 받을 수도
-        # 없어(No matching distribution) 포함 시 빌드가 fail-closed 로 중단된다.
-        _pkg = s.split("==")[0].split(">")[0].split("<")[0].split("[")[0].split(" ")[0].strip().lower()
-        if _pkg.startswith(_HOST_EXCLUDE_PREFIXES):
-            continue
-        out.append(s)
-    return "\n".join(out) + "\n"
-
-
-def _strip_host_excluded(text: str) -> str:
-    """호스트 설치 목록에서 torch/nvidia/triton 스탠자를 제거(이미지에 이미 구워짐).
-
-    uv export(멀티라인 --hash 연속) / 평문 requirements 양쪽 처리. 스탠자 = 열0에서 시작하는
-    `pkg==ver` 줄 + 이어지는 들여쓴 --hash/# via 줄. 해시는 보존(호스트 --require-hashes 검증용).
-    """
-    lines = text.splitlines()
-    out: list[str] = []
-    i, n = 0, len(lines)
-    while i < n:
-        line = lines[i]
-        if not line.strip() or line[:1] == "#":     # 헤더/빈 줄 보존
-            out.append(line)
-            i += 1
-            continue
-        if line[:1] not in (" ", "\t"):             # 패키지 스탠자 시작(열0)
-            stanza = [line]
-            j = i + 1
-            while j < n and lines[j][:1] in (" ", "\t") and lines[j].strip():
-                stanza.append(lines[j])
-                j += 1
-            pkg = stanza[0].split("==")[0].split(">")[0].split("<")[0].split(" ")[0].strip().lower()
-            if not pkg.startswith(_HOST_EXCLUDE_PREFIXES):
-                out.extend(stanza)
-            i = j
-            continue
-        out.append(line)                            # 방어: 고아 들여쓴 줄 보존
-        i += 1
-    return "\n".join(out).rstrip("\n") + "\n"
-
-
-def _pip_download_cmd(req: Path, wheels_dir: Path, wheel_platform: str) -> list[str]:
-    """pip download 명령 구성(순수 함수 — 테스트 대상). wheel_platform 이 주어지면
-    타깃 플랫폼 고정(--platform 은 --only-binary 필수). 빈 문자열이면 빌드 호스트 플랫폼.
-    """
-    cmd = [
-        sys.executable, "-m", "pip", "download", "-r", str(req),
-        "-d", str(wheels_dir), "--no-deps", "-q",
-    ]
-    if wheel_platform:
-        cmd += ["--only-binary=:all:", "--platform", wheel_platform]
-        # 신규 패키지(예: argon2-cffi-bindings 25.x)는 manylinux2014 휠이 없고 manylinux_2_28+
-        # 만 배포한다. pip 은 --platform 다중 지정 시 어느 하나에 맞는 휠을 받으므로, 구 태그
-        # (2014, 오래된 glibc 커버)를 유지한 채 신 태그를 폴백으로 추가한다(엄격히 더 관대·안전).
-        if wheel_platform == "manylinux2014_x86_64":
-            cmd += ["--platform", "manylinux_2_28_x86_64"]
-        cmd += ["--python-version", "311", "--implementation", "cp", "--abi", "cp311"]
-    return cmd
-
-
-def _pip_download(out_dir: Path, wheel_platform: str = _DEFAULT_WHEEL_PLATFORM) -> bool:
-    """pip download -r requirements → wheels/.
-
-    fail-closed: pip download 가 일부라도 실패하면(rc!=0) False 를 반환해 빌드를 중단한다.
-    누락 wheel 을 성공으로 넘기면 고객사 폐쇄망 오프라인 설치가 런타임 ImportError 로 죽는다.
-    또한 install.sh·expected_files 가 참조하는 `_requirements_no_torch.txt` 를 반드시 생성한다
-    (과거 writer=_requirements_freeze.txt vs consumer=_requirements_no_torch.txt 파일명 불일치 버그).
-    """
-    wheels_dir = out_dir / "wheels"
-    wheels_dir.mkdir(parents=True, exist_ok=True)
-    repo_req = _REPO_ROOT / "requirements.txt"
-    if repo_req.exists():
-        # 명시적 requirements.txt 가 있으면 최우선(기존 동작 보존).
-        req = repo_req
-        no_torch_text = _strip_host_excluded(req.read_text(encoding="utf-8"))
-    else:
-        # [공급망] uv.lock(해시핀·CI강제)에서 export → 빌드호스트 venv freeze 드리프트 차단.
-        # 다운로드 소스는 해시 없이 pinned(크로스플랫폼 --platform 안전), 호스트 설치는 해시
-        # 보존 no_torch 로 --require-hashes(타깃 네이티브 wheel 무결성 검증).
-        locked = _export_locked_requirements(out_dir)
-        if locked is not None:
-            locked_text = locked.read_text(encoding="utf-8")
-            req = out_dir / "_requirements_download.txt"
-            req.write_text(_strip_hashes(locked_text), encoding="utf-8", newline="\n")
-            no_torch_text = _strip_host_excluded(locked_text)
-        else:
-            # 최후수단 — uv 미가용: pip freeze(비핀). git+/editable/file 의존성 제외.
-            print("  [pip] no requirements.txt / uv.lock export 불가 — venv freeze 폴백(비핀)", file=sys.stderr)
-            r = subprocess.run(
-                [sys.executable, "-m", "pip", "freeze", "--exclude-editable"],
-                capture_output=True, text=True,
-            )
-            if r.returncode != 0:
-                print(f"  [ERR] pip freeze 실패: {r.stderr[-300:]}", file=sys.stderr)
-                return False
-            lines = [
-                line for line in r.stdout.splitlines()
-                if line.strip()
-                and not line.startswith("git+") and not line.startswith("-e ") and "@ file:" not in line
-            ]
-            req = out_dir / "_requirements_freeze.txt"
-            req.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
-            no_torch_text = _strip_host_excluded(req.read_text(encoding="utf-8"))
-
-    # 최종 요구 목록(주석·해시·빈 줄 제외) — 다운로드 완전성 자기검사용 카운트.
-    requested = [
-        ln for ln in req.read_text(encoding="utf-8").splitlines()
-        if ln.strip() and not ln.strip().startswith("#") and not ln.strip().startswith("--")
-    ]
-    # 호스트 설치용(torch류 제외) 목록 — install.sh 가 이 파일명을 참조하므로 항상 생성(해시 보존).
-    (out_dir / "_requirements_no_torch.txt").write_text(no_torch_text, encoding="utf-8", newline="\n")
-
-    r = subprocess.run(
-        _pip_download_cmd(req, wheels_dir, wheel_platform),
-        capture_output=True, text=True,
-    )
-    if r.returncode != 0:
-        print(f"  [ERR] pip download 실패(rc={r.returncode}, platform={wheel_platform or 'host'}): {r.stderr[-300:]}", file=sys.stderr)
-        return False
-    # --no-deps 는 요구 1건당 산출 1건(.whl 또는 sdist .tar.gz/.zip). 산출이 요구보다 적으면
-    # 불완전 번들 — 자기검사로 표면화한다.
-    downloaded = sum(
-        1 for f in wheels_dir.iterdir()
-        if f.suffix in (".whl", ".zip") or f.name.endswith(".tar.gz")
-    )
-    print(f"  [pip]  {downloaded} dists -> {wheels_dir} (requested {len(requested)})", file=sys.stderr)
-    if downloaded < len(requested):
-        print(
-            f"  [ERR] wheel 자기검사 실패: 요구 {len(requested)} > 산출 {downloaded}. "
-            "불완전 번들 — 빌드 중단(fail-closed).",
-            file=sys.stderr,
-        )
-        return False
-    return True
 
 
 # 고객 인수(acceptance) 러너 — 호스트에서 bash+curl 로 실행(파이썬 불요). 배포 API 에 팩 문서를
@@ -1235,16 +1009,21 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     infra = out_dir / "infra-config"
     infra.mkdir(parents=True, exist_ok=True)
 
-    for src, dst in [
-        # 개발용 docker-compose.yml(api/worker가 build: 라 이미지 추출 불가 + mlflow 잔존)은
-        # 번들에 안 넣는다 — setup.sh·deploy_airgap.sh 어느 것도 참조하지 않아 그냥 있으면
-        # "왜 파일이 두 개고 뭐가 다른가"라는 혼란만 남긴다. 운영 배포는 아래 airgap 파일만 쓴다.
-        (_REPO_ROOT / "docker-compose.airgap.yml",       infra / "docker-compose.airgap.yml"),
-        # GPU 오버레이(옵인) — base 는 CPU. NVIDIA 노드만 -f 로 덧붙인다.
-        (_REPO_ROOT / "docker-compose.gpu.yml",          infra / "docker-compose.gpu.yml"),
-    ]:
-        if src.exists():
-            shutil.copy2(src, dst)
+    # 개발용 docker-compose.yml(api/worker가 build: 라 이미지 추출 불가 + mlflow 잔존)은
+    # 번들에 안 넣는다 — setup.sh·deploy_airgap.sh 어느 것도 참조하지 않아 그냥 있으면
+    # "왜 파일이 두 개고 뭐가 다른가"라는 혼란만 남긴다. 운영 배포는 airgap 파일만 쓴다.
+    # GPU 오버레이(옵인)는 base 가 CPU 라서 NVIDIA 노드만 -f 로 덧붙인다.
+    # mTLS 종료 nginx 설정(opt-in `--profile mtls`)은 compose 의 nginx-mtls 가 `./mtls/nginx.mtls.conf`
+    # 를 마운트하므로 infra-config/mtls/ 에 실제 파일이 있어야 한다(과거 미동봉 → 마운트 소스 부재로
+    # 디렉토리 오생성·nginx 기동 실패). certs/ 는 환경별 PKI 라 번들 제외 — 운영자가 infra-config/mtls/certs/
+    # 에 배치(conf 헤더 절차 참조). 어떤 파일을 싣는지는 정본(deploy_manifest.toml) 의 [bundle.infra].
+    for _name, _rel in _dm.load()["bundle"]["infra"]["sources"].items():
+        _src = _REPO_ROOT / _rel
+        if _src.exists():
+            (infra / _name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(_src, infra / _name)
+        else:
+            print(f"  [WARN] {_rel} 없음 — infra-config/{_name} 미동봉.", file=sys.stderr)
 
     # [env_file 경로 정합] compose 의 `env_file: .env` 는 **compose 파일 위치 기준**으로 해석된다.
     # 리포 레이아웃(poc/docker-compose.airgap.yml + poc/.env)에서는 맞지만, 번들에서는 compose 가
@@ -1259,23 +1038,19 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
             _airgap_dst.write_text(_fixed, encoding="utf-8", newline="\n")
             print("  [infra] airgap compose env_file → ../.env (번들 루트 .env 로드)", file=sys.stderr)
 
-    # mTLS 종료 nginx 설정(opt-in `--profile mtls`). airgap/base compose 의 nginx-mtls 가
-    # `./mtls/nginx.mtls.conf` 를 마운트하므로 번들 infra-config/mtls/ 에 실제 파일이 있어야
-    # 한다(과거 미동봉 → 마운트 소스 부재로 디렉토리 오생성·nginx 기동 실패). certs/ 는
-    # 환경별 PKI 라 번들 제외 — 운영자가 infra-config/mtls/certs/ 에 배치(conf 헤더 절차 참조).
-    mtls_conf_src = _REPO_ROOT / "infra" / "mtls" / "nginx.mtls.conf"
-    if mtls_conf_src.exists():
-        mtls_dst_dir = infra / "mtls"
-        mtls_dst_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(mtls_conf_src, mtls_dst_dir / "nginx.mtls.conf")
-
     # docs — 절차서 (manifest files_expected 의 docs/{INSTALL,OPERATION,TROUBLESHOOTING}.md 충족)
     docs_dst = out_dir / "docs"
     docs_dst.mkdir(parents=True, exist_ok=True)
-    for _doc in ("INSTALL.md", "OPERATION.md", "TROUBLESHOOTING.md"):
+    for _doc in _dm.bundle_docs():
         _src = _REPO_ROOT / "docs" / _doc
         if _src.exists():
             shutil.copy2(_src, docs_dst / _doc)
+    # 번들 루트 README.md — 설치자가 가장 먼저 여는 한 쪽. expected_files() 는 README.md 를 선언하지만
+    # 만드는 코드가 없어 20260928 번들 루트에 README 가 없었다(실물 확인).
+    _readme_cfg = _dm.load()["bundle"]["root"]["readme"]
+    _readme = _REPO_ROOT / _readme_cfg["source"]
+    if _readme.exists():
+        shutil.copy2(_readme, out_dir / _readme_cfg["dest"])
 
     # .env template — 폐쇄망 번들은 반드시 onprem-local 하드닝 프로파일 전용 템플릿을 출하한다.
     # (과거엔 dev 용 .env.example 을 복사했는데, 거기엔 DEPLOY_PROFILE 이 없고 POC_MODE=dryrun·
@@ -1373,21 +1148,22 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         newline="\n",
     )
 
-    # alembic migrations
-    alembic_src = _REPO_ROOT / "alembic"
-    alembic_dst = out_dir / "db-migrations" / "alembic"
-    if alembic_src.exists() and not alembic_dst.exists():
-        import shutil as _sh
-        _sh.copytree(alembic_src, alembic_dst)
+    # alembic 은 번들에 따로 싣지 않는다 — api 이미지에 alembic.ini·alembic/ 이 들어 있고 마이그레이션은
+    # 컨테이너 안에서 실행된다(INSTALL.md §6). 예전 db-migrations/ 사본은 어느 스크립트도 읽지 않았다.
 
     # OSS 라이선스 + SBOM — expected_files 가 licenses/third-party-licenses.txt 를 기대하는데
-    # 과거엔 아무도 복사하지 않아 번들에 실제로는 없었다(공급망 감사 산출물 부재). licenses/
-    # 전체(third-party-licenses.*·sbom.cyclonedx.json·sbom.json)를 동봉한다. 없으면 경고 후 진행.
+    # 과거엔 아무도 복사하지 않아 번들에 실제로는 없었다(공급망 감사 산출물 부재). 정본이 적은
+    # 파일만 싣는다(같은 내용의 .md·.json·sbom.json 형식은 뺀다). 없으면 경고 후 진행.
     licenses_src = _REPO_ROOT / "licenses"
     licenses_dst = out_dir / "licenses"
     if licenses_src.exists() and not licenses_dst.exists():
         import shutil as _sh
-        _sh.copytree(licenses_src, licenses_dst)
+        licenses_dst.mkdir(parents=True, exist_ok=True)
+        for _lic in _dm.bundle_licenses():
+            if (licenses_src / _lic).is_file():
+                _sh.copy2(licenses_src / _lic, licenses_dst / _lic)
+            else:
+                print(f"  [WARN] licenses/{_lic} 없음 — 미동봉.", file=sys.stderr)
         print(f"  [lic]  라이선스·SBOM → {licenses_dst}", file=sys.stderr)
     elif not licenses_src.exists():
         print(
@@ -1472,31 +1248,7 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "  echo \"Loading $tar ...\"\n"
         "  \"$CRT\" load -i \"$tar\"\n"
         "done\n\n"
-        "# 2) (옵션) 호스트 파이썬 deps — 컨테이너 배포는 deps 가 이미지에 포함(INSTALL.md).\n"
-        "#    번들 wheel 은 타깃 인터프리터(cp311) 전용이다. Ubuntu 22.04 기본 파이썬은 3.10 이라\n"
-        "#    호스트에서 설치를 시도하면 'No matching distribution' 으로 반드시 실패하는데, 종전엔\n"
-        "#    그 실패가 set -e 로 install.sh 전체를 죽여 **아래 4) .env 생성까지 실행되지 않았다**\n"
-        "#    (실측 2026-08-02 리허설: exit 1, .env 미생성 → INSTALL.md 2단계에서 설치 중단).\n"
-        "#    → 기본은 실행하지 않는다. 호스트에서 스크립트를 직접 구동할 때만 켠다. 켠 경우에는\n"
-        "#    종전대로 fail-closed(누락 wheel 을 조용히 넘기면 런타임 ImportError 로 이어짐).\n"
-        "REQ=\"$BUNDLE_DIR/python-deps/_requirements_no_torch.txt\"\n"
-        "if [ \"${INSTALL_HOST_DEPS:-0}\" != \"1\" ]; then\n"
-        "  echo '[deps] SKIP — 컨테이너 배포는 deps 가 이미지에 포함. 호스트 직접구동이면 INSTALL_HOST_DEPS=1 로 재실행.'\n"
-        "elif ! command -v pip >/dev/null 2>&1 || [ ! -f \"$REQ\" ]; then\n"
-        "  echo '[deps] SKIP — pip 미탑재 또는 요구목록 부재.'\n"
-        "else\n"
-        "  PYV=\"$(python3 -c 'import sys;print(\"%d.%d\"%sys.version_info[:2])' 2>/dev/null || echo unknown)\"\n"
-        "  if [ \"$PYV\" != \"3.11\" ]; then\n"
-        "    echo \"[deps] SKIP — 호스트 파이썬 $PYV != 번들 wheel 타깃 3.11. 설치하면 반드시 실패한다.\"\n"
-        "    echo '       호스트 직접구동이 필요하면 python3.11 환경에서 재실행하라(컨테이너 배포는 불필요).'\n"
-        "  else\n"
-        "    echo '[deps] host python deps 설치 ...'\n"
-        "    # uv.lock export 목록은 해시핀 → --require-hashes 로 공급망 무결성 검증(타깃 네이티브 wheel).\n"
-        "    HASHFLAG=\"\"; grep -q -- '--hash=' \"$REQ\" && HASHFLAG=\"--require-hashes\"\n"
-        "    pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" $HASHFLAG -r \"$REQ\"\n"
-        "  fi\n"
-        "fi\n\n"
-        "# 3) env 설정\n"
+        "# 2) env 설정\n"
         "# 비밀값 파일이다 — 생성 시점부터 소유자 전용으로 만든다(umask + 명시 chmod).\n"
         "if [ ! -f .env ]; then (umask 077; cp \"$BUNDLE_DIR/infra-config/.env.template\" .env); fi\n"
         "chmod 600 .env 2>/dev/null || true\n"
@@ -1542,7 +1294,7 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     # db_probe.sh — deploy_airgap.sh 가 4단계(DB 헬시 대기)에서 `. "$SELF/db_probe.sh"` 로 읽는다.
     # 이 목록에 없어 번들에 안 실렸고, 실제 설치기를 돌려 보니 "No such file or directory" 로 4단계 직전에
     # 설치가 멈췄다(2026-09-27 실설치 리허설). 리포에서 직접 돌릴 때는 scripts/ 에 있어 가려져 있었다.
-    for _script in ("preflight_host.sh", "setup.sh", "deploy.sh", "deploy_airgap.sh", "db_probe.sh", "verify_install.sh", "deploy_rollback.sh"):
+    for _script in _dm.bundle_root_scripts():
         _src = _REPO_ROOT / "scripts" / _script
         if _src.exists():
             _dst = out_dir / _script
@@ -1564,7 +1316,14 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         import shutil as _sh
         if pack_dst.exists():
             _sh.rmtree(pack_dst)
-        _sh.copytree(pack_src, pack_dst)
+        pack_dst.mkdir(parents=True)
+        # 팩 폴더의 README.md·real_fixtures.json(빌드 입력, expected_labels.json 에 이미 병합됨)은
+        # 러너가 읽지 않는다 — 정본이 적은 파일과 표본 문서(docs/)만 싣는다.
+        for _f in _dm.bundle_acceptance_files():
+            if _f != "run_acceptance.sh" and (pack_src / _f).is_file():
+                _sh.copy2(pack_src / _f, pack_dst / _f)
+        if (pack_src / "docs").is_dir():
+            _sh.copytree(pack_src / "docs", pack_dst / "docs")
         run_sh = pack_dst / "run_acceptance.sh"
         # newline="\n" 고정 — 없으면 Windows 빌드 호스트에서 LF 가 CRLF 로 번역되어(Path.write_text
         # 기본 동작) 리눅스 타깃에서 `set -o pipefail` 이 "invalid option name" 으로 죽는다(실측
@@ -1685,6 +1444,48 @@ def _resolve_hf_cache_dir() -> Path:
     return Path(root) / "hub"
 
 
+def _hf_keep_main_revision(cache_dir: Path):
+    """shutil.copytree 의 ignore 콜백 — refs/main 이 가리키는 리비전만 남긴다.
+
+    빌드 호스트 HF 캐시에 같은 모델의 리비전이 둘 이상 있으면(KURE-v1 이 그랬다: d14c8a94·8b418a58)
+    snapshots/·.no_exist/ 를 통째로 복사해 같은 가중치가 2.29GB 만큼 두 번 실렸다(20260928 번들,
+    model.safetensors 바이트 동일). 로더는 리비전을 지정하지 않고(HF_MODEL_REVISION 미설정) refs/main 을
+    따르므로 그 리비전만 있으면 된다. refs/main 이 없으면 아무것도 거르지 않는다.
+    """
+    main_ref = cache_dir / "refs" / "main"
+    keep = main_ref.read_text(encoding="utf-8").strip() if main_ref.is_file() else ""
+
+    def _ignore(directory: str, names: list[str]) -> list[str]:
+        d = Path(directory)
+        if keep and d.parent == cache_dir and d.name in ("snapshots", ".no_exist"):
+            return [n for n in names if n != keep]
+        return []
+
+    return _ignore
+
+
+def _prune_unreferenced_blobs(cache_dir: Path) -> int:
+    """심링크 레이아웃(리눅스 빌드호스트)에서 남은 리비전이 가리키지 않는 blobs/ 파일을 지운다.
+
+    리비전을 걸러도 blobs/ 에는 그 리비전에서만 쓰이던 파일(예: 다른 README)이 남는다.
+    스냅샷 안 항목이 전부 심링크일 때만 동작하고, 실파일이 섞여 있으면(Windows 복사본) 건드리지 않는다.
+    """
+    blobs = cache_dir / "blobs"
+    snaps = cache_dir / "snapshots"
+    if not (blobs.is_dir() and snaps.is_dir()):
+        return 0
+    files = [f for f in snaps.rglob("*") if f.is_file() or f.is_symlink()]
+    if not files or not all(f.is_symlink() for f in files):
+        return 0
+    used = {Path(os.readlink(f)).name for f in files}
+    removed = 0
+    for b in blobs.iterdir():
+        if b.name not in used:
+            b.unlink()
+            removed += 1
+    return removed
+
+
 def _copy_embedder_cache(
     manifest: "BundleManifest", out_dir: Path, *, allow_download: bool = True
 ) -> bool:
@@ -1761,12 +1562,13 @@ def _copy_embedder_cache(
         dst.parent.mkdir(parents=True, exist_ok=True)
         try:
             # 리눅스 빌드호스트: HF blob↔snapshot 상대 심링크 보존(중복 없음·용량 최소).
-            shutil.copytree(src, dst, symlinks=True)
+            shutil.copytree(src, dst, symlinks=True, ignore=_hf_keep_main_revision(src))
+            _prune_unreferenced_blobs(dst)
         except (OSError, shutil.Error):
             # Windows 심링크 권한 부재 등 → 심링크 따라가며 실본문 복사(용량↑, 이식성 우선).
             if dst.exists():
                 shutil.rmtree(dst, ignore_errors=True)
-            shutil.copytree(src, dst, symlinks=False)
+            shutil.copytree(src, dst, symlinks=False, ignore=_hf_keep_main_revision(src))
         size_mb = sum(f.stat().st_size for f in dst.rglob("*") if f.is_file()) / 1_048_576
         print(f"  [embed] {m.name} -> {dst}  ({size_mb:.0f}MB)", file=sys.stderr)
     return ok
@@ -1775,28 +1577,21 @@ def _copy_embedder_cache(
 def build_bundle(
     manifest: "BundleManifest",
     out_dir: Path,
-    wheel_platform: str = _DEFAULT_WHEEL_PLATFORM,
     *,
     stage_embedder: bool = True,
 ) -> int:
-    """실 빌드: docker save + pip download + infra 파일 복사."""
+    """실 빌드: docker save + infra 파일 복사 + 모델 스테이징."""
     print("\n=== Koipa Airgap Bundle - BUILD ===", file=sys.stderr)
     images_dir = out_dir / "docker-images"
     images_dir.mkdir(parents=True, exist_ok=True)
 
     failed: list[str] = []
 
-    # docker save
-    for svc, entry in manifest.components.items():
-        ok = _docker_save(entry.image, images_dir / f"{svc}.tar")
+    # docker save — 같은 이미지를 쓰는 서비스(worker·beat)는 tar 하나로 합친다(image_tar_plan).
+    for svc, image in image_tar_plan(manifest.components).items():
+        ok = _docker_save(image, images_dir / f"{svc}.tar")
         if not ok:
             failed.append(f"docker:{svc}")
-
-    # pip download
-    pip_dir = out_dir / "python-deps"
-    pip_dir.mkdir(parents=True, exist_ok=True)
-    if not _pip_download(pip_dir, wheel_platform):
-        failed.append("pip-download")
 
     # infra 파일
     _copy_infra(out_dir, manifest.version)
@@ -1921,11 +1716,6 @@ def main() -> int:
              "담지 않으면 빌드 중단(번들↔prod parity). 릴리스마다 갱신.",
     )
     ap.add_argument(
-        "--wheel-platform", default=_DEFAULT_WHEEL_PLATFORM,
-        help=f"pip download 타깃 플랫폼(기본 {_DEFAULT_WHEEL_PLATFORM}=Linux). "
-             "빈 문자열이면 빌드 호스트 플랫폼(win/mac wheel 위험 — 비권장).",
-    )
-    ap.add_argument(
         "--readiness", default="reports/operational_readiness.json",
         help="실 빌드 직전 release-gate가 검사할 readiness 리포트 경로(fail-closed).",
     )
@@ -1992,7 +1782,7 @@ def main() -> int:
 
     out_dir = Path(args.output)
 
-    # 위생 가드 — 예전(ES시대) 번들 위 재빌드 시 stale tar/win wheel 이 실려나가는 것 차단.
+    # 위생 가드 — 예전(ES시대) 번들 위 재빌드 시 stale tar/정본에서 뺀 산출물이 실려나가는 것 차단.
     hygiene = check_bundle_hygiene(out_dir, manifest)
     if hygiene:
         print("\n[bundle][FATAL] 번들 위생 위반(예전 산출물 잔존 의심):", file=sys.stderr)
@@ -2009,9 +1799,6 @@ def main() -> int:
         print_checklist(manifest)
         print(f"\n[bundle] dry-run OK -> {paths['yaml']}", file=sys.stderr)
         return 0
-
-    # ── [빌드 전제] 환경마커 평가기 — 없으면 조용히 깨진 wheel 목록이 나온다 ──
-    _require_packaging_for_markers()
 
     # ── [증거 정합] readiness 리포트가 '이 번들에 실린 모델'을 설명하는가 ──────
     # release-gate 는 verdict(PASS/CONDITIONALLY_READY)만 본다. 그래서 **다른 모델로 만든 낡은
@@ -2049,7 +1836,6 @@ def main() -> int:
     # ── 실 빌드 ──────────────────────────────────────────────
     rc = build_bundle(
         manifest, out_dir,
-        wheel_platform=args.wheel_platform,
         stage_embedder=not args.skip_embedder,
     )
     if rc == 0:

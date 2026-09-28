@@ -670,6 +670,9 @@ jobs:
             --dry-run \
             --output dist/koipa-airgap-bundle
 
+      - name: Deploy manifest check (배포 정본 ↔ 이미지 scripts·Dockerfile COPY·.dockerignore)
+        run: python scripts/check_deploy_manifest.py
+
       - name: Upload PoC reports
         if: always()
         uses: actions/upload-artifact@v4

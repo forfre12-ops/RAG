@@ -15,7 +15,7 @@ UV ?= $(PY) -m uv
 
 .PHONY: help venv install env lock lock-check infra-up infra-down infra-verify api worker beat \
         revalidate-pg-up revalidate-pg-migrate revalidate-pg-bench revalidate-pg-down revalidate-tsrank-crux \
-        p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
+        p2 p2-full bundle-dry deploy-manifest-check licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 acceptance-pack acceptance-pack-deps acceptance-test pilot-scorecard pilot-verify poc-all clean clean-data reports test-lite-cov \
         perf-scenarios perf-scenarios-full perf-clean-run \
         gold-set retrieval-gold check-data check-gold check-leakage check-patent-proxy check-release-evidence check-parser-support openapi-consistency check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-gate-recalculate release-manifest \
@@ -119,6 +119,12 @@ p3-800:
 bundle-dry:
 	$(PY) scripts/build_offline_bundle.py --version 1.0.0-rc1 --dry-run \
 	    --output dist/koipa-airgap-bundle
+	@$(MAKE) -s deploy-manifest-check
+
+# 배포 정본(deploy_manifest.toml) ↔ 이미지 scripts 허용 목록·Dockerfile COPY·.dockerignore 대조.
+# 만들어진 번들을 검사하려면: $(PY) scripts/check_deploy_manifest.py --bundle <번들 폴더>
+deploy-manifest-check:
+	$(PY) scripts/check_deploy_manifest.py
 
 licenses:
 	$(PY) scripts/dump_licenses.py --output licenses/

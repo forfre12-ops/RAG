@@ -71,3 +71,8 @@ node_modules/
 **/*.log
 **/node_modules/
 **/*.bak
+
+# ── 이미지 미사용 경로(정본 container.exclude_paths) ──
+# BEGIN deploy_manifest:exclude_paths — 자동 생성(scripts/check_deploy_manifest.py --write)
+src/koipa/api/static/samples/
+# END deploy_manifest:exclude_paths

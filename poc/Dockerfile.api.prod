@@ -41,7 +41,37 @@ WORKDIR /app
 # (scripts/docker_install_locked.sh 주석 참조).
 COPY pyproject.toml uv.lock ./
 COPY src ./src
-COPY scripts ./scripts
+# BEGIN deploy_manifest:container_scripts — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
+# 이미지에는 정본(deploy_manifest.toml)의 container.scripts.allow 만 싣는다.
+COPY scripts/_cli_io.py \
+     scripts/analyze_golden_run.py \
+     scripts/backup_postgres.py \
+     scripts/calibrate_classifier.py \
+     scripts/check_domain_leakage_gate.py \
+     scripts/compare_proxy_models.py \
+     scripts/db_engine.py \
+     scripts/demo_e2e_8010.py \
+     scripts/demo_e2e_golden.py \
+     scripts/docker_install_locked.sh \
+     scripts/dr_discovery.py \
+     scripts/dr_drill.py \
+     scripts/dr_restore.py \
+     scripts/eval_p1_model_gold.py \
+     scripts/eval_real_public_fpr.py \
+     scripts/eval_seal.py \
+     scripts/evaluate_public_s3_challenge.py \
+     scripts/gate_p1_candidate.py \
+     scripts/import_review_corrections.py \
+     scripts/p5_e2e_smoke.py \
+     scripts/probe_ingest_capacity.py \
+     scripts/promote_golden_candidates.py \
+     scripts/register_deployed_model.py \
+     scripts/register_review_signoff_job.py \
+     scripts/setup_console_test_login.py \
+     scripts/verify_deploy_live.sh \
+     scripts/verify_infra.py \
+     ./scripts/
+# END deploy_manifest:container_scripts
 COPY alembic ./alembic
 COPY alembic.ini ./
 # [2026-09-24 발견] evidence/ 를 여태 안 실었다 — console_signoff._EXCLUSIONS 가 런타임에

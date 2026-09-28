@@ -75,14 +75,14 @@ docker image inspect koipa-api:$IMAGE_TAG koipa-worker:$IMAGE_TAG >/dev/null
     --version 1.0.0-rc1 --dry-run \
     --classifier-model-dir artifacts/<VERSION>
 
-# 실제 빌드(docker save + pip download + 가중치/temperature.json 동봉)
+# 실제 빌드(docker save + 가중치/temperature.json 동봉)
 .venv/Scripts/python.exe scripts/build_offline_bundle.py \
     --version 1.0.0-rc1 \
     --classifier-model-dir artifacts/<VERSION>
 ```
 - **`--version` 값 = 고객사 `.env`의 `IMAGE_TAG`.** 빌더는 이미지를 `koipa-api:<version>`으로 태깅하고 airgap compose 기본값은 `${IMAGE_TAG:-1.0.0-rc1}`이다. `--version`과 INSTALL.md §4의 `IMAGE_TAG`가 **다르면** compose가 없는 태그를 참조해 `image not found`로 기동 실패한다. 한 문자열로 고정할 것(여기선 `1.0.0-rc1`).
 - `--classifier-model-dir` **미지정 시** env `CLASSIFIER_MODEL_DIR`/`KOIPA_CLASSIFIER_MODEL_DIR` 사용. **셋 다 없으면 베이스 모델만 번들 → 고객사에서 rule-fallback(분류기 미탑재)**. 반드시 지정·확인.
-- 출력: `dist/koipa-airgap-bundle/` (`docker-images/*.tar`, `python-deps/wheels/`, `models/classifier-trained/`(+temperature.json), `models/hf/`(KURE-v1 등), `db-migrations/alembic/`, `infra-config/docker-compose.airgap.yml`, `.env.template`, `install.sh`, `verify.sh`, `CHECKSUMS.sha256`).
+- 출력: `dist/koipa-airgap-bundle/` (`docker-images/*.tar`, `models/classifier-trained/`(+temperature.json), `models/hf/`(KURE-v1 등), `infra-config/docker-compose.airgap.yml`, `.env.template`, `install.sh`, `verify.sh`, `CHECKSUMS.sha256`).
 - 파싱 기준 compose는 `docker-compose.airgap.yml`(기본) — dev compose(build:/minio/mlflow 잔존)로 빌드하지 말 것.
 
 ### A4. 무결성 + 릴리스 사인오프

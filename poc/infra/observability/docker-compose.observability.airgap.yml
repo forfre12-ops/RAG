@@ -1,6 +1,6 @@
 name: koipa-obs
 
-# 관측성 스택 (폐쇄망/airgap 전용) — Prometheus + Grafana + Loki + Promtail + exporters.
+# 관측성 스택 (폐쇄망/airgap 전용) — Prometheus + Grafana + Loki + Promtail + postgres-exporter.
 # ─────────────────────────────────────────────────────────────────────────────
 # dev용 docker-compose.observability.yml 과의 차이:
 #   1) external network 를 koipa-airgap_default 로 조인(dev 는 koipa-poc_default).
@@ -88,14 +88,6 @@ services:
       DATA_SOURCE_NAME: "postgresql://koipa:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/koipa?sslmode=disable"
     ports:
       - "127.0.0.1:9187:9187"
-    networks: [default]
-
-  redis-exporter:
-    image: oliver006/redis_exporter:v1.66.0
-    command:
-      - --redis.addr=redis://redis:6379
-    ports:
-      - "127.0.0.1:9121:9121"
     networks: [default]
 
 volumes:
