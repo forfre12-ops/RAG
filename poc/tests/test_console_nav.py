@@ -41,8 +41,8 @@ def _labels(html: str) -> list[str]:
 
 def test_link_list_is_not_empty():
     # [2026-08-24] 3 → 2. 「검증문서 후보 관리」를 메뉴에서 뺐다(console_nav 주석 참조).
-    # 하한을 2 로 둔다 — 남은 둘(관리자 콘솔·등급 시연)은 화면의 종류를 가르는 축이라
-    # 그보다 줄면 메뉴가 화면 사이 이동 수단으로서 뜻을 잃는다.
+    # 하한을 2 로 둔다 — 남은 둘(관리자 콘솔·업로드·분류 테스트, 2026-09-29 개명)은 화면의 종류를
+    # 가르는 축이라 그보다 줄면 메뉴가 화면 사이 이동 수단으로서 뜻을 잃는다.
     assert len(CONSOLE_LINKS) >= 2, CONSOLE_LINKS
     for key, label, href in CONSOLE_LINKS:
         assert key and label and href.startswith("/"), (key, label, href)

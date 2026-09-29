@@ -16,50 +16,10 @@ function isOpen(page) {
 }
 
 export const scenarios = [
-  {
-    id: 'upload.progress.admin-stays-open-until-done',
-    writes: true,
-    needsMock: true,
-    title: '관리자 콘솔 — 업로드가 도는 동안 진행 팝업이 떠 있고, 끝나면 닫힌다',
-    why: '종전에는 인라인 글씨 한 줄뿐이라 멈춘 것과 구분이 안 됐다',
-    async run({ server, check }) {
-      const page = await openPage(server, '/console/admin.html');
-      await page.settle();
-      server.faults.push({ path: '/documents/analyze', delayMs: 600 });
-
-      page.attachFile('cl-file', { name: '대용량 기술자료.pdf' });
-      page.click('btn-extract');
-      check.eq(isOpen(page), true, '요청이 나가는 즉시 팝업이 뜬다');
-      check.includes(page.text('ap-file'), '대용량 기술자료.pdf', '어느 파일인지 팝업에 적힌다');
-
-      await page.settle();
-      check.eq(isOpen(page), false, '끝나면 팝업이 닫힌다');
-      assertNoScriptErrors(check, page);
-      return page;
-    },
-  },
-
-  {
-    id: 'upload.progress.admin-closes-on-failure',
-    writes: true,
-    needsMock: true,
-    title: '관리자 콘솔 — 업로드가 실패해도 진행 팝업은 닫힌다',
-    why: '오버레이가 남으면 화면 전체가 잠겨 아무것도 누를 수 없게 된다',
-    async run({ server, check }) {
-      const page = await openPage(server, '/console/admin.html');
-      await page.settle();
-      server.faults.push({ path: '/documents/analyze', status: 500, body: { detail: 'boom' } });
-
-      page.attachFile('cl-file', { name: '깨진문서.pdf' });
-      page.click('btn-extract');
-      await page.settle();
-
-      check.eq(isOpen(page), false, '실패해도 팝업이 닫힌다');
-      check.includes(page.html('cl-file-info'), '추출 실패', '실패 사유는 화면에 남는다');
-      assertNoScriptErrors(check, page);
-      return page;
-    },
-  },
+  /* [2026-09-29] 'upload.progress.admin-stays-open-until-done' ·
+     'upload.progress.admin-closes-on-failure' 를 뺐다 — 벡터(cl-file/btn-extract, 분류 실행
+     카드)를 콘솔에서 뺐다. 관리자 콘솔에는 이제 업로드 표면이 없다 — 같은 UploadProgress
+     컴포넌트는 아래 demo·manage 시나리오가 계속 검증한다. */
 
   {
     id: 'upload.progress.demo-stays-open-until-done',

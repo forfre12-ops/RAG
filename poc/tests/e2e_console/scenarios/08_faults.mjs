@@ -8,7 +8,6 @@
 import { openPage } from '../lib/page.mjs';
 
 const CLICKS = [
-  ['검수 큐', 'button[onclick="loadReviewQueue()"]', 'ops'],
   ['관제 종합', 'button[onclick="loadDashboard()"]', 'ops'],
   ['감사 로그', 'button[onclick="loadAuditLog()"]', 'ops'],
   ['검증문서 현황', 'button[onclick="loadGoldenStatus()"]', 'review'],
@@ -46,7 +45,6 @@ export const scenarios = [
 
       // 로그창 밖(각 카드 자리)에도 남는가 — 접힌 로그만으로는 사용자가 못 본다
       const inCard = {
-        '검수 큐': page.text('rq-info') + page.text('queue'),
         '관제 종합': page.text('dash-grid'),
         '감사 로그': page.text('au-body'),
         '검증문서 현황': page.text('gs-body'),
@@ -105,25 +103,26 @@ export const scenarios = [
   {
     id: 'fault.network.disconnect',
     title: '연결이 끊기면 네트워크 오류라고 말하고 화면이 죽지 않는다',
+    // [2026-09-29] 종전 벡터(cl-body/btn-classify)를 콘솔에서 뺐다 — 같은 성격의 검증을
+    // 여전히 있는 관제 대시보드 조회로 옮겼다(cl-* 흐름 자체는 index.html 쪽에서 다룬다).
     needsMock: true,
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      server.faults.push({ path: '/classify', abort: true });
+      server.faults.push({ path: '/admin/dashboard', abort: true });
 
-      page.set('cl-body', '본문');
-      page.click('btn-classify');
+      page.click(page.q('.tab[data-tab="ops"]'));
+      page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
 
       check.includes(page.logLines('err').join(' '), '네트워크 오류', '네트워크 오류라고 말한다');
-      check.ok(page.text('cl-result').length > 0, '결과 자리에도 실패가 남는다', page.text('cl-result'));
-      check.eq(page.$('btn-classify')?.disabled, false, '버튼이 잠긴 채 남지 않는다');
+      check.matches(page.text('dash-grid'), /실패|오류/, '카드 자리에도 실패가 남는다', page.text('dash-grid'));
 
       // 끊긴 뒤에도 다음 조작이 된다
       server.faults.length = 0;
-      page.click('btn-classify');
+      page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
-      check.includes(page.html('cl-result'), 'S1', '연결이 돌아오면 다시 동작한다');
+      check.ok(!/실패|오류/.test(page.text('dash-grid')), '연결이 돌아오면 다시 동작한다', page.text('dash-grid'));
       return page;
     },
   },
@@ -132,52 +131,33 @@ export const scenarios = [
     id: 'fault.html-instead-of-json',
     title: 'JSON 자리에 HTML 오류 페이지가 와도 화면이 무너지지 않는다',
     why: '역프록시가 502 를 HTML 로 돌려주는 흔한 상황이다 — JSON.parse 가 던지면 그 뒤가 다 멈춘다',
+    // [2026-09-29] 종전 벡터(검수 큐)를 콘솔에서 뺐다 — 같은 성격의 검증을 관제 대시보드로 옮겼다.
     needsMock: true,
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      server.faults.push({ path: '/review-queue', status: 502, raw: '<html><head><title>502 Bad Gateway</title></head><body><h1>502</h1></body></html>' });
+      server.faults.push({ path: '/admin/dashboard', status: 502, raw: '<html><head><title>502 Bad Gateway</title></head><body><h1>502</h1></body></html>' });
 
       page.click(page.q('.tab[data-tab="ops"]'));
-      page.click(page.q('button[onclick="loadReviewQueue()"]'));
+      page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
 
       check.eq(page.errors.length, 0, '스크립트가 죽지 않았다', page.errors.map((e) => e.message).join(' | '));
       check.includes(page.logLines('err').join(' '), '502', '502 라고 로그에 남는다');
       // 화면이 계속 쓸 수 있는 상태여야 한다
       server.faults.length = 0;
-      page.click(page.q('button[onclick="loadReviewQueue()"]'));
+      page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
-      check.eq(page.qa('#queue .q-item').length, 3, '그 다음 조회는 정상으로 그려진다');
+      check.ok(!/실패|오류|502/.test(page.text('dash-grid')), '그 다음 조회는 정상으로 그려진다', page.text('dash-grid'));
       return page;
     },
   },
 
-  {
-    id: 'fault.slow.button-locked-while-running',
-    title: '응답이 느린 동안 같은 버튼이 두 번 눌리지 않는다',
-    why: '중복 제출은 학습·활성화 같은 비가역 동작에서 실제 사고가 된다',
-    needsMock: true,
-    async run({ server, check }) {
-      const page = await openPage(server, '/console/admin.html');
-      await page.settle();
-      server.faults.push({ path: '/classify', delayMs: 600 });
-
-      page.set('cl-body', '본문');
-      page.click('btn-classify');
-      check.eq(page.$('btn-classify')?.disabled, true, '요청 중에는 버튼이 잠긴다');
-      check.includes(page.text('btn-classify'), '분류 중', '진행 중이라고 문구가 바뀐다');
-
-      let second = null;
-      try { page.click('btn-classify'); } catch (e) { second = e.message; }
-      check.ok(second && second.includes('비활성'), '두 번째 클릭이 막힌다');
-
-      await page.settle(3000);
-      check.eq(server.countCalls('POST', '/classify'), 1, '요청은 한 번만 나갔다');
-      check.eq(page.$('btn-classify')?.disabled, false, '끝나면 다시 눌린다');
-      return page;
-    },
-  },
+  /* [2026-09-29] 'fault.slow.button-locked-while-running' 을 뺐다 — 벡터였던 cl-body/btn-classify
+     (분류 실행 카드)를 콘솔에서 뺐다. 같은 이중클릭 잠금 패턴을 admin.html 의 다른 쓰기 버튼
+     (재학습 제출·모델 리로드 등)에서는 못 찾았다(disabled/busy-text 로직이 없음) — 이 카드만의
+     구현이었다. index.html 의 btn-classify(SSE 경로)로 옮겨 다시 만드는 게 정확하겠으나
+     아직 안 했다 — 알려진 커버리지 공백. */
 
   {
     id: 'fault.autorefresh.stop-during-inflight',
@@ -218,9 +198,9 @@ export const scenarios = [
 
       // 헬스가 죽어도 다른 조회는 된다
       page.click(page.q('.tab[data-tab="ops"]'));
-      page.click(page.q('button[onclick="loadReviewQueue()"]'));
+      page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
-      check.eq(page.qa('#queue .q-item').length, 3, '검수 큐는 정상으로 그려진다');
+      check.ok(!/실패|오류/.test(page.text('dash-grid')), '관제 대시보드는 정상으로 그려진다', page.text('dash-grid'));
       check.eq(page.errors.length, 0, '스크립트 오류가 나지 않는다', page.errors.map((e) => e.message).join(' | '));
       return page;
     },

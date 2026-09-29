@@ -8,24 +8,10 @@
 import { openPage } from '../lib/page.mjs';
 import { assertNoScriptErrors } from '../lib/expect.mjs';
 
-/* 쓰기 동작 전수 — 이름 · 누를 것 · 사전 준비 · 나가면 안 되는 요청 */
+/* 쓰기 동작 전수 — 이름 · 누를 것 · 사전 준비 · 나가면 안 되는 요청
+ * [2026-09-29] '확정'·'재라벨'을 뺐다 — 그 UI(검수 큐 카드)를 콘솔에서 뺐다(실고객 문서
+ * 검수·확정은 이제 KL 포털의 몫). POST /confirm·/relabel 은 더 이상 이 콘솔에서 누를 수 없다. */
 const WRITES = [
-  {
-    name: '확정', pane: 'ops', endpoint: 'POST /confirm',
-    async setup(page) {
-      page.click(page.q('button[onclick="loadReviewQueue()"]'));
-      await page.settle();
-    },
-    press: (page) => page.q('#queue button[onclick="doConfirm(0)"]'),
-  },
-  {
-    name: '재라벨', pane: 'ops', endpoint: 'POST /relabel',
-    async setup(page) {
-      page.click(page.q('button[onclick="loadReviewQueue()"]'));
-      await page.settle();
-    },
-    press: (page) => page.q('#queue button[onclick="doRelabel(0)"]'),
-  },
   { name: '재학습 제출', pane: 'train', endpoint: 'POST /train', press: (p) => p.q('button[onclick="submitTrain()"]') },
   { name: '모델 핫리로드', pane: 'train', endpoint: 'POST /admin/model/reload', press: (p) => p.q('button[onclick="reloadModel()"]') },
   {
@@ -123,12 +109,9 @@ export const scenarios = [
       page.check('cfg-write-enable', false);
 
       page.click(page.q('.tab[data-tab="ops"]'));
-      page.click(page.q('button[onclick="loadReviewQueue()"]'));
       page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
-      check.ok(server.lastCall('GET', '/review-queue'), '검수 큐 조회는 된다');
       check.ok(server.lastCall('GET', '/admin/dashboard'), '관제 조회는 된다');
-      check.data.eq(page.qa('#queue .q-item').length, 3, '목록이 정상으로 그려진다');
       return page;
     },
   },
@@ -207,24 +190,9 @@ export const scenarios = [
 
       check.ok(!page.$('gate'), '화면 임계 입력칸이 없다');
       check.ok(!page.$('srv-gate-v'), '읽기 전용 서버 임계 표시도 없다');
-
-      // 신뢰도가 높아도 서버가 needs_review 라고 하면 화면은 「검수」로 말해야 한다.
-      server.overrides['POST /classify'] = {
-        inference_id: '00000000-0000-4000-8000-0000000000aa',
-        doc_id: 'gate-test-1', label: 'S2', confidence: 0.98, scores: {},
-        model_version: 'v-test', elapsed_ms: 12,
-        status: 'needs_review',
-        warnings: ['agreement-gate: rule S1 vs model S2'],
-      };
-      page.click(page.q('.tab[data-tab="ops"]'));
-      page.set('cl-docid', 'gate-test-1');
-      page.set('cl-body', '판정 대상 본문');
-      page.click(page.$('btn-classify'));
-      await page.settle();
-
-      check.includes(page.text('cl-result'), '검수 필요',
-        '신뢰도 98% 여도 서버가 needs_review 면 「검수 필요」로 말한다');
-      check.includes(page.text('queue'), '검수', '큐 배지도 서버 판정을 따른다');
+      // [2026-09-29] "신뢰도가 높아도 서버가 needs_review 면 화면이 「검수」로 말한다"는
+      // 재검증은 뺐다 — 그 카드(cl-*)를 콘솔에서 뺐다. 같은 성격의 검증은 이제
+      // 11_demo.mjs(demo.classify.escalation-explained 등, index.html)가 맡는다.
       return page;
     },
   },
@@ -233,25 +201,21 @@ export const scenarios = [
     id: 'safety.actor.identity-on-every-write',
     writes: true,
     title: '상태를 바꾸는 요청에는 행위자가 반드시 실린다',
-    why: '행위자 없이 나가면 감사 로그에 신원이 안 남는다 — 감리의 핵심 항목이다',
+    why: '행위자 없이 나가면 감사 로그에 신원이 안 남는다 — 감리의 핵심 항목이다. '
+       + '[2026-09-29] 종전에는 POST /confirm 도 같이 봤으나, 그 UI(검수 큐 카드)를 콘솔에서 뺐다 — '
+       + '남은 예시(키워드 추가) 하나로 같은 계약(actor.user_id·role·X-Actor-Role 헤더)을 확인한다.',
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
       page.set('cfg-user', '검수자홍길동');
       page.set('cfg-role', 'reviewer');
 
-      page.click(page.q('.tab[data-tab="ops"]'));
-      page.click(page.q('button[onclick="loadReviewQueue()"]'));
-      await page.settle();
-      page.click(page.q('#queue button[onclick="doConfirm(0)"]'));
-      await page.settle();
-
       page.click(page.q('.tab[data-tab="config"]'));
       page.set('kw-n-keyword', '신규키워드');
       page.click(page.q('button[onclick="createKeyword()"]'));
       await page.settle();
 
-      for (const [m, p] of [['POST', '/confirm'], ['POST', '/admin/keywords']]) {
+      for (const [m, p] of [['POST', '/admin/keywords']]) {
         const c = server.lastCall(m, p);
         check.eq(c?.body?.actor?.user_id, '검수자홍길동', `${p}: 행위자 이름이 실렸다`);
         check.eq(c?.body?.actor?.role, 'reviewer', `${p}: 행위자 역할이 실렸다`);

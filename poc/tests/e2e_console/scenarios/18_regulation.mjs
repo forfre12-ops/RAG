@@ -24,7 +24,6 @@ const C1 = 'c1c1c1c1-0000-4000-8000-000000000001';
 const C3 = 'c1c1c1c1-0000-4000-8000-000000000003';
 const DOC1 = 'd0d0d0d0-0000-4000-8000-000000000001';
 const DOC2 = 'd0d0d0d0-0000-4000-8000-000000000002';
-const DOC3 = 'd0d0d0d0-0000-4000-8000-000000000003';
 
 const SENT1 = '① 극비 문서는 사전 승인 없이 사외로 반출할 수 없다.';
 
@@ -52,20 +51,8 @@ const EVID = (doc, sentences = [SENT1], over = {}) => ({
   ...over,
 });
 const EMPTY = (doc, reason = 'below_floor') => ({ doc_id: doc, indexed: true, reason, items: [] });
-const evFault = (doc, body, status) => ({
-  path: new RegExp(`/documents/${doc}/regulation-evidence`), ...(status ? { status } : {}), body,
-});
-
-const QITEM = (n, doc, over = {}) => ({
-  classification_id: `aaaaaaaa-0000-4000-8000-00000000000${n}`,
-  doc_id: doc, filename: `검수 문서 ${n}.docx`, grade: 'S2',
-  confidence: 0.63, model_version: 'v-fe4b386b', status: 'needs_review', classified_at: '2026-09-20T01:00:00Z',
-  text_preview: `검수 본문 미리보기 ${n}`, review_reason: 'low_confidence', score_margin: 0.11, ...over,
-});
-/** 검수 대기·확정 대기 조회가 같은 목록을 받는다 — 확정 대기는 그중 status 가 staging 인 것만 그린다. */
-function withQueue(server, items) {
-  server.overrides['GET /review-queue'] = { items, total: items.length, limit: 50, offset: 0, warnings: [] };
-}
+// [2026-09-29] evFault·QITEM·withQueue(검수 큐 조회 벡터)를 뺐다 — 그 UI(검수 큐·확정 대기의
+// 「왜 이 등급인가?」 패널)를 콘솔에서 뺐다(위 두 시나리오 제거 자리 참고).
 
 const calls = (server, method, prefix) => server.calls.filter((c) => c.method === method && c.path.startsWith(prefix));
 const selectBtn = (page, id) => page.q(`button[onclick="selectRegulation('${id}')"]`);
@@ -123,12 +110,13 @@ export const scenarios = [
     title: '규정 기능이 없는 서버(404)·볼 권한이 없는 사용자(403)에게는 카드도 검수 블록도 없고 오류 줄도 남지 않는다',
     why: '꺼진 서버에서 정상인 404 가 요청 로그에 오류로 쌓이면 운영자는 매번 고장으로 읽는다. '
        + '검수 화면은 문서를 펼칠 때마다 조회를 보내지도 않아야 한다',
+    // [2026-09-29] "펼쳐도 규정을 조회하지 않는다" 절을 뺐다 — 그 펼침 패널(검수 큐의 toggleWhy)을
+    // 콘솔에서 뺐다. 실제 문서 검수 중 규정참고 표시는 이제 KL 포털이 GET .../regulation-evidence 를
+    // 직접 불러 그린다(우리 콘솔 몫이 아니다) — 카드 숨김 자체는 여전히 우리 설정 탭의 몫이라 남긴다.
     async run({ server, check }) {
       for (const [status, detail] of [[404, 'Not Found'], [403, 'Forbidden']]) {
         server.reset();
-        withQueue(server, [QITEM(1, DOC1)]);
         server.faults.push({ path: '/regulations', method: 'GET', status, body: { detail } });
-        server.faults.push(evFault(DOC1, EVID(DOC1)));
         const page = await openPage(server, '/console/admin.html');
         await page.settle();
 
@@ -137,12 +125,6 @@ export const scenarios = [
         check.ok(!page.visible('reg-card'), `${status}: 설정 탭을 열어도 카드가 보이지 않는다`);
         check.includes(page.text('pane-note'), '등급 체계와 태깅 규칙입니다', `${status}: 탭 안내문은 그대로다`);
         check.excludes(page.text('pane-note'), '사내 규정', `${status}: 없는 기능을 안내문에 적지 않는다`);
-
-        page.click(page.q('.tab[data-tab="ops"]'));
-        page.click(page.q('#queue button[onclick="toggleWhy(0)"]'));
-        await page.settle();
-        check.eq(calls(server, 'GET', `/documents/${DOC1}/regulation-evidence`).length, 0, `${status}: 문서를 펼쳐도 관련 규정 조회를 보내지 않는다`);
-        check.eq(page.qa('#why-0 .reg-ref').length, 0, `${status}: 검수 화면에 규정 블록 자리도 만들지 않는다`);
         check.eq(page.logLines('err').filter((l) => l.includes('/regulations')).length, 0, `${status}: 요청 로그에 규정 오류 줄이 없다`);
         assertNoScriptErrors(check, page);
         page.close();
@@ -184,8 +166,10 @@ export const scenarios = [
       check.ok(!page.q(`button[onclick="deleteRegulation('${REG1}')"]`), '사용 중인 규정에는 삭제 버튼이 없다');
 
       // 입력칸 — 전부 요청에 쓰인다(다른 시나리오가 실제 전송을 본다)
+      // [2026-09-29 정정] reg-llm-toggle·reg-runtime-toggle(런타임 스위치 체크박스 2개, 208d202f)이
+      // 빠져 있었다 — 이 시험이 그 커밋 이후로 갱신된 적이 없었다(오늘 콘솔 분리 작업과는 무관).
       const ids = page.qa('#reg-card input').map((e) => e.id).sort();
-      check.eq(ids.join(','), 'reg-date,reg-file,reg-name,reg-scope-note,reg-scope-ok,reg-ver', '입력칸은 규정명·판·시행일·파일과 활성화 확인 둘뿐이다');
+      check.eq(ids.join(','), 'reg-date,reg-file,reg-llm-toggle,reg-name,reg-runtime-toggle,reg-scope-note,reg-scope-ok,reg-ver', '입력칸은 규정명·판·시행일·파일·활성화 확인·런타임 스위치 2개뿐이다');
       check.eq(page.dialogs.filter((d) => d.kind === 'prompt').length, 0, '프롬프트 창이 뜨지 않는다');
 
       const vis = visibleText(page);
@@ -526,12 +510,23 @@ export const scenarios = [
     needsMock: true,
     title: '「미리보기」는 화면에 올라온 저장된 문서만(중복 없이) 보내고, 문서마다 규정 문장이나 표시하지 않은 이유를 보인다',
     why: '규정이 문서에 적용되는지는 점수로 가를 수 없어 활성화 전에 사람이 결과를 보고 정한다. 붙여넣은 본문처럼 저장되지 않은 문서는 조회할 수 없다',
+    // [2026-09-29] 이 목록의 공급원이던 검수 큐 카드를 콘솔에서 뺐다 — QUEUE 는 이제 항상 빈
+    // 배열이라 loadReviewQueue() 로 채울 수 없다(admin.html regPreviewDocs 주석 참고). 알려진
+    // 한계로 남긴 수동 경로(QUEUE.push)를 이 시험도 그대로 쓴다 — 렌더링 자체는 아직 살아 있다.
     async run({ server, check }) {
-      withQueue(server, [QITEM(1, DOC1), QITEM(2, DOC2), QITEM(3, DOC1), QITEM(4, 'NOT-A-UUID')]);
       server.overrides['POST /regulations/{reg_id}/preview'] = { reg_id: REG2, results: [
         EVID(DOC1), EMPTY(DOC2, 'below_floor')] };
       server.overrides['GET /regulations/{reg_id}'] = DETAIL(REG2, '개인정보 처리 지침', 'v1.0', 'ready');
       const page = await openConfig(server);
+      // regPreviewDocs() 는 QUEUE 항목의 title 만 읽는다(loadReviewQueue() 가 하던 매핑을 손으로 흉내).
+      // QUEUE 는 top-level let 이라 page.win.QUEUE 로는 안 닿는다(window 프로퍼티가 아니다) —
+      // win.eval 로 같은 전역 어휘 범위(script 들이 공유하는 영역)에서 직접 push 한다.
+      page.win.eval(`QUEUE.push(
+        { doc_id: '${DOC1}', title: '검수 문서 1.docx' },
+        { doc_id: '${DOC2}', title: '검수 문서 2.docx' },
+        { doc_id: '${DOC1}', title: '검수 문서 1.docx' },
+        { doc_id: 'NOT-A-UUID', title: 'x' }
+      )`);
       await choose(page, REG2);
       page.click(page.q('button[onclick="previewRegulation()"]'));
       await page.settle();
@@ -559,118 +554,19 @@ export const scenarios = [
       await p2.settle();
       check.eq(calls(server, 'POST', `/regulations/${REG2}/preview`).length, 0, '미리볼 문서가 없으면 요청이 나가지 않는다');
       check.includes(p2.text('reg-preview'), '미리볼 문서가 없습니다', '이유와 다음에 할 일을 말한다');
-      check.includes(p2.text('reg-preview'), '검토할 문서 보기', '다음에 할 일이 버튼 이름이다');
+      check.includes(p2.text('reg-preview'), '더 이상 자동으로 채워지지 않습니다', '자동으로 안 채워지는 이유를 말한다');
       return p2;
     },
   },
 
-  {
-    id: 'regulation.review.block-under-why-in-both-lists',
-    needsMock: true,
-    title: '「왜 이 등급인가?」를 펼치면 관련 규정 원문이 참고 문구와 함께 붙는다 — 검수 대기·확정 대기 모두, 수치 없이',
-    why: '검수자가 문서 옆에서 규정 원문을 바로 보는 것이 이 기능의 목적이다. 등급 판정 근거로 오해되지 않게 고정 문구가 붙고, '
-       + '점수·유사도는 서버가 주지도 화면이 그리지도 않는다',
-    async run({ server, check }) {
-      withQueue(server, [QITEM(1, DOC1), QITEM(2, DOC2, { status: 'staging', grade: 'S3' })]);
-      server.faults.push(evFault(DOC1, EVID(DOC1)));
-      server.faults.push(evFault(DOC2, EVID(DOC2, ['① 공개 자료는 별도 승인 없이 게시할 수 있다.', '② 게시 전에 담당 부서가 확인한다.'])));
-      const page = await openPage(server, '/console/admin.html');
-      await page.settle();
-      check.eq(calls(server, 'GET', '/documents/').length, 0, '펼치기 전에는 관련 규정을 조회하지 않는다(펼칠 때 읽는다)');
-
-      const why0 = page.q('#queue button[onclick="toggleWhy(0)"]');
-      page.click(why0);
-      await page.settle();
-      const ev1 = server.anyCall('GET', `/documents/${DOC1}/regulation-evidence`);
-      check.ok(ev1, '펼치자 그 문서의 관련 규정을 조회했다');
-      check.ok(server.anyCall('GET', '/review-queue/11111111') || server.anyCall('GET', '/review-queue/aaaaaaaa'), '기존 근거 조회는 그대로 나간다');
-      const block = page.q('#why-0 .reg-ref');
-      check.ok(block && page.visible(block), '관련 규정 블록이 근거 상자 안에 보인다');
-      const bt = page.text(block);
-      check.includes(bt, '관련 규정(참고)', '제목');
-      check.includes(bt, '문서보안 규정 v3.1 · 제12조(극비 문서의 취급)', '규정명·판·조항 번호와 제목');
-      check.includes(bt, SENT1, '규정 원문 문장이 그대로 나온다');
-      check.includes(bt, '이 내용은 참고용이며 등급 판정 근거가 아닙니다.', '참고용이라는 고정 문구');
-      check.ok(!NUMBERISH.test(bt), '점수·유사도·퍼센트 수치가 없다', bt);
-      check.ok(page.text('why-0').indexOf('판정') < page.text('why-0').indexOf('관련 규정(참고)'), '기존 근거 다음에 붙는다(그 위가 아니다)');
-
-      // 접었다 다시 펼쳐도 다시 조회하지 않는다
-      page.click(why0);
-      page.click(why0);
-      await page.settle();
-      check.eq(calls(server, 'GET', `/documents/${DOC1}/regulation-evidence`).length, 1, '같은 문서를 다시 펼쳐도 조회는 한 번이다');
-      check.includes(page.text(page.q('#why-0 .reg-ref')), SENT1, '다시 펼쳐도 블록이 그대로 있다');
-
-      // 확정 대기 목록도 같다 — 등급별 목록은 문장이 여러 줄로 나온다
-      page.click(page.q('#stg-queue button[onclick^="toggleWhyStaging("]'));
-      await page.settle();
-      const sb = page.q('#stg-queue .why-box .reg-ref');
-      check.ok(sb && page.visible(sb), '확정 대기 목록에도 블록이 붙는다');
-      check.includes(page.text(sb), '① 공개 자료는 별도 승인 없이 게시할 수 있다.', '첫 문장');
-      check.includes(page.text(sb), '② 게시 전에 담당 부서가 확인한다.', '나머지 문장도 순서대로 나온다');
-      check.includes(page.text(sb), '이 내용은 참고용이며 등급 판정 근거가 아닙니다.', '확정 대기에도 같은 고정 문구');
-      check.eq(page.qa('#queue .why-box .reg-ref').length + page.qa('#stg-queue .why-box .reg-ref').length, 2, '펼친 두 곳에만 붙는다');
-
-      const vis = visibleText(page);
-      check.ok(FORBIDDEN.every(([s]) => !vis.includes(s)), '구현 정보 금지 문자열이 화면에 없다');
-      assertNoScriptErrors(check, page);
-      return page;
-    },
-  },
-
-  {
-    id: 'regulation.review.empty-and-failure-draw-nothing-or-a-muted-line',
-    needsMock: true,
-    title: '결과가 비면 블록을 그리지 않고(404·비어 있음·문서 미색인), 조회 기반이 없을 때(503)만 흐린 한 줄을 남긴다',
-    why: '「관련 규정 없음」이라고 적으면 규정에 그런 내용이 없다는 뜻으로 읽힌다 — 조회가 못 찾은 것일 뿐이다. '
-       + '그리고 이 조회의 실패가 검수 화면을 막으면 안 된다',
-    async run({ server, check }) {
-      withQueue(server, [QITEM(1, DOC1), QITEM(2, DOC2), QITEM(3, DOC3), QITEM(4, 'NOT-A-UUID'),
-        QITEM(5, 'd0d0d0d0-0000-4000-8000-000000000005')]);
-      server.faults.push(evFault(DOC1, EMPTY(DOC1, 'below_floor')));
-      server.faults.push(evFault(DOC2, { detail: 'document not found' }, 404));
-      server.faults.push(evFault(DOC3, { detail: '관련 규정을 조회할 수 없습니다: RuntimeError' }, 503));
-      server.faults.push(evFault('d0d0d0d0-0000-4000-8000-000000000005', { doc_id: 'x', indexed: false, reason: 'document_not_indexed', items: [] }));
-      const page = await openPage(server, '/console/admin.html');
-      await page.settle();
-
-      const open = async (i) => { page.click(page.q(`#queue button[onclick="toggleWhy(${i})"]`)); await page.settle(); };
-      const boxText = (i) => page.text(`why-${i}`);
-      const shown = (i) => { const b = page.q(`#why-${i} .reg-ref`); return !!b && page.visible(b); };
-
-      await open(0);
-      check.ok(!shown(0), '비어 있음 — 블록을 그리지 않는다');
-      check.excludes(boxText(0), '관련 규정', '비어 있음 — 「관련 규정 없음」 같은 문구도 없다');
-      check.includes(boxText(0), '판정', '비어 있어도 기존 근거는 그대로 나온다');
-
-      await open(1);
-      check.ok(!shown(1), '404 — 블록을 그리지 않는다');
-      check.excludes(boxText(1), '규정', '404 — 오류 문구도 없다');
-
-      await open(2);
-      check.ok(shown(2), '503 — 자리는 남는다');
-      check.includes(boxText(2), '규정 참고를 불러오지 못했습니다', '503 — 흐린 한 줄로 알린다');
-      check.excludes(boxText(2), 'RuntimeError', '503 — 서버 내부 이름을 화면에 옮기지 않는다');
-      check.includes(boxText(2), '판정', '503 이어도 기존 근거는 그대로 나온다');
-
-      await open(3);
-      check.eq(server.calls.filter((c) => c.path.includes('NOT-A-UUID')).length, 0, 'UUID 가 아닌 문서(저장되지 않은 분류)는 조회하지 않는다');
-      check.ok(!shown(3), '저장되지 않은 문서 — 블록이 없다');
-
-      await open(4);
-      check.ok(!shown(4), '문서 미색인 — 블록이 없다');
-      check.excludes(boxText(4), '관련 규정', '문서 미색인 — 문구도 없다');
-      check.eq(page.errors.length, 0, '어느 경우에도 스크립트 오류가 없다', page.errors.map((e) => e.message).join(' | '));
-
-      // 빈 결과는 잠깐만 믿는다 — 접었다 펼치면 곧바로 다시 묻지는 않는다
-      const n = calls(server, 'GET', `/documents/${DOC1}/regulation-evidence`).length;
-      page.click(page.q('#queue button[onclick="toggleWhy(0)"]'));
-      page.click(page.q('#queue button[onclick="toggleWhy(0)"]'));
-      await page.settle();
-      check.eq(calls(server, 'GET', `/documents/${DOC1}/regulation-evidence`).length, n, '빈 결과도 1분 동안은 다시 묻지 않는다');
-      return page;
-    },
-  },
+  /* [2026-09-29] 'regulation.review.block-under-why-in-both-lists' ·
+     'regulation.review.empty-and-failure-draw-nothing-or-a-muted-line' 을 뺐다 — 둘 다
+     검수 큐·확정 대기의 「왜 이 등급인가?」 펼침 패널(toggleWhy·toggleWhyStaging) 안에서
+     관련 규정 블록이 그려지는지를 봤는데, 그 패널 자체를 콘솔에서 뺐다(사용자 지시 — 실고객
+     문서 검수는 KL 포털로). 그 표시는 이제 KL 포털이 GET /documents/{doc_id}/regulation-evidence
+     를 직접 불러 자기 화면에 그리는 몫이다(그 엔드포인트는 이미 kl_backend 를 받는다) — 우리
+     e2e 로 검증할 UI 표면이 아니다. 서버 쪽 계약(빈 결과·404·503 처리)은 여전히
+     poc/tests/test_regulation_api.py 가 지킨다. */
 
   {
     id: 'regulation.xss.names-and-text-are-never-html',
@@ -684,23 +580,19 @@ export const scenarios = [
       server.overrides['GET /regulations/{reg_id}'] = DETAIL(REG2, `${evil}규정`, 'v1<b>x</b>', 'ready', { warnings: [evil], scope_note: evil });
       server.overrides['GET /regulations/{reg_id}/clauses'] = LIST([
         CLAUSE(C3, evil, evil, 'handling', true, `${evil2}\n${evil}`)]);
-      withQueue(server, [QITEM(1, DOC1)]);
-      server.faults.push(evFault(DOC1, EVID(DOC1, [evil, evil2])));
 
       const page = await openConfig(server);
       await choose(page, REG2);
       page.click(page.q(`button[onclick="toggleRegClauseText('${C3}')"]`));
-      page.click(page.q('.tab[data-tab="ops"]'));
-      page.click(page.q('#queue button[onclick="toggleWhy(0)"]'));
       await page.settle();
 
       check.eq(page.win.__pwn, undefined, '어떤 문자열도 실행되지 않았다');
       check.eq(page.qa('#reg-card img, #reg-card script').length, 0, '카드 안에 img·script 태그가 만들어지지 않았다');
       check.eq(page.qa('#reg-card b').filter((b) => b.textContent === 'x').length, 0, '판 표기에 섞인 <b> 태그가 굵은 글씨로 해석되지 않았다(카드가 쓰는 <b> 는 제외)');
-      check.eq(page.qa('#why-0 img, #why-0 script').length, 0, '검수 화면 블록 안에도 태그가 없다');
       check.includes(page.text('reg-body'), '<img src=x onerror="window.__pwn=1">규정', '규정명이 글자 그대로 보인다');
       check.includes(page.text('reg-clauses'), '<script>window.__pwn=2</script>', '조항 원문이 글자 그대로 있다');
-      check.includes(page.text('why-0'), '<img src=x onerror="window.__pwn=1">', '관련 문장이 글자 그대로 보인다');
+      // [2026-09-29] 관련 문장(검수 화면 블록) XSS 검증은 뺐다 — 그 표시 화면(#why-0)을 콘솔에서
+      // 뺐다. 그 렌더링은 이제 KL 포털의 몫이라 우리 e2e 로 검증할 대상이 아니다.
       check.eq(page.errors.length, 0, '스크립트 오류가 없다', page.errors.map((e) => e.message).join(' | '));
       return page;
     },

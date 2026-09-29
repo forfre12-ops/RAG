@@ -34,7 +34,6 @@ export const scenarios = [
 
       // 목록·표를 먼저 채워 둔다 — 행 안의 버튼(확정·재라벨·수정 등)까지 훑기 위해서.
       for (const sel of [
-        'button[onclick="loadReviewQueue()"]',
         'button[onclick="loadGradeEditor()"]',
         'button[onclick="loadKeywords()"]',
         'button[onclick="loadSynthQueue()"]',

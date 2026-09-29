@@ -73,6 +73,33 @@ src/koipa/
 
 `modules/`의 **m1~m6 번호가 곧 파이프라인 순서**이고, 기능분해도·DFD의 프로세스와 1:1로 대응합니다.
 
+### 3-1. 최상위 폴더 지도 (저장소 루트 `rag/` 기준)
+
+git 이 추적하는 것은 소스·문서·설정뿐입니다. 데이터·모델·번들·실험 결과는 디스크에만 있습니다(`.gitignore`).
+**「안 함」으로 표시된 폴더는 지우면 되돌릴 방법이 없습니다.**
+
+| 구분 | 폴더 | 내용 | git 추적 |
+|---|---|---|---|
+| 소스 | `poc/src` · `poc/tests` · `poc/alembic` | 앱 · 시험 · DB 마이그레이션 | 함 |
+| | `poc/scripts` | 검사 · 학습 · 데이터 구축 · 번들 빌더 (`archive/` 는 옛 세대) | 함 |
+| | `poc/docs` | 설치·운영 절차서와 분석 메모 | 함 |
+| | `poc/infra` · `poc/deploy` · `poc/evidence` · `poc/licenses` | 관측성·mTLS·postgres 등 보조 설정 · 프록시 골든 런타임 · 검수 요청 제외 목록(이미지에 실림) · 라이선스 | 함 |
+| | `doc/` | 감리·KL·발주처 문서 (`doc/releases` 는 제출 스냅샷이라 고치지 않음) | 함 |
+| | `scripts/` (루트) | 문서·감리·릴리스 묶음 도구와 주간보고 도구 | 함 |
+| 데이터 | `poc/datasets` | 학습셋·골든셋·검수 후보 (`_archive_unused_20260927/` 는 참조 0건이라 보관한 것) | 일부 |
+| | `서식모음/` · `sample/` | 서식·특허 원자료 | 안 함 |
+| 산출물 | `poc/artifacts` | 학습한 모델. **배포 모델 `classifier_p1_v5_clean/v-fe4b386b` 가 여기 있음 — 이 PC 가 유일한 원본** | 안 함 |
+| | `poc/artifacts_out` | 재학습 서비스가 쓰는 출력 | 안 함 |
+| | `poc/reports` | 실험·측정 결과와 학습 체크포인트 (추적은 6개뿐) | 거의 안 함 |
+| | `poc/dist` · `배포/` | 오프라인 설치 번들 (`dist` 는 빌드 출력, `배포/` 는 납품 후보 사본) | 안 함 |
+| 시험 장치 | `.wsl-rocky/` | WSL Rocky 8.9·8.10 시험 배포판 | 안 함 |
+| | `docker-data/` | 로컬 개발 compose 의 postgres·redis 볼륨 | 안 함 |
+| | `.kilo/worktrees/` | 다른 세션이 쓰는 git worktree | 안 함 |
+| 환경 | `poc/.venv` · `poc/.venv-gpu` · `.git` · 각종 `*_cache` | 가상환경·저장소·캐시 | 안 함 |
+
+이름이 비슷해 헷갈리는 것: `doc/`(감리 문서) ≠ `poc/docs/`(설치·운영) · `artifacts/`(학습 모델) ≠ `artifacts_out/`(재학습 출력) ≠ `_artifacts/`(옛 로그) ·
+`reports/` 는 루트·`poc/` 두 곳에 있고 `poc/reports` 가 실제 결과입니다.
+
 ---
 
 ## 4. 시연 — 시나리오 두 개

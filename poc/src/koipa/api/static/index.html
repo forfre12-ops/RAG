@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>한국지식재산보호원 | 등급 시연</title>
-<meta name="description" content="한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정하는 라이브 데모. FUN-005 실가동 라우터에 본문을 보내 등급·자동확정 여부와 사유·평가요소·법령 근거를 확인합니다." />
+<title>한국지식재산보호원 | 업로드·분류 테스트</title>
+<meta name="description" content="[2026-09-29] 실고객 문서의 업로드·분류는 KL 포털이 API 로 직접 수행합니다 — 이 화면은 우리가 파이프라인을 직접 확인해 보는 내부 테스트용입니다. 한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정하는 FUN-005 실가동 라우터에 본문을 보내 등급·자동확정 여부와 사유·평가요소·법령 근거를 확인합니다." />
 
 <link rel="stylesheet" href="./styles.css" />
-<script src="./deploy_badge.js" data-screen="시연"></script>
+<script src="./deploy_badge.js" data-screen="테스트"></script>
 </head>
 <body>
 
 <!-- console-header:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 (scripts/sync_console_header.py) -->
 <!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 -->
-<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><div class="cnav"><a class="cnav-link" href="/console/admin.html">관리자 콘솔</a><span class="cnav-link is-current" aria-current="page">등급 시연</span></div><span class="spacer"></span></header>
+<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><div class="cnav"><a class="cnav-link" href="/console/admin.html">관리자 콘솔</a><span class="cnav-link is-current" aria-current="page">업로드·분류 테스트</span></div><span class="spacer"></span></header>
 <!-- console-header:end -->
 
 <div class="hero-bg"></div>
@@ -24,7 +24,7 @@
   <div class="meta-row">
     <span class="badge">
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      Live Demo
+      내부 테스트
     </span>
     <span class="meta-dot">•</span>
     <span class="meta-category">KOIPA AI 영업비밀관리</span>
@@ -34,11 +34,12 @@
     <span class="meta-soft">2026-07-17</span>
   </div>
 
-  <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>실시간 등급분류 콘솔</h1>
+  <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>업로드·분류 테스트 콘솔</h1>
 
   <p class="lede">
-    한국어 문서를 받아 <b>4단계 보안등급</b>(특급·1급·2급·3급)을 자동 판정하고,
-    <b>왜 그 등급인지</b> 근거와 함께 보여 줍니다.
+    실고객 문서의 업로드·분류·검수·확정은 KL 포털이 우리 API 로 직접 수행합니다.
+    이 화면은 <b>우리가 파이프라인을 직접 확인</b>하는 내부 테스트용입니다 — 한국어 문서를 받아
+    <b>4단계 보안등급</b>(특급·1급·2급·3급)을 자동 판정하고, <b>왜 그 등급인지</b> 근거와 함께 보여 줍니다.
   </p>
 
   <div class="hero-kpis">
@@ -53,9 +54,9 @@
 
   <hr class="hero-sep" />
 
-  <!-- ===== §1 시연 ===== -->
+  <!-- ===== §1 업로드·분류 테스트 ===== -->
   <section id="s1">
-    <h2><span class="num">§1</span>시연 — 30초 안에 4단계가 갈리는 순간</h2>
+    <h2><span class="num">§1</span>업로드·분류 테스트 — 30초 안에 4단계가 갈리는 순간</h2>
     <p class="h2-sub">문서를 <b>올리거나</b>, 샘플을 <b>고르거나</b>, 본문을 <b>붙여넣으십시오</b>. 처리 단계는 아래에 실시간으로 표시됩니다.<details style="margin-top:6px"><summary style="cursor:pointer">지원 형식과 처리 단계</summary>HWP · PDF · DOCX · XLSX 등을 받아 추출 → 정규화 → 개인정보 가림 → 분할 → 검수 게이트 → 등급까지 한 번에 처리합니다. 추출기·품질·글자수·표·개인정보 가림 건수는 아래 §2 결과 안 「파싱 상세」에 있습니다.</details></p>
 
     <div class="card" style="padding: 20px 24px;">

@@ -3,7 +3,7 @@
 왜(2026-08-20). 상단이 세 갈래로 갈라져 있었다(실측).
 
     header.top   골든셋 검수·서명 · 후보 관리 · 로그인
-    nav.nav      관리자 콘솔(admin.html) · 등급 시연(index.html)
+    nav.nav      관리자 콘솔(admin.html) · 업로드·분류 테스트(index.html, 2026-09-29 이전 이름 "등급 시연")
     로고 3종     base64 PNG · 인라인 SVG 근사본 · 외부 PNG 파일
     기관명 옆    .product / .brand-sub / .brand-url — 클래스도 문구도 제각각
 
@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from koipa.api.golden import _render_console_login_html, _render_specledger_gold_console_html
+from koipa.api.golden import _as_reviewer_view, _render_console_login_html, _render_specledger_gold_console_html
 from koipa.console_nav import CONSOLE_LINKS, HEADER_CSS, REVIEW_SCREEN_EXCLUDE, header_html
 
 # 검수 화면 — 관리자 콘솔로 가는 메뉴를 두지 않는다(2026-09-11, 설계단계 감리 지적).
@@ -43,7 +43,9 @@ STATIC = _POC / "src" / "koipa" / "api" / "static"
 # [2026-08-24] 「검증문서 후보 관리」도 뺐다(3항목 → 2항목, 사용자 판단). 그 항목만
 # 포털 로그인을 거쳐야 열리고(다른 둘은 그냥 열린다) 특정 업무 화면이라 층위가 달랐다.
 # 진입은 관리자 콘솔 「검증문서 현황」 카드의 [후보 관리 화면 열기 ↗] 버튼이 맡는다.
-LABELS = ["관리자 콘솔", "등급 시연"]
+# [2026-09-29] "등급 시연" → "업로드·분류 테스트" 로 개명(console_nav.py 정본) — 실고객 문서
+# 업로드·분류는 이제 KL 포털이 API 로 하고, 이 화면은 우리가 직접 확인해 보는 내부 테스트용이다.
+LABELS = ["관리자 콘솔", "업로드·분류 테스트"]
 
 
 def _screens() -> dict[str, str]:
@@ -109,12 +111,21 @@ def test_every_menu_item_is_in_the_top_bar(name):
     박아 두면 항목이 바뀔 때마다 이름이 거짓이 된다 — 이 시험이 실제로 잠그는 것은 개수가
     아니라 "LABELS 전부가 상단에 있다"이고, LABELS 는 아래
     test_menu_labels_match_the_single_source 가 console_nav.CONSOLE_LINKS 와 묶어 둔다.
+
+    [2026-09-30 정정] manage 의 원시 렌더(_screens()['manage'])는 9/27부터 admin·kl_backend
+    세션에 관리자 콘솔 복귀 링크를 담고 있다(사용자 요청, 커밋 3ebb781 —
+    test_review_screens_admin_separation.py 참고). 배제 검사(reviewer 는 이 링크를 보면 안
+    된다)는 원시 렌더가 아니라 reviewer 가 실제로 받는 응답(_as_reviewer_view 를 거친 것)으로
+    해야 그 화면과 같은 기준이 된다 — 있어야 할 라벨(else 분기)은 계속 원시 렌더로 본다
+    (admin 세션 기준 골격은 안 바뀌었으므로).
     """
-    head = _header_of(_screens()[name])
+    raw_html = _screens()[name]
+    head = _header_of(raw_html)
+    excl_head = _header_of(_as_reviewer_view(raw_html)) if name == "manage" else head
     for key, label, _ in CONSOLE_LINKS:
         if name in REVIEW_SCREENS and key in REVIEW_SCREEN_EXCLUDE:
             # [2026-09-11] 검수 화면에서 관리자 콘솔로 넘어갈 수 있었다(감리 지적) — 이 메뉴는 없어야 한다.
-            assert label not in head, f"{name}: 검수 화면에 「{label}」 이 있다"
+            assert label not in excl_head, f"{name}: 검수 화면에 「{label}」 이 있다"
         else:
             assert label in head, f"{name}: 메뉴 「{label}」 이 상단에 없다"
 

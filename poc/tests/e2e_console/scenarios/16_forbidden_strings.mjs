@@ -87,11 +87,7 @@ export const scenarios = [
         scan(page, check, `${tab} 탭`);
       }
 
-      // 조회 버튼을 눌러 서버 응답으로 만들어지는 문구까지 그린다.
-      // 조회 버튼은 탭 전환 뒤에만 보인다 — 보이지 않으면 건너뛴다(누르는 것이 목적이 아니다).
-      const rq = page.$('btn-review-queue');
-      if (rq && page.visible(rq)) { page.click(rq); await page.settle(); }
-      scan(page, check, '검토 목록 조회 후');
+      // [2026-09-29] 검수 큐 조회 버튼은 콘솔에서 뺐다(카드 자체가 없다) — 예전 조회-후 스캔은 없앤다.
       assertNoScriptErrors(check, page);
       return page;
     },
@@ -100,12 +96,12 @@ export const scenarios = [
   {
     id: 'forbidden.demo.index',
     needsData: true,
-    title: '등급 시연 화면에 구현 정보가 없다',
+    title: '업로드·분류 테스트 화면에 구현 정보가 없다',
     why: 'API 키 기본값이 화면 맨 위에 떠 있던 자리다',
     async run({ server, check }) {
       const page = await openPage(server, '/console/index.html', { bundleModules: true });
       await page.settle();
-      scan(page, check, '시연 화면');
+      scan(page, check, '테스트 화면');
       assertNoScriptErrors(check, page);
       return page;
     },
