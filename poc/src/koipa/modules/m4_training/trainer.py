@@ -284,6 +284,18 @@ class TrainSpec:
     chunk_char_size: int = 0
     chunk_overlap: int = 64
     chunk_min_chars: int = 40
+    # [2026-09-30] MIL(다중 인스턴스) 윈도 학습 — chunk_expand(라벨 그대로 물려받는 방식,
+    # 2026-09-13 폐기: 꼬리 조각이 평범한 글을 고등급으로 배우게 해 S3 과탐 급증)의 대안.
+    # 문서를 pipeline.py._encode_windows 와 같은 방식(토큰 512 초과분을 overflow 윈도로,
+    # stride=chunk_overlap)으로 나누되, **윈도마다 개별 라벨을 주지 않는다** — 모든 윈도를
+    # 한 forward로 통과시킨 뒤 서빙과 동일한 severe-max 집계(_mil_aggregate_batch)로
+    # 문서 하나당 확률벡터 하나를 만들고, loss도 문서당 1회만 계산한다. 라벨 누수 경로가
+    # chunk_expand와 구조적으로 다르다(꼬리 윈도 자체에는 gradient가 약하게만 흐른다 —
+    # own-argmax가 아닌 윈도는 집계에서 평균 성분으로만 기여). 기본 False=기존 문서단위
+    # truncation 보존. mil_max_windows: 문서당 최대 윈도 수(메모리 상한) — outer chunk 상한
+    # (max_seq_len*3=1536자)이 보통 650~700토큰이라 2윈도로 충분하지만 여유를 둔다.
+    mil_windowed_training: bool = False
+    mil_max_windows: int = 3
     batch_size: int = 8
     epochs: int = 5
     lr: float = 2e-5
@@ -537,6 +549,79 @@ def _weighted_cross_entropy(
     # External values were validated once by _load_training_jsonl.  Avoid a
     # device-to-host synchronization on every GPU batch here.
     return (per_row * weights).sum() / denominator
+
+
+def _weighted_nll_from_logprobs(
+    log_probs,
+    labels,
+    *,
+    class_weights=None,
+    sample_weights=None,
+):
+    """`_weighted_cross_entropy` 와 같은 가중 규칙을, 이미 softmax+집계까지 끝난
+    log-확률(logits 아님)에 적용한다 — MIL 문서단위 집계 벡터는 severe-max 보강으로
+    합이 1을 넘을 수 있어(비정규) F.cross_entropy(logits 기대)에 그대로 넣으면 안 된다."""
+    import torch.nn.functional as functional
+
+    if sample_weights is None:
+        effective_class_weights = (
+            class_weights.to(device=log_probs.device, dtype=log_probs.dtype)
+            if class_weights is not None
+            else None
+        )
+        return functional.nll_loss(log_probs, labels, weight=effective_class_weights)
+
+    weights = sample_weights.to(device=log_probs.device, dtype=log_probs.dtype).reshape(-1)
+    if weights.numel() != labels.numel():
+        raise ValueError("sample_weights length must match labels")
+    effective_class_weights = (
+        class_weights.to(device=log_probs.device, dtype=log_probs.dtype)
+        if class_weights is not None
+        else None
+    )
+    per_row = functional.nll_loss(
+        log_probs, labels, weight=effective_class_weights, reduction="none",
+    )
+    normalization = weights
+    if effective_class_weights is not None:
+        normalization = normalization * effective_class_weights[labels]
+    denominator = normalization.sum()
+    return (per_row * weights).sum() / denominator
+
+
+def _mil_aggregate_batch(probs, window_mask, window_weight, severe_ids: set[int]):
+    """`m5_inference/pipeline.py::InferencePipeline._aggregate_chunk_probs` 의 배치판.
+
+    probs: [B, W, C] 윈도별 softmax. window_mask: [B, W] 1=실제 윈도·0=패딩.
+    window_weight: [B, W] 길이 가중(패딩 윈도는 0). severe_ids: 심각 등급 id 집합
+    (own-argmax 인 윈도만 후보 — 2026-09-27 서빙과 동일 규칙, s3-agreement-low-confidence
+    계열 오탐 회피). 반환 doc_prob: [B, C] — 서빙과 같은 이유로 **비정규**(합>1 가능)일
+    수 있다. 호출부(loss)에서 정규화 후 log를 취한다."""
+    import torch
+
+    w = window_weight * window_mask
+    w_sum = w.sum(dim=1, keepdim=True).clamp(min=1e-9)
+    weighted = (probs * w.unsqueeze(-1)).sum(dim=1) / w_sum  # [B, C]
+
+    # [2026-09-30 스모크 테스트에서 발견·수정] doc_prob[:, c] = ... 같은 인플레이스 인덱스
+    # 대입은 autograd 의 버전 카운터를 건드려 backward 에서
+    # "modified by an inplace operation" 로 죽는다(severe_ids 가 2개 이상이면 두 번째
+    # 반복에서 재현). 열 전체를 torch.where 로 매 반복 out-of-place 재구성한다.
+    argmax_c = probs.argmax(dim=-1)  # [B, W]
+    mask_bool = window_mask.bool()
+    n_classes = weighted.shape[-1]
+    doc_prob = weighted
+    for c in severe_ids:
+        own_top = (argmax_c == c) & mask_bool  # [B, W]
+        row_has_any = own_top.any(dim=1)  # [B]
+        masked_probs_c = probs[..., c].masked_fill(~own_top, float("-inf"))
+        max_c = masked_probs_c.max(dim=1).values  # [B]
+        col = torch.zeros(n_classes, dtype=torch.bool, device=weighted.device)
+        col[c] = True
+        apply_here = row_has_any.unsqueeze(-1) & col.unsqueeze(0)  # [B, C]
+        boosted = torch.maximum(doc_prob, max_c.unsqueeze(-1).expand(-1, n_classes))
+        doc_prob = torch.where(apply_here, boosted, doc_prob)
+    return doc_prob
 
 
 def _compute_fnr(cm: np.ndarray) -> tuple[float, dict[str, float]]:
@@ -955,13 +1040,58 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
             "sample_weight": sample_weights,
         }).map(tokenize, batched=True, remove_columns=["text"])
 
-    ds_train = make_dataset(train_x, train_y, train_sample_weights)
-    # 평가는 기존과 동일하게 문서단위·비가중으로 집계한다.
-    ds_val = make_dataset(val_x, val_y, [1.0] * len(val_y))
+    def tokenize_mil(batch):
+        """pipeline.py._encode_windows 와 같은 오버플로 윈도잉을, 문서별로 다시 묶어
+        [윈도수, max_seq_len] 로 고정 패딩한다 — 윈도마다 라벨을 주지 않고 문서 1건=행 1개를
+        유지해야(뒤 compute_loss 에서 문서단위 집계+loss 1회) HF Trainer 의 표준 배치가 그대로
+        '문서 batch_size개'를 의미한다."""
+        stride = min(int(spec.chunk_overlap), spec.max_seq_len // 4)
+        enc = tok(
+            batch["text"], truncation=True, max_length=spec.max_seq_len,
+            stride=max(0, stride), return_overflowing_tokens=True,
+            padding="max_length",
+        )
+        sample_map = enc.pop("overflow_to_sample_mapping")
+        n_docs = len(batch["text"])
+        per_doc_ids: list[list[list[int]]] = [[] for _ in range(n_docs)]
+        per_doc_attn: list[list[list[int]]] = [[] for _ in range(n_docs)]
+        for win_idx, doc_idx in enumerate(sample_map):
+            if len(per_doc_ids[doc_idx]) >= spec.mil_max_windows:
+                continue  # 문서당 윈도 상한(메모리) — outer chunk 상한상 실무상 거의 안 걸림
+            per_doc_ids[doc_idx].append(enc["input_ids"][win_idx])
+            per_doc_attn[doc_idx].append(enc["attention_mask"][win_idx])
+        pad_id = tok.pad_token_id or 0
+        dummy_ids = [pad_id] * spec.max_seq_len
+        dummy_attn = [0] * spec.max_seq_len
+        out_ids, out_attn, out_wmask = [], [], []
+        for d in range(n_docs):
+            ids, attn = list(per_doc_ids[d]), list(per_doc_attn[d])
+            wmask = [1] * len(ids)
+            while len(ids) < spec.mil_max_windows:
+                ids.append(dummy_ids)
+                attn.append(dummy_attn)
+                wmask.append(0)
+            out_ids.append(ids)
+            out_attn.append(attn)
+            out_wmask.append(wmask)
+        return {"input_ids": out_ids, "attention_mask": out_attn, "window_mask": out_wmask}
+
+    def make_dataset_mil(texts, labels, sample_weights):
+        return Dataset.from_dict({
+            "text": texts,
+            "label": labels,
+            "sample_weight": sample_weights,
+        }).map(tokenize_mil, batched=True, remove_columns=["text"])
+
+    _mk_ds = make_dataset_mil if spec.mil_windowed_training else make_dataset
+    ds_train = _mk_ds(train_x, train_y, train_sample_weights)
+    # 평가도 학습과 같은 경로로 집계한다 — MIL 모드에서 eval 만 truncation 이면
+    # report.json 이 서빙과 다시 어긋난다(오늘 조사가 고치려는 바로 그 불일치).
+    ds_val = _mk_ds(val_x, val_y, [1.0] * len(val_y))
     ds_test = (
         None
         if spec.proxy_candidate_mode
-        else make_dataset(test_x, test_y, [1.0] * len(test_y))
+        else _mk_ds(test_x, test_y, [1.0] * len(test_y))
     )
 
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -977,6 +1107,13 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
 
     # 고등급 id (TS/S1 등) — 미탐 비대칭 가중·fnr_high 계산 공통 기준
     high_ids = [_LABEL2ID[c] for c in spec.high_grade_codes if c in _LABEL2ID]
+    # MIL 집계용 — 서빙(pipeline.py._SEVERE_AGG_CODES)과 같은 설정값·같은 기본값(TS·S1).
+    try:
+        from koipa.config import settings as _settings_for_mil  # noqa: PLC0415
+        _severe_codes = tuple(getattr(_settings_for_mil, "severe_agg_codes", None) or ("TS", "S1"))
+    except Exception:  # noqa: BLE001 — 설정을 못 읽어도 학습은 기본값으로 계속되어야 한다
+        _severe_codes = ("TS", "S1")
+    mil_severe_ids = {_LABEL2ID[c] for c in _severe_codes if c in _LABEL2ID}
 
     # [2026-08-29] 등급별 손실 가중을 DB 에서 읽는다.
     # 적용서 v2.2 R4 가 "유출영향도 의미는 등급 서열 + loss_weight + 등급별 FNR 로
@@ -1040,6 +1177,39 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
             )
             return (loss, outputs) if return_outputs else loss
 
+    class MILWeightedTrainer(Trainer):
+        """문서=1행(윈도 [W,L] 내장)을 한 forward 로 통과시키고, 서빙과 같은 severe-max
+        집계(_mil_aggregate_batch)로 문서당 확률벡터 하나를 만든 뒤 loss 도 문서당 1회만
+        낸다. chunk_expand(2026-09-13, 라벨을 윈도마다 물려줘 꼬리 조각이 평범한 글을
+        고등급으로 배우게 함 — S3 과탐 급증)와 달리, own-argmax 가 아닌 윈도는 집계에서
+        평균 성분으로만 기여해 개별 라벨 누수 경로가 없다."""
+
+        def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+            labels = inputs.pop("labels")
+            sample_weights = inputs.pop("sample_weight", None)
+            window_mask = inputs.pop("window_mask")  # [B, W]
+            input_ids = inputs.pop("input_ids")  # [B, W, L]
+            attention_mask = inputs.pop("attention_mask")  # [B, W, L]
+            b, w, seq_len = input_ids.shape
+            outputs = model(
+                input_ids=input_ids.view(b * w, seq_len),
+                attention_mask=attention_mask.view(b * w, seq_len),
+            )
+            logits = outputs.logits.view(b, w, -1)  # [B, W, C]
+            probs = torch.softmax(logits, dim=-1)
+            # 윈도 길이 가중 — 실제 글자수 대신 non-pad 토큰수로 근사(패딩 윈도=0).
+            window_weight = attention_mask.sum(dim=-1).to(probs.dtype) * window_mask
+            doc_prob = _mil_aggregate_batch(probs, window_mask, window_weight, mil_severe_ids)
+            doc_prob_norm = doc_prob / doc_prob.sum(dim=-1, keepdim=True).clamp(min=1e-9)
+            log_probs = torch.log(doc_prob_norm.clamp(min=1e-9))
+            loss = _weighted_nll_from_logprobs(
+                log_probs, labels,
+                class_weights=class_weights, sample_weights=sample_weights,
+            )
+            # compute_metrics 는 이 벡터로 argmax 한다 — 서빙 최종판정과 같은 벡터.
+            outputs.logits = doc_prob
+            return (loss, outputs) if return_outputs else loss
+
     base_data_collator = DataCollatorWithPadding(tok)
 
     def weighted_data_collator(features):
@@ -1052,6 +1222,17 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         batch = base_data_collator(model_features)
         batch["sample_weight"] = torch.tensor(weights, dtype=torch.float32)
         return batch
+
+    def mil_data_collator(features):
+        return {
+            "input_ids": torch.tensor([f["input_ids"] for f in features], dtype=torch.long),
+            "attention_mask": torch.tensor([f["attention_mask"] for f in features], dtype=torch.long),
+            "window_mask": torch.tensor([f["window_mask"] for f in features], dtype=torch.float32),
+            "labels": torch.tensor([f["label"] for f in features], dtype=torch.long),
+            "sample_weight": torch.tensor(
+                [float(f.get("sample_weight", 1.0)) for f in features], dtype=torch.float32
+            ),
+        }
 
     def compute_metrics(eval_pred):
         preds = np.argmax(eval_pred.predictions, axis=-1)
@@ -1105,22 +1286,25 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         remove_unused_columns=False,
     )
 
+    _trainer_cls = MILWeightedTrainer if spec.mil_windowed_training else WeightedTrainer
+    _collator = mil_data_collator if spec.mil_windowed_training else weighted_data_collator
+
     # transformers v5+ 호환: Trainer.__init__ 가 `tokenizer` → `processing_class`로 이름
     # 변경됨. v4 에서는 tokenizer 가, v5 에서는 processing_class 가 표준.
     # 두 경로 모두 시도 (런타임 버전 호환).
     try:
-        trainer = WeightedTrainer(
+        trainer = _trainer_cls(
             model=model, args=args,
             train_dataset=ds_train, eval_dataset=ds_val,
             processing_class=tok,
-            data_collator=weighted_data_collator,
+            data_collator=_collator,
             compute_metrics=compute_metrics,
         )
     except TypeError:  # v4 폴백
-        trainer = WeightedTrainer(
+        trainer = _trainer_cls(
             model=model, args=args,
             train_dataset=ds_train, eval_dataset=ds_val,
-            tokenizer=tok, data_collator=weighted_data_collator,
+            tokenizer=tok, data_collator=_collator,
             compute_metrics=compute_metrics,
         )
 

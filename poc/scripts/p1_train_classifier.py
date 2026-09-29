@@ -295,6 +295,21 @@ def main() -> int:
             "--chunk-expand 와 함께 쓸 때만 의미가 있다."
         ),
     )
+    ap.add_argument(
+        "--mil-windowed-training",
+        action="store_true",
+        help=(
+            "[2026-09-30] chunk_expand(라벨 복제→꼬리조각 누수)의 대안. 문서를 서빙과 같은 "
+            "오버플로 윈도로 나누되 라벨은 문서당 1개 유지 — 윈도별 로짓을 severe-max로 모아 "
+            "문서당 loss 1회만 계산한다. --chunk-expand 와 동시 사용 불가."
+        ),
+    )
+    ap.add_argument(
+        "--mil-max-windows",
+        type=int,
+        default=None,
+        help="MIL 모드에서 문서당 최대 윈도 수(기본 3). --mil-windowed-training 과 함께 쓴다.",
+    )
     ap.add_argument("--val-path", default=None)
     ap.add_argument("--test-path", default=None)
     ap.add_argument(
@@ -407,6 +422,12 @@ def main() -> int:
             spec_kwargs["chunk_expand"] = True
         if getattr(args, "chunk_char_size", None):
             spec_kwargs["chunk_char_size"] = args.chunk_char_size
+        if getattr(args, "mil_windowed_training", False):
+            if args.chunk_expand:
+                ap.error("--mil-windowed-training and --chunk-expand are mutually exclusive")
+            spec_kwargs["mil_windowed_training"] = True
+        if getattr(args, "mil_max_windows", None):
+            spec_kwargs["mil_max_windows"] = args.mil_max_windows
         spec = TrainSpec(**spec_kwargs)
         print(f"[p1] full mode spec: {spec_kwargs}", file=sys.stderr)
         report = train_classifier(spec)
