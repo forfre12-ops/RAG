@@ -5,7 +5,7 @@
 ■ 무엇을 만드는가
 
   doc/03_openapi_koipa_kl.yaml (전체 규약서, 정본) 에서 `x-audience: kl` 인 작업만 골라
-    · koipa_kl_openapi.yaml     KL 이 호출하는 5개 인터페이스(IF-01·02·03·05·06)만 담은 OpenAPI
+    · koipa_kl_openapi.yaml     KL 이 호출하는 7개 인터페이스(IF-01·02·03·05·06·07·08)만 담은 OpenAPI
     · KL_API_연동_안내서.html    호출 순서·예시·오류 처리·제한값. 필드 표는 규약서에서 그대로 뽑는다
   를 출력 폴더에 쓴다. 예시 응답은 손으로 적지 않고 `samples/*.json` 을 읽는다 — 그 파일들은
   실제 엔진에 요청을 보내 받은 응답이다(다시 만들 때도 같은 방식으로 받아 교체한다).
@@ -48,13 +48,20 @@ YAML_NAME = "koipa_kl_openapi.yaml"
 GUIDE_NAME = "KL_API_연동_안내서.html"
 DATE = "2026-09-25"
 
-# 회신서(IF-01~IF-06)의 번호. IF-04 는 엔진이 KL 로 보내는 통보라 규약서 경로가 없다.
+# 회신서(IF-01~IF-08)의 번호. IF-04 는 엔진이 KL 로 보내는 통보라 규약서 경로가 없다.
+# [2026-09-29] IF-07 = /confirm — 지재원 포털이 사람 검수로 확정한 등급을 돌려보내는 통로.
+# 코드(api/confirm.py require_role("admin","reviewer","kl_backend"))는 원래부터 kl_backend 를
+# 받고 있었고, 규약서의 x-audience 태그만 internal→kl 로 실제 동작에 맞게 고쳤다.
+# [2026-09-29] IF-08 = /classify/batch — 사용자 지시로 개방(다건 문서 일괄 분류). 코드 변경 없음,
+# 태그만 internal→kl.
 KL_INTERFACES: dict[tuple[str, str], str] = {
     ("get", "/healthz"): "IF-01",
     ("post", "/documents"): "IF-02",
     ("post", "/classify/async"): "IF-03",
     ("get", "/classify/jobs/{job_id}"): "IF-05",
     ("get", "/classify/{doc_id}"): "IF-06",
+    ("post", "/confirm"): "IF-07",
+    ("post", "/classify/batch"): "IF-08",
 }
 HTTP_METHODS = ("get", "post", "put", "delete", "patch")
 GRADE_NAMES = {"TS": "특급기밀", "S1": "1급 비밀", "S2": "2급 대외비", "S3": "3급 공개"}
@@ -64,9 +71,10 @@ SAMPLES = {
     "async": "02_classify_async_response.json",
     "job": "03_job_done.json",
     "doc": "04_classify_by_doc_response.json",
+    "confirm": "05_confirm_response.json",
 }
 
-KL_INFO_DESCRIPTION = """한국지식재산보호원 AI 영업비밀관리시스템 — KL 웹시스템이 호출하는 5개 인터페이스만 담은 규격이다.
+KL_INFO_DESCRIPTION = """한국지식재산보호원 AI 영업비밀관리시스템 — KL 웹시스템이 호출하는 7개 인터페이스만 담은 규격이다.
 전체 규약서에서 자동으로 만든 것이라 직접 고치지 않는다.
 
   IF-01  GET  /healthz                    준비 상태 확인
@@ -75,6 +83,8 @@ KL_INFO_DESCRIPTION = """한국지식재산보호원 AI 영업비밀관리시스
   IF-04  POST {callback_url}              엔진 -> KL 완료 통보(선택, POST /classify/async 의 callback_url 참고)
   IF-05  GET  /classify/jobs/{job_id}     작업 상태·결과 조회
   IF-06  GET  /classify/{doc_id}          문서 단위 최근 결과 조회
+  IF-07  POST /confirm                    지재원 포털의 검수 확정 등급을 돌려받음(재학습 입력)
+  IF-08  POST /classify/batch             다건 문서 일괄 분류(최대 1000건, 결과는 IF-05로 조회)
 
 호출 순서와 예시는 함께 드리는 「AI 분류 엔진 연동 안내서」에 있다.
 인증은 서버 간 호출 기준 X-API-Key 헤더다(/healthz 는 인증 없음).
@@ -353,6 +363,7 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
     accepted = _sample(samples, "async")
     job = _sample(samples, "job")
     by_doc = _sample(samples, "doc")
+    confirmed = _sample(samples, "confirm")
     doc_id = upload["doc_id"]
     job_id = accepted["job_id"]
     if set(schemas["Grade"]["enum"]) != set(GRADE_NAMES):
@@ -384,7 +395,7 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
              f'<div class="meta">KL 웹시스템 → 분류 엔진 호출 규격과 예시 · {DATE} · 엔진 모델 {html.escape(str(job["results"][0]["model_version"]))} 기준</div></div>')
     b.append('<table class="docinfo"><tbody>'
              "<tr><th>대상</th><td>KL 웹시스템 개발자</td></tr>"
-             "<tr><th>범위</th><td>KL 이 호출하는 5개 인터페이스(IF-01 · 02 · 03 · 05 · 06)와, 엔진이 KL 로 보내는 선택 통보(IF-04)</td></tr>"
+             "<tr><th>범위</th><td>KL 이 호출하는 7개 인터페이스(IF-01 · 02 · 03 · 05 · 06 · 07 · 08)와, 엔진이 KL 로 보내는 선택 통보(IF-04)</td></tr>"
              "<tr><th>근거</th><td>엔진에 직접 요청을 보내 확인한 결과와 소스 코드. 이 안내서의 예시 응답은 모두 실행 결과입니다</td></tr>"
              f"<tr><th>함께 드리는 파일</th><td><code>{YAML_NAME}</code> (OpenAPI 3.0.3, 위 인터페이스만 수록) · <code>samples/</code> (예시 응답 JSON)</td></tr>"
              "</tbody></table>")
@@ -414,6 +425,8 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
             ["IF-04", "<code>POST {callback_url}</code>", "엔진 → KL 완료·실패 통보", "<code>callback_url</code> 을 보낸 경우에만 발생합니다(7장)"],
             ["IF-05", "<code>GET /api/v1/classify/jobs/{job_id}</code>", "작업 상태·결과 조회", "결과 전체(근거·경고 포함)는 여기와 IF-04 통보에 있습니다"],
             ["IF-06", "<code>GET /api/v1/classify/{doc_id}</code>", "문서 단위 최근 결과 조회", "저장된 요약과 사람이 확정한 등급을 돌려줍니다"],
+            ["IF-07", "<code>POST /api/v1/confirm</code>", "지재원 포털의 검수 확정 등급을 돌려받음", "①~④ 와 반대 방향(KL → 엔진, 검수 확정 시). 저희는 이 값을 재학습 입력으로 씁니다(3-5)"],
+            ["IF-08", "<code>POST /api/v1/classify/batch</code>", "다건 문서 일괄 분류(최대 1,000건)", "한 건씩 ①②를 반복하는 대신 한 번에 보냅니다. 결과는 IF-05 로 조회합니다(3-6)"],
         ],
         widths=[8, 34, 30, 28],
     ))
@@ -506,12 +519,55 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
     }))
     b.append(_details("응답 예시 보기 (04_classify_by_doc_response.json)", _json_pre(by_doc)))
 
+    b.append(h3("3-5. 검수 확정 통보 — IF-07"))
+    confirm_op = spec["paths"]["/confirm"]["post"]
+    confirm_req_schema = confirm_op["requestBody"]["content"]["application/json"]["schema"]
+    confirm_resp_schema = confirm_op["responses"]["200"]["content"]["application/json"]["schema"]
+    b.append(p("지재원 포털에서 사람이 검수해 등급을 확정하면, KL 웹시스템이 이 결과를 엔진으로 <b>돌려보냅니다</b> "
+               "(①~④ 와 반대 방향 — KL → 엔진). 저희는 예측 <code>label</code> 을 그대로 감사 증적으로 남기고, "
+               "확정 등급은 다음 재학습의 입력으로 씁니다."))
+    b.append(_pre('curl -X POST "$BASE/confirm" -H "X-API-Key: $KOIPA_API_KEY" -H "Content-Type: application/json" \\\n'
+                  f"  -d '{{\"doc_id\":\"{doc_id}\",\"confirmed_label\":\"S2\","
+                  '"actor":{"user_id":"<지재원 포털의 실제 검수자 ID>","role":"kl_backend"}}}\''))
+    b.append(p("<code>actor.user_id</code> 에는 저희 쪽 계정이 아니라 <b>지재원 포털에서 실제로 검수한 사람의 식별자</b>를 담아 보내 주십시오 — "
+               "감사 로그와 재학습 라벨 출처에 그 값이 그대로 남습니다. <code>actor.role</code> 은 <code>kl_backend</code> 로 고정입니다."))
+    b.append(field_table(spec, confirm_req_schema, request=True))
+    b.append(field_table(spec, confirm_resp_schema))
+    b.append(p("응답 예시:"))
+    b.append(_details("응답 예시 보기 (05_confirm_response.json — ConfirmService 를 직접 호출해 받은 실제 응답)", _json_pre(confirmed)))
+    b.append(p("<code>persisted=false</code> 이면 분류 이력을 못 찾아 <b>감사 기록으로만</b> 남았다는 뜻입니다(200 이지만 무음 성공이 아닙니다) — "
+               "<code>warnings</code> 에 사유가 있습니다. 같은 <code>doc_id</code> 로 다시 보내도 안전합니다(멱등)."))
+
+    b.append(h3("3-6. 일괄 분류 — IF-08"))
+    batch_op = spec["paths"]["/classify/batch"]["post"]
+    batch_req_schema = batch_op["requestBody"]["content"]["application/json"]["schema"]
+    batch_resp_schema = batch_op["responses"]["202"]["content"]["application/json"]["schema"]
+    b.append(p("문서를 한 건씩 ①②로 보내는 대신, 이미 등록된 <code>doc_id</code> 여러 건을 한 번에 보냅니다(최대 1,000건). "
+               "요청 한 건의 항목 구성은 <code>POST /classify/async</code>(②)와 같습니다 — <code>content</code> 를 같이 보내면 그 문서에 한해 "
+               "등록 시 저장한 본문 대신 그 값을 씁니다."))
+    b.append(_pre(f'curl -X POST "$BASE/classify/batch" -H "X-API-Key: $KOIPA_API_KEY" -H "Content-Type: application/json" \\\n'
+                  f"  -d '{{\"documents\":[{{\"doc_id\":\"{doc_id}\"}},{{\"doc_id\":\"<다른 doc_id>\"}}]}}'"))
+    b.append(field_table(spec, batch_req_schema, request=True))
+    b.append(field_table(spec, batch_resp_schema))
+    b.append(p("<code>completed</code> · <code>failed</code> · <code>failed_doc_ids</code> · <code>errors</code> 는 접수 시점 값입니다 — "
+               "PoC(즉시 실행) 환경에서는 이미 채워져 있고, 운영 Celery 모드에서는 0 · 0 · <code>[]</code> · <code>[]</code> 로 시작해 "
+               "<code>status_url</code>(=IF-05)로 진행 상황을 조회합니다. 한 건이 영구 실패해도 나머지는 계속 처리됩니다(부분 실패 허용, "
+               "<code>status=partial</code>). 개별 문서의 등급 결과는 이 응답이 아니라 IF-05 의 <code>results[]</code> 에 있습니다(4장 규칙 그대로 적용)."))
+
     # ── 4. 결과 읽는 법 ─────────────────────────────────────────────────
     b.append(h2("4. 결과 읽는 법"))
     b.append(p("IF-05 의 <code>results[]</code> 한 건(<code>ClassifyJobResult</code>)의 필드입니다. IF-06 은 이 중 등급 · 확률 · 모델 버전 · 상태만 담고 확정 등급을 더합니다(3-4)."))
     b.append(field_table(spec, {"$ref": "#/components/schemas/ClassifyJobResult"}, overrides={
         "label": "예측 등급 코드. 사람이 확정한 등급은 confirmed_label 입니다.",
     }))
+    b.append(note("[2026-09-29] <b>위 표는 필드 전체 목록이며, 실제로 귀사가 받으시는 값은 이보다 단순합니다.</b> "
+                  "판정 근거를 보여 주는 항목 — <code>scores</code> · <code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · "
+                  "<code>evidence</code> · <code>model_grade</code> · <code>decision_path</code> · <code>grade_candidates</code> · "
+                  "<code>grade_candidates_reason</code> — 은 항상 비어 있습니다(<code>scores</code> 는 <code>{}</code>, 나머지는 <code>null</code> 또는 빈 배열). "
+                  "실제로 값이 채워지는 것은 <code>label</code>(최종 판정) · <code>rule_grade</code>(룰 판정이 <code>label</code> 과 다를 때만) · "
+                  "<code>regulation_reference</code>(해당 규정이 있을 때만) · <code>status</code> · <code>confidence</code> · <code>model_version</code> · "
+                  "<code>warnings</code> 뿐입니다 — 등급이 같으면 <code>label</code> 하나, 갈리면 <code>label</code> 을 메인으로 <code>rule_grade</code> 를 함께 보시면 됩니다. "
+                  "같은 엔드포인트를 저희 내부 관리 화면도 호출하는데, 그쪽은 이 값들을 그대로 받습니다 — 구분은 호출 인증(서버 간 자격) 기준이며 요청 쪽에서 고를 수 없습니다."))
     b.append(h3("등급 코드"))
     b.append(_table(["label", "이름"], [[f"<code>{c}</code>", GRADE_NAMES[c]] for c in schemas["Grade"]["enum"]], center={0}, widths=[20, 80]))
     b.append(h3("status — 검수가 필요한가"))
@@ -539,6 +595,11 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
         "<code>confidence</code> 는 0, <code>status</code> 는 <code>needs_review</code>, <code>model_version</code> 은 <code>none</code> 입니다. "
         "② 사람이 이미 확정한 등급이 있어 추론을 건너뛴 경우 — <code>model_version</code> 이 <code>human_review:…</code> 로 시작하고 <code>status</code> 는 <code>staging</code> 입니다. "
         "두 경우는 <code>model_version</code> 과 <code>warnings</code> 로 구분합니다.",
+        "[2026-09-29] <code>rule_grade</code> 는 룰 엔진(시드 키워드 S×V×M) 단독 판정입니다. <b><code>label</code>(최종 판정)과 같으면 null 입니다</b> — "
+        "다를 때만 참고로 채워집니다. 즉 두 판정이 같으면 <code>label</code> 하나만 보시면 되고, 갈렸을 때만 <code>rule_grade</code> 를 함께 확인하시면 됩니다.",
+        "[2026-09-29] <code>regulation_reference</code> 는 귀사 사내 규정 중 이 문서에 해당하는 원문 조항입니다(등급 판정과 무관한 <b>참고용</b>). "
+        "기능이 꺼져 있거나 해당 규정을 찾지 못하면 null 입니다. GPU 가 없는 배포에서는 로컬 LLM 판정이 제한 시간 안에 끝나지 못해 항상 null 이 됩니다 — "
+        "GPU 도입 전까지는 이 필드를 기대하지 마십시오.",
         "<code>automation_assessment</code> 는 이 결과에 없습니다(2026-09-27 부터). 저희 내부 자동확정 정책을 검증하는 그림자 관측치라 연동에 쓰지 않으며, "
         "동기 응답(<code>POST /classify</code>, 내부 화면 전용)에만 남겨 뒀습니다.",
     ]))
@@ -620,10 +681,13 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
             ["3", "분류 요청의 <code>content</code>", "필수", "선택. 생략하면 등록 때 저장한 본문을 씁니다"],
             ["4", "등록 후 분류 호출", "<code>POST /classify?doc_id=…</code>", "본문 <code>{\"doc_id\": …}</code> 로 보냅니다(쿼리 파라미터는 받지 않음)"],
             ["5", "등록 폼 필드", "<code>doc_type</code> · <code>external_ref</code>", "<code>doc_type</code> · <code>external_ref</code> 는 받지 않습니다(보내도 무시). <code>source_type</code> · <code>security_marking</code> · <code>access_scope</code> · <code>enqueue_classification</code> 추가"],
-            ["6", "분류 결과 필드", "15개", "IF-05 결과 한 건은 17개 — <code>rule_evaluation_factors</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> 추가"
+            ["6", "분류 결과 필드", "15개", "IF-05 결과 한 건은 18개 — <code>rule_evaluation_factors</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> · "
+             "<code>regulation_reference</code>(2026-09-29 추가, 4장) 가 늘었습니다"
              "(<code>automation_assessment</code> 는 안 실립니다 — 내부 전용이라 2026-09-27 부터 뺐습니다). 사람이 확정한 등급 <code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> 은 IF-06 에서만 옵니다"],
             ["7", "오류 본문", "<code>{code, message, …}</code>", "대부분 <code>{\"detail\": …}</code>. <code>code</code> 는 413·429·500 에만 있고 값은 <code>KOIPA_BODY_TOO_LARGE</code> · <code>KOIPA_RATE_LIMIT</code> · <code>KOIPA_INTERNAL</code> 셋뿐입니다"],
             ["8", "문서 조회(IF-06)", "분류 결과 전체", "저장된 요약 10개 항목만 담습니다(3-4장 표)"],
+            ["9", "검수 확정 통보", "없음", "IF-07(<code>POST /confirm</code>, 2026-09-29 추가) — 지재원 포털의 검수 확정 등급을 KL 이 엔진으로 돌려보내는 통로입니다(3-5장)"],
+            ["10", "일괄 분류", "없음", "IF-08(<code>POST /classify/batch</code>, 2026-09-29 추가) — 최대 1,000건을 한 번에 보냅니다(3-6장). 기존에도 코드는 있었으나 이 문서 범위 밖이었습니다"],
         ],
         center={0}, widths=[4, 20, 30, 46],
     ))

@@ -566,7 +566,8 @@ documents:
     # 4건(유사문서·Prometheus·합성 커버리지/작업조회)은 KL 연동과 무관해 의도적으로 미기재 —
     # 아래 버전도 그때로 갱신
     # [2026-09-26] 호출자가 없던 4건(가이드 2·승격 대기·이중검토 보류)을 걷어 68→64건(개정 이력 판3).
-    version: 2026-09-26
+    # [2026-09-29] KL 이 부르는 것 5→6건 정정(IF-07, 개정 이력 판5) → 6→7건 확대(IF-08 /classify/batch, 판6).
+    version: 2026-09-29
 
   - id: DOC-GAMRI-003
     title: ERD 개체관계도
@@ -1028,6 +1029,38 @@ documents:
     audience: customer
     status: current
     version: 2026-09-25
+
+  - id: DOC-KLR-014
+    title: 인수인계 안내서 (납품 구성 · 인수 체크리스트 · 인수 전 유의 사항)
+    path: doc/result/KL_인수인계_2026-09-29/00_인수인계_안내서.html
+    owner: engineering
+    audience: customer
+    status: draft
+    version: 2026-09-29
+
+  - id: DOC-KLR-015
+    title: 설치 매뉴얼 (번들 rocky-koipa-20260929)
+    path: doc/result/KL_인수인계_2026-09-29/01_설치_매뉴얼.html
+    owner: engineering
+    audience: customer
+    status: draft
+    version: 2026-09-29
+
+  - id: DOC-KLR-016
+    title: 운영 매뉴얼 (Day-2 운영 · 백업 · 모니터링 · 장애 대응)
+    path: doc/result/KL_인수인계_2026-09-29/02_운영_매뉴얼.html
+    owner: engineering
+    audience: customer
+    status: draft
+    version: 2026-09-29
+
+  - id: DOC-KLR-017
+    title: 학습·재학습 매뉴얼 (학습셋 · 실행 · 게이트 · 활성화 · 롤백)
+    path: doc/result/KL_인수인계_2026-09-29/03_학습_재학습_매뉴얼.html
+    owner: engineering
+    audience: customer
+    status: draft
+    version: 2026-09-29
 
   - id: DOC-INT-013
     title: 미사용 자산 전수조사

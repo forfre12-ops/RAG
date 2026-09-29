@@ -19,7 +19,7 @@ import time
 import uuid
 from typing import Callable, Optional
 
-from koipa.schemas.classify import ClassifyJobResult, ClassifyRequest
+from koipa.schemas.classify import ClassifyJobResult, ClassifyRequest, kl_wire_projection
 from koipa.schemas.classify_async import (
     ClassifyAsyncRequest,
     ClassifyAsyncResponse,
@@ -179,10 +179,13 @@ class AsyncClassifyService:
             result = self.classify.classify(self._strip_async_fields(req))
             result_json = result.job_result()
             self.jobs.update(job_id, status="done", completed=1, results=[result_json])
+            # [2026-09-29] 콜백은 정의상 항상 KL 수신 — 저장값(results, GET 조회가 읽는 값)은
+            # 전체를 두고 webhook 본문만 kl_wire_projection 으로 좁힌다.
+            kl_result_json = self._to_kl_result_json(result_json)
             callback_payload = {
                 "job_id": str(job_id),
                 "status": "done",
-                "results": [result_json],
+                "results": [kl_result_json],
             }
             logger.info("async classify done: job_id=%s doc_id=%s", job_id, req.doc_id)
         except Exception as exc:  # noqa: BLE001
@@ -269,6 +272,7 @@ class AsyncClassifyService:
         )
 
         # M-callback: 배치도 동일하게 callback_url 이 있으면 outbox webhook 발사.
+        # 저장값(results)은 전체를 두고, webhook 본문만 kl_wire_projection 으로 좁힌다.
         self._publish_callback(
             getattr(req, "callback_url", None),
             {
@@ -278,7 +282,7 @@ class AsyncClassifyService:
                 "completed": completed,
                 "failed": failed,
                 "failed_doc_ids": failed_ids,
-                "results": results,
+                "results": [self._to_kl_result_json(r) for r in results],
             },
         )
 
@@ -323,6 +327,21 @@ class AsyncClassifyService:
             results=results,
             error=job.get("error"),
         )
+
+    @staticmethod
+    def _to_kl_result_json(result_json: dict) -> dict:
+        """job_result() 딕셔너리 1건 → KL 콜백에 실릴 좁힌 사본.
+
+        [2026-09-29] 콜백 수신자는 정의상 항상 KL(callback_url 은 KL 이 준다). GET 조회가
+        읽는 저장값(results)은 건드리지 않고, 여기서 만든 사본만 webhook 본문에 쓴다 —
+        async_classify.py 의 kl_backend 역할 분기와 같은 규칙(kl_wire_projection).
+        """
+        from koipa.services.regulation_evidence_service import regulation_reference_for_kl_wire  # noqa: PLC0415
+
+        return kl_wire_projection(
+            ClassifyJobResult.model_validate(result_json),
+            regulation_reference=regulation_reference_for_kl_wire(result_json.get("doc_id", "")),
+        ).model_dump(mode="json")
 
     @staticmethod
     def _publish_callback(callback_url: str | None, payload: dict) -> None:

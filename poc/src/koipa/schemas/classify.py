@@ -2,6 +2,7 @@ from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 from .common import FactorRegistry, Grade
+from .regulation import EvidenceItemModel
 
 
 class DocumentInput(BaseModel):
@@ -155,6 +156,39 @@ class ClassifyOutcome(BaseModel):
     # 척하는 것이 된다. 검수자가 확인해야 할 것이 등급이 아니라 **접근권한**임을 알린다.
     grade_candidates: list[str] = []
     grade_candidates_reason: Optional[str] = None
+    # [2026-09-29] RAG+LLM 규정참고(설계서 §2.5·§3.6) — 이 문서에 해당하는 규정 원문이 있을
+    # 때만 채운다. 등급 판정과 무관한 참고용이며, GPU 없는 배포(현재 고객사 운영 서버)에서는
+    # 로컬 LLM 옵션이 시간 안에 못 끝나 항상 None 이 된다 — 필드는 지금 만들어 두고 GPU 도입은
+    # 별도 과제([[regulation-reference-implemented-2026-09-25]]).
+    regulation_reference: Optional[list[EvidenceItemModel]] = None
+
+
+def kl_wire_projection(
+    result: "ClassifyOutcome", regulation_reference: Optional[list[EvidenceItemModel]] = None
+) -> "ClassifyOutcome":
+    """KL(지재원 포털)이 실제로 받을 사본 — 같은 클래스, 진단용 필드만 비운다.
+
+    [2026-09-29] KL 요청: "등급이 같으면 예상 등급 하나, 다르면 분류기(label)를 메인으로 하고
+    룰분류기 예측은 따로, RAG+LLM 인 경우엔 관련 참고도 같이". label(최종판정)은 이미 시스템의
+    대표 답이므로 그대로 메인으로 두고, rule_grade 는 label 과 같으면 지워 "하나만" 리턴되게 한다.
+    evaluation_factors·evidence·decision_path 등 룰/모델 결합 근거를 보여주는 내부 진단 필드는
+    KL 요청 범위 밖이라 비운다 — DB 저장·우리 콘솔(admin.html)·`GET /classify/jobs/{job_id}` 를
+    관리자/시스템 역할로 부르는 내부 대용량 테스트 화면은 이 함수를 거치지 않아 그대로 전체를 본다
+    (api/async_classify.py 의 kl_backend 역할 분기, workers/tasks.py 의 콜백 발사 지점).
+    """
+    rule_grade = result.rule_grade if result.rule_grade is not None and result.rule_grade != result.label else None
+    return result.model_copy(update={
+        "scores": {},
+        "evaluation_factors": None,
+        "rule_evaluation_factors": None,
+        "evidence": [],
+        "model_grade": None,
+        "decision_path": None,
+        "grade_candidates": [],
+        "grade_candidates_reason": None,
+        "rule_grade": rule_grade,
+        "regulation_reference": regulation_reference,
+    })
 
 
 class ClassifyResponse(ClassifyOutcome):

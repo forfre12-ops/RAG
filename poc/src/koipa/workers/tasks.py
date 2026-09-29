@@ -104,8 +104,9 @@ def classify_async(
     경로는 그동안 callback_url 을 떼어내고 워커도 발사하지 않아 webhook 이 영원히 안 울렸다 — 이제
     submit_async 가 callback_url 을 워커로 넘기고 여기서 발사한다(in-process 경로와 상호배타 = 중복 없음).
     """
-    from koipa.schemas.classify import ClassifyRequest
+    from koipa.schemas.classify import ClassifyJobResult, ClassifyRequest, kl_wire_projection
     from koipa.services.classify_service import ClassifyService
+    from koipa.services.regulation_evidence_service import regulation_reference_for_kl_wire
 
     try:
         req = ClassifyRequest(**payload)
@@ -113,7 +114,14 @@ def classify_async(
         result = svc.classify(req)
         result_json = result.job_result()
         _record_job_done(job_id, results=[result_json], completed=1)
-        _publish_callback_webhook(callback_url, {"job_id": job_id, "status": "done", "results": [result_json]})
+        # [2026-09-29] 콜백 수신자는 정의상 항상 KL(callback_url 은 KL 이 준다) — 저장값(results,
+        # GET /classify/jobs/{job_id} 가 읽는 값)은 그대로 두고, 실제로 발사하는 webhook 본문만
+        # kl_wire_projection 으로 좁힌다(async_classify.py 의 kl_backend 역할 분기와 같은 규칙).
+        kl_result_json = kl_wire_projection(
+            ClassifyJobResult.model_validate(result_json),
+            regulation_reference=regulation_reference_for_kl_wire(result_json.get("doc_id", "")),
+        ).model_dump(mode="json")
+        _publish_callback_webhook(callback_url, {"job_id": job_id, "status": "done", "results": [kl_result_json]})
         return result_json
     except Exception as exc:  # noqa: BLE001
         attempts = self.request.retries

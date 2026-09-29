@@ -4,7 +4,7 @@ openapi: 3.0.3
 info:
   title: Koipa AI Engine API — KL 연동 인터페이스
   description: |
-    한국지식재산보호원 AI 영업비밀관리시스템 — KL 웹시스템이 호출하는 5개 인터페이스만 담은 규격이다.
+    한국지식재산보호원 AI 영업비밀관리시스템 — KL 웹시스템이 호출하는 7개 인터페이스만 담은 규격이다.
     전체 규약서에서 자동으로 만든 것이라 직접 고치지 않는다.
 
       IF-01  GET  /healthz                    준비 상태 확인
@@ -13,6 +13,8 @@ info:
       IF-04  POST {callback_url}              엔진 -> KL 완료 통보(선택, POST /classify/async 의 callback_url 참고)
       IF-05  GET  /classify/jobs/{job_id}     작업 상태·결과 조회
       IF-06  GET  /classify/{doc_id}          문서 단위 최근 결과 조회
+      IF-07  POST /confirm                    지재원 포털의 검수 확정 등급을 돌려받음(재학습 입력)
+      IF-08  POST /classify/batch             다건 문서 일괄 분류(최대 1000건, 결과는 IF-05로 조회)
 
     호출 순서와 예시는 함께 드리는 「AI 분류 엔진 연동 안내서」에 있다.
     인증은 서버 간 호출 기준 X-API-Key 헤더다(/healthz 는 인증 없음).
@@ -34,6 +36,8 @@ security:
 tags:
 - name: classify
   description: 등급 분류 추론 (FUN-005)
+- name: confirm
+  description: 분류 결과 확정·재라벨 (FUN-005, FUN-024)
 - name: documents
   description: 등급 판정 대상 문서 업로드·ingestion (FUN-005 연계)
 - name: health
@@ -102,6 +106,87 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
       x-interface: IF-03
+  /classify/batch:
+    post:
+      x-audience: kl
+      tags:
+      - classify
+      summary: 다건 문서 일괄 분류 (비동기 큐, 최대 1000건)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - documents
+              properties:
+                documents:
+                  type: array
+                  maxItems: 1000
+                  items:
+                    $ref: '#/components/schemas/ClassifyRequest'
+                callback_url:
+                  type: string
+                  nullable: true
+                  description: 완료·실패 시 결과 webhook 을 받을 주소(선택). 단건 요청(IF-03)과 같은 규칙(6장).
+      responses:
+        '202':
+          description: |
+            일괄 작업 등록 (부분 실패 허용).
+            PoC는 즉시 in-process 실행이므로 응답에 completed/failed/failed_doc_ids/errors가
+            즉시 채워진다. 운영 Celery 모드에서는 0/0/[]/[] 로 시작 후 /classify/jobs/{id}로 폴링.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - job_id
+                - total
+                - status_url
+                properties:
+                  job_id:
+                    type: string
+                    format: uuid
+                  total:
+                    type: integer
+                  status:
+                    type: string
+                    enum:
+                    - queued
+                    - running
+                    - done
+                    - failed
+                    - partial
+                  status_url:
+                    type: string
+                    format: uri
+                  completed:
+                    type: integer
+                    description: 성공적으로 처리된 건 수 (부분 실패 처리 도입)
+                  failed:
+                    type: integer
+                    description: retry까지 모두 실패한 건 수
+                  failed_doc_ids:
+                    type: array
+                    description: 영구 실패한 doc_id 목록
+                    items:
+                      type: string
+                  errors:
+                    type: array
+                    description: 영구 실패 사유 (doc_id·error_type·message·attempts)
+                    items:
+                      type: object
+                      properties:
+                        doc_id:
+                          type: string
+                        error_type:
+                          type: string
+                        message:
+                          type: string
+                        attempts:
+                          type: integer
+      x-interface: IF-08
   /classify/jobs/{job_id}:
     get:
       x-audience: kl
@@ -167,6 +252,71 @@ paths:
         '503':
           description: DB 일시 장애. 본문은 {"detail":"service temporarily unavailable"} — 잠시 뒤 다시 조회한다.
       x-interface: IF-06
+  /confirm:
+    post:
+      x-audience: kl
+      tags:
+      - confirm
+      summary: 분류 결과 확정 (staging -> production) — KL 포털의 검수 확정을 받는 통로
+      description: |
+        지재원 포털에서 사람이 검수해 확정한 등급을 돌려받는다. Koipa 는 이 값을 재학습 입력으로
+        쓴다(예측 label 은 감사 증적으로 남기고 덮어쓰지 않는다 — GET /classify/{doc_id} 의
+        confirmed_label 로 함께 조회 가능). actor.user_id 에 KL 포털의 실제 검수자 신원을 담아
+        보낸다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - doc_id
+              - confirmed_label
+              - actor
+              properties:
+                doc_id:
+                  type: string
+                inference_id:
+                  type: string
+                  format: uuid
+                confirmed_label:
+                  $ref: '#/components/schemas/Grade'
+                actor:
+                  $ref: '#/components/schemas/Actor'
+                note:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: 확정 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - confirmation_id
+                - confirmed_at
+                properties:
+                  confirmation_id:
+                    type: string
+                    format: uuid
+                  confirmed_at:
+                    type: string
+                    format: date-time
+                  persisted:
+                    type: boolean
+                    default: true
+                    description: DB 영속 여부. false=분류 미존재/DB 일시 장애로 감사로만 기록(무음 성공 아님) — 재확인 필요.
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+                    description: 비치명 경고(분류 미존재·미지정 라벨·멱등 중복·영속 실패 등).
+                  second_review_required:
+                    type: boolean
+                    default: false
+                    description: 고등급 2인검토 게이트로 needs_second_review 로 보류됐는지.
+      x-interface: IF-07
   /documents:
     post:
       x-audience: kl
@@ -333,6 +483,22 @@ components:
       - S1
       - S2
       - S3
+    Actor:
+      type: object
+      required:
+      - user_id
+      - role
+      description: 호출자(관리자/시스템) 정보. 감사 로그용.
+      properties:
+        user_id:
+          type: string
+        role:
+          type: string
+          enum:
+          - admin
+          - reviewer
+          - system
+          - kl_backend
     DocumentInput:
       type: object
       required:
@@ -549,10 +715,17 @@ components:
           type: string
           nullable: true
           description: 후보가 남은 사유(사람이 읽는 문장)
+        regulation_reference:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/RegulationEvidenceItem'
+          description: '[2026-09-29] RAG+LLM 규정참고 — 이 문서에 해당하는 사내 규정 원문이 있을 때만 채운다(등급 판정과 무관, 참고용). 기능이 꺼져 있거나 해당
+            규정이 없으면 null. GPU 가 없는 배포에서는 로컬 LLM 옵션이 제한 시간 안에 끝나지 못해 항상 null 이 된다(GPU 도입은 별도 과제).'
     ClassifyJobResult:
-      description: GET /classify/jobs/{job_id} 의 results[] 한 건(IF-05, KL 이 호출) 및 콜백(IF-04) 본문 — ClassifyOutcome
-        그대로이며 처리 시간·automation_assessment 는 없다(둘 다 내부 전용 ClassifyResponse 에만 있다. 2026-09-27 automation_assessment
-        제거 — 그 전에는 그림자 관측치가 KL 에도 실려 나갔다).
+      description: |-
+        GET /classify/jobs/{job_id} 의 results[] 한 건(IF-05, KL 이 호출) 및 콜백(IF-04) 본문 — ClassifyOutcome 그대로이며 처리 시간·automation_assessment 는 없다(둘 다 내부 전용 ClassifyResponse 에만 있다. 2026-09-27 automation_assessment 제거 — 그 전에는 그림자 관측치가 KL 에도 실려 나갔다).
+        [2026-09-29] KL(지재원 포털)이 실제로 받는 값은 또 좁혀진다: label(최종 판정=분류기가 메인)이 항상 있고, rule_grade 는 label 과 **다를 때만** 채워진다(같으면 null — "등급이 같으면 하나만" 요청). evaluation_factors·rule_evaluation_factors·evidence·model_grade·decision_path·grade_candidates· grade_candidates_reason·scores 는 KL 응답에서는 항상 비어 있다(scores={}·나머지 null 또는 빈 배열) — 같은 필드를 우리 콘솔·관리자 역할로 조회하면(같은 엔드포인트를 내부 화면도 재사용) 채워진 그대로 나온다. 구분은 서버가 호출자 인증 역할(kl_backend 인지)로 판단하며 요청 쪽에서 고를 수 없다.
       allOf:
       - $ref: '#/components/schemas/ClassifyOutcome'
     StoredClassificationResponse:
@@ -732,6 +905,49 @@ components:
         retryable:
           type: boolean
           description: true 면 같은 요청을 다시 보내 성공할 수 있다(미처리 500 은 true).
+    RegulationEvidenceItem:
+      type: object
+      required:
+      - regulation
+      - clause
+      - sentences
+      - is_grade_list
+      properties:
+        regulation:
+          type: object
+          required:
+          - reg_id
+          - name
+          - version_label
+          properties:
+            reg_id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            version_label:
+              type: string
+        clause:
+          type: object
+          required:
+          - clause_id
+          - article_no
+          - title
+          properties:
+            clause_id:
+              type: string
+              format: uuid
+            article_no:
+              type: string
+            title:
+              type: string
+        sentences:
+          type: array
+          items:
+            type: string
+          description: 규정 원문 문장 그대로. 등급별 목록이면 목록 전체(순서대로)
+        is_grade_list:
+          type: boolean
   responses:
     Unauthorized:
       description: 인증 실패

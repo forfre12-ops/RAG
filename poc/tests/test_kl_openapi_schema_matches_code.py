@@ -126,14 +126,23 @@ def _diff(doc_spec: dict, code_spec: dict, method: str, path: str) -> list[str]:
     return problems
 
 
-def test_the_kl_operations_are_the_five_agreed_interfaces(doc):
-    """IF-01·02·03·05·06 — 회신서가 KL 이 호출한다고 밝힌 다섯 개."""
+def test_the_kl_operations_are_the_seven_agreed_interfaces(doc):
+    """IF-01·02·03·05·06·07·08 — 회신서가 KL 이 호출한다고 밝힌 일곱 개.
+
+    [2026-09-29] IF-07(POST /confirm) 추가 — 지재원 포털이 사람 검수로 확정한 등급을
+    돌려보내는 통로. 코드(api/confirm.py)는 처음부터 kl_backend 역할을 받고 있었고,
+    규약서의 x-audience 태그만 internal→kl 로 실제 동작에 맞게 고쳤다.
+    [2026-09-29] IF-08(POST /classify/batch) 추가 — 사용자 지시로 개방(다건 문서 일괄
+    분류). 코드 변경 없음, 태그만 internal→kl.
+    """
     assert _kl_operations(doc) == sorted([
         ("get", "/healthz"),
         ("post", "/documents"),
         ("post", "/classify/async"),
         ("get", "/classify/jobs/{job_id}"),
         ("get", "/classify/{doc_id}"),
+        ("post", "/confirm"),
+        ("post", "/classify/batch"),
     ])
 
 

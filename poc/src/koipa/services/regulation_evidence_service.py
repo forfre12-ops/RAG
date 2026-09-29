@@ -29,10 +29,13 @@ from collections import OrderedDict
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from koipa.schemas.regulation import EvidenceItemModel
 
 from koipa.regulation import llm_select, vectors
 from koipa.regulation.index import (
@@ -354,3 +357,36 @@ class RegulationEvidenceService:
 
 def get_regulation_evidence_service() -> RegulationEvidenceService:
     return RegulationEvidenceService.get_instance()
+
+
+def regulation_reference_for_kl_wire(doc_id: str) -> list[EvidenceItemModel] | None:
+    """분류 결과에 실어 KL 로 보낼 규정참고 — 없으면(꺼짐·미색인·오류) None.
+
+    [2026-09-29] async_classify.py(GET /classify/jobs/{job_id} kl_backend 분기)·
+    workers/tasks.py(콜백 발사)가 부른다. `find_for_document` 는 원래 검수 화면 전용
+    진입점이라 여기서 실패를 전부 삼킨다 — 규정참고 조회 실패로 분류 응답 자체가
+    막히면 안 된다(등급 전달이 우선, 참고는 있으면 더하는 것).
+    """
+    from koipa.config import settings  # noqa: PLC0415
+    from koipa.schemas.regulation import EvidenceClauseRef, EvidenceItemModel, EvidenceRegulationRef  # noqa: PLC0415
+
+    if not getattr(settings, "regulation_reference_enabled", False):
+        return None
+    try:
+        result = RegulationEvidenceService.get_instance().find_for_document(doc_id)
+    except LookupError:
+        return None
+    except Exception:  # noqa: BLE001
+        logger.warning("regulation_reference_for_kl_wire: 조회 실패 doc_id=%s", doc_id, exc_info=True)
+        return None
+    if not result.items:
+        return None
+    return [
+        EvidenceItemModel(
+            regulation=EvidenceRegulationRef(reg_id=i.rgltn_id, name=i.rgltn_nm, version_label=i.ver_lbl_nm),
+            clause=EvidenceClauseRef(clause_id=i.clause_id, article_no=i.article_no, title=i.title),
+            sentences=list(i.sentences),
+            is_grade_list=i.is_grade_list,
+        )
+        for i in result.items
+    ]
