@@ -432,19 +432,29 @@ def has_real_evidence(result: "RuleLabelResult") -> bool:
     return any(mk.start is None for mk in result.matched_keywords)
 
 
-# [2026-09-27] BUY\u00B7Weekly\u00B7WTI\u00B7LNG\u00B7IRA \uC81C\uAC70 \u2014 \uACF5\uAC1C \uC2DC\uD669 \uB9AC\uD3EC\uD2B8 \uC0C1\uD22C\uC5B4\uB77C 651\uAC74 \uC804\uC218(hardened42\u00B7
-# holdout109\u00B7golden500) \uC2E4\uCE21\uC5D0\uC11C \uC774 \uB137\uC740 \uB2E8 \uD55C \uBC88\uB3C4 TS/S1(\uACE0\uB4F1\uAE09) \uBB38\uC11C\uC5D0 \uAC78\uB9B0 \uC801\uC774 \uC5C6\uACE0
-# \uAC78\uB9B4 \uB54C\uB9C8\uB2E4(holdout109 7\uAC74) S3 \uBB38\uC11C\uB97C S1/S2\uB85C \uACFC\uBD84\uB958\uC2DC\uCF30\uB2E4. \uC81C\uAC70 \uD6C4 \uAC19\uC740 651\uAC74 \uC7AC\uCE21\uC815:
-# \uAC1C\uC120 7 \u00B7 \uBD80\uC791\uC6A9 0. CVD\uB294 \uB0A8\uAE34\uB2E4 \u2014 \uAC19\uC740 651\uAC74\uC5D0\uC11C 4/6\uC774 \uC9C4\uC9DC TS(\uBC18\uB3C4\uCCB4 CVD \uACF5\uC815)\uC774\uACE0
-# \uC624\uD0D0\uC740 1\uAC74(\uD0DC\uC591\uAD11 \uAD00\uC138 \uB9AC\uD3EC\uD2B8\uC758 "\uC0C1\uACC4\uAD00\uC138countervailing duty" \uB3D9\uC74C\uC774\uC758\uC5B4)\uBFD0\uC774\uB77C \uC21C\uC2E0\uD638\uAC00 \uC788\uB2E4.
+# [2026-09-27] BUY·Weekly·WTI·LNG·IRA 제거 — 공개 시황 리포트 상투어라 651건 전수(hardened42·
+# holdout109·golden500) 실측에서 이 넷은 단 한 번도 TS/S1(고등급) 문서에 걸린 적이 없고
+# 걸릴 때마다(holdout109 7건) S3 문서를 S1/S2로 과분류시켰다. 제거 후 같은 651건 재측정:
+# 개선 7 · 부작용 0. CVD는 남긴다 — 같은 651건에서 4/6이 진짜 TS(반도체 CVD 공정)이고
+# 오탐은 1건(태양광 관세 리포트의 "상계관세 countervailing duty" 동음이의어)뿐이라 순신호가 있다.
+#
+# [2026-09-29] PMI·IPO·valuation(TS 부스트)·Guide Book(S2 부스트) 제거. 기준은 측정 전에 정했다:
+# 정답이 있는 1,418건(같은 본문 63건 제외, scripts/measure_rule_acronym_negation.py)에서
+#   ① 그 토큰만 빼면 룰 등급이 맞게 바뀐 문서 ≥1 · 틀리게 바뀐 문서 0
+#   ② 필요한 상향(FNR-safe)을 잃는 문서 0
+#   ③ 정답이 부스트 등급보다 낮은 문서(과분류) ≥2 이고 정답이 부스트 등급과 같은 문서보다 많음
+#   ④ 공개 문서에 흔한 일반 낱말(PMI=구매관리자지수·IPO=공모·valuation·Guide Book)
+# 남긴 것: M&A(정답 TS 57 대 과분류 2), ETF·EBITDA·license·CVD(빼면 필요한 상향을 잃는 문서가 있다),
+# BEV·DMF(표본 1건). ⚠ 기계 라벨 기준의 방향일 뿐 고객사 정확도가 아니다. 진짜 M&A 사후통합 문서는
+# "Post-Merger" 패턴이 계속 잡는다. 검수 대상 1,731건에는 이 넷이 0건이라 그 셋의 출력은 안 바뀐다.
 _HIGH_RISK_PATTERNS: list[tuple[str, str, float, str]] = [
     ("TS", r"\b(?:DRAM|HBM|EUV|CVD|ALD|ICP-RIE|SiH4|N2O|sccm|Torr|Li6PS5Cl|Li2S|P2S5|LiCl|ZrO2|NMC|mAh/g)\b", 1.6, "ECONOMIC_VALUE"),
     ("TS", r"\b(?:HSM|FIPS|master\s*key|root\s*CA|SCADA|zero[- ]day|CFAR|MIMO|RLHF|LLM)\b", 1.6, "MANAGEMENT_LEVEL"),
-    ("TS", r"\b(?:DCF|NDA|PMI|Post[- ]Merger|IPO|M&A|CFO|valuation|merger|acquisition)\b", 1.4, "NON_PUBLICITY"),
+    ("TS", r"\b(?:DCF|NDA|Post[- ]Merger|M&A|CFO|merger|acquisition)\b", 1.4, "NON_PUBLICITY"),
     ("S1", r"\b(?:GMP|DMF|PLC|TFT[- ]LCD|QKD|source\s*code|API|patent|license|trade\s*secret)\b", 1.2, "ECONOMIC_VALUE"),
     ("S1", r"\b(?:EBITDA|target\s*price|cost\s*structure|customer\s*(?:list|database)|pricing\s*model)\b", 1.0, "ECONOMIC_VALUE"),
     ("S1", "(?:\uAE30\uC5C5\\s*\uC2E4\uC0AC|\uC778\uC218\\s*\uBB34\uC0B0|\uD569\uBCD1\\s*\uAC00\uACA9|\uC778\uC218\\s*\uAC00\uACA9|\uBE44\uACF5\uAC1C\\s*\uC774\uC0AC\uD68C|\uBBF8\uACF5\uC2DC)", 1.2, "NON_PUBLICITY"),
-    ("S2", r"\b(?:Guide\s*Book|OEM|BEV|AMPC|CDMO|GHz|GWh|LTE|ETF|OECD)\b", 0.9, "NON_PUBLICITY"),
+    ("S2", r"\b(?:OEM|BEV|AMPC|CDMO|GHz|GWh|LTE|ETF|OECD)\b", 0.9, "NON_PUBLICITY"),
     ("S2", r"\b(?:internal\s*(?:review|plan|memo)|draft|negotiation|vendor|supplier|budget|forecast)\b", 1.0, "NON_PUBLICITY"),
 ]
 

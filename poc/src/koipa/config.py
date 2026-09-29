@@ -546,7 +546,11 @@ class Settings(BaseSettings):
     # FNR-safe 오버라이드 threshold (pipeline.py).
     # 룰 엔진의 TS 점수가 이 값 이상이고 룰 등급이 모델 등급보다 높으면 TS로 올림.
     # 높일수록 오버라이드 빈도 감소 (S3 과분류 완화), 낮출수록 FNR 안전성 강화.
-    # 권장 범위: 2.5~5.0. 기본 3.0. 운영 데이터 누적 후 조정.
+    # 권장 범위: 2.5~5.0. 기본 3.0.
+    # [2026-09-29 실측] 기본값 3.0/2.2/1.6 은 구제-과상향 곡선의 무릎이다(scripts/audit_rule_override_value.py ·
+    # 모델 v-fe4b386b · hardened42·clean42·business35·holdout109 · 기계 라벨). 낮추면(TS>=1.5/S1>=1.0/S2>=0.8)
+    # 구제는 그대로거나 +1 인데 과상향이 +1~3 늘고, 높이면(TS>=4.5/S1>=3.5/S2>=2.5) 구제가 3→1 로 준다.
+    # 규모가 구제 3건·과상향 0~3건이라 미세 조정의 근거로는 부족하다 — 바꾸려면 같은 도구로 다시 잴 것.
     fnr_rule_ts_threshold: float = 3.0
     fnr_rule_s1_threshold: float = 2.2
     fnr_rule_s2_threshold: float = 1.6
