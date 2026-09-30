@@ -145,6 +145,52 @@ def classify_async(
         raise
 
 
+@celery_app.task(
+    name="koipa.classify_batch",
+    bind=True,
+    max_retries=0,
+)
+def classify_batch(
+    self: Any, documents_payload: list[dict], job_id: str | None = None, callback_url: str | None = None
+) -> dict:
+    """다건 배치 분류 비동기 task (2026-09-30 신설).
+
+    건별 isolation+retry는 AsyncClassifyService._process_batch_documents 안의
+    iter_with_partial_failure 가 이미 담당한다 — task 자체는 재시도하지 않는다
+    (max_retries=0). task 전체를 재시도하면 이미 끝난 건까지 중복 처리된다.
+    submit_batch 의 in-process 경로와 정확히 같은 두 메서드(_process_batch_documents·
+    _finalize_batch)를 그대로 불러써 두 경로가 갈라지지 않게 한다.
+    """
+    import uuid as _uuid
+
+    from koipa.schemas.classify import ClassifyRequest
+    from koipa.services.async_classify_service import AsyncClassifyService
+
+    jid = _uuid.UUID(job_id) if job_id else _uuid.uuid4()
+    svc = AsyncClassifyService()
+    try:
+        documents = [ClassifyRequest(**d) for d in documents_payload]
+        results, failed_ids, errors = svc._process_batch_documents(documents, jid)  # noqa: SLF001
+        out = svc._finalize_batch(  # noqa: SLF001
+            jid, total=len(documents_payload), results=results,
+            failed_ids=failed_ids, errors=errors, callback_url=callback_url,
+        )
+        return out.model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001 — 건별 격리 밖의 재앙적 실패(예: ClassifyService 자체 불가)
+        logger.error(
+            "classify_batch task failed catastrophically: job_id=%s err=%s",
+            job_id, type(exc).__name__, exc_info=True,
+        )
+        _record_compensation(
+            job_id, partial_results=[],
+            reason=f"classify_batch exhausted: {type(exc).__name__}: {exc}",
+        )
+        _publish_callback_webhook(
+            callback_url, {"job_id": job_id, "status": "failed", "error": f"{type(exc).__name__}: {exc}"}
+        )
+        raise
+
+
 def _publish_callback_webhook(callback_url: str | None, payload: dict) -> None:
     """워커 완료/실패 시 callback_url 로 결과 webhook 발사 — outbox.publish_callback(공용 계약)로 위임.
 

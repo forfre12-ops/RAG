@@ -303,7 +303,12 @@ paths:
                     items: { type: string }
                   errors:
                     type: array
-                    description: 영구 실패 사유 (doc_id·error_type·message·attempts)
+                    description: |
+                      영구 실패 사유 (doc_id·error_type·message·attempts).
+                      [2026-09-30] error_type=DocumentTooLarge 는 그 문서 한 건이 너무 커서
+                      (단건 동기 경로와 같은 청크 상한) 배치 전체를 오래 막지 않도록 재시도
+                      없이(attempts=0) 즉시 실패 처리한 것이다 — 재제출해도 같은 이유로 다시
+                      실패하니, 그 문서만 POST /classify/async 로 단건 제출할 것.
                     items:
                       type: object
                       properties:

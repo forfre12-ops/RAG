@@ -34,6 +34,35 @@ from koipa.services.job_store import get_default_store
 logger = logging.getLogger(__name__)
 
 
+def _oversized_batch_doc_reason(doc: ClassifyRequest) -> Optional[str]:
+    """배치 문서 한 건이 너무 커서 배치 전체를 오래 막는지 검사.
+
+    [2026-09-30] `/classify/batch`는 건별 순차 처리라(iter_with_partial_failure), 문서 하나가
+    100쪽대면 그 한 건이 수십~백여 초를 끌어 나머지 999건이 뒤에서 기다린다. 단건 동기 경로
+    (`api/documents.py`의 analyze_sync_max_chunks)와 같은 상한을 여기도 적용한다 — 재시도로는
+    크기가 줄지 않으므로 재시도 없이 즉시 실패 처리한다(아래 _process_batch_documents).
+    content가 없으면(문서 조회 등 다른 입력 경로) 크기를 알 수 없어 검사하지 않는다.
+    """
+    if not doc.content:
+        return None
+    try:
+        from koipa.config import settings  # noqa: PLC0415
+        from koipa.modules.m5_inference.pipeline import chunk_text  # noqa: PLC0415
+
+        cap = int(getattr(settings, "analyze_sync_max_chunks", 0) or 0)
+        if cap <= 0:
+            return None
+        n_chunks = len(chunk_text(doc.content, settings.max_seq_len * 3, settings.chunk_overlap))
+        if n_chunks > cap:
+            return (
+                f"document too large for batch: {n_chunks} chunks > {cap} "
+                f"({len(doc.content):,} chars). 대용량 문서는 POST /classify/async 로 단건 제출할 것."
+            )
+    except Exception:  # noqa: BLE001 — 검사 자체가 실패하면 통과시킨다(과대 차단보다 처리 시도가 안전)
+        return None
+    return None
+
+
 # [2026-09-11] 브로커 확인 결과를 잠깐 저장한다 (PER-002 "등록 3초 이내").
 #
 # 종전에는 비동기 요청마다 브로커에 TCP 연결을 새로 시도했다(0.5초 제한). 브로커가 살아 있으면
@@ -211,27 +240,37 @@ class AsyncClassifyService:
             status_url=f"/api/v1/classify/jobs/{job_id}",
         )
 
-    def submit_batch(
-        self, req: ClassifyBatchRequest
-    ) -> ClassifyBatchResponse:
-        """건별 isolation + retry 패턴.
+    def _process_batch_documents(
+        self, documents: list[ClassifyRequest], job_id: uuid.UUID
+    ) -> tuple[list[dict], list[str], list[dict]]:
+        """건별 isolation+retry로 배치를 처리한다 — in-process 경로·Celery 워커 경로 공용.
 
-        한 건이 영구 실패해도 다음 건 계속 진행. 응답에 부분 실패 정보 포함.
-        모두 성공: status="done". 일부 성공: "partial". 전부 실패: "failed".
+        [2026-09-30] 너무 큰 문서(_oversized_batch_doc_reason)는 재시도 없이 즉시 실패
+        처리한다 — 크기는 재시도로 줄지 않으니 재시도 지연만 낭비한다. 진행 카운터는
+        이미 판정된 과대 문서까지 포함해 갱신한다(폴링 화면이 "멈춘 것처럼" 보이지 않게).
         """
-        logger.debug("async batch submit enter: total=%d", len(req.documents))
-        job_id = uuid.uuid4()
-        total = len(req.documents)
-        self.jobs.create(
-            job_id, payload={"total": total, "completed": 0}
-        )
+        oversized_ids: list[str] = []
+        oversized_errors: list[dict] = []
+        valid_docs: list[ClassifyRequest] = []
+        for doc in documents:
+            reason = _oversized_batch_doc_reason(doc)
+            if reason:
+                oversized_ids.append(doc.doc_id)
+                oversized_errors.append({
+                    "doc_id": doc.doc_id, "error_type": "DocumentTooLarge",
+                    "message": reason, "attempts": 0,
+                })
+            else:
+                valid_docs.append(doc)
 
         def _handle(doc: ClassifyRequest) -> dict:
             res = self.classify.classify(doc)
             return res.job_result()
 
-        # 진행 카운터 업데이트용 wrapper — 매 건 완료 시 jobs.update.
-        completed_counter = {"n": 0}
+        # 진행 카운터 업데이트용 wrapper — 매 건 완료 시 jobs.update. 과대 판정분을 base로 시작.
+        completed_counter = {"n": len(oversized_ids)}
+        if oversized_ids:
+            self.jobs.update(job_id, completed=completed_counter["n"])
 
         def _handle_and_track(doc: ClassifyRequest) -> dict:
             out = _handle(doc)
@@ -240,14 +279,26 @@ class AsyncClassifyService:
             return out
 
         results, failed_ids, errors = iter_with_partial_failure(
-            req.documents,
+            valid_docs,
             _handle_and_track,
             max_attempts=self.BATCH_MAX_ATTEMPTS,
             base_delay=self.BATCH_BASE_DELAY,
             sleep_fn=self._sleep_fn,
             id_of=lambda d: d.doc_id,
         )
+        return results, [*oversized_ids, *failed_ids], [*oversized_errors, *errors]
 
+    def _finalize_batch(
+        self,
+        job_id: uuid.UUID,
+        *,
+        total: int,
+        results: list[dict],
+        failed_ids: list[str],
+        errors: list[dict],
+        callback_url: str | None,
+    ) -> ClassifyBatchResponse:
+        """처리 결과를 JobStore에 최종 기록 + 콜백 발사 — in-process·워커 공용 종결부."""
         completed = len(results)
         failed = len(failed_ids)
         if failed == 0:
@@ -274,7 +325,7 @@ class AsyncClassifyService:
         # M-callback: 배치도 동일하게 callback_url 이 있으면 outbox webhook 발사.
         # 저장값(results)은 전체를 두고, webhook 본문만 kl_wire_projection 으로 좁힌다.
         self._publish_callback(
-            getattr(req, "callback_url", None),
+            callback_url,
             {
                 "job_id": str(job_id),
                 "status": final_status,
@@ -286,9 +337,6 @@ class AsyncClassifyService:
             },
         )
 
-        # 배치는 건별 isolation+retry로 전건을 in-process 처리(결과 인라인)하는 게 계약이라
-        # 단발 Celery task로 갈 게 아니다. 처리가 끝났으므로 'queued' 거짓표기 대신 실제
-        # 최종 상태(done/partial/failed)를 반환한다.
         return ClassifyBatchResponse(
             job_id=job_id,
             total=total,
@@ -298,6 +346,60 @@ class AsyncClassifyService:
             failed=failed,
             failed_doc_ids=failed_ids,
             errors=errors,
+        )
+
+    def submit_batch(
+        self, req: ClassifyBatchRequest
+    ) -> ClassifyBatchResponse:
+        """건별 isolation + retry 패턴.
+
+        한 건이 영구 실패해도 다음 건 계속 진행. 응답에 부분 실패 정보 포함.
+        모두 성공: status="done". 일부 성공: "partial". 전부 실패: "failed".
+
+        [2026-09-30] 운영(브로커 가용) — 전건을 워커(koipa.classify_batch)로 넘기고
+        즉시 'queued'를 반환한다(submit_async 와 동일 판단 · _celery_dispatch_available).
+        예전엔 이 분기가 없어 최대 1000건을 이 요청 안에서 전부 순차 처리했다 — 문서가
+        작아도 수 분, 큰 문서가 섞이면 수십 분까지 걸려 호출자 연결이 응답 전에 끊기고,
+        job_id는 그 응답 안에만 있어 끊기면 폴링할 방법도 없었다(실사용 문제, 이 커밋에서
+        고침). PoC/시험/브로커 미가용은 기존과 동일하게 in-process 로 끝까지 처리한다.
+        """
+        logger.debug("async batch submit enter: total=%d", len(req.documents))
+        job_id = uuid.uuid4()
+        total = len(req.documents)
+        self.jobs.create(
+            job_id, payload={"total": total, "completed": 0}
+        )
+
+        if _celery_dispatch_available():
+            try:
+                from koipa.workers.tasks import classify_batch  # noqa: PLC0415
+
+                payload = [d.model_dump(mode="json") for d in req.documents]
+                classify_batch.delay(
+                    payload, job_id=str(job_id), callback_url=getattr(req, "callback_url", None)
+                )
+                logger.info("async batch enqueued to celery: job_id=%s total=%d", job_id, total)
+                return ClassifyBatchResponse(
+                    job_id=job_id,
+                    total=total,
+                    status="queued",
+                    status_url=f"/api/v1/classify/jobs/{job_id}",
+                    completed=0,
+                    failed=0,
+                    failed_doc_ids=[],
+                    errors=[],
+                )
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "celery enqueue failed for batch — falling back to in-process: job_id=%s",
+                    job_id, exc_info=True,
+                )
+                invalidate_dispatch_cache()
+
+        results, failed_ids, errors = self._process_batch_documents(req.documents, job_id)
+        return self._finalize_batch(
+            job_id, total=total, results=results, failed_ids=failed_ids, errors=errors,
+            callback_url=getattr(req, "callback_url", None),
         )
 
     def get_status(
