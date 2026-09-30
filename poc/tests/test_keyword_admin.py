@@ -6,6 +6,7 @@ reload_rules 만 실 ClassifyService 싱글턴으로 통합 검증(모델 미로
 
 from __future__ import annotations
 
+import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
 
@@ -324,3 +325,100 @@ def test_endpoint_create_translates_error_to_http(monkeypatch):
     with pytest.raises(HTTPException) as ei:
         kadmin.create_keyword(req)
     assert ei.value.status_code == 400
+
+
+# ── 실제 등급 판정에 미치는 영향 (LabelRuleEngine 통합, PG 불요) ────────────────────
+# 위 CRUD 테스트들은 전부 fake session + 스텁 reload라 "키워드를 추가하면 실제 분류
+# 결과가 바뀌는가"는 커버하지 않는다(2026-09-30 사용자 지적). load_seeds_from_db()가
+# KeywordAdminService.create()가 저장한 LevelKeyword를 KEYWORD_SEEDS와 동일한 형태
+# (keyword/grade/factor/weight/pattern_type)로 내놓는다는 계약(seeds.py) 위에서,
+# 그 형태의 시드가 LabelRuleEngine을 통해 실제로 등급을 바꾸는지 DB 없이 재현한다.
+def test_admin_added_keyword_changes_classification_outcome():
+    """관리자 콘솔에서 키워드를 추가하면 실제 등급 판정이 바뀌고, 빼면 원복되는가."""
+    from koipa.config import settings
+    from koipa.modules.m3_labeling.rule_engine import LabelRuleEngine
+    from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS
+
+    text = (
+        "본 문서는 2026년도 상반기 사업 추진 현황을 정리한 일반 업무 보고서입니다. "
+        "특이사항 없이 정상적으로 진행되고 있습니다. "
+        "존재하지않는테스트전용키워드가 포함되어 있습니다."
+    )
+
+    baseline = LabelRuleEngine(seeds=KEYWORD_SEEDS).label(text)
+    assert baseline.grade_scores.get("S1", 0.0) == 0.0
+    assert baseline.grade != "S1"
+
+    # KeywordAdminService.create()가 DB에 쌓는 LevelKeyword 한 행과 같은 모양.
+    admin_added_seed = {
+        "keyword": "존재하지않는테스트전용키워드",
+        "grade": "S1",
+        "factor": "SECRECY",
+        "weight": 3.0,
+        "pattern_type": "exact",
+    }
+    with_keyword = LabelRuleEngine(seeds=[*KEYWORD_SEEDS, admin_added_seed]).label(text)
+    s1_score = with_keyword.grade_scores.get("S1", 0.0)
+    assert s1_score == 3.0
+    assert with_keyword.grade == "S1"
+    # m5_inference/pipeline.py의 FNR-safe override가 실제로 비교하는 바로 그 임계값 —
+    # 이 임계를 넘어야 모델 예측과 무관하게 최종등급이 강제로 올라간다.
+    assert s1_score >= settings.fnr_rule_s1_threshold
+
+    # 비활성화(is_active=False)하면 load_seeds_from_db()가 그 행을 제외한다(seeds.py의
+    # LevelKeyword.is_active 필터) — 키워드 없는 시드 목록으로 돌아가는 것과 동일 효과.
+    reverted = LabelRuleEngine(seeds=KEYWORD_SEEDS).label(text)
+    assert reverted.grade_scores == baseline.grade_scores
+    assert reverted.grade == baseline.grade
+
+
+def _pg_up() -> bool:
+    """판정은 _pg_probe 한 곳에만 둔다 — DATABASE_URL의 host·port를 본다(repo 관례)."""
+    from _pg_probe import postgres_available
+
+    return postgres_available()
+
+
+@pytest.mark.skipif(not _pg_up(), reason="postgres not available (DATABASE_URL 기준)")
+def test_load_seeds_from_db_excludes_inactive_keyword():
+    """/admin/keywords가 실제로 쓰는 테이블에서, 비활성 처리한 키워드가 룰엔진 시드
+    로딩(load_seeds_from_db)에서 실제로 빠지는가 — 실 DB. 테스트가 남긴 행은 끝에 지운다.
+    """
+    from koipa.db import session_scope
+    from koipa.db.models import ClassificationLevel, LevelKeyword
+    from koipa.modules.m3_labeling.seeds import load_seeds_from_db
+
+    marker = "존재하지않는테스트전용키워드_pg_" + uuid.uuid4().hex[:8]
+    kid = None
+    try:
+        with session_scope() as db:
+            level = (
+                db.query(ClassificationLevel)
+                .filter(ClassificationLevel.is_active.is_(True))
+                .first()
+            )
+            assert level is not None, "활성 등급이 하나도 없습니다 — 등급체계 시드 확인 필요"
+            kw = LevelKeyword(
+                level_id=level.level_id, keyword=marker, pattern_type="exact",
+                factor_id=None, weight=1.0, source="test", is_active=True,
+            )
+            db.add(kw)
+            db.flush()
+            kid = kw.keyword_id
+
+        seeds = load_seeds_from_db()
+        assert seeds is not None
+        assert any(s["keyword"] == marker for s in seeds), "활성 키워드가 시드 로딩에 없습니다"
+
+        with session_scope() as db:
+            row = db.query(LevelKeyword).filter(LevelKeyword.keyword_id == kid).one()
+            row.is_active = False
+
+        seeds_after = load_seeds_from_db()
+        assert seeds_after is None or not any(s["keyword"] == marker for s in seeds_after), (
+            "비활성화했는데도 시드 로딩에 남아 있습니다 — load_seeds_from_db의 is_active 필터가 깨졌습니다"
+        )
+    finally:
+        if kid is not None:
+            with session_scope() as db:
+                db.query(LevelKeyword).filter(LevelKeyword.keyword_id == kid).delete()
