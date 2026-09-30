@@ -266,7 +266,7 @@ footer strong{color:var(--text-dim);}
   <div class="section-sep" id="s4">
     <span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">판정</span>
   </div>
-  <h2>등급 넷과, 등급을 만드는 곱셈식</h2>
+  <h2>등급 넷과, 등급에서 파생되는 S·V·M</h2>
 
   <p>등급 코드는 <code>Grade</code> 열거형에 고정돼 있고(<code>schemas/common.py:39</code>), 런타임에는 DB <code>tad_cm_clsf_grd_mng</code>에서 다시 읽는다. 다른 등급체계를 쓰는 기관에도 등급을 등록해 대응할 수 있다(<code>GradeRegistry</code>).</p>
 
@@ -282,8 +282,8 @@ footer strong{color:var(--text-dim);}
   </table>
   </div>
 
-  <h3>판정식 — 등급 = 비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</h3>
-  <p>발주처 정본 가이드 B안 v2.2를 그대로 코드로 옮긴 것이다(<code>modules/m3_labeling/rule_engine.py:56</code>, 함수 <code>grade_from_svm</code>).</p>
+  <h3>판정 — 등급은 키워드 룰이 정하고, S·V·M(비공지성·경제적 유용성·비밀관리성)은 그 등급에서 파생된다</h3>
+  <p>등급은 키워드 룰이 정하고, S·V·M 레벨은 그 등급에서 파생되며, 곱셈 매핑(발주처 정본 가이드 B안 v2.2, <code>modules/m3_labeling/rule_engine.py:56</code>, 함수 <code>grade_from_svm</code>)은 그 위에서 상향 방향의 교차 확인으로 작동한다.</p>
 
   <div class="table-wrap">
   <table>
@@ -332,7 +332,7 @@ footer strong{color:var(--text-dim);}
     </div>
     <div>
       <h4>룰 엔진 (M3)</h4>
-      <p>DB에 등록된 키워드 시드를 본문에 매칭해 요소별 점수를 쌓고, S·V·M을 판독해 곱셈식으로 등급을 낸다.</p>
+      <p>DB에 등록된 키워드 시드를 본문에 매칭해 요소별 점수를 쌓아 등급을 정한다. S·V·M 레벨은 그 등급에서 파생되며, 곱셈 매핑은 상향 방향으로만 교차 확인한다.</p>
       <ul>
         <li>레거시 4요소를 정본 3요건(S·V·M)으로 폴딩 — 유출영향도는 V로 흡수</li>
         <li>임베딩 기반 의미 매칭도 지원(표기가 달라도 매칭)</li>

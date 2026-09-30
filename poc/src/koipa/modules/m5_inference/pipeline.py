@@ -1474,7 +1474,10 @@ class InferencePipeline:
         probs = []
         # win_weights: 오버플로 윈도잉으로 한 청크가 N윈도우로 쪼개지면 각 윈도우가 원 청크의
         # 길이 가중치를 승계 → chunk_probs 행수와 정합. (severe max-pool은 가중 무관 = FNR 핵심 보존)
-        win_weights: list[int] = []
+        # [window_weight_dedup_overflow, opt-in] 기본은 원청크 가중치를 윈도우마다 그대로 반복
+        # 부여한다(동작 보존 — 쪼개진 청크가 총 가중치 N배). 켜면 윈도우 수로 나눠 청크당 총
+        # 가중치를 1배로 보존한다(S2/S3 등 length-weighted 평균만 영향, severe max-pool은 무관).
+        win_weights: list[float] = []
         # span은 torch.no_grad() **안쪽**에 둔다 — 전체 forward가 grad 비활성 유지(필수).
         # 속성은 스칼라·비민감(model_version·청크수·device)만. OTel 미활성 시 no-op.
         with torch.no_grad():
@@ -1494,7 +1497,14 @@ class InferencePipeline:
                     if temp != 1.0:
                         logits = logits / temp
                     probs.append(F.softmax(logits, dim=-1).cpu())
-                    win_weights.extend(chunk_weights[batch_start + i] for i in sample_map)
+                    if getattr(settings, "window_weight_dedup_overflow", False):
+                        from collections import Counter as _Counter  # noqa: PLC0415
+                        _win_counts = _Counter(sample_map)
+                        win_weights.extend(
+                            chunk_weights[batch_start + i] / _win_counts[i] for i in sample_map
+                        )
+                    else:
+                        win_weights.extend(chunk_weights[batch_start + i] for i in sample_map)
         chunk_probs = torch.cat(probs)  # [n_windows, n_labels]
         doc_prob = self._aggregate_chunk_probs(chunk_probs, win_weights)
         # 표시용 scores는 합=1로 재정규화 (모든 인덱스를 같은 상수로 나눠 순서 보존).

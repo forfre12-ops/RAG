@@ -719,6 +719,15 @@ class Settings(BaseSettings):
     # TS + margin >= S1 이면 동점으로 본다.
     ts_tie_break_margin: float = 0.005
 
+    # [오버플로 윈도우 가중치 정규화] opt-in, 기본 OFF(동작 보존).
+    # 원청크(문자 단위)가 토큰이 조밀해 여러 윈도우로 쪼개지면(오버플로), 종전엔 원청크의
+    # 글자수 가중치를 쪼개진 윈도우 각각에 그대로 반복 부여했다 — 쪼개진 청크가 안 쪼개진
+    # 청크보다 length-weighted 평균(S2/S3 등)에서 총 가중치가 N배(윈도우 수)로 커진다.
+    # TS/S1 등 severe_agg_codes는 own-argmax max-pooling이라 가중치와 무관 — 영향 없음.
+    # 켜면 원청크 가중치를 그 청크가 만든 윈도우 수로 나눠 청크별 총 가중치를 보존한다.
+    # 켜기 전 홀드아웃 A/B로 등급 변화·auto_confirm_rate·silent_miss 재확인 필수.
+    window_weight_dedup_overflow: bool = False
+
     # 고등급(TS/S1) 변경 2인검토 (C-cons, doc/36). 기본 False=단일검수자 즉시확정(동작 보존).
     # True면 고등급으로의 confirm/relabel은 **서로 다른 2인**이 같은 등급에 동의해야 확정되고,
     # 1인만 동의한 동안은 classification.status='needs_second_review'로 보류된다(편향·오염 방지).
