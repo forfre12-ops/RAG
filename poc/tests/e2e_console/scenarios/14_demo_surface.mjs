@@ -80,7 +80,12 @@ export const scenarios = [
         classification: {
           label: 'S1', confidence: 0.42, scores: { TS: 0.1, S1: 0.42, S2: 0.3, S3: 0.18 },
           status: 'needs_review', model_version: 'v-fe4b386b',
-          factors: { secrecy: 2, value: 1, management: 1 }, factors_source: 'rule_evidenced',
+          factors: {
+            secrecy: { state: 'observed', value: 2, evidence: ['영업비밀'] },
+            value: { state: 'observed', value: 1, evidence: ['설계도'] },
+            management: { state: 'observed', value: 1, evidence: ['대외비'] },
+          },
+          factors_source: 'rule_evidenced',
           rule_factors: null, warnings: ['low_confidence'], elapsed_ms: 180,
           rule_grade: 'S1', model_grade: 'S2', decision_path: 'disagreement',
         },

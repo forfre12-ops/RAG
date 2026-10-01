@@ -189,8 +189,8 @@ def _force_rule(pipe, monkeypatch, grade):
     res = InferenceResult(
         label=grade, confidence=0.9,
         scores={"TS": 0.0, "S1": 0.0, "S2": 0.9, "S3": 0.1},
-        factors=EvaluationFactors.from_factor_scores(
-            {"SECRECY": 2.0, "VALUE": 2.0, "MANAGEMENT": 2.0}
+        factors=EvaluationFactors.from_axis_results(
+            secrecy=(True, 2, []), value=(True, 2, []), management=(True, 2, []),
         ),
     )
     monkeypatch.setattr(pipe, "_run_rule_fallback", lambda *a, **k: res)

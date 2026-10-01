@@ -161,6 +161,13 @@ class LabelingPipeline:
                             matched_keywords=r.matched_keywords,
                             total_score=round(merged_total, 4),
                             method="rule+llm",
+                            # [2026-10-02] 증거 유무 자체는 이 병합(등급/점수 재계산)으로
+                            # 안 바뀐다 — 그대로 안 넘기면 기본값 False로 리셋돼 룰이 실제로
+                            # 찾은 근거가 있어도 응답에서 전부 unknown이 돼버린다.
+                            management_evidenced=r.management_evidenced,
+                            management_marking_terms=r.management_marking_terms,
+                            secrecy_evidenced=r.secrecy_evidenced,
+                            value_evidenced=r.value_evidenced,
                         )
                     method = "rule+llm"
             except Exception as exc:  # noqa: BLE001 — 폴백 유지(룰 단독 판정)
@@ -170,9 +177,46 @@ class LabelingPipeline:
                                type(exc).__name__, exc)
 
         if _HAS_SCHEMA:
-            factors = EvaluationFactors.from_factor_scores(r.factor_scores)
+            # [2026-10-02 역산 제거] 축마다 *_evidenced가 True일 때만 값·근거를 싣는다 —
+            # False면 factor_scores에 숫자가 있어도(등급에서 유래한 0/1/2) 버리고
+            # state="unknown"으로 내보낸다(FactorDetail 자체가 역산 재유입을 막음).
+            from koipa.modules.m3_labeling.rule_engine import to_canonical_factor  # noqa: PLC0415
+
+            def _axis_evidence(canonical: str) -> list[str]:
+                seen: list[str] = []
+                for m in r.matched_keywords:
+                    if to_canonical_factor(m.factor) == canonical and m.keyword not in seen:
+                        seen.append(m.keyword)
+                    if len(seen) >= 10:
+                        break
+                return seen
+
+            def _axis_value(code: str) -> Optional[int]:
+                v = r.factor_scores.get(code)
+                return int(round(v)) if v is not None else None
+
+            def _management_evidence() -> list[str]:
+                # [2026-10-02] M은 키워드 매치(matched_keywords) 외에 본문 전체 스캔인
+                # 관리표시 탐지(management_marking_terms)로도 evidenced될 수 있다 — 후자는
+                # matched_keywords에 안 남으므로 여기서 합치지 않으면 state="observed"인데
+                # evidence=[]인 모순이 생긴다(실측으로 발견됨).
+                seen = _axis_evidence("MANAGEMENT")
+                for term in r.management_marking_terms:
+                    if term not in seen:
+                        seen.append(term)
+                    if len(seen) >= 10:
+                        break
+                return seen
+
+            factors = EvaluationFactors.from_axis_results(
+                secrecy=(r.secrecy_evidenced, _axis_value("SECRECY"), _axis_evidence("SECRECY")),
+                value=(r.value_evidenced, _axis_value("VALUE"), _axis_evidence("VALUE")),
+                management=(
+                    r.management_evidenced, _axis_value("MANAGEMENT"), _management_evidence(),
+                ),
+            )
         else:
-            # 스키마 미가용 폴백 — dataclass EvaluationFactors에 직접 매핑
+            # 스키마 미가용 폴백 — dataclass EvaluationFactors(float)에 직접 매핑
             field_map = _get_factor_field_map()
             factors = EvaluationFactors(
                 **{field_map[k]: v for k, v in r.factor_scores.items() if k in field_map}

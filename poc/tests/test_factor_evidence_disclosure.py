@@ -27,7 +27,9 @@ from __future__ import annotations
 
 import pytest
 
+from koipa.modules.m3_labeling.pipeline import LabelingPipeline
 from koipa.modules.m3_labeling.rule_engine import build_rule_engine_from_db
+from koipa.schemas.classify import EvaluationFactors, FactorDetail
 from koipa.services.classify_service import ClassifyService
 
 _DISCLOSURE = "독립 근거 없음"
@@ -75,18 +77,31 @@ def test_s3_does_not_disclose(engine):
     assert not [w for w in r.warnings if _DISCLOSURE in w]
 
 
-def test_factors_source_reports_estimated_when_disclosed():
-    """공시가 있으면 factors_source 는 rule_evidenced 라고 말하면 안 된다.
+def test_factors_source_reports_estimated_when_v_unevidenced(engine):
+    """V축 근거가 없으면(공시 대상) factors_source 는 rule_evidenced 라고 말하면 안 된다.
 
     이것이 이번 수정의 핵심이다 — 역산값을 '룰 근거' 라고 부르던 것을 멈춘다.
+
+    [2026-10-02] factors_source는 더는 경고 **문자열**을 안 본다 — EvaluationFactors의
+    축별 state를 직접 본다(classify_service.py _factors_source). 종전 문자열 매칭은
+    역산이 일어나는 4경로 중 2곳(출처사전 cap·청크 severe-agg 폴백)을 못 잡는 버그가
+    있었다 — 축 state를 직접 보면 그 버그가 설계상 사라진다. LabelingPipeline을 통해
+    실제 EvaluationFactors가 조립되는 경로까지 확인한다(단위 로직만이 아니라 배선까지).
     """
-    f = ClassifyService._factors_source
-    disclosed = ("경제적유용성(V) 독립 근거 없음 — 요소 시드 미검출, "
-                 "콘텐츠등급 기반 추정 (검수 시 확인 권장)")
-    assert f([disclosed]) == "model_estimated"
-    assert f(["정상 경고"]) == "rule_evidenced"
-    # 기존 경로(모델 등급 정합화)는 그대로 유지돼야 한다.
-    assert f(["factors aligned to model grade"]) == "model_estimated"
+    pipeline = LabelingPipeline(rule_engine=engine)
+    result = pipeline.label("리콜 대응 계획 초안. 내부 자료.")
+    assert result.rule_result.grade != "S3"
+    assert not result.rule_result.value_evidenced
+    assert ClassifyService._factors_source(result.factors) == "model_estimated"
+
+
+def test_factors_source_rule_evidenced_when_all_axes_observed():
+    f = EvaluationFactors(
+        secrecy=FactorDetail(state="observed", value=2, evidence=["근거"]),
+        value=FactorDetail(state="observed", value=2, evidence=["근거"]),
+        management=FactorDetail(state="observed", value=1, evidence=["근거"]),
+    )
+    assert ClassifyService._factors_source(f) == "rule_evidenced"
 
 
 def test_disclosure_does_not_change_grade(engine):

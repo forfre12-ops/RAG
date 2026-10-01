@@ -65,8 +65,8 @@ def _run(monkeypatch, metadata, predicted="S1"):
         label=Grade[predicted],
         confidence=0.9,
         scores={g: (0.9 if g == predicted else 0.0) for g in ("TS", "S1", "S2", "S3")},
-        factors=EvaluationFactors.from_factor_scores(
-            {"SECRECY": float(s), "VALUE": float(v), "MANAGEMENT": float(m)}
+        factors=EvaluationFactors.from_axis_results(
+            secrecy=(True, s, []), value=(True, v, []), management=(True, m, []),
         ),
     )
     pipe = InferencePipeline()
@@ -123,8 +123,8 @@ def _classify(monkeypatch, metadata, predicted="S1"):
         label=Grade[predicted],
         confidence=0.99,          # 임계(0.50)를 넉넉히 넘겨 low-confidence 라우팅과 분리한다
         scores={g: (0.99 if g == predicted else 0.0) for g in ("TS", "S1", "S2", "S3")},
-        factors=EvaluationFactors.from_factor_scores(
-            {"SECRECY": float(s), "VALUE": float(v), "MANAGEMENT": float(m)}
+        factors=EvaluationFactors.from_axis_results(
+            secrecy=(True, s, []), value=(True, v, []), management=(True, m, []),
         ),
     )
     svc = ClassifyService()

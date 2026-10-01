@@ -8,7 +8,7 @@ from typing import Optional
 
 from koipa.config import settings
 from koipa.schemas.common import Grade, GradeRegistry
-from koipa.schemas.classify import EvidenceSpan, EvaluationFactors
+from koipa.schemas.classify import EvidenceSpan, EvaluationFactors, FactorDetail
 from koipa.modules.m2_preprocess import split as _chunk_split
 from koipa.modules.m3_labeling.pipeline import LabelingPipeline
 from koipa.obs.otel import span  # 수동 span — OTel 미설치/미활성 시 완전 no-op
@@ -121,6 +121,21 @@ from koipa.modules.m3_labeling.rule_engine import (  # noqa: E402
     management_from_metadata_dict as _management_from_metadata_dict,
     marking_from_document as _marking_from_document,
 )
+
+
+def _axis_level(detail: Optional[FactorDetail], default: int = 0) -> int:
+    """FactorDetail(S/V/M 한 축) → 레벨(0/1/2). state="unknown"(근거 없음)이면 default.
+
+    [2026-10-02] EvaluationFactors.secrecy/value/management가 float에서 FactorDetail로
+    바뀌면서, "근거 없으면 등급에서 역산한 숫자"가 아니라 "근거 없으면 None"이 됐다. 그런데
+    S×V×M 공식(grade_from_svm)·grade_candidates 같은 내부 계산은 여전히 정수 0/1/2가
+    필요하다 — 그 계산 자체는 바꾸지 않고(등급 결정 로직은 이번 변경 범위 밖), 입력만 이
+    헬퍼로 안전하게 변환한다. default=0은 "근거 없음"을 공식상 최하위로 보수적으로 다루는
+    기존 관행과 동일하다(값을 지어내는 게 아니라 계산 입력일 뿐 — 응답에는 안 나간다).
+    """
+    if detail is None or detail.state != "observed" or detail.value is None:
+        return default
+    return int(detail.value)
 
 
 def _source_prior_is_public(src: object) -> bool:
@@ -814,46 +829,15 @@ class InferencePipeline:
                         new_scores, new_conf = self._enforce_label_consistency(
                             result.scores, cap_code, floor=0.6
                         )
-                        # [2026-08-24] cap 뒤 표시 요소 재정합. A3(1326행대)와 같은 방식이다 —
-                        # 새로 만들지 않고 그 패턴을 재사용한다.
-                        #
-                        # 종전에는 factors 를 그대로 통과시켜, 등급은 S3 로 내려가는데 화면의
-                        # S·V·M 은 상위 등급 조합(예: S2·V2·M2)으로 남았다. 검수자가 보면
-                        # 판정식으로 설명이 안 되는 조합이다 — "S3 인데 요소는 S2 조합".
-                        # 관측치는 버리지 않고 rule_factors 로 보존한다(두 벌을 나란히 보여야
-                        # 왜 갈렸는지 읽힌다). 등급·게이트는 건드리지 않는다 — **표시만**이다.
+                        # [2026-08-24 도입 → 2026-10-02 역산 제거] cap으로 등급이 바뀌어도
+                        # factors는 더 이상 등급에 맞춰 재조정하지 않는다 — 각 축은 이미
+                        # FactorDetail.state(observed/unknown)로 근거 유무를 그대로 들고
+                        # 있으므로, "등급과 산수로 안 맞아 보임"을 막으려고 숫자를 지어낼
+                        # 필요가 없다. rule_factors도 더는 쓰지 않는다(덮어쓰기가 없으니
+                        # 보존할 "덮어쓰기 전 값"이 따로 없다). 등급·게이트는 원래부터 안
+                        # 건드렸고, 이번 변경도 표시(factors)만의 문제다.
                         cap_factors = result.factors
                         cap_rule_factors = result.rule_factors
-                        try:
-                            from koipa.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
-                                grade_from_svm,
-                                svm_levels_for_grade,
-                            )
-                            if cap_factors is not None:
-                                _fs = int(float(getattr(cap_factors, "secrecy", 0)))
-                                _fv = int(float(getattr(cap_factors, "value", 0)))
-                                _fm = int(float(getattr(cap_factors, "management", 0)))
-                                if grade_from_svm(_fs, _fv, _fm) != cap_code:
-                                    if cap_rule_factors is None:
-                                        cap_rule_factors = cap_factors
-                                    _s2, _v2, _m2 = svm_levels_for_grade(cap_code)
-                                    cap_factors = EvaluationFactors.from_factor_scores(
-                                        {"SECRECY": float(_s2), "VALUE": float(_v2),
-                                         "MANAGEMENT": float(_m2)}
-                                    )
-                                    result.warnings = list(result.warnings) + [
-                                        f"factors aligned to capped grade {cap_code} "
-                                        f"(source-prior; observed kept as rule_factors)"
-                                    ]
-                        except Exception as exc:  # noqa: BLE001 — 표시 정합 실패가 판정을 막지 않는다
-                            # 등급은 그대로 두고 **표시할 근거만** 원래 값으로 되돌린다.
-                            # 검수자가 보는 근거가 등급과 어긋난 상태가 되므로, 그 사실은 남긴다.
-                            logger.warning(
-                                "요소 표시 정합 실패 — 원래 요소값으로 되돌린다(등급은 그대로): %s: %s",
-                                type(exc).__name__, exc,
-                            )
-                            cap_factors = result.factors
-                            cap_rule_factors = result.rule_factors
                         result = InferenceResult(
                             label=Grade[cap_code],
                             confidence=min(new_conf, 0.7),
@@ -945,8 +929,8 @@ class InferencePipeline:
                     # 정해지지 않은 것**이다 — 찍은 값을 유일한 답처럼 내보내지 않는다.
                     # label 은 그대로 둔다(계약 보존). 무엇이 갈림길인지만 함께 낸다.
                     try:
-                        _s = int(float(getattr(result.factors, "secrecy", 0) or 0))
-                        _v = int(float(getattr(result.factors, "value", 0) or 0))
+                        _s = _axis_level(result.factors.secrecy)
+                        _v = _axis_level(result.factors.value)
                         _cands = sorted(
                             {_grade_from_svm(_s, _v, _m) for _m in (0, 1, 2)},
                             key=lambda g: _ORD.get(g, 99),
@@ -961,25 +945,19 @@ class InferencePipeline:
                             "M 이 정해지면 등급이 하나로 정해집니다."
                         )
                 if m_state != "unknown" and result.factors is not None:
-                    try:
-                        cur_m = int(float(getattr(result.factors, "management", 0)))
-                    except (TypeError, ValueError) as exc:
-                        # -1 은 "읽지 못했다"는 뜻이고 아래 비교에서 항상 새 값과 다르므로
-                        # 메타데이터 값이 그대로 적용된다(안전한 방향). 다만 요소값이
-                        # 숫자가 아니었다는 사실 자체가 데이터 결함이라 흔적을 남긴다.
-                        logger.warning(
-                            "management 요소값을 숫자로 읽지 못했다(%r) — 메타데이터 값을 "
-                            "그대로 적용한다: %s",
-                            getattr(result.factors, "management", None), exc,
-                        )
-                        cur_m = -1
+                    # -1 default는 "읽지 못했다"는 뜻이고 아래 비교에서 항상 새 값과 다르므로
+                    # 메타데이터 값이 그대로 적용된다(안전한 방향).
+                    cur_m = _axis_level(result.factors.management, default=-1)
                     new_m = 0 if m_state == "proven_absent" else int(m_lv or 0)
                     if new_m != cur_m:
-                        result.factors = EvaluationFactors.from_factor_scores({
-                            "SECRECY": float(getattr(result.factors, "secrecy", 0) or 0),
-                            "VALUE": float(getattr(result.factors, "value", 0) or 0),
-                            "MANAGEMENT": float(new_m),
-                        })
+                        # M만 실측(메타데이터)으로 갱신 — S·V는 기존 state(observed/unknown)
+                        # 그대로 들고 간다(역산으로 새로 채우지 않는다).
+                        _s_det, _v_det = result.factors.secrecy, result.factors.value
+                        result.factors = EvaluationFactors.from_axis_results(
+                            secrecy=(_s_det.state == "observed", _s_det.value, _s_det.evidence),
+                            value=(_v_det.state == "observed", _v_det.value, _v_det.evidence),
+                            management=(True, new_m, [m_reason]),
+                        )
                         result.warnings = list(result.warnings) + [
                             f"metadata-management: {m_reason} → M={new_m} (시스템 확인 · 등급 미변경)"
                         ]
@@ -1006,17 +984,11 @@ class InferencePipeline:
                     # 등급에 바로 물리면 하향 경로가 열린다). 대신 **방향을 갈라 신호를 낸다**:
                     #     공식 > 서빙  미탐 방향 → 검수 라우팅(자동확정만 차단, 등급 무변경)
                     #     공식 < 서빙  과대 방향 → 표시만(무음 하향은 하지 않는다)
-                    try:
-                        svm_grade = _grade_from_svm(
-                            int(float(getattr(result.factors, "secrecy", 0) or 0)),
-                            int(float(getattr(result.factors, "value", 0) or 0)),
-                            new_m,
-                        )
-                    except (TypeError, ValueError) as exc:
-                        # 요소값을 못 읽으면 대조 자체를 건너뛴다 — 없는 근거로 검수를
-                        # 만들지 않는다(위 cur_m 폴백과 같은 규율).
-                        logger.warning("요소↔등급 대조를 건너뛴다(요소값 판독 실패): %s", exc)
-                        svm_grade = cur
+                    svm_grade = _grade_from_svm(
+                        _axis_level(result.factors.secrecy),
+                        _axis_level(result.factors.value),
+                        new_m,
+                    )
                     if _ORD.get(svm_grade, 99) < _ORD.get(cur, 99):
                         result.warnings = list(result.warnings) + [
                             f"metadata-management-underclass: 요소 (S,V,M={new_m}) 의 정본 공식은"
@@ -1294,23 +1266,10 @@ class InferencePipeline:
                     f"abbrev-only-escalation: {pred_code} 승격이 영문 약어 부스트에만 근거"
                     " (한국어 시드 근거 없음) — 자동확정 보류·검수 라우팅 (등급 무변경, FNR-safe)"
                 ]
-            if factors is not None and pred_code in ("TS", "S1", "S2", "S3"):
-                try:
-                    from koipa.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
-                        svm_levels_for_grade,
-                    )
-                    s2, v2, m2 = svm_levels_for_grade(pred_code)
-                    factors = EvaluationFactors.from_factor_scores(
-                        {"SECRECY": float(s2), "VALUE": float(v2), "MANAGEMENT": float(m2)}
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    # 등급은 그대로 두고 **표시할 근거만** 원래 값으로 되돌린다.
-                    # 검수자가 보는 근거가 등급과 어긋난 상태가 되므로, 그 사실은 남긴다.
-                    logger.warning(
-                        "요소 표시 정합 실패 — 원래 요소값으로 되돌린다(등급은 그대로): %s: %s",
-                        type(exc).__name__, exc,
-                    )
-                    factors = lab.factors
+            # [2026-10-02 역산 제거] 종전에는 청크 집계 등급이 룰 단독 등급과 다르면
+            # factors를 그 등급에서 거꾸로 채웠고(svm_levels_for_grade), 덮기 전 값은
+            # 보존조차 안 하고 버렸다 — 이 경로(청크 폴백)만 다른 3곳보다 더 심했다.
+            # 이제 factors는 그대로 lab.factors(근거 없는 축은 이미 state="unknown")다.
 
         return InferenceResult(
             label=pred,
@@ -1518,37 +1477,13 @@ class InferencePipeline:
         conf = min(max(float(norm[pred_idx]), 0.0), 1.0)
 
         lab = self.labeling.label(text)  # 보조 evidence/factors
-        # [A3] 모델 등급 ↔ 룰 factors 정합. 룰이 미탐(곱=0/낮음)인데 모델이 고등급이면
-        # 표시 S/V/M을 모델 등급에 정합화(+경고) — 'S0·V0·M0인데 TS' 모순 표기 방지.
+        # [A3, 2026-08-20 도입 → 2026-10-02 역산 제거] 룰과 모델 등급이 갈려도 factors는
+        # 더 이상 모델 등급에 맞춰 재조정하지 않는다 — 근거 없는 축은 이미
+        # FactorDetail.state="unknown"으로 나가므로 "산수로 안 맞아 보임"을 막을 이유가
+        # 없다. rule_factors(= 덮기 전 보존값)도 더는 안 쓴다 — 덮지 않으니 보존할 게 없다.
         factors = lab.factors
         rule_factors: Optional[EvaluationFactors] = None
         a3_warn: list[str] = []
-        pred_code = pred.value if hasattr(pred, "value") else str(pred)
-        if factors is not None and pred_code in ("TS", "S1", "S2", "S3"):
-            try:
-                from koipa.modules.m3_labeling.rule_engine import grade_from_svm, svm_levels_for_grade  # noqa: PLC0415
-                fsv = int(float(getattr(factors, "secrecy", 0)))
-                fvv = int(float(getattr(factors, "value", 0)))
-                fmv = int(float(getattr(factors, "management", 0)))
-                if grade_from_svm(fsv, fvv, fmv) != pred_code:
-                    # [2026-08-20] 덮기 **전** 값을 남긴다. 종전에는 버려서, 화면에 역산값만
-                    # 남고 "S2·V2·M2 인데 룰은 S1" 처럼 판정식으로 설명이 안 되는 조합이
-                    # 보였다. 두 벌을 나란히 보여야 왜 갈렸는지 읽힌다.
-                    rule_factors = factors
-                    s2, v2, m2 = svm_levels_for_grade(pred_code)
-                    factors = EvaluationFactors.from_factor_scores(
-                        {"SECRECY": float(s2), "VALUE": float(v2), "MANAGEMENT": float(m2)}
-                    )
-                    a3_warn = [f"factors aligned to model grade {pred_code} (rule under-detected S/V/M)"]
-            except Exception as exc:  # noqa: BLE001
-                # 등급은 그대로 두고 **표시할 근거만** 원래 값으로 되돌린다.
-                # 검수자가 보는 근거가 등급과 어긋난 상태가 되므로, 그 사실은 남긴다.
-                logger.warning(
-                    "요소 표시 정합 실패 — 원래 요소값으로 되돌린다(등급은 그대로): %s: %s",
-                    type(exc).__name__, exc,
-                )
-                factors = lab.factors
-                rule_factors = None
         from koipa.modules.m3_labeling.rule_engine import has_real_evidence  # noqa: PLC0415
         return InferenceResult(
             label=pred,

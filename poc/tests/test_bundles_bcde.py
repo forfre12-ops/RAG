@@ -17,24 +17,34 @@ from koipa.modules.m6_evaluation.kill_gate import (
     should_suppress_autoconfirm,
 )
 from koipa.modules.m6_evaluation.locked_readiness import locked_eval_readiness
+from koipa.schemas.classify import EvaluationFactors, FactorDetail
 from koipa.schemas.common import Grade
 from koipa.services.classify_service import ClassifyService
 
 
 # ── C: factors_source ─────────────────────────────────────────────────────────
+# [2026-10-02] _factors_source는 더는 경고 문자열을 안 보고 축별 state를 직접 본다
+# (역산 제거 — 관련: test_factor_evidence_disclosure.py).
 
-def test_factors_source_model_estimated_on_alignment_warning():
-    assert ClassifyService._factors_source(
-        ["factors aligned to model grade TS (rule under-detected S/V/M)"]
-    ) == "model_estimated"
-    assert ClassifyService._factors_source(
-        ["chunk severe-agg/escalation: rule grade S2 → TS (most-severe-wins)"]
-    ) == "model_estimated"
+def _detail(state: str) -> FactorDetail:
+    return FactorDetail(
+        state=state, value=1 if state == "observed" else None,
+        evidence=["근거"] if state == "observed" else [],
+    )
 
 
-def test_factors_source_rule_evidenced_default():
-    assert ClassifyService._factors_source([]) == "rule_evidenced"
-    assert ClassifyService._factors_source(["low-confidence: 0.40 < 0.55"]) == "rule_evidenced"
+def _factors(s: str = "observed", v: str = "observed", m: str = "observed") -> EvaluationFactors:
+    return EvaluationFactors(secrecy=_detail(s), value=_detail(v), management=_detail(m))
+
+
+def test_factors_source_model_estimated_when_any_axis_unknown():
+    assert ClassifyService._factors_source(_factors(s="unknown")) == "model_estimated"
+    assert ClassifyService._factors_source(_factors(v="unknown")) == "model_estimated"
+    assert ClassifyService._factors_source(_factors(m="unknown")) == "model_estimated"
+
+
+def test_factors_source_rule_evidenced_when_all_axes_observed():
+    assert ClassifyService._factors_source(_factors()) == "rule_evidenced"
 
 
 # ── E: kill-gate 안전브레이크 ──────────────────────────────────────────────────

@@ -22,13 +22,32 @@ from pathlib import Path
 import pytest
 
 from koipa.api.explain import _factor_decomposition
+from koipa.schemas.classify import EvaluationFactors, FactorDetail
 
 _SRC = Path(__file__).resolve().parents[1] / "src" / "koipa" / "api" / "explain.py"
 
 
-class _Factors:
-    def __init__(self, s, v, m):
-        self.secrecy, self.value, self.management = s, v, m
+# [2026-10-02] EvaluationFactors의 세 축은 이제 FactorDetail(state/value/evidence)이다 —
+# 등급에서 역산한 숫자를 그대로 믿던 길을 끊었다(설계: mighty-crunching-pebble 계획).
+# limiting_factor는 더는 문서 단위 factors_source 문자열이 아니라 rows의 축별 state에서
+# 직접 뽑는다(세 축 모두 observed일 때만) — 그래서 아래 헬퍼는 state를 명시적으로 받는다.
+
+def _detail(value: int, *, observed: bool = True) -> FactorDetail:
+    if not observed:
+        return FactorDetail(state="unknown")
+    return FactorDetail(state="observed", value=value, evidence=["근거"])
+
+
+def _observed_factors(s: int, v: int, m: int) -> EvaluationFactors:
+    return EvaluationFactors(secrecy=_detail(s), value=_detail(v), management=_detail(m))
+
+
+def _all_unknown_factors() -> EvaluationFactors:
+    return EvaluationFactors(
+        secrecy=_detail(0, observed=False),
+        value=_detail(0, observed=False),
+        management=_detail(0, observed=False),
+    )
 
 
 class _Result:
@@ -39,7 +58,7 @@ class _Result:
 
 
 def test_response_does_not_claim_the_grade_came_from_multiplication():
-    out = _factor_decomposition(_Result(_Factors(2, 2, 0), "model_estimated"))
+    out = _factor_decomposition(_Result(_observed_factors(2, 2, 0), "model_estimated"))
     blob = repr(out)
     assert "multiplicative" not in blob, (
         "응답이 곱셈을 산출 방법으로 주장한다 — 배포본에서 곱셈 단계는 발동 0건이다"
@@ -49,7 +68,7 @@ def test_response_does_not_claim_the_grade_came_from_multiplication():
 
 def test_reference_rule_is_labelled_as_a_yardstick_not_a_method():
     """판정식을 아예 감추지는 않는다 — 대조 기준으로는 유효하다."""
-    out = _factor_decomposition(_Result(_Factors(2, 2, 0), "rule_evidenced"))
+    out = _factor_decomposition(_Result(_observed_factors(2, 2, 0), "rule_evidenced"))
     assert "S×V×M" in out["reference_rule"]
     assert "기준" in out["reference_rule"], "기준임을 문장 안에서 밝히지 않으면 방법으로 읽힌다"
 
@@ -57,21 +76,46 @@ def test_reference_rule_is_labelled_as_a_yardstick_not_a_method():
 def test_factor_source_travels_with_the_values():
     """값만 주고 출처를 안 주면 받는 쪽이 추정치를 근거로 읽는다."""
     for source in ("model_estimated", "rule_evidenced"):
-        out = _factor_decomposition(_Result(_Factors(1, 1, 1), source))
+        out = _factor_decomposition(_Result(_observed_factors(1, 1, 1), source))
         assert out["factors_source"] == source
 
 
 def test_estimated_factors_do_not_get_a_limiting_factor():
-    """역산값에서 최저 요소를 고르면 등급에서 나온 값을 등급의 원인이라 말하는 순환이다."""
-    out = _factor_decomposition(_Result(_Factors(2, 2, 0), "model_estimated"))
+    """근거 없는(state=unknown) 축이 있으면 최저 요소를 고르지 않는다.
+
+    역산값에서 최저 요소를 골라 "이것이 등급을 제약했다"고 말하면, 등급에서 나온 값을
+    등급의 원인이라 하는 순환이 된다.
+    """
+    out = _factor_decomposition(_Result(_all_unknown_factors(), "model_estimated"))
     assert out["limiting_factor"] is None
     assert "limiting_factor_note" in out, "왜 못 말하는지 적지 않으면 누락으로 읽힌다"
 
 
 def test_evidenced_factors_still_get_a_limiting_factor():
-    """근거일 때는 여전히 유용한 정보다 — 통째로 없애면 검수자가 잃는 것이 있다."""
-    out = _factor_decomposition(_Result(_Factors(2, 2, 0), "rule_evidenced"))
+    """세 축 모두 근거일 때는 여전히 유용한 정보다 — 통째로 없애면 검수자가 잃는 것이 있다."""
+    out = _factor_decomposition(_Result(_observed_factors(2, 2, 0), "rule_evidenced"))
     assert out["limiting_factor"] == "management"
+
+
+def test_one_unknown_axis_blocks_limiting_factor_even_if_others_observed():
+    """축 하나만 unknown이어도 전부 못 미더운 것으로 취급한다 — 그 축이 실제론 더
+    낮았을 수도 있어서다. rows는 그래도 축별 state를 정직하게 보여준다(2026-10-02 설계:
+    M은 S·V와 별개 메커니즘으로 evidenced될 수 있어, 문서 전체를 하나의 깃발로 뭉개면
+    안 된다).
+    """
+    factors = EvaluationFactors(
+        secrecy=_detail(0, observed=False),
+        value=_detail(0, observed=False),
+        management=_detail(1, observed=True),
+    )
+    out = _factor_decomposition(_Result(factors, "model_estimated"))
+    assert out["limiting_factor"] is None
+    by_factor = {r["factor"]: r for r in out["rows"]}
+    assert by_factor["secrecy"]["state"] == "unknown"
+    assert by_factor["secrecy"]["score"] is None
+    assert by_factor["management"]["state"] == "observed"
+    assert by_factor["management"]["score"] == 1
+    assert by_factor["management"]["evidence"], "observed인데 근거 텍스트가 비어 있다"
 
 
 def test_no_factors_returns_empty():
@@ -88,5 +132,7 @@ def test_module_docstring_states_the_correction():
 @pytest.mark.parametrize("source", ["model_estimated", "rule_evidenced"])
 def test_decided_by_is_reported(source):
     """무엇이 등급을 정했는지는 응답이 직접 말해야 한다 — 추측하게 두지 않는다."""
-    out = _factor_decomposition(_Result(_Factors(0, 0, 0), source, decision_path="rule-override"))
+    out = _factor_decomposition(
+        _Result(_observed_factors(0, 0, 0), source, decision_path="rule-override")
+    )
     assert out["decided_by"] == "rule-override"

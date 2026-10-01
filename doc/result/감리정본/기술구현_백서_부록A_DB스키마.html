@@ -332,7 +332,7 @@ btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.m
 
     <section id="t-evaluation-factors">
       <h3>tb_evaluation_factors<span class="logical-name">평가 요건</span></h3>
-      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">정본 <b>3요건</b> 체계. 등급 = 비공지성(S) × 경제적 유용성(V) × 비밀관리성(M), 각 요건 0·1·2점의 <b>곱셈식</b>(B안, 2026-06-18 전환). 곱 매핑: S=2·V=2일 때 곱≥4(M≥1)→TS·M=0→S1, 그 외 곱≥1→S2·곱=0→S3 (<code>grade_from_svm</code>). 곱셈식이라 <code>weight</code> 컬럼은 미사용(하위호환 1.0). 레거시 4요소는 <code>is_active=FALSE</code>로 보존(키워드 시드 태그 및 FK 정합 유지, migration <code>c7d8e9f0a1b2</code>). 정본/레거시 매핑은 <code>LEGACY_FACTOR_ALIAS</code>로 3요건에 폴딩(LEAK_IMPACT→VALUE).</p>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">정본 <b>3요건</b> 체계(비공지성 S·경제적 유용성 V·비밀관리성 M, 각 0·1·2점). 등급은 키워드 룰이 정하고, S·V·M 레벨은 그 등급에서 파생되며, 곱셈 매핑(B안, 2026-06-18 전환, <code>grade_from_svm</code>)은 그 위에서 상향 방향의 교차 확인으로 작동한다: S=2·V=2일 때 곱≥4(M≥1)→TS·M=0→S1, 그 외 곱≥1→S2·곱=0→S3. 곱셈식이라 <code>weight</code> 컬럼은 미사용(하위호환 1.0). 레거시 4요소는 <code>is_active=FALSE</code>로 보존(키워드 시드 태그 및 FK 정합 유지, migration <code>c7d8e9f0a1b2</code>). 정본/레거시 매핑은 <code>LEGACY_FACTOR_ALIAS</code>로 3요건에 폴딩(LEAK_IMPACT→VALUE).</p>
       <div class="tbl-wrap"><table>
         <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
         <tbody>

@@ -765,7 +765,7 @@ class ClassifyService:
                 confidence=pred.confidence,
                 scores=pred.scores,
                 evaluation_factors=pred.factors,
-                factors_source=self._factors_source(warnings_acc),
+                factors_source=self._factors_source(pred.factors),
                 rule_evaluation_factors=getattr(pred, "rule_factors", None),
                 evidence=pred.evidence,
                 model_version=pred.model_version,
@@ -1538,27 +1538,19 @@ class ClassifyService:
             logger.debug("metadata-presence metric emit skipped: %s", exc)
 
     @staticmethod
-    def _factors_source(warnings_acc: list[str]) -> str:
-        """[번들 C] evaluation_factors 출처 판정 — 'model_estimated' | 'rule_evidenced'.
+    def _factors_source(factors) -> str:
+        """[번들 C, 2026-10-02 재작성] evaluation_factors 출처 판정 — 'model_estimated' | 'rule_evidenced'.
 
-        룰 미탐으로 등급에 맞춰 factor를 역산(svm_levels_for_grade)한 경우(정합화 경고
-        'factors aligned to model grade' / 'chunk severe-agg' 존재) 표시 S/V/M은 법리 근거가
-        아니라 모델/집계 추정치다 → 컴플라이언스상 구분 표시. 경고가 진실의 단일 소스.
+        종전엔 정합화 경고 **문자열**을 매칭해 판정했는데(`factors aligned to model
+        grade`/`chunk severe-agg`/"독립 근거 없음"), 역산이 일어나는 4곳 중 cap 경로와
+        청크 severe-agg 폴백 2곳의 실제 경고 문구가 이 매칭에 안 걸려 역산됐는데도
+        rule_evidenced 로 잘못 답하는 기존 버그가 있었다. 이제 역산 자체를 소스(rule_engine.py/
+        pipeline.py)에서 끊었으므로, S/V/M 각 축의 `state`를 직접 본다 — 셋 다 observed 면
+        rule_evidenced, 하나라도 unknown 이면 model_estimated. 문자열이 아니라 실제 state 3개를
+        보므로 설계상 누락될 수 없다.
         """
-        for w in warnings_acc:
-            if "factors aligned to model grade" in w or "chunk severe-agg" in w:
-                return "model_estimated"
-            # [2026-08-15] 룰 경로 자신이 "요소 시드 미검출 · 콘텐츠등급 기반 추정" 이라고
-            # 공시했는데 응답은 그것을 rule_evidenced 라 부르고 있었다. 룰 엔진에서 s_lv·v_lv
-            # 는 content_grade(키워드 argmax 등급)에서 역산되므로(`strong = content_grade in
-            # ("TS","S1")`) 그 값은 법리 근거가 아니라 등급의 재진술이다. M 축에는 같은 공시가
-            # 이미 있었고 S·V 만 빠져 있었다.
-            #
-            # 실측 규모(RULE_EXTRACTOR_DIAGNOSIS 2026-08-12): v3 final_800 에서 secrecy·value
-            # 둘 다 낮게봄 84.6% · 과검출 0.0% · VALUE 누산점수는 300건 전부 0.0.
-            # 시드 보강·semantic·임계탐색이 모두 막혀(같은 문서 §7) 탐지 자체는 못 고친다.
-            # 고칠 수 있는 것은 **탐지 못 한 것을 탐지했다고 말하지 않는 것**이다.
-            if "독립 근거 없음" in w and "콘텐츠등급 기반 추정" in w:
+        for axis in (factors.secrecy, factors.value, factors.management):
+            if getattr(axis, "state", None) != "observed":
                 return "model_estimated"
         return "rule_evidenced"
 

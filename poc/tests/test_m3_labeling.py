@@ -117,14 +117,21 @@ def test_rule_engine_fnr_safe_picks_higher_grade_on_tie():
 
 @pytest.mark.slow
 def test_pipeline_returns_evaluation_factors():
+    """[2026-10-02] 축마다 FactorDetail(state/value/evidence) — 역산 제거 후 스키마.
+
+    근거가 실제로 없으면 state="unknown"·value=None으로 정직하게 비므로, 숫자를
+    더해 0보다 큰지 보는 식으로는 더는 검증할 수 없다(그게 바로 없앤 역산이다).
+    대신 적어도 한 축은 observed(실제 시드 매치)인지를 본다.
+    """
     pipe = LabelingPipeline()
     out = pipe.label("1급 비밀 영업비밀 공정 노하우 원가 구조")
     assert hasattr(out.factors, "secrecy")
     assert hasattr(out.factors, "value")
     assert hasattr(out.factors, "management")
-    # 적어도 한 factor는 점수가 잡혀야 함
-    total = out.factors.secrecy + out.factors.value + out.factors.management
-    assert total > 0.0
+    axes = (out.factors.secrecy, out.factors.value, out.factors.management)
+    assert any(a.state == "observed" and a.value is not None for a in axes), (
+        f"세 축 모두 unknown — 적어도 하나는 시드 매치가 있어야 하는 입력이다: {axes}"
+    )
 
 
 @pytest.mark.slow

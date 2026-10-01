@@ -61,7 +61,7 @@ def test_classify_request_schema_roundtrip(openapi_spec):
 
 def test_classify_response_schema_roundtrip():
     from uuid import uuid4
-    from koipa.schemas.classify import ClassifyResponse, EvaluationFactors
+    from koipa.schemas.classify import ClassifyResponse, EvaluationFactors, FactorDetail
     from koipa.schemas.common import Grade
 
     dummy = {
@@ -71,9 +71,9 @@ def test_classify_response_schema_roundtrip():
         "confidence": 0.85,
         "scores": {"TS": 0.05, "S1": 0.10, "S2": 0.85, "S3": 0.0},
         "evaluation_factors": EvaluationFactors(
-            secrecy=0.6,
-            value=0.7,
-            management=0.5,
+            secrecy=FactorDetail(state="observed", value=1, evidence=["근거"]),
+            value=FactorDetail(state="observed", value=1, evidence=["근거"]),
+            management=FactorDetail(state="unknown"),
         ),
         "evidence": [],
         "model_version": "test",

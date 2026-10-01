@@ -7,6 +7,7 @@ from .classify import (
     StoredClassificationResponse,
     EvidenceSpan,
     EvaluationFactors,
+    FactorDetail,
 )
 from .classify_async import (
     ClassifyAsyncRequest,
@@ -50,7 +51,7 @@ from .metrics import (
 __all__ = [
     "Grade", "GradeDefinition", "Actor", "Error",
     "DocumentInput", "ClassifyRequest", "ClassifyResponse", "ClassifyJobResult", "StoredClassificationResponse",
-    "EvidenceSpan", "EvaluationFactors",
+    "EvidenceSpan", "EvaluationFactors", "FactorDetail",
     "ClassifyAsyncRequest", "ClassifyAsyncResponse",
     "ClassifyBatchRequest", "ClassifyBatchResponse", "ClassifyJobStatus",
     "ConfirmRequest", "ConfirmResponse", "RelabelRequest", "RelabelResponse",

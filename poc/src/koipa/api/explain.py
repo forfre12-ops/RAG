@@ -83,25 +83,40 @@ def _factor_decomposition(result: ClassifyResponse) -> dict:
 
       · 배포본에서 등급은 분류기가 정한다. 곱셈 단계는 실측 발동 0건이다
         (993건 · 평가셋 4종 · scripts/audit_rule_formula.py — 등급 변경 0).
-      · 표시되는 S·V·M 은 대개 그 **등급에서 역산한 값**이다(svm_levels_for_grade).
-        메타데이터로 접근범위·보안표시가 온 경우에만 M 축이 실측이다.
+      · [2026-10-02] 종전엔 본문 근거가 없는 축도 등급에서 역산한 값(svm_levels_for_grade)을
+        그대로 돌려줬다. 이제 그 역산 자체를 소스(rule_engine.py/m3_labeling/pipeline.py)에서
+        끊었다 — 근거가 실제로 관측된 축만 `state="observed"`+값을 받고, 없으면
+        `state="unknown"`+값 없음으로 정직하게 온다(`FactorDetail`, 축마다 독립).
 
     그래서 세 가지를 갈라 낸다. 무엇이 근거이고 무엇이 기준인지 섞지 않는다.
 
-        rows            요소값 그대로
-        factors_source  이 값이 근거인가 추정인가(model_estimated | rule_evidenced)
+        rows            요소마다 state(observed/unknown)·score·evidence — 축별로 독립
+        factors_source  문서 단위 요약(세 축 모두 observed 면 rule_evidenced, 하나라도
+                         unknown 이면 model_estimated) — rows 를 보면 어느 축인지도 안다
         reference_rule  정본 판정식 — 이 등급을 만든 **방법이 아니라 기준**이다
 
-    `limiting_factor` 는 요소가 근거일 때만 낸다. 역산값에서 최저 요소를 골라 "이것이
-    등급을 제약했다"고 말하면, 등급에서 나온 값을 등급의 원인이라고 하는 순환이 된다.
+    `limiting_factor` 는 **세 축 모두 근거가 있을 때만** 낸다. 축 하나가 unknown이면 그
+    축이 실제로는 더 낮았을 수도 있어 "이 요소가 등급을 제약했다"고 말할 근거가 없다.
+    종전엔 문서 전체를 rule_evidenced/model_estimated 둘 중 하나로만 봤지만(M은 독립
+    메커니즘이라 S·V와 다른 state를 가질 수 있는데도), 이제 `rows`가 축별 state를 그대로
+    노출하므로 limiting_factor 판정도 축별 state에서 직접 뽑는다.
     """
     if not result.evaluation_factors:
         return {}
     f = result.evaluation_factors
     rows = [
-        {"factor": "secrecy", "name": "비공지성(S)", "score": round(float(getattr(f, "secrecy", 0.0) or 0.0), 4)},
-        {"factor": "value", "name": "경제적 유용성(V)", "score": round(float(getattr(f, "value", 0.0) or 0.0), 4)},
-        {"factor": "management", "name": "비밀관리성(M)", "score": round(float(getattr(f, "management", 0.0) or 0.0), 4)},
+        {
+            "factor": code,
+            "name": name,
+            "state": detail.state,
+            "score": detail.value,
+            "evidence": list(detail.evidence),
+        }
+        for code, name, detail in (
+            ("secrecy", "비공지성(S)", f.secrecy),
+            ("value", "경제적 유용성(V)", f.value),
+            ("management", "비밀관리성(M)", f.management),
+        )
     ]
     source = str(getattr(result, "factors_source", "") or "rule_evidenced")
     out = {
@@ -111,13 +126,13 @@ def _factor_decomposition(result: ClassifyResponse) -> dict:
         "reference_rule": "정본 판정식 등급 = S×V×M (이 등급의 산출 방법이 아니라 대조 기준)",
         "decided_by": result.decision_path,
     }
-    if source == "rule_evidenced":
+    if all(r["state"] == "observed" for r in rows):
         limiting = min(rows, key=lambda r: r["score"])
         out["limiting_factor"] = limiting["factor"]
     else:
         out["limiting_factor"] = None
         out["limiting_factor_note"] = (
-            "요소값이 등급에서 역산된 추정치라 제약 요소를 말할 수 없다"
+            "근거 없는(state=unknown) 축이 있어 제약 요소를 말할 수 없다 — rows에서 축별로 확인"
         )
     return out
 

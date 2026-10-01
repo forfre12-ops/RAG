@@ -516,8 +516,8 @@ function renderResult(data, elapsedMs) {
   // 원문 경고는 화면 카드가 아니라 실시간 로그로 보낸다 — 감리·디버깅에서 서버 응답과
   // 대조할 수 있어야 하지만, 판정 카드에 영어 원문과 수치가 섞이면 화면이 읽히지 않는다.
   (data.warnings || []).forEach((w) => logLine("info", `warning: ${w}`));
-  // 평가요소 stats (factors_source=model_estimated 는 '모델 추정'으로 구분)
-  renderFactors(data.evaluation_factors || {}, data.factors_source, data.rule_evaluation_factors);
+  // 평가요소 stats (factors_source=model_estimated 는 '일부 축 근거 없음'으로 구분)
+  renderFactors(data.evaluation_factors || {}, data.factors_source);
   // 키워드 칩 (weight 진하기)
   renderKeywordChips(data.evidence || []);
   // 본문 하이라이트
@@ -1137,13 +1137,20 @@ function renderSummary(data) {
      이 질문에 답하지 못했다. 세 값을 정렬해 **무조건 상위 2개**를 집어 "가장 높게 측정되었습니다"
      라고 적었다. 셋 다 0.00 이어도 앞의 둘(S·V)을 골라 그렇게 말했다 — 0점을 "가장 높다"고
      하는 것은 사실이 아니다. 같은 점수일 때도 "가장 높게"는 성립하지 않는다.
-     그래서 세 경우를 가른다: 전부 0 / 전부 같은 점수 / 실제로 높은 것이 있음. */
+     그래서 세 경우를 가른다: 전부 0 / 전부 같은 점수 / 실제로 높은 것이 있음.
+     [2026-10-02] S·V·M은 이제 {state,value,evidence} 축별 객체다 — 근거 없는 축은
+     value=0이 아니라 state="unknown"(값 자체가 없음)으로 온다. observed인 축만 모아
+     순위를 매긴다 — unknown을 0으로 섞으면 "확인된 0점"과 "모름"이 같은 문장이 된다. */
   const allFactors = Object.entries(factors)
-    .filter(([k]) => k !== "" && typeof factors[k] === "number")
+    .filter(([, d]) => d && typeof d === "object" && d.state === "observed" && typeof d.value === "number")
+    .map(([k, d]) => [k, d.value])
     .sort((a, b) => b[1] - a[1]);
   const topFactors = allFactors.slice(0, 2);
   const maxFactor = allFactors.length ? allFactors[0][1] : 0;
   const allSame = allFactors.length > 1 && allFactors.every(([, v]) => v === maxFactor);
+  const observedAxisCount = Object.keys(factors).filter((k) => k !== "scores").length
+    ? allFactors.length
+    : -1; // factors 객체 자체가 비어 있으면(분류 자체가 없던 경우 등) -1로 구분
 
   const factorLabels = {
     secrecy: "비공지성(S)",
@@ -1165,21 +1172,25 @@ function renderSummary(data) {
   const matchedTxt = matched.length > 0
     ? `「${matched.join("」 「")}」 키워드가 감지되었습니다.`
     : "본문에서 시드 키워드 매칭이 없어 기본 등급으로 판정되었습니다.";
-  // factors_source=model_estimated 는 룰 미탐으로 등급에 맞춰 역산한 추정치(법리 근거 아님).
-  const estimated = data.factors_source === "model_estimated";
-  const estimatedTail = estimated ? " (모델 역산 — 법리 근거 아님)" : "";
+  // [2026-10-02] factors_source는 더는 "역산했다"는 뜻이 아니다 — 축 하나라도
+  // state="unknown"(본문 근거 없음)이면 model_estimated다. 몇 개 축이 observed인지는
+  // observedAxisCount(위에서 계산)가 이미 정확히 알고 있으니 그것으로 문장을 가른다.
   let factorTxt = "";
-  if (allFactors.length === 0) {
+  if (observedAxisCount < 0) {
     factorTxt = "";
-  } else if (maxFactor <= 0) {
-    // 셋 다 0 — 무엇이 "가장 높다"고 말할 수 없다. 왜 0인지를 적는다.
-    factorTxt = `3요건(S·V·M)이 <b>모두 0점</b>입니다 — 본문에서 등급을 올릴 근거가 검출되지 않았습니다${estimatedTail}.`;
-  } else if (allSame) {
-    factorTxt = `3요건(S·V·M)이 <b>모두 같은 점수(${maxFactor.toFixed(2)})</b>입니다${estimatedTail}.`;
+  } else if (observedAxisCount === 0) {
+    // 세 축 모두 근거 없음 — 조용히 문장을 생략하면 "안 알려준 것"처럼 보인다.
+    factorTxt = "3요건(S·V·M) 중 본문에서 확인된 근거가 없습니다 — 등급은 모델이 직접 판정했습니다.";
+  } else if (maxFactor <= 0 && observedAxisCount === 3) {
+    // 셋 다 observed인데 0 — 무엇이 "가장 높다"고 말할 수 없다. 왜 0인지를 적는다.
+    factorTxt = "3요건(S·V·M)이 <b>모두 0점</b>입니다 — 본문에서 등급을 올릴 근거가 검출되지 않았습니다.";
+  } else if (allSame && observedAxisCount === 3) {
+    factorTxt = `3요건(S·V·M)이 <b>모두 같은 점수(${maxFactor.toFixed(2)})</b>입니다.`;
   } else {
+    const partialNote = observedAxisCount < 3 ? " (나머지 요소는 본문에서 확인되지 않았습니다)" : "";
     factorTxt = `3요건(S·V·M) 중 ${topFactors
       .map(([k, v]) => `<b>${factorLabels[k] || k}(${v.toFixed(2)})</b>`)
-      .join("·")}가 ${estimated ? "가장 높게 <b>추정</b>되었습니다 (모델 역산 — 법리 근거 아님)" : "가장 높게 측정되었습니다"}.`;
+      .join("·")}가 확인된 근거 중 가장 높게 측정되었습니다${partialNote}.`;
   }
 
   // 서버가 계산한 라우팅 status 를 반드시 노출 — needs_review 를 확정처럼 보이지 않게.
@@ -1232,45 +1243,53 @@ function gradeLabel(g) {
    (A3 상향 정합 · 출처 cap 하향 정합) **관측치를 rule_factors 로 보존**한다. 그 값이 있으면
    두 줄로 그린다 — 어느 것이 판정에 쓰인 값이고 어느 것이 본문에서 관측된 값인지 갈라야
    검수자가 왜 갈렸는지 읽는다. 없으면 종전과 같이 한 줄이다. */
-function renderFactors(f, factorsSource, observed) {
+function renderFactors(f, factorsSource) {
   const wrap = $("#result-factors");
   const labels = {
     secrecy: "비공지성(S)",
     value: "경제적 유용성(V)",
     management: "비밀관리성(M)",
   };
-  // 서버 응답은 키워드 가중치 누적값이라 등급에 따라 0~5+ 범위.
-  // 화면 표시는 3 요소(S·V·M) 상대값을 0~1로 정규화해서 비교 가능하게 한다.
+  // [2026-10-02] 축마다 {state,value,evidence} 객체로 온다 — 근거 없는 축은 value=0이
+  // 아니라 state="unknown"(값 자체가 없음)이다. "확인 안 됨"을 0점 막대로 그리면
+  // "확인된 0점"처럼 보인다 — 그게 이번에 없앤 역산과 같은 종류의 거짓말이라 피한다.
   wrap.innerHTML = "";
-  // 역산 추정치는 법리 근거가 아님을 구분 표기(번들C 컴플라이언스 계약).
   if (factorsSource === "model_estimated") {
     const note = document.createElement("div");
     note.style.cssText = "grid-column:1/-1;font-size:12px;color:#d97706;margin-bottom:4px;";
-    note.textContent = "⚠ 모델 추정치 — 룰이 근거를 못 찾아 등급에 맞춰 역산(법리 근거 아님)";
+    note.textContent = "⚠ 일부 요소는 본문에서 근거를 찾지 못해 '확인 안 됨'입니다(값을 지어내지 않습니다)";
     wrap.appendChild(note);
   }
-  // 관측치가 따로 있으면 위 숫자가 무엇인지 먼저 밝힌다 — 두 벌이 섞여 보이면 안 된다.
-  if (observed && Object.keys(labels).some((k) => typeof observed[k] === "number" && observed[k] !== f[k])) {
-    const src = document.createElement("div");
-    src.style.cssText = "grid-column:1/-1;font-size:12px;color:var(--text-dim,#71717a);margin-bottom:4px;";
-    src.textContent = "위 숫자는 판정 등급에 맞춘 값입니다. 아래 「본문 관측」이 본문에서 실제로 읽은 값입니다.";
-    wrap.appendChild(src);
-  }
-  const values = Object.keys(labels).map((k) => (typeof f[k] === "number" ? f[k] : 0));
-  const maxV = Math.max(1, ...values);
-  Object.entries(labels).forEach(([k, l], i) => {
-    const v = values[i];
-    const norm = maxV > 0 ? v / maxV : 0;
+  const entries = Object.keys(labels).map((k) => {
+    const d = f[k];
+    const observed = !!d && typeof d === "object" && d.state === "observed" && typeof d.value === "number";
+    return {
+      key: k, label: labels[k], observed,
+      value: observed ? d.value : null,
+      evidence: (observed && Array.isArray(d.evidence)) ? d.evidence : [],
+    };
+  });
+  const maxV = Math.max(1, ...entries.filter((e) => e.observed).map((e) => e.value));
+  entries.forEach((e) => {
     const stat = document.createElement("div");
     stat.className = "stat";
-    const ov = observed && typeof observed[k] === "number" ? observed[k] : null;
-    const ovRow = ov !== null && ov !== v
-      ? `<div class="l" style="margin-top:4px;color:var(--text-dim,#71717a);">본문 관측 ${ov.toFixed(2)}</div>`
+    if (!e.observed) {
+      stat.innerHTML = `
+        <div class="v" style="color:var(--text-dim,#71717a);font-size:14px;">확인 안 됨</div>
+        <div class="l">${e.label}</div>
+        <div style="margin-top:8px;height:4px;background:var(--bg);border-radius:0;overflow:hidden;"></div>
+      `;
+      wrap.appendChild(stat);
+      return;
+    }
+    const norm = maxV > 0 ? e.value / maxV : 0;
+    const evRow = e.evidence.length
+      ? `<div class="l" style="margin-top:4px;color:var(--text-dim,#71717a);">근거: ${e.evidence.slice(0, 3).map(escapeHtml).join(", ")}</div>`
       : "";
     stat.innerHTML = `
-      <div class="v">${v.toFixed(2)}</div>
-      <div class="l">${l}</div>
-      ${ovRow}
+      <div class="v">${e.value.toFixed(2)}</div>
+      <div class="l">${e.label}</div>
+      ${evRow}
       <div style="margin-top:8px;height:4px;background:var(--bg);border-radius:0;overflow:hidden;">
         <div style="width:${(norm * 100).toFixed(0)}%;height:100%;background:var(--text);"></div>
       </div>

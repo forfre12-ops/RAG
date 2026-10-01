@@ -122,8 +122,8 @@ def _classify(monkeypatch, text, predicted="S1"):
     forced = InferenceResult(
         label=Grade[predicted], confidence=0.99,
         scores={g: (0.99 if g == predicted else 0.0) for g in ("TS", "S1", "S2", "S3")},
-        factors=EvaluationFactors.from_factor_scores(
-            {"SECRECY": float(s), "VALUE": float(v), "MANAGEMENT": float(m)}
+        factors=EvaluationFactors.from_axis_results(
+            secrecy=(True, s, []), value=(True, v, []), management=(True, m, []),
         ),
     )
     svc = ClassifyService()
@@ -134,7 +134,7 @@ def _classify(monkeypatch, text, predicted="S1"):
 def test_serving_fills_management_from_a_stamp(monkeypatch, _stub_pipeline_db):
     """메타데이터가 **하나도 없어도** 표시가 있으면 M 이 채워진다 — 이것이 이 경로의 목적이다."""
     res = _classify(monkeypatch, _docx(header="대외비"))
-    assert res.evaluation_factors.management == 1.0, res.warnings
+    assert res.evaluation_factors.management.value == 1, res.warnings
     assert any("document_marking" in w for w in res.warnings), res.warnings
 
 
@@ -147,7 +147,7 @@ def test_serving_does_not_change_the_grade(monkeypatch, _stub_pipeline_db):
 
 def test_serving_ignores_a_body_mention(monkeypatch, _stub_pipeline_db):
     res = _classify(monkeypatch, _docx(body=_BODY + " 본 자료는 대외비 규정에 따라 관리한다."))
-    assert res.evaluation_factors.management == 0.0
+    assert res.evaluation_factors.management.value == 0
     assert res.status != "needs_review", f"본문 언급으로 검수를 만들었다: {res.warnings}"
 
 

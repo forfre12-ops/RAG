@@ -44,18 +44,24 @@ def _stub_pipeline_db(monkeypatch):
 def _classify(monkeypatch, predicted="S1", metadata=None, text=_BODY):
     import koipa.config as cfg
     from koipa.modules.m5_inference.pipeline import InferenceResult
-    from koipa.schemas.classify import ClassifyRequest, EvaluationFactors
+    from koipa.schemas.classify import ClassifyRequest, EvaluationFactors, FactorDetail
     from koipa.schemas.common import Grade
     from koipa.services.classify_service import ClassifyService
 
     monkeypatch.setattr(cfg.settings, "metadata_floor_enabled", True, raising=False)
     s, v, m = svm_levels_for_grade(predicted)
+
+    def _det(level: int) -> FactorDetail:
+        return FactorDetail(state="observed", value=level, evidence=["stub"])
+
+    # [2026-10-02] 역산 제거 전엔 S/V/M이 평평한 float이었다 — 이 스텁은 그 시절
+    # svm_levels_for_grade(predicted) 출력을 "이미 정해진 요소값"으로 그대로 흉내 낸다.
+    # 이 시험의 관심사는 M이 **등급 결정 이후** 메타데이터로 갱신되는지이지, S/V/M의
+    # 최초 state 자체가 아니므로 셋 다 observed로 둔다.
     forced = InferenceResult(
         label=Grade[predicted], confidence=0.99,
         scores={g: (0.99 if g == predicted else 0.0) for g in ("TS", "S1", "S2", "S3")},
-        factors=EvaluationFactors.from_factor_scores(
-            {"SECRECY": float(s), "VALUE": float(v), "MANAGEMENT": float(m)}
-        ),
+        factors=EvaluationFactors(secrecy=_det(s), value=_det(v), management=_det(m)),
     )
     svc = ClassifyService()
     monkeypatch.setattr(svc.inference, "_run_rule_fallback", lambda *a, **k: forced)

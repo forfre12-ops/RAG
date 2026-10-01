@@ -158,9 +158,9 @@
       "S3": 0.03
     },
     "evaluation_factors": {
-      "secrecy": 2,
-      "value": 2,
-      "management": 2
+      "secrecy": { "state": "observed", "value": 2, "evidence": ["영업비밀"] },
+      "value": { "state": "observed", "value": 2, "evidence": ["독자 기술"] },
+      "management": { "state": "observed", "value": 2, "evidence": ["대외비"] }
     },
     "factors_source": "rule_evidenced",
     "rule_evaluation_factors": null,
@@ -241,9 +241,9 @@
             "S3": 0.03
           },
           "evaluation_factors": {
-            "secrecy": 2,
-            "value": 2,
-            "management": 2
+            "secrecy": { "state": "observed", "value": 2, "evidence": ["영업비밀"] },
+            "value": { "state": "observed", "value": 2, "evidence": ["독자 기술"] },
+            "management": { "state": "observed", "value": 2, "evidence": ["대외비"] }
           },
           "factors_source": "rule_evidenced",
           "evidence": [
@@ -379,9 +379,9 @@
       "status": "staging",
       "model_version": "v-fe4b386b",
       "factors": {
-        "secrecy": 2,
-        "value": 2,
-        "management": 2
+        "secrecy": { "state": "observed", "value": 2, "evidence": ["영업비밀"] },
+        "value": { "state": "observed", "value": 2, "evidence": ["독자 기술"] },
+        "management": { "state": "observed", "value": 2, "evidence": ["대외비"] }
       },
       "factors_source": "rule_evidenced",
       "rule_factors": null,

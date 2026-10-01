@@ -390,6 +390,11 @@ class RuleLabelResult:
     # 등) 또는 MANAGEMENT 요소 시드가 실제 매치됐으면 True. False면 m_lv 가 콘텐츠등급에서 추정된
     # 것(독립 근거 없음)이라 검수 시 M 확인이 필요하다는 신호. **등급에는 영향 없음**(순수 메타데이터).
     management_evidenced: bool = False
+    # [2026-10-02] management_evidenced=True를 만든 실제 근거 텍스트 — MANAGEMENT 요소
+    # 시드 매치는 matched_keywords에 이미 있지만, 형식적 관리표시(기밀/대외비 등, 본문
+    # 전체 스캔)는 matched_keywords에 안 남아서 evidenced=True인데 보여줄 텍스트가 없는
+    # 모순이 있었다. 이 필드가 그 틈을 채운다(management_marking_terms() 결과).
+    management_marking_terms: list[str] = field(default_factory=list)
     # [S·V축 가시화 2026-08-15] 같은 뜻을 S·V 로 넓힌 것. s_lv·v_lv 도 content_grade 에서
     # 역산되는데(strong = content_grade in ("TS","S1")) M 에만 공시가 있었다.
     # False 면 그 요소값은 근거가 아니라 등급의 재진술이다. **등급에는 영향 없음.**
@@ -534,10 +539,22 @@ def detect_management_marking(text: str) -> bool:
 
     비밀관리성(M)의 독립 근거 유무를 판정하는 데만 쓴다. 대소문자 무시(영문 표시).
     """
+    return bool(management_marking_terms(text))
+
+
+def management_marking_terms(text: str) -> list[str]:
+    """본문에서 실제로 매치된 관리표시 문구 목록(최대 5개) — M 근거 텍스트용.
+
+    [2026-10-02] detect_management_marking()은 bool만 줘서, M이 evidenced=True일 때
+    "무엇을 보고 그렇게 판단했는지"를 응답에 실을 수 없었다(FactorDetail.evidence가
+    비어버림 — observed인데 evidence=[]인 모순). 같은 스캔이지만 매치된 문구 자체를
+    돌려준다. detect_management_marking()은 이 함수의 bool(...)로 재정의해 둘이
+    어긋나지 않게 한다.
+    """
     if not text:
-        return False
+        return []
     low = text.lower()
-    return any(term.lower() in low for term in _MANAGEMENT_MARKING_TERMS)
+    return [term for term in _MANAGEMENT_MARKING_TERMS if term.lower() in low][:5]
 
 
 class LabelRuleEngine:
@@ -787,12 +804,13 @@ class LabelRuleEngine:
                     f"svm={svm_val}({svm_grade})↔content({content_grade}) → FNR-safe {final}"
                 ]
             chosen = final
-            # [표시 정합 B2/A3] FNR-safe 보정으로 svm_grade≠chosen이면 표시 S/V/M을 최종 등급에
-            # 정합화. 예: public 게이트로 svm=S3지만 content=TS → chosen=TS → S/V/M도 TS 기준 표시.
-            # (그렇지 않으면 'S0·V0·M0인데 TS' 모순 표기가 검수자에게 노출됨)
-            if grade_from_svm(s_lv, v_lv, m_lv) != chosen:
-                s_lv, v_lv, m_lv = svm_levels_for_grade(chosen)
-                svm_val = s_lv * v_lv * m_lv
+            # [표시 정합 B2/A3 — 2026-10-02 역산 제거] 종전에는 FNR-safe 보정으로
+            # svm_grade≠chosen이면 표시 S/V/M을 최종 등급에서 거꾸로 채워 넣었다
+            # (svm_levels_for_grade(chosen)) — 근거 없이 숫자를 지어내는 것이었다(사용자 지적).
+            # 이제 안 한다: s_lv/v_lv/m_lv는 위에서 실제로 계산된 값 그대로 쓴다. "등급과
+            # 표시 S/V/M이 산수로 안 맞아 보임"은 더는 문제가 아니다 — 근거 없는 축은 아래
+            # evidenced 판정에서 state="unknown"으로 걸러지고(값 자체를 안 보여줌), 최종
+            # 등급은 rule_grade/model_grade 필드로 이미 별도 표시된다.
             # 정본 3요건은 레벨(0/1/2)로 덮되, 커스텀 factor 키는 보존(merge — genericity 계약).
             factor_scores = {**factor_scores, "SECRECY": float(s_lv), "VALUE": float(v_lv), "MANAGEMENT": float(m_lv)}
 
@@ -802,26 +820,29 @@ class LabelRuleEngine:
         mgmt_factor_matched = any(
             to_canonical_factor(mm.factor) == "MANAGEMENT" for mm in matches
         )
-        management_evidenced = mgmt_factor_matched or detect_management_marking(text)
+        _marking_terms = management_marking_terms(text)
+        management_evidenced = mgmt_factor_matched or bool(_marking_terms)
         if chosen != "S3" and not management_evidenced:
             warnings = warnings + [
                 "비밀관리성(M) 독립 근거 없음 — 관리표시/관리요소 미검출, 콘텐츠등급 기반 추정"
                 " (검수 시 M 확인 권장)"
             ]
 
-        # [S·V 축 가시화 2026-08-15] M 에만 있던 공시를 S·V 로 넓힌다.
+        # [S·V 축 가시화 2026-08-15, 2026-10-02 소비처까지 정리] M 에만 있던 공시를 S·V 로 넓힌다.
         #
         # 왜. 위 블록에서 s_lv·v_lv 는 **요소 근거가 아니라 content_grade(키워드 argmax
-        # 등급)에서 역산**된다 — `strong = content_grade in ("TS","S1")` 한 줄이 둘을 동시에
-        # 정한다. 그런데 응답의 factors_source 는 그것을 `rule_evidenced` 라 부른다. M 은
-        # 바로 위에서 "콘텐츠등급 기반 추정" 이라고 공시하는데 S·V 는 안 한다. 같은 방식으로
-        # 나온 값인데 하나만 밝히고 있었다.
+        # 등급)에서 유래** — `strong = content_grade in ("TS","S1")` 한 줄이 둘을 동시에
+        # 정한다. 그래서 secrecy_evidenced/value_evidenced 가 False 인 축은, 이 s_lv/v_lv
+        # 숫자가 있어도 **호출부(m3_labeling/pipeline.py 의 EvaluationFactors.from_axis_results)
+        # 가 반드시 버리고 state="unknown" 으로 내보낸다** — 이 함수는 숫자만 계산하고
+        # 내보내지 않을지는 아래 evidenced 불리언으로 결정되므로, 역산 재유입 여부는 여기가
+        # 아니라 호출부 책임이다(2026-10-02 이전엔 이 숫자가 그대로 응답에 실렸었다).
         #
         # 실측(RULE_EXTRACTOR_DIAGNOSIS 2026-08-12)이 그 규모를 이미 재 놓았다.
         #   v3 final_800   secrecy 낮게봄 84.6% · value 낮게봄 84.6% · 과검출 0.0%
         #   누산 점수       VALUE 300건 전부 0.0 · SECRECY 전 문서 동일값 1.35
-        # 시드 보강·semantic·임계탐색 세 가지가 전부 막혔고(같은 문서 §7), 남은 정직한
-        # 조치는 **탐지 못 한 것을 탐지했다고 말하지 않는 것**이다.
+        # 시드 보강·semantic·임계탐색 세 가지가 전부 막혔다(같은 문서 §7) — 즉 이 84.6%는
+        # state="unknown"으로 나갈 축이 "가끔"이 아니라 "S3 아닌 대부분 문서"라는 뜻이다.
         #
         # ⚠ 등급은 건드리지 않는다. 순수 공시다 - 여기서 등급을 움직이면 판정면이 바뀐다.
         secrecy_evidenced = any(
@@ -850,6 +871,7 @@ class LabelRuleEngine:
             svm=svm_val,
             warnings=warnings,
             management_evidenced=management_evidenced,
+            management_marking_terms=_marking_terms,
             secrecy_evidenced=secrecy_evidenced,
             value_evidenced=value_evidenced,
         )

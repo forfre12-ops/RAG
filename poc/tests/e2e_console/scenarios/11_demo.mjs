@@ -34,7 +34,13 @@ export const scenarios = [
         rule_grade: 'TS', model_grade: 'TS', decision_path: '룰·모델 모두 TS 로 일치',
         status: 'needs_review', model_version: 'v-fe4b386b', elapsed_ms: 12,
         warnings: ['low-confidence: confidence=0.46 < 0.50 — review recommended'],
-        evidence: [], evaluation_factors: { secrecy: 2, value: 2, management: 2 },
+        evidence: [],
+        // [2026-10-02] S·V·M은 이제 축마다 {state,value,evidence} 객체다(역산 제거).
+        evaluation_factors: {
+          secrecy: { state: 'observed', value: 2, evidence: ['영업비밀'] },
+          value: { state: 'observed', value: 2, evidence: ['대외 반출을 금한다'] },
+          management: { state: 'observed', value: 2, evidence: ['대외비'] },
+        },
         factors_source: 'rule_evidenced', rag_context_used: [],
       };
       server.overrides['POST /classify/stream'] = {
@@ -90,7 +96,12 @@ export const scenarios = [
           'fnr-safe override: rule TS score=7.00 >= threshold 3.00 (model S1 -> TS)',
           'low-confidence: confidence=0.48 < 0.50 — review recommended',
         ],
-        evidence: [], evaluation_factors: { secrecy: 2, value: 2, management: 0 },
+        evidence: [],
+        evaluation_factors: {
+          secrecy: { state: 'observed', value: 2, evidence: ['영업비밀'] },
+          value: { state: 'observed', value: 2, evidence: ['핵심 기술'] },
+          management: { state: 'observed', value: 0, evidence: [] },
+        },
         factors_source: 'rule_evidenced', rag_context_used: [],
       };
       server.overrides['POST /classify/stream'] = {
@@ -264,7 +275,14 @@ export const scenarios = [
       const base = JSON.parse(JSON.stringify(FIXTURES['POST /classify/stream']));
       for (const ev of base._sse) {
         if (ev.event === 'result') {
-          ev.data.evaluation_factors = { secrecy: 0, value: 0, management: 0 };
+          // [2026-10-02] 반드시 state:'observed'여야 한다 — state:'unknown'(근거 없음)이면
+          // app.js가 "확인된 근거가 없습니다"로 갈라 이 시나리오의 "확인된 값이 전부 0"
+          // 케이스를 더는 재현하지 못한다(근거 없음과 확인된 0은 이제 다른 문장이다).
+          ev.data.evaluation_factors = {
+            secrecy: { state: 'observed', value: 0, evidence: [] },
+            value: { state: 'observed', value: 0, evidence: [] },
+            management: { state: 'observed', value: 0, evidence: [] },
+          };
           ev.data.evidence = [];
         }
       }
@@ -303,7 +321,12 @@ export const scenarios = [
         gate: { requires_review: true, reasons: ['table_incomplete', 'content_dropped'] },
         classification: {
           label: 'S3', confidence: 0.93, scores: { S3: 0.93 }, status: 'needs_review',
-          model_version: 'v-fe4b386b', factors: { secrecy: 0, value: 0, management: 0 },
+          model_version: 'v-fe4b386b',
+          factors: {
+            secrecy: { state: 'observed', value: 0, evidence: [] },
+            value: { state: 'observed', value: 0, evidence: [] },
+            management: { state: 'observed', value: 0, evidence: [] },
+          },
           factors_source: 'rule_evidenced', rule_factors: null,
           warnings: ['extraction_gate: 열화 추출(표누락/저품질)→검수 라우팅 (table_incomplete, content_dropped)'],
           elapsed_ms: 845, rule_grade: 'S3', model_grade: 'S3',
@@ -395,7 +418,12 @@ export const scenarios = [
         classification: {
           label: 'S1', confidence: 0.42, scores: { TS: 0.1, S1: 0.42, S2: 0.3, S3: 0.18 },
           status: 'needs_review', model_version: 'v-fe4b386b',
-          factors: { secrecy: 2, value: 1, management: 1 }, factors_source: 'rule_evidenced',
+          factors: {
+            secrecy: { state: 'observed', value: 2, evidence: ['영업비밀'] },
+            value: { state: 'observed', value: 1, evidence: ['설계도'] },
+            management: { state: 'observed', value: 1, evidence: ['대외비'] },
+          },
+          factors_source: 'rule_evidenced',
           rule_factors: null, warnings: ['low_confidence'], elapsed_ms: 180,
           rule_grade: 'S1', model_grade: 'S2', decision_path: 'disagreement',
         },
