@@ -1,6 +1,6 @@
 """POST /golden/jobs/register — 같은 파일을 다시 올려도 묶음이 늘지 않는다.
 
-왜(2026-08-25 사용자 지적, 223 실측). 검수 목록 8행이 실제로는 파일 3개였다 —
+왜(2026-08-25, 223 실측). 검수 목록 8행이 실제로는 파일 3개였다 —
 demo_slate_v1.jsonl 4행 · regate_gold_20260702_013914.jsonl 2행 ·
 golden_review/ff5a822c/candidates.jsonl 2행. register_build 가 호출마다
 uuid4() 를 새로 뽑고 중복 검사가 없었다.

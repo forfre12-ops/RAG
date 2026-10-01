@@ -7,7 +7,7 @@
     로고 3종     base64 PNG · 인라인 SVG 근사본 · 외부 PNG 파일
     기관명 옆    .product / .brand-sub / .brand-url — 클래스도 문구도 제각각
 
-사용자 지시로 **검수·서명 화면의 header.top 을 기준**으로 합쳤다. 정적 2면은 파이썬을
+그래서 **검수·서명 화면의 header.top 을 기준**으로 합쳤다. 정적 2면은 파이썬을
 못 부르므로 같은 마크업을 파일에 박아 넣는다 — 그래서 손으로 고치면 다시 갈라진다.
 이 시험이 그 어긋남을 잡는다.
 """
@@ -33,14 +33,14 @@ STATIC = _POC / "src" / "koipa" / "api" / "static"
 
 # [2026-08-21] 「로그인」 추가 — 쿠키 없는 브라우저에서 콘솔 전 기능이 401 인데
 # 어느 화면에도 login.html 주소가 없었다(시연장에서 멈추는 자리).
-# [2026-08-24] 「로그인」을 뺐다(사용자 지시). login.html 화면은 살아 있고 주소로 열린다 —
+# [2026-08-24] 「로그인」을 뺐다. login.html 화면은 살아 있고 주소로 열린다 —
 # 메뉴에서만 뺀 것이다. 목록의 정본은 console_nav.CONSOLE_LINKS 이고 이 상수는 그 사본이라,
 # 아래 test_menu_labels_match_the_single_source 가 둘이 어긋나면 잡는다.
-# [2026-08-24] 「검증문서 검수 목록」도 뺐다(사용자 지시, 4항목 → 3항목). 그 항목만 목적지가
+# [2026-08-24] 「검증문서 검수 목록」도 뺐다(4항목 → 3항목). 그 항목만 목적지가
 # 다른 화면이 아니라 「관리자 콘솔」과 **같은 화면의 내부 앵커**(#gold-jobs-card)여서, 이
 # 메뉴가 지키는 원칙("메뉴 하나 = 서로 다른 화면 하나", 61f1a94f)을 깨는 유일한 항목이었다.
 # 검수 목록은 이제 관리자 콘솔 「검증문서」 탭의 첫 카드다(golden_jobs.js order:1).
-# [2026-08-24] 「검증문서 후보 관리」도 뺐다(3항목 → 2항목, 사용자 판단). 그 항목만
+# [2026-08-24] 「검증문서 후보 관리」도 뺐다(3항목 → 2항목). 그 항목만
 # 포털 로그인을 거쳐야 열리고(다른 둘은 그냥 열린다) 특정 업무 화면이라 층위가 달랐다.
 # 진입은 관리자 콘솔 「검증문서 현황」 카드의 [후보 관리 화면 열기 ↗] 버튼이 맡는다.
 # [2026-09-29] "등급 시연" → "업로드·분류 테스트" 로 개명(console_nav.py 정본) — 실고객 문서
@@ -105,7 +105,7 @@ def test_old_header_skeletons_are_gone(name):
 
 @pytest.mark.parametrize("name", list(_screens()))
 def test_every_menu_item_is_in_the_top_bar(name):
-    """사용자 지시: 공용 메뉴가 다섯 화면 전부의 최상단에 있어야 한다.
+    """요건: 공용 메뉴가 다섯 화면 전부의 최상단에 있어야 한다.
 
     [2026-08-24] 종전 이름은 test_four_menu_items_are_in_the_top_bar 였다. 개수(4)를 이름에
     박아 두면 항목이 바뀔 때마다 이름이 거짓이 된다 — 이 시험이 실제로 잠그는 것은 개수가
@@ -113,7 +113,7 @@ def test_every_menu_item_is_in_the_top_bar(name):
     test_menu_labels_match_the_single_source 가 console_nav.CONSOLE_LINKS 와 묶어 둔다.
 
     [2026-09-30 정정] manage 의 원시 렌더(_screens()['manage'])는 9/27부터 admin·kl_backend
-    세션에 관리자 콘솔 복귀 링크를 담고 있다(사용자 요청, 커밋 3ebb781 —
+    세션에 관리자 콘솔 복귀 링크를 담고 있다(커밋 3ebb781 —
     test_review_screens_admin_separation.py 참고). 배제 검사(reviewer 는 이 링크를 보면 안
     된다)는 원시 렌더가 아니라 reviewer 가 실제로 받는 응답(_as_reviewer_view 를 거친 것)으로
     해야 그 화면과 같은 기준이 된다 — 있어야 할 라벨(else 분기)은 계속 원시 렌더로 본다
@@ -154,7 +154,7 @@ def test_screen_specific_widgets_survived():
     # golden.py 의 인라인 JS 가 무가드로 잡는다 — 없으면 KPI·품질·원장 렌더가 통째로 멈춘다.
     assert 'id="topCount"' in _header_of(s["manage"])
     # [2026-08-24] 앵커 **대상**만 잠근다. 종전에는 `href="#sec-parse"` 를 찾았는데, 그 링크는
-    # 상단 바의 구역 이동 메뉴 4개 중 하나였고 사용자 지시로 그 메뉴가 빠졌다
+    # 상단 바의 구역 이동 메뉴 4개 중 하나였고 그 메뉴가 빠졌다
     # (scripts/sync_console_header.py). 주소가 살아 있어야 한다는 취지는 그대로다 —
     # 사용설명서·배포 가이드·parse_demo.html 스텁이 이 주소를 쓴다. 들어오는 링크가 있는지는
     # tests/test_demo_static_assets.py 가 admin.html 쪽에서 따로 잠근다.

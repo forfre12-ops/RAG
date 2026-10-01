@@ -46,7 +46,7 @@ def test_review_screens_do_not_link_to_the_admin_console() -> None:
     """검수자가 실제로 받는 화면에는 이 링크가 절대 없어야 한다 — KL 지적의 핵심.
 
     [2026-09-27] manage 화면은 admin·kl_backend 세션에서는 관리자 콘솔로 돌아가는
-    편의 링크를 다시 허용했다(사용자 요청 — 이미 admin 권한이 있는 세션이 admin.html 을
+    편의 링크를 다시 허용했다(이미 admin 권한이 있는 세션이 admin.html 을
     직접 주소로 열 수 있는 것과 같은 일이라 새 권한이 생기지 않는다). 그래서 여기서는
     **원시 렌더가 아니라 검수자에게 실제로 나가는 응답**(`_as_reviewer_view` 을 거친 것)을
     본다 — 그게 KL 이 지적한 대상이다. admin 세션이 링크를 보는 것 자체는 바로 아래
@@ -77,7 +77,7 @@ def test_admin_view_is_unchanged(client) -> None:
 
 
 def test_admin_view_shows_a_way_back_to_the_admin_console(client) -> None:
-    """[2026-09-27, 사용자 요청] admin·kl_backend 세션은 후보 관리 화면에서 관리자 콘솔로
+    """[2026-09-27] admin·kl_backend 세션은 후보 관리 화면에서 관리자 콘솔로
     돌아가는 메뉴 링크를 본다 — 이미 그 역할이면 admin.html 을 직접 열 수 있어 새 권한이
     생기는 게 아니다. reviewer 세션에는 이 링크가 나가면 안 된다(바로 위 시험이 잠근다).
     """

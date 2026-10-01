@@ -6,8 +6,8 @@
 권고했다(인쇄 185쪽 (나)). 학습셋의 TS 는 연구·기술 쪽에 몰려 있어 재무·인사 문서를 TS 로
 배운 사례가 드물다.
 
-⚠ 8/24 방침(합성 신규 생성 중단)의 **예외**다. 2026-09-11 사용자 지시("서버 배포 제외하고
-  전부 진행")로 이 칸만 좁게 연다. 기존 학습셋과 섞지 않고 별도 폴더에 둔다. 학습에 넣는
+⚠ 8/24 방침(합성 신규 생성 중단)의 **예외**다. 2026-09-11 결정("서버 배포 제외하고
+  전부 진행")에 따라 이 칸만 좁게 연다. 기존 학습셋과 섞지 않고 별도 폴더에 둔다. 학습에 넣는
   것은 비교 실험(v7b)으로만 하고, 넣었을 때와 뺐을 때를 같은 자로 잰다.
 
 생성: 로컬 Ollama — 외부 전송 없음. 등급명이 본문에 드러나면 버린다(구버전 합성의 33.8% 가
@@ -145,7 +145,7 @@ def main(argv=None) -> int:
                                        encoding="utf-8", newline="\n")
     manifest = {"created": time.strftime("%Y-%m-%dT%H:%M:%S"), "model": a.model, "requested": a.per_domain * len(SCENARIOS),
                 "accepted": len(rows), "rejected": dict(reasons), "by_domain": dict(Counter(r["domain"] for r in rows)),
-                "elapsed_sec": round(time.time() - t0), "policy": "8/24 합성 중단 방침의 예외 — 2026-09-11 사용자 지시",
+                "elapsed_sec": round(time.time() - t0), "policy": "8/24 합성 중단 방침의 예외 (2026-09-11 승인)",
                 "not_merged_into_training": True,
                 "files": {"samples.jsonl": {"rows": len(rows), "sha256": _file_sha256(out / "samples.jsonl")}}}
     (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8", newline="\n")

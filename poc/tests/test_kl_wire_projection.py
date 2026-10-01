@@ -1,6 +1,6 @@
 """KL(지재원 포털)이 실제로 받는 등급 응답 — kl_wire_projection() 이 좁히는 규칙을 잠근다.
 
-왜 있는가(2026-09-29). 사용자 요청: "분류기 등급과 룰분류가 같을 때는 예상 등급 하나만, 다른
+왜 있는가(2026-09-29). 요건: "분류기 등급과 룰분류가 같을 때는 예상 등급 하나만, 다른
 경우에는 분류기(label)를 메인으로 하고 룰분류기 예측은 따로, RAG+LLM 인 경우엔 관련 참고도
 같이 리턴". `kl_wire_projection()`(schemas/classify.py)이 이 규칙을 구현한다 — label 은
 그대로 두고, rule_grade 는 label 과 같으면 지우고(하나만), evaluation_factors·evidence·

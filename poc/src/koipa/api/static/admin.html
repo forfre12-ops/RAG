@@ -364,7 +364,7 @@ details.adv[open]{padding-bottom:12px;}
 
   <!-- FLOW STEPPER — [2026-09-29] 루프 A(분류→검수·확정)를 뺐다. 그 두 단계는 이제 KL 포털이
        우리 API(IF-02·03·05·07)로 직접 수행한다 — 우리 콘솔에 실고객 문서 검수·확정 화면을 두지
-       않는다(사용자 지시). 남는 루프 B(골든셋→재학습→배포→메트릭)만 그린다. -->
+       않는다. 남는 루프 B(골든셋→재학습→배포→메트릭)만 그린다. -->
   <div class="loopwrap">
     <div class="flow loop" id="flow-b">
       <span class="loop-tag">모델 갱신 흐름</span>
@@ -494,7 +494,7 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- [2026-09-29] 「분류 실행」·「문서 검토 대기·등급 확정/수정」·「확정 대기·최종 확정」 카드 3개를
-         뺐다(사용자 지시 — 관리자 콘솔과 KL 포털을 명확히 분리) — 실고객 문서 업로드·분류·검수·확정은
+         뺐다(관리자 콘솔과 KL 포털을 명확히 분리하기 위함) — 실고객 문서 업로드·분류·검수·확정은
          이제 KL 포털이 우리 API(IF-02·03·05·07)로 직접 수행한다. 우리가 직접 업로드·분류를
          시험해 보는 용도는 /console/index.html(내부 테스트 페이지, 등급 시연에서 재정의)로 옮겼다.
          「검수 화면」이 이 콘솔에 없는 이유가 이것이다 — 남는 검수는 아래 골든셋(검증문서) 검수뿐이다. -->
@@ -585,7 +585,7 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <p class="hint" id="sy-provider-note" style="margin-top:2px"></p>
         <!-- [2026-09-28] 생성 규칙(플레이북) — 지금 생성에 기본 적용되는 규칙을 관리자가
-             확인할 수 있어야 한다는 사용자 지시. 기본 접힘(요약 한 줄)·펼치면 규칙·금지
+             확인할 수 있어야 한다. 기본 접힘(요약 한 줄)·펼치면 규칙·금지
              낱말이 보인다. 정본은 m1_synthesis/generation_playbook.py, 조회는 GET /synth/playbook. -->
         <details id="sy-playbook" style="margin-top:8px;">
           <summary class="hint" style="cursor:pointer;">생성 규칙(플레이북) — <span id="sy-playbook-version">불러오는 중…</span></summary>
@@ -2962,7 +2962,7 @@ function syncLlmProviders(list, active){
   else if(act && names.indexOf(act)>=0) sel.value=act;
 }
 
-/* [2026-09-28] "로컬 LLM은 우리가 보유하고 있는 것만 목록에 나와야" — 사용자 지시.
+/* [2026-09-28] 로컬 LLM은 보유 중인 것만 목록에 나와야 한다.
  * syncLlmProviders 는 healthz 의 정적 허용목록(스키마가 받는 값 9개)을 그대로 보여준다 —
  * 실제로 이 서버가 지금 그 provider 로 생성할 수 있는지와 무관하다. 이 함수가 그 위에
  * GET /synth/providers/status(상용은 키 유무, 로컬은 연결 가능 여부)를 얹어 목록을 좁힌다.
@@ -2994,7 +2994,7 @@ async function loadSynthProviderStatus(){
 }
 
 /* [2026-09-28] 지금 생성에 기본 적용되는 규칙(플레이북)을 관리자가 확인할 수 있어야
- * 한다는 사용자 지시. 정본은 m1_synthesis/generation_playbook.py — 여기는 읽기 전용으로
+ * 한다. 정본은 m1_synthesis/generation_playbook.py — 여기는 읽기 전용으로
  * 보여주기만 한다(콘솔에서 고치지 않는다). */
 async function loadSynthPlaybook(){
   const verEl=$('sy-playbook-version'), bodyEl=$('sy-playbook-body');

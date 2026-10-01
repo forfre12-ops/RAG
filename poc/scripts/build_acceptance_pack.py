@@ -6,7 +6,7 @@
 **under-분류(미탐)되지 않는지**(severity floor; 서빙은 안전방향 과분류라 정확일치가 아니라 floor 로 본다),
 (3) 게이트 가시성(needs_review·경고)이다. 채점은 scripts/run_acceptance.py 가 한다.
 
-시드(사용자 지시: 공개문서 혼합):
+시드(공개문서 혼합):
   - 합성 backbone : datasets/gold/classification_gold.jsonl  ([가상기업A] 안전 합성)
   - 공개 법근거   : datasets/gold_real/holdout_eval.clean.jsonl (legal_reference 동반)
   - 공개 S3 음성  : datasets/gold_real/... 없으면 합성 폴백

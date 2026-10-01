@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 from .common import FactorRegistry, Grade
 from .regulation import EvidenceItemModel
 
@@ -24,53 +24,63 @@ class EvidenceSpan(BaseModel):
     tag: Optional[str] = None
 
 
+class FactorDetail(BaseModel):
+    """평가요소 한 축(S/V/M 중 하나)의 판정 — 역산 금지, 근거 없으면 unknown.
+
+    [2026-10-02] 종전에는 본문 증거가 없어도 등급에서 거꾸로 계산한 값(svm_levels_for_grade)을
+    그대로 내려보냈다 — 감사 관점에서 "이 수치가 진짜 근거냐"에 답할 수 없는 상태였다(사용자
+    지적). 이제 근거가 실제로 관측됐을 때만 value·evidence를 채우고, 없으면 state="unknown"·
+    value=None으로 정직하게 비워둔다. unknown은 0(공개/무가치/무관리 확인됨)과 다르다 —
+    "모른다"와 "아니라고 확인됐다"를 구분한다.
+    """
+
+    state: Literal["observed", "unknown"]
+    value: Optional[int] = None   # state="observed"일 때만 0/1/2
+    evidence: list[str] = Field(default_factory=list)  # state="observed"일 때만 채움
+
+
 class EvaluationFactors(BaseModel):
-    """평가요소 점수.
+    """평가요소 판정 — 정본 가이드 3요건(S×V×M), 축마다 독립 관측.
 
     기본 4개 named field는 영업비밀 도메인 하위호환용.
     다른 도메인은 scores 딕셔너리에 factor_code → value 형태로 저장.
-    named field와 scores는 from_factor_scores()로 동시에 채워짐.
     """
 
-    # 정본 가이드 3요건 (B안 S×V×M)
-    secrecy: float = 0.0          # 비공지성(S)
-    value: float = 0.0            # 경제적 유용성(V)
-    management: float = 0.0       # 비밀관리성(M)
+    # 정본 가이드 3요건 (B안 S×V×M) — 각 축은 독립 관측(FactorDetail), 등급에서 역산 안 함.
+    secrecy: FactorDetail     # 비공지성(S)
+    value: FactorDetail       # 경제적 유용성(V)
+    management: FactorDetail  # 비밀관리성(M)
 
-    # 도메인 독립 동적 점수 — 모든 factor_code를 담음.
-    # 다른 프로젝트에서는 이 필드만 참조하면 충분.
+    # 도메인 독립 동적 점수 — 관측된 축만 담음(값 없는 축은 생략). 외부 소비처 미확인(2026-10-02).
     scores: dict[str, float] = Field(default_factory=dict)
 
     @classmethod
-    def from_factor_scores(cls, factor_scores: dict[str, float]) -> "EvaluationFactors":
-        """rule engine의 factor_scores (factor_code → value) → EvaluationFactors.
+    def from_axis_results(
+        cls,
+        *,
+        secrecy: tuple[bool, Optional[int], list[str]],
+        value: tuple[bool, Optional[int], list[str]],
+        management: tuple[bool, Optional[int], list[str]],
+    ) -> "EvaluationFactors":
+        """(evidenced, level, evidence_texts) 3축 → EvaluationFactors.
 
-        FactorRegistry에서 현재 활성 factor map을 로드해:
-        - 기본 4요소는 named field에도 채움 (하위호환)
-        - 모든 factor는 scores dict에 저장 (도메인 독립)
+        evidenced=False면 level·evidence_texts는 무시되고 state="unknown"·value=None이 된다
+        (호출부가 실수로 숫자를 같이 넘겨도 역산 재유입을 막는다).
         """
-        field_map = FactorRegistry.get_field_map()
-        named: dict[str, float] = {}
-        for code, value in factor_scores.items():
-            # DB field_map이 구(舊) 4요소로 stale일 수 있어, 정본 코드는 code.lower()로 직접 매핑
-            field_name = field_map.get(code) or code.lower()
-            # named field로 매핑 가능한 정본 3요건만 named에 설정
-            if field_name in {"secrecy", "value", "management"}:
-                named[field_name] = value
-        return cls(**named, scores=factor_scores)
+        def _detail(evidenced: bool, lv: Optional[int], ev: list[str]) -> FactorDetail:
+            if not evidenced:
+                return FactorDetail(state="unknown")
+            return FactorDetail(state="observed", value=lv, evidence=ev)
 
-    @model_validator(mode="after")
-    def _sync_scores(self) -> "EvaluationFactors":
-        """named field → scores 동기화 (직접 생성 시 scores가 비어있을 경우 보완)."""
-        if not self.scores:
-            field_map = FactorRegistry.get_field_map()
-            inv = {v: k for k, v in field_map.items()}
-            self.scores = {
-                inv.get(f, f.upper()): getattr(self, f)
-                for f in ("secrecy", "value", "management")
-                if getattr(self, f, 0.0) != 0.0
-            }
-        return self
+        s, v, m = _detail(*secrecy), _detail(*value), _detail(*management)
+        field_map = FactorRegistry.get_field_map()
+        inv = {fname: code for code, fname in field_map.items()}
+        scores = {
+            inv.get(name, name.upper()): float(d.value)
+            for name, d in (("secrecy", s), ("value", v), ("management", m))
+            if d.value is not None
+        }
+        return cls(secrecy=s, value=v, management=m, scores=scores)
 
 
 class AutomationAssessment(BaseModel):
@@ -113,7 +123,7 @@ class ClassifyOutcome(BaseModel):
     두 경우는 model_version 과 warnings 로 가른다.
 
     [2026-09-27] automation_assessment 는 여기 없다 — KL 이 부르는 IF-05(GET /classify/jobs/{job_id})·콜백에
-    실리지 않게 ClassifyResponse 로만 옮겼다(사용자 지시 '불필요한 건 API 에서 최대한 빼자'). 그 값 자체는
+    실리지 않게 ClassifyResponse 로만 옮겼다('불필요한 건 API 에서 최대한 빼자'는 원칙에 따라). 그 값 자체는
     _try_persist 가 DB(tad_cm_clsf_rslt_mng.automation_assessment)에 그대로 남기므로 우리 내부 집계
     (scripts/analyze_auto_confirm_shadow.py --from-db)는 이 변경과 무관하다.
     """
@@ -124,17 +134,16 @@ class ClassifyOutcome(BaseModel):
     confidence: float
     scores: dict[str, float]
     evaluation_factors: Optional[EvaluationFactors] = None
-    # [번들 C] evaluation_factors(S/V/M)의 출처 — 법리 근거 오인 방지(컴플라이언스).
-    #   "rule_evidenced": 룰엔진이 실제 본문 증거로 산출한 factor(법리 근거로 표시 가능).
-    #   "model_estimated": 모델/청크집계 등급에 맞춰 역산(svm_levels_for_grade)한 추정치 —
-    #     룰이 미탐했을 때 '등급↔factor 모순 표기'를 막으려 정합화한 값이라 법리 근거 아님.
-    # UI/리포트는 model_estimated를 '모델 추정'으로 구분 표시할 것.
+    # [번들 C, 2026-10-02 재정의] evaluation_factors(S/V/M) 중 근거 없는(state="unknown") 축이
+    #   있는지 요약 — 법리 근거 오인 방지(컴플라이언스). 축 3개 전부 state="observed"면
+    #   "rule_evidenced", 하나라도 "unknown"이면 "model_estimated". 각 축이 FactorDetail.state를
+    #   직접 들고 있으므로(2026-10-02 이전엔 문서 단위 플래그 하나뿐이었다) 세세한 판단은
+    #   evaluation_factors.<축>.state를 직접 볼 것 — 이 필드는 요약용 파생값이다.
     factors_source: str = "rule_evidenced"
-    # [2026-08-20] factors_source == "model_estimated" 일 때 **룰이 실제로 관측한**
-    #   S/V/M. 종전에는 역산값이 원본을 덮어써서, 화면에 "S2·V2·M2 인데 룰은 S1" 처럼
-    #   판정식(grade_from_svm)으로 설명되지 않는 조합이 떴다.
-    #   두 벌을 나란히 보여 주면 왜 룰과 모델이 갈렸는지가 그 자리에서 읽힌다.
-    #   역산이 없었으면 None — 그때는 evaluation_factors 가 곧 룰 관측값이다.
+    # [2026-10-02] 폐기 예정 — 종전엔 등급에 맞춰 역산한 값이 evaluation_factors를 덮어쓸 때
+    #   덮어쓰기 전 원래 관측값을 보존하는 용도였다. 이제 역산 자체를 안 하므로(근거 없으면
+    #   evaluation_factors가 바로 state="unknown") 항상 None — evaluation_factors 자체가 곧
+    #   룰 관측값이다. 하위 호환을 위해 필드만 남겨둔다.
     rule_evaluation_factors: Optional[EvaluationFactors] = None
     evidence: list[EvidenceSpan] = []
     model_version: str
@@ -202,7 +211,7 @@ class ClassifyResponse(ClassifyOutcome):
     # 자동확정 위험도 보정 전의 그림자 관측치. 정책을 바꾸지 않고 검수 결과와 연결한다.
     # [2026-09-27] ClassifyOutcome 이 아니라 여기(내부 전용 응답)에만 둔다 — 규약서(03_openapi_koipa_kl.yaml)
     # 가 스스로 "연동에 쓰지 않으며 예고 없이 바뀔 수 있다"고 적어 둔 값을 KL 이 받는 job_result()/ClassifyJobResult
-    # 에는 안 싣기 위해서다(사용자 지시 2026-09-27). DB 저장(_try_persist)은 이 필드를 그대로 받아 독립적으로
+    # 에는 안 싣기 위해서다. DB 저장(_try_persist)은 이 필드를 그대로 받아 독립적으로
     # 남기므로 scripts/analyze_auto_confirm_shadow.py 같은 내부 집계는 영향 없다.
     automation_assessment: Optional[AutomationAssessment] = None
 

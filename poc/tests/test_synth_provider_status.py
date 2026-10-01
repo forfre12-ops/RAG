@@ -1,6 +1,6 @@
 """제공자 가용성 조회 — 콘솔이 "우리가 실제로 가진 것만" 보여주는 근거.
 
-왜(2026-09-28, 사용자 지시). healthz.llm_providers_supported 는 스키마가 받는 값
+왜(2026-09-28). healthz.llm_providers_supported 는 스키마가 받는 값
 9개(noop·anthropic·openai·google·gemini·local_openai·vllm·ollama·lm_studio)를 그대로
 내려준다 — 실제로 이 서버가 그 provider 로 지금 생성할 수 있는지와 무관하다. 이 시험은
 GET /synth/providers/status 가 "고를 수 있다"와 "가진 것"을 가른다는 것과, GET
@@ -42,7 +42,7 @@ def test_commercial_availability_follows_server_key(monkeypatch):
 
 
 def test_google_gemini_are_not_advertised():
-    """상용은 GPT·Claude 둘만 advertise 한다(2026-09-28 사용자 지시) — google/gemini 는 중복."""
+    """상용은 GPT·Claude 둘만 advertise 한다(2026-09-28) — google/gemini 는 중복."""
     names = {r["name"] for r in sps.provider_status()}
     assert "google" not in names
     assert "gemini" not in names

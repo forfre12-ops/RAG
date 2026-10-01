@@ -132,7 +132,7 @@ def test_the_kl_operations_are_the_seven_agreed_interfaces(doc):
     [2026-09-29] IF-07(POST /confirm) 추가 — 지재원 포털이 사람 검수로 확정한 등급을
     돌려보내는 통로. 코드(api/confirm.py)는 처음부터 kl_backend 역할을 받고 있었고,
     규약서의 x-audience 태그만 internal→kl 로 실제 동작에 맞게 고쳤다.
-    [2026-09-29] IF-08(POST /classify/batch) 추가 — 사용자 지시로 개방(다건 문서 일괄
+    [2026-09-29] IF-08(POST /classify/batch) 추가 — 요건에 따라 개방(다건 문서 일괄
     분류). 코드 변경 없음, 태그만 internal→kl.
     """
     assert _kl_operations(doc) == sorted([

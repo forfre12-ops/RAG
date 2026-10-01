@@ -329,7 +329,7 @@ def test_endpoint_create_translates_error_to_http(monkeypatch):
 
 # ── 실제 등급 판정에 미치는 영향 (LabelRuleEngine 통합, PG 불요) ────────────────────
 # 위 CRUD 테스트들은 전부 fake session + 스텁 reload라 "키워드를 추가하면 실제 분류
-# 결과가 바뀌는가"는 커버하지 않는다(2026-09-30 사용자 지적). load_seeds_from_db()가
+# 결과가 바뀌는가"는 커버하지 않는다(2026-09-30). load_seeds_from_db()가
 # KeywordAdminService.create()가 저장한 LevelKeyword를 KEYWORD_SEEDS와 동일한 형태
 # (keyword/grade/factor/weight/pattern_type)로 내놓는다는 계약(seeds.py) 위에서,
 # 그 형태의 시드가 LabelRuleEngine을 통해 실제로 등급을 바꾸는지 DB 없이 재현한다.

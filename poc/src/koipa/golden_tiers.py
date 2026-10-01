@@ -97,13 +97,12 @@ _REAL_TEXT_ORIGINS = frozenset({ORIGIN_PUBLIC_REAL, ORIGIN_CUSTOMER_REAL})
 # source(본문 태그) → origin 결정적 유도. (콘솔 표시만 깨질 뿐 파일·리터럴은 UTF-8 정상.)
 _SYNTHETIC_ORIGIN_SOURCES = frozenset({"synthetic", "public_scenario", "synthetic_grounded"})
 _CUSTOMER_REAL_ORIGIN_SOURCES = frozenset({"real_deidentified"})
-# ⛔ 2026-09-19 "금융보고서" 제거 — source 이름만 보고 public_real 로 찍고 있었으나
+# ⛔ 2026-09-19 "금융보고서" 제거 — source 이름만으로는 public_real 로 오분류된다.
 # 실제 원본은 합성이다(datasets/raw/manifest.yaml:119 nmixx-fin/synthetic_financial_report_korean
-# → p2_oss_corpus_builder.py:198). 이미 export_golden_review_xlsx.py:32-36 이 이 오분류를
-# 지적해뒀다("금융보고서 229건이 public_real 로 집계되지만 원자료는 합성" — 정정 시
-# public_real 641→412, 실문서 S2 48→0). 전체 datasets/ 재검색(27,186건, 253파일)으로도
-# 이 소스에 대응하는 진짜 실문서(GOLD·검증된 SILVER)를 찾지 못해 정정을 반영한다.
-# 같은 이름의 다른 출처를 다시 넣기 전에 원본 계보(manifest.yaml)부터 확인할 것.
+# → p2_oss_corpus_builder.py:198). 반영 결과: public_real 641→412, 실문서 S2 48→0.
+# 전체 datasets/ 재검색(27,186건, 253파일)으로도 이 소스에 대응하는 진짜 실문서
+# (GOLD·검증된 SILVER)는 찾지 못했다 — 같은 이름의 다른 출처를 다시 넣기 전에
+# 원본 계보(manifest.yaml)부터 확인할 것.
 _PUBLIC_REAL_EXACT_SOURCES = frozenset()
 _PUBLIC_REAL_PREFIXES = ("판례",)        # 판례 · 판례(1000+/2000+/3000+) · 판례_공개문서 …
 

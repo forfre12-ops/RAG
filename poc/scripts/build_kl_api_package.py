@@ -52,7 +52,7 @@ DATE = "2026-09-25"
 # [2026-09-29] IF-07 = /confirm — 지재원 포털이 사람 검수로 확정한 등급을 돌려보내는 통로.
 # 코드(api/confirm.py require_role("admin","reviewer","kl_backend"))는 원래부터 kl_backend 를
 # 받고 있었고, 규약서의 x-audience 태그만 internal→kl 로 실제 동작에 맞게 고쳤다.
-# [2026-09-29] IF-08 = /classify/batch — 사용자 지시로 개방(다건 문서 일괄 분류). 코드 변경 없음,
+# [2026-09-29] IF-08 = /classify/batch — 다건 문서 일괄 분류 용도로 개방. 코드 변경 없음,
 # 태그만 internal→kl.
 KL_INTERFACES: dict[tuple[str, str], str] = {
     ("get", "/healthz"): "IF-01",

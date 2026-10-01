@@ -1,6 +1,6 @@
 """LLM provider 가용성 조회 — 콘솔이 "우리가 실제로 가진 것만" 보여주게 한다.
 
-배경(2026-09-28, 사용자 지시): healthz.llm_providers_supported 는 스키마가 받는 값 전부
+배경(2026-09-28): healthz.llm_providers_supported 는 스키마가 받는 값 전부
 (정본 config._VALID_LLM_PROVIDER, 9개)를 그대로 내려준다 — **실제로 이 서버가 그 provider로
 지금 생성할 수 있는지와 무관하다.** 로컬(ollama·vllm·local_openai·lm_studio)은 그 서버가
 떠 있어야 하고, 상용(anthropic·openai)은 키가 서버에 설정돼 있어야 한다. 이 모듈이 그 구분을
@@ -28,7 +28,7 @@ from koipa.config import settings
 _PROBE_TIMEOUT_SEC = 0.6
 _CACHE_TTL_SEC = 5.0
 
-# [2026-09-28 사용자 지시] 상용은 GPT·Claude 둘만 advertise 한다. google/gemini 는 코드에서
+# [2026-09-28] 상용은 GPT·Claude 둘만 advertise 한다. google/gemini 는 코드에서
 # anthropic·openai 와 같은 자리(LocalOpenAIProvider 분기, adapters/llm/__init__.py:41)를 이미
 # 쓰고 있어 계속 받지만(하위호환·API 스키마 불변), 콘솔 드롭다운에서는 중복이라 뺀다.
 _ADVERTISED_COMMERCIAL: tuple[str, ...] = ("anthropic", "openai")

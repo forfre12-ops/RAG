@@ -46,7 +46,7 @@ def test_config_driven_rejections_name_the_setting(name, must_mention):
 
 
 def test_prefill_identity_is_allowed_to_sign():
-    """[2026-08-20 사용자 결정] 로그인은 항상 되어야 한다 — 프리필 신원 거부를 뺐다.
+    """[2026-08-20] 로그인은 항상 되어야 한다 — 프리필 신원 거부를 뺐다.
 
     종전에는 `kl-admin-test`(프리필 sub)를 막았고, 그 때문에 223 에서 후보 120건이
     한 건도 서명되지 않았다. 잃는 것은 원장의 사람별 구분이다 —
