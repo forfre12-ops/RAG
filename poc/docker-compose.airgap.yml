@@ -141,9 +141,16 @@ services:
       HF_HOME: /models/hf
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
-      # [스레드 정합] api 와 같은 이유 — cgroup 한도를 코드에 알려 준다.
-      OMP_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
-      MKL_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
+      # [스레드 정합 — 2026-09-30 정정] api 는 프로세스 1개라 WORKER_CPU_LIMIT 그대로 맞지만,
+      # 워커는 Celery 프로세스가 CELERY_WORKER_CONCURRENCY(기본 2)개 떠서 프로세스마다 이
+      # 스레드 수를 또 쓴다 — 그대로 두면 2프로세스×4스레드=8 이 cgroup 한도(4)를 2배
+      # 초과 구독한다(실측: 동시 처리량이 이론상 2배가 아니라 1.26~1.50배에 그침).
+      # 프로세스당 스레드 = WORKER_CPU_LIMIT ÷ CELERY_WORKER_CONCURRENCY. compose 는 산술을
+      # 못 해 별도 변수로 노출한다 — 기본값(4÷2=2)은 CELERY_WORKER_CONCURRENCY 기본값과
+      # 반드시 같이 맞출 것(한쪽만 바꾸면 다시 어긋난다).
+      OMP_NUM_THREADS: "${WORKER_THREADS_PER_PROCESS:-2}"
+      MKL_NUM_THREADS: "${WORKER_THREADS_PER_PROCESS:-2}"
+      CELERY_WORKER_CONCURRENCY: "${WORKER_CONCURRENCY:-2}"
     volumes:
       - ../models:/models:ro,z      # [SELinux] api 와 같은 공유 라벨 — 위 api 블록 주석 참조
       - storagedata:/app/.storage   # api 와 공유 — 로컬FS 문서·원본

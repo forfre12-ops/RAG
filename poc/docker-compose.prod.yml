@@ -102,9 +102,18 @@ services:
     env_file: !override
       - "${ENV_FILE:-.env.prod}"
     environment: !override
-      # [스레드 정합] api 와 동일 — torch 가 cgroup 한도를 못 봐 오버서브스크립션이 난다.
-      OMP_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
-      MKL_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
+      # [스레드 정합 — 2026-09-30 정정] api 는 프로세스 1개(WEB_CONCURRENCY 기본 1)라
+      # OMP_NUM_THREADS=WORKER_CPU_LIMIT 가 맞지만, 워커는 Celery 프로세스가
+      # CELERY_WORKER_CONCURRENCY(기본 2)개 떠서 **프로세스마다** 이 스레드 수를 또 쓴다.
+      # 종전엔 OMP_NUM_THREADS 를 WORKER_CPU_LIMIT 그대로 둬서 2프로세스×4스레드=8 이
+      # cgroup 한도(WORKER_CPU_LIMIT=4) 를 2배 초과 구독했다(실측: 동시 처리량이 이론상
+      # 2배가 아니라 1.26~1.50배에 그침). 프로세스당 스레드는 WORKER_CPU_LIMIT 를
+      # CELERY_WORKER_CONCURRENCY 로 나눈 값이어야 한다 — compose 는 산술을 못 하므로
+      # 별도 변수로 노출한다. 기본값(4÷2=2)은 아래 CELERY_WORKER_CONCURRENCY 기본값과
+      # 반드시 같이 맞출 것(한쪽만 바꾸면 다시 어긋난다).
+      OMP_NUM_THREADS: "${WORKER_THREADS_PER_PROCESS:-2}"
+      MKL_NUM_THREADS: "${WORKER_THREADS_PER_PROCESS:-2}"
+      CELERY_WORKER_CONCURRENCY: "${WORKER_CONCURRENCY:-2}"
     # dev 코드 bind 제거. 워커도 모델 접근 필요(classify/index 태스크) → ro external volume.
     # HF 캐시는 non-root 홈(/home/koipa) — root 캐시(/root)는 uid1000 이 쓸 수 없어 재다운로드 유발.
     volumes: !override
