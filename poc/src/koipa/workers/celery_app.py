@@ -66,6 +66,18 @@ celery_app.conf.task_annotations = {
         "soft_time_limit": max(settings.celery_task_soft_time_limit, 900),
         "time_limit": max(settings.celery_task_time_limit, 1200),
     },
+    # [실측 2026-09-30] classify_batch 는 신설 당시(이 주석이 생기기 전) 이 표에 없어 전역
+    # 기본값(900/1200초)을 그대로 물려받았다 — 고객사가 "1000건까지 되냐"고 물어 재보니,
+    # 건당(이 PC·배포모델·캐시 후 steady state) 0.233초(806자 1청크 샘플) → 1000건 233초로는
+    # 안전하지만, 문서 하나가 과대문서 가드(analyze_sync_max_chunks=34청크) 바로 아래 크기면
+    # 건당 최대 약 34청크×0.24초/청크≈8.2초 — 느린 회원사 CPU(2코어, 단건 경로 실측 기준
+    # 약 3배 느림)까지 고려하면 건당 최대 ≈24.5초, 1000건이면 최악 ≈6.8시간(24,480초)이다.
+    # **건별 isolation+retry 로 이미 처리된 결과는 task 자체가 시간제한에 걸려 죽으면
+    # 전부 버려진다**(배치는 끝에 한 번만 JobStore 에 쓴다) — 상한을 넉넉히 둔다.
+    "koipa.classify_batch": {
+        "soft_time_limit": max(settings.celery_task_soft_time_limit, 25200),
+        "time_limit": max(settings.celery_task_time_limit, 28800),
+    },
     "koipa.synthesize_batch": {
         "soft_time_limit": min(settings.celery_task_soft_time_limit, 300),
         "time_limit": min(settings.celery_task_time_limit, 420),
@@ -104,6 +116,10 @@ celery_app.conf.task_annotations = {
 # (미정의 name을 라우팅하면 호출 시 NotRegistered). 'index' 큐는 deliver_outbox_tick이 사용.
 celery_app.conf.task_routes = {
     "koipa.classify_async": {"queue": "classify"},
+    # [2026-09-30] classify_batch 신설 당시 빠져 있었다 — 라우팅이 없으면 기본 'celery' 큐로
+    # 가 classify_async 와 다른 큐에서 돈다(둘 다 같은 워커가 구독하므로 지금 당장 동작은
+    # 하지만, 의도치 않게 분리돼 있었다). 같은 family 라 같은 큐로 맞춘다.
+    "koipa.classify_batch": {"queue": "classify"},
     "koipa.synthesize_batch": {"queue": "synthesis"},
     "koipa.train_classifier": {"queue": "learning"},
     "koipa.golden_build": {"queue": "learning"},  # 빌더 — train과 자원 풀 공유
