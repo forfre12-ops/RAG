@@ -184,24 +184,16 @@ def _check_compute() -> dict:
     까지 겹쳤다. 둘 다 어디에도 안 떠서 오래 방치됐다 — 그래서 여기에 노출한다.
 
     ok 는 항상 True(가용성 판단 아님). 실효 CPU 와 스레드가 어긋나면 status=degraded.
+
+    [2026-09-30] cgroup 판독은 resource_detect.py 로 옮겼다 — celery_app.py 의 워커
+    동시성·스레드 자동 설정이 같은 로직을 쓴다(둘이 갈라지지 않게 한 곳만 둔다).
     """
     import os
 
+    from koipa.resource_detect import detect_cpu_quota
+
     host_cpus = os.cpu_count() or 0
-    quota = None
-    try:  # cgroup v2 — 컨테이너에 실제로 허용된 CPU
-        raw = Path("/sys/fs/cgroup/cpu.max").read_text().split()
-        if raw[0] != "max":
-            quota = round(int(raw[0]) / int(raw[1]), 2)
-    except Exception:  # noqa: BLE001
-        pass
-    if quota is None:
-        try:  # cgroup v1
-            q = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read_text())
-            p = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read_text())
-            quota = round(q / p, 2) if q > 0 else None
-        except Exception:  # noqa: BLE001
-            pass
+    quota = detect_cpu_quota()
 
     threads = None
     try:

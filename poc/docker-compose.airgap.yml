@@ -141,16 +141,18 @@ services:
       HF_HOME: /models/hf
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
-      # [스레드 정합 — 2026-09-30 정정] api 는 프로세스 1개라 WORKER_CPU_LIMIT 그대로 맞지만,
-      # 워커는 Celery 프로세스가 CELERY_WORKER_CONCURRENCY(기본 2)개 떠서 프로세스마다 이
-      # 스레드 수를 또 쓴다 — 그대로 두면 2프로세스×4스레드=8 이 cgroup 한도(4)를 2배
-      # 초과 구독한다(실측: 동시 처리량이 이론상 2배가 아니라 1.26~1.50배에 그침).
-      # 프로세스당 스레드 = WORKER_CPU_LIMIT ÷ CELERY_WORKER_CONCURRENCY. compose 는 산술을
-      # 못 해 별도 변수로 노출한다 — 기본값(4÷2=2)은 CELERY_WORKER_CONCURRENCY 기본값과
-      # 반드시 같이 맞출 것(한쪽만 바꾸면 다시 어긋난다).
-      OMP_NUM_THREADS: "${WORKER_THREADS_PER_PROCESS:-2}"
-      MKL_NUM_THREADS: "${WORKER_THREADS_PER_PROCESS:-2}"
-      CELERY_WORKER_CONCURRENCY: "${WORKER_CONCURRENCY:-2}"
+      # [스레드 정합 — 2026-09-30, 자동감지로 한 번 더 정정]
+      # 1차 정정: api 는 프로세스 1개라 WORKER_CPU_LIMIT 그대로 맞지만, 워커는 Celery
+      #   프로세스가 CELERY_WORKER_CONCURRENCY(기본 2)개 떠서 프로세스마다 이 스레드
+      #   수를 또 쓴다 — 그대로 두면 2프로세스×4스레드=8 이 cgroup 한도(4)를 2배 초과
+      #   구독한다(실측: 동시 처리량이 이론상 2배가 아니라 1.26~1.50배에 그침).
+      # 2차: WORKER_THREADS_PER_PROCESS·WORKER_CONCURRENCY 로 쪼개 여기 기본값을
+      #   박았는데, 그러면 celery_app.py 의 자동감지가 항상 가려진다(compose 가 항상
+      #   값을 채우므로 "사람이 명시 안 함" 조건이 성립 안 됨) — 그래서 **여기서는
+      #   아무 기본값도 주지 않는다.** 이 넷을 사람이 .env 파일에 직접 넣지 않으면
+      #   celery_app.py 가 기동 시점에 cgroup CPU·메모리 한도를 읽어 자동 계산한다
+      #   (_resolve_worker_scaling, 곱해도 cgroup 한도를 안 넘게). 고객사마다 서버
+      #   사양이 달라도 설치 스크립트가 숫자를 안 넣어도 되게 — 넣으면 그 값이 우선.
     volumes:
       - ../models:/models:ro,z      # [SELinux] api 와 같은 공유 라벨 — 위 api 블록 주석 참조
       - storagedata:/app/.storage   # api 와 공유 — 로컬FS 문서·원본

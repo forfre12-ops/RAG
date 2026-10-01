@@ -1,7 +1,90 @@
+import os
+
 from celery import Celery
 from celery.schedules import crontab
 
 from koipa.config import settings
+
+
+def _autodetect_worker_scaling() -> tuple[int, int, str]:
+    """고객사마다 CPU 가 다른데 동시성·스레드를 자동으로 못 맞추던 문제(2026-09-30).
+
+    [2026-09-30] docker-compose 기본값(WORKER_CPU_LIMIT=4·동시성=2·프로세스당
+    스레드=4 그대로)이 그 자체로 2배 초과구독이었다([[worker-cpu-oversubscription-fixed]]
+    — 이 파일 수정 이력 참조). 그건 "기본값끼리 서로 안 맞다"를 고친 것이고, 이건
+    "고객사 서버 실제 코어 수를 사람이 안 넣어도 되게" 한 걸음 더 간 것이다.
+
+    사람이 CELERY_WORKER_CONCURRENCY 를 **명시적으로** 환경변수에 넣었으면 그 값을
+    그대로 존중한다(자동 계산은 아무 설정도 없을 때만). 자동 계산 기준:
+      - CPU: resource_detect.effective_cpu_count() (cgroup 한도 우선, 없으면 호스트).
+      - 메모리: 워커 프로세스마다 분류 모델을 독립적으로 올린다(prefork — fork 후에도
+        각자 가중치를 들고 있다) — 코어 수만 보고 동시성을 올리면 메모리가 먼저
+        바닥날 수 있다. [2026-09-30 실측 정정] 처음엔 1~2.6GiB/판으로 적어 뒀는데
+        (다른 세션·다른 모델의 가중치 로드 측정이었다) 실제 워커 컨테이너 전체(모델
+        로드+요청 처리 뒤) 를 `docker stats` 로 재니 840MiB 뿐이었다 — 2GiB 가정이면
+        4GiB 컨테이너에서 동시성이 1로 떨어져(완전 직렬, 실측 배속 1.00x) 앞서 수동
+        조정으로 확인한 동시성 2(배속 1.78x)보다 못한 값이 나왔다. 840MiB 실측에
+        여유를 두어 프로세스당 1.5GiB 로 잡는다 — 기본 1개 몫(~1GiB)을 빼고 나머지를
+        프로세스당 1.5GiB 로 나눈 값과 CPU 기준 중 작은 쪽을 쓴다.
+      - 상한 8 — 더 큰 서버에서의 검증 없이 무제한 확장하지 않는다.
+      - 스레드/프로세스 = 유효 CPU ÷ 동시성 (내림, 최소 1) — 둘을 곱해도 CPU 한도를
+        넘지 않는다(이게 바로 위 오버서브스크립션 버그가 어기던 불변식).
+
+    반환: (concurrency, threads_per_process, 근거 한 줄) — 근거는 기동 로그에 남겨
+    "왜 이 숫자인지"를 지재원·고객사 설치 로그에서 바로 보이게 한다.
+    """
+    from koipa.resource_detect import detect_cpu_quota, detect_memory_limit_gb, effective_cpu_count
+
+    host_cpus = os.cpu_count() or 1
+    eff_cpu = effective_cpu_count(host_cpus)
+    mem_gb = detect_memory_limit_gb()
+
+    by_cpu = max(1, eff_cpu)
+    if mem_gb is not None:
+        by_mem = max(1, int((mem_gb - 1.0) // 1.5))
+        concurrency = max(1, min(by_cpu, by_mem, 8))
+    else:
+        concurrency = max(1, min(by_cpu, 8))
+    threads = max(1, eff_cpu // concurrency)
+    quota = detect_cpu_quota()
+    reason = (
+        f"auto: cgroup_cpu={quota if quota else 'N/A'} host_cpus={host_cpus} "
+        f"eff_cpu={eff_cpu} mem_limit_gb={mem_gb if mem_gb else 'N/A'} "
+        f"-> concurrency={concurrency} threads/process={threads}"
+    )
+    return concurrency, threads, reason
+
+
+def _resolve_worker_scaling() -> tuple[int, int]:
+    """CELERY_WORKER_CONCURRENCY 를 사람이 명시했으면 그대로, 아니면 자동 계산.
+
+    OMP_NUM_THREADS/MKL_NUM_THREADS 는 torch 가 import 되기 전에 환경변수로 있어야
+    적용된다 — tasks.py 는 torch 를 함수 안에서 지연 임포트하므로(이 파일 맨 아래
+    `from koipa.workers import tasks` 시점에도 아직 안 불러짐) 여기서 os.environ 에
+    쓰면 시점상 안전하다.
+    """
+    import logging
+
+    log = logging.getLogger(__name__)
+    if "CELERY_WORKER_CONCURRENCY" in os.environ:
+        concurrency = settings.celery_worker_concurrency
+        threads = int(os.environ.get("OMP_NUM_THREADS") or os.environ.get("MKL_NUM_THREADS") or concurrency)
+        log.info("worker scaling: 명시 설정 사용 concurrency=%d threads=%s (자동계산 안 함)", concurrency, threads)
+        return concurrency, threads
+    try:
+        concurrency, threads, reason = _autodetect_worker_scaling()
+    except Exception as exc:  # noqa: BLE001 — 감지 실패는 기존 기본값으로(동작 보존)
+        log.warning("worker scaling 자동감지 실패 — 기존 기본값 사용: %s: %s", type(exc).__name__, exc)
+        return settings.celery_worker_concurrency, settings.celery_worker_concurrency
+    log.info("worker scaling 자동감지: %s", reason)
+    if "OMP_NUM_THREADS" not in os.environ:
+        os.environ["OMP_NUM_THREADS"] = str(threads)
+    if "MKL_NUM_THREADS" not in os.environ:
+        os.environ["MKL_NUM_THREADS"] = str(threads)
+    return concurrency, threads
+
+
+_AUTO_CONCURRENCY, _AUTO_THREADS = _resolve_worker_scaling()
 
 celery_app = Celery(
     "koipa",
@@ -31,7 +114,10 @@ celery_app.conf.task_acks_late = True
 celery_app.conf.task_reject_on_worker_lost = False
 celery_app.conf.worker_prefetch_multiplier = 1
 # prefork 기본 동시성 = 호스트 코어 수. 컨테이너 한도를 못 보므로 명시한다(config 주석 참조).
-celery_app.conf.worker_concurrency = settings.celery_worker_concurrency
+# [2026-09-30] CELERY_WORKER_CONCURRENCY 를 사람이 안 넣으면 cgroup CPU·메모리 한도로
+# 자동 계산한다(_resolve_worker_scaling, 위) — 고객사마다 서버 사양이 달라도 설치
+# 스크립트가 숫자를 안 넣어도 되게. 명시하면 그 값을 그대로 쓴다(자동계산 안 함).
+celery_app.conf.worker_concurrency = _AUTO_CONCURRENCY
 
 # [실측 2026-08-08] Redis 브로커의 visibility_timeout 기본값은 **3600초(1시간)** 다.
 # 이 시간 안에 ack 되지 않은 메시지를 브로커가 "워커가 죽었다"고 보고 **다시 배달**한다.
