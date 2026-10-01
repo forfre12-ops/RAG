@@ -292,3 +292,5 @@ poc/datasets/_console_jwt/
 # 참조 없는 대용량 후보 덤프 — single_document_candidates/ 와 같은 취지
 poc/datasets/new_build_candidates_2026-09-17/
 poc/datasets/proxy_gold/single_document_candidates_archive_*/
+# Rocky Linux 설치 리허설 스크래치(23GB, 10/1) — git add -A 사고 방지(2026-10-02)
+wsl_images/
