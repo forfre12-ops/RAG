@@ -106,7 +106,10 @@ def classify_async(
     """
     from koipa.schemas.classify import ClassifyJobResult, ClassifyRequest, kl_wire_projection
     from koipa.services.classify_service import ClassifyService
-    from koipa.services.regulation_evidence_service import regulation_reference_for_kl_wire
+    from koipa.services.regulation_evidence_service import (
+        regulation_reference_for_kl_wire,
+        regulation_summary_for_kl_wire,
+    )
 
     try:
         req = ClassifyRequest(**payload)
@@ -117,9 +120,12 @@ def classify_async(
         # [2026-09-29] 콜백 수신자는 정의상 항상 KL(callback_url 은 KL 이 준다) — 저장값(results,
         # GET /classify/jobs/{job_id} 가 읽는 값)은 그대로 두고, 실제로 발사하는 webhook 본문만
         # kl_wire_projection 으로 좁힌다(async_classify.py 의 kl_backend 역할 분기와 같은 규칙).
+        kl_doc_id = result_json.get("doc_id", "")
+        kl_reference = regulation_reference_for_kl_wire(kl_doc_id)
         kl_result_json = kl_wire_projection(
             ClassifyJobResult.model_validate(result_json),
-            regulation_reference=regulation_reference_for_kl_wire(result_json.get("doc_id", "")),
+            regulation_reference=kl_reference,
+            regulation_summary=regulation_summary_for_kl_wire(kl_doc_id, kl_reference),
         ).model_dump(mode="json")
         _publish_callback_webhook(callback_url, {"job_id": job_id, "status": "done", "results": [kl_result_json]})
         return result_json

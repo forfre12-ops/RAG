@@ -2472,8 +2472,8 @@ components:
 
     ClassifyOutcome:
       type: object
-      description: "분류 결과의 공통 항목 — 동기 응답(ClassifyResponse)과 비동기 작업 결과(ClassifyJobResult)가 같이 쓴다. 필수는 inference_id · doc_id · label · confidence · scores · model_version 여섯이고, 나머지는 분류를 끝까지 수행했을 때만 채워진다. 본문을 읽을 수 없어 격리한 경우(label 은 최고 등급·confidence 0·status needs_review·model_version none)와 사람이 이미 확정한 등급이 있어 추론을 건너뛴 경우(model_version 이 human_review 로 시작·status staging)에는 evaluation_factors · rule_evaluation_factors · evidence · rule_grade · model_grade · decision_path · grade_candidates · grade_candidates_reason · automation_assessment 가 비어 있다(null 또는 빈 배열). 두 경우는 model_version 과 warnings 로 가른다."
-      required: [inference_id, doc_id, label, confidence, scores, model_version]
+      description: "분류 결과의 공통 항목 — 동기 응답(ClassifyResponse)과 비동기 작업 결과(ClassifyJobResult)가 같이 쓴다. 필수는 inference_id · doc_id · label · confidence · confidence_tier · scores · model_version 일곱이고(confidence_tier 는 2026-10-02 추가된 계산 필드 — confidence 에서 항상 파생되므로 required), 나머지는 분류를 끝까지 수행했을 때만 채워진다. 본문을 읽을 수 없어 격리한 경우(label 은 최고 등급·confidence 0·status needs_review·model_version none)와 사람이 이미 확정한 등급이 있어 추론을 건너뛴 경우(model_version 이 human_review 로 시작·status staging)에는 evaluation_factors · rule_evaluation_factors · evidence · rule_grade · model_grade · decision_path · grade_candidates · grade_candidates_reason · automation_assessment 가 비어 있다(null 또는 빈 배열). 두 경우는 model_version 과 warnings 로 가른다."
+      required: [inference_id, doc_id, label, confidence, confidence_tier, scores, model_version]
       properties:
         inference_id: { type: string, format: uuid, description: "분류 결과 식별자" }
         doc_id: { type: string, description: "분류한 문서의 doc_id" }
@@ -2484,6 +2484,16 @@ components:
           maximum: 1
           example: 0.87
           description: 선택한 등급(label)의 확률(0~1)
+        confidence_tier:
+          type: string
+          enum: [낮음, 보통, 높음]
+          readOnly: true
+          description: >-
+            [2026-10-02] confidence 를 검수 우선순위 3단계로 나눈 계산 필드(항상 confidence 에서
+            그대로 파생, 서버가 직접 설정하지 않는다). 자동확정 여부를 가르는 게이트가 아니다 —
+            KL포털이 문서마다 매번 사람 검수를 하므로 이 값은 어느 문서를 먼저 볼지 고르는 참고
+            일 뿐이다. 경계(1/3·2/3)는 아직 사람 검수 결과로 실측하지 않은 균등분할이라 바뀔 수
+            있다.
         scores:
           type: object
           description: 등급별 확률 분포
@@ -2499,12 +2509,19 @@ components:
           type: string
           enum: [rule_evidenced, model_estimated]
           default: rule_evidenced
-          description: evaluation_factors 출처 — rule_evidenced(룰엔진 실증 근거·법리 표시 가능) / model_estimated(등급 역산 추정치·법리 근거 아님).
+          description: >-
+            [2026-10-02 정정] evaluation_factors 출처 요약 — rule_evidenced(S/V/M 세 축 모두 실제
+            근거가 관측됨) / model_estimated(한 축 이상 근거 없음, 해당 축은 evaluation_factors.<축>.state
+            가 "unknown"). "역산 추정치"가 아니다 — 2026-10-02 부터 등급에서 거꾸로 채우는 역산 자체를
+            없앴다(근거가 없으면 축이 바로 "unknown"으로 온다). 세세한 판단은 evaluation_factors 의 각
+            축 state 를 직접 볼 것, 이 필드는 요약용 파생값이다.
         rule_evaluation_factors:
           nullable: true
           allOf:
             - $ref: '#/components/schemas/EvaluationFactors'
-          description: factors_source 가 model_estimated 일 때 룰이 실제로 관측한 S/V/M. 역산이 없었으면 null(그때는 evaluation_factors 가 곧 룰 관측값).
+          description: >-
+            [2026-10-02 폐기 예정] 역산이 있었을 때 역산 전 원래 관측값을 보존하던 필드 — 역산 자체가
+            없어져 항상 null 이다(그때는 evaluation_factors 가 곧 룰 관측값). 하위 호환을 위해 필드만 남겼다.
         evidence:
           type: array
           description: 근거 키워드·문맥 span
@@ -2546,6 +2563,14 @@ components:
             [2026-09-29] RAG+LLM 규정참고 — 이 문서에 해당하는 사내 규정 원문이 있을 때만 채운다(등급 판정과
             무관, 참고용). 기능이 꺼져 있거나 해당 규정이 없으면 null. GPU 가 없는 배포에서는 로컬 LLM 옵션이
             제한 시간 안에 끝나지 못해 항상 null 이 된다(GPU 도입은 별도 과제).
+        regulation_summary:
+          type: string
+          nullable: true
+          description: >-
+            [2026-10-02] regulation_reference 를 사람 말로 요약한 한두 문장("당연히 설명이 나가야지"
+            요건). regulation_reference 가 없거나 로컬 LLM 요약 옵션이 꺼져 있으면(기본) null. ⛔ 로컬
+            LLM 이 새로 쓴 글이다 — regulation_reference(원문)와 항상 같이 보일 것, 이 문장만 단독으로
+            등급·법리 근거로 쓰지 않는다. GPU 가 없는 배포에서는 항상 null.
 
     ClassifyResponse:
       description: |
@@ -2574,9 +2599,13 @@ components:
 
         [2026-09-29] KL(지재원 포털)이 실제로 받는 값은 또 좁혀진다: label(최종 판정=분류기가 메인)이 항상
         있고, rule_grade 는 label 과 **다를 때만** 채워진다(같으면 null — "등급이 같으면 하나만" 요청).
-        evaluation_factors·rule_evaluation_factors·evidence·model_grade·decision_path·grade_candidates·
-        grade_candidates_reason·scores 는 KL 응답에서는 항상 비어 있다(scores={}·나머지 null 또는 빈 배열) —
-        같은 필드를 우리 콘솔·관리자 역할로 조회하면(같은 엔드포인트를 내부 화면도 재사용) 채워진 그대로 나온다.
+
+        [2026-10-02 뒤집힘] evaluation_factors·rule_evaluation_factors·evidence·decision_path 는 더
+        이상 비우지 않는다 — KL포털이 문서마다 매번 사람 검수를 하기로 하면서 "신뢰도는 근거와 같이
+        보여준다"로 결정이 바뀌었다(9/29 엔 반대로 "KL 요청 범위 밖"이라 비웠었다). model_grade·
+        grade_candidates·grade_candidates_reason·scores 는 **여전히** KL 응답에서 항상 비어 있다
+        (scores={}·나머지 null 또는 빈 배열) — 이 넷은 이번 결정에서 다시 논의되지 않았다. 같은 필드를
+        우리 콘솔·관리자 역할로 조회하면(같은 엔드포인트를 내부 화면도 재사용) 채워진 그대로 나온다.
         구분은 서버가 호출자 인증 역할(kl_backend 인지)로 판단하며 요청 쪽에서 고를 수 없다.
       allOf:
         - $ref: '#/components/schemas/ClassifyOutcome'
@@ -2584,7 +2613,7 @@ components:
     StoredClassificationResponse:
       type: object
       description: GET /classify/{doc_id} — 저장된 최근 분류 결과와 사람이 확정한 등급.
-      required: [inference_id, doc_id, label, confidence, scores, model_version]
+      required: [inference_id, doc_id, label, confidence, confidence_tier, scores, model_version]
       properties:
         inference_id: { type: string, format: uuid, description: "분류 결과 식별자" }
         doc_id: { type: string, description: "분류한 문서의 doc_id" }
@@ -2595,6 +2624,12 @@ components:
           maximum: 1
           example: 0.87
           description: 선택한 등급(label)의 확률(0~1)
+        confidence_tier:
+          type: string
+          enum: [낮음, 보통, 높음]
+          readOnly: true
+          description: >-
+            [2026-10-02] confidence 를 검수 우선순위 3단계로 나눈 계산 필드 — ClassifyOutcome 과 같다.
         scores:
           type: object
           description: 등급별 확률 분포

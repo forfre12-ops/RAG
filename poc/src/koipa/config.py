@@ -899,6 +899,11 @@ class Settings(BaseSettings):
     #   고르는 방식(설계서 §3.6, 같은 71건·판정자 3명): per_candidate(기본) = 후보 조항마다 따로 묻는다 — 정밀도 78%·해당 규정이 뜬 문서 14·틀린 것이 뜬 문서 4, 호출 6번, 문서당 약 2.9초
     #   single = 문서를 한 번만 보이고 후보의 항 전체에서 가장 직접적인 항을 고르게 한다 — 정밀도 70%·해당 30·틀린 것 13, 호출 2번, 문서당 약 1.1초(GPU) (더 많이 찾지만 틀린 것도 더 뜬다)
     regulation_llm_mode: str = "per_candidate"
+    # [2026-10-02] 고른 조항이 이 문서에 왜 적용되는지 **로컬 LLM 이 한두 문장으로 쓴다**("당연히 설명이 나가야지" 요건).
+    #   select_applicable(조항을 고르는 호출)과 달리 이 호출은 글을 짓는다 — 사실과 다른 말을 만들 위험이 더 크므로 별도 스위치로 끊는다.
+    #   꺼짐(기본)이면 regulation_summary 는 늘 null 이고 화면엔 조항 원문만 남는다. regulation_llm_select_enabled 가 꺼져 있으면 이 스위치도 무동작
+    #   (고를 조항 자체가 없다 — 조회 1위를 그대로 보이는 결정형 경로에는 요약을 달지 않는다).
+    regulation_llm_summary_enabled: bool = False
 
     # 임베딩 어댑터 선택:
     #   hash : hash_embedding (결정론, GPU·다운로드 불필요, lite-noapi 기본)

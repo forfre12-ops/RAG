@@ -91,6 +91,11 @@ services:
       - ./src:/app/src
       - ./scripts:/app/scripts
       - ../docker-data/modelcache:/root/.cache/huggingface
+      # [2026-10-02] api·worker 가 같은 로컬FS 저장소(/app/.storage)를 봐야 한다 — 없으면
+      # api 가 등록 때 쓴 원본 파일(예: 규정 등록)을 worker 의 색인 태스크가 못 찾아
+      # "원본 파일을 읽지 못했습니다" 로 실패한다(실측: 격리 스택에서 재현+이 줄 추가로 해소).
+      # prod·dual·airgap compose 는 이미 storagedata 를 api·worker 가 공유한다 — dev 만 빠져 있었다.
+      - storagedata:/app/.storage
     ports:
       - "8000:8000"
 
@@ -115,6 +120,7 @@ services:
     volumes:
       - ./src:/app/src
       - ../docker-data/modelcache:/root/.cache/huggingface
+      - storagedata:/app/.storage   # api 와 공유 — 위 api 블록 주석 참조
 
   # Celery beat — beat_schedule(drift 15분·auto-rollback 60분·outbox 60초·active-learning
   # 30분)의 주기 트리거를 발행한다. 이 서비스가 없으면 폐곡선 자동화가 전혀 동작하지 않는다.
@@ -154,4 +160,5 @@ services:
       retries: 3
 
 volumes:
-  mlflow_data:  # MLflow SQLite (Phase 4 야간 작업)
+  mlflow_data:   # MLflow SQLite (Phase 4 야간 작업)
+  storagedata:   # 로컬FS 문서·원본(api·worker 공유, 2026-10-02) — 위 api 블록 주석 참조

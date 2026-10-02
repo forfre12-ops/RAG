@@ -560,13 +560,18 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
     b.append(field_table(spec, {"$ref": "#/components/schemas/ClassifyJobResult"}, overrides={
         "label": "예측 등급 코드. 사람이 확정한 등급은 confirmed_label 입니다.",
     }))
-    b.append(note("[2026-09-29] <b>위 표는 필드 전체 목록이며, 실제로 귀사가 받으시는 값은 이보다 단순합니다.</b> "
-                  "판정 근거를 보여 주는 항목 — <code>scores</code> · <code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · "
-                  "<code>evidence</code> · <code>model_grade</code> · <code>decision_path</code> · <code>grade_candidates</code> · "
-                  "<code>grade_candidates_reason</code> — 은 항상 비어 있습니다(<code>scores</code> 는 <code>{}</code>, 나머지는 <code>null</code> 또는 빈 배열). "
-                  "실제로 값이 채워지는 것은 <code>label</code>(최종 판정) · <code>rule_grade</code>(룰 판정이 <code>label</code> 과 다를 때만) · "
-                  "<code>regulation_reference</code>(해당 규정이 있을 때만) · <code>status</code> · <code>confidence</code> · <code>model_version</code> · "
-                  "<code>warnings</code> 뿐입니다 — 등급이 같으면 <code>label</code> 하나, 갈리면 <code>label</code> 을 메인으로 <code>rule_grade</code> 를 함께 보시면 됩니다. "
+    b.append(note("[2026-10-02 갱신] <b>위 표는 필드 전체 목록이며, 실제로 귀사가 받으시는 값은 이보다 좁혀져 있습니다.</b> "
+                  "항상 비어 있는 것은 <code>scores</code> · <code>model_grade</code> · <code>grade_candidates</code> · "
+                  "<code>grade_candidates_reason</code> 넷뿐입니다(<code>scores</code> 는 <code>{}</code>, 나머지는 <code>null</code> 또는 빈 배열). "
+                  "<code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>evidence</code> · <code>decision_path</code> 는 "
+                  "2026-10-02 부터 채워진 그대로 나갑니다(그 전에는 저희 내부 전용이라 비웠습니다) — "
+                  "<code>confidence</code> 를 뒷받침하는 근거로 같이 봐 주십시오. "
+                  "<code>label</code>(최종 판정) · <code>rule_grade</code>(룰 판정이 <code>label</code> 과 다를 때만) · "
+                  "<code>confidence_tier</code>(2026-10-02 추가, <code>confidence</code> 를 검수 우선순위 3단계로 나눈 참고값 — 등급을 가르는 값이 아닙니다) · "
+                  "<code>regulation_reference</code>(해당 규정이 있을 때만) · <code>regulation_summary</code>(2026-10-02 추가, 규정 원문을 사람 말로 요약한 한두 "
+                  "문장 — 로컬 LLM 옵션을 켰을 때만, 반드시 <code>regulation_reference</code> 원문과 같이 봐 주십시오) · <code>status</code> · <code>confidence</code> · "
+                  "<code>model_version</code> · <code>warnings</code> 도 함께 채워집니다 — 등급이 같으면 <code>label</code> 하나, 갈리면 <code>label</code> 을 메인으로 "
+                  "<code>rule_grade</code> 를 함께 보시면 됩니다. "
                   "같은 엔드포인트를 저희 내부 관리 화면도 호출하는데, 그쪽은 이 값들을 그대로 받습니다 — 구분은 호출 인증(서버 간 자격) 기준이며 요청 쪽에서 고를 수 없습니다."))
     b.append(h3("등급 코드"))
     b.append(_table(["label", "이름"], [[f"<code>{c}</code>", GRADE_NAMES[c]] for c in schemas["Grade"]["enum"]], center={0}, widths=[20, 80]))
@@ -586,7 +591,9 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
         "<code>warnings</code> 는 사람이 읽는 사유 문자열입니다. 형식이 바뀔 수 있으므로 화면 표시와 로그에 쓰고, 문자열로 분기하지 않습니다.",
         "<code>grade_candidates</code> 는 비밀관리성(M)을 판단할 접근범위·보안표시를 받지 못해 등급이 하나로 정해지지 않을 때 남는 후보입니다. 비어 있으면 <code>label</code> 이 유일한 답입니다. "
         "<code>label</code> 을 대체하지 않으며, 접근범위·보안표시를 보내면(5장) 줄어듭니다.",
-        "<code>confidence</code> 는 선택한 등급(<code>label</code>)의 확률(0~1)이고 <code>scores</code> 는 등급별 확률입니다.",
+        "<code>confidence</code> 는 선택한 등급(<code>label</code>)의 확률(0~1)이고 <code>scores</code> 는 등급별 확률입니다. "
+        "[2026-10-02] <code>confidence_tier</code> 는 <code>confidence</code> 를 검수 우선순위 3단계(낮음·보통·높음)로 나눈 계산값입니다 — "
+        "자동확정 여부를 가르는 게이트가 아니라, 어느 문서를 먼저 볼지 고르는 참고일 뿐입니다.",
         "필수는 <code>inference_id</code> · <code>doc_id</code> · <code>label</code> · <code>confidence</code> · <code>scores</code> · <code>model_version</code> 여섯입니다. "
         "<code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>evidence</code> · <code>rule_grade</code> · <code>model_grade</code> · "
         "<code>decision_path</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> 은 "
@@ -599,7 +606,9 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
         "다를 때만 참고로 채워집니다. 즉 두 판정이 같으면 <code>label</code> 하나만 보시면 되고, 갈렸을 때만 <code>rule_grade</code> 를 함께 확인하시면 됩니다.",
         "[2026-09-29] <code>regulation_reference</code> 는 귀사 사내 규정 중 이 문서에 해당하는 원문 조항입니다(등급 판정과 무관한 <b>참고용</b>). "
         "기능이 꺼져 있거나 해당 규정을 찾지 못하면 null 입니다. GPU 가 없는 배포에서는 로컬 LLM 판정이 제한 시간 안에 끝나지 못해 항상 null 이 됩니다 — "
-        "GPU 도입 전까지는 이 필드를 기대하지 마십시오.",
+        "GPU 도입 전까지는 이 필드를 기대하지 마십시오. "
+        "[2026-10-02] <code>regulation_summary</code> 는 그 원문을 사람 말로 요약한 한두 문장입니다 — 로컬 LLM 요약 옵션을 추가로 켰을 때만 채워지고, "
+        "기본은 null 입니다. 로컬 LLM 이 새로 쓴 글이므로 반드시 <code>regulation_reference</code>(원문)와 함께 보시고, 이 문장만으로 등급·법리 근거를 판단하지 마십시오.",
         "<code>automation_assessment</code> 는 이 결과에 없습니다(2026-09-27 부터). 저희 내부 자동확정 정책을 검증하는 그림자 관측치라 연동에 쓰지 않으며, "
         "동기 응답(<code>POST /classify</code>, 내부 화면 전용)에만 남겨 뒀습니다.",
     ]))
@@ -681,8 +690,10 @@ def render_guide(spec: dict, samples: dict[str, object]) -> str:
             ["3", "분류 요청의 <code>content</code>", "필수", "선택. 생략하면 등록 때 저장한 본문을 씁니다"],
             ["4", "등록 후 분류 호출", "<code>POST /classify?doc_id=…</code>", "본문 <code>{\"doc_id\": …}</code> 로 보냅니다(쿼리 파라미터는 받지 않음)"],
             ["5", "등록 폼 필드", "<code>doc_type</code> · <code>external_ref</code>", "<code>doc_type</code> · <code>external_ref</code> 는 받지 않습니다(보내도 무시). <code>source_type</code> · <code>security_marking</code> · <code>access_scope</code> · <code>enqueue_classification</code> 추가"],
-            ["6", "분류 결과 필드", "15개", "IF-05 결과 한 건은 18개 — <code>rule_evaluation_factors</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> · "
-             "<code>regulation_reference</code>(2026-09-29 추가, 4장) 가 늘었습니다"
+            ["6", "분류 결과 필드", "15개", "IF-05 결과 한 건은 20개 — <code>rule_evaluation_factors</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> · "
+             "<code>regulation_reference</code>(2026-09-29 추가) · <code>confidence_tier</code> · <code>regulation_summary</code>(2026-10-02 추가, 4장) 가 늘었습니다. "
+             "같은 날부터 <code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>evidence</code> · <code>decision_path</code> 도 채워진 그대로 나갑니다"
+             "(그 전에는 늘 비어 있었습니다). "
              "(<code>automation_assessment</code> 는 안 실립니다 — 내부 전용이라 2026-09-27 부터 뺐습니다). 사람이 확정한 등급 <code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> 은 IF-06 에서만 옵니다"],
             ["7", "오류 본문", "<code>{code, message, …}</code>", "대부분 <code>{\"detail\": …}</code>. <code>code</code> 는 413·429·500 에만 있고 값은 <code>KOIPA_BODY_TOO_LARGE</code> · <code>KOIPA_RATE_LIMIT</code> · <code>KOIPA_INTERNAL</code> 셋뿐입니다"],
             ["8", "문서 조회(IF-06)", "분류 결과 전체", "저장된 요약 10개 항목만 담습니다(3-4장 표)"],

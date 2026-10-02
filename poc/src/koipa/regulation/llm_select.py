@@ -4,7 +4,9 @@
 그 밖을 가르는 AUROC 가 0.42~0.71 이었다(설계서 §3.4). 그래서 조회가 준 후보 조항 상위 K 개를 로컬 LLM 에게 보이고, 조항의 항 가운데
 문서에 직접 적용되는 것을 **번호로 고르게** 한다.
 
-⛔ LLM 이 만든 글은 화면에 나가지 않는다 — 고른 항의 규정 원문만 나간다(원문 그대로 원칙 P3). 아무 항도 고르지 않으면 아무것도 안 보인다.
+⛔ select_applicable() 이 고르는 데서 LLM 이 만든 글은 화면에 나가지 않는다 — 고른 항의 규정 원문만 나간다(원문 그대로 원칙 P3).
+   아무 항도 고르지 않으면 아무것도 안 보인다. (⚠ [2026-10-02] generate_summary() 는 예외다 — 고른 조항을 사람 말로 요약하는
+   **별도 호출**이고, 그 글은 화면에 나간다. 항상 원문과 같이 보여 대조할 수 있게 하는 책임은 호출부에 있다. 아래 함수 docstring 참조.)
 ⛔ 등급을 판정하지 않는다. 프롬프트도 등급을 묻지 않는다.
 ⛔ 판정이 서지 않으면(LLM 오류·시간 초과·해석 불가) 보이지 않는다 — 확인하지 못한 규정을 「해당」으로 내보내지 않는다.
 ⛔ **로컬 LLM 만 쓴다.** 문서 본문(고객사 기밀)이 프롬프트에 들어가므로 원격 공급자(anthropic·openai·google)나 목업(noop)이면 호출하지 않는다.
@@ -13,6 +15,7 @@
 
 from __future__ import annotations
 
+import difflib
 import inspect
 import ipaddress
 import json
@@ -563,3 +566,136 @@ def _select_per_candidate(
         for f in (kind_fut, *(j[2] for j in jobs)):
             if f is not None:
                 f.cancel()
+
+
+# ── 고른 조항을 사람 말로 요약하기 (2026-10-02) ──────────────────────────────────
+#
+# select_applicable()은 조항을 **고르기만** 한다 — 화면엔 고른 항의 원문만 나가고 LLM 이 만든
+# 글은 안 나갔다. "당연히 설명이 나가야지" 요건으로, 고른 조항이 이 문서에 왜 적용되는지를
+# 짧게 설명하는 호출을 추가한다. ⛔ 이 호출은 **글을 짓는다** — 조항 원문에 없는 내용을 말할
+# 위험이 select_applicable 보다 크므로, 화면에는 이 요약과 **원문을 항상 같이** 보여 대조할 수
+# 있게 하고(규정_evidence_service.generate_summary 호출부 책임), 별도 스위치
+# (regulation_llm_summary_enabled)로 끊을 수 있게 둔다. 로컬 LLM 전용 — 호출부가
+# endpoint_is_local·is_local_provider 를 먼저 확인한다(select_applicable 과 같은 책임 분리).
+#
+# ⭐ 설계는 손으로 고르지 않았다 — `scripts/measure_regulation_summary.py`(9/25, 설계 단계 탐색)가
+# 이미 "요약 + 조항 원문에서 글자 그대로 복사한 인용(quote)"형식을 재서 남겨 뒀다
+# (`reports/CLAUDE_REGULATION_RAG_20260925/summary_report.txt`). 실측(제품에 가까운 qwen3:14b·
+# retrieved 모드, 사내 업무문서 71건): 인용 글자일치 189/191(99%) · 숫자근거 191/191(100%) ·
+# 조항범위내 191/191(100%) — 인용을 **강제하고 검증하면** 지어낸 숫자·범위 밖 조항을 사실상
+# 다 걸러낸다. 반면 **등급이름을 말한 항목이 125/191(65%)** 였다(문서의 등급을 직접 판정한
+# 사례는 0/191 — "이 문서는 ○○ 등급이다" 식은 안 나왔지만, 일반 명사로 등급 낱말은 자주 썼다).
+# 그래서 이 구현은 그 측정을 그대로 반영한다 — ① quote 를 반드시 받고 원문에서 검증(안 되면
+# None) ② "이 문서는 ~등급이다" 류 판정 문장이면 거부. 등급 낱말 자체(조항이 그 낱말을 쓰면
+# 자연히 섞인다)는 막지 않는다 — 측정에서 "문서등급_판정"은 전 모델·수백 건에서 0건이었다.
+
+SUMMARY_SYSTEM = ("당신은 사내 문서보안 규정 담당자입니다. 이미 골라진 규정 조항이 이 문서에 왜 적용되는지를 "
+                   "검수자에게 설명합니다. 이 문서의 등급을 판정하지 않고, 조항 원문에 없는 내용은 말하지 않습니다.")
+
+SUMMARY_QUESTION = (
+    "질문: 위 [고른 조항]이 이 문서에 적용되는 이유를 한두 문장으로 설명하십시오.\n"
+    "규칙:\n"
+    "1. 조항에 적힌 내용만 쓴다. 조항에 없는 내용·추측·새 수치를 덧붙이지 않는다.\n"
+    "2. 이 문서의 등급을 판정하지 않는다. \"이 문서는 ○○ 등급이다\" 라고 쓰지 않는다. 조항이 정한 기준만 옮긴다.\n"
+    "3. quote 에는 조항 원문에서 글자 그대로 복사한 문장(20~120자)을 넣는다 — summary 를 뒷받침하는 근거다.\n"
+    "JSON 으로만 답하십시오: {\"summary\": \"한두 문장\", \"quote\": \"조항 원문 그대로\"}")
+
+SUMMARY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {"summary": {"type": "string"}, "quote": {"type": "string"}},
+    "required": ["summary", "quote"],
+}
+
+_SUMMARY_RE = re.compile(r'"summary"\s*:\s*"((?:[^"\\]|\\.)*)"')
+_QUOTE_RE = re.compile(r'"quote"\s*:\s*"((?:[^"\\]|\\.)*)"')
+_SUMMARY_MAX_CHARS = 400    # 한두 문장을 넘으면 지어낸 말이 섞였을 가능성이 커 보인다(검증이 아니라 안전장치)
+_SUMMARY_TOKENS = 220
+_QUOTE_FUZZY_RATIO = 0.9    # 측정(summary_report.txt)에서 쓴 것과 같은 문턱 — 가장 긴 공통 구간 / 인용 길이
+_JUDGES_DOC_RE = re.compile(r"이\s*문서(는|의)?[^.。]{0,25}(극비|기밀|대외비|일반|TS|S1|S2|S3|특급|1급|2급|3급)")
+
+
+def build_summary_prompt(doc_text: str, items: Sequence[EvidenceItem], doc_chars: int) -> str:
+    doc = " ".join(doc_text.split())[: max(1, doc_chars)]
+    body = "\n".join(f"- {it.article_no}({it.title}) {s}" for it in items for s in it.sentences)
+    return f"[문서 앞부분]\n{doc}\n\n[고른 조항]\n{body}\n\n{SUMMARY_QUESTION}"
+
+
+def _norm_for_quote(s: str) -> str:
+    return re.sub(r"[\s*]+", "", s or "")
+
+
+def _quote_verifies(quote: str, items: Sequence[EvidenceItem]) -> bool:
+    """quote 가 고른 조항 원문 어딘가에 실제로 있는가 — 글자 그대로(공백·* 제외) 또는 느슨히
+    (가장 긴 공통 구간이 인용 길이의 90% 이상). `measure_regulation_summary.py` 의 analyze() 와
+    같은 기준이다 — 거기서 qwen3:14b·retrieved 기준 189~190/191 이 이 기준을 통과했다."""
+    nq = _norm_for_quote(quote)
+    if not nq:
+        return False
+    nc = _norm_for_quote(" ".join(s for it in items for s in it.sentences))
+    if nq in nc:
+        return True
+    sm = difflib.SequenceMatcher(None, nq, nc, autojunk=False)
+    lcs = sm.find_longest_match(0, len(nq), 0, len(nc)).size
+    return (lcs / len(nq)) >= _QUOTE_FUZZY_RATIO
+
+
+def parse_summary(text: str, items: Sequence[EvidenceItem]) -> str | None:
+    """답에서 요약 문장을 읽는다. summary·quote 를 못 읽거나, quote 가 조항 원문에서 검증되지
+    않거나, 등급을 직접 판정("이 문서는 ○○ 등급이다")하면 None — 화면엔 원문만 남는다."""
+    summary: str | None = None
+    quote: str | None = None
+    for cand in (text, *(m.group(0) for m in _OBJ_RE.finditer(text or ""))):
+        try:
+            obj = json.loads(cand)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(obj, dict) and isinstance(obj.get("summary"), str):
+            summary = obj["summary"].strip()
+            quote = obj.get("quote").strip() if isinstance(obj.get("quote"), str) else None
+            break
+    if summary is None:
+        m = _SUMMARY_RE.search(text or "")
+        summary = m.group(1).strip() if m else None
+        m2 = _QUOTE_RE.search(text or "")
+        quote = m2.group(1).strip() if m2 else None
+    if not summary or len(summary) > _SUMMARY_MAX_CHARS:
+        return None
+    if not quote or not _quote_verifies(quote, items):
+        return None             # 확인 못 한 인용 — 지어낸 근거일 수 있다, 보이지 않는다
+    if _JUDGES_DOC_RE.search(summary):
+        return None             # "이 문서는 ○○ 등급이다" 류 — 등급을 판정하지 않는다
+    return summary
+
+
+def generate_summary(
+    provider: Any,
+    doc_text: str,
+    items: Sequence[EvidenceItem],
+    *,
+    doc_chars: int = 1500,
+    timeout_s: float = 60.0,
+    executor: ThreadPoolExecutor | None = None,
+) -> str | None:
+    """고른 조항(`items`)이 이 문서에 왜 적용되는지 로컬 LLM 이 한두 문장으로 쓴다.
+
+    항이 없거나 문서 본문이 비면 호출하지 않는다. 호출이 실패·시간 초과·해석 불가·너무 길면
+    None — 확인하지 못한 설명을 내보내지 않는다(select_applicable 과 같은 원칙).
+    ⛔ 로컬 공급자인지·서버 주소가 사내인지는 호출부(regulation_evidence_service)가 먼저
+    확인한다 — 이 함수는 그 확인이 끝난 provider 를 받는다고 가정한다.
+    """
+    if not items or not doc_text.strip():
+        return None
+    ex = executor or shared_executor(6)
+    use_schema = accepts_json_schema(provider)
+    prompt = build_summary_prompt(doc_text, items, doc_chars)
+    if getattr(provider, "name", "") == "ollama" and len(SUMMARY_SYSTEM) + len(prompt) > OLLAMA_PROMPT_LIMIT_CHARS:
+        logger.warning("규정 요약 생성을 건너뛴다 — 프롬프트가 Ollama 컨텍스트를 넘는다")
+        return None
+    fut = ex.submit(_generate, provider, SUMMARY_SYSTEM, prompt, SUMMARY_SCHEMA, use_schema, _SUMMARY_TOKENS)
+    try:
+        text = fut.result(timeout=max(0.1, float(timeout_s)))
+    except Exception as exc:  # noqa: BLE001 — 시간 초과·연결 오류·호출 실패 모두 「쓰지 못함」
+        fut.cancel()
+        logger.warning("규정 요약 생성 실패: %s", _why(exc))
+        return None
+    return parse_summary(text, items)

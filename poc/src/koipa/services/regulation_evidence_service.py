@@ -66,6 +66,18 @@ class EvidenceResult:
     items: list[EvidenceItem] = field(default_factory=list)
 
 
+class _SummaryItem:
+    """llm_select.generate_summary 가 기대하는 모양(article_no·title·sentences)으로
+    EvidenceItemModel(API, clause 아래 중첩)을 가볍게 맞춘다 — 역변환·재조회 없이."""
+
+    __slots__ = ("article_no", "title", "sentences")
+
+    def __init__(self, article_no: str, title: str, sentences: tuple[str, ...]) -> None:
+        self.article_no = article_no
+        self.title = title
+        self.sentences = sentences
+
+
 def _clause_rec(reg: Any, clause: Any, sentences: list[Any]) -> ClauseRec:
     return ClauseRec(
         clause_id=str(clause.id), rgltn_id=str(reg.id), rgltn_nm=reg.name, ver_lbl_nm=reg.version_label,
@@ -307,6 +319,40 @@ class RegulationEvidenceService:
             self._llm_cache_put(key, sel.items, sel.reason)
         return EvidenceResult(doc_id, True, sel.reason, sel.items)
 
+    # ── 고른 조항을 사람 말로 요약하기 (2026-10-02, "당연히 설명이 나가야지" 요건) ──────────
+    def summarize(self, doc_id: str, items: list["EvidenceItemModel"]) -> str | None:
+        """`items`(이미 고른 조항, API 모양)가 이 문서에 왜 적용되는지 로컬 LLM 이 한두 문장으로 쓴다.
+
+        select_applicable 과 같은 안전 확인(로컬 공급자·서버 주소)을 여기서도 먼저 한다 — 문서
+        본문이 또 다른 호출의 프롬프트에 들어가기 때문이다. 확인에 걸리거나 호출이 실패하면
+        None(화면엔 조항 원문만 남는다, 설명은 안 붙는다). `items`를 이미 가진 쪽(규정참고를
+        이미 조회한 호출)이 그대로 넘긴다 — LLM 고르기를 다시 돌리지 않는다.
+        """
+        s = self._settings()
+        if not items:
+            return None
+        provider_name = str(getattr(s, "llm_provider", "") or "")
+        if not llm_select.is_local_provider(provider_name):
+            logger.error("규정 요약 생성을 건너뛴다 — 공급자 %r 는 로컬이 아니다(문서 본문을 밖으로 보내지 않는다)", provider_name)
+            return None
+        try:
+            provider = self._llm()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("규정 요약용 LLM 공급자 생성 실패: %s", type(exc).__name__)
+            return None
+        base_url = getattr(provider, "base_url", None)
+        if base_url is not None and not llm_select.endpoint_is_local(base_url):
+            logger.error("규정 요약 생성을 건너뛴다 — LLM 서버 주소(호스트 %r)가 사내가 아니거나 확인되지 않는다",
+                         urlsplit(str(base_url)).hostname)
+            return None
+        doc_text = self._doc_text(doc_id)
+        shim_items = [_SummaryItem(i.clause.article_no, i.clause.title, tuple(i.sentences)) for i in items]
+        return llm_select.generate_summary(
+            provider, doc_text, shim_items,
+            doc_chars=int(s.regulation_llm_doc_chars), timeout_s=float(s.regulation_llm_timeout_s),
+            executor=llm_select.shared_executor(int(s.regulation_llm_max_concurrency)),
+        )
+
     def _llm_cache_get(self, key: tuple, ttl: float) -> tuple[list[EvidenceItem], str | None] | None:
         now = self._clock()
         with self._llm_cache_lock:
@@ -390,3 +436,23 @@ def regulation_reference_for_kl_wire(doc_id: str) -> list[EvidenceItemModel] | N
         )
         for i in result.items
     ]
+
+
+def regulation_summary_for_kl_wire(doc_id: str, reference: "list[EvidenceItemModel] | None") -> str | None:
+    """`regulation_reference_for_kl_wire`가 이미 찾아 준 조항(`reference`)을 사람 말로 요약 — 없으면(꺼짐·항 없음) None.
+
+    [2026-10-02] "당연히 설명이 나가야지" 요건. 호출하는 쪽에서 `regulation_reference_for_kl_wire`가
+    돌려준 항을 그대로 넘긴다 — LLM 고르기(find_for_document)를 또 돌리지 않는다. 이 함수도
+    실패를 전부 삼킨다(참고는 있으면 더하는 것, 분류 응답을 막지 않는다).
+    """
+    from koipa.config import settings  # noqa: PLC0415
+
+    if not reference:
+        return None
+    if not getattr(settings, "regulation_llm_summary_enabled", False):
+        return None
+    try:
+        return RegulationEvidenceService.get_instance().summarize(doc_id, reference)
+    except Exception:  # noqa: BLE001
+        logger.warning("regulation_summary_for_kl_wire: 요약 생성 실패 doc_id=%s", doc_id, exc_info=True)
+        return None

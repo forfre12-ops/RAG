@@ -438,11 +438,17 @@ class AsyncClassifyService:
         읽는 저장값(results)은 건드리지 않고, 여기서 만든 사본만 webhook 본문에 쓴다 —
         async_classify.py 의 kl_backend 역할 분기와 같은 규칙(kl_wire_projection).
         """
-        from koipa.services.regulation_evidence_service import regulation_reference_for_kl_wire  # noqa: PLC0415
+        from koipa.services.regulation_evidence_service import (  # noqa: PLC0415
+            regulation_reference_for_kl_wire,
+            regulation_summary_for_kl_wire,
+        )
 
+        doc_id = result_json.get("doc_id", "")
+        reference = regulation_reference_for_kl_wire(doc_id)
         return kl_wire_projection(
             ClassifyJobResult.model_validate(result_json),
-            regulation_reference=regulation_reference_for_kl_wire(result_json.get("doc_id", "")),
+            regulation_reference=reference,
+            regulation_summary=regulation_summary_for_kl_wire(doc_id, reference),
         ).model_dump(mode="json")
 
     @staticmethod

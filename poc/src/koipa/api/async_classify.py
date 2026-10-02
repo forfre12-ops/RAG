@@ -2,6 +2,7 @@
 
 # future annotations 비활성: slowapi limiter가 함수 시그니처 forward-ref 평가에서 fail.
 
+import time
 import uuid
 from uuid import UUID
 
@@ -20,9 +21,30 @@ from koipa.schemas.classify_async import (
     ClassifyJobStatus,
 )
 from koipa.services.async_classify_service import AsyncClassifyService
-from koipa.services.regulation_evidence_service import regulation_reference_for_kl_wire
+from koipa.services.regulation_evidence_service import (
+    regulation_reference_for_kl_wire,
+    regulation_summary_for_kl_wire,
+)
 
 router = APIRouter(tags=["classify"], dependencies=[Depends(require_auth)])
+
+
+def _regulation_kl_wire_budget_deadline(n_results: int) -> float | None:
+    """배치 조회(GET /classify/jobs/{job_id})가 결과 수만큼 규정참고·요약 LLM 호출을 **순차로**
+    부르다 무한정 늘어지지 않게 전체 예산을 둔다(2026-10-02, regulation_summary 추가로 문서당
+    최대 지연이 거의 2배가 되면서 발견 — 배치 1,000건이면 이론상 이 GET 하나가 몇 시간 걸릴 수
+    있었다). `regulation_evidence_service._find_many`(미리보기용 예산)와 같은 수치·같은 판단
+    기준을 쓴다. 결과가 1건이면 예산을 두지 않는다(원래도 그 1건분 지연뿐이다).
+    """
+    from koipa.config import settings  # noqa: PLC0415
+
+    if n_results <= 1:
+        return None
+    if not (getattr(settings, "regulation_llm_select_enabled", False)
+            or getattr(settings, "regulation_llm_summary_enabled", False)):
+        return None
+    timeout_s = float(getattr(settings, "regulation_llm_timeout_s", 60.0))
+    return time.monotonic() + 2.0 * timeout_s
 
 
 @router.post("/classify/async", response_model=ClassifyAsyncResponse, status_code=202)
@@ -50,15 +72,27 @@ def classify_job_status(job_id: UUID, request: Request):
     res = AsyncClassifyService().get_status(job_id)
     if res is None:
         raise HTTPException(status_code=404, detail="job not found")
-    # [2026-09-29] kl_backend 역할로 부르면(=KL 이 실제로 받는 호출) 진단 필드를 비우고
-    # 규정참고를 채운 사본으로 좁힌다. 그 외(admin·reviewer·system, 우리 콘솔의 대용량
-    # 문서 테스트 화면 포함)는 지금까지와 동일하게 전체를 그대로 돌려준다 — 같은 IF-05
-    # 엔드포인트를 내부에서도 재사용하고 있어(app.js:887) 여기를 바꾸면 그 화면이 깨진다.
+    # [2026-09-29] kl_backend 역할로 부르면(=KL 이 실제로 받는 호출) 일부 진단 필드를 비우고
+    # 규정참고(+요약, 2026-10-02)를 채운 사본으로 좁힌다. 그 외(admin·reviewer·system, 우리
+    # 콘솔의 대용량 문서 테스트 화면 포함)는 지금까지와 동일하게 전체를 그대로 돌려준다 —
+    # 같은 IF-05 엔드포인트를 내부에서도 재사용하고 있어(app.js:887) 여기를 바꾸면 그 화면이 깨진다.
     if getattr(request.state, "auth_role", None) == "kl_backend" and res.results:
-        res.results = [
-            kl_wire_projection(r, regulation_reference=regulation_reference_for_kl_wire(r.doc_id))
-            for r in res.results
-        ]
+        projected = []
+        deadline = _regulation_kl_wire_budget_deadline(len(res.results))
+        over_budget = False
+        for r in res.results:
+            if deadline is not None and (over_budget or time.monotonic() > deadline):
+                # 예산 초과 — 남은 문서는 규정참고·요약 없이(둘 다 None) 그대로 내보낸다.
+                # label·confidence 등 핵심 판정은 멀쩡하다, 참고용 부가정보만 생략될 뿐이다.
+                over_budget = True
+                projected.append(kl_wire_projection(r))
+                continue
+            reference = regulation_reference_for_kl_wire(r.doc_id)
+            projected.append(kl_wire_projection(
+                r, regulation_reference=reference,
+                regulation_summary=regulation_summary_for_kl_wire(r.doc_id, reference),
+            ))
+        res.results = projected
     return res
 
 

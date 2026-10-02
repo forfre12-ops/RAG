@@ -1,8 +1,24 @@
 from typing import Literal, Optional
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 from .common import FactorRegistry, Grade
 from .regulation import EvidenceItemModel
+
+# [2026-10-02] 신뢰도 화면 표시 3단계 — 게이트가 아니라 검수 우선순위 참고자료다(KL포털이
+# 문서마다 매번 사람 검수를 하기로 했으므로, 이 값이 자동확정 여부를 바꾸지 않는다). 경계는
+# 아직 사람 검수 결과로 실측하지 않은 균등분할(1/3·2/3)이다 — 검수 데이터가 쌓이면 구간별
+# 실제 정답률로 다시 맞출 것. 고정값처럼 인용하지 말 것.
+_CONFIDENCE_TIER_LOW_MAX = 1 / 3
+_CONFIDENCE_TIER_MID_MAX = 2 / 3
+
+
+def compute_confidence_tier(confidence: float) -> str:
+    v = float(confidence)
+    if v < _CONFIDENCE_TIER_LOW_MAX:
+        return "낮음"
+    if v < _CONFIDENCE_TIER_MID_MAX:
+        return "보통"
+    return "높음"
 
 
 class DocumentInput(BaseModel):
@@ -132,6 +148,14 @@ class ClassifyOutcome(BaseModel):
     doc_id: str
     label: Grade
     confidence: float
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def confidence_tier(self) -> str:
+        """[2026-10-02] confidence 에서 그대로 파생 — 별도로 설정하지 않는다(항상 일관).
+        model_copy(update=...)로 confidence 를 안 바꾸면 kl_wire_projection 뒤에도 그대로 따라온다."""
+        return compute_confidence_tier(self.confidence)
+
     scores: dict[str, float]
     evaluation_factors: Optional[EvaluationFactors] = None
     # [번들 C, 2026-10-02 재정의] evaluation_factors(S/V/M) 중 근거 없는(state="unknown") 축이
@@ -168,35 +192,44 @@ class ClassifyOutcome(BaseModel):
     # [2026-09-29] RAG+LLM 규정참고(설계서 §2.5·§3.6) — 이 문서에 해당하는 규정 원문이 있을
     # 때만 채운다. 등급 판정과 무관한 참고용이며, GPU 없는 배포(현재 고객사 운영 서버)에서는
     # 로컬 LLM 옵션이 시간 안에 못 끝나 항상 None 이 된다 — 필드는 지금 만들어 두고 GPU 도입은
-    # 별도 과제([[regulation-reference-implemented-2026-09-25]]).
+    # 별도 과제.
     regulation_reference: Optional[list[EvidenceItemModel]] = None
+    # [2026-10-02] regulation_reference 를 사람 말로 요약한 한두 문장 — "당연히 설명이
+    # 나가야지" 요건. regulation_reference 가 없거나 regulation_llm_summary_enabled 가
+    # 꺼져 있으면 항상 None. ⛔ 로컬 LLM 이 새로 쓴 글이다 — regulation_reference(원문)와
+    # 항상 같이 보일 것, 이 문장만 단독으로 등급·법리 근거로 쓰지 않는다.
+    regulation_summary: Optional[str] = None
 
 
 def kl_wire_projection(
-    result: "ClassifyOutcome", regulation_reference: Optional[list[EvidenceItemModel]] = None
+    result: "ClassifyOutcome",
+    regulation_reference: Optional[list[EvidenceItemModel]] = None,
+    regulation_summary: Optional[str] = None,
 ) -> "ClassifyOutcome":
-    """KL(지재원 포털)이 실제로 받을 사본 — 같은 클래스, 진단용 필드만 비운다.
+    """KL(지재원 포털)이 실제로 받을 사본 — 같은 클래스, 진단용 필드 일부만 비운다.
 
     [2026-09-29] KL 요청: "등급이 같으면 예상 등급 하나, 다르면 분류기(label)를 메인으로 하고
     룰분류기 예측은 따로, RAG+LLM 인 경우엔 관련 참고도 같이". label(최종판정)은 이미 시스템의
     대표 답이므로 그대로 메인으로 두고, rule_grade 는 label 과 같으면 지워 "하나만" 리턴되게 한다.
-    evaluation_factors·evidence·decision_path 등 룰/모델 결합 근거를 보여주는 내부 진단 필드는
-    KL 요청 범위 밖이라 비운다 — DB 저장·우리 콘솔(admin.html)·`GET /classify/jobs/{job_id}` 를
-    관리자/시스템 역할로 부르는 내부 대용량 테스트 화면은 이 함수를 거치지 않아 그대로 전체를 본다
+
+    [2026-10-02 뒤집힘] evaluation_factors·rule_evaluation_factors·evidence·decision_path는
+    더 이상 비우지 않는다 — KL포털이 문서마다 매번 사람 검수를 하기로 하면서 "신뢰도는
+    근거(evidence)와 같이 보여준다"로 결정이 바뀌었다(9/29엔 반대로 "KL 요청 범위 밖"이라
+    비웠었다). scores·model_grade·grade_candidates(_reason)는 여전히 비운다 — 이 넷은 오늘
+    다시 논의되지 않았다. confidence_tier(계산 필드)는 result 에서 그대로 승계된다(별도
+    처리 불필요). DB 저장·우리 콘솔(admin.html)·`GET /classify/jobs/{job_id}`를 관리자/시스템
+    역할로 부르는 내부 대용량 테스트 화면은 이 함수를 거치지 않아 그대로 전체를 본다
     (api/async_classify.py 의 kl_backend 역할 분기, workers/tasks.py 의 콜백 발사 지점).
     """
     rule_grade = result.rule_grade if result.rule_grade is not None and result.rule_grade != result.label else None
     return result.model_copy(update={
         "scores": {},
-        "evaluation_factors": None,
-        "rule_evaluation_factors": None,
-        "evidence": [],
         "model_grade": None,
-        "decision_path": None,
         "grade_candidates": [],
         "grade_candidates_reason": None,
         "rule_grade": rule_grade,
         "regulation_reference": regulation_reference,
+        "regulation_summary": regulation_summary,
     })
 
 
@@ -241,6 +274,14 @@ class StoredClassificationResponse(BaseModel):
     doc_id: str
     label: Grade
     confidence: float
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def confidence_tier(self) -> str:
+        """[2026-10-02] ClassifyOutcome.confidence_tier 와 같은 계산 — 이 응답은 그걸 상속하지 않는
+        별도 클래스라 여기도 따로 둔다."""
+        return compute_confidence_tier(self.confidence)
+
     scores: dict[str, float]
     model_version: str
     status: str = "staging"
