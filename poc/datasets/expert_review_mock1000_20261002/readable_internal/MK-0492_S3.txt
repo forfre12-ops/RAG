@@ -1,7 +1,7 @@
 [내부 전용 — 검수자 배포 금지]
 review_id: MK-0492
 true_grade: S3
-department: 생산제조 / info_type: 공정 진척 정보 / doc_format: 업무 기록
+department: 생산제조 / info_type: 공정 진척 정보(작업일보) / doc_format: 업무 기록
 source_type: internal / security_marking: none / access_scope: none
 label_basis: 가이드 카탈로그 표(정보유형->등급) 직접 배정
 ============================================================

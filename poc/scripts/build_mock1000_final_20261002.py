@@ -41,6 +41,19 @@ TARGET_DEPT = {
 }
 
 
+# [2026-10-02] 메인 배치(934건) 중 16건이 가이드 카탈로그의 완전한 정보유형명 대신
+# 괄호 수식어가 빠진 축약형을 썼다(내용은 카탈로그 항목과 일치 — 라벨 문자열만 어긋남).
+# 카탈로그 대조 스크립트로 전수 검사해 찾았다. ⚠ (department, info_type) 만으로 정규화하면
+# 안 된다 — 같은 부서 안에 괄호 없는 축약형이 "다른 등급의 정답"인 경우가 있다
+# (경영/TS 의 정답은 바로 "이사회 정보"이고, 생산제조/S2 의 정답은 "공정 진척 정보"다).
+# 그래서 (department, grade, info_type) 세 칸을 전부 키로 쓴다.
+INFO_TYPE_NORMALIZE = {
+    ("경영", "S1", "이사회 정보"): "이사회 정보(회의록)",
+    ("생산제조", "S3", "공정 진척 정보"): "공정 진척 정보(작업일보)",
+    ("인사", "S3", "인력관리 정보"): "인력관리 정보(근태)",
+}
+
+
 def load_tagged(path: Path, department: str, grade: str) -> list[dict]:
     with path.open(encoding="utf-8") as f:
         data = json.load(f)
@@ -76,10 +89,12 @@ def main() -> None:
     main_docs = []
     with (REPO / "poc/reports/mock1000_v2_docs.json").open(encoding="utf-8") as f:
         for d in json.load(f):
+            info_type = d["info_type"]
+            info_type = INFO_TYPE_NORMALIZE.get((d["department"], d["grade"], info_type), info_type)
             main_docs.append({
                 "department": d["department"],
                 "grade": d["grade"],
-                "info_type": d["info_type"],
+                "info_type": info_type,
                 "title": d["title"].strip(),
                 "body": d["body"].strip(),
             })
@@ -92,6 +107,33 @@ def main() -> None:
 
     all_docs = main_docs + backfill
     print(f"total docs: {len(all_docs)} (main {len(main_docs)} + backfill {len(backfill)})")
+
+    # --- 완전 중복(제목+본문 byte-identical) 치환 ---
+    # [2026-10-02] 1,001건 전수 대조에서 연구개발/S2 3쌍이 제목·본문까지 완전히 같았다
+    # (워크플로가 동일 프롬프트를 두 청크에 중복 배정해 캐시가 같은 결과를 돌려준 것으로
+    # 추정). 둘 중 뒤에 나온 사본만 새로 쓴 문서로 교체한다 — 부서·등급·정보유형은
+    # 그대로 유지해 분포가 안 틀어지게 한다.
+    dup_replacements_path = TEMP / "rnd_s2_dedup_replacements.json"
+    if dup_replacements_path.exists():
+        with dup_replacements_path.open(encoding="utf-8") as f:
+            replacement_queue = {}
+            for d in json.load(f)["docs"]:
+                replacement_queue.setdefault(d["info_type"], []).append(d)
+
+        seen_text: dict[str, int] = {}
+        n_replaced = 0
+        for i, d in enumerate(all_docs):
+            key = d["title"] + "\n" + d["body"]
+            if key in seen_text:
+                pool = replacement_queue.get(d["info_type"]) or []
+                if not pool:
+                    raise AssertionError(f"중복 치환할 여분이 없다: {d['info_type']}")
+                new = pool.pop(0)
+                all_docs[i] = {**d, "title": new["title"].strip(), "body": new["body"].strip()}
+                n_replaced += 1
+            else:
+                seen_text[key] = i
+        print(f"exact-duplicate replaced: {n_replaced}")
 
     # --- 분포 검증 ---
     from collections import Counter
@@ -107,6 +149,25 @@ def main() -> None:
     lens = [len(d["body"]) for d in all_docs]
     print(f"len min/mean/median/max: {min(lens)} / {sum(lens)/len(lens):.1f} / "
           f"{sorted(lens)[len(lens)//2]} / {max(lens)}")
+
+    # --- 카탈로그 정합성 검사: info_type 이 guide40 카탈로그(부서,등급)->정보유형명과
+    # 글자 그대로 일치하는가. 축약형(괄호 수식어 누락 등)을 놓치면 다운스트림에서
+    # 같은 정보유형이 다른 라벨로 갈린다 — 이번에 16건이 이걸로 걸렸다. ---
+    from collections import defaultdict as _dd
+    catalog = _dd(set)
+    with (GUIDE40 / "internal_manifest.jsonl").open(encoding="utf-8") as f:
+        for line in f:
+            r = json.loads(line)
+            catalog[(r["department"], r["true_grade"])].add(r["info_type"])
+    off_catalog = [
+        (d["department"], d["grade"], d["info_type"])
+        for d in all_docs
+        if d["info_type"] not in catalog.get((d["department"], d["grade"]), set())
+    ]
+    print(f"off-catalog info_type: {len(off_catalog)}")
+    for o in off_catalog[:20]:
+        print("  ", o)
+    assert not off_catalog, "카탈로그에 없는 info_type 이 있다 — 정규화 테이블에 추가할 것"
 
     # --- 게이트 재검사 ---
     violations = []
