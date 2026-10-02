@@ -83,7 +83,9 @@ observability = [
 allow = [
   "_cli_io.py",                       # dr_drill.py 가 부른다
   "analyze_golden_run.py",            # 골든 빌드 서비스가 런타임 import
+  "assign_golden_reviewers_randomly.py", # 전문가 검수 배정을 무작위·비중복으로 나눈다(이상민 요청#3)
   "backup_postgres.py",               # dr_restore.py 가 부른다
+  "batch_issue_reviewer_tokens.py",   # setup_console_test_login.py 를 여러 명분 한 번에 돌린다(이상민 요청#3)
   "calibrate_classifier.py",          # 학습기 오류 안내가 가리킨다(온도 보정을 따로 만드는 도구)
   "check_domain_leakage_gate.py",     # 골든 빌드 서비스가 런타임 import
   "compare_proxy_models.py",          # 프록시 모델 비교 기능이 CLI 로 부른다

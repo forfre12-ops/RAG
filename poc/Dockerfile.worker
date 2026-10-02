@@ -26,7 +26,9 @@ COPY src ./src
 # 이미지에는 정본(deploy_manifest.toml)의 container.scripts.allow 만 싣는다.
 COPY scripts/_cli_io.py \
      scripts/analyze_golden_run.py \
+     scripts/assign_golden_reviewers_randomly.py \
      scripts/backup_postgres.py \
+     scripts/batch_issue_reviewer_tokens.py \
      scripts/calibrate_classifier.py \
      scripts/check_domain_leakage_gate.py \
      scripts/compare_proxy_models.py \
