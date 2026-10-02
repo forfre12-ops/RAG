@@ -51,21 +51,34 @@ def _configured_url() -> str:
         return ""
 
 
-def pg_endpoint() -> tuple[str, int]:
-    """접속을 시도할 (host, port). 이름은 호출부 호환으로 유지한다."""
+def _bare_url() -> str:
+    """드라이버 접미사를 뗀 URL(urlparse 가 스킴을 읽을 수 있는 형태)."""
     url = _configured_url()
-    if not url:
-        return DEFAULT_HOST, _FALLBACK_PORT
     bare = url
     for suffix in _DRIVER_SUFFIXES:
         bare = bare.replace(suffix, "")
+    return bare
+
+
+def pg_endpoint() -> tuple[str, int]:
+    """접속을 시도할 (host, port). 이름은 호출부 호환으로 유지한다."""
+    bare = _bare_url()
+    if not bare:
+        return DEFAULT_HOST, _FALLBACK_PORT
     parsed = urlparse(bare)
     port = parsed.port or _DEFAULT_PORT.get(parsed.scheme, _FALLBACK_PORT)
     return parsed.hostname or DEFAULT_HOST, port
 
 
-def postgres_available(timeout: float = 0.5) -> bool:
-    """접속 가능하면 True. 판정 실패는 '없음'으로 본다(시험을 막지 않는다).
+def postgres_available(timeout: float = 1.0) -> bool:
+    """접속되고 **인증까지** 성공하면 True. 판정 실패는 '없음'으로 본다(시험을 막지 않는다).
+
+    [2026-10-02 정정] 종전엔 TCP 소켓만 열리면 True 였다. 실측: 이 자리(127.0.0.1:5432)를
+    다른 자격증명의 Postgres 가 쥐고 있어도("FATAL: password authentication failed for
+    user koipa") 소켓은 열리므로 "있음"으로 오판했다 — fullstack 마커 시험이
+    pytest_collection_modifyitems 의 자동 skip 을 못 받고 실제로 돌다가 매 요청 수 초씩
+    쓰며 실패했다(test_db_locks.py 등). 이제 SELECT 1 까지 실제로 해 본다 — 인증이 안 되면
+    의미 있게 쓸 수 없는 DB 이므로 '없음'과 같게 다룬다.
 
     이름은 호출부 호환으로 유지한다.
     """
@@ -73,6 +86,14 @@ def postgres_available(timeout: float = 0.5) -> bool:
     try:
         sock = socket.create_connection((host, port), timeout=timeout)
         sock.close()
-        return True
     except OSError:
+        return False
+    try:
+        import psycopg  # noqa: PLC0415
+
+        with psycopg.connect(_bare_url(), connect_timeout=timeout) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        return True
+    except Exception:  # noqa: BLE001
         return False

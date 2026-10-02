@@ -56,6 +56,11 @@ def _actor(user_id: str = "kl-user-1", role: str = "kl_backend") -> dict:
 # ============================================================
 
 class TestS1SyncClassify:
+    # [2026-10-02] 이 파일의 다른 IF-0x 시험(169·241·281·306행)은 전부 이 표식으로 DB 없으면
+    # 건너뛴다. 이 시험만 빠져 있었다 — 분류 자체는 DB 없이도 200을 내지만, elapsed_ms<5000
+    # 예산은 실패한 영속화 재시도(_try_persist)의 DB 접속 시도 비용을 포함해서 잰다. DB가
+    # 없는 환경에서는 그 비용이 예산을 넘긴다(실측 9.6s) — 의미 있게 잴 수 없으니 건너뛴다.
+    @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_single_document_classification(self):
         with TestClient(app) as cli:
             r = cli.post(

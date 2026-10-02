@@ -26,9 +26,22 @@ os.environ.setdefault("API_KEY_TRUST_ACTOR_ROLE_HEADER", "true")
 # prom_metrics._is_testing()과 동일한 패턴.
 os.environ.setdefault("TESTING", "1")
 
-# .env에 AUDIT_DISABLED=1이 있어도 테스트에서는 감사 로그를 활성화.
-# audit middleware가 os.getenv로 직접 읽으므로 여기서 강제 설정.
-os.environ["AUDIT_DISABLED"] = "0"
+# [2026-10-02 정정] 종전에는 여기서 AUDIT_DISABLED=0 을 강제했다("감사 로그가 꺼진 .env를
+# 테스트가 물려받지 않게"). 하지만 감사 체인을 실제로 검증하는 시험들
+# (test_audit_w3_d.py·test_audit_chain_wiring.py·test_secrets_manager_wiring.py 등)은
+# 전부 자기 안에서 monkeypatch/patch.dict로 직접 켜고 끈다 — 이 전역 강제값에 의존하지
+# 않는다. 그런데 감사로그와 무관한 나머지 테스트 전부가 이 강제값 때문에 매 HTTP 요청마다
+# 실제 DB connect 를 시도했다 — 로컬에 자격증명이 안 맞는 Postgres 가 떠 있으면(예: 다른
+# 컨테이너가 5432 를 쥐고 있는데 koipa/koipa_dev 를 거부) 요청 하나에 수 초가 들었다
+# (test_golden_reviewer_assignment.py 67건이 19분 걸린 원인 중 하나). 기본을 끔으로 뒤집고,
+# 감사 체인을 실제로 쓰는 시험은 자기 몫으로 남긴다.
+os.environ.setdefault("AUDIT_DISABLED", "1")
+
+# [2026-10-02 실측] 위 완화 이후에도 감사 체인을 실제로 켜는 시험(또는 운영에 가까운 DB
+# 점검)은 여전히 이 타임아웃을 거친다. 기본(5초)은 IPv6·IPv4 순서로 두 번 소진돼 실패 시
+# 10초가 들었다 — DB 가 정상이면 연결은 수십 ms 안에 끝나므로 1초로 줄여도 해가 없다
+# (실패하는 경우에만 더 빨리 포기하게 한다).
+os.environ.setdefault("DB_CONNECT_TIMEOUT", "1")
 
 # 4-tier 프로파일 도입(commit 5a2b4e0) 이후 default lite-noapi → enable_training=False.
 # 기존 test_api_routers_w3 / test_kl_integration의 train 라우터 검증은 enable_training=True

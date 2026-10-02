@@ -201,7 +201,14 @@ def test_assert_production_credentials_blocks_trust_actor_role_header():
     config_mod.settings.require_safety_gates = False
     config_mod.settings.api_key_trust_actor_role_header = True
     try:
-        with patch.dict(os.environ, {"TESTING": "", "PYTEST_CURRENT_TEST": "", "RATE_LIMIT_DISABLED": ""}):
+        with patch.dict(
+            os.environ,
+            # [2026-10-02] conftest 가 이제 AUDIT_DISABLED 를 기본 끔("1")으로 둔다(대부분
+            # 테스트가 감사로그와 무관한데 매 요청마다 DB 접속을 물려받던 것을 고침). 이 테스트는
+            # ACTOR_ROLE 검사 하나만 보려는 것이므로, 운영 모드의 더 앞선 게이트인
+            # AUDIT_DISABLED=1 금지에 먼저 걸리지 않게 명시적으로 켜 둔다.
+            {"TESTING": "", "PYTEST_CURRENT_TEST": "", "RATE_LIMIT_DISABLED": "", "AUDIT_DISABLED": "0"},
+        ):
             try:
                 config_mod.assert_production_credentials()
             except RuntimeError as exc:
