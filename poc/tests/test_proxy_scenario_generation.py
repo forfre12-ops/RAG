@@ -68,8 +68,12 @@ def test_catalog_scenario_overrides_generic_generation_context():
 
 
 def test_generic_request_keeps_optional_proxy_controls_optional():
+    """[2026-10-03] use_playbook=False 로 고정 — 이 문구(_DEFAULT_STRUCTURE_REQUIREMENTS)는
+    playbook이 꺼졌을 때만 쓰인다(generator.py:801-816). playbook 기본값이 9/29 작업으로
+    바뀌면서(생성규칙 1단계) 이 시험이 명시 안 하면 어느 쪽이 도는지 불확실해져 떨어졌었다.
+    """
     provider = _FakeProvider()
-    SyntheticDocGenerator(llm=provider).generate_one(
+    SyntheticDocGenerator(llm=provider, use_playbook=False).generate_one(
         SynthRequest(target_grade="S2", domain="business")
     )
 

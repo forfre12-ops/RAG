@@ -53,6 +53,11 @@ KNOWN_GAPS = {
     # 2026-08-19 현재 워킹트리 규약서에는 추가되는 중이다. 그 커밋이 들어오면 지운다.
     "/golden/candidates/{doc_id}/provenance",
     "/golden/jobs/{job_id}/signoff/preflight",
+    # 합성문서 생성 현황·플레이북 조회(api/synthesis.py). 내부 데이터 생성 도구용 조회
+    # API라 KL 연동 계약서 범위인지 불확실 — /rag/search 와 같은 종류의 미결정 상태.
+    # 2026-10-03 전체 회귀에서 처음 드러남(합성 기능 추가 시 규약서 갱신을 안 함).
+    "/synth/providers/status",
+    "/synth/playbook",
 }
 
 
