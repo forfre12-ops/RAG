@@ -12,16 +12,29 @@
       "doc_id": "ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73",
       "label": "S2",
       "confidence": 0.8803578615188599,
-      "scores": {
-        "TS": 0.02003907598555088,
-        "S1": 0.08763943612575531,
-        "S2": 0.8803578615188599,
-        "S3": 0.011963642202317715
-      },
+      "scores": {},
       "evaluation_factors": {
-        "secrecy": 1.0,
-        "value": 1.0,
-        "management": 1.0,
+        "secrecy": {
+          "state": "observed",
+          "value": 1,
+          "evidence": [
+            "대외비 표시 없음"
+          ]
+        },
+        "value": {
+          "state": "observed",
+          "value": 1,
+          "evidence": [
+            "원가 구조"
+          ]
+        },
+        "management": {
+          "state": "observed",
+          "value": 1,
+          "evidence": [
+            "접근 권한 미설정"
+          ]
+        },
         "scores": {
           "SECRECY": 1.0,
           "VALUE": 1.0,
@@ -30,9 +43,26 @@
       },
       "factors_source": "model_estimated",
       "rule_evaluation_factors": {
-        "secrecy": 2.0,
-        "value": 2.0,
-        "management": 0.0,
+        "secrecy": {
+          "state": "observed",
+          "value": 2,
+          "evidence": [
+            "원가 구조",
+            "거래선 정보"
+          ]
+        },
+        "value": {
+          "state": "observed",
+          "value": 2,
+          "evidence": [
+            "원가 구조"
+          ]
+        },
+        "management": {
+          "state": "observed",
+          "value": 0,
+          "evidence": []
+        },
         "scores": {
           "SECRECY": 2.0,
           "VALUE": 2.0,
@@ -55,10 +85,13 @@
         "agreement-gate: model=S2 vs rule=S1 disagree on non-public grade — routed to human review (conf alone insufficient)"
       ],
       "rule_grade": "S1",
-      "model_grade": "S2",
+      "model_grade": null,
       "decision_path": "룰 S1 · 모델 S2 불일치 (검수 사유는 아래 경고 참조)",
       "grade_candidates": [],
-      "grade_candidates_reason": null
+      "grade_candidates_reason": null,
+      "regulation_reference": null,
+      "regulation_summary": null,
+      "confidence_tier": "높음"
     }
   ],
   "error": null

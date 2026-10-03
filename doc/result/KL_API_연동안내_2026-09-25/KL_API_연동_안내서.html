@@ -165,16 +165,29 @@ curl &quot;$BASE/healthz&quot;</pre>
       &quot;doc_id&quot;: &quot;ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73&quot;,
       &quot;label&quot;: &quot;S2&quot;,
       &quot;confidence&quot;: 0.8803578615188599,
-      &quot;scores&quot;: {
-        &quot;TS&quot;: 0.02003907598555088,
-        &quot;S1&quot;: 0.08763943612575531,
-        &quot;S2&quot;: 0.8803578615188599,
-        &quot;S3&quot;: 0.011963642202317715
-      },
+      &quot;scores&quot;: {},
       &quot;evaluation_factors&quot;: {
-        &quot;secrecy&quot;: 1.0,
-        &quot;value&quot;: 1.0,
-        &quot;management&quot;: 1.0,
+        &quot;secrecy&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 1,
+          &quot;evidence&quot;: [
+            &quot;대외비 표시 없음&quot;
+          ]
+        },
+        &quot;value&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 1,
+          &quot;evidence&quot;: [
+            &quot;원가 구조&quot;
+          ]
+        },
+        &quot;management&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 1,
+          &quot;evidence&quot;: [
+            &quot;접근 권한 미설정&quot;
+          ]
+        },
         &quot;scores&quot;: {
           &quot;SECRECY&quot;: 1.0,
           &quot;VALUE&quot;: 1.0,
@@ -183,9 +196,26 @@ curl &quot;$BASE/healthz&quot;</pre>
       },
       &quot;factors_source&quot;: &quot;model_estimated&quot;,
       &quot;rule_evaluation_factors&quot;: {
-        &quot;secrecy&quot;: 2.0,
-        &quot;value&quot;: 2.0,
-        &quot;management&quot;: 0.0,
+        &quot;secrecy&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 2,
+          &quot;evidence&quot;: [
+            &quot;원가 구조&quot;,
+            &quot;거래선 정보&quot;
+          ]
+        },
+        &quot;value&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 2,
+          &quot;evidence&quot;: [
+            &quot;원가 구조&quot;
+          ]
+        },
+        &quot;management&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 0,
+          &quot;evidence&quot;: []
+        },
         &quot;scores&quot;: {
           &quot;SECRECY&quot;: 2.0,
           &quot;VALUE&quot;: 2.0,
@@ -208,10 +238,13 @@ curl &quot;$BASE/healthz&quot;</pre>
         &quot;agreement-gate: model=S2 vs rule=S1 disagree on non-public grade — routed to human review (conf alone insufficient)&quot;
       ],
       &quot;rule_grade&quot;: &quot;S1&quot;,
-      &quot;model_grade&quot;: &quot;S2&quot;,
+      &quot;model_grade&quot;: null,
       &quot;decision_path&quot;: &quot;룰 S1 · 모델 S2 불일치 (검수 사유는 아래 경고 참조)&quot;,
       &quot;grade_candidates&quot;: [],
-      &quot;grade_candidates_reason&quot;: null
+      &quot;grade_candidates_reason&quot;: null,
+      &quot;regulation_reference&quot;: null,
+      &quot;regulation_summary&quot;: null,
+      &quot;confidence_tier&quot;: &quot;높음&quot;
     }
   ],
   &quot;error&quot;: null
@@ -225,6 +258,7 @@ curl &quot;$BASE/healthz&quot;</pre>
   &quot;doc_id&quot;: &quot;ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73&quot;,
   &quot;label&quot;: &quot;S2&quot;,
   &quot;confidence&quot;: 0.8804,
+  &quot;confidence_tier&quot;: &quot;높음&quot;,
   &quot;scores&quot;: {
     &quot;S2&quot;: 0.8804,
     &quot;TS&quot;: 0.02003907598555088,
