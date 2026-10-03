@@ -446,7 +446,9 @@ _MODEL_SIZE_GB: dict[str, float] = {
     "classifier_lightweight": 0.5,
     "embedding": 2.0,
     "embedding_fallback": 2.0,
-    "llm": 10.0,  # Qwen3-14B AWQ
+    "llm": 29.5,  # Qwen3-14B bf16 safetensors — 실측 다운로드 29,552,588,155B(2026-10-03,
+                  # `huggingface_hub.snapshot_download`). 종전 10.0 은 실제로 담지 않던 시절
+                  # AWQ(4bit) 추정치를 그대로 남겨 둔 값이라 지금 담는 bf16 가중치와 안 맞았다.
     "unknown": 0.5,
 }
 
@@ -525,16 +527,18 @@ def expected_files(
         # [2026-09-05] classifier 도 HF 캐시 레이아웃이다 — 런타임이 hub id 로 찾는다.
         # 종전에는 models/{org}-{name}/ 를 선언했는데 그 경로는 아무도 보지 않았고,
         # 담는 코드도 없어 verify_install 이 늘 결손을 보고할 자리였다.
-        if m.role in ("embedding", "classifier"):
-            # [#2] 임베더는 HF 캐시 레이아웃으로 실린다(HF_HOME=/models/hf; compose 가
+        if m.role in ("embedding", "classifier", "llm"):
+            # [#2] 임베더·학습베이스는 HF 캐시 레이아웃으로 실린다(HF_HOME=/models/hf; compose 가
             # ../models:/models 마운트 → 오프라인 로드 경로 models/hf/hub/models--<org>--<name>/).
             # 종전엔 models/<org>-<name>/ 로 잘못 선언돼 실제 스테이징 경로와 어긋났고(그나마
             # 스테이징 자체가 없었다), verify_install 이 엉뚱한 경로를 기대했다.
+            # [2026-10-03] llm 역할도 같은 레이아웃으로 합류 — api/worker 가 쓰진 않지만
+            # 고객사 로컬 LLM 서버(vLLM/Ollama 등)에 넣을 가중치 원본으로 동봉한다.
             files.append(f"models/hf/hub/models--{m.name.replace('/', '--')}/")
         elif m.role == "classifier_trained":
             files.append(f"models/{m.name.replace('/', '-')}/")
-        # 그 밖의 역할(llm·embedding_fallback)은 번들에 싣지 않는다 — 종전엔 models/Qwen-Qwen3-14B/ 를
-        # 선언했지만 그걸 담는 코드가 없어 실물이 없는 선언이었다(20260928 번들: 48개 중 2개).
+        # embedding_fallback(BGE-M3)은 여전히 안 싣는다 — 임베더가 KURE-v1 하나로 충분해
+        # 폴백을 쓴 적이 없다(미사용 경로, 별도 확인 전까지 보류).
     files += [f"infra-config/{f}" for f in b["infra"]["files"]]
     files += [f"docs/{f}" for f in b["docs"]["files"]]
     files += [f"licenses/{f}" for f in b["licenses"]["files"]]
@@ -1555,9 +1559,13 @@ def _copy_embedder_cache(
     # 못 하는데, 폐쇄망은 enable_incremental_retrain=True 이고 증분 재학습은 매번
     # kf-deberta-base 에서 풀 파인튜닝한다(warm-start 없음).
     #
-    # ⚠ LLM(role=llm)은 넣지 않는다 — vLLM/Ollama 의 HTTP endpoint 로 서빙하지
-    #   transformers 가 HF 캐시에서 로드하지 않는다.
-    _HF_CACHE_ROLES = ("embedding", "classifier")
+    # [2026-10-03] LLM(role=llm)도 담는다 — api/worker 프로세스가 transformers 로 직접
+    # 로드하지는 않지만(vLLM/Ollama 의 HTTP endpoint 로 서빙), 그 vLLM/Ollama 서버 자체는
+    # 이 번들이 띄우지 않는다(docker-compose.gpu.yml 은 api/worker 의 GPU 예약뿐, vLLM
+    # 서비스 정의가 없다) — 고객사가 별도로 세우는 로컬 LLM 서버에 넣을 가중치 원본을
+    # 여기 실어 보내는 것. 사용자 결정: 로컬 LLM 백엔드가 쓰는 모델이 Qwen3-14B 하나뿐이면
+    # 번들에 포함(config.py 의 local_llm_model·vllm_model 기본값이 둘 다 이 모델).
+    _HF_CACHE_ROLES = ("embedding", "classifier", "llm")
     embedders = [m for m in manifest.models if m.role in _HF_CACHE_ROLES]
     if not embedders:
         print("  [WARN] manifest 에 HF 캐시로 담을 모델 없음 — 스테이징 skip", file=sys.stderr)
@@ -1573,8 +1581,14 @@ def _copy_embedder_cache(
         if not src.exists() and allow_download:
             print(f"  [embed] 캐시 부재 → 다운로드 시도: {m.name}", file=sys.stderr)
             try:
-                from cache_kure_v1 import cache_model  # noqa: PLC0415
-                dl_ok, detail = cache_model(m.name)
+                if m.role == "llm":
+                    # sentence-transformers 는 임베딩 모델 전용 — Qwen3-14B(causal LM)엔 안 맞는다.
+                    from huggingface_hub import snapshot_download  # noqa: PLC0415
+                    snapshot_download(repo_id=m.name)
+                    dl_ok, detail = True, "snapshot_download OK"
+                else:
+                    from cache_kure_v1 import cache_model  # noqa: PLC0415
+                    dl_ok, detail = cache_model(m.name)
                 print(f"  [embed] 다운로드 {'OK' if dl_ok else 'FAIL'}: {detail}", file=sys.stderr)
             except Exception as exc:  # noqa: BLE001
                 print(f"  [embed] 다운로드 불가: {exc}", file=sys.stderr)
@@ -1584,6 +1598,11 @@ def _copy_embedder_cache(
                 why = ("폐쇄망에서 **학습**이 이 오류로 죽습니다: OSError "
                        "'couldn't connect to huggingface.co … not found in cached files'. "
                        "추론은 CLASSIFIER_MODEL_DIR 로 뜨므로 영향이 없습니다")
+            elif m.role == "llm":
+                why = ("api/worker 기동엔 영향 없음(HTTP endpoint 로 호출) — 다만 고객사가 "
+                       "같이 받는 로컬 LLM 서버(vLLM/Ollama 등)에 넣을 가중치 원본이 번들에 "
+                       "안 실린다는 뜻입니다. 로컬 LLM 옵션을 끄면(regulation_llm_select_enabled"
+                       "=False 등) 당장 문제 없습니다")
             else:
                 why = ("airgap(onprem-local)은 require_real_embedder=True 라 이게 없으면 "
                        "startup 이 죽습니다(#2)")

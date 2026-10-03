@@ -97,7 +97,12 @@ def test_expected_files_omit_retired_items(dry_manifest):
 
 
 def test_expected_files_do_not_declare_unshipped_models():
-    """LLM·대체 임베더는 번들에 싣지 않는다 — 선언만 있고 실물이 없던 항목(models/Qwen-Qwen3-14B/)을 만들지 않는다."""
+    """대체 임베더(embedding_fallback)는 번들에 안 싣는다 — 임베더가 KURE-v1 하나로 충분해 안 쓴다.
+
+    [2026-10-03 뒤집음] llm(Qwen3-14B)은 이제 싣는다 — 종전엔 선언만 있고 실물이 없던
+    항목(models/Qwen-Qwen3-14B/)이었는데, 고객사 로컬 LLM 서버용 가중치 원본으로
+    HF 캐시 레이아웃에 실제로 담기로 했다(사용자 결정, 로컬 백엔드가 쓰는 모델이 하나뿐).
+    """
     from build_offline_bundle import ModelEntry
 
     comps = {"postgres": ComponentEntry("postgres:16", "16")}
@@ -107,8 +112,9 @@ def test_expected_files_do_not_declare_unshipped_models():
         ModelEntry("nlpai-lab/KURE-v1", None, None, "MIT", "embedding"),
     ]
     files = expected_files(comps, models)
-    assert not any("Qwen" in f or "bge-m3" in f for f in files)
+    assert not any("bge-m3" in f for f in files)
     assert "models/hf/hub/models--nlpai-lab--KURE-v1/" in files
+    assert "models/hf/hub/models--Qwen--Qwen3-14B/" in files
 
 
 def test_image_tar_plan_merges_services_sharing_an_image():

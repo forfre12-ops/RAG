@@ -61,6 +61,11 @@ def container_scripts(path: Path | None = None) -> list[str]:
     return _files("container.scripts", "allow", path)
 
 
+def container_ops_scripts(path: Path | None = None) -> list[str]:
+    """ops 이미지(Dockerfile.ops, 수동 실행 전용)에 싣는 scripts/ 파일."""
+    return _files("container.ops_scripts", "allow", path)
+
+
 def container_scripts_not_in_image(path: Path | None = None) -> dict[str, str]:
     """문서·코드가 언급하지만 이미지에는 넣지 않는 스크립트 → 이유."""
     return dict(load(path)["container"]["scripts"]["not_in_image"])

@@ -1,0 +1,81 @@
+# 운영/점검 도구 이미지 — 수시 기동이 아니라 운영자가 수동으로 돌리는 전용 이미지.
+# 목적: calibrate_classifier·DR·golden 평가·검수 계정 발급 같은 도구를 koipa-api/
+# koipa-worker(상시 기동, 요청을 처리) 와 분리해 공격면·이미지 용량을 줄인다
+# (2026-10-03, 제3자 검토서 지적 — 이 분리 전에는 운영 도구가 전부 api 이미지에 같이 실렸다).
+#
+# 빌드:
+#   docker build -f Dockerfile.ops -t koipa-ops:prod .
+# 실행 (예):
+#   docker compose --profile tools run --rm ops python3 scripts/dr_drill.py --help
+#
+# [재현성] Dockerfile.api.prod 와 같은 base digest — 반입본과 재빌드본의 동일성을 보증한다.
+FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS base
+
+ARG KOIPA_BUILD_SHA=unknown
+ARG KOIPA_BUILD_AT=unknown
+ENV KOIPA_BUILD_SHA=${KOIPA_BUILD_SHA} \
+    KOIPA_BUILD_AT=${KOIPA_BUILD_AT}
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential libpq-dev curl libfreetype6 libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+COPY src ./src
+# BEGIN deploy_manifest:container_ops_scripts — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
+# 이미지에는 정본(deploy_manifest.toml)의 container.ops_scripts.allow 만 싣는다.
+COPY scripts/_cli_io.py \
+     scripts/assign_golden_reviewers_randomly.py \
+     scripts/backup_postgres.py \
+     scripts/batch_issue_reviewer_tokens.py \
+     scripts/calibrate_classifier.py \
+     scripts/compare_proxy_models.py \
+     scripts/db_engine.py \
+     scripts/demo_e2e_8010.py \
+     scripts/demo_e2e_golden.py \
+     scripts/docker_install_locked.sh \
+     scripts/dr_discovery.py \
+     scripts/dr_drill.py \
+     scripts/dr_restore.py \
+     scripts/eval_p1_model_gold.py \
+     scripts/eval_real_public_fpr.py \
+     scripts/eval_seal.py \
+     scripts/evaluate_public_s3_challenge.py \
+     scripts/gate_p1_candidate.py \
+     scripts/import_review_corrections.py \
+     scripts/p5_e2e_smoke.py \
+     scripts/probe_ingest_capacity.py \
+     scripts/promote_golden_candidates.py \
+     scripts/register_deployed_model.py \
+     scripts/register_review_signoff_job.py \
+     scripts/set_reviewer_passwords.py \
+     scripts/setup_console_test_login.py \
+     scripts/verify_deploy_live.sh \
+     scripts/verify_infra.py \
+     ./scripts/
+# END deploy_manifest:container_ops_scripts
+# eval_seal.py·promote_golden_candidates.py 가 평가정답 오염차단 제외 목록을 읽는다
+# (console_signoff._EXCLUSIONS, 2026-09-24 발견 — api 이미지와 같은 이유로 필요).
+COPY evidence ./evidence
+
+# [용량] extras 는 api.prod 와 동일하게 전부 깐다 — 어떤 ops 도구가 어떤 extra 를 쓰는지
+# 개별 확인 안 함(calibrate_classifier.py 는 torch 필요, hwp 류는 안 쓸 수 있음) — 과소
+# 설치로 도구가 ImportError 로 죽는 쪽이 이미지 몇백MB 아끼는 것보다 나쁘다고 판단.
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
+RUN pip install --upgrade pip && \
+    TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh \
+        psh otel jwt hwp hwp-tables pdf-tables xls llm && \
+    pip install -U "wheel>=0.46.2" "jaraco.context>=6.1.0"
+
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
+
+RUN useradd -m -u 1000 koipa && mkdir -p /app/.storage /app/datasets && chown -R koipa:koipa /app
+USER koipa
+
+# 상시 기동 아님 — `docker compose run`/`docker run` 으로 매번 명령을 지정한다.
+CMD ["python3", "-c", "print('koipa-ops: docker run --rm koipa-ops python3 scripts/<tool>.py --help')"]

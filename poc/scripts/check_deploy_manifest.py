@@ -36,6 +36,8 @@ SKIP_SUFFIX = {".pyc", ".md", ".log", ".bak"}          # .dockerignore 가 거�
 DOCS_OPERATOR = ("INSTALL.md", "OPERATION.md", "TROUBLESHOOTING.md")
 BLOCK_BEGIN = "# BEGIN deploy_manifest:container_scripts"
 BLOCK_END = "# END deploy_manifest:container_scripts"
+OPS_BLOCK_BEGIN = "# BEGIN deploy_manifest:container_ops_scripts"
+OPS_BLOCK_END = "# END deploy_manifest:container_ops_scripts"
 IGNORE_BEGIN = "# BEGIN deploy_manifest:exclude_paths"
 IGNORE_END = "# END deploy_manifest:exclude_paths"
 
@@ -124,7 +126,8 @@ def derive_container_scripts(manifest: dict) -> dict[str, str]:
     for p in (POC / "alembic").rglob("*.py"):
         if "__pycache__" not in p.parts:
             roots[p.relative_to(POC).as_posix()] = _exec_text(p)
-    for name in ("Dockerfile.api.prod", "Dockerfile.worker", "docker-compose.airgap.yml", "docker-compose.gpu.yml"):
+    for name in ("Dockerfile.api.prod", "Dockerfile.worker", "Dockerfile.ops",
+                 "docker-compose.airgap.yml", "docker-compose.gpu.yml"):
         q = POC / name
         if q.exists():
             roots[name] = _exec_text(q)
@@ -162,12 +165,15 @@ def derive_container_scripts(manifest: dict) -> dict[str, str]:
 
 
 # ── Dockerfile / .dockerignore 블록 ──────────────────────────
-def _copy_block(scripts: list[str]) -> str:
-    lines = [BLOCK_BEGIN + " — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.",
-             "# 이미지에는 정본(deploy_manifest.toml)의 container.scripts.allow 만 싣는다."]
+def _copy_block(
+    scripts: list[str], *, begin: str = BLOCK_BEGIN, end: str = BLOCK_END,
+    manifest_key: str = "container.scripts.allow",
+) -> str:
+    lines = [begin + " — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.",
+             f"# 이미지에는 정본(deploy_manifest.toml)의 {manifest_key} 만 싣는다."]
     srcs = [f"scripts/{s}" for s in scripts]
     lines.append("COPY " + " \\\n     ".join(srcs) + " \\\n     ./scripts/")
-    lines.append(BLOCK_END)
+    lines.append(end)
     return "\n".join(lines) + "\n"
 
 
@@ -186,6 +192,10 @@ def _replace_block(text: str, begin: str, end: str, block: str) -> str | None:
 
 def _dockerfiles() -> list[Path]:
     return [POC / "Dockerfile.api.prod", POC / "Dockerfile.worker"]
+
+
+def _ops_dockerfiles() -> list[Path]:
+    return [POC / "Dockerfile.ops"]
 
 
 # ── 검사 ────────────────────────────────────────────────────
@@ -210,21 +220,31 @@ def check(manifest: dict) -> list[str]:
         if not (POC / "licenses" / lic).is_file():
             errs.append(f"라이선스 원본 없음: licenses/{lic}")
     allow = dm.container_scripts()
+    ops_allow = dm.container_ops_scripts()
     for s in allow:
         if not (SCRIPTS / s).is_file():
             errs.append(f"이미지 scripts 허용 목록에 있는데 원본이 없다: scripts/{s}")
+    for s in ops_allow:
+        if not (SCRIPTS / s).is_file():
+            errs.append(f"ops scripts 허용 목록에 있는데 원본이 없다: scripts/{s}")
     if len(allow) != len(set(allow)):
         errs.append("container.scripts.allow 에 중복이 있다")
     if allow != sorted(allow):
         errs.append("container.scripts.allow 가 정렬돼 있지 않다(diff 가독성)")
+    if len(ops_allow) != len(set(ops_allow)):
+        errs.append("container.ops_scripts.allow 에 중복이 있다")
+    if ops_allow != sorted(ops_allow):
+        errs.append("container.ops_scripts.allow 가 정렬돼 있지 않다(diff 가독성)")
     for s, why in dm.container_scripts_not_in_image().items():
-        if s in allow:
-            errs.append(f"not_in_image 인데 allow 에도 있다: {s} ({why})")
+        if s in allow or s in ops_allow:
+            errs.append(f"not_in_image 인데 allow/ops_allow 에도 있다: {s} ({why})")
 
-    # 2) 런타임 근거 폐포 == 허용 목록
+    # 2) 런타임 근거 폐포 == 허용 목록(두 이미지 합집합) — docker_install_locked.sh 처럼
+    #    두 쪽 다 쓰는 빌드 도구는 겹쳐도 된다, 안 겹쳐야 하는 건 아니다.
     derived = derive_container_scripts(manifest)
-    missing = sorted(set(derived) - set(allow))
-    extra = sorted(set(allow) - set(derived))
+    combined = set(allow) | set(ops_allow)
+    missing = sorted(set(derived) - combined)
+    extra = sorted(combined - set(derived))
     for s in missing:
         errs.append(f"근거가 있는데 이미지 목록에 없다(이미지에서 실행이 깨진다): scripts/{s} ← {derived[s]}")
     for s in extra:
@@ -241,6 +261,15 @@ def check(manifest: dict) -> list[str]:
             errs.append(f"{df.name}: COPY 블록이 정본과 다르다 — --write 로 다시 쓸 것")
         if re.search(r"^COPY\s+scripts\s+\./scripts", text, flags=re.M):
             errs.append(f"{df.name}: `COPY scripts ./scripts` 가 남아 있다(폴더째 실림)")
+    want_ops_copy = _copy_block(ops_allow, begin=OPS_BLOCK_BEGIN, end=OPS_BLOCK_END,
+                                 manifest_key="container.ops_scripts.allow")
+    for df in _ops_dockerfiles():
+        text = _read(df)
+        new = _replace_block(text, OPS_BLOCK_BEGIN, OPS_BLOCK_END, want_ops_copy)
+        if new is None:
+            errs.append(f"{df.name}: ops COPY 블록 표지({OPS_BLOCK_BEGIN})가 없다 — --write 로 만들 것")
+        elif new != text:
+            errs.append(f"{df.name}: ops COPY 블록이 정본과 다르다 — --write 로 다시 쓸 것")
     ign = POC / ".dockerignore"
     itext = _read(ign)
     inew = _replace_block(itext, IGNORE_BEGIN, IGNORE_END, _ignore_block(dm.container_excluded_paths()))
@@ -261,6 +290,16 @@ def write(manifest: dict) -> list[str]:
             new, n = re.subn(r"^COPY\s+scripts\s+\./scripts\s*\n", lambda _m: want_copy, text, count=1, flags=re.M)
             if n == 0:
                 raise SystemExit(f"{df.name}: `COPY scripts ./scripts` 도 표지도 없어 바꿀 자리를 못 찾았다")
+        if new != text:
+            df.write_text(new, encoding="utf-8", newline="\n")
+            changed.append(df.name)
+    want_ops_copy = _copy_block(dm.container_ops_scripts(), begin=OPS_BLOCK_BEGIN, end=OPS_BLOCK_END,
+                                 manifest_key="container.ops_scripts.allow")
+    for df in _ops_dockerfiles():
+        text = _read(df)
+        new = _replace_block(text, OPS_BLOCK_BEGIN, OPS_BLOCK_END, want_ops_copy)
+        if new is None:
+            raise SystemExit(f"{df.name}: ops COPY 블록 표지({OPS_BLOCK_BEGIN})가 없어 바꿀 자리를 못 찾았다")
         if new != text:
             df.write_text(new, encoding="utf-8", newline="\n")
             changed.append(df.name)

@@ -27,6 +27,15 @@ $COMPOSE down                          # 전체 정지 (named 볼륨은 보존)
 - **beat**: 정확히 1개만. 정기 자동화(§7)의 발행기 — 누락 시 drift·롤백·outbox·파티션·감사검증이 전부 정지.
 - 헬스: `curl -s http://localhost:8000/api/v1/healthz/ready`(의존성 실측, 503=미준비) · `/api/v1/healthz/deep`(파서·모델·임베더 프로브).
 
+**이 문서가 언급하는 `scripts/*.py` 운영 도구**(보정·DR·골든 평가·검수 계정 발급 등)는
+`api`/`worker` 이미지가 아니라 별도 `ops` 이미지에 있다(2026-10-03, 상시 기동 이미지의
+공격면·용량을 줄이려고 분리). 실행은 매번 명령을 지정한다:
+```bash
+$COMPOSE --profile tools run --rm ops python3 scripts/<스크립트>.py ...
+```
+(`analyze_golden_run.py`·`check_domain_leakage_gate.py` 둘은 예외 — 골든 빌드가 런타임에
+직접 불러 쓰는 라이브러리라 `api`/`worker`에 그대로 있다. 운영자가 직접 실행할 일은 없다.)
+
 ---
 
 ## 2. 분류 서빙 · 안전 게이트 상태 확인

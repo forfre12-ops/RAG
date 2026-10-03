@@ -37,3 +37,12 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
+  ops:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

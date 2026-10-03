@@ -194,6 +194,34 @@ services:
       retries: 3
       start_period: 120s
 
+  # 운영/점검 도구 — 상시 기동 아님, 매번 명령을 지정해 돌린다(2026-10-03, 분리 이유는
+  # Dockerfile.ops 주석 참조). 예: docker compose --profile tools run --rm ops python3 scripts/dr_drill.py --help
+  ops:
+    profiles: ["tools"]
+    image: koipa-ops:${IMAGE_TAG:-1.0.0-rc1}
+    env_file: .env
+    environment:
+      DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD}@postgres:5432/koipa
+      REDIS_URL: redis://redis:6379/0
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      POC_MODE: ${POC_MODE:-full}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nlpai-lab/KURE-v1}
+      CLASSIFIER_MODEL_DIR: ${CLASSIFIER_MODEL_DIR:-/models/classifier-trained}
+      HF_HOME: /models/hf
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+    volumes:
+      - ../models:/models:ro,z
+      - storagedata:/app/.storage
+      - golden_data:/app/datasets
+      - artifacts_out:/app/artifacts_out
+    depends_on:
+      - redis
+      - postgres
+    # GPU 예약 없음(기본 CPU) — calibrate_classifier.py 등이 GPU 가 필요하면 docker-compose.gpu.yml 오버레이로 얹는다.
+
   # mTLS 종료 (옵션): docker compose ... --profile mtls up -d nginx-mtls
   nginx-mtls:
     profiles: ["mtls"]

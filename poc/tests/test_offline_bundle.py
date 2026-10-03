@@ -674,8 +674,9 @@ def test_hygiene_clean_and_noop_when_absent(tmp_path: Path):
 # 폐쇄망은 enable_incremental_retrain=True 이고 증분 재학습은 매번 kf-deberta-base 에서
 # 풀 파인튜닝한다(warm-start 없음).
 #
-# ⚠ LLM(Qwen3-14B)은 대상이 아니다 — vLLM/Ollama 의 HTTP endpoint 로 서빙하지
-#   transformers 가 HF 캐시에서 로드하지 않는다.
+# [2026-10-03 뒤집음] LLM(Qwen3-14B)도 대상이다 — api/worker 자신은 transformers 로
+#   로드하지 않지만(vLLM/Ollama 의 HTTP endpoint 로 서빙), 이 번들이 그 서버를 띄우지
+#   않으므로 고객사가 별도로 세울 로컬 LLM 서버용 가중치 원본으로 동봉한다.
 
 def _models_for_cache_test():
     return [
@@ -693,7 +694,8 @@ def test_classifier_base_model_is_staged_into_hf_cache(tmp_path, monkeypatch):
     import build_offline_bundle as B
 
     fake_hub = tmp_path / "hostcache" / "hub"
-    for name in ("models--nlpai-lab--KURE-v1", "models--kakaobank--kf-deberta-base"):
+    for name in ("models--nlpai-lab--KURE-v1", "models--kakaobank--kf-deberta-base",
+                 "models--Qwen--Qwen3-14B"):
         d = fake_hub / name
         d.mkdir(parents=True)
         (d / "config.json").write_text("{}", encoding="utf-8")
@@ -711,8 +713,13 @@ def test_classifier_base_model_is_staged_into_hf_cache(tmp_path, monkeypatch):
     assert (hub / "models--nlpai-lab--KURE-v1").is_dir(), "임베더가 안 담겼다"
 
 
-def test_llm_is_not_staged_into_hf_cache(tmp_path, monkeypatch):
-    """LLM 은 HF 캐시로 담지 않는다 — endpoint 로 서빙하지 로컬 로드가 아니다(28GB 낭비)."""
+def test_llm_is_staged_into_hf_cache(tmp_path, monkeypatch):
+    """[2026-10-03 뒤집음] LLM(Qwen3-14B)도 HF 캐시 레이아웃으로 담긴다.
+
+    api/worker 프로세스 자신은 안 쓴다(HTTP endpoint 로 서빙) — 그러나 이 번들이
+    vLLM/Ollama 서비스를 따로 띄우지 않으므로, 고객사가 세우는 로컬 LLM 서버에 넣을
+    가중치 원본을 여기 실어 보낸다(사용자 결정, 로컬 백엔드가 쓰는 모델이 이거 하나뿐).
+    """
     import build_offline_bundle as B
 
     fake_hub = tmp_path / "hostcache" / "hub"
@@ -724,9 +731,9 @@ def test_llm_is_not_staged_into_hf_cache(tmp_path, monkeypatch):
 
     out = tmp_path / "bundle"
     out.mkdir()
-    B._copy_embedder_cache(_Man(), out, allow_download=False)
+    assert B._copy_embedder_cache(_Man(), out, allow_download=False) is True
     hub = out / "models" / "hf" / "hub"
-    assert not (hub / "models--Qwen--Qwen3-14B").exists(), "LLM 이 HF 캐시로 담겼다"
+    assert (hub / "models--Qwen--Qwen3-14B").is_dir(), "LLM 이 HF 캐시로 안 담겼다"
 
 
 def test_missing_base_model_is_reported_as_error(tmp_path, monkeypatch, capsys):
