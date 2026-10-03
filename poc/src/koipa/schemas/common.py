@@ -194,11 +194,6 @@ class FactorRegistry:
         return dict(cls._cache)
 
     @classmethod
-    def get_codes(cls) -> list[str]:
-        """활성 평가요소 코드 목록 반환."""
-        return list(cls.get_field_map())
-
-    @classmethod
     def invalidate(cls) -> None:
         """캐시 무효화 — schema PUT 후 호출해 다음 조회 시 재로드."""
         cls._cache = None

@@ -65,32 +65,6 @@ def _skip_optional_db_load() -> bool:
         return False
 
 
-def get_factor_codes() -> list[str]:
-    """FactorRegistry에서 현재 활성 평가요소 코드 목록 반환.
-
-    DB에 커스텀 factor가 있으면 그것을, 없으면 FACTOR_SEEDS 기반 기본값 반환.
-    """
-    try:
-        from koipa.schemas.common import FactorRegistry  # noqa: PLC0415
-        return FactorRegistry.get_codes()
-    except Exception as _exc:  # noqa: BLE001
-        logger.warning("요소 코드를 레지스트리에서 못 읽음 - 내장 FACTOR_SEEDS 로 폴백 (%s: %s)", type(_exc).__name__, _exc)
-        return [f["code"] for f in FACTOR_SEEDS]
-
-
-def get_grade_order() -> dict[str, int]:
-    """GradeRegistry에서 현재 활성 등급의 우선순위 매핑 반환.
-
-    DB에 커스텀 등급이 있으면 그것을, 없으면 GRADE_ORDER 상수를 반환.
-    FNR-safe 로직(더 높은 등급 우선 선택)에서 사용.
-    """
-    try:
-        from koipa.schemas.common import GradeRegistry  # noqa: PLC0415
-        return GradeRegistry.get_order()
-    except Exception as _exc:  # noqa: BLE001
-        logger.warning("등급 순서를 레지스트리에서 못 읽음 - 내장 GRADE_ORDER 로 폴백 (%s: %s)", type(_exc).__name__, _exc)
-        return GRADE_ORDER
-
 
 def load_seeds_from_db() -> list[dict] | None:
     """DB level_keywords + evaluation_factors 테이블에서 KEYWORD_SEEDS 형식으로 로드.
