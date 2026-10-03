@@ -14,15 +14,17 @@ import re
 from uuid import UUID
 
 from fastapi import (
-    APIRouter, Cookie, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile,
+    APIRouter, Cookie, Depends, File, Form, Header, HTTPException, Query, Request, Response, UploadFile,
 )
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
-from koipa.api._jwt_auth import require_auth
+from koipa.api._jwt_auth import SigningUnavailable, require_auth, sign_jwt
 from koipa.api._rbac import require_role
 from koipa.api.confirm import bind_authenticated_actor, resolve_actor_user_id
+from koipa.api.rate_limit import limiter
 from koipa.config import settings
 from koipa.golden_tiers import human_reviewer_rejection_reason
+from koipa.services import reviewer_credentials
 from koipa.services.job_store import get_default_store
 from koipa.schemas.golden import (
     GoldenAssignmentRequest,
@@ -44,6 +46,9 @@ from koipa.schemas.golden import (
     GoldenSignoffRequest,
     GoldenSignoffPreflightResponse,
     GoldenSignoffResponse,
+    GoldenCategoryStatsResponse,
+    ReviewExportRequest,
+    ReviewerLoginRequest,
 )
 from koipa.services.golden_build_service import (
     GoldenBuildService,
@@ -358,6 +363,7 @@ def proxy_gold_candidate_list(
     status: str | None = None, grade: str | None = None,
     origin: str | None = None, query: str | None = None,
     review_batch: str | None = None,
+    department: str | None = None, info_type: str | None = None,
     limit: int | None = Query(default=None, ge=1, le=2000),
     offset: int = Query(default=0, ge=0),
     auth: dict = Depends(require_auth),
@@ -389,6 +395,7 @@ def proxy_gold_candidate_list(
     with _access_errors():
         return scope.shape_list(svc.list_candidates(
             status=status, grade=grade, origin=origin, query=query, review_batch=review_batch,
+            department=department, info_type=info_type,
             visible_doc_ids=scope.visible_doc_ids(svc), view=scope.candidate_view(svc),
             query_match=scope.query_match(), limit=limit, offset=offset), svc)
 
@@ -405,6 +412,67 @@ def proxy_gold_candidate_summary(auth: dict = Depends(require_auth)) -> dict:
     with _access_errors():
         return scope.shape_summary(svc.summary(
             visible_doc_ids=scope.visible_doc_ids(svc), view=scope.candidate_view(svc)))
+
+
+@router.get(
+    "/golden/candidates/category-stats",
+    response_model=GoldenCategoryStatsResponse,
+    dependencies=[Depends(require_role("admin", "kl_backend", "system"))],
+    summary="부서×정보유형×등급별 생성 건수(관리자 전용)",
+)
+def proxy_gold_candidate_category_stats(review_batch: str | None = None) -> dict:
+    """admin.html "데이터 생성 현황" — 검수자 배정·블라인드와 무관하게 늘 전체를 본다
+    (admin_only 라우트라 scope 를 거치지 않는다 — _scope 를 안 쓰는 다른 ADMIN_ONLY 라우트와 같다)."""
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        return svc.category_stats(review_batch=review_batch)
+
+
+@router.post(
+    "/golden/candidates/export",
+    dependencies=[Depends(require_role("admin", "kl_backend", "system"))],
+    summary="검수 결과 엑셀 내보내기(관리자 전용)",
+)
+def proxy_gold_candidate_export(body: ReviewExportRequest) -> Response:
+    """선택한 문서(doc_ids) 또는 필터로 좁힌 전체를 .xlsx 로 내린다.
+
+    관리자 전용(ADMIN_ONLY) — 검수자 배정·블라인드를 거치지 않는다(관리자는 원래 전체를
+    본다). "의견"은 별도 입력칸을 새로 만들지 않고 결정에 딸린 사유(reason)를 그대로 쓴다
+    (2026-10-02 사용자 결정 — 등급을 매길 때 이미 사유를 적게 돼 있어 입력은 이미 돼 있다).
+    """
+    import io  # noqa: PLC0415
+
+    from openpyxl import Workbook  # noqa: PLC0415
+
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        rows = svc.export_rows(
+            doc_ids=body.doc_ids, status=body.status, grade=body.grade, origin=body.origin,
+            review_batch=body.review_batch, department=body.department, info_type=body.info_type,
+        )
+
+    headers = ["doc_id", "department", "info_type", "status", "proposed_grade",
+               "final_grade", "reviewer", "reason", "decided_at"]
+    header_labels = ["문서ID", "부서", "정보유형", "상태", "제안등급",
+                      "확정등급", "검수자", "사유/의견", "결정시각"]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "검수결과"
+    ws.append(header_labels)
+    for row in rows:
+        ws.append([row.get(h, "") for h in headers])
+    for i, label in enumerate(header_labels, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = max(12, len(label) + 4)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"golden_review_export_{len(rows)}.xlsx"
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get(
@@ -1291,23 +1359,42 @@ def _render_console_login_html() -> str:
         "h1{font-size:40px;line-height:1.1;letter-spacing:-2px;margin:14px 0 10px}"
         "h1 em{font-style:normal;color:var(--red)}p{line-height:1.7;color:#535960}"
         "textarea{width:100%;height:150px;border:1px solid #cfd0ce;padding:13px;font:13px monospace;"
-        "word-break:break-all}button{margin-top:18px;width:100%;border:0;background:#111;color:#fff;"
+        "word-break:break-all}"
+        "input[type=text],input[type=password]{width:100%;border:1px solid #cfd0ce;padding:13px;"
+        "font:15px inherit;margin-top:10px}"
+        "button{margin-top:18px;width:100%;border:0;background:#111;color:#fff;"
         "padding:15px;font-weight:800;font-size:15px;cursor:pointer}"
         ".msg{margin-top:16px;padding:14px;background:#fff0f1;color:#a31429;display:none}"
         ".note{border-left:4px solid var(--red);padding:16px 20px;background:#fafafa;margin:24px 0}"
+        ".divider{display:flex;align-items:center;gap:14px;margin:40px 0 24px;color:var(--mute);font-size:13px}"
+        ".divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--line)}"
         + HEADER_CSS + NAV_CSS +
         "</style><body>"
         # 로그인 화면은 아직 쿠키가 없다 - 메뉴를 눌러도 401 이 정상이다.
         # 그래도 '어떤 화면들이 있는지' 를 보여주는 것이 주소를 외우게 하는 것보다 낫다.
         + header_html("검증문서 검수 로그인", exclude=REVIEW_SCREEN_EXCLUDE)
         + '<main class="wrap"><div class="eyebrow">CONSOLE ACCESS</div>'
-        "<h1>발급받은 <em>토큰</em>으로<br>로그인합니다.</h1>"
-        "<p>발급받은 접속 토큰을 붙여넣으십시오. 토큰은 이 브라우저에만 저장되며 주소창에 남지 않습니다.</p>"
-        '<div class="note">누가 등급을 정했는지 기록에 남기기 위해 공유 API 키로는 열 수 없습니다. '
-        "토큰의 계정 이름이 검수 이력에 그대로 기록됩니다.</div>"
+        "<h1>아이디와 <em>비밀번호</em>로<br>로그인합니다.</h1>"
+        "<p>발급받은 아이디와 비밀번호를 입력하십시오. 이 브라우저에만 로그인 상태가 저장됩니다.</p>"
+        '<div class="note">누가 등급을 정했는지 기록에 남기기 위해 공유 계정으로는 열 수 없습니다. '
+        "로그인한 아이디가 검수 이력에 그대로 기록됩니다.</div>"
+        '<input id="u" type="text" placeholder="아이디" autocomplete="username" autofocus>'
+        '<input id="p" type="password" placeholder="비밀번호" autocomplete="current-password">'
+        '<button id="goPw">로그인</button><div class="msg" id="mPw"></div>'
+        '<div class="divider">또는 발급받은 접속 토큰으로</div>'
         + _login_prefill_block()
-        + '<button id="go">로그인</button><div class="msg" id="m"></div></main><script>'
+        + '<button id="go">토큰으로 로그인</button><div class="msg" id="m"></div></main><script>'
         "var $=function(x){return document.getElementById(x)};"
+        "async function loginWithPassword(u,p){"
+        "var r=await fetch('/api/v1/golden/candidates/login',{method:'POST',credentials:'same-origin',"
+        "headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});"
+        "if(!r.ok){$('mPw').style.display='block';"
+        "$('mPw').textContent=(r.status===404)"
+        "?'이 서버는 아이디+비밀번호 로그인이 켜져 있지 않습니다. 아래 토큰으로 로그인하십시오.'"
+        ":'로그인 실패. 아이디 또는 비밀번호를 확인하십시오.';return false}"
+        "location.href=dest();return true}"
+        "$('goPw').onclick=function(){loginWithPassword($('u').value.trim(),$('p').value)};"
+        "$('p').addEventListener('keydown',function(e){if(e.key==='Enter')$('goPw').click()});"
         # [2026-08-20] 쿠키를 **토큰 만료까지** 살린다.
         # 종전에는 Max-Age 가 없어 세션 쿠키였다 — 브라우저를 닫으면 로그인이 풀려서
         # 검수자가 매번 다시 붙여넣어야 했다. 토큰 payload 의 exp 를 읽어 그 시각까지
@@ -1350,6 +1437,38 @@ def _render_console_login_html() -> str:
 def proxy_gold_console_login_html() -> HTMLResponse:
     """콘솔 진입 화면 — 무인증. 데이터는 없고 토큰을 쿠키로 심기만 한다."""
     return HTMLResponse(content=_render_console_login_html())
+
+
+# 세션 쿠키 수명 — 서버가 직접 서명하는 토큰(아이디+비밀번호 로그인)의 만료.
+# CLI 로 발급하는 토큰(scripts/setup_console_test_login.py 기본 30일)과 성격이 달라 따로 둔다.
+_PASSWORD_LOGIN_TTL_SECONDS = 60 * 86400
+
+
+@html_router.post("/golden/candidates/login", summary="검수자 아이디+비밀번호 로그인")
+@limiter.limit("10/minute")
+def proxy_gold_console_password_login(request: Request, body: ReviewerLoginRequest) -> Response:
+    """비밀번호를 확인하고, 맞으면 서버가 직접 세션 토큰을 서명해 쿠키로 심는다.
+
+    실패해도 계정 존재 여부를 구분해 알려주지 않는다(둘 다 같은 401) — 계정 목록을 긁어내는
+    통로가 되면 안 된다. settings.console_jwt_private_key_path 가 없으면 이 기능 자체가
+    꺼져 있다는 뜻으로 404(기존 "토큰 붙여넣기" 로그인만 켜진 배포에서는 이 경로가 아예 없다).
+    """
+    roles = reviewer_credentials.verify_password(body.username, body.password)
+    if roles is None:
+        raise HTTPException(status_code=401, detail="invalid username or password")
+    try:
+        token = sign_jwt(sub=body.username, roles=roles, ttl_seconds=_PASSWORD_LOGIN_TTL_SECONDS)
+    except SigningUnavailable as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"password login is not configured on this server: {e}",
+        ) from e
+    resp = JSONResponse({"ok": True, "username": body.username, "roles": list(roles)})
+    resp.set_cookie(
+        "koipa_access_token", token, max_age=_PASSWORD_LOGIN_TTL_SECONDS,
+        path="/", samesite="lax",
+    )
+    return resp
 
 
 _CONSOLE_ADMIN_ROLES = frozenset({"admin", "kl_backend"})

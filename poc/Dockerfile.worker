@@ -50,6 +50,7 @@ COPY scripts/_cli_io.py \
      scripts/promote_golden_candidates.py \
      scripts/register_deployed_model.py \
      scripts/register_review_signoff_job.py \
+     scripts/set_reviewer_passwords.py \
      scripts/setup_console_test_login.py \
      scripts/verify_deploy_live.sh \
      scripts/verify_infra.py \

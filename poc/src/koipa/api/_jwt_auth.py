@@ -93,6 +93,51 @@ def _b64url_decode(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + pad)
 
 
+def _b64u(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+class SigningUnavailable(Exception):
+    """settings.console_jwt_private_key_path 가 비었거나 못 읽는다 — 아이디+비밀번호 로그인은
+    이 경우 켜지지 않는다(기존 "토큰 붙여넣기" 경로만 동작, 비파괴)."""
+
+
+def sign_jwt(*, sub: str, roles: tuple[str, ...], ttl_seconds: int) -> str:
+    """서버가 직접 RS256 세션 토큰을 서명한다 — 아이디+비밀번호 로그인 전용.
+
+    settings.console_jwt_private_key_path 의 개인키로 서명하고, kid 는
+    settings.console_jwt_kid(검증용 jwks.json 과 맞아야 verify_jwt 가 찾는다). iss/aud 는
+    settings.jwt_issuer/jwt_audience 를 그대로 싣는다 — verify_jwt 의 검증 조건과 동일해야
+    서버가 스스로 발급한 토큰을 스스로 거부하는 사고가 안 난다.
+    """
+    key_path = getattr(settings, "console_jwt_private_key_path", "")
+    if not key_path:
+        raise SigningUnavailable("console_jwt_private_key_path not configured")
+    try:
+        from cryptography.hazmat.primitives import hashes, serialization  # noqa: PLC0415
+        from cryptography.hazmat.primitives.asymmetric import padding  # noqa: PLC0415
+
+        with open(key_path, "rb") as f:
+            key = serialization.load_pem_private_key(f.read(), password=None)
+    except Exception as e:  # noqa: BLE001
+        raise SigningUnavailable(f"failed to load signing key: {e}") from e
+
+    now = int(time.time())
+    header = {"alg": "RS256", "typ": "JWT", "kid": getattr(settings, "console_jwt_kid", "")}
+    payload = {
+        "sub": sub,
+        "roles": list(roles),
+        "iss": getattr(settings, "jwt_issuer", "") or "",
+        "aud": getattr(settings, "jwt_audience", "") or "",
+        "iat": now,
+        "exp": now + int(ttl_seconds),
+    }
+    signing_input = f"{_b64u(json.dumps(header, separators=(',', ':')).encode())}." \
+                    f"{_b64u(json.dumps(payload, separators=(',', ':')).encode())}".encode()
+    sig = key.sign(signing_input, padding.PKCS1v15(), hashes.SHA256())
+    return f"{signing_input.decode()}.{_b64u(sig)}"
+
+
 def _load_jwks() -> dict:
     """JWKS 캐시 — settings.jwt_jwks_path 또는 inline jwt_public_key."""
     path = getattr(settings, "jwt_jwks_path", "")

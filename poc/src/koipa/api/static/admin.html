@@ -340,7 +340,7 @@ details.adv[open]{padding-bottom:12px;}
    nav-right·nav-badge 전부 마크업 0건). .brand/.brand-mark/.health-pill/.dot 은
    지금 상단이 쓰므로 남긴다. */
 /* console-header:css:start — koipa/console_nav.py HEADER_CSS. 손으로 고치지 말 것 */
-.top{height:84px;border-bottom:1px solid #e1e1de;display:flex;align-items:center;padding:0 34px;gap:18px;background:#fff;position:sticky;top:0;z-index:50}.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}.top .mark img{width:100%;height:100%;object-fit:contain}.top .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:#111;display:inline;text-decoration:none;white-space:nowrap}.top .divider{height:23px;border-left:1px solid #cfcfcb}.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#71717a;white-space:nowrap}.top .spacer{flex:1}.top .topmid{margin:0}@media(max-width:900px){.top{padding:0 16px;gap:10px}.top .brand,.top .divider{display:none}}@media(max-width:640px){.top .product{display:none}}@media print{.top{display:none}}
+.top{height:84px;border-bottom:1px solid #e1e1de;display:flex;align-items:center;padding:0 34px;gap:18px;background:#fff;position:sticky;top:0;z-index:50}.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}.top .mark img{width:100%;height:100%;object-fit:contain}.top .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:#111;display:inline;text-decoration:none;white-space:nowrap}.top .divider{height:23px;border-left:1px solid #cfcfcb}.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#71717a;white-space:nowrap}.top .spacer{flex:1}.top .topmid{margin:0}.top .logout-link{font-size:12.5px;color:#71717a;text-decoration:none;white-space:nowrap;border:1px solid #dededb;padding:6px 12px;border-radius:4px}.top .logout-link:hover{color:#111;border-color:#111}@media(max-width:900px){.top{padding:0 16px;gap:10px}.top .brand,.top .divider{display:none}}@media(max-width:640px){.top .product{display:none}}@media print{.top{display:none}}
 .cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#71717a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
 /* console-header:css:end */
 </style>
@@ -353,7 +353,7 @@ details.adv[open]{padding-bottom:12px;}
 
 <!-- console-header:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 (scripts/sync_console_header.py) -->
 <!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 -->
-<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><div class="cnav"><span class="cnav-link is-current" aria-current="page">관리자 콘솔</span><a class="cnav-link" href="/console/index.html#sec-parse">업로드·분류 테스트</a></div><span class="spacer"></span><span id="health" class="health-pill" title="서버 연결 상태"><span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span></span></header>
+<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><div class="cnav"><span class="cnav-link is-current" aria-current="page">관리자 콘솔</span><a class="cnav-link" href="/console/index.html#sec-parse">업로드·분류 테스트</a></div><span class="spacer"></span><span id="health" class="health-pill" title="서버 연결 상태"><span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span></span><a href="#" class="logout-link" onclick="document.cookie='koipa_access_token=; path=/; Max-Age=0; SameSite=Lax';location.href='/api/v1/golden/candidates/login.html';return false">로그아웃</a></header>
 <!-- console-header:end -->
 
 <div class="wrap">
@@ -499,30 +499,62 @@ details.adv[open]{padding-bottom:12px;}
          시험해 보는 용도는 /console/index.html(내부 테스트 페이지, 등급 시연에서 재정의)로 옮겼다.
          「검수 화면」이 이 콘솔에 없는 이유가 이것이다 — 남는 검수는 아래 골든셋(검증문서) 검수뿐이다. -->
 
-    <!-- ===== G3. 골든셋 현황 ===== 서명 결과가 "얼마나 찼는지"를 루프 B 안에서 보여준다.
-         같은 수치가 [관제] 탭 대시보드에도 '배포 readiness'라는 이름으로 있었지만, 골든 검수를
-         하는 사람이 자기 작업의 현황으로 알아보기 어려웠다(다른 탭 · 다른 이름). 엔드포인트는
-         동일하다 — GET /admin/locked-readiness. -->
+    <!-- [2026-10-03 사용자 결정] G3 "검증문서 현황 — 구성·서명" 카드의 지표(서명 확정/목표 5 등)를
+         뺐다 — 그 숫자로 관리자가 할 수 있는 다른 행동이 없다는 판단. 자동배포를 막는 안전장치
+         (golden_tiers.eval_readiness·deploy_gate_min_locked_per_grade)는 코드에 그대로 남아
+         있다. 같은 수치는 [관제] 탭 대시보드의 '배포 준비 상태' 패널에도 있다(그 패널은 실제
+         배포 판단에 쓰여 남긴다) — GET /admin/locked-readiness.
+         ⚠ 링크 하나는 그대로 둔다 — [console_nav.py](CONSOLE_LINKS 주석)가 "후보 관리 화면
+         진입은 이 카드의 버튼이 맡는다"고 명시한 **유일한 진입로**였다(상단 공용 메뉴에는
+         의도적으로 안 둠 — 로그인이 필요한 업무 화면이라 층위가 다름). 지표 없이 링크만 남긴다. -->
     <section class="card col-span" data-pane="review" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">조회</span> 검증문서 현황 — 구성 · 서명 <span class="reqtag" data-tech>FUN-024</span></div>
-        <span class="ep" data-tech>GET /golden/summary · /admin/locked-readiness</span>
+        <div class="ttl"><span class="step-no aux">이동</span> 검증문서 후보 관리</div>
       </div>
       <div class="card-body">
-        <div class="btn-row" style="margin:0 0 10px;">
-          <button class="btn sec sm" onclick="loadGoldenStatus()">현황 조회</button>
-        </div>
-        <!-- 후보 관리·실문서 인테이크 — 별도 화면이라 URL 을 아는 사람만 들어갈 수 있었다.
-             콘솔 어디에도 링크가 없어 "그 화면이 있다는 사실" 자체가 화면에 없었다.
-             두 화면은 포털 JWT 쿠키를 요구하므로 로그인 화면을 거쳐 들어간다
-             (토큰을 URL 에 싣지 않는 설계 — 액세스로그·브라우저 히스토리 잔존 방지). -->
-        <div class="btn-row" style="margin:0 0 10px;flex-wrap:wrap;">
-          
+        <div class="btn-row" style="margin:0;flex-wrap:wrap;">
           <a class="btn sec sm" href="../api/v1/golden/candidates/login.html" target="_blank" rel="noopener">후보 관리 화면 열기 ↗</a>
         </div>
-        <div id="gs-body"><span style="color:var(--text-dim);font-size:12px;">「현황 조회」를 누르면 현재 상태가 나옵니다</span></div>
-        <p class="sec-note" style="margin-top:8px;">읽기 전용 · 서명 화면에서 <b>라이브 반영</b>을 켜야 확정 수치가 오릅니다.</p>
-        </p>
+      </div>
+    </section>
+
+    <!-- ===== 데이터 생성 현황 — 부서·정보유형별 (이상민, 영업비밀보호센터 주임, 요청 #1·#2·#4
+         2026-10-02 — 가이드별 생성 건수 통계 + 카테고리별 분류조회 + 선택 엑셀 내보내기) ===== -->
+    <section class="card col-span" data-pane="review" style="order:2">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no aux">조회</span> 데이터 생성 현황 — 부서 · 정보유형별</div>
+        <span class="ep" data-tech>GET /golden/candidates/category-stats · /golden/candidates · POST /golden/candidates/export</span>
+      </div>
+      <div class="card-body">
+        <div class="row3" style="margin:0 0 10px;align-items:flex-end;">
+          <div class="field">
+            <!-- [2026-10-02] 옛 배치(1,711건, "보류")는 부서·정보유형 메타데이터가 아예 없어
+                 전체로 보면 63%가 "미분류"로 뭉쳐 보인다("카테고리 분류가 안 된 것처럼" 보이는
+                 원인이었다, 사용자 실측). 기본값을 지금 활성 배치로 좁힌다 — 전체를 보려면
+                 명시적으로 "모든 배치"를 고른다. -->
+            <label class="fld">검수 배치</label>
+            <select id="cat-batch"><option value="expert_review_mock1000_20261002" selected>guide40 모의문서 1,001건(현재 검수 대상)</option><option value="">모든 배치(옛 배치 포함 — 분류 없는 문서가 많이 섞입니다)</option></select>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn sec sm" onclick="loadCategoryStats()">생성 현황 조회</button>
+          </div>
+        </div>
+        <div id="cat-stats-body"><span style="color:var(--text-dim);font-size:12px;">「생성 현황 조회」를 누르면 부서 × 정보유형 × 등급별 건수가 나옵니다.</span></div>
+        <div class="row3" style="margin-top:14px;">
+          <div class="field">
+            <label class="fld">부서</label>
+            <select id="cat-dept" onchange="updateInfoTypeOptions()"><option value="">먼저 위에서 현황을 조회하십시오</option></select>
+          </div>
+          <div class="field">
+            <label class="fld">정보유형</label>
+            <select id="cat-info"><option value="">전체</option></select>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn sec sm" onclick="loadCategoryBrowse()">이 조건으로 조회</button>
+          </div>
+        </div>
+        <div id="cat-browse-body" style="margin-top:10px"></div>
+        <p class="sec-note" style="margin-top:8px;">검수 결과(등급·검수자·사유)를 엑셀로 받습니다 — 체크한 문서가 있으면 그것만, 없으면 지금 조회된 목록 전체를 담습니다.</p>
       </div>
     </section>
 
@@ -1206,8 +1238,8 @@ function confirmSignoffDone(){
   // [2026-08-21] 'model' 은 2026-08-20 탭 개편으로 없어진 이름이다. showPane 가드에 걸려
   // 검수 탭으로 되돌아왔고, 재학습 카드는 끝까지 안 나왔다. 재학습은 '학습·배포' 탭에 있다.
   showPane('train');
-  // 서명 직후에는 "얼마나 찼는지"가 가장 궁금하다 — 현황을 자동으로 갱신해 준다.
-  if(typeof loadGoldenStatus==='function') loadGoldenStatus();
+  // [2026-10-03] "서명 직후 현황 자동 갱신" 호출을 뺐다 — 그 현황 카드(G3) 자체를
+  // 없앴다(사용자 결정, 위 admin.html 본문 주석 참고).
   // [2026-08-21] 'tr-kind' 는 저장소 어디에도 정의가 없어(이 줄이 유일한 참조) 항상
   // 폴백으로 떨어졌고, 그 폴백은 검수 탭의 카드라 학습·배포 탭에서는 보이지도 않았다.
   // 재학습 카드에 실재하는 id 로 바꾼다(admin.html:621 select#tr-preset).
@@ -1611,110 +1643,11 @@ async function loadAuditLog(){
 // 실적재 시연으로 쌓인 created_by=demo-console 문서·분류·RAG벡터만 스코프 물리삭제.
 // Safe Mode 가드 + 확인 팝업. 운영 데이터(다른 created_by)는 서버 스코프상 대상이 아님.
 
-/* ---- G3. 골든셋 현황 ----
- * GET /admin/locked-readiness — 사람이 서명해 확정된 평가정답이 등급별로 얼마나 찼는지.
- * 같은 수치가 [관제] 대시보드의 '배포 readiness' 패널에도 있지만, 골든 검수를 하는 사람이
- * 다른 탭의 다른 이름으로 자기 작업 현황을 찾기는 어렵다. 루프 B 안에서도 보이게 한다. */
-// tier 이름은 코드 값 그대로 두면 운영자가 못 읽는다 — 무엇에 쓰이는지로 옮긴다.
-const TIER_LABEL={
-  locked_gold_eval: ['평가 정답', '사람이 서명해 확정 — 학습에는 쓰지 않음'],
-  gold_candidate:   ['승격 대기', '자동 게이트 통과 · 사람 서명 대기'],
-  legal_floor:      ['법적 근거', '판례·고시 기반 — 회귀 차단용'],
-  silver_train:     ['학습 시드', '학습에만 사용 · 평가 금지'],
-  held_review:      ['보류', '서명이 요건을 못 갖춰 격리 — 평가·학습 모두 제외'],
-};
-const ORIGIN_LABEL={ public_real:'공개 실문서', customer_real:'고객사 실문서', synthetic:'합성', unknown:'미상' };
-
-async function loadGoldenStatus(){
-  const box=$('gs-body'); if(!box) return;
-  box.innerHTML='<span style="color:var(--text-dim);font-size:12px;">불러오는 중…</span>';
-  let corpus=null;
-  try{ corpus=await api('GET','/golden/summary'); }
-  catch(e){ corpus={__err:`${errKo(e)}`}; }
-  try{
-    const d=await api('GET','/admin/locked-readiness');
-    // ── 정본 구성 ────────────────────────────────────────────────────────────
-    let corpusHtml='';
-    if(corpus && !corpus.__err){
-      const tiers=Object.entries(corpus.by_tier||{}).sort((a,b)=>b[1]-a[1]);
-      const tot=corpus.total||0;
-      corpusHtml=`
-        <div class="dash-panel" style="margin-bottom:10px;">
-          <div class="dp-h"><span>정본 구성</span><span class="pill">${tot}건</span></div>
-          <div class="tbl-wrap"><table>
-            <thead><tr><th>단계</th><th>건수</th><th>비중</th><th>쓰임</th></tr></thead>
-            <tbody>${tiers.map(([k,v])=>{
-              const L=TIER_LABEL[k]||[k,''];
-              return `<tr><td><b>${esc(L[0])}</b></td><td class="mono">${v}</td>`
-                + `<td class="mono">${tot?((v/tot)*100).toFixed(1):0}%</td>`
-                + `<td style="color:var(--text-dim);font-size:11.5px;">${esc(L[1])}</td></tr>`;
-            }).join('')}</tbody>
-          </table></div>
-          <div class="dp-row" style="margin-top:8px;">
-            ${GRADES.map(g=>`<div><span>${g}</span> <b>${(corpus.by_grade||{})[g]??0}</b></div>`).join('')}
-          </div>
-          <div class="dp-row">
-            ${Object.entries(corpus.by_origin||{}).map(([k,v])=>
-              `<div><span>${esc(ORIGIN_LABEL[k]||k)}</span> <b>${v}</b></div>`).join('')}
-          </div>
-        </div>`;
-    }else if(corpus && corpus.__err){
-      corpusHtml=`<div class="warnbox" style="margin-bottom:10px;">정본 구성 조회 실패: ${esc(corpus.__err)}</div>`;
-    }
-    const min=d.min_per_grade ?? 0;
-    const pg=d.per_grade||{}, rp=d.real_per_grade||{}, sp=d.synthetic_per_grade||{};
-    const missing=d.missing||[];
-    // 등급별로 "확정 / 목표"와 남은 건수를 같이 보여준다 — 남은 것을 세는 게 이 카드의 목적이다.
-    const rows=GRADES.map(g=>{
-      const have=pg[g]??0, need=Math.max(0, min-have), ok=have>=min;
-      const compo=[];
-      if(rp[g]!=null) compo.push(`실문서 ${rp[g]}`);
-      if(sp[g]!=null) compo.push(`합성 ${sp[g]}`);
-      return `<tr>
-        <td>${gradeTag(g)}</td>
-        <td class="mono"><b>${have}</b> / ${min}</td>
-        <td>${ok?'<span class="pill ok">충족</span>':`<span class="pill warn">${need}건 남음</span>`}</td>
-        <td style="color:var(--text-dim);font-size:11.5px;">${compo.join(' · ')||'—'}</td>
-      </tr>`;
-    }).join('');
-    // ready 만 크게 보이면 "평가 준비 끝"으로 읽힌다. 실측 2026-08-09: TS 5건이 전부 합성인데
-    // ready=true 였다. 합성 본문에 서명이 붙어도 실세계 성능 근거가 되지 못하므로
-    // (자체 실측 합성학습→실문서 F1 0.26) 실문서가 0인 등급을 배지 옆에 함께 적는다.
-    /* [2026-08-25] 「서명 0건」과 「서명은 있는데 전부 합성」을 갈라 적는다.
-       종전에는 둘을 한 덩어리로 묶어, 서명이 아예 0건인 등급까지 "서명분이 전부
-       합성입니다"라고 적었다 — 실측 223: TS·S1·S2 가 0/0 인데 그 문장이 떴다.
-       **없는 서명을 합성이라고 말하는 것은 사실과 다르다.** 같은 결함을 2026-08-24 에
-       운영 대시보드 쪽(dpPanel '배포 준비 상태')에서 고쳤는데 이 카드가 안 따라왔다. */
-    const gradesWith = GRADES.filter(g => pg[g] != null);
-    const noSignGrades = gradesWith.filter(g => (pg[g]||0) === 0);
-    const realZeroGrades = gradesWith.filter(g => (pg[g]||0) > 0 && (rp[g]||0) === 0);
-    const badge = (d.ready
-      ? '<span class="pill ok">배포 가능</span>'
-      : '<span class="pill warn">미충족</span>')
-      + (realZeroGrades.length
-        ? `<span class="pill warn">${realZeroGrades.join(', ')} 실문서 0</span>` : '');
-    box.innerHTML=corpusHtml+`
-      <div class="dash-panel">
-        <div class="dp-h"><span>서명 확정 평가정답</span>${badge}</div>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>등급</th><th>확정 / 목표</th><th>남은 것</th><th>구성</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table></div>
-        <div class="dp-row" style="margin-top:8px;">
-          <div><span>실문서</span> <b>${d.real_total??0}</b></div>
-          <div><span>합성</span> <b>${d.synthetic_total??0}</b></div>
-          <div><span>배포 게이트</span> <b>${d.deploy_locked_gate_passed?'통과':'미통과'}</b></div>
-        </div>
-        ${missing.length?`<div class="dp-note">부족 등급: ${missing.join(', ')}</div>`:''}
-        ${noSignGrades.length?`<div class="dp-note">${noSignGrades.join(', ')} 는 서명이 0건입니다 — 아직 검수·서명하지 않았습니다.</div>`:''}
-        ${realZeroGrades.length?`<div class="dp-note" style="color:var(--red)">${realZeroGrades.join(', ')} 는 서명분이 전부 합성입니다. 합성 본문으로 잰 정확도는 실세계 성능이 아니므로, 수치를 인용할 때 실문서/합성 구성을 함께 밝히십시오.</div>`:''}
-        ${d.reason?`<div class="dp-note">사유: ${esc(d.reason)}</div>`:''}
-      </div>`;
-    log(`검증문서 현황: ready=${d.ready} · 부족 ${missing.join(',')||'없음'}`,'ok');
-  }catch(e){
-    box.innerHTML=`<div class="warnbox">현황 조회 실패: ${errKo(e)}</div>`;
-  }
-}
+// [2026-10-03 사용자 결정] G3 "골든셋 현황" 카드(정본 구성·서명 확정 평가정답 지표)를
+// 뺐다 — 그 숫자로 관리자가 할 수 있는 다른 행동이 없었다는 판단. 이 카드만 쓰던
+// TIER_LABEL·ORIGIN_LABEL·loadGoldenStatus()도 같이 지운다(다른 곳에서 안 씀,
+// grep 로 확인). 안전장치 자체(golden_tiers.eval_readiness)와 GET /golden/summary·
+// /admin/locked-readiness 엔드포인트는 그대로 둔다 — [관제] 탭 대시보드가 여전히 쓴다.
 
 /* ---- 5. METRICS ---- */
 async function loadMetrics(){
@@ -1901,11 +1834,19 @@ function renderDashboard(d){
 $('dash-grid').innerHTML = p1+p2+p3+p4;
 }
 async function loadDashboard(){
+  // [2026-10-03] 클릭과 결과 사이에 아무 표시가 없어 "늦게 나오는 것 같다"는 지적이 있었다 —
+  // 서버 자체는 빨라도(실측 수십 ms, 첫 호출만 수백 ms) 화면이 클릭을 확인해 주지 않으면
+  // 사람은 그 틈을 "느리다"로 느낀다. 버튼을 잠깐 잠그고 조회 중임을 바로 보인다.
+  const btn=document.querySelector('button[onclick="loadDashboard()"]');
+  if(btn){ btn.disabled=true; btn.dataset.label=btn.textContent; btn.textContent='조회 중…'; }
+  $('dash-grid').innerHTML='<div class="q-empty">조회 중…</div>';
   try{
     const d=await api('GET','/admin/dashboard');
     renderDashboard(d);
   }catch(e){
     $('dash-grid').innerHTML=`<div class="warnbox">관제 대시보드 조회 실패: ${errKo(e)}</div>`;
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent=btn.dataset.label; }
   }
 }
 
@@ -2222,6 +2163,69 @@ async function loadSynthCoverage(){
        <tr><th></th>${grades.map(g=>`<th style="padding:2px 8px">${g}</th>`).join('')}</tr>${rows}
      </table></div>
      <div class="sec-note" style="margin-top:8px;line-height:1.6">${esc(d.caveat||'')}<br/>이 표는 <b>학습셋</b>을 셉니다. 여기서 만든 문서는 검토 큐로 가고, 승인·학습셋 편입 뒤에야 이 수가 늘어납니다.</div>`;
+}
+
+/* ---- 데이터 생성 현황(부서·정보유형) — 이상민 요청 #1·#2·#4, 2026-10-02 ---- */
+let CAT_STATS=null, CAT_ROWS=[];
+async function loadCategoryStats(){
+  const box=$('cat-stats-body'); if(!box) return;
+  const batch=$('cat-batch').value;
+  const q=batch?('?review_batch='+encodeURIComponent(batch)):'';
+  let d;
+  try{ d=await api('GET','/golden/candidates/category-stats'+q); }
+  catch(e){ box.innerHTML=`<div class="hint">불러오지 못했습니다: ${errKo(e)}</div>`; return; }
+  if(!d||!Array.isArray(d.departments)){ box.innerHTML='<div class="hint">응답 형식이 올바르지 않습니다.</div>'; return; }
+  CAT_STATS=d;
+  const deptSel=$('cat-dept');
+  deptSel.innerHTML='<option value="">전체</option>'+d.departments.map(dep=>`<option value="${esc(dep)}">${esc(dep)}</option>`).join('');
+  updateInfoTypeOptions();
+  const rows=(d.rows||[]).map(r=>`<tr><td>${esc(r.department)}</td><td>${esc(r.info_type)}</td><td style="text-align:center">${esc(r.grade)}</td><td style="text-align:right">${r.count}</td></tr>`).join('');
+  const warn=!batch&&d.departments.includes('미분류')?'<div class="hint" style="color:#a31429">※ "모든 배치"를 골라 옛 배치(부서·정보유형 메타데이터 없음)가 "미분류"로 섞여 있습니다. 위에서 현재 배치만 고르면 사라집니다.</div>':'';
+  box.innerHTML = `<div class="hint" style="margin-bottom:4px">전체 ${d.total}건 · 부서 ${d.departments.length}개 · 정보유형 ${d.info_types.length}개</div>${warn}
+    <div style="overflow-x:auto;max-height:260px;overflow-y:auto"><table style="border-collapse:collapse;font-family:var(--font-mono);font-size:12px;width:100%">
+    <tr><th style="text-align:left">부서</th><th style="text-align:left">정보유형</th><th>등급</th><th style="text-align:right">건수</th></tr>${rows}</table></div>`;
+}
+function updateInfoTypeOptions(){
+  const dep=$('cat-dept').value, infoSel=$('cat-info');
+  if(!CAT_STATS){ infoSel.innerHTML='<option value="">전체</option>'; return; }
+  const types=[...new Set((CAT_STATS.rows||[]).filter(r=>!dep||r.department===dep).map(r=>r.info_type))].sort();
+  infoSel.innerHTML='<option value="">전체</option>'+types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+}
+async function loadCategoryBrowse(){
+  const box=$('cat-browse-body'); if(!box) return;
+  const dep=$('cat-dept').value, info=$('cat-info').value, batch=$('cat-batch').value;
+  const q=new URLSearchParams(); if(dep) q.set('department',dep); if(info) q.set('info_type',info); if(batch) q.set('review_batch',batch); q.set('limit','500');
+  let d;
+  try{ d=await api('GET','/golden/candidates?'+q.toString()); }
+  catch(e){ box.innerHTML=`<div class="hint">조회 실패: ${errKo(e)}</div>`; return; }
+  CAT_ROWS=d.candidates||[];
+  if(!CAT_ROWS.length){ box.innerHTML='<div class="hint">조건에 맞는 문서가 없습니다.</div>'; return; }
+  const rows=CAT_ROWS.map(c=>`<tr><td><input type="checkbox" class="cat-pick" value="${esc(c.doc_id)}"></td><td>${esc(c.doc_id)}</td><td>${esc(c.final_grade||c.proposed_grade||'–')}</td><td>${esc(c.status)}</td></tr>`).join('');
+  box.innerHTML = `<div class="btn-row" style="margin:0 0 8px;">
+      <button class="btn sec sm" onclick="exportCategorySelection()">엑셀로 내보내기</button>
+      <span style="font-size:12px;color:var(--text-dim);margin-left:8px;">${CAT_ROWS.length}건 조회됨 — 체크 없으면 전체, 체크하면 선택분만</span>
+    </div>
+    <div style="overflow-x:auto;max-height:320px;overflow-y:auto"><table style="border-collapse:collapse;font-size:12px;width:100%">
+    <tr><th></th><th style="text-align:left">문서ID</th><th>등급</th><th>상태</th></tr>${rows}</table></div>`;
+}
+async function exportCategorySelection(){
+  const picked=[...document.querySelectorAll('.cat-pick:checked')].map(x=>x.value);
+  const dep=$('cat-dept').value, info=$('cat-info').value, batch=$('cat-batch').value;
+  const body = picked.length ? {doc_ids:picked} : {department:dep||null, info_type:info||null, review_batch:batch||null};
+  const c=cfg();
+  let res;
+  try{
+    res=await fetch(c.base+'/golden/candidates/export', {
+      method:'POST', headers:{...authHeaders(c),'Content-Type':'application/json'},
+      body:JSON.stringify(body), credentials:'same-origin',
+    });
+  }catch(e){ alert('내보내기 실패: '+e.message); return; }
+  if(!res.ok){ alert('내보내기 실패('+res.status+')'); return; }
+  const blob=await res.blob();
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='golden_review_export.xlsx';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 async function loadSynthQueue(){

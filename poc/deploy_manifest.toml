@@ -50,6 +50,13 @@ files = [
 
 [bundle.review_batch]               # golden_review_batch/ — 선택은 빌더의 select_review_batch_files()
 patterns = ["*_review.md", "*.metadata.json"]
+# [2026-10-03 사용자 결정] 빈 문자열 = 배포본에 검수 후보를 아예 안 싣는다. 지재원 관리자가
+# 배포 뒤 「학습 후보 생성」(FUN-003, 클로드·GPT 연동)으로 직접 만들어 검수하는 운영 방식으로
+# 바뀌었다 — 우리가 미리 만든 모의문서(1,711건·mock1000 1,001건 전부)는 로컬 테스트
+# 용도로만 남기고 배포본에는 안 넣는다. 다시 특정 배치를 실으려면 그 review_batch 태그
+# 문자열을 여기 적는다(doc_id 접두사로 하드코딩했다가 조용히 0건을 실은 결함을 2026-10-03
+# 에 고쳤다 — 반드시 이 값을 거쳐서만 고를 것).
+batch = ""
 
 [bundle.models]
 # models/classifier-trained/ 는 디렉터리째 싣는다 — 모델 신원을 디렉터리 해시(tree_sha256)로 확인하므로
@@ -107,6 +114,7 @@ allow = [
   "promote_golden_candidates.py",     # 골든 API 가 가리킨다
   "register_deployed_model.py",       # setup.sh 6-2 · INSTALL.md
   "register_review_signoff_job.py",   # 골든 API 가 가리킨다
+  "set_reviewer_passwords.py",        # 아이디+비밀번호 로그인(POST /golden/candidates/login) 계정 발급
   "setup_console_test_login.py",      # setup.sh · INSTALL.md
   "verify_deploy_live.sh",            # OPERATION.md 배포 검증
   "verify_infra.py",                  # INSTALL.md · OPERATION.md 인프라 점검

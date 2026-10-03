@@ -519,6 +519,19 @@
     },
     "real_locked_eval": 0
   },
+  "GET /golden/candidates/category-stats": {
+    "total": 2,
+    "rows": [
+      {"department": "생산제조", "info_type": "생산기술 정보", "grade": "S1", "count": 1},
+      {"department": "경영", "info_type": "경영실적 정보", "grade": "S2", "count": 1}
+    ],
+    "departments": ["경영", "생산제조"],
+    "info_types": ["경영실적 정보", "생산기술 정보"]
+  },
+  "GET /regulations/runtime-toggle": {"enabled": false},
+  "PUT /regulations/runtime-toggle": {"enabled": true},
+  "GET /regulations/llm-select-toggle": {"enabled": false},
+  "PUT /regulations/llm-select-toggle": {"enabled": true},
   "GET /admin/locked-readiness": {
     "ready": false,
     "per_grade": {

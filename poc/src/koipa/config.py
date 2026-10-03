@@ -288,6 +288,14 @@ class Settings(BaseSettings):
     jwt_issuer: str = ""              # iss claim 검증값. 빈 문자열이면 검증 skip (개발용)
     jwt_audience: str = ""            # aud claim 검증값. 빈 문자열이면 검증 skip (개발용)
 
+    # [2026-10-02] 검수자 아이디+비밀번호 로그인 — 서버가 비밀번호를 확인한 뒤 **직접** 세션
+    # 토큰을 서명해 내준다(검수자가 토큰 문자열을 외우거나 복사할 필요 없음). 이 키가 있어야만
+    # 로그인 API 가 켜진다(없으면 404 — 기존 "토큰을 붙여넣는" 방식만 동작, 비파괴).
+    # 검증용 공개키(jwt_jwks_path)와 달리 이 키는 **서명용 개인키**라 서버 프로세스가 들고
+    # 있어야 하는 새로운 신뢰 경계다 — 폐쇄망 내부 검수 콘솔 전용으로만 쓴다.
+    console_jwt_private_key_path: str = ""
+    console_jwt_kid: str = "console-test-1"  # verify_jwt 가 jwks.json 에서 찾을 키 id. 발급 스크립트와 맞춰야 한다.
+
     # RBAC actor_role 소스 (보안: X-Actor-Role 헤더 위조 차단).
     # api_key 모드는 단일 공유키라 키 보유자=신뢰된 시스템 호출자. role은 서버가 고정.
     #   api_key_role: api_key 인증 성공 시 부여되는 역할 (require_role 검사 대상).

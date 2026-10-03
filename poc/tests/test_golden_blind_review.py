@@ -96,7 +96,8 @@ def test_blind_field_lists_are_locked_literally():
     assert access.BLIND_ALIASED_CANDIDATE_FIELDS == {"doc_id", "title"}
     assert access.BLIND_KEPT_CANDIDATE_FIELDS == {
         "document_origin", "requires_manual_audit", "review_batch", "claim_scope", "content_revision", "characters",
-        "document_sha256", "extraction", "provenance", "source_file_sha256", "is_actual_document", "text"}
+        "document_sha256", "extraction", "provenance", "source_file_sha256", "is_actual_document", "text",
+        "department", "info_type"}
     # 이벤트
     assert access.BLIND_HIDDEN_EVENT_FIELDS == {"proposed_grade", "management_before"}
     assert access.BLIND_REBUILT_EVENT_FIELDS == {"management_after"}

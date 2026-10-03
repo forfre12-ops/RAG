@@ -10,7 +10,7 @@ import { openPage } from '../lib/page.mjs';
 const CLICKS = [
   ['관제 종합', 'button[onclick="loadDashboard()"]', 'ops'],
   ['감사 로그', 'button[onclick="loadAuditLog()"]', 'ops'],
-  ['검증문서 현황', 'button[onclick="loadGoldenStatus()"]', 'review'],
+  // [2026-10-03] '검증문서 현황'(loadGoldenStatus/gs-body) 항목을 뺐다 — 그 카드를 없앴다.
   ['작업 목록', 'button[onclick="loadJobs()"]', 'train'],
   ['최신 메트릭', 'button[onclick="loadMetrics()"]', 'train'],
   ['등급체계 조회', 'button[onclick="loadGradeEditor()"]', 'config'],
@@ -47,7 +47,6 @@ export const scenarios = [
       const inCard = {
         '관제 종합': page.text('dash-grid'),
         '감사 로그': page.text('au-body'),
-        '검증문서 현황': page.text('gs-body'),
         '작업 목록': page.text('jobs-body'),
         '최신 메트릭': page.text('metrics-extra'),
         '등급체계 조회': page.text('grade-info'),

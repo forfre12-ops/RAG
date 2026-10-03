@@ -374,3 +374,44 @@ class GoldenAssignmentStatusResponse(BaseModel):
     enforcement: GoldenAssignmentEnforcement
     events: Optional[list[dict]] = None     # include_events=true 일 때만 있다
 
+
+class GoldenCategoryStatsRow(BaseModel):
+    department: str
+    info_type: str
+    grade: str
+    count: int
+
+
+class GoldenCategoryStatsResponse(BaseModel):
+    """GET /golden/candidates/category-stats — 부서×정보유형×등급별 건수(관리자 전용)."""
+
+    total: int
+    rows: list[GoldenCategoryStatsRow]
+    departments: list[str]
+    info_types: list[str]
+
+
+class ReviewExportRequest(BaseModel):
+    """검수 결과 엑셀 내보내기 (관리자 전용). doc_ids 를 주면 그 문서만(화면에서 체크박스로
+    고른 것), 비우면 아래 필터로 좁힌 전체를 낸다 — 둘 다 주면 doc_ids 가 우선한다."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    doc_ids: Optional[list[str]] = None
+    status: Optional[str] = None
+    grade: Optional[str] = None
+    origin: Optional[str] = None
+    review_batch: Optional[str] = None
+    department: Optional[str] = None
+    info_type: Optional[str] = None
+
+
+class ReviewerLoginRequest(BaseModel):
+    """검수자 아이디+비밀번호 로그인 (POST /golden/candidates/login). 무인증 라우터 — 이 요청
+    자체가 신원 증명이다. 성공하면 서버가 세션 토큰을 서명해 쿠키로 심는다(JWT를 몰라도 된다)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    username: str
+    password: str
+

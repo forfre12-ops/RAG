@@ -676,12 +676,15 @@ ROUTE_TABLE: dict[tuple[str, str], str] = {
     ("GET", "/golden/assignments"): ADMIN_ONLY,
     ("GET", "/golden/candidates"): REVIEWER_SCOPED,
     ("GET", "/golden/candidates/summary"): REVIEWER_SCOPED,
+    ("GET", "/golden/candidates/category-stats"): ADMIN_ONLY,
+    ("POST", "/golden/candidates/export"): ADMIN_ONLY,
     ("GET", "/golden/candidates/decisions"): REVIEWER_SCOPED,
     ("GET", "/golden/candidates/{doc_id}"): REVIEWER_SCOPED,
     ("POST", "/golden/candidates/{doc_id}/decision"): REVIEWER_SCOPED,
     ("GET", "/golden/candidates/manage.html"): REVIEWER_SCOPED,
     ("GET", "/golden/candidates/session"): NO_DATA,
     ("GET", "/golden/candidates/login.html"): NO_DATA,
+    ("POST", "/golden/candidates/login"): NO_DATA,  # 아이디+비밀번호 로그인 — 후보 데이터 없음
     ("GET", "/golden/jobs"): REVIEWER_CLOSED,
     ("GET", "/golden/jobs/{job_id}"): REVIEWER_CLOSED,
     ("GET", "/golden/summary"): REVIEWER_CLOSED,
@@ -725,6 +728,8 @@ def test_admin_only_routes_are_403_for_reviewers_under_every_flag_combination(h,
         ("POST", "/golden/assignments"): {"json": {}},
         ("POST", "/golden/assignments/revoke"): {"json": {}},
         ("GET", "/golden/assignments"): {},
+        ("GET", "/golden/candidates/category-stats"): {},
+        ("POST", "/golden/candidates/export"): {"json": {}},
     }
     assert {k for k, v in ROUTE_TABLE.items() if v == ADMIN_ONLY} == set(calls), "표와 호출 목록이 어긋났다"
     for (method, path), kw in calls.items():

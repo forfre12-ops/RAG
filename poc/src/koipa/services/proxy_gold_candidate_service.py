@@ -294,6 +294,7 @@ class ProxyGoldCandidateService:
         self, *, status: str | None = None, grade: str | None = None,
         origin: str | None = None, query: str | None = None,
         review_batch: str | None = None,
+        department: str | None = None, info_type: str | None = None,
         visible_doc_ids: AbstractSet[str] | None = None,
         view: CandidateView | None = None,
         query_match: QueryMatch | None = None,
@@ -330,6 +331,10 @@ class ProxyGoldCandidateService:
             candidates = [c for c in candidates if c["final_grade"] == grade or c["proposed_grade"] == grade]
         if origin:
             candidates = [c for c in candidates if c["document_origin"] == origin]
+        if department:
+            candidates = [c for c in candidates if c["department"] == department]
+        if info_type:
+            candidates = [c for c in candidates if c["info_type"] == info_type]
         # [검수 배치] 콘솔 전체가 306건인데 이번 검수 대상은 그중 120건이다. 표식이
         # 없으면 검수자가 어느 문서를 봐야 하는지 알 수 없다(실측 2026-08-14: 적재만
         # 해 놓고 배포했으면 검수자가 306건 앞에서 멈췄을 자리다).
@@ -429,6 +434,79 @@ class ProxyGoldCandidateService:
         out = self._summary(candidates)
         out["quality"] = self._quality_memo(candidates)
         return out
+
+    def category_stats(
+        self, *, review_batch: str | None = None,
+        visible_doc_ids: AbstractSet[str] | None = None, view: CandidateView | None = None,
+    ) -> dict[str, Any]:
+        """부서×정보유형×등급별 건수 — admin.html "데이터 생성 현황"이 쓴다.
+
+        department/info_type 이 없는 후보(보강 전 옛 적재분)는 "미분류"로 묶는다 — 조용히
+        빠뜨리면 "가이드별 합계"가 전체 후보 수보다 작아져 어디로 샜는지 알 수 없다.
+        """
+        candidates = self._candidates()
+        if review_batch:
+            candidates = [c for c in candidates if c.get("review_batch") == review_batch]
+        if visible_doc_ids is not None:
+            candidates = [c for c in candidates if c["doc_id"] in visible_doc_ids]
+        if view is not None:
+            candidates = view(candidates)
+
+        counts: dict[tuple[str, str, str], int] = {}
+        for c in candidates:
+            dept = c.get("department") or "미분류"
+            info = c.get("info_type") or "미분류"
+            grade = c.get("final_grade") or c.get("proposed_grade") or "미정"
+            key = (dept, info, grade)
+            counts[key] = counts.get(key, 0) + 1
+
+        rows = [
+            {"department": dept, "info_type": info, "grade": grade, "count": n}
+            for (dept, info, grade), n in sorted(counts.items())
+        ]
+        return {
+            "total": len(candidates),
+            "rows": rows,
+            "departments": sorted({r["department"] for r in rows}),
+            "info_types": sorted({r["info_type"] for r in rows}),
+        }
+
+    def export_rows(
+        self, *, doc_ids: list[str] | None = None,
+        status: str | None = None, grade: str | None = None, origin: str | None = None,
+        review_batch: str | None = None, department: str | None = None, info_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """엑셀 내보내기용 평평한 행 하나당 문서 하나. doc_ids 가 있으면(선택 내보내기) 그
+        문서들만, 없으면 필터로 좁힌 전체(필터 내보내기)를 쓴다 — 둘 중 하나다.
+
+        admin.html 에서만 쓴다(검수자 배정·블라인드를 거치지 않고 항상 전체 시야) — 관리자는
+        원래 제한이 없으므로 여기서 따로 좁힐 이유가 없다.
+        """
+        if doc_ids is not None:
+            wanted = set(doc_ids)
+            candidates = [c for c in self._candidates() if c["doc_id"] in wanted]
+        else:
+            listing = self.list_candidates(
+                status=status, grade=grade, origin=origin, review_batch=review_batch,
+                department=department, info_type=info_type, limit=None,
+            )
+            candidates = listing["candidates"]
+
+        rows: list[dict[str, Any]] = []
+        for c in candidates:
+            decision = c.get("latest_decision") or {}
+            rows.append({
+                "doc_id": c["doc_id"],
+                "department": c.get("department") or "",
+                "info_type": c.get("info_type") or "",
+                "status": c.get("status") or "",
+                "proposed_grade": c.get("proposed_grade") or "",
+                "final_grade": c.get("final_grade") or "",
+                "reviewer": decision.get("actor_id") or "",
+                "reason": decision.get("reason") or "",
+                "decided_at": decision.get("decided_at") or "",
+            })
+        return rows
 
     def review_batch_index(self) -> dict[str, str | None]:
         """doc_id → review_batch(표식 없으면 None). 본문·등급은 싣지 않는다.
@@ -1201,6 +1279,12 @@ class ProxyGoldCandidateService:
             "final_grade": None,                    # 결정 덮어쓰기에서 채운다(_load_candidates)
             "status": base_status,                  # 위와 같다
             "document_origin": document_origin,
+            # [2026-10-02] 부서·정보유형 — 가이드별 생성 현황·카테고리 조회(admin.html)가 쓴다.
+            # 원본 생성 manifest 에는 이미 분리된 필드로 있었는데 적재 스크립트가 표시용 문자열
+            # (document_type)에 뭉쳐 넣기만 하고 따로는 안 날랐다. 없는 후보(이 필드가 없던
+            # 적재분)는 None — 조회·통계에서는 "미분류"로 묶인다.
+            "department": str(meta.get("department") or "") or None,
+            "info_type": str(meta.get("info_type") or "") or None,
             "requires_manual_audit": bool(meta.get("requires_manual_audit")),
             # 검수 배치 표식. 전달본 단위로 묶어 목록을 좁힌다.
             "review_batch": str(meta.get("review_batch") or "") or None,

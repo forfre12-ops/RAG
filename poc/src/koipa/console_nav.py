@@ -142,6 +142,9 @@ HEADER_CSS = (
     # 마진은 남는 공간을 스페이서보다 **먼저** 먹어서, 그대로 두면 메뉴가 가운데로
     # 밀린다. 상단 안에서만 0 으로 되돌린다.
     ".top .topmid{margin:0}"
+    ".top .logout-link{font-size:12.5px;color:#71717a;text-decoration:none;white-space:nowrap;"
+    "border:1px solid #dededb;padding:6px 12px;border-radius:4px}"
+    ".top .logout-link:hover{color:#111;border-color:#111}"
     # 메뉴가 3→4 로 늘어 좁은 폭에서 기관명과 부딪힌다. 기관명·화면이름을 먼저 접는다 —
     # 메뉴는 마지막까지 남긴다(요구사항: 4개 메뉴가 최상단에 있어야 한다).
     # [2026-08-24] `.top .nav-link` 를 뺐다. 등급 시연 화면의 구역 이동 목차를 가리키던
@@ -188,6 +191,14 @@ def header_html(product: str, current: str = "", *, trailing: str = "",
         if (in_menu or not product)
         else f'<span class="divider"></span><span class="product">{_html.escape(product)}</span>'
     )
+    # [2026-10-02] 로그아웃 — 지금까지 다섯 화면 어디에도 없었다(쿠키를 지우는 유일한 통로가
+    # "로그인 실패 시 조용히 지움"뿐이었다). 쿠키만 지우고 로그인 화면으로 보낸다 — 서버에
+    # 상태를 안 두므로(토큰은 무상태) 지울 것은 이 쿠키 하나뿐이다.
+    logout = (
+        '<a href="#" class="logout-link" '
+        "onclick=\"document.cookie='koipa_access_token=; path=/; Max-Age=0; SameSite=Lax';"
+        "location.href='/api/v1/golden/candidates/login.html';return false\">로그아웃</a>"
+    )
     return (
         '<header class="top">'
         + mark
@@ -196,5 +207,6 @@ def header_html(product: str, current: str = "", *, trailing: str = "",
         + nav_bar_html(current, exclude=exclude)
         + '<span class="spacer"></span>'
         + trailing
+        + logout
         + "</header>"
     )
