@@ -970,7 +970,6 @@ echo "[acceptance] $_v: ${n} docs, ${fail} veto(고등급 미탐/파싱실패), 
 # "전달 패키지 1,731건 전부"가 아니라 품질 기준을 통과한 것만이다. 목록은 evidence/ 에 커밋돼 있고
 # `scripts/audit_golden_candidate_pool.py --write-exclusions` 가 쓴다. 파일이 없으면 아무것도 안 뺀다.
 _REVIEW_REQUEST_EXCLUSIONS = _REPO_ROOT / "evidence" / "review_request_exclusions.jsonl"
-_REVIEW_FILE_ID = re.compile(r"^(MD-\d+)")
 
 
 def load_review_request_exclusions(path: Path | None = None) -> set[str]:
@@ -992,13 +991,33 @@ def load_review_request_exclusions(path: Path | None = None) -> set[str]:
     return out
 
 
-def select_review_batch_files(src: Path, excluded: set[str]) -> list[Path]:
-    """검수 배치 파일(MD-#### 접두: 메타·본문 쌍) 중 요청에서 뺀 문서의 것을 제외하고 고른다."""
+def select_review_batch_files(src: Path, excluded: set[str], batch: str) -> list[Path]:
+    """`batch`로 태그된 후보(메타·본문 쌍)만 고른다, 요청에서 뺀 문서는 제외.
+
+    [2026-10-03 결함 발견·수정] 전에는 doc_id 가 "MD-" 로 시작하는 파일만 골랐다(1,711건
+    배치의 doc_id 체계). 그 뒤 새 배치(mock1000, doc_id "MK-")로 바뀌었는데 이 글자가
+    그대로 있어서 — 지금 배포본을 만들면 **아무 문서도 안 실린다**(실측: "MD-*" 글롭이
+    0건, 1,711건은 2026-10-03에 보관함으로 옮겨 이 폴더에 없다). doc_id 접두사가 아니라
+    각 문서의 metadata.json 안 `review_batch` 필드로 거른다 — 배치가 또 바뀌어도 이름
+    체계와 무관하게 동작한다. 어느 배치를 실을지는 deploy_manifest.toml 의
+    [bundle.review_batch].batch 가 정본이다(이 함수를 부르는 쪽이 그 값을 읽어 넘긴다).
+    """
     files = []
-    for f in sorted(src.glob("MD-*")):
-        m = _REVIEW_FILE_ID.match(f.name)
-        if m and m.group(1) not in excluded:
-            files.append(f)
+    for meta_path in sorted(src.glob("*.metadata.json")):
+        doc_id = meta_path.name[: -len(".metadata.json")]
+        if doc_id in excluded:
+            continue
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if meta.get("review_batch") != batch:
+            continue
+        body_path = src / f"{doc_id}_review.md"
+        if not body_path.is_file():
+            continue
+        files.append(meta_path)
+        files.append(body_path)
     return files
 
 
@@ -1340,45 +1359,64 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
             file=sys.stderr,
         )
 
-    # [2026-09-24] 전문가 검수 배치(1,731건)를 번들에 함께 싣는다. `.dockerignore` 가
-    # datasets/ 전체를 이미지 빌드에서 뺀다(민감물 유입·빌드 지연 방지, 의도된 설계) — 그 결과
-    # golden.py 라우터·블라인드 코드는 이미지에 실려도 **검수할 문서 자체는 안 실렸다**. 이대로
-    # 내보내면 지재원은 빈 검수 화면만 받는다(실측: 이 검사 전엔 build_offline_bundle.py 가
-    # proxy_gold 를 어디서도 참조하지 않았다). single_document_candidates/ 전체(93MB, 다른 배치의
-    # 공개 실문서 79건 포함)를 통째로 싣지 않고 **이 배치(MD-#### 접두, 3.9MB)만 필터링**한다 —
-    # 이번 인도 목적과 무관한 과거 후보 풀까지 내보내지 않기 위해서다.
-    # [2026-09-25] 그 배치 1,731건 중 품질 결함 20건(evidence/review_request_exclusions.jsonl)은 뺀다 → 1,711건.
+    # [2026-09-24] 검수 배치를 번들에 함께 싣는다. `.dockerignore` 가 datasets/ 전체를 이미지
+    # 빌드에서 뺀다(민감물 유입·빌드 지연 방지, 의도된 설계) — 그 결과 golden.py 라우터·블라인드
+    # 코드는 이미지에 실려도 **검수할 문서 자체는 안 실렸다**. 이대로 내보내면 지재원은 빈 검수
+    # 화면만 받는다. single_document_candidates/ 전체(다른 배치의 공개 실문서도 포함)를 통째로
+    # 싣지 않고 **지금 활성 배치만** 필터링한다 — 이번 인도 목적과 무관한 과거 후보 풀까지
+    # 내보내지 않기 위해서다.
+    # [2026-10-03 결함 수정] 어느 배치가 "지금 활성"인지를 doc_id 접두사(예전 "MD-*")로
+    # 하드코딩했었다 — 배치가 mock1000("MK-*")으로 바뀌자 조용히 0건을 실었을 것이다(실측).
+    # deploy_manifest.toml 의 [bundle.review_batch].batch 를 정본으로 읽는다 — 배치가 또
+    # 바뀌면 거기 한 곳만 고치면 된다.
+    #
+    # [2026-10-03 사용자 결정] 배포본엔 **검수 후보를 아예 안 싣는다** — 지재원 관리자가 배포
+    # 뒤 "학습 후보 생성"(FUN-003, 클로드·GPT 연동)으로 직접 만들어 검수하는 운영 방식으로
+    # 바뀌었다. 우리가 미리 만든 모의문서(1,711건·mock1000 1,001건 전부)는 **로컬 테스트
+    # 용도로만** 남기고 배포본에는 안 넣는다. 그래서 batch 값을 비워 둔다("") — 비어 있으면
+    # 의도적 제외이고, 값이 있는데 0건이면 그게 진짜 결함이라 둘을 구분해서 알린다.
     review_src = _REPO_ROOT / "datasets" / "proxy_gold" / "single_document_candidates"
-    review_batch_tag = "expert_review_1731_20260924"
-    review_excluded = load_review_request_exclusions()
-    review_files = select_review_batch_files(review_src, review_excluded) if review_src.exists() else []
-    if review_files:
-        import shutil as _sh_review  # noqa: PLC0415
-
-        review_dst = out_dir / "golden_review_batch"
-        review_dst.mkdir(parents=True, exist_ok=True)
-        for f in review_files:
-            _sh_review.copy2(f, review_dst / f.name)
-        n_docs = sum(1 for f in review_files if f.name.endswith("_review.md"))
-        size_mb = sum(f.stat().st_size for f in review_files) / (1024 * 1024)
+    review_batch_tag = str(_dm.load()["bundle"]["review_batch"]["batch"] or "").strip()
+    if not review_batch_tag:
         print(
-            f"  [golden] 전문가 검수 배치({review_batch_tag}, {n_docs}건 · {size_mb:.1f}MB, "
-            f"검수 요청에서 뺀 {len(review_excluded)}건 제외) → {review_dst}",
-            file=sys.stderr,
-        )
-        print(
-            "  [golden] 적재는 설치 후 별도 수행: "
-            "`cp -r golden_review_batch/* <배포경로>/datasets/proxy_gold/single_document_candidates/` "
-            "(단, 후보 폴더가 이미 있으면 병합이지 덮어쓰기가 아니어야 한다 — 기존 후보와 안 섞이게 "
-            "review_batch 메타데이터로 이미 구분됨)",
+            "  [golden] 검수 후보 미동봉(의도) — 지재원 관리자가 배포 뒤 「학습 후보 생성」으로 "
+            "직접 만들어 검수합니다. 로컬 테스트용 모의문서는 배포본에 안 싣습니다.",
             file=sys.stderr,
         )
     else:
-        print(
-            f"  [WARN] {review_src} 에 검수 배치 없음 — 전문가 검수 문서 미동봉. "
-            "`scripts/load_expert_review_1731_to_console.py` 로 먼저 적재하세요.",
-            file=sys.stderr,
+        review_excluded = load_review_request_exclusions()
+        review_files = (
+            select_review_batch_files(review_src, review_excluded, review_batch_tag)
+            if review_src.exists() else []
         )
+        if review_files:
+            import shutil as _sh_review  # noqa: PLC0415
+
+            review_dst = out_dir / "golden_review_batch"
+            review_dst.mkdir(parents=True, exist_ok=True)
+            for f in review_files:
+                _sh_review.copy2(f, review_dst / f.name)
+            n_docs = sum(1 for f in review_files if f.name.endswith("_review.md"))
+            size_mb = sum(f.stat().st_size for f in review_files) / (1024 * 1024)
+            print(
+                f"  [golden] 전문가 검수 배치({review_batch_tag}, {n_docs}건 · {size_mb:.1f}MB, "
+                f"검수 요청에서 뺀 {len(review_excluded)}건 제외) → {review_dst}",
+                file=sys.stderr,
+            )
+            print(
+                "  [golden] 적재는 설치 후 별도 수행: "
+                "`cp -r golden_review_batch/* <배포경로>/datasets/proxy_gold/single_document_candidates/` "
+                "(단, 후보 폴더가 이미 있으면 병합이지 덮어쓰기가 아니어야 한다 — 기존 후보와 안 섞이게 "
+                "review_batch 메타데이터로 이미 구분됨)",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"  [WARN] batch={review_batch_tag!r} 로 지정했는데 {review_src} 에 해당 문서가 "
+                "없다 — 설정은 실렸는데 실제 데이터가 없는 결함일 수 있다. "
+                "`scripts/load_mock1000_to_console.py` 등으로 먼저 적재하세요.",
+                file=sys.stderr,
+            )
 
 
 def _copy_observability(out_dir: Path) -> None:

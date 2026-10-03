@@ -52,6 +52,11 @@ datasets/gold_real/locked_gold_eval.jsonl.lock
 datasets/proxy_gold/aihub_runs/
 datasets/proxy_gold/aihub_receipts/
 datasets/proxy_gold/aihub_71813_extracted/
+# [2026-10-03] single_document_candidates/ 안의 검수 후보와 같은 성격의 데이터를 보관함으로
+# 옮긴 자리 — 옮겼다고 추적 대상이 되면 안 된다(원래도 반출 차단 대상이었다).
+datasets/proxy_gold/_archive_review_batches/
+# 검수자 아이디+비밀번호 저장소 — bcrypt 해시뿐이지만 로컬 운영 데이터라 커밋 대상 아님.
+datasets/proxy_gold/reviewer_credentials.json
 
 # 콘솔 테스트 로그인 키 — 배포본·리포에 넣지 않는다
 secrets/

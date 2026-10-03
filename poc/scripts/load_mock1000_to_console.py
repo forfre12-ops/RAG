@@ -68,6 +68,10 @@ def main() -> int:
             "intended_label": m["true_grade"],
             "document_origin": "synthetic",
             "document_type": f"모의문서({m['department']}/{m['info_type']}, {m['doc_format']})",
+            # [2026-10-02] 표시용 문자열(document_type) 말고 따로도 싣는다 — 카테고리별
+            # 조회·가이드별 생성 통계(admin.html)가 이 필드로 거르고 묶는다.
+            "department": m["department"],
+            "info_type": m["info_type"],
             "authoring_method": "mock1000_guide40_structure_20261002",
             "requires_manual_audit": True,
             "candidate_status": "proposed",
