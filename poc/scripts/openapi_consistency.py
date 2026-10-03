@@ -219,6 +219,13 @@ def diff(
     yaml_norm = {(m, _normalize_path(p)) for m, p in yaml_set}
     router_norm = {(m, _normalize_path(p)) for m, p in router_set}
 
+    # [2026-10-02] _ROUTER_IGNORE_EXACT(/dashboard/summary·/admin/demo/purge·/rag/search 등)는
+    # "외부 KL 계약 범위 밖"이라 router_set 수집 단계에서 이미 빠져 있다(_is_ignored, 위 ①에서
+    # router 측만 거름). 그런데 YAML(doc/03_openapi_koipa_kl.yaml)에는 그 경로가 여전히 적혀
+    # 있어서 "YAML에만 있음(미구현)"으로 항상 오탐했다 — 실제로는 라우터에 있는데 비교 대상에서
+    # 한쪽만 뺀 비대칭이 원인이다. YAML 쪽도 같은 기준으로 걸러 대칭을 맞춘다.
+    yaml_norm = {(m, p) for m, p in yaml_norm if not _is_ignored(p)}
+
     # profile-conditional 제외 (예: training 라우터)
     if skip_yaml_prefixes:
         yaml_norm = {
@@ -262,9 +269,11 @@ def main() -> int:
         from koipa.config import settings as _s  # noqa: PLC0415
         _training_enabled = getattr(_s, "enable_training", False)
         _regulation_enabled = getattr(_s, "regulation_reference_enabled", False)
+        _synth_enabled = getattr(_s, "enable_synthetic_generation", False)
     except Exception:  # noqa: BLE001
         _training_enabled = False
         _regulation_enabled = False
+        _synth_enabled = False
 
     skip_prefixes: tuple[str, ...] = ()
     if not _training_enabled:
@@ -275,6 +284,12 @@ def main() -> int:
     if not _regulation_enabled:
         skip_prefixes += (f"{server_prefix}/regulations", f"{server_prefix}/documents/{{doc_id}}/regulation-evidence")
         print("  ℹ 규정 참고 표시 라우터 비활성 (regulation_reference_enabled=False) — 규정 YAML 경로 제외")
+    # [2026-10-02] synth 라우터도 같은 profile-conditional 패턴이다(app.py: enable_synthetic_
+    # generation=False면 synthesis_api.router 자체가 include_router 안 됨) — training·regulation
+    # 둘만 예외 처리돼 있어서 synth 5경로가 --strict에서 항상 drift로 잡혔다.
+    if not _synth_enabled:
+        skip_prefixes += (f"{server_prefix}/synth",)
+        print("  ℹ 합성문서 라우터 비활성 (enable_synthetic_generation=False) — /synth/* YAML 경로 제외")
 
     result = diff(yaml_paths, router_paths, skip_yaml_prefixes=skip_prefixes)
 

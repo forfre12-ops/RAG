@@ -685,7 +685,11 @@ class ClassifyService:
             # [agreement-gate] 등급차등 + 룰·모델 합의 게이트 (opt-in, 기본 off).
             # conf 단독 자동확정은 신뢰성이 측정으로 부정됨(golden500: AUROC 0.58, 자동확정
             # 정밀도 63%, 고등급 미탐 46). 확신을 conf가 아니라 *독립 신호(룰 합의)*에서 얻는다:
-            #   · 예측이 공개등급(S3): conf만으로 자동확정 허용(S3 conf 정밀도 94%, 과소분류 불가)
+            # [2026-10-02 주석 정정] "과소분류 불가"는 틀린 서술이었다 — S3 예측이 실제로
+            # 더 높은 등급을 깎아내리는 과소분류는 측정상 6%(정밀도 94%)로 **존재한다.**
+            # 다만 그 비율이 낮아 conf 단독 자동확정의 감내 가능한 위험으로 받아들인 것이다.
+            #   · 예측이 공개등급(S3): conf만으로 자동확정 허용(S3 conf 정밀도 94% — 과소분류가
+            #     드물다는 실측이지 "불가능"하다는 뜻이 아니다)
             #   · 예측이 그 외(TS/S1/S2): 룰엔진과 등급이 합의해야 자동확정, 불일치면 검수
             # 측정(golden500): 자동확정 정밀도 63→81%, 고등급 미탐 46→8. 등급은 무인으로 바꾸지
             # 않고 검수 라우팅만 한다. 룰 산출 실패는 silent 폴백(게이트가 죽어도 분류는 진행).
@@ -895,7 +899,10 @@ class ClassifyService:
             model_label = getattr(pred, "label", pred)
             model_code = model_label.value if hasattr(model_label, "value") else str(model_label)
             if model_code == public_code:
-                return None  # 공개등급: conf 단독으로 신뢰(과소분류 위험 없는 최하등급)
+                # [2026-10-02 주석 정정] "위험 없는 최하등급"도 틀렸다 — 최하등급이라 더 못
+                # 내려갈 뿐, 과소분류(진짜 등급을 깎아내리는 것) 자체는 측정상 6%로 있다.
+                # 위 agreement-gate 주석(S3 conf 정밀도 94%)과 같은 실측을 근거로 감내한다.
+                return None  # 공개등급: conf 단독으로 신뢰(과소분류가 드물다는 실측 근거, 0은 아님)
             # run()이 노출한 원시 룰등급/근거여부 재사용 — 없으면 폴백 재계산(룰엔진 1회).
             rule_g = getattr(pred, "rule_grade", None)
             has_evidence = getattr(pred, "rule_has_evidence", None)

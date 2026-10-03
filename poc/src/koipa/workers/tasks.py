@@ -1186,16 +1186,36 @@ def active_learning_tick(mode: str = "auto") -> dict:
             logger.exception("train_classifier_task enqueue failed")
             payload["triggered"] = "ENQUEUE_FAILED"
     elif status.retrain_status == "RETRAIN_RECOMMENDED":
-        now = datetime.utcnow()
+        from datetime import timedelta  # noqa: PLC0415
+
+        # [2026-10-02] 종전엔 datetime.utcnow()로 판정해, beat tz(Asia/Seoul)·주석이 말하는
+        # "03~05시 KST"가 실제로는 UTC 03~05시(=KST 12~14시, 점심시간)에 발동했다. 한국은
+        # DST가 없어 고정 +9시간 변환이 정확하다(zoneinfo 불필요).
+        now_kst = datetime.utcnow() + timedelta(hours=9)
         # 월요일 03~05시 범위에만 weekly 트리거 (beat tz 한국 기준)
-        if now.weekday() == 0 and 3 <= now.hour < 5:
-            logger.info("weekly RETRAIN_RECOMMENDED triggered: %s", status.reason)
-            try:
-                train_classifier_task.apply_async(kwargs={"spec_kwargs": None})
-                payload["triggered"] = "RETRAIN_RECOMMENDED"
-            except Exception:  # noqa: BLE001
-                logger.exception("train_classifier_task enqueue failed")
-                payload["triggered"] = "ENQUEUE_FAILED"
+        if now_kst.weekday() == 0 and 3 <= now_kst.hour < 5:
+            # [2026-10-02] 이 창(2시간) 안에서 beat가 30분마다(최대 4회) 이 분기를 다시 타는데
+            # 잠금이 없어 train_classifier_task가 같은 주에 최대 4번 중복 큐잉될 수 있었다.
+            # idempotency 저장소(redis SETNX+TTL, 멀티워커 안전)를 주 단위 키로 재사용해
+            # 그 주의 첫 성공한 틱만 enqueue하게 막는다 — enqueue 실패 시엔 다음 틱이
+            # 재시도할 수 있게 잠금을 풀어준다.
+            from koipa.services.idempotency import get_idempotency_store  # noqa: PLC0415
+
+            iso_year, iso_week, _ = now_kst.isocalendar()
+            lock_key = f"weekly-retrain-{iso_year}-W{iso_week:02d}"
+            store = get_idempotency_store()
+            if not store.acquire(lock_key):
+                payload["triggered"] = "SKIP_ALREADY_TRIGGERED_THIS_WEEK"
+            else:
+                logger.info("weekly RETRAIN_RECOMMENDED triggered: %s", status.reason)
+                try:
+                    train_classifier_task.apply_async(kwargs={"spec_kwargs": None})
+                    payload["triggered"] = "RETRAIN_RECOMMENDED"
+                    store.store(lock_key, (200, b"{}", "application/json"))
+                except Exception:  # noqa: BLE001
+                    logger.exception("train_classifier_task enqueue failed")
+                    payload["triggered"] = "ENQUEUE_FAILED"
+                    store.release(lock_key)
         else:
             payload["triggered"] = "SKIP_WAIT_WEEKLY_WINDOW"
     else:

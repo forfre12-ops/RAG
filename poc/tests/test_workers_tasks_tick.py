@@ -81,12 +81,13 @@ def test_tick_auto_urgent_enqueue_failure_marked():
 
 
 def test_tick_auto_recommended_outside_window_skips():
-    """RECOMMENDED 상태 + 월요일 03~05시 아닌 시각 → SKIP_WAIT_WEEKLY_WINDOW.
+    """RECOMMENDED 상태 + 월요일 03~05시(KST) 아닌 시각 → SKIP_WAIT_WEEKLY_WINDOW.
 
     tasks.active_learning_tick은 함수 안에서 from datetime import datetime을 호출하므로
-    datetime.datetime 자체를 패치한다.
+    datetime.datetime 자체를 패치한다. utcnow()는 내부에서 +9시간(KST) 변환되므로
+    여기서 주는 값은 **UTC** 시각이다.
     """
-    fixed = datetime(2026, 6, 2, 14, 0, 0)  # 화요일 14시 (weekday=1)
+    fixed = datetime(2026, 6, 2, 14, 0, 0)  # 화요일 14시 UTC → 화요일 23시 KST(weekday=1)
 
     class FakeDateTime:
         @classmethod
@@ -104,9 +105,17 @@ def test_tick_auto_recommended_outside_window_skips():
 
 
 def test_tick_auto_recommended_inside_window_enqueues():
-    """월요일 04시 → enqueue."""
-    fixed = datetime(2026, 6, 1, 4, 0, 0)  # 2026-06-01 = 월요일
-    assert fixed.weekday() == 0
+    """월요일 04시 KST(=일요일 19시 UTC) → enqueue, 그 주 잠금을 남긴다.
+
+    weekly-retrain 잠금은 실제 redis(이 개발 PC에 떠 있음)를 쓴다 — 매번 같은 ISO
+    week 키를 테스트하면 24h TTL이 안 지난 재실행에서 이전 실행이 남긴 키와 충돌한다.
+    그래서 get_idempotency_store를 세션 전체에 격리된 새 in-memory store로 바꿔
+    production 코드(redis 우선)는 그대로 두고 테스트만 결정적으로 만든다.
+    """
+    from koipa.services.idempotency import _MemoryStore
+
+    fixed = datetime(2026, 5, 31, 19, 0, 0)  # 일요일 19시 UTC = 월요일 04시 KST
+    assert (fixed.weekday(), fixed.hour) == (6, 19)  # 전제 확인 — 일요일 19시
 
     class FakeDateTime:
         @classmethod
@@ -115,11 +124,68 @@ def test_tick_auto_recommended_inside_window_enqueues():
 
     import datetime as _dt
     with patch.object(_dt, "datetime", FakeDateTime):
-        with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
-                   return_value=_status(retrain="RETRAIN_RECOMMENDED", total=60)):
-            with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
-                out = active_learning_tick(mode="auto")
+        with patch("koipa.services.idempotency.get_idempotency_store", return_value=_MemoryStore()):
+            with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+                       return_value=_status(retrain="RETRAIN_RECOMMENDED", total=60)):
+                with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
+                    out = active_learning_tick(mode="auto")
     assert out["triggered"] == "RETRAIN_RECOMMENDED"
+    assert enq.call_count == 1
+
+
+def test_tick_auto_recommended_second_tick_same_week_does_not_requeue():
+    """같은 주간 창(30분 틱 반복) 안에서 두 번째 호출은 재큐잉하지 않는다.
+
+    [2026-10-02] 수정 전엔 이 잠금이 없어 2시간 창 안에서 beat가 30분마다 다시 타
+    train_classifier_task가 최대 4번 중복 큐잉될 수 있었다.
+    """
+    from koipa.services.idempotency import _MemoryStore
+
+    fixed = datetime(2026, 5, 31, 19, 0, 0)  # 월요일 04시 KST
+    store = _MemoryStore()  # 두 틱이 같은 store 인스턴스를 봐야 잠금이 의미가 있다
+
+    class FakeDateTime:
+        @classmethod
+        def utcnow(cls):
+            return fixed
+
+    import datetime as _dt
+    with patch.object(_dt, "datetime", FakeDateTime):
+        with patch("koipa.services.idempotency.get_idempotency_store", return_value=store):
+            with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+                       return_value=_status(retrain="RETRAIN_RECOMMENDED", total=60)):
+                with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
+                    first = active_learning_tick(mode="auto")
+                    second = active_learning_tick(mode="auto")  # 30분 뒤 다음 틱 재현
+    assert first["triggered"] == "RETRAIN_RECOMMENDED"
+    assert second["triggered"] == "SKIP_ALREADY_TRIGGERED_THIS_WEEK"
+    assert enq.call_count == 1
+
+
+def test_tick_auto_recommended_enqueue_failure_releases_lock_for_retry():
+    """enqueue 실패는 잠금을 풀어 다음 틱이 재시도할 수 있게 한다."""
+    from koipa.services.idempotency import _MemoryStore
+
+    fixed = datetime(2026, 5, 31, 19, 0, 0)  # 월요일 04시 KST
+    store = _MemoryStore()
+
+    class FakeDateTime:
+        @classmethod
+        def utcnow(cls):
+            return fixed
+
+    import datetime as _dt
+    with patch.object(_dt, "datetime", FakeDateTime):
+        with patch("koipa.services.idempotency.get_idempotency_store", return_value=store):
+            with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+                       return_value=_status(retrain="RETRAIN_RECOMMENDED", total=60)):
+                with patch("koipa.workers.tasks.train_classifier_task.apply_async",
+                           side_effect=RuntimeError("broker down")):
+                    failed = active_learning_tick(mode="auto")
+                with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
+                    retried = active_learning_tick(mode="auto")
+    assert failed["triggered"] == "ENQUEUE_FAILED"
+    assert retried["triggered"] == "RETRAIN_RECOMMENDED"
     assert enq.call_count == 1
 
 
