@@ -36,6 +36,15 @@ def _pg_ok() -> bool:
 _PG = _pg_ok()
 
 
+@pytest.fixture(autouse=True)
+def _unset_audit_disabled(monkeypatch):
+    """[2026-10-03] conftest가 2026-10-02부터 AUDIT_DISABLED=1을 기본값으로 둔다(다른
+    테스트들의 불필요한 DB connect를 막기 위함). 본 모듈은 audit_log 기록 자체를
+    검증하므로 test_audit_chain_wiring.py와 동일하게 이 기본값을 풀어준다.
+    """
+    monkeypatch.delenv("AUDIT_DISABLED", raising=False)
+
+
 # ============================================================
 # PG 가용 여부와 무관: 응답이 정상이어야 함 (best-effort)
 # ============================================================

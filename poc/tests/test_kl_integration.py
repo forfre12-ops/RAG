@@ -283,6 +283,15 @@ class TestS8MetricsViews:
 # ============================================================
 
 class TestCrossCutting:
+    @pytest.fixture(autouse=True)
+    def _unset_audit_disabled(self, monkeypatch):
+        """[2026-10-03] conftest가 2026-10-02부터 AUDIT_DISABLED=1을 기본값으로 둔다.
+        audit_log 기록을 직접 검증하는 이 클래스만 풀어준다(파일 전체에 걸면 audit와
+        무관한 다른 클래스들까지 매 요청 DB connect를 다시 시도하게 됨 — conftest가
+        막으려던 바로 그 회귀).
+        """
+        monkeypatch.delenv("AUDIT_DISABLED", raising=False)
+
     @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_kl_scenarios_recorded_in_audit_log(self):
         """KL 시나리오 호출 시 audit_log에 actor_role=kl_backend로 기록되는지."""

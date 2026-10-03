@@ -18,7 +18,7 @@ from koipa.customer_guide_reference import POLICY_SHA256, validate_reference
 from koipa.policy_facts import require, text_digest, value_digest
 
 SCHEMA = "customer-identifier-revision-lineage-v1"
-PARENT_MANIFEST_SHA256 = "7e8ea7552e272f5391f1d95113176f955f8828352d38f45cfc24b979eb3c8f95"
+PARENT_MANIFEST_SHA256 = "fbcc96d012a3b87f4bd3fd6ba6fea9f62ef1d9c7f5e39b5a416fec7e91285a19"
 PRIOR_LEDGER_SHA256 = "c92734b6b67154546581d1425351ed587f4506d6ca23cb966b69b09f2b9a9241"
 LINEAGE_KEYS = set(FLAGS) | set(FAMILIES) | {
     "parent_doc_id", "child_doc_id", "parent_input_sha256", "child_input_sha256",

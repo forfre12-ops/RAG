@@ -137,7 +137,7 @@ run "worker 이미지 빌드" docker build -f Dockerfile.worker \
 run "worker 이미지 import 스모크" docker run --rm koipa-gate-worker:check \
     python -c "import koipa.workers.tasks; print('koipa.workers.tasks import OK')"
 
-run "인수 샘플팩 채점" "$PY" scripts/run_acceptance.py --mode inproc --require-model
+run "인수 샘플팩 채점" env CLASSIFIER_MODEL_DIR="$DEPLOYED_MODEL" "$PY" scripts/run_acceptance.py --mode inproc --require-model
 
 run "readiness 리포트" "$PY" scripts/build_operational_readiness.py \
     --model-dir "$P1_MODEL" --deployed-model "$DEPLOYED_MODEL" --out reports/operational_readiness.md

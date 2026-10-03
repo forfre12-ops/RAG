@@ -140,7 +140,7 @@ def main():
     tracked += [Path(__file__).resolve(), POC / "scripts/measure_serving_records.py"]
     tracked += sorted((POC / "src/koipa").rglob("*.py"))
     hashes_before = {str(p): sha(p) for p in tracked}
-    if hashes_before[str(SOURCE / "manifest.json")] != "7e8ea7552e272f5391f1d95113176f955f8828352d38f45cfc24b979eb3c8f95":
+    if hashes_before[str(SOURCE / "manifest.json")] != "fbcc96d012a3b87f4bd3fd6ba6fea9f62ef1d9c7f5e39b5a416fec7e91285a19":
         raise RuntimeError("Original260 source manifest changed")
     docs = validate_documents(read_rows(SOURCE / "authoring/documents.jsonl"))
     answers = {r["doc_id"]: r for r in read_rows(SOURCE / "answers/answers.candidate.jsonl")}

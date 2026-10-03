@@ -15,7 +15,7 @@ from koipa.customer_benchmark import FLAGS, GRADES
 from koipa.customer_guide_reference import POLICY_SHA256, validate_reference
 from koipa.policy_facts import require, text_digest, value_digest
 
-SOURCE_MANIFEST_SHA256 = "7e8ea7552e272f5391f1d95113176f955f8828352d38f45cfc24b979eb3c8f95"
+SOURCE_MANIFEST_SHA256 = "fbcc96d012a3b87f4bd3fd6ba6fea9f62ef1d9c7f5e39b5a416fec7e91285a19"
 DECISION_SCHEMA = "customer-source-disposition-v1"
 LEDGER_SCHEMA = "customer-internal-reference-adoption-ledger-v1"
 DECISION_FIELDS = set(FLAGS) | {

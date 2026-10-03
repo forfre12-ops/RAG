@@ -31,7 +31,7 @@ from koipa.customer_reference_audit_v1 import audit_reference
 from koipa.policy_facts import require, text_digest, value_digest
 
 ORIGINAL_MANIFEST_SHA256 = (
-    "7e8ea7552e272f5391f1d95113176f955f8828352d38f45cfc24b979eb3c8f95"
+    "fbcc96d012a3b87f4bd3fd6ba6fea9f62ef1d9c7f5e39b5a416fec7e91285a19"
 )
 GROUPING_FILE_SHA256 = (
     "c491d00a77c0b8aee0c753c036ce8865df975d9d0c47212ff7a7fe0d840a60ec"

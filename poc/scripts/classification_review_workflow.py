@@ -21,7 +21,7 @@ from prepare_content_reference_review import record_sha
 
 POC = Path(__file__).resolve().parents[1]
 SOURCE = POC / "reports/CONTENT_REFERENCE_REVISION_20260915/material_v1_1"
-SOURCE_SHA = "71730fa117570d5e5a4c66beb19618d5c30e564cd94a2dfc721fd7c654e9adbc"
+SOURCE_SHA = "97727233dcd7bcd0a37de681508dfb092a211ac64203ba7988d78f19ac059012"
 PROTOCOL = POC / "docs/CLASSIFICATION_REVIEW_AND_PILOT_PROTOCOL_V1.md"
 SLOTS = ("R1", "R2")
 REASONS = {"rule_interpretation", "evidence_insufficient", "scope_incomplete", "label_mistake", "context_conflict", "policy_gap"}

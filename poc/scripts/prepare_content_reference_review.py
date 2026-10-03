@@ -21,7 +21,7 @@ POC = Path(__file__).resolve().parents[1]
 PACK = POC / "reports/CONTENT_REFERENCE_20260914/reference_v1"
 POLICY = POC / "docs/CONTENT_PROTECTION_REFERENCE_V1.md"
 ISSUES = POC / "docs/CONTENT_REFERENCE_POLICY_ISSUES_2026-09-15.md"
-MANIFEST_SHA = "3a01e018cd63c746171fc26436d48cc02067ff78c52ae9645165a84488d7a7a0"
+MANIFEST_SHA = "ee871d45cb7a5239a0bde1f29a4589e6a29b73b2faf7edf8637e41835bbe7079"
 POLICY_SHA = "4263c96b624f26ea14f1eed919516a01e38f896dcc5990fc6e1dbcc3c120f66f"
 NAMES = {"keep": "유지", "amend_material": "수정 후보(본문·용도 보완)",
          "needs_context": "추가 확인", "propose_under_reference": "새 기준 해석 제안"}

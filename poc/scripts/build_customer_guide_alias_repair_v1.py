@@ -22,7 +22,7 @@ from koipa.customer_benchmark import FLAGS, GRADES, duplicate_audit, presented_t
 from koipa.customer_guide_reference import POLICY, POLICY_SHA256, validate_reference
 from koipa.policy_facts import require, text_digest, value_digest
 
-PARENT_MANIFEST = "7e8ea7552e272f5391f1d95113176f955f8828352d38f45cfc24b979eb3c8f95"
+PARENT_MANIFEST = "fbcc96d012a3b87f4bd3fd6ba6fea9f62ef1d9c7f5e39b5a416fec7e91285a19"
 SCHEMA = "customer-guide-alias-repair-pack-v1"
 SOURCES = ("scripts/customer_guide_alias_repair_v1.py", "scripts/build_customer_guide_alias_repair_v1.py")
 

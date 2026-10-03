@@ -20,7 +20,7 @@ from koipa.customer_benchmark import FLAGS
 from koipa.customer_guide_reference import POLICY_SHA256
 from koipa.policy_facts import require, text_digest, value_digest
 
-PARENT_MANIFEST = "7e8ea7552e272f5391f1d95113176f955f8828352d38f45cfc24b979eb3c8f95"
+PARENT_MANIFEST = "fbcc96d012a3b87f4bd3fd6ba6fea9f62ef1d9c7f5e39b5a416fec7e91285a19"
 DEFAULT_PARENT = POC / "reports/CUSTOMER_GUIDE_PARALLEL02_20260915/reference_v0_6"
 SCHEMA = "customer-source-disposition-v1"
 

@@ -15,7 +15,7 @@ from koipa.customer_reference_audit_v1 import POLICY_SHA256, audit_reference
 from koipa.policy_facts import require, text_digest, value_digest
 
 SCHEMA = "customer-clarification-audit-v1"
-PARENT_MANIFEST_SHA256 = "7e8ea7552e272f5391f1d95113176f955f8828352d38f45cfc24b979eb3c8f95"
+PARENT_MANIFEST_SHA256 = "fbcc96d012a3b87f4bd3fd6ba6fea9f62ef1d9c7f5e39b5a416fec7e91285a19"
 ADOPTION_MANIFEST_SHA256 = "7c1d0f2f7004e33fd7ac7225fa1788f908973146725562dcfb2a34f32b326ce1"
 ADOPTION_LEDGER_SHA256 = "1f9ceca8e52e1487d8f5e54eedc5dac7b10e8038e984c36f4068eb63b8a6a694"
 EXPOSURE_LEDGER_SHA256 = "ec4e33107d387e04244d1cdb1bf4c952d1abc19e8a4440dd2001c918710d438f"

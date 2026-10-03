@@ -1608,6 +1608,80 @@ paths:
               schema: { type: object, additionalProperties: true }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /golden/candidates/category-stats:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [golden]
+      summary: 부서×정보유형×등급별 생성 건수 (관리자 전용)
+      parameters:
+        - { in: query, name: review_batch, schema: { type: string }, required: false }
+      responses:
+        '200':
+          description: 통계 집계
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: 관리자 전용 — reviewer 는 403 }
+
+  /golden/candidates/export:
+    post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [golden]
+      summary: 검수 결과 엑셀 내보내기 (관리자 전용)
+      description: >-
+        doc_ids 를 주면 그 문서만, 비우면 status·grade·origin·review_batch 필터로 좁힌
+        전체를 .xlsx 로 낸다 — 둘 다 주면 doc_ids 가 우선한다.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                doc_ids: { type: array, items: { type: string } }
+                status: { type: string }
+                grade: { type: string }
+                origin: { type: string }
+                review_batch: { type: string }
+      responses:
+        '200':
+          description: xlsx 바이너리
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: 관리자 전용 — reviewer 는 403 }
+
+  /golden/candidates/login:
+    post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [golden]
+      summary: 검수자 아이디+비밀번호 로그인
+      description: >-
+        무인증 라우터 — 이 요청 자체가 신원 증명이다. 성공하면 서버가 세션 토큰을
+        서명해 쿠키(koipa_access_token)로 심는다. 비밀번호 로그인이 서버에 설정돼
+        있지 않으면 404.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: 로그인 성공 — 세션 쿠키 발급
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { description: 아이디 또는 비밀번호 불일치 }
+        '404': { description: 이 서버는 비밀번호 로그인이 설정돼 있지 않음 }
+
   /golden/candidates/session:
     get:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다

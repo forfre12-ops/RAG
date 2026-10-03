@@ -221,11 +221,15 @@ def test_corpus_invariants(engine: LabelRuleEngine) -> None:
             continue
         if any(x != x or x < 0 for x in svm):  # noqa: PLR0124 - NaN 검사
             bump("요소 점수가 음수/NaN")
-        # 곱셈 블록을 탄 문서(요소가 0/1/2 레벨)는 표시와 등급이 반드시 정합해야 한다.
+        # [2026-10-02 역산 제거] 종전엔 표시 S/V/M 이 최종 등급과 어긋나면
+        # svm_levels_for_grade(chosen) 로 강제로 다시 맞췄다 — 근거 없이 숫자를 지어내는
+        # 것이었다(사용자 지적, mighty-crunching-pebble 계획). 이제 그 reconciliation을
+        # 없앴으므로 **표시 S/V/M 이 최종 등급과 formula 상 안 맞는 것은 더는 위반이 아니다**
+        # — FNR-safe 상향(svm_grade≠content_grade) 이 일어난 문서에서 자연스럽게 생긴다.
+        # 그래도 지켜야 할 것: factor_scores 에 실제로 실린 숫자 자체는 내부적으로 일관돼야
+        # 한다(표시된 S×V×M 이 표시된 svm 값과 일치) — 이건 역산과 무관한 별개 불변식이다.
         if result.total_score > 0 and all(float(x).is_integer() and 0 <= x <= 2 for x in svm):
             levels = tuple(int(x) for x in svm)
-            if grade_from_svm(*levels) != result.grade:
-                bump("표시 S/V/M 이 최종 등급과 모순")
             if result.svm != levels[0] * levels[1] * levels[2]:
                 bump("svm 값이 요소 곱과 불일치")
 
