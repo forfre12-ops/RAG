@@ -54,19 +54,30 @@ class AuditRepo:
 
         entry = AuditLog(
             request_id=request_id,
-            actor_id=actor_id,
-            actor_role=actor_role,
-            action=action,
-            target_type=target_type,
-            target_id=target_id,
+            actor_id=self._clip(actor_id, 50),
+            actor_role=self._clip(actor_role, 30),
+            action=self._clip(action, 50),
+            target_type=self._clip(target_type, 30),
+            target_id=self._clip(target_id, 100),
             payload_hash=payload_hash,
             ip_address=self._safe_inet(ip_address),
-            user_agent=(user_agent[:500] if user_agent else None),
+            user_agent=self._clip(user_agent, 500),
             success=success,
-            error_code=error_code,
+            error_code=self._clip(error_code, 50),
         )
         self.db.add(entry)
         return entry
+
+    @staticmethod
+    def _clip(value: str | None, max_len: int) -> str | None:
+        """컬럼 길이를 넘는 값은 잘라서 담는다 — 넘기면 INSERT 가 통째로 실패해(감사 자체가
+        누락된다(2026-10-03, `/classify/jobs/<uuid>` 같은 51자 경로를 `action`에 그대로 담다
+        VARCHAR(50) 초과로 발견). 감사는 최선형 기록이라 길이초과로 행 전체를 잃는 것보다
+        잘라서라도 남기는 쪽이 맞다 — 적어도 시도가 있었다는 사실은 남는다.
+        """
+        if value is None:
+            return None
+        return value[:max_len]
 
     @staticmethod
     def _safe_inet(value: str | None) -> str | None:

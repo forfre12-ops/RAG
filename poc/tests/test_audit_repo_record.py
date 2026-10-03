@@ -149,3 +149,32 @@ def test_record_keeps_actor_none_when_not_given(repo):
     r, _ = repo
     entry = r.record(action="classify")
     assert entry.actor_id is None and entry.actor_role is None
+
+
+def test_oversized_action_is_clipped_not_dropped(repo):
+    """[2026-10-03] /classify/jobs/<uuid> 처럼 라우트 매칭이 안 돼 _derive_action 이
+    원본 경로를 그대로 돌려줄 때 51자가 나와 VARCHAR(50)을 넘겼다 — INSERT 전체가
+    StringDataRightTruncation 으로 실패해 그 요청의 감사 기록 자체가 통째로 사라졌다
+    (부하시험 중 실측). 잘라서라도 남긴다."""
+    r, _ = repo
+    original = "/classify/jobs/00000000-0000-0000-0000-000000000000"
+    entry = r.record(action=original)
+    assert len(entry.action) == 50
+    assert entry.action == original[:50]
+
+
+def test_oversized_actor_and_target_fields_are_clipped(repo):
+    r, _ = repo
+    entry = r.record(
+        action="classify",
+        actor_id="a" * 80,
+        actor_role="r" * 50,
+        target_type="t" * 50,
+        target_id="i" * 150,
+        error_code="e" * 80,
+    )
+    assert len(entry.actor_id) == 50
+    assert len(entry.actor_role) == 30
+    assert len(entry.target_type) == 30
+    assert len(entry.target_id) == 100
+    assert len(entry.error_code) == 50
