@@ -514,7 +514,12 @@ class ClassifyService:
                     from koipa.config import settings as _st  # noqa: PLC0415
                     _blocked = {str(g).strip().upper()
                                 for g in (getattr(_st, "no_auto_confirm_grades", None) or [])}
-                except Exception:  # noqa: BLE001 — 설정을 못 읽어도 분류를 막지 않는다
+                except Exception as _exc:  # noqa: BLE001 — 설정을 못 읽어도 분류를 막지 않는다
+                    logger.warning(
+                        "no_auto_confirm_grades 설정을 못 읽어 이번 요청은 그 손잡이 없이 처리됨"
+                        " (%s: %s) — 손잡이를 켜 뒀다면 이번 건은 적용되지 않았다는 뜻",
+                        type(_exc).__name__, _exc,
+                    )
                     _blocked = set()
                 if _blocked:
                     _code = pred.label.value if hasattr(pred.label, "value") else str(pred.label)
@@ -1555,7 +1560,15 @@ class ClassifyService:
         pipeline.py)에서 끊었으므로, S/V/M 각 축의 `state`를 직접 본다 — 셋 다 observed 면
         rule_evidenced, 하나라도 unknown 이면 model_estimated. 문자열이 아니라 실제 state 3개를
         보므로 설계상 누락될 수 없다.
+
+        [2026-10-03 수정] factors 자체가 None(본문을 읽을 수 없어 격리된 경우 등 — ClassifyOutcome
+        의 "조기 반환" 경로, evaluation_factors 가 애초에 비어 있다)일 때 `factors.secrecy`가
+        AttributeError 로 죽던 결함을 고친다. 아무 근거도 없는 상태이므로 FNR-safe 원칙대로
+        "법리 표시 가능"쪽(rule_evidenced)이 아니라 "근거 불확실"쪽(model_estimated)으로 안전하게
+        떨어뜨린다 — test_classify_gates_scenario.py 7건이 이 경로로 실패하고 있었다.
         """
+        if factors is None:
+            return "model_estimated"
         for axis in (factors.secrecy, factors.value, factors.management):
             if getattr(axis, "state", None) != "observed":
                 return "model_estimated"

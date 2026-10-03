@@ -344,7 +344,6 @@ details.adv[open]{padding-bottom:12px;}
 .cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#71717a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
 /* console-header:css:end */
 </style>
-<script src="./review_reason_ko.js"></script>
 <script src="./errors_ko.js"></script>
 <script src="./upload_progress.js"></script>
 <script src="./deploy_badge.js" data-screen="관리자"></script>
@@ -488,6 +487,13 @@ details.adv[open]{padding-bottom:12px;}
             <b>쓰기 작업 허용</b>
             <span id="write-gate-msg" style="font-size:11.5px;color:var(--text-dim);"></span>
           </label>
+        </div>
+        <!-- [2026-10-03] /console/index.html의 「실시간 반영 시연」·업로드 실적재 안내가 이 버튼을
+             가리키고 있었는데(created_by=demo-console → admin의 「데모 데이터 초기화」) 실제로는
+             버튼 자체가 없었다 — 백엔드(POST /admin/demo/purge, 스코프 고정)는 있었다. -->
+        <div style="margin-top:8px">
+          <button class="btn sec" onclick="purgeDemoData()" style="width:100%">데모 데이터 초기화</button>
+          <div class="hint">실시간 반영 시연·실적재 업로드로 쌓인 demo-console 데이터만 지웁니다. 운영 데이터는 대상이 아닙니다.</div>
         </div>
       </div>
       </details>
@@ -1642,6 +1648,21 @@ async function loadAuditLog(){
 /* ---- 데모 데이터 초기화 (시연 반복용) ---- */
 // 실적재 시연으로 쌓인 created_by=demo-console 문서·분류·RAG벡터만 스코프 물리삭제.
 // Safe Mode 가드 + 확인 팝업. 운영 데이터(다른 created_by)는 서버 스코프상 대상이 아님.
+async function purgeDemoData(){
+  if(!guardWrite('데모 데이터 초기화')) return;
+  if(!confirm('「실시간 반영 시연」·실적재 업로드로 쌓인 데모 데이터(created_by=demo-console)만 지웁니다.\n\n운영 데이터는 스코프상 대상이 아니지만, 삭제된 데모 데이터는 되돌릴 수 없습니다. 진행할까요?')) return;
+  try{
+    const r=await api('POST','/admin/demo/purge');
+    const msg=`데모 데이터를 지웠습니다 — 문서 ${r.documents??0}건·분류 ${r.classifications??0}건·청크 ${r.chunks??0}건`
+      + ((r.warnings&&r.warnings.length)?`\n주의: ${r.warnings.join(' · ')}`:'');
+    log(msg.replace(/\n/g,' '), 'ok');
+    alert(msg);
+  }catch(e){
+    const msg=`데모 데이터 초기화 실패: ${errKoText(e)}`;
+    log(msg, 'err');
+    alert(msg);
+  }
+}
 
 // [2026-10-03 사용자 결정] G3 "골든셋 현황" 카드(정본 구성·서명 확정 평가정답 지표)를
 // 뺐다 — 그 숫자로 관리자가 할 수 있는 다른 행동이 없었다는 판단. 이 카드만 쓰던
@@ -1797,7 +1818,7 @@ function renderDashboard(d){
     (lr.ready?'<span class="pill ok">준비됨</span>':'<span class="pill warn">미충족</span>')
     + (allSynth.length?'<span class="pill warn">실문서 0</span>':'') + dpDegraded(d,'locked_readiness'),
     // 이 패널이 무엇을 세는지 한 줄로 밝힌다 — 업로드·분류 건수와 무관한 값이다(사용자 질문).
-    `<div class="dp-note">사람이 서명해 <b>평가 정답</b>으로 잠근 검증문서(locked_gold_eval) 수입니다. 이 수가 등급별 기준을 채워야 재학습 모델을 <b>자동 활성</b>할 수 있습니다. 업로드·분류 건수와는 무관합니다.</div>`
+    `<div class="dp-note">사람이 서명해 <b>평가 정답</b>으로 잠근 검증문서 수입니다. 이 수가 등급별 기준을 채워야 재학습 모델을 <b>자동 활성</b>할 수 있습니다. 업로드·분류 건수와는 무관합니다.</div>`
     + (gradeRows?`<div class="dp-tab">${gradeRows}</div>`:'<div class="dp-note">등급별 데이터 없음</div>')
     + (lr.min_per_grade!=null?`<div class="dp-note">등급별 최소 ${lr.min_per_grade}건 필요${(lr.missing&&lr.missing.length)?` · 부족 ${lr.missing.join(' · ')}`:''}</div>`:'')
     + (noSign.length?`<div class="dp-note"><b>${noSign.join(', ')}</b> 는 서명이 0건입니다 — 검수·서명을 아직 하지 않았습니다.</div>`:'')
@@ -1838,8 +1859,8 @@ async function loadDashboard(){
   // 서버 자체는 빨라도(실측 수십 ms, 첫 호출만 수백 ms) 화면이 클릭을 확인해 주지 않으면
   // 사람은 그 틈을 "느리다"로 느낀다. 버튼을 잠깐 잠그고 조회 중임을 바로 보인다.
   const btn=document.querySelector('button[onclick="loadDashboard()"]');
-  if(btn){ btn.disabled=true; btn.dataset.label=btn.textContent; btn.textContent='조회 중…'; }
-  $('dash-grid').innerHTML='<div class="q-empty">조회 중…</div>';
+  if(btn){ btn.disabled=true; btn.dataset.label=btn.textContent; btn.textContent='불러오는 중…'; }
+  $('dash-grid').innerHTML='<div class="q-empty">불러오는 중…</div>';
   try{
     const d=await api('GET','/admin/dashboard');
     renderDashboard(d);
@@ -2249,7 +2270,7 @@ function renderSynthQueue(){
         <div>${gradeTag(it.corrected_grade||it.target_grade)}${it.corrected_grade?`<span class="pill" title="검수자가 승인하면서 등급을 고쳤습니다. 학습 데이터는 이 등급으로 만들어집니다.">교정됨 · 생성 시 ${esc(it.target_grade)}</span>`:''}
           <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${esc(it.llm_provider)}/${esc(it.llm_model||'-')}</span>
           ${it.quality_score!=null?`<span class="pill ${it.quality_score>=0.7?'ok':'warn'}">품질 ${Number(it.quality_score).toFixed(2)}</span>`:''}
-          ${it.label_source?`<span class="pill warn" title="LLM 이 정상 응답을 주지 못해 대체 본문으로 만들어진 문서입니다(${esc(it.label_source)}). 승인해도 학습 데이터에는 들어가지 않습니다.">대체본 · 학습 제외</span>`:''}
+          ${it.label_source?`<span class="pill warn" title="LLM 이 정상 응답을 주지 못해 대체 본문으로 만들어진 문서입니다. 승인해도 학습 데이터에는 들어가지 않습니다.">대체본 · 학습 제외</span>`:''}
           <span class="pill">${esc(it.review_status)}</span></div>
       </div>
       ${it.preview?`<div style="font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;max-height:110px;overflow:auto;white-space:pre-wrap;">${esc(it.preview)}</div>`:''}

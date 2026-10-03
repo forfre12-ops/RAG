@@ -447,6 +447,13 @@
       }
     ]
   },
+  "POST /admin/demo/purge": {
+    "purged": true,
+    "documents": 3,
+    "classifications": 3,
+    "chunks": 7,
+    "warnings": []
+  },
   "POST /admin/model/reload": {
     "reloaded": true,
     "model_dir": "artifacts/classifier_p1_v5_clean/v-fe4b386b",

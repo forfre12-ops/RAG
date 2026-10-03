@@ -934,9 +934,12 @@ async function analyzeLargeAsync(file, cap) {
   }
 }
 
-// 실적재 — 분석과 별개로 실제 서빙 경로(POST /documents → /classify)로 적재해
-// needs_review 건이 거버넌스 콘솔 DB 검수 큐에 나타나게 한다. created_by=demo-console 마커라
-// admin의 「데모 데이터 초기화」로 스코프 삭제 가능. RAG 는 'demo' 컬렉션(평가 'docs' 분리)에 색인.
+// 실적재 — 분석과 별개로 실제 서빙 경로(POST /documents → /classify)로 적재한다.
+// [2026-10-03 정정] 과거엔 이 문서가 거버넌스 콘솔의 검수·확정 큐에 나타난다고 적었으나
+// 그 카드는 2026-09-29에 빠졌다(관리자 콘솔·KL 포털 분리) — 실 고객 문서 검수·확정은
+// KL 포털이 API로 수행하고, 이 화면(파이프라인 점검용)에는 그 다음 단계를 보여줄 화면이
+// 없다. created_by=demo-console 마커라 admin의 「데모 데이터 초기화」로 스코프 삭제 가능.
+// RAG 는 'demo' 컬렉션(평가 'docs' 분리)에 색인.
 async function persistToQueue(analysis, file) {
   const box = $("#persist-box");
   if (!file || !box) return;
@@ -978,8 +981,8 @@ async function persistToQueue(analysis, file) {
     box.innerHTML = `<div class="${routed ? "gate-review" : "gate-ok"}">
       <b>실적재 완료</b> — doc_id <code>${escapeHtml(uj.doc_id)}</code> · 등급 <b>${escapeHtml(cj.label || "?")}</b> · 상태 <b>${escapeHtml(st)}</b>
       <div style="margin-top:4px">${routed
-        ? "→ <b>거버넌스 콘솔 → 「DB 검수 큐 불러오기」</b> 하면 이 문서가 검수 대기로 나타납니다."
-        : "자동 확정(staging) — 검수 대기가 아니라 거버넌스 콘솔의 「확정 대기」 목록에 나타납니다(관리자가 최종 확정)."}</div></div>`;
+        ? "검수가 필요합니다(needs_review) — 실 고객 문서의 검수·확정은 KL 포털이 API로 수행합니다. 이 화면은 파이프라인 점검용이라 그 뒤 단계를 보여주는 화면이 없습니다."
+        : "자동 확정 대기(staging)로 적재됐습니다 — 관리자 최종 확정도 KL 포털 쪽 절차입니다. 이 화면은 파이프라인 점검용이라 그 뒤 단계를 보여주는 화면이 없습니다."}</div></div>`;
     logLine("ok", `실적재 분류 OK ${cj.label || "?"} status=${st}`);
   } catch (e) {
     box.innerHTML = `<div class="gate-review"><b>실적재 오류</b>: ${escapeHtml(e.message)}</div>`;
@@ -1005,9 +1008,14 @@ async function loadFileSample(url, name) {
 }
 
 // 운영 대시보드 — DB 실측 카운트 폴링
-async function refreshDashboard() {
+// [2026-10-03] 수동 새로고침 버튼을 눌렀을 때만 "조회 중" 표시를 한다 — 5초 자동 폴링마다
+// 버튼이 깜빡이면 거슬리므로 manual=true 일 때만 잠깐 잠근다. 서버는 실측 수십 ms로 빠르지만
+// 클릭과 결과 사이에 아무 표시가 없으면 "늦게 나오는 것 같다"는 지적을 받는다.
+async function refreshDashboard(manual) {
   const box = $("#ops-tiles");
   if (!box) return;
+  const btn = manual ? $("#btn-dash-refresh") : null;
+  if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = "불러오는 중…"; }
   try {
     const r = await apiGet("/api/v1/dashboard/summary");
     if (!r.ok) return;
@@ -1025,7 +1033,10 @@ async function refreshDashboard() {
     box.innerHTML = tiles.map((t) =>
       `<div class="ops-tile ${t.grade ? "grade" : ""}"><div class="ops-num">${t.grade ? t.html : t.n}</div><div class="ops-lbl">${t.l}</div></div>`
     ).join("");
-  } catch (e) { /* best-effort */ }
+  } catch (e) { /* best-effort */
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label; }
+  }
 }
 
 // 원클릭 "실시간 반영 시연" — 등록→분류→교정→승급→재분류, 전부 서버 실호출
@@ -1448,7 +1459,7 @@ async function init() {
   const btnReflect = $("#btn-reflect");
   if (btnReflect) btnReflect.addEventListener("click", runReflectDemo);
   const btnDash = $("#btn-dash-refresh");
-  if (btnDash) btnDash.addEventListener("click", refreshDashboard);
+  if (btnDash) btnDash.addEventListener("click", () => refreshDashboard(true));
   if ($("#ops-tiles")) { refreshDashboard(); setInterval(refreshDashboard, 5000); }
   // 파일 직접 업로드 (드래그드롭 / 클릭) → 즉시 백엔드 파싱+이중판정
   const dropZone = $("#doc-drop");
