@@ -1,6 +1,14 @@
 # Git 저장소 뿌리는 rag/이고 Python 프로젝트는 poc/에 있다.
 # `make test-lite`는 현재 3분을 넘어 push 훅으로는 무겁다. 여기서는
 # 의존성·데이터·결정성의 빠른 계약만 보고, 전체 lite 회귀는 별도 실행한다.
+#
+# [2026-10-03 사용자 지시] 위 설명은 "빠른 훅만 두자"던 종전 판단이다 — 그날 바로
+# 반례가 쌓였다(배포 번들이 구코드를 담은 채 출하 대기, 검수 배치 설정이 하루 두 번
+# 바뀜, 콘솔이 폐기 실험본을 노출). 아래 full-verification-gate 가 그 교훈을 반영한
+# 전수 게이트다 — pytest(DB 포함 전체)·데이터위생·콘솔 e2e·도커 이미지 빌드+import
+# 스모크·인수팩·release-gate 를 순서대로 돈다(10~20분, 콜드 기준). 느리다고 단계를
+# 빼면 당일 겪은 문제로 되돌아간다 — 자세한 이유는 poc/scripts/full_verification_gate.sh
+# 머리말 참조. push 전에 반드시 통과해야 한다(실패하면 그 자리에서 push 가 막힌다).
 repos:
   - repo: local
     hooks:
@@ -17,3 +25,11 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-push]
+      - id: full-verification-gate
+        name: 전수 검증 게이트(pytest 전체·데이터위생·콘솔e2e·도커빌드·인수팩·release-gate)
+        entry: bash poc/scripts/full_verification_gate.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+        verbose: true
