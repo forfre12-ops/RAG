@@ -1370,11 +1370,11 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     # deploy_manifest.toml 의 [bundle.review_batch].batch 를 정본으로 읽는다 — 배치가 또
     # 바뀌면 거기 한 곳만 고치면 된다.
     #
-    # [2026-10-03 사용자 결정] 배포본엔 **검수 후보를 아예 안 싣는다** — 지재원 관리자가 배포
-    # 뒤 "학습 후보 생성"(FUN-003, 클로드·GPT 연동)으로 직접 만들어 검수하는 운영 방식으로
-    # 바뀌었다. 우리가 미리 만든 모의문서(1,711건·mock1000 1,001건 전부)는 **로컬 테스트
-    # 용도로만** 남기고 배포본에는 안 넣는다. 그래서 batch 값을 비워 둔다("") — 비어 있으면
-    # 의도적 제외이고, 값이 있는데 0건이면 그게 진짜 결함이라 둘을 구분해서 알린다.
+    # [2026-10-03 사용자 결정 — 같은 날 재확정] 배포본에 mock1000(guide40 구조, 1,001건)을
+    # 싣는다 — 검수자 계정 20개를 이미 발급했고(6800b315) 그 계정들이 배포 직후 이 배치를
+    # 검수한다. 1,711건 배치는 더 안 쓴다(보관함으로 이동). batch 값이 빈 문자열이면
+    # "검수 후보 의도적 미동봉"(예: 운영 방식이 다시 바뀌어 지재원이 직접 생성하는 쪽으로
+    # 갈 때)이고, 값이 있는데 0건이면 그게 진짜 결함이다 — 둘을 구분해서 알린다.
     review_src = _REPO_ROOT / "datasets" / "proxy_gold" / "single_document_candidates"
     review_batch_tag = str(_dm.load()["bundle"]["review_batch"]["batch"] or "").strip()
     if not review_batch_tag:

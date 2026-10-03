@@ -67,6 +67,13 @@ _REVIEW_SOURCE_DIRS = (
     "datasets/gold_real/builds",   # 골든 빌더가 만든 후보
 )
 
+# [2026-10-03] "새 검수 시작하기" 목록에 2026-07~08 파일(수명 끝난 실험본 — 예: ff5a822c는
+# 8/9에 만들어졌다가 같은 날 콘솔 방식으로 대체됨, 16d04096은 그 전신 결함본)이 "지금 고를
+# 수 있는 것"처럼 떠서 화면만 보고는 폐기된 자료와 구분이 안 됐다(사용자 지적). 파일을
+# 지우진 않는다 — 이력 보존은 이 프로젝트의 일관된 방침이다(옛 배포 번들도 유지). 목록
+# 노출만 최근 것으로 좁힌다.
+_REGISTERABLE_MAX_AGE_DAYS = 30
+
 
 def _is_review_source(rel_path: str) -> bool:
     """검수 목록에 올릴 파일인가 — 허용 폴더 아래이면서 승격 정본이 아니어야 한다."""
@@ -297,7 +304,12 @@ class GoldenBuildService:
             if not _is_review_source(p.relative_to(_POC_ROOT).as_posix()):
                 continue
             try:
-                if p.stat().st_size == 0:
+                stat = p.stat()
+                if stat.st_size == 0:
+                    continue
+                age_days = (dt.datetime.now(dt.timezone.utc)
+                            - dt.datetime.fromtimestamp(stat.st_mtime, dt.timezone.utc)).days
+                if age_days > _REGISTERABLE_MAX_AGE_DAYS:
                     continue
                 with p.open(encoding="utf-8") as fh:
                     head = fh.readline()
@@ -318,9 +330,9 @@ class GoldenBuildService:
                 "path": p.relative_to(_POC_ROOT).as_posix(),
                 "records": n,
                 "records_exact": n <= 5000,
-                "size": p.stat().st_size,
+                "size": stat.st_size,
                 "modified": dt.datetime.fromtimestamp(
-                    p.stat().st_mtime, dt.timezone.utc
+                    stat.st_mtime, dt.timezone.utc
                 ).isoformat(),
             })
         out.sort(key=lambda r: r["modified"], reverse=True)
