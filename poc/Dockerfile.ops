@@ -51,7 +51,6 @@ COPY scripts/_cli_io.py \
      scripts/p5_e2e_smoke.py \
      scripts/probe_ingest_capacity.py \
      scripts/promote_golden_candidates.py \
-     scripts/register_deployed_model.py \
      scripts/register_review_signoff_job.py \
      scripts/set_reviewer_passwords.py \
      scripts/setup_console_test_login.py \

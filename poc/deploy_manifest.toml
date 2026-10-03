@@ -93,9 +93,21 @@ observability = [
 # 여기엔 **진짜 런타임 import**가 있는 것만 둔다 — 운영자가 수동으로 돌리는 도구는
 # [container.ops_scripts] 로 옮겼다(2026-10-03, 상시 기동 이미지의 공격면·용량을 줄이려고 분리).
 allow = [
+  "_cli_io.py",                       # [2026-10-04 정정] register_deployed_model.py·setup_console_test_login.py
+                                       #   둘 다 `from _cli_io import force_utf8_stdio` — api 컨테이너 안에서
+                                       #   두 스크립트를 되돌렸을 때 이 공유 헬퍼를 빠뜨려 ModuleNotFoundError로
+                                       #   또 실패하는 걸 실제 Rocky 재설치로 발견(2차 실패). ops 쪽에도 유지(dr_drill.py).
   "analyze_golden_run.py",            # 골든 빌드 서비스가 런타임 import(golden_build_service.py:909)
   "check_domain_leakage_gate.py",     # 골든 빌드 서비스가 런타임 import(golden_build_service.py:910)
   "docker_install_locked.sh",         # Dockerfile.api.prod · Dockerfile.worker 의 RUN(빌드 시점)
+  "register_deployed_model.py",       # [2026-10-04 정정] setup.sh:307 이 `exec -T api python
+                                       #   scripts/register_deployed_model.py` 로 api 컨테이너 **안에서**
+                                       #   돈다 — ops 로 옮겼다가 설치 6-2 단계가 실패하는 걸 실제
+                                       #   설치 리허설로 발견. python import 여부만 보고 놓쳤다.
+  "setup_console_test_login.py",      # [2026-10-04 정정] setup.sh:259 가 같은 방식으로 api 안에서
+                                       #   돈다(토큰 발급, 설치 7단계) — 이유는 위와 동일.
+                                       #   batch_issue_reviewer_tokens.py 가 ops 쪽에서도 불러 그
+                                       #   목록에는 중복으로 남긴다(공유 허용, docker_install_locked.sh 와 같은 패턴).
 ]
 [container.scripts.not_in_image]
 "build_offline_bundle.py"            = "번들 빌드 호스트 전용(INSTALL.md 가 빌드 호스트에서 돌리라고 안내)"
@@ -130,10 +142,9 @@ allow = [
   "p5_e2e_smoke.py",                  # dr_drill.py 가 부른다(ops 안에서 체인)
   "probe_ingest_capacity.py",         # 문서 처리량 재고 — 운영자가 수동으로 돌림
   "promote_golden_candidates.py",     # 골든 후보 정본 병합 게이트 — 운영자가 수동으로 돌림
-  "register_deployed_model.py",       # setup.sh 6-2 · INSTALL.md(설치 시 1회)
   "register_review_signoff_job.py",   # 골든 서명 잡 등록 — 운영자가 수동으로 돌림
   "set_reviewer_passwords.py",        # 아이디+비밀번호 로그인 계정 발급 — 운영자가 수동으로 돌림
-  "setup_console_test_login.py",      # setup.sh · INSTALL.md(설치 시 1회)
+  "setup_console_test_login.py",      # batch_issue_reviewer_tokens.py 가 ops 안에서 부른다(위 container.scripts 참고 — api 쪽에도 중복)
   "verify_deploy_live.sh",            # OPERATION.md 배포 검증
   "verify_infra.py",                  # INSTALL.md · OPERATION.md 인프라 점검
 ]

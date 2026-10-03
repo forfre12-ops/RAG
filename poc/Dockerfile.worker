@@ -24,9 +24,12 @@ COPY pyproject.toml uv.lock ./
 COPY src ./src
 # BEGIN deploy_manifest:container_scripts — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
 # 이미지에는 정본(deploy_manifest.toml)의 container.scripts.allow 만 싣는다.
-COPY scripts/analyze_golden_run.py \
+COPY scripts/_cli_io.py \
+     scripts/analyze_golden_run.py \
      scripts/check_domain_leakage_gate.py \
      scripts/docker_install_locked.sh \
+     scripts/register_deployed_model.py \
+     scripts/setup_console_test_login.py \
      ./scripts/
 # END deploy_manifest:container_scripts
 COPY evidence ./evidence
