@@ -83,8 +83,12 @@ def truth() -> dict:
         "content_max_length": _content_max_length(ClassifyRequest),
         # 동기 응답 POST /classify(ClassifyResponse)와 KL 이 완료 통보·조회로 받는 결과 항목(ClassifyJobResult, IF-05)은
         # 다른 모델이다 — 처리 시간(elapsed_ms) 하나가 다르다(aaea98c3 · 2026-09-26). 문서가 어느 쪽을 말하는지에 따라 참값이 갈린다.
-        "response_fields": len(ClassifyResponse.model_fields),
-        "job_result_fields": len(ClassifyJobResult.model_fields),
+        # [2026-10-03 결함 수정] model_fields 만 세면 @computed_field(confidence_tier, 2026-10-02 추가)가
+        # 안 잡힌다 — pydantic v2 는 계산 필드를 model_computed_fields 에 따로 둔다. 실제 JSON 응답에는
+        # 그대로 나가므로(model_dump 가 계산 필드를 싣는다) 둘을 더해야 실측 키 개수와 맞는다(실측: 둘 다 1씩
+        # 어긋나 있었다 — 19→20·21→22, 이 커밋의 KL 문서 수정이 그 어긋남을 고치다가 발견했다).
+        "response_fields": len(ClassifyResponse.model_fields) + len(ClassifyResponse.model_computed_fields),
+        "job_result_fields": len(ClassifyJobResult.model_fields) + len(ClassifyJobResult.model_computed_fields),
         # extraction-gate 는 진단·시연 엔드포인트(/documents/analyze) 전용이라
         # 운영 분류 경로의 게이트 수에서 뺀다 — 문서도 15 로 적고 그 사실을 밝힌다.
         "review_gates": len([t for t in REVIEW_GATE_TAGS if t != "extraction-gate"]),

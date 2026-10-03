@@ -113,7 +113,7 @@ a{color:#0a0a0a}
       <tr><td class="c">가-2</td><td>전체 워크플로우</td><td><b>기재 정확</b></td><td>6단계 그대로 맞습니다. 전후 보정 2건만 보강</td></tr>
       <tr><td class="c">가-2-1</td><td>GPU 환경 변경점</td><td>회신</td><td>등급 결정 경로는 GPU 유무와 무관하게 동일합니다</td></tr>
       <tr><td class="c">가-2-2</td><td>100쪽 문서 처리 시간</td><td>회신</td><td>100쪽 문서를 <b>파싱부터 판정까지 종단 실측</b>했습니다. 6 CPU 기준 <b>약 5분</b>. 스캔 문서는 납품 번들에서 처리되지 않습니다(OCR 미동봉)</td></tr>
-      <tr><td class="c">가-3</td><td>반환 항목</td><td>회신</td><td>현행 19필드(2026-09-27 정정 &mdash; &sect;5 참조). GPU 유무로 달라지지 않습니다</td></tr>
+      <tr><td class="c">가-3</td><td>반환 항목</td><td>회신</td><td>현행 22필드(2026-10-02 정정 &mdash; &sect;5 참조). GPU 유무로 달라지지 않습니다</td></tr>
       <tr><td class="c">가-3-1</td><td>SVM 점수 산정</td><td>회신</td><td>키워드 등급이 먼저 정해지고, 곱셈(S&times;V&times;M)은 그 위의 교차 확인입니다</td></tr>
       <tr><td class="c">가-3-2</td><td>XAI 방법</td><td>회신</td><td>Attention·Gradient Saliency 는 쓰지 않습니다. 매칭 구간·판정 경로로 근거를 제시합니다</td></tr>
       <tr><td class="c">가-4</td><td>룰 기반 방식</td><td><b>기재 정확</b></td><td>출현 횟수 &times; 가중치의 등급별 합산 argmax 입니다. 시드 404개</td></tr>
@@ -320,11 +320,11 @@ a{color:#0a0a0a}
 <h2>5. 가-3 &mdash; 반환 항목</h2>
   <div class="q">현행 반환 항목이 최종 확정인가 · GPU 여부에 따른 구분</div>
 
-  <p>현행 <code>ClassifyResponse</code> 는 <b>19필드</b>입니다. GPU 유무로 달라지지 않습니다. 아래 표가 그 19필드입니다. 사람이 확정한 등급을 담는 3개(<code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> &mdash; &sect;5-1)는 이 응답에 없고 문서 단위 조회에서 나옵니다.</p>
+  <p>현행 <code>ClassifyResponse</code> 는 <b>22필드</b>입니다. GPU 유무로 달라지지 않습니다. 아래 표가 그 22필드입니다. 사람이 확정한 등급을 담는 3개(<code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> &mdash; &sect;5-1)는 이 응답에 없고 문서 단위 조회에서 나옵니다.</p>
 
   <div class="note">
-    <b>정정(2026-09-27).</b> <code>ClassifyResponse</code>(19필드, 아래 표)는 저희 내부 화면 전용 응답입니다. 귀사가 실제로 받는 IF-05 작업 결과·콜백 본문은
-    <b>17필드</b>(elapsed_ms 없음 + 2026-09-27 부터 <code>automation_assessment</code> 도 없음 — 자동확정 정책 검증용 내부 관측치라 연동에 쓰지 않습니다)이며,
+    <b>정정(2026-10-02, 두 번째).</b> <code>ClassifyResponse</code>(22필드, 아래 표)는 저희 내부 화면 전용 응답입니다. 귀사가 실제로 받는 IF-05 작업 결과·콜백 본문은
+    <b>20필드</b>(elapsed_ms 없음 + <code>automation_assessment</code> 도 없음 — 자동확정 정책 검증용 내부 관측치라 연동에 쓰지 않습니다)이며,
     상세는 「API 통신 방안 검토 회신」 &sect;3 을 참고하시기 바랍니다.
   </div>
 
@@ -334,6 +334,7 @@ a{color:#0a0a0a}
     <tbody>
       <tr><td><code>label</code></td><td class="c">O</td><td>등급</td></tr>
       <tr><td><code>confidence</code></td><td class="c">O</td><td>신뢰도 &mdash; <b>검수 라우팅의 입력</b></td></tr>
+      <tr><td><code>confidence_tier</code></td><td class="c">&mdash;</td><td><code>confidence</code> 에서 그대로 파생된 3단계(낮음/보통/높음) &mdash; 검수 우선순위 참고용(2026-10-02 추가)</td></tr>
       <tr><td><code>scores</code></td><td class="c">O</td><td>등급별 확률</td></tr>
       <tr><td><code>inference_id</code> · <code>doc_id</code></td><td class="c">O</td><td>식별자</td></tr>
       <tr><td><code>model_version</code></td><td class="c">O</td><td>판정에 쓰인 모델 판</td></tr>
@@ -346,18 +347,19 @@ a{color:#0a0a0a}
       <tr><td><code>evidence</code></td><td class="c">&mdash;</td><td>근거 구간(&sect;7 참조)</td></tr>
       <tr><td><code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>factors_source</code></td><td class="c">&mdash;</td><td>3요건 표시값과 그 출처</td></tr>
       <tr><td><code>grade_candidates</code> · <code>grade_candidates_reason</code></td><td class="c">&mdash;</td><td>비밀관리성(M)을 받지 못해 아직 하나로 정해지지 않은 등급 후보와 그 사유. 비어 있으면 <code>label</code> 이 유일한 답입니다(2026-09-10 추가)</td></tr>
+      <tr><td><code>regulation_reference</code></td><td class="c">&mdash;</td><td>이 문서에 해당하는 사내 규정 원문 조항(해당하는 경우만, 2026-09-29 추가)</td></tr>
+      <tr><td><code>regulation_summary</code></td><td class="c">&mdash;</td><td><code>regulation_reference</code> 를 한두 문장으로 요약(원문 인용 검증을 거침 — 2026-10-02 추가, 로컬 LLM 옵션 켠 경우만)</td></tr>
     </tbody>
   </table>
   </div>
 
   <div class="note">
-    <b>정정(2026-09-27).</b> 이 회신 당시(2026-08-28)에는 반환 항목을 20필드로 적었습니다. 그 뒤 세 가지가 바뀌었습니다.
-    ① 2026-09-10 에 등급 후보집합 <code>grade_candidates</code> · <code>grade_candidates_reason</code> 두 필드를 더했습니다(위 표 마지막 행).
-    ② 2026-09-26 에 확정 등급 세 필드(<code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code>)를 분류 응답에서 뺐습니다 &mdash;
-    확정은 분류 뒤에 사람이 하는 일이라 분류 응답과 완료 통보에는 값이 채워진 적이 없습니다.
-    ③ 같은 날 문서 단위 조회(<code>GET /classify/{doc_id}</code>)의 응답을 저장된 값만 담는 10필드(확정 등급 세 필드 포함)로 갈랐습니다.
-    그래서 현행 분류 응답(<code>POST /classify</code>)은 19필드이고, 완료 통보(<code>POST {callback_url}</code>)와
-    작업 조회(<code>GET /classify/jobs/{job_id}</code>)의 결과 항목은 처리 시간 <code>elapsed_ms</code> 를 뺀 18필드입니다.
+    <b>정정(2026-10-02, 두 번째).</b> 이 회신 당시(2026-08-28)에는 반환 항목을 20필드로 적었고, 2026-09-27 정정에서는 19필드로 고쳤습니다. 그 뒤 한 번 더 바뀌었습니다 &mdash;
+    2026-10-02 에 귀사가 문서마다 매번 사람이 검수하기로 결정되면서, 9/29 정정에서 "연동 범위 밖"이라 뺐던
+    <code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>evidence</code> · <code>decision_path</code> 를 다시 채우고,
+    신뢰도를 3단계로 보여주는 <code>confidence_tier</code> 를 더했습니다(<code>scores</code> · <code>model_grade</code> · <code>grade_candidates</code>(_reason) 넷은 여전히 비웁니다).
+    그래서 현행 분류 응답(<code>POST /classify</code>)은 22필드이고, 완료 통보(<code>POST {callback_url}</code>)와
+    작업 조회(<code>GET /classify/jobs/{job_id}</code>)의 결과 항목은 처리 시간 <code>elapsed_ms</code> 와 <code>automation_assessment</code> 를 뺀 20필드입니다.
   </div>
 
   <div class="note">
@@ -371,7 +373,7 @@ a{color:#0a0a0a}
   <h3>5-1. 확정 여부와 추가 항목</h3>
 
   <p>결과 수신 항목과 연계 방식이 협의로 확정되면 <b>연동 규약서에 반영해 정본으로 관리</b>합니다.
-  그때까지는 위 19필드가 배포본 기준 규격입니다.</p>
+  그때까지는 위 22필드가 배포본 기준 규격입니다.</p>
 
   <div class="tw">
   <table>

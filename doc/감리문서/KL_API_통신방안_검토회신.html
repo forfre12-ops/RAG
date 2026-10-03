@@ -191,7 +191,7 @@ a{color:#0a0a0a}
 
 ③ 완료 통보 (엔진 → 관리시스템)
    POST {callback_url}
-   { "job_id": "...", "status": "done", "results": [ { ... 17필드 ... } ] }</pre>
+   { "job_id": "...", "status": "done", "results": [ { ... 20필드 ... } ] }</pre>
 
   <div class="note">
     <b>인증.</b> 화면이나 요청 본문으로 자격증명을 받지 않습니다. 서버가 같은 오리진
@@ -215,11 +215,16 @@ a{color:#0a0a0a}
   <h2>3. 결과 반환 항목 &mdash; 확대 요청</h2>
 
   <p>초안의 콜백 항목은 5개(<code>doc_id</code> · <code>success</code> · <code>etc</code> ·
-  <code>file_name</code> · <code>label</code>)다. 당사 응답은 <b>17필드</b>이며, 그중
+  <code>file_name</code> · <code>label</code>)다. 당사 응답은 <b>20필드</b>이며, 그중
   <b>검수 라우팅에 반드시 필요한 것</b>이 빠져 있습니다.</p>
 
   <div class="note">
-    <b>정정(2026-09-27).</b> 완료 통보 결과 항목의 필드 수를 이 회신에서는 20필드로 적었으나 현재는 17필드입니다.
+    <b>정정(2026-10-02, 두 번째).</b> 완료 통보 결과 항목의 필드 수를 2026-09-27 정정에서는 17필드로
+    적었으나 현재는 20필드입니다. 2026-10-02 에 KL 포털이 문서마다 매번 사람 검수를 하기로
+    결정이 바뀌면서, 9/29 에 "연동 범위 밖"이라 비웠던 등급 평가요소·근거(<code>evaluation_factors</code> ·
+    <code>rule_evaluation_factors</code> · <code>evidence</code> · <code>decision_path</code>)를 다시 채우고,
+    신뢰도를 3단계(낮음/보통/높음)로 보여주는 <code>confidence_tier</code>를 더했습니다
+    (<code>scores</code> · <code>model_grade</code> · <code>grade_candidates</code>(_reason) 넷은 여전히 비웁니다).
     2026-09-10 에 등급 후보집합 두 필드(<code>grade_candidates</code> · <code>grade_candidates_reason</code>)를 더했고,
     2026-09-26 에 처리 시간(<code>elapsed_ms</code>)과 확정 등급 세 필드(<code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code>)를 뺐고,
     2026-09-27 에 내부 전용 그림자 관측치(<code>automation_assessment</code>)를 마저 뺐습니다 &mdash;
