@@ -133,6 +133,14 @@ _ROUTER_IGNORE_EXACT: set[str] = {
     "/api/v1/admin/demo/purge",   # 데모 데이터 purge — 관리·파괴적, 외부 계약 아님
     "/api/v1/dashboard/summary",  # 운영 대시보드 집계 — 내부 관측성
     "/api/v1/rag/search",         # LLM-free 내부 검색 — 외부 KL API 아님
+    # [2026-10-04] 재학습 라우터 3건 — enable_training 뿐 아니라 enable_incremental_retrain
+    # (기본 True인 프로파일 다수, app.py:443)이어도 등록된다. 아래 skip_prefixes(YAML 쪽만 거름)는
+    # 이 3건이 router_only로 잡히는 걸 못 막는다(diff()가 router_norm은 안 거르기 때문) — 애초에
+    # 학습은 KL 7개 인터페이스에 포함된 적이 없어(KL_INFO_DESCRIPTION 참조) 플래그 조합과 무관하게
+    # 항상 범위 밖이다. 여기 넣어 router 수집 단계에서 영구히 제외한다.
+    "/api/v1/train",
+    "/api/v1/train/jobs",
+    "/api/v1/train/jobs/{train_job_id}",
 }
 
 
