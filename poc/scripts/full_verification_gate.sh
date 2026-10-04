@@ -60,7 +60,7 @@ fail() {
 cleanup() {
     # 성공/실패/중단 어느 경우에도 임시 자원은 반드시 정리한다.
     echo "" ; echo "== 정리 — 임시 DB·게이트용 도커 이미지 =="
-    docker rm -f koipa-testdb >/dev/null 2>&1 || true
+    docker rm -f koipa-testdb koipa-testredis >/dev/null 2>&1 || true
     docker rmi -f koipa-gate-api:check koipa-gate-worker:check koipa-gate-ops:check >/dev/null 2>&1 || true
     local _elapsed=$(( $(date +%s) - _start ))
     if [ "$FAILED" -eq 0 ]; then
@@ -94,8 +94,18 @@ run "임시 PostgreSQL 기동" bash -c '
     echo "  기동 대기..." && sleep 8
     DATABASE_URL="'"$TEST_DB_URL"'" "'"$PY"'" -m alembic upgrade head
 '
-run "전체 pytest(fullstack 포함, DB 연결)" bash -c \
-    "TESTING=1 DATABASE_URL='$TEST_DB_URL' '$PY' -m pytest -q -m 'not gpu and not model_download'"
+# [2026-10-04] redis가 없으면 규정 런타임 스위치(koipa.regulation.runtime_toggle) 호출이 전부
+# 연결 실패로 빠진다 — 개별 호출은 bounded(socket_connect_timeout=2)라 더는 안 멈추지만,
+# fail-open 설계상 "redis 없음"과 "진짜 꺼짐"을 구분 못 해 타이밍 전제 시험(예산캡)과 쓰기
+# 경로(set_enabled, 예외처리 없음) 둘 다 깨진다 — 실측(py-spy)으로 확인 후 postgres와 같은
+# 패턴으로 추가한다.
+run "임시 Redis 기동" bash -c '
+    docker rm -f koipa-testredis >/dev/null 2>&1 || true
+    docker run -d --rm --name koipa-testredis -p 16379:6379 redis:7.2-alpine >/dev/null
+    sleep 2
+'
+run "전체 pytest(fullstack 포함, DB·Redis 연결)" bash -c \
+    "TESTING=1 DATABASE_URL='$TEST_DB_URL' REDIS_URL='redis://localhost:16379/0' '$PY' -m pytest -q -m 'not gpu and not model_download'"
 
 run "데이터 누출 게이트" "$PY" scripts/check_data_quality.py \
     --train-hash-manifest datasets/gold_real/train_subset.hashes.txt \
