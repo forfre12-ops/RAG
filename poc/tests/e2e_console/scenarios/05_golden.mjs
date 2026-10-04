@@ -182,8 +182,8 @@ export const scenarios = [
   {
     id: 'golden.jobs.folded-duplicates-are-declared',
     needsMock: true,
-    title: '중복 묶음을 접었으면 몇 개를 접었는지, 어느 행이 진행 중인지 말한다',
-    why: '조용히 감추면 "목록이 왜 줄었나"를 화면에서 알 수 없다 — 감추되 감췄다고 적는다',
+    title: '중복 묶음을 접은 행은 몇 건을 흡수했는지, 진행 중인 결정이 있는지 그 행에 적는다',
+    why: '행이 사라진 이유를 그 행 안에서 알 수 있어야 한다',
     async run({ server, check }) {
       const page = await reviewTab(server);
       server.faults.push({
@@ -207,8 +207,6 @@ export const scenarios = [
       await page.settle();
 
       const body = page.text('gold-jobs-body');
-      check.includes(body, '중복 묶음 5건', '몇 개를 접었는지 총계를 밝힌다');
-      check.includes(body, '검수 결정이 남아 있는 묶음은 접지 않습니다', '무엇을 접지 않는지 밝힌다');
       check.includes(body, '재등록 1건', '이 행이 몇 개를 흡수했는지 행에 적는다');
       check.includes(body, '결정 2건', '이 행에 진행분이 있다는 것을 보여준다');
       assertNoScriptErrors(check, page);

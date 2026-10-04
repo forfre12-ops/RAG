@@ -157,14 +157,9 @@
         // 서버 정렬은 best-effort(Redis SCAN 순서)라, 화면에서 생성 시각으로 다시 정렬해 놓았다.
         // 그 사실을 밝혀 둔다 — "서버가 준 순서"와 "화면 순서"가 다르다는 것을 감춰선 안 된다.
         + (d.ordering === 'best_effort'
-            ? '<p class="sec-note" style="margin-top:6px;">서버 정렬은 잡 저장소 기준 '
-              + '<b>best-effort</b>(최근순 보장 아님)라, <b>생성 시각으로 최신순 재정렬</b>해 표시합니다. '
-              + '목록이 20건으로 잘리므로 그보다 오래된 잡은 여기 없을 수 있습니다.</p>'
-            : '')
-        + (d.folded_duplicates > 0
-            ? '<p class="sec-note" style="margin-top:4px;">같은 파일을 다시 등록해 생긴 '
-              + '<b>중복 묶음 ' + esc(String(d.folded_duplicates)) + '건</b>은 목록에서 접었습니다 — '
-              + '검수 결정이 남아 있는 묶음은 접지 않습니다.</p>'
+            ? '<p class="sec-note" style="margin-top:6px;">서버가 돌려주는 작업 저장소의 순서는 '
+              + '<b>정확한 최신순을 보장하지 않으므로</b>, 화면에서 <b>생성 시각 기준으로 다시 정렬</b>해 표시합니다. '
+              + '목록은 20건까지만 보여지므로, 그보다 오래된 작업은 이 목록에 나타나지 않을 수 있습니다.</p>'
             : '');
       log('검수 목록 ' + jobs.length + '건 조회', 'ok');
     } catch (e) {

@@ -555,12 +555,16 @@ details.adv[open]{padding-bottom:12px;}
             <label class="fld">정보유형</label>
             <select id="cat-info"><option value="">전체</option></select>
           </div>
-          <div class="field" style="display:flex;align-items:flex-end;">
+          <div class="field" style="display:flex;align-items:flex-end;gap:10px;">
             <button class="btn sec sm" onclick="loadCategoryBrowse()">이 조건으로 조회</button>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap;">
+              <input type="checkbox" id="cat-decided-only" checked onchange="loadCategoryBrowse()" />
+              검수 완료(등급 확정)만
+            </label>
           </div>
         </div>
         <div id="cat-browse-body" style="margin-top:10px"></div>
-        <p class="sec-note" style="margin-top:8px;">검수 결과(등급·검수자·사유)를 엑셀로 받습니다 — 체크한 문서가 있으면 그것만, 없으면 지금 조회된 목록 전체를 담습니다.</p>
+        <p class="sec-note" style="margin-top:8px;">검수 결과(등급·검수자·사유)를 엑셀로 받습니다 — 체크한 문서가 있으면 그것만, 없으면 지금 조회된 목록 전체를 담습니다. 위 체크를 켜 두면 아직 검수자가 등급을 확정하지 않은 문서는 조회·내보내기 모두에서 빠집니다.</p>
       </div>
     </section>
 
@@ -2215,16 +2219,23 @@ function updateInfoTypeOptions(){
 async function loadCategoryBrowse(){
   const box=$('cat-browse-body'); if(!box) return;
   const dep=$('cat-dept').value, info=$('cat-info').value, batch=$('cat-batch').value;
+  const decidedOnly=$('cat-decided-only')?.checked;
   const q=new URLSearchParams(); if(dep) q.set('department',dep); if(info) q.set('info_type',info); if(batch) q.set('review_batch',batch); q.set('limit','500');
   let d;
   try{ d=await api('GET','/golden/candidates?'+q.toString()); }
   catch(e){ box.innerHTML=`<div class="hint">조회 실패: ${errKo(e)}</div>`; return; }
-  CAT_ROWS=d.candidates||[];
-  if(!CAT_ROWS.length){ box.innerHTML='<div class="hint">조건에 맞는 문서가 없습니다.</div>'; return; }
+  let rowsAll=d.candidates||[];
+  // [2026-10-04] 검수자가 아직 등급을 확정하지 않은 문서(기본 상태 proposed 등)도 이 목록·엑셀에
+  // 전부 섞여 나왔다(사용자 지적 — "검수한거의 의견을 듣고 싶은건데"). grade_fixed 는 결정 원장에
+  // 최종 등급이 실제로 적혔는지를 서버가 이미 계산해 주는 값이라(승인·확정 둘 다 true), 이 값으로만
+  // 좁히면 새 판정 로직을 만들 필요가 없다.
+  CAT_ROWS = decidedOnly ? rowsAll.filter(c=>c.grade_fixed) : rowsAll;
+  if(!rowsAll.length){ box.innerHTML='<div class="hint">조건에 맞는 문서가 없습니다.</div>'; return; }
+  if(!CAT_ROWS.length){ box.innerHTML=`<div class="hint">조건에 맞는 문서 ${rowsAll.length}건은 있으나, 검수자가 등급을 확정한 것은 아직 없습니다 — 위 체크를 끄면 전체를 봅니다.</div>`; return; }
   const rows=CAT_ROWS.map(c=>`<tr><td><input type="checkbox" class="cat-pick" value="${esc(c.doc_id)}"></td><td>${esc(c.doc_id)}</td><td>${esc(c.final_grade||c.proposed_grade||'–')}</td><td>${esc(c.status)}</td></tr>`).join('');
   box.innerHTML = `<div class="btn-row" style="margin:0 0 8px;">
       <button class="btn sec sm" onclick="exportCategorySelection()">엑셀로 내보내기</button>
-      <span style="font-size:12px;color:var(--text-dim);margin-left:8px;">${CAT_ROWS.length}건 조회됨 — 체크 없으면 전체, 체크하면 선택분만</span>
+      <span style="font-size:12px;color:var(--text-dim);margin-left:8px;">${CAT_ROWS.length}건 조회됨${decidedOnly?' (검수 완료분만, 전체 '+rowsAll.length+'건 중)':''} — 체크 없으면 전체, 체크하면 선택분만</span>
     </div>
     <div style="overflow-x:auto;max-height:320px;overflow-y:auto"><table style="border-collapse:collapse;font-size:12px;width:100%">
     <tr><th></th><th style="text-align:left">문서ID</th><th>등급</th><th>상태</th></tr>${rows}</table></div>`;
@@ -2232,7 +2243,13 @@ async function loadCategoryBrowse(){
 async function exportCategorySelection(){
   const picked=[...document.querySelectorAll('.cat-pick:checked')].map(x=>x.value);
   const dep=$('cat-dept').value, info=$('cat-info').value, batch=$('cat-batch').value;
-  const body = picked.length ? {doc_ids:picked} : {department:dep||null, info_type:info||null, review_batch:batch||null};
+  // [2026-10-04] 체크한 게 없으면 종전엔 서버 필터(부서·정보유형·배치)로 '화면에 없던 것까지' 다시
+  // 긁어왔다 — 화면의 "검수 완료만" 체크와 어긋날 수 있었다(서버 필터는 grade_fixed 를 모른다).
+  // 지금 화면에 올라와 있는 CAT_ROWS(이미 그 체크를 반영한 집합)의 doc_id 를 그대로 보내,
+  // 화면에 보이는 것과 받는 파일이 항상 같게 한다.
+  const body = picked.length ? {doc_ids:picked}
+    : CAT_ROWS.length ? {doc_ids:CAT_ROWS.map(c=>c.doc_id)}
+    : {department:dep||null, info_type:info||null, review_batch:batch||null};
   const c=cfg();
   let res;
   try{
