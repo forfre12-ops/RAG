@@ -61,7 +61,7 @@ cleanup() {
     # 성공/실패/중단 어느 경우에도 임시 자원은 반드시 정리한다.
     echo "" ; echo "== 정리 — 임시 DB·게이트용 도커 이미지 =="
     docker rm -f koipa-testdb >/dev/null 2>&1 || true
-    docker rmi -f koipa-gate-api:check koipa-gate-worker:check >/dev/null 2>&1 || true
+    docker rmi -f koipa-gate-api:check koipa-gate-worker:check koipa-gate-ops:check >/dev/null 2>&1 || true
     local _elapsed=$(( $(date +%s) - _start ))
     if [ "$FAILED" -eq 0 ]; then
         echo "[전수검증 완료] 전부 통과 — 경과 ${_elapsed}초. 커밋/푸시해도 좋다."
@@ -136,6 +136,15 @@ run "worker 이미지 빌드" docker build -f Dockerfile.worker \
     -t koipa-gate-worker:check .
 run "worker 이미지 import 스모크" docker run --rm koipa-gate-worker:check \
     python -c "import koipa.workers.tasks; print('koipa.workers.tasks import OK')"
+
+# [2026-10-04] ops(Dockerfile.ops, 2026-10-03 분리)가 빠져 있었다 — deploy_manifest.toml의
+# save 목록(container.save)에 "ops"가 실려 실제 번들에 ops.tar로 나가는데, 이 게이트는
+# api·worker만 빌드+스모크해서 ops가 빌드는 되는데 import가 깨진 채로 배포될 사고를 못 잡았다.
+run "ops 이미지 빌드" docker build -f Dockerfile.ops \
+    --build-arg KOIPA_BUILD_SHA="$_sha" --build-arg KOIPA_BUILD_AT="$_now" \
+    -t koipa-gate-ops:check .
+run "ops 이미지 import 스모크" docker run --rm koipa-gate-ops:check \
+    python -c "import koipa.config; print('koipa.config import OK')"
 
 run "인수 샘플팩 채점" env CLASSIFIER_MODEL_DIR="$DEPLOYED_MODEL" "$PY" scripts/run_acceptance.py --mode inproc --require-model
 

@@ -33,7 +33,15 @@ def _client():
 
         from koipa.config import settings  # noqa: PLC0415
 
-        _cached_client = redis.Redis.from_url(settings.redis_url, decode_responses=True, socket_timeout=2)
+        # [2026-10-04] socket_timeout은 연결 이후 읽기/쓰기에만 적용된다 — 연결 자체(getaddrinfo+
+        # TCP connect)는 별도로 socket_connect_timeout이 없으면 OS 기본값(무제한에 가까움)을 쓴다.
+        # redis가 없는 환경(예: full_verification_gate.sh — postgres만 띄우고 redis는 안 띄움)에서
+        # conftest.py의 autouse 픽스처(_reset_regulation_runtime_toggle)가 매 테스트마다 이 클라이언트로
+        # 접속을 시도하다 그 연결 단계에서 멈춰, 전체 pytest가 수 시간째 안 끝나는 것으로 실측됐다
+        # (py-spy로 getaddrinfo에서 멈춘 스택 확인).
+        _cached_client = redis.Redis.from_url(
+            settings.redis_url, decode_responses=True, socket_timeout=2, socket_connect_timeout=2
+        )
     return _cached_client
 
 

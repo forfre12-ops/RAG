@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -156,6 +157,10 @@ def _restore_settings():
     config_mod._SECRETS_FILLED = _secrets_filled
 
 
+# [2026-10-04] _reset_regulation_runtime_toggle 의 회로차단기 — 아래 픽스처 참조.
+_regulation_redis_unreachable = False
+
+
 @pytest.fixture(autouse=True)
 def _reset_regulation_runtime_toggle():
     """규정 참고 표시의 콘솔 켬/끔 스위치(redis 키)는 프로세스 전역이라 한 시험이 켜고 안 지우면
@@ -171,6 +176,25 @@ def _reset_regulation_runtime_toggle():
             c.delete(runtime_toggle._KEY, runtime_toggle._LLM_KEY)
         except Exception:  # noqa: BLE001 — redis 미가용 환경도 시험은 계속 돈다
             pass
-    _clear()
+
+    def _clear_bounded():
+        # [2026-10-04] redis.Redis.from_url(...)의 socket_timeout은 연결 뒤 읽기/쓰기만 막는다 —
+        # 연결 단계(getaddrinfo 포함)는 그 값으로 안 막혀서(redis-py connection.py:_connect 확인),
+        # redis가 없는 환경(이 게이트 — postgres만 띄우고 redis는 안 띄움)에서 getaddrinfo 자체가
+        # 멈춰 전체 pytest(8,062개, autouse라 매 시험마다 호출)가 수 시간째 안 끝나는 것을 py-spy로
+        # 실측했다. try/except는 '빠르게 실패'만 막지 '멈춤'은 못 막으므로, 스레드로 분리해
+        # 강제 시간제한을 둔다. 스레드가 시간 안에 못 끝났으면(진짜 멈춘 것) 이 프로세스에서는
+        # redis가 없다고 확정하고 더 시도하지 않는다 — 안 그러면 멈춘 스레드가 시험마다 하나씩
+        # 쌓인다(8,062개 기준 최대 16,000개+).
+        global _regulation_redis_unreachable
+        if _regulation_redis_unreachable:
+            return
+        t = threading.Thread(target=_clear, daemon=True)
+        t.start()
+        t.join(timeout=2.0)
+        if t.is_alive():
+            _regulation_redis_unreachable = True
+
+    _clear_bounded()
     yield
-    _clear()
+    _clear_bounded()
