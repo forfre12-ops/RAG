@@ -130,8 +130,11 @@ def get_idempotency_store():
             import redis  # type: ignore  # noqa: PLC0415
 
             from koipa.config import settings  # noqa: PLC0415
+            # [2026-10-05] socket_timeout 만으론 접속 단계가 안 막힌다 — socket_connect_timeout
+            # 추가(regulation/runtime_toggle.py 10/4 c1511d99 와 같은 값).
             client = redis.Redis.from_url(
-                settings.redis_url, decode_responses=False, socket_timeout=2
+                settings.redis_url, decode_responses=False,
+                socket_timeout=2, socket_connect_timeout=2,
             )
             client.ping()
             _store = _RedisStore(client)

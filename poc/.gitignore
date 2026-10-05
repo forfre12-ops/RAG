@@ -11,6 +11,9 @@ __pycache__/
 .env.jjw
 .env.cust
 .env.cloud
+# [2026-10-05] 로컬 docker 스택용 실 시크릿(API_KEY·POSTGRES_PASSWORD·KOIPA_AUDIT_CHAIN_SECRET·
+# CONSOLE_LOGIN_PREFILL_TOKEN 등 실값 포함, 추적 전수조사로 발견) — 위 .env.jjw 등과 같은 성격.
+.env.docker-only
 datasets/raw/
 datasets/corrections/
 datasets/external/

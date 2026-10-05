@@ -259,7 +259,11 @@ class RedisOutboxStore(OutboxStore):
         import redis  # noqa: PLC0415
 
         self._redis_module = redis
-        self._client = redis.Redis.from_url(redis_url, decode_responses=True)
+        # [2026-10-05] socket_connect_timeout 없으면 접속 단계 자체가 OS 기본값(무제한에 가까움)
+        # 으로 멈출 수 있다 — regulation/runtime_toggle.py(10/4 c1511d99)와 같은 값.
+        self._client = redis.Redis.from_url(
+            redis_url, decode_responses=True, socket_timeout=2, socket_connect_timeout=2
+        )
         self._client.ping()
         self._ttl = msg_ttl_seconds
         self._url = redis_url

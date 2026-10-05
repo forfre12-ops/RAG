@@ -283,7 +283,7 @@ _review_batch_into_volume() {
       d=/app/datasets/proxy_gold/single_document_candidates
       mkdir -p "$d" || exit 1
       cp -n /incoming/* "$d"/ || true
-      ls "$d"/MD-*.metadata.json 2>/dev/null | wc -l' 2>/dev/null | tail -1 | tr -d ' \r'
+      ls "$d"/*.metadata.json 2>/dev/null | wc -l' 2>/dev/null | tail -1 | tr -d ' \r'
 }
 _load_review_batch() {
   local _src="$BUNDLE/golden_review_batch" _want _got
@@ -291,7 +291,12 @@ _load_review_batch() {
     inf "golden_review_batch/ 없음 — 검수 문서 적재를 건너뛴다(전문가 검수를 안 하는 번들이면 정상)"
     return 0
   fi
-  _want="$(ls "$_src"/MD-*.metadata.json 2>/dev/null | wc -l | tr -d ' ')"
+  # [2026-10-05 수정] "MD-" 접두사 하드코딩이면 mock1000 배치(doc_id "MK-")에서 건수가 늘 0으로
+  # 잘못 뜬다(실제 복사는 /incoming/* 라 접두사와 무관하게 정상 — 이 카운트만 거짓으로 "0건"을
+  # 보고했다). golden_review_batch/ 는 build_offline_bundle.py 의 select_review_batch_files()가
+  # 이미 review_batch 필드로 걸러서 담은 폴더라, 여기선 접두사 없이 전부 세는 게 맞다(10/3 에
+  # 번들 빌더 쪽에서 했던 것과 같은 수정을 설치 스크립트 쪽에도 반영).
+  _want="$(ls "$_src"/*.metadata.json 2>/dev/null | wc -l | tr -d ' ')"
   _got="$(_review_batch_into_volume "$_src")" || _got=""
   if [ -n "$_got" ] && [ "$_got" -ge "$_want" ] 2>/dev/null; then
     ok "검수 문서 적재 — 볼륨에 후보 ${_got}건(번들 ${_want}건). 이미 있던 후보·검수 원장은 덮어쓰지 않았다"

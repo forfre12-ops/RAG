@@ -122,7 +122,11 @@ class _RedisCache:
             return True
         try:
             import redis  # type: ignore
-            self._client = redis.Redis.from_url(self._url, decode_responses=False, socket_timeout=2)
+            # [2026-10-05] socket_connect_timeout 추가 — socket_timeout 만으론 접속 단계 자체가
+            # OS 기본값(무제한에 가까움)으로 멈출 수 있다(regulation/runtime_toggle.py 와 같은 값).
+            self._client = redis.Redis.from_url(
+                self._url, decode_responses=False, socket_timeout=2, socket_connect_timeout=2
+            )
             self._client.ping()
             return True
         except Exception:  # noqa: BLE001

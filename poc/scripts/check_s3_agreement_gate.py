@@ -29,7 +29,6 @@ import json
 import os
 import subprocess
 import sys
-from collections import Counter
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent

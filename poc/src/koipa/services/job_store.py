@@ -163,7 +163,13 @@ class RedisJobStore:
         import redis  # noqa: PLC0415
 
         self._redis_module = redis
-        self._client = redis.Redis.from_url(redis_url, decode_responses=True)
+        # [2026-10-05] socket_timeout 만으로는 접속 단계(getaddrinfo+TCP connect) 자체가
+        # 안 막힌다 — socket_connect_timeout 이 없으면 OS 기본값(무제한에 가까움)을 쓴다.
+        # 오늘 전수검증 중 이 경로가 실제로 20분 넘게 멈춘 걸 재현했다(regulation/runtime_toggle.py
+        # 가 10/4 c1511d99 로 먼저 고친 것과 같은 값).
+        self._client = redis.Redis.from_url(
+            redis_url, decode_responses=True, socket_timeout=2, socket_connect_timeout=2
+        )
         # 연결 가능성 확인 (실패 시 호출자가 폴백 결정)
         self._client.ping()
         self._ttl = ttl_seconds
