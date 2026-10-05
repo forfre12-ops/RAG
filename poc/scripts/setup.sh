@@ -194,7 +194,7 @@ GOLDEN_REVIEW_BLIND_ENFORCED=1
 
 # 후보 관리 화면의 기본 검수 배치 — 번들 golden_review_batch/ 의 회차. 옛 회차가 후보 풀에 쌓여도
 # 첫 화면이 이번 회차만 보여 준다(그 배치가 서버에 없으면 자동으로 전체).
-GOLDEN_DEFAULT_REVIEW_BATCH=expert_review_1731_20260924
+GOLDEN_DEFAULT_REVIEW_BATCH=expert_review_mock1000_20261002
 
 # 골든 검수 콘솔 로그인 — 결정 저장(POST .../decision)은 공유 API_KEY 를 거부하고 포털 JWT
 # 쿠키만 받는다("golden console requires a portal JWT login"). 이걸 안 채우면 AUTH_MODE
@@ -206,6 +206,11 @@ AUTH_MODE=both
 JWT_JWKS_PATH=datasets/_console_jwt/jwks.json
 JWT_ISSUER=koipa-console
 JWT_AUDIENCE=koipa-api
+# [2026-10-05] 아이디+비밀번호 로그인(POST /golden/candidates/login)은 로그인마다 서버가
+# 직접 토큰을 서명한다 — 이 경로가 없으면 404 "password login is not configured"가 난다
+# (실측 2026-10-04). 개인키 자체는 7단계에서 setup_console_test_login.py --also-copy-private-key
+# 로 이 경로에 채운다(컨테이너 비영속인 secrets/ 가 아니라 golden_data 볼륨 아래).
+CONSOLE_JWT_PRIVATE_KEY_PATH=datasets/_console_jwt/private.pem
 
 # 하드닝 프로파일 필수 — 원본 저장 암호화
 STORAGE_ENCRYPTION_ENABLED=1
@@ -258,7 +263,8 @@ _issue_token() {
   ${CRT_COMPOSE} --env-file "$ENV_FILE" -f infra-config/docker-compose.airgap.yml \
     exec -T api python scripts/setup_console_test_login.py \
     --sub "$1" --roles "$2" --days "$CONSOLE_TOKEN_DAYS" \
-    --also-copy-jwks datasets/_console_jwt/jwks.json 2>&1
+    --also-copy-jwks datasets/_console_jwt/jwks.json \
+    --also-copy-private-key datasets/_console_jwt/private.pem 2>&1
 }
 # 발급된 토큰을 호스트 파일($2)로 꺼낸다 — 컨테이너를 다시 만들면 안의 토큰 파일이 사라진다. 권한 600.
 _save_token() {

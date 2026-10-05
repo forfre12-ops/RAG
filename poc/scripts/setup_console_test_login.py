@@ -87,6 +87,16 @@ def main(argv=None) -> int:
     ap.add_argument("--also-copy-jwks", default="",
                     help="검증키를 복사할 경로. 컨테이너는 secrets/ 를 마운트하지 않으므로 "
                          "바인드되는 경로(예: datasets/_console_jwt/jwks.json)로 준다")
+    # [2026-10-05] 서명키(개인키) 복사 — 콘솔 "아이디+비밀번호 로그인"(golden.py 의
+    # POST /golden/candidates/login)은 로그인 순간마다 서버가 **직접** 새 토큰을 서명한다
+    # (sign_jwt(), settings.console_jwt_private_key_path 필요). 이 플래그 없이는 개인키가
+    # secrets/console_jwt/private.pem(컨테이너 비영속 경로)에만 남아, 이 스크립트가 한 번
+    # 발급한 "미리 채워진" 토큰은 동작해도 사용자가 직접 로그인하려 하면 404
+    # "password login is not configured"가 난다(실측, 2026-10-04).
+    ap.add_argument("--also-copy-private-key", default="",
+                    help="서명용 개인키를 복사할 경로(예: datasets/_console_jwt/private.pem). "
+                         "CONSOLE_JWT_PRIVATE_KEY_PATH 로 그 경로를 지정해야 아이디+비밀번호 "
+                         "로그인이 켜진다.")
     args = ap.parse_args(argv)
 
     from cryptography.hazmat.primitives import hashes, serialization
@@ -174,6 +184,19 @@ def main(argv=None) -> int:
             print(f"  [알림] jwks 권한 조정 생략({exc.__class__.__name__}) — 내용은 기록됨")
         copied = str(dst)
 
+    priv_copied = ""
+    if args.also_copy_private_key:
+        dst2 = Path(args.also_copy_private_key)
+        if not dst2.is_absolute():
+            dst2 = ROOT / dst2
+        dst2.parent.mkdir(parents=True, exist_ok=True)
+        dst2.write_bytes(priv_path.read_bytes())
+        try:
+            dst2.chmod(0o600)
+        except OSError as exc:
+            print(f"  [알림] 개인키 권한 조정 생략({exc.__class__.__name__}) — 내용은 기록됨")
+        priv_copied = str(dst2)
+
     print(json.dumps({
         "키": made,
         "jwks": str(jwks_path.relative_to(ROOT)).replace("\\", "/"),
@@ -184,12 +207,15 @@ def main(argv=None) -> int:
         "token_file_사람별": str(per_person.relative_to(ROOT)).replace("\\", "/"),
         "env_updated": updated,
         "jwks_copied_to": copied or None,
+        "private_key_copied_to": priv_copied or None,
     }, ensure_ascii=False, indent=2))
     print("\n서버 환경변수:")
     print("  AUTH_MODE=both")
     print(f"  JWT_JWKS_PATH={jwks_path.relative_to(ROOT).as_posix()}")
     print(f"  JWT_ISSUER={args.iss}")
     print(f"  JWT_AUDIENCE={args.aud}")
+    if priv_copied:
+        print(f"  CONSOLE_JWT_PRIVATE_KEY_PATH={args.also_copy_private_key}  # 아이디+비밀번호 로그인에 필요")
     print("\n이 사람에게 줄 것")
     print("  1) 로그인 화면   <서버주소>/api/v1/golden/candidates/login.html")
     print(f"  2) 붙여넣을 토큰  {per_person}")
