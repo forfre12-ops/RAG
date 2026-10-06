@@ -348,7 +348,6 @@ paths:
               type: object
               required:
               - actor
-              - file
               properties:
                 actor:
                   type: string
@@ -371,12 +370,28 @@ paths:
                   type: boolean
                   default: false
                   description: true 면 등록과 동시에 비동기 분류를 큐에 건다(응답에 classification_job_id).
+                callback_url:
+                  type: string
+                  nullable: true
+                  description: enqueue_classification=true 일 때 분류 완료·실패 결과를 받을 webhook 주소(선택). POST /classify/async(IF-03)의
+                    callback_url 과 같은 규칙(6장).
+                client_request_id:
+                  type: string
+                  nullable: true
+                  description: 호출자가 지정하는 임의 식별자(선택). doc_id 는 내용 해시로 재사용(dedupe)되고 job_id 는 응답을 받은 뒤에야 알 수 있어, 이
+                    요청과 결과를 미리 묶을 키가 둘 다 못 된다. 보낸 값은 응답·작업 조회·콜백에 그대로 돌아온다.
                 file:
                   type: string
                   format: binary
-                  description: '원본 파일. 지원 형식: TXT·MD·LOG·CSV / HWP·HWPX / DOC·DOCX / XLS·XLSM·XLSX / PPTX·PPTM /
-                    PDF(텍스트 레이어가 있는 것). 이미지와 스캔 PDF 는 OCR 을 하지 않으므로 그 밖의 형식과 같이 201 로 등록되지만 본문이 추출되지 않는다(char_count
-                    0).'
+                  nullable: true
+                  description: '원본 파일. file 과 file_path 중 정확히 하나만 보낸다. 지원 형식: TXT·MD·LOG·CSV / HWP·HWPX / DOC·DOCX
+                    / XLS·XLSM·XLSX / PPTX·PPTM / PDF(텍스트 레이어가 있는 것). 이미지와 스캔 PDF 는 OCR 을 하지 않으므로 그 밖의 형식과 같이 201
+                    로 등록되지만 본문이 추출되지 않는다(char_count 0).'
+                file_path:
+                  type: string
+                  nullable: true
+                  description: '[2026-10-07] file 대신 서버가 직접 읽을 경로(선택). documents_shared_mount_dir 로 지정된 공유 디렉터리
+                    안에 있어야 한다 — 이 설정이 배포에 없으면(기본) 422. 그 디렉터리 밖을 가리키면 경로조작 방어로 거절(422).'
       responses:
         '201':
           description: ingestion 완료
@@ -389,7 +404,8 @@ paths:
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
         '422':
-          description: '빈 파일 또는 actor JSON 오류. 본문은 {"detail": ...} 형태.'
+          description: '빈 파일, actor JSON 오류, file·file_path 둘 다 보냄, 둘 다 안 보냄, 또는 file_path 가 공유 디렉터리 밖/미설정. 본문은
+            {"detail": ...} 형태.'
         '500':
           $ref: '#/components/responses/InternalError'
       x-interface: IF-02
@@ -453,6 +469,10 @@ components:
           type: integer
           nullable: true
           description: 전체 쪽수. 쪽 개념이 없는 형식은 null
+        client_request_id:
+          type: string
+          nullable: true
+          description: 요청 때 보낸 값을 그대로 돌려준다(POST /documents, POST /documents/batch). 안 보냈으면 null.
         classification_job_id:
           type: string
           nullable: true
@@ -579,6 +599,14 @@ components:
               응답이 2xx 가 아니면 최대 5회 재시도하고 그래도 실패하면 엔진 쪽 DLQ 에 보관한다.
               본문은 완료 시 {"job_id","status":"done","results":[ClassifyJobResult]},
               실패 시 {"job_id","status":"failed","error"} 이다. 서명 헤더는 붙이지 않는다.
+          client_request_id:
+            type: string
+            nullable: true
+            description: |
+              호출자가 지정하는 임의 식별자(선택). doc_id 는 내용 해시로 재사용(dedupe)되고
+              job_id 는 응답을 받은 뒤에야 알 수 있어, 이 요청과 결과를 미리 묶을 키가 둘 다
+              못 된다. 보낸 값은 그대로 작업(job)에 저장되고 IF-05 조회·콜백 본문에 동일하게
+              돌아온다. 서버는 값의 의미를 해석하지 않는다(그대로 보관·반환만).
     EvaluationFactors:
       type: object
       description: 정본 가이드 3요건(S 비공지성 · V 경제적 유용성 · M 비밀관리성) 점수. 각 0~2.
@@ -858,6 +886,10 @@ components:
           description: |
             현행 코드가 내는 값은 queued · done · failed · partial 이다.
             partial — 일부 건은 성공·일부는 영구 실패(다건 작업). completed/failed 로 분포를 확인한다.
+        client_request_id:
+          type: string
+          nullable: true
+          description: POST /classify/async(또는 POST /documents) 요청 때 보낸 값을 그대로 돌려준다. 안 보냈으면 null.
         total:
           type: integer
           nullable: true

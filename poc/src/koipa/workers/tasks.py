@@ -94,7 +94,8 @@ def _record_compensation(job_id: str | None, partial_results: list[dict], reason
     default_retry_delay=1,
 )
 def classify_async(
-    self: Any, payload: dict, job_id: str | None = None, callback_url: str | None = None
+    self: Any, payload: dict, job_id: str | None = None, callback_url: str | None = None,
+    client_request_id: str | None = None,
 ) -> dict:
     """단일 문서 분류 비동기 task.
 
@@ -127,7 +128,12 @@ def classify_async(
             regulation_reference=kl_reference,
             regulation_summary=regulation_summary_for_kl_wire(kl_doc_id, kl_reference),
         ).model_dump(mode="json")
-        _publish_callback_webhook(callback_url, {"job_id": job_id, "status": "done", "results": [kl_result_json]})
+        _done_payload = {
+            "job_id": job_id, "status": "done",
+            "client_request_id": client_request_id, "results": [kl_result_json],
+        }
+        _publish_callback_webhook(callback_url, _done_payload)
+        _publish_kl_stream_webhook(_done_payload)
         return result_json
     except Exception as exc:  # noqa: BLE001
         attempts = self.request.retries
@@ -145,9 +151,12 @@ def classify_async(
             partial_results=[],
             reason=f"classify_async exhausted: {type(exc).__name__}: {exc}",
         )
-        _publish_callback_webhook(
-            callback_url, {"job_id": job_id, "status": "failed", "error": f"{type(exc).__name__}: {exc}"}
-        )
+        _failed_payload = {
+            "job_id": job_id, "status": "failed",
+            "client_request_id": client_request_id, "error": f"{type(exc).__name__}: {exc}",
+        }
+        _publish_callback_webhook(callback_url, _failed_payload)
+        _publish_kl_stream_webhook(_failed_payload)
         raise
 
 
@@ -191,9 +200,11 @@ def classify_batch(
             job_id, partial_results=[],
             reason=f"classify_batch exhausted: {type(exc).__name__}: {exc}",
         )
-        _publish_callback_webhook(
-            callback_url, {"job_id": job_id, "status": "failed", "error": f"{type(exc).__name__}: {exc}"}
-        )
+        _batch_failed_payload = {
+            "job_id": job_id, "status": "failed", "error": f"{type(exc).__name__}: {exc}",
+        }
+        _publish_callback_webhook(callback_url, _batch_failed_payload)
+        _publish_kl_stream_webhook(_batch_failed_payload)
         raise
 
 
@@ -204,6 +215,16 @@ def _publish_callback_webhook(callback_url: str | None, payload: dict) -> None:
     """
     from koipa.services.outbox import publish_callback  # noqa: PLC0415
     publish_callback(callback_url, payload)
+
+
+def _publish_kl_stream_webhook(payload: dict) -> None:
+    """[2026-10-07] 워커 완료/실패 시 KL Stream 에도 발사 — outbox.publish_kl_stream 위임.
+
+    kl_stream_redis_url 미설정이면 no-op. callback_url 유무와 무관하게 매 종결마다 시도한다
+    (in-process 경로 AsyncClassifyService._publish_kl_stream 과 동일 계약).
+    """
+    from koipa.services.outbox import publish_kl_stream  # noqa: PLC0415
+    publish_kl_stream(payload)
 
 
 # 아직 학습셋 판이 정해지지 않은 상태의 자리표시. 빌드가 실제 판 이름으로 한 줄 더 쌓는다

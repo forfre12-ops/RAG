@@ -72,7 +72,10 @@ bind_authenticated_actor = _bind_authenticated_actor
 @router.post("/confirm", response_model=ConfirmResponse)
 def confirm(
     req: ConfirmRequest,
-    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
+    # [2026-10-06] "system" 추가 — 설치기본값 api_key_role=system(X-API-Key 공유키 호출자)이
+    # 여기서만 403 이었다. app.py·golden.py 의 동급 라우트는 전부 admin/kl_backend/system
+    # 세 역할을 같이 허용하는데 이 세 엔드포인트(confirm·review-queue·evidence)만 빠져 있었다.
+    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend", "system")),
 ):
     # tenant 제거: 격리는 KL 포털 전담 → 무스코프 확정.
     # [신원 무결성] corrected_by 가 human_review 라벨러로 흐르므로 클라 자칭이 아닌 인증 신원으로.
@@ -106,7 +109,7 @@ def review_queue(
             "동률이면 오래된 것 먼저(기아 방지)."
         ),
     ),
-    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
+    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend", "system")),
 ):
     """검수 대기(승인 대기) 분류 목록 — DB에 쌓인 needs_review 를 서버측에서 조회(FUN-024).
 
@@ -143,7 +146,7 @@ def review_queue(
 )
 def review_item_evidence(
     classification_id: UUID,
-    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
+    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend", "system")),
 ) -> dict:
     return load_review_evidence(classification_id)
 

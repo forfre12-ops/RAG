@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
 import time
 
 import pytest
 
+from koipa.config import settings
 from koipa.services.outbox import (
     InMemoryOutboxStore,
     RedisOutboxStore,
@@ -79,6 +81,116 @@ def test_deliver_with_exception():
 
     r = deliver_once(store, http_send=boom)
     assert r["failed"] == 1
+
+
+# ---------------------------------------------------------------------------
+# [2026-10-06] publish_callback 즉시 배송 kick — KL 요청(완료 즉시 발송, 60초는 재시도만)
+# ---------------------------------------------------------------------------
+
+
+def test_publish_callback_kicks_immediate_delivery_when_broker_available(monkeypatch):
+    from koipa.services import outbox as outbox_mod
+
+    reset_default_store()
+    monkeypatch.setenv("OUTBOX_BACKEND", "memory")
+    monkeypatch.setattr(
+        "koipa.services.async_classify_service._celery_dispatch_available", lambda: True,
+    )
+    calls: list[tuple] = []
+
+    class _FakeTask:
+        def delay(self, *a, **kw):
+            calls.append((a, kw))
+
+    monkeypatch.setattr("koipa.workers.tasks.deliver_outbox_tick", _FakeTask())
+
+    ok = outbox_mod.publish_callback("http://kl/cb", {"job_id": "j1", "status": "done"})
+    assert ok is True
+    assert len(calls) == 1, "브로커 가용이면 즉시 1회 배송 시도를 Celery 에 맡겨야 한다"
+    reset_default_store()
+
+
+def test_publish_callback_skips_kick_when_broker_unavailable(monkeypatch):
+    from koipa.services import outbox as outbox_mod
+
+    reset_default_store()
+    monkeypatch.setenv("OUTBOX_BACKEND", "memory")
+    monkeypatch.setattr(
+        "koipa.services.async_classify_service._celery_dispatch_available", lambda: False,
+    )
+    calls: list[tuple] = []
+
+    class _FakeTask:
+        def delay(self, *a, **kw):
+            calls.append((a, kw))
+
+    monkeypatch.setattr("koipa.workers.tasks.deliver_outbox_tick", _FakeTask())
+
+    ok = outbox_mod.publish_callback("http://kl/cb", {"job_id": "j1", "status": "done"})
+    assert ok is True, "브로커 미가용이어도 outbox 적재 자체는 성공해야 한다(60초 틱이 나중에 집음)"
+    assert len(calls) == 0
+    reset_default_store()
+
+
+def test_publish_callback_no_url_is_noop():
+    from koipa.services import outbox as outbox_mod
+
+    assert outbox_mod.publish_callback(None, {"job_id": "j1"}) is False
+
+
+# ---------------------------------------------------------------------------
+# [2026-10-07] publish_kl_stream — KL Consumer Group 직접구독용 Stream (사용자 결정)
+# ---------------------------------------------------------------------------
+
+
+def test_publish_kl_stream_noop_when_url_unset(monkeypatch):
+    from koipa.services import outbox as outbox_mod
+
+    monkeypatch.setattr(settings, "kl_stream_redis_url", "")
+    assert outbox_mod.publish_kl_stream({"job_id": "j1", "status": "done"}) is False
+
+
+def test_publish_kl_stream_xadds_with_configured_name_and_maxlen(monkeypatch):
+    from koipa.services import outbox as outbox_mod
+
+    outbox_mod.reset_kl_stream_client()
+    monkeypatch.setattr(settings, "kl_stream_redis_url", "redis://kl-stream-host:6380/0")
+    monkeypatch.setattr(settings, "kl_stream_name", "koipa:classify:results")
+    monkeypatch.setattr(settings, "kl_stream_maxlen", 123)
+
+    calls: list[dict] = []
+
+    class _FakeClient:
+        def xadd(self, name, entry, maxlen=None, approximate=None):
+            calls.append({"name": name, "entry": entry, "maxlen": maxlen, "approximate": approximate})
+
+    monkeypatch.setattr(outbox_mod, "_get_kl_stream_client", lambda url: _FakeClient())
+
+    payload = {"job_id": "j1", "status": "done", "client_request_id": "req-9"}
+    ok = outbox_mod.publish_kl_stream(payload)
+
+    assert ok is True
+    assert len(calls) == 1
+    assert calls[0]["name"] == "koipa:classify:results"
+    assert calls[0]["maxlen"] == 123
+    assert calls[0]["approximate"] is True
+    assert json.loads(calls[0]["entry"]["payload_json"]) == payload
+    outbox_mod.reset_kl_stream_client()
+
+
+def test_publish_kl_stream_failure_is_non_critical(monkeypatch):
+    from koipa.services import outbox as outbox_mod
+
+    outbox_mod.reset_kl_stream_client()
+    monkeypatch.setattr(settings, "kl_stream_redis_url", "redis://kl-stream-host:6380/0")
+
+    def _boom(url):
+        raise ConnectionError("down")
+
+    monkeypatch.setattr(outbox_mod, "_get_kl_stream_client", _boom)
+
+    assert outbox_mod.publish_kl_stream({"job_id": "j1"}) is False
+    outbox_mod.reset_kl_stream_client()
 
 
 # ---------------------------------------------------------------------------

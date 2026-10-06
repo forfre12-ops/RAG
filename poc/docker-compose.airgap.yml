@@ -45,6 +45,22 @@ services:
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
 
+  # [2026-10-07] KL Consumer Group 직접구독용 — 분류 완료 Stream 전용, 메인 redis 와
+  # 일부러 별개 인스턴스다. 메인 redis 에는 Celery 작업큐·outbox(실패 콜백 payload·재시도
+  # 대상)·멀티워커 job 저장소가 함께 들어 있어, 그 접속정보를 그대로 내주면 분류 결과
+  # 스트림 하나만 보여주려던 것이 그 외 내부 데이터까지 노출하는 길이 된다. 이 컨테이너
+  # 안에는 koipa:classify:results 스트림 말고는 아무것도 안 둔다(api·worker 가 쓰는
+  # 유일한 키). 기본적으로 꺼져 있다 — KL_STREAM_REDIS_URL 을 .env 에 채워야 켜진다
+  # (api/worker 환경변수, 아래).
+  redis-kl-stream:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --stop-writes-on-bgsave-error no
+    volumes:
+      - redis_kl_stream_data:/data
+    ports:
+      - "127.0.0.1:${KL_STREAM_REDIS_PORT:-6380}:6379"
+
   # mlflow 제거 — 폐쇄망(고객사) 배포는 추론 전용(enable_training=False)이라 모델 트래킹/레지스트리
   # 불요. 학습·MLflow 는 지재원(Koipa) full-train 환경에서만. (mlflow 가 minio 아티팩트 저장에
   # 의존했으므로 minio 제거와 함께 제거.)
@@ -58,6 +74,9 @@ services:
       DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD}@postgres:5432/koipa
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       REDIS_URL: redis://redis:6379/0
+      # [2026-10-07] 비우면(기본) KL Stream 기능 꺼짐. 켤 때는 반드시 redis-kl-stream
+      # 처럼 메인 redis 와 분리된 인스턴스를 가리킬 것(redis-kl-stream 서비스 주석 참조).
+      KL_STREAM_REDIS_URL: ${KL_STREAM_REDIS_URL:-}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS(/app/.storage). MinIO 미사용.
       POC_MODE: ${POC_MODE:-full}
       LLM_PROVIDER: ${LLM_PROVIDER:-vllm}
@@ -130,6 +149,7 @@ services:
       DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)
       DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
+      KL_STREAM_REDIS_URL: ${KL_STREAM_REDIS_URL:-}
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS. api 와 동일 storagedata 볼륨 공유.
       POC_MODE: ${POC_MODE:-full}
@@ -239,6 +259,7 @@ services:
 volumes:
   pgdata:
   redisdata:
+  redis_kl_stream_data:   # [2026-10-07] KL Stream 전용 redis-kl-stream — 메인 redisdata 와 분리
   storagedata:     # 로컬FS 문서·원본 보관(api·worker 공유) — minio/mlflowdata 대체
   golden_data:     # 골든 후보·검수 원장·사람 서명(api·worker 공유). 이미지에 없는 경로다
   artifacts_out:   # 재학습 산출 모델(api·worker 공유)

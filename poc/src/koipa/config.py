@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # 부팅 시점에 fail-fast로 막는다. 단 하위호환 alias(vllm/ollama 등 기존 .env/코드가
 # 쓰는 값)는 반드시 통과시킨다 — 현존 사용값을 깨지 않는 것이 최우선(비파괴).
 # 각 집합은 어댑터 팩토리(adapters/*/__init__.py)의 분기·.env*·테스트 실측값을 합집합으로 둠.
-_VALID_AUTH_MODE = {"api_key", "jwt", "both"}
+_VALID_AUTH_MODE = {"api_key", "jwt", "both", "none"}
 # llm: noop/anthropic/openai/google + 로컬 OpenAI 호환(local_openai)와 그 alias들.
 _VALID_LLM_PROVIDER = {
     "noop", "anthropic", "openai", "google", "gemini",
@@ -244,6 +244,19 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://koipa:koipa_dev@localhost:5432/koipa"
     redis_url: str = "redis://localhost:6379/0"
 
+    # [2026-10-07] KL 요청 — 분류 완료 결과를 Redis Stream 으로도 발사(Consumer Group 으로
+    # 직접 구독). koipa:job:{job_id} STRING 저장·콜백은 그대로 둔다 — 이건 세 번째 채널이다.
+    # 비워두면(기본) 기능 자체가 꺼진다. **redis_url(작업큐·outbox 가 있는 메인 Redis)과는
+    # 반드시 다른 인스턴스를 가리킬 것** — 같은 Redis 를 그대로 열어주면 KL 쪽 접속 권한이
+    # 이 스트림뿐 아니라 Celery 작업큐·콜백 실패 로그까지 닿는다(docker-compose.airgap.yml
+    # 의 redis-kl-stream 서비스가 그 전용 인스턴스).
+    kl_stream_redis_url: str = ""
+    kl_stream_name: str = "koipa:classify:results"
+    # Stream 은 trim 하지 않으면 무한히 자란다 — XADD 때마다 MAXLEN(근사치)으로 오래된
+    # 항목을 밀어낸다. KL 이 그보다 오래 안 읽으면 그 사이 결과는 유실된다(기존
+    # koipa:job:{job_id} 조회·콜백이 여전히 1차 전달 경로이므로 안전망은 남아 있다).
+    kl_stream_maxlen: int = 10_000
+
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = ""
     minio_secret_key: str = ""  # J1: dev 디폴트 제거. .env 필수.
@@ -280,8 +293,17 @@ class Settings(BaseSettings):
     # --- API ---
     # J1: dev 디폴트 제거. dryrun/테스트는 빈 키 허용, full 모드는 startup에서 fail-fast.
     api_key: str = ""
+    # [2026-10-06] 키 교체 유예(rotation grace). api_key 를 바로 바꾸면 그 순간부터 옛 키를
+    # 쓰는 호출자가 전부 401 이 된다 — 두 키를 같이 받아주는 창을 둬서, 호출자를 새 키로
+    # 옮긴 뒤에야 이 값을 비워 옛 키를 완전히 폐기한다. 빈 문자열이면 옛 키 비교 자체를
+    # 건너뛴다(평소 동작 불변).
+    api_key_previous: str = ""
 
-    # P1-C3: JWT 인증 모드. api_key(기본) | jwt | both
+    # P1-C3: JWT 인증 모드. api_key(기본) | jwt | both | none
+    # [2026-10-06] "none" — 사용자 결정(폐쇄망 전용 배포, 2026-10-07). X-API-Key·JWT 검증을
+    # 전부 생략한다. 역할은 그래도 api_key_role 설정값을 그대로 쓴다 — "인증을 끈다"가
+    # "무조건 admin 전권을 준다"로 저절로 번지지 않게 하기 위해서다. 네트워크가 외부에
+    # 열리면 그대로 무방비가 되므로, 인터넷에 노출되지 않는 배포에서만 쓸 것.
     auth_mode: str = "api_key"
     jwt_jwks_path: str = ""           # JWKS JSON 파일 경로 (kid → key)
     jwt_public_key: str = ""          # 단일 RS256 공개키 PEM (JWKS 미사용시)
@@ -954,6 +976,20 @@ class Settings(BaseSettings):
     # 운영 기본 20MB — 대부분 가이드 PDF·DOCX 커버. 초과 시 413 Payload Too Large 반환.
     max_upload_mb: int = 20
 
+    # [2026-10-06] POST /documents/batch 한 요청의 최대 파일 수. /classify/batch(이미 추출된
+    # 텍스트, 상한 1000)와 달리 이 경로는 요청 안에서 파일마다 파싱(HWP/PDF/DOCX 추출)을
+    # 동기로 마쳐야 doc_id 를 돌려줄 수 있다 — 상한을 높게 두면 한 요청이 그 시간만큼
+    # 커넥션을 붙들어, KL 이 애초에 피하려던 "요청 하나가 오래 걸린다" 문제를 파일 수만
+    # 줄어든 채로 재현한다. 보수적으로 작게 시작한다(필요하면 조정).
+    documents_batch_max_files: int = 50
+
+    # [2026-10-07] KL 요청 — 등록 시스템과 같은 VM에서 돈다는 전제로, 파일을 업로드하지
+    # 않고 "이 경로에 이미 있는 파일을 읽어라"로 등록. 비워두면(기본) 기능 자체가 꺼진다
+    # (file_path 를 보내도 422) — 반드시 호출측 저장소가 실제로 이 컨테이너에 마운트된
+    # 디렉터리를 가리킬 때만 값을 채운다. 받은 경로가 이 디렉터리 밖을 가리키면(경로조작)
+    # 거절한다 — "같은 VM"이라는 전제만으로 임의 경로를 그대로 읽지 않는다.
+    documents_shared_mount_dir: str = ""
+
     # #13: JSON 본문 크기 DoS 가드 — 일반 JSON body(/classify/batch 등)의 상한.
     # 멀티파트 업로드는 위 max_upload_mb로 막히지만, JSON body는 Pydantic 파싱 후에야
     # 413이 떠서 인증된 호출자가 대용량 body(예: 1000×1MB)로 OOM을 유발할 수 있다.
@@ -1407,7 +1443,9 @@ def assert_production_credentials() -> None:
         return
     fill_from_secrets_manager()
     missing: list[str] = []
-    if not settings.api_key:
+    # [2026-10-06] auth_mode=none 이면 애초에 키를 검사하지 않으므로(require_auth) 기동 때도
+    # 요구하지 않는다 — 안 그러면 "인증을 껐는데 쓰지도 않는 키를 설정하라"는 모순이 생긴다.
+    if not settings.api_key and settings.auth_mode != "none":
         missing.append("KOIPA_API_KEY")
     # 객체스토어 백엔드(minio/seaweedfs/s3)일 때만 시크릿 키 필수.
     # 폐쇄망 local(file://) 배포는 minio를 쓰지 않으므로 키를 요구하지 않는다
@@ -1606,6 +1644,7 @@ def fill_from_secrets_manager() -> dict:
     # 보충 후보: 운영에 필요한 자격증명만 (전체 settings 덮어쓰기 금지)
     candidates = [
         ("api_key", "KOIPA_API_KEY"),
+        ("api_key_previous", "KOIPA_API_KEY_PREVIOUS"),
         ("minio_secret_key", "KOIPA_MINIO_SECRET_KEY"),
         ("audit_chain_secret", "KOIPA_AUDIT_CHAIN_SECRET"),
         ("anthropic_api_key", "ANTHROPIC_API_KEY"),

@@ -60,6 +60,14 @@ def assert_production_auth_config() -> None:
     if not _is_production():
         return
     mode = (getattr(settings, "auth_mode", "api_key") or "api_key").lower()
+    if mode == "none":
+        # 막지 않는다(사용자 결정, 2026-10-07 — 폐쇄망 전용 배포) — 다만 운영 기동 로그에
+        # 눈에 띄게 남긴다. 이 서버가 외부에 열리면(네트워크 설정 변경 등) 그 순간부터
+        # 무방비이므로, 로그만으로라도 "인증이 꺼진 채 떴다"가 조용히 지나가지 않게 한다.
+        logger.warning(
+            "SECURITY: auth_mode=none 으로 기동합니다 — X-API-Key·JWT 검증을 전부 생략합니다. "
+            "이 네트워크가 외부에 노출되면 인증 없이 전체 API가 열립니다. 폐쇄망 전용 배포에서만 쓰십시오."
+        )
     if mode in ("jwt", "both"):
         missing: list[str] = []
         if not getattr(settings, "jwt_issuer", ""):
@@ -332,20 +340,32 @@ def require_auth(
     x_api_key: str | None = Header(default=None),
     koipa_access_token: str | None = Cookie(default=None),
 ):
-    """모드 자동 선택 — settings.auth_mode=jwt|api_key.
+    """모드 자동 선택 — settings.auth_mode=jwt|api_key|both|none.
 
     - api_key (default): X-API-Key 검증
     - jwt: Authorization: Bearer 검증 (KL 서명 JWT, KL이 유일 발급자)
     - both: 둘 중 하나 만족
+    - none: [2026-10-06] 검증을 전부 생략(폐쇄망 전용 배포). 역할은 그래도
+      api_key_role 설정값을 쓴다 — 인증 생략이 전권 승인으로 저절로 번지지 않게.
 
     tenant 제거: 단일 KL 인증이 곧 인증의 전부(서명검증). 고객사 격리는 KL 포털
     라우팅이 상류에서 전담하므로 Koipa 내부엔 per-customer 경계가 없다.
     """
     mode = (getattr(settings, "auth_mode", "api_key") or "api_key").lower()
+    if mode == "none":
+        roles = _resolve_api_key_roles(request)
+        _stash_auth(request, mode="none", actor=None, role=roles[0])
+        return {"mode": "none", "actor_role": roles[0], "actor_roles": roles}
     if mode in ("api_key", "both"):
         # 상수시간 비교(hmac.compare_digest) — 평문 `==`의 바이트단위 early-exit
         # 타이밍 사이드채널 차단. 빈 settings.api_key는 인증 불가(가드 유지).
-        if x_api_key and settings.api_key and hmac.compare_digest(x_api_key, settings.api_key):
+        # [2026-10-06] 키 교체 유예(rotation grace) — api_key_previous 가 설정돼 있으면 옛 키도
+        # 같은 상수시간 비교로 받아준다. 둘 다 아니면 전체가 False(아래 401)로 떨어진다.
+        _api_key_matches = bool(x_api_key) and (
+            bool(settings.api_key) and hmac.compare_digest(x_api_key, settings.api_key)
+            or bool(settings.api_key_previous) and hmac.compare_digest(x_api_key, settings.api_key_previous)
+        )
+        if _api_key_matches:
             # 보안: 역할은 서버 설정에서 결정 (X-Actor-Role 헤더 위조 차단).
             roles = _resolve_api_key_roles(request)
             _stash_auth(request, mode="api_key", actor=None, role=roles[0])

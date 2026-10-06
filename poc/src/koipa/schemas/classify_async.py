@@ -12,6 +12,10 @@ from .classify import ClassifyJobResult, ClassifyRequest
 
 class ClassifyAsyncRequest(ClassifyRequest):
     callback_url: Optional[str] = None
+    # [2026-10-06] KL 요청 — doc_id 는 내용 해시로 재사용(dedupe)되고 job_id 는 응답을 받은 뒤에야
+    # 알 수 있어, 둘 다 호출자가 보낸 "이 요청"과 "그 결과"를 미리 묶는 키가 못 된다. 호출자가
+    # 지정한 임의 문자열을 그대로 작업(job)에 저장해 되돌려준다 — 서버는 의미를 해석하지 않는다.
+    client_request_id: Optional[str] = None
 
 
 class ClassifyAsyncResponse(BaseModel):
@@ -46,6 +50,7 @@ class ClassifyBatchResponse(BaseModel):
 class ClassifyJobStatus(BaseModel):
     job_id: UUID
     status: str  # queued/running/done/failed/partial
+    client_request_id: Optional[str] = None
     total: Optional[int] = None
     completed: Optional[int] = None
     failed: Optional[int] = None

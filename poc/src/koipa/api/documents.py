@@ -10,6 +10,7 @@ import json
 import os
 import tempfile
 import time
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -31,6 +32,41 @@ def _get_ingestion_service() -> DocumentIngestionService:
     return DocumentIngestionService()
 
 
+def _read_shared_mount_file(raw_path: str) -> tuple[str, bytes]:
+    """[2026-10-07] KL 요청 — 업로드 대신 "이미 같은 VM에 있는 파일"을 경로로 등록.
+
+    documents_shared_mount_dir 가 비어 있으면(기본) 기능 자체를 끈다. 설정돼 있어도
+    받은 경로가 그 디렉터리 밖을 가리키면 거절한다(경로조작 방어) — "같은 VM"이라는
+    전제를 받은 문자열 그대로 신뢰하지 않고, 실제로 컨테이너에 마운트된 그 폴더
+    안에 있는지 매번 다시 확인한다. 반환: (파일명, 바이트).
+    """
+    base = (getattr(settings, "documents_shared_mount_dir", "") or "").strip()
+    if not base:
+        raise HTTPException(
+            status_code=422,
+            detail="file_path is disabled on this deployment (documents_shared_mount_dir unset)",
+        )
+    base_resolved = Path(base).resolve(strict=False)
+    try:
+        candidate = Path(raw_path).resolve(strict=False)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"invalid file_path: {exc}") from exc
+    try:
+        candidate.relative_to(base_resolved)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail="file_path must be inside the shared directory configured on this deployment",
+        )
+    if not candidate.is_file():
+        raise HTTPException(status_code=422, detail="file_path does not exist or is not a file")
+    try:
+        body = candidate.read_bytes()
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail=f"file_path could not be read: {exc}") from exc
+    return candidate.name, body
+
+
 class DocumentUploadResponse(BaseModel):
     doc_id: Optional[str]           # UUID str | None (DB 미가용 시 None)
     filename: str
@@ -42,6 +78,9 @@ class DocumentUploadResponse(BaseModel):
     char_count: int
     chunk_count: int
     pages_total: Optional[int] = None
+    # [2026-10-06] 호출자가 보낸 값을 그대로 돌려준다(doc_id dedupe·job_id 선후관계 때문에
+    # 둘 다 요청↔결과를 미리 묶는 키가 못 된다 — classify_async.py 참고). 서버는 저장·반환만.
+    client_request_id: Optional[str] = None
     classification_job_id: Optional[str] = None
     classification_status: Optional[str] = None
     classification_status_url: Optional[str] = None
@@ -51,6 +90,45 @@ class DocumentUploadResponse(BaseModel):
     # 격리돼 자동분류를 그대로 통과하지 않는다(호출측이 검수 유도).
     requires_review: bool = False
     review_reasons: list[str] = []
+
+
+def _ingest_to_response(
+    svc: DocumentIngestionService,
+    *,
+    filename: str,
+    content_bytes: bytes,
+    source_type: Optional[str],
+    security_marking: Optional[str],
+    access_scope: Optional[str],
+    created_by: str,
+    client_request_id: Optional[str],
+) -> DocumentUploadResponse:
+    """파일 1건 적재 → 분류 관련 필드는 비운 DocumentUploadResponse. 단건·배치 공용."""
+    result = svc.ingest(
+        filename=filename,
+        content_bytes=content_bytes,
+        source_type=source_type,
+        security_marking=security_marking,
+        access_scope=access_scope,
+        created_by=created_by,
+    )
+    return DocumentUploadResponse(
+        doc_id=(str(result.doc_id) if result.doc_id is not None else None),
+        filename=result.filename,
+        source_format=result.source_format,
+        file_hash=result.file_hash,
+        file_size_bytes=result.file_size_bytes,
+        extraction_method=result.extraction_method,
+        extraction_quality=result.extraction_quality,
+        char_count=result.char_count,
+        chunk_count=result.chunk_count,
+        pages_total=result.pages_total,
+        client_request_id=client_request_id,
+        persisted=result.persisted,
+        warnings=result.warnings,
+        requires_review=result.requires_review,
+        review_reasons=result.review_reasons,
+    )
 
 
 @router.post("/documents", response_model=DocumentUploadResponse, status_code=201)
@@ -84,7 +162,25 @@ async def upload_document(
                     "all_employees. 보안표시가 none 일 때 관리수준(M)을 정하는 주 입력.",
     ),
     enqueue_classification: bool = Form(default=False),
-    file: UploadFile = File(...),
+    # [2026-10-06] KL 요청 — 등록+분류(enqueue_classification=true)의 완료 통보를 받을 주소.
+    # ClassifyAsyncRequest 는 이미 이 필드가 있었지만 이 엔드포인트엔 받을 자리가 없어 내부
+    # submit_async 호출에 전달되지 않았다(구조적으로 끊김) — 그 결과 "콜백을 못 받는다"였다.
+    callback_url: Optional[str] = Form(
+        default=None,
+        description="enqueue_classification=true 일 때 분류 완료·실패 결과를 받을 webhook 주소(선택).",
+    ),
+    # [2026-10-06] KL 요청 — doc_id dedupe·job_id 선후관계 때문에 둘 다 호출자 쪽 매칭 키가
+    # 못 된다. 그대로 저장해 응답·작업 조회·콜백에 돌려준다(서버는 해석하지 않음).
+    client_request_id: Optional[str] = Form(default=None),
+    # [2026-10-07] KL 요청 — 파일을 업로드하지 않고, 같은 VM에 이미 있는 파일의 경로로
+    # 등록. file 과 file_path 중 정확히 하나만 보낸다. documents_shared_mount_dir 가
+    # 설정돼 있어야 하고, 그 디렉터리 밖을 가리키면 거절한다(_read_shared_mount_file).
+    file_path: Optional[str] = Form(
+        default=None,
+        description="file 대신 서버가 읽을 절대경로(선택). documents_shared_mount_dir 로 "
+                    "지정된 공유 디렉터리 안에 있어야 한다 — 이 설정이 없으면 422.",
+    ),
+    file: Optional[UploadFile] = File(default=None),
     svc: DocumentIngestionService = Depends(_get_ingestion_service),
     auth: dict = Depends(require_auth),
 ):
@@ -103,39 +199,52 @@ async def upload_document(
     # [#13] created_by 감사 신원을 인증 principal 로 확정(body 자칭 위조 차단; JWT sub 우선).
     bind_authenticated_actor(actor_obj, auth)
     max_bytes = settings.max_upload_mb * 1024 * 1024
-    declared_size = getattr(file, "size", None)
-    if declared_size is not None and declared_size > max_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"file too large: {declared_size} > {max_bytes} bytes ({settings.max_upload_mb}MB)",
-        )
 
-    body = await file.read()
-    if len(body) > max_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"file too large: {len(body)} > {max_bytes} bytes ({settings.max_upload_mb}MB)",
-        )
-    if not body:
-        raise HTTPException(status_code=422, detail="empty file")
+    if file is not None and file_path:
+        raise HTTPException(status_code=422, detail="give either file or file_path, not both")
+    if file is None and not file_path:
+        raise HTTPException(status_code=422, detail="file or file_path is required")
 
-    filename = file.filename or "unknown"
+    if file_path:
+        filename, body = _read_shared_mount_file(file_path)
+        if len(body) > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"file too large: {len(body)} > {max_bytes} bytes ({settings.max_upload_mb}MB)",
+            )
+        if not body:
+            raise HTTPException(status_code=422, detail="empty file")
+    else:
+        declared_size = getattr(file, "size", None)
+        if declared_size is not None and declared_size > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"file too large: {declared_size} > {max_bytes} bytes ({settings.max_upload_mb}MB)",
+            )
+        body = await file.read()
+        if len(body) > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"file too large: {len(body)} > {max_bytes} bytes ({settings.max_upload_mb}MB)",
+            )
+        if not body:
+            raise HTTPException(status_code=422, detail="empty file")
+        filename = file.filename or "unknown"
     # tenant 제거: 격리는 KL 포털 전담(상류 보장). 단일 고객사 엔진이라 ingest를 무스코프로 수행.
-    result = svc.ingest(
+    resp = _ingest_to_response(
+        svc,
         filename=filename,
         content_bytes=body,
         source_type=source_type,
         security_marking=security_marking,
         access_scope=access_scope,
         created_by=actor_obj.user_id,
+        client_request_id=client_request_id,
     )
 
-    classification_job_id: Optional[str] = None
-    classification_status: Optional[str] = None
-    classification_status_url: Optional[str] = None
     if enqueue_classification:
-        if not result.persisted or result.doc_id is None or result.char_count == 0:
-            result.warnings.append(
+        if not resp.persisted or resp.doc_id is None or resp.char_count == 0:
+            resp.warnings.append(
                 "classification was not queued: document was not persisted or has no extracted text"
             )
         else:
@@ -144,34 +253,167 @@ async def upload_document(
                 from koipa.services.async_classify_service import AsyncClassifyService  # noqa: PLC0415
 
                 job = AsyncClassifyService().submit_async(
-                    ClassifyAsyncRequest(doc_id=str(result.doc_id))
+                    ClassifyAsyncRequest(
+                        doc_id=resp.doc_id, callback_url=callback_url,
+                        client_request_id=client_request_id,
+                    )
+                )
+                resp.classification_job_id = str(job.job_id)
+                resp.classification_status = job.status
+                resp.classification_status_url = job.status_url
+            except Exception as exc:  # noqa: BLE001
+                resp.warnings.append(
+                    f"classification was not queued: {type(exc).__name__}"
+                )
+
+    return resp
+
+
+def _batch_item_error(
+    filename: str, client_request_id: Optional[str], message: str, *, file_size_bytes: int = 0,
+) -> DocumentUploadResponse:
+    """ingest() 호출 전 단계(크기·공백 파일)에서 걸린 배치 항목 — 단건 경로의 "지원하지
+    않는 형식도 201"과 같은 언어로, 실패를 예외로 던지지 않고 그 파일의 결과 자리에 채운다.
+    """
+    return DocumentUploadResponse(
+        doc_id=None, filename=filename, source_format="", file_hash="",
+        file_size_bytes=file_size_bytes, extraction_method="none", extraction_quality=0.0,
+        char_count=0, chunk_count=0, client_request_id=client_request_id,
+        persisted=False, warnings=[message],
+    )
+
+
+class DocumentBatchUploadResponse(BaseModel):
+    total: int
+    results: list[DocumentUploadResponse]
+    classification_job_id: Optional[str] = None
+    classification_status: Optional[str] = None
+    classification_status_url: Optional[str] = None
+
+
+@router.post("/documents/batch", response_model=DocumentBatchUploadResponse, status_code=201)
+async def upload_documents_batch(
+    actor: str = Form(..., description="Actor JSON 문자열 (multipart 제약)"),
+    source_type: Optional[str] = Form(default=None, description="ICD §3.1 — 파일 전체에 공통 적용"),
+    security_marking: Optional[str] = Form(default=None, description="ICD §3.2 — 파일 전체에 공통 적용"),
+    access_scope: Optional[str] = Form(default=None, description="ICD §3.3 — 파일 전체에 공통 적용"),
+    enqueue_classification: bool = Form(default=False),
+    callback_url: Optional[str] = Form(
+        default=None,
+        description="enqueue_classification=true 일 때, 이 배치의 분류가 모두 끝나면(부분 실패 포함) 한 번 통보받을 webhook 주소(선택).",
+    ),
+    # 파일 순서와 1:1 매칭(생략 가능) — 길이가 files 와 다르면 422.
+    client_request_ids: Optional[list[str]] = Form(default=None),
+    files: list[UploadFile] = File(...),
+    svc: DocumentIngestionService = Depends(_get_ingestion_service),
+    auth: dict = Depends(require_auth),
+) -> DocumentBatchUploadResponse:
+    """여러 문서를 한 요청으로 업로드 — 등록마다 매번 새 연결을 맺어야 하는 부담을 줄인다.
+
+    [2026-10-06] 각 파일은 POST /documents 와 동일하게 독립 처리된다(한 파일의 실패가
+    나머지를 막지 않음 — results[i] 에 그 파일의 사유가 남는다). enqueue_classification=true
+    면 성공적으로 적재된 문서 전체를 **하나의** POST /classify/batch 작업으로 묶어 큐에 건다
+    (이미 운영 검증된 경로를 그대로 재사용 — 09-30 Celery 디스패치·시간제한 보강 적용분).
+    documents_batch_max_files(기본 50) 를 넘는 요청은 413 — 파싱(HWP/PDF/DOCX 추출)이 요청
+    안에서 동기로 끝나야 doc_id 를 돌려줄 수 있어, 상한을 높이면 이 요청 자체가 오래 걸린다.
+    """
+    try:
+        actor_obj = Actor.model_validate(json.loads(actor))
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"invalid actor json: {exc}") from exc
+    bind_authenticated_actor(actor_obj, auth)
+
+    if not files:
+        raise HTTPException(status_code=422, detail="no files")
+    max_files = max(1, int(getattr(settings, "documents_batch_max_files", 50) or 50))
+    if len(files) > max_files:
+        raise HTTPException(
+            status_code=413,
+            detail=f"too many files: {len(files)} > {max_files} per request. "
+                   f"요청을 나눠 보낼 것(POST /documents/batch, documents_batch_max_files).",
+        )
+    if client_request_ids is not None and len(client_request_ids) != len(files):
+        raise HTTPException(
+            status_code=422,
+            detail=f"client_request_ids length ({len(client_request_ids)}) "
+                   f"must match files length ({len(files)})",
+        )
+
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+    results: list[DocumentUploadResponse] = []
+    classify_targets: list[str] = []
+    for i, file in enumerate(files):
+        crid = client_request_ids[i] if client_request_ids is not None else None
+        filename = file.filename or "unknown"
+        declared_size = getattr(file, "size", None)
+        if declared_size is not None and declared_size > max_bytes:
+            results.append(_batch_item_error(
+                filename, crid,
+                f"file too large: {declared_size} > {max_bytes} bytes ({settings.max_upload_mb}MB)",
+                file_size_bytes=declared_size,
+            ))
+            continue
+        body = await file.read()
+        if len(body) > max_bytes:
+            results.append(_batch_item_error(
+                filename, crid,
+                f"file too large: {len(body)} > {max_bytes} bytes ({settings.max_upload_mb}MB)",
+                file_size_bytes=len(body),
+            ))
+            continue
+        if not body:
+            results.append(_batch_item_error(filename, crid, "empty file"))
+            continue
+        resp = _ingest_to_response(
+            svc,
+            filename=filename,
+            content_bytes=body,
+            source_type=source_type,
+            security_marking=security_marking,
+            access_scope=access_scope,
+            created_by=actor_obj.user_id,
+            client_request_id=crid,
+        )
+        results.append(resp)
+        if resp.persisted and resp.doc_id is not None and resp.char_count > 0:
+            classify_targets.append(resp.doc_id)
+
+    classification_job_id: Optional[str] = None
+    classification_status: Optional[str] = None
+    classification_status_url: Optional[str] = None
+    if enqueue_classification:
+        if not classify_targets:
+            for r in results:
+                r.warnings.append(
+                    "classification was not queued: no document in this batch was persisted with extracted text"
+                )
+        else:
+            try:
+                from koipa.schemas.classify import ClassifyRequest  # noqa: PLC0415
+                from koipa.schemas.classify_async import ClassifyBatchRequest  # noqa: PLC0415
+                from koipa.services.async_classify_service import AsyncClassifyService  # noqa: PLC0415
+
+                job = AsyncClassifyService().submit_batch(
+                    ClassifyBatchRequest(
+                        documents=[ClassifyRequest(doc_id=d) for d in classify_targets],
+                        callback_url=callback_url,
+                    )
                 )
                 classification_job_id = str(job.job_id)
                 classification_status = job.status
                 classification_status_url = job.status_url
             except Exception as exc:  # noqa: BLE001
-                result.warnings.append(
-                    f"classification was not queued: {type(exc).__name__}"
-                )
+                targets = set(classify_targets)
+                for r in results:
+                    if r.doc_id in targets:
+                        r.warnings.append(f"classification was not queued: {type(exc).__name__}")
 
-    return DocumentUploadResponse(
-        doc_id=(str(result.doc_id) if result.doc_id is not None else None),
-        filename=result.filename,
-        source_format=result.source_format,
-        file_hash=result.file_hash,
-        file_size_bytes=result.file_size_bytes,
-        extraction_method=result.extraction_method,
-        extraction_quality=result.extraction_quality,
-        char_count=result.char_count,
-        chunk_count=result.chunk_count,
-        pages_total=result.pages_total,
+    return DocumentBatchUploadResponse(
+        total=len(files),
+        results=results,
         classification_job_id=classification_job_id,
         classification_status=classification_status,
         classification_status_url=classification_status_url,
-        persisted=result.persisted,
-        warnings=result.warnings,
-        requires_review=result.requires_review,
-        review_reasons=result.review_reasons,
     )
 
 

@@ -1166,7 +1166,31 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "# 카드가 생기고, 끄면 그 화면·API 가 사라진다(올려 둔 규정 데이터는 남는다).\n"
         "# 전제: 문서와 규정을 같은 실제 임베더(EMBEDDING_MODEL=KURE-v1)로 비교한다 — 번들에 임베더 모델이 들어 있어야\n"
         "# 하고, 해시 임베더면 규정 등록이 거절된다.\n"
-        "# REGULATION_REFERENCE_ENABLED=1\n",
+        "# REGULATION_REFERENCE_ENABLED=1\n"
+        "\n"
+        # [2026-10-07] KL 연계 개선 요청 반영분 — 전부 기본 꺼짐(비워두면 평소 동작 그대로).
+        "# --- KL 연계 개선 (2026-10-07 · 전부 선택, 기본 꺼짐) ---\n"
+        "# API 키 교체 유예. 새 키로 바꾼 뒤 당분간 옛 키도 받아주려면 옛 값을 여기 채운다.\n"
+        "# 호출자를 다 옮긴 뒤에는 다시 비워 옛 키를 폐기한다.\n"
+        "API_KEY_PREVIOUS=\n"
+        "\n"
+        "# 파일 업로드 대신 \"같은 VM에 이미 있는 파일 경로\"로 문서 등록(POST /documents 의 file_path).\n"
+        "# 이 디렉터리가 실제로 이 컨테이너에 마운트돼 있어야 하고, 그 바깥 경로는 전부 거절된다.\n"
+        "# DOCUMENTS_SHARED_MOUNT_DIR=/data/kl-shared\n"
+        "# POST /documents/batch 한 요청의 최대 파일 수(기본 50 — 파일마다 동기 파싱이 필요해 크게 두지 않는다).\n"
+        "DOCUMENTS_BATCH_MAX_FILES=50\n"
+        "\n"
+        "# 분류 완료를 koipa:job:{job_id} 저장·콜백 외에 Redis Stream 으로도 발사(Consumer Group 직접구독).\n"
+        "# 반드시 위 REDIS_URL(작업큐·outbox)과 다른 인스턴스를 가리킬 것 — docker-compose.airgap.yml 의\n"
+        "# redis-kl-stream 서비스가 그 전용 인스턴스다(기동은 되지만 이 값이 비면 아무것도 쓰지 않는다).\n"
+        "# KL_STREAM_REDIS_URL=redis://redis-kl-stream:6379/0\n"
+        "# KL_STREAM_NAME=koipa:classify:results\n"
+        "# KL_STREAM_MAXLEN=10000\n"
+        "\n"
+        "# 인증을 전부 끈다(X-API-Key·JWT 검증 생략). 역할은 그래도 위 API_KEY_ROLE 그대로 적용된다.\n"
+        "# 인터넷에서 닿지 않는 폐쇄 배포에서만 켤 것 — 바인드 주소가 바뀌면 그 순간부터 인증 없이\n"
+        "# 전체 API 가 열린다. 일반 배포는 주석 처리된 상태(= api_key 유지)를 권장한다.\n"
+        "# AUTH_MODE=none\n",
         encoding="utf-8",
         newline="\n",
     )

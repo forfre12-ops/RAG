@@ -527,12 +527,87 @@ def publish_callback(callback_url: str | None, payload: dict) -> bool:
     try:
         publish(get_outbox_store(), target_url=callback_url, payload=payload)
         logger.info("async callback enqueued to outbox: url=%s job=%s", callback_url, payload.get("job_id"))
-        return True
     except Exception as exc:  # noqa: BLE001
         logger.error(
             "async callback enqueue failed (non-critical): url=%s err=%s",
             callback_url, type(exc).__name__, exc_info=True,
         )
+        return False
+    _kick_immediate_delivery()
+    return True
+
+
+def _kick_immediate_delivery() -> None:
+    """[2026-10-06] 발행 직후 1회 배송을 바로 시도한다 — 60초 beat 틱은 그 뒤로도 재시도 전용.
+
+    종전엔 최초 시도조차 60초 틱(koipa.deliver_outbox_tick)에만 의존해 완료부터 통보까지
+    최대 약 1분이 떴다(KL 요청 — 완료 즉시 발송, 60초 주기는 재시도만). 브로커가 가용할 때만
+    워커에 비동기로 맡기고(호출부의 응답 지연 없음), 테스트·브로커 미가용이면 조용히
+    건너뛴다 — 이번에 못 보낸 메시지는 그대로 다음 60초 틱이 집어 간다(기존 동작 보존).
+    """
+    try:
+        from koipa.services.async_classify_service import _celery_dispatch_available  # noqa: PLC0415
+        if not _celery_dispatch_available():
+            return
+        from koipa.workers.tasks import deliver_outbox_tick  # noqa: PLC0415
+        deliver_outbox_tick.delay()
+    except Exception:  # noqa: BLE001 — best-effort, 실패해도 다음 60초 틱이 복구
+        logger.debug("outbox immediate delivery kick failed (다음 60초 틱이 재시도)", exc_info=True)
+
+
+# ---------------------------------------------------------------------------
+# [2026-10-07] KL Consumer Group 직접구독용 Stream — 사용자 결정, 전용 Redis 에만 쓴다
+# ---------------------------------------------------------------------------
+
+_kl_stream_client = None
+_kl_stream_lock = threading.Lock()
+
+
+def _get_kl_stream_client(url: str):
+    """kl_stream_redis_url 전용 클라이언트(캐시) — get_outbox_store() 의 메인 Redis 와는
+    별개 연결이다. 반드시 별도 인스턴스를 가리키도록 운영 설정으로 강제한다(코드는 URL이
+    같은지 검사하지 않는다 — 배포 설정 책임)."""
+    global _kl_stream_client
+    if _kl_stream_client is not None:
+        return _kl_stream_client
+    with _kl_stream_lock:
+        if _kl_stream_client is None:
+            import redis  # noqa: PLC0415
+            _kl_stream_client = redis.Redis.from_url(
+                url, decode_responses=True, socket_timeout=2, socket_connect_timeout=2,
+            )
+        return _kl_stream_client
+
+
+def reset_kl_stream_client() -> None:
+    """테스트용."""
+    global _kl_stream_client
+    with _kl_stream_lock:
+        _kl_stream_client = None
+
+
+def publish_kl_stream(payload: dict) -> bool:
+    """분류 작업 종결(done/failed/partial) 시 KL 전용 Stream 에 XADD.
+
+    kl_stream_redis_url 이 비어 있으면(기본) no-op — 기존 koipa:job:{job_id} 저장·콜백
+    경로는 이 함수와 완전히 무관하게 그대로 동작한다. best-effort(예외를 삼키고 로깅만) —
+    이 발사가 실패해도 이미 영속된 분류 결과·콜백 전달을 막지 않는다.
+    """
+    from koipa.config import settings  # noqa: PLC0415
+
+    url = (getattr(settings, "kl_stream_redis_url", "") or "").strip()
+    if not url:
+        return False
+    try:
+        client = _get_kl_stream_client(url)
+        name = (settings.kl_stream_name or "koipa:classify:results").strip()
+        maxlen = int(settings.kl_stream_maxlen or 10_000)
+        entry = {"payload_json": json.dumps(payload, default=str, ensure_ascii=False)}
+        client.xadd(name, entry, maxlen=maxlen, approximate=True)
+        logger.info("kl stream xadd: stream=%s job=%s status=%s", name, payload.get("job_id"), payload.get("status"))
+        return True
+    except Exception:  # noqa: BLE001 — best-effort, 기존 STRING·콜백 경로는 영향 없음
+        logger.error("kl stream publish failed (non-critical)", exc_info=True)
         return False
 
 

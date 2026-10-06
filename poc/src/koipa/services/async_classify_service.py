@@ -173,7 +173,7 @@ class AsyncClassifyService:
         job_id = uuid.uuid4()
         self.jobs.create(
             job_id,
-            payload={"total": 1, "completed": 0},
+            payload={"total": 1, "completed": 0, "client_request_id": getattr(req, "client_request_id", None)},
         )
         # 운영(브로커 가용): 실제 Celery classify_async.delay() 발사 후 'queued' 반환.
         # job은 'queued'로 남고 worker가 done/failed로 전이 → status가 실제 상태 반영.
@@ -186,7 +186,8 @@ class AsyncClassifyService:
                 # callback_url 을 워커로 넘겨 완료 시 webhook 을 발사하게 한다(과거엔 떼어내
                 # 워커에 전달조차 안 돼 운영 경로 webhook 이 영원히 안 울렸다).
                 classify_async.delay(
-                    payload, job_id=str(job_id), callback_url=getattr(req, "callback_url", None)
+                    payload, job_id=str(job_id), callback_url=getattr(req, "callback_url", None),
+                    client_request_id=getattr(req, "client_request_id", None),
                 )
                 logger.info("async classify enqueued to celery: job_id=%s doc_id=%s", job_id, req.doc_id)
                 return ClassifyAsyncResponse(
@@ -214,6 +215,7 @@ class AsyncClassifyService:
             callback_payload = {
                 "job_id": str(job_id),
                 "status": "done",
+                "client_request_id": getattr(req, "client_request_id", None),
                 "results": [kl_result_json],
             }
             logger.info("async classify done: job_id=%s doc_id=%s", job_id, req.doc_id)
@@ -226,12 +228,16 @@ class AsyncClassifyService:
             callback_payload = {
                 "job_id": str(job_id),
                 "status": "failed",
+                "client_request_id": getattr(req, "client_request_id", None),
                 "error": str(exc),
             }
         # M-callback: callback_url 이 있으면 outbox webhook 발사 — _strip_async_fields
         # 가 callback_url 을 떼어내 분류 자체엔 영향 없게 하면서도, 여기서 결과를
         # outbox 로 publish 해 webhook 이 실제로 울리게 한다(과거엔 영원히 안 울림).
         self._publish_callback(getattr(req, "callback_url", None), callback_payload)
+        # [2026-10-07] KL Stream — callback_url 유무와 무관하게 매 작업 종결마다 시도한다
+        # (kl_stream_redis_url 미설정이면 no-op).
+        self._publish_kl_stream(callback_payload)
         # in-process 경로는 이미 처리가 끝났으므로 'queued' 거짓표기 대신 실제 최종 상태
         # (done/failed)를 반환한다. status_url 폴링은 동일 값을 다시 보게 된다.
         return ClassifyAsyncResponse(
@@ -324,18 +330,18 @@ class AsyncClassifyService:
 
         # M-callback: 배치도 동일하게 callback_url 이 있으면 outbox webhook 발사.
         # 저장값(results)은 전체를 두고, webhook 본문만 kl_wire_projection 으로 좁힌다.
-        self._publish_callback(
-            callback_url,
-            {
-                "job_id": str(job_id),
-                "status": final_status,
-                "total": total,
-                "completed": completed,
-                "failed": failed,
-                "failed_doc_ids": failed_ids,
-                "results": [self._to_kl_result_json(r) for r in results],
-            },
-        )
+        _batch_wire_payload = {
+            "job_id": str(job_id),
+            "status": final_status,
+            "total": total,
+            "completed": completed,
+            "failed": failed,
+            "failed_doc_ids": failed_ids,
+            "results": [self._to_kl_result_json(r) for r in results],
+        }
+        self._publish_callback(callback_url, _batch_wire_payload)
+        # [2026-10-07] KL Stream — callback_url 유무와 무관하게 매 배치 종결마다 시도한다.
+        self._publish_kl_stream(_batch_wire_payload)
 
         return ClassifyBatchResponse(
             job_id=job_id,
@@ -421,6 +427,7 @@ class AsyncClassifyService:
         return ClassifyJobStatus(
             job_id=job_id,
             status=job.get("status", "queued"),
+            client_request_id=job.get("client_request_id"),
             total=job.get("total"),
             completed=job.get("completed"),
             failed=job.get("failed"),
@@ -461,6 +468,17 @@ class AsyncClassifyService:
         publish_callback(callback_url, payload)
 
     @staticmethod
+    def _publish_kl_stream(payload: dict) -> None:
+        """[2026-10-07] KL Consumer Group 직접구독용 Stream 발사 — outbox.publish_kl_stream 위임.
+
+        kl_stream_redis_url 미설정이면 no-op. callback_url 과 무관하게 매 작업 종결마다 시도.
+        """
+        from koipa.services.outbox import publish_kl_stream  # noqa: PLC0415
+        publish_kl_stream(payload)
+
+    @staticmethod
     def _strip_async_fields(req: ClassifyAsyncRequest) -> ClassifyRequest:
         """ClassifyAsyncRequest → ClassifyRequest (callback_url 등 제거)."""
-        return ClassifyRequest.model_validate(req.model_dump(exclude={"callback_url"}))
+        return ClassifyRequest.model_validate(
+            req.model_dump(exclude={"callback_url", "client_request_id"})
+        )
