@@ -174,7 +174,7 @@ def test_require_auth_previous_key_empty_by_default_does_not_widen_acceptance(mo
 
 
 # ---------------------------------------------------------------------------
-# [2026-10-07] auth_mode=none — 사용자 결정(폐쇄망 전용 배포), 검증 전부 생략
+# [2026-10-06] auth_mode=none — 사용자 결정(폐쇄망 전용 배포), 검증 전부 생략
 # ---------------------------------------------------------------------------
 
 def test_require_auth_none_mode_needs_no_key_at_all(monkeypatch):

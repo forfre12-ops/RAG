@@ -1,4 +1,4 @@
-"""POST /api/v1/documents — file_path 옵션 (2026-10-07 신설).
+"""POST /api/v1/documents — file_path 옵션 (2026-10-06 신설).
 
 KL 요청 — 파일을 업로드하지 않고 같은 VM에 이미 있는 파일을 경로로 등록.
 documents_shared_mount_dir 로 지정한 디렉터리 밖을 가리키면 거절(경로조작 방어).

@@ -244,7 +244,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://koipa:koipa_dev@localhost:5432/koipa"
     redis_url: str = "redis://localhost:6379/0"
 
-    # [2026-10-07] KL 요청 — 분류 완료 결과를 Redis Stream 으로도 발사(Consumer Group 으로
+    # [2026-10-06] KL 요청 — 분류 완료 결과를 Redis Stream 으로도 발사(Consumer Group 으로
     # 직접 구독). koipa:job:{job_id} STRING 저장·콜백은 그대로 둔다 — 이건 세 번째 채널이다.
     # 비워두면(기본) 기능 자체가 꺼진다. **redis_url(작업큐·outbox 가 있는 메인 Redis)과는
     # 반드시 다른 인스턴스를 가리킬 것** — 같은 Redis 를 그대로 열어주면 KL 쪽 접속 권한이
@@ -300,7 +300,7 @@ class Settings(BaseSettings):
     api_key_previous: str = ""
 
     # P1-C3: JWT 인증 모드. api_key(기본) | jwt | both | none
-    # [2026-10-06] "none" — 사용자 결정(폐쇄망 전용 배포, 2026-10-07). X-API-Key·JWT 검증을
+    # [2026-10-06] "none" — 사용자 결정(폐쇄망 전용 배포, 2026-10-06). X-API-Key·JWT 검증을
     # 전부 생략한다. 역할은 그래도 api_key_role 설정값을 그대로 쓴다 — "인증을 끈다"가
     # "무조건 admin 전권을 준다"로 저절로 번지지 않게 하기 위해서다. 네트워크가 외부에
     # 열리면 그대로 무방비가 되므로, 인터넷에 노출되지 않는 배포에서만 쓸 것.
@@ -983,7 +983,7 @@ class Settings(BaseSettings):
     # 줄어든 채로 재현한다. 보수적으로 작게 시작한다(필요하면 조정).
     documents_batch_max_files: int = 50
 
-    # [2026-10-07] KL 요청 — 등록 시스템과 같은 VM에서 돈다는 전제로, 파일을 업로드하지
+    # [2026-10-06] KL 요청 — 등록 시스템과 같은 VM에서 돈다는 전제로, 파일을 업로드하지
     # 않고 "이 경로에 이미 있는 파일을 읽어라"로 등록. 비워두면(기본) 기능 자체가 꺼진다
     # (file_path 를 보내도 422) — 반드시 호출측 저장소가 실제로 이 컨테이너에 마운트된
     # 디렉터리를 가리킬 때만 값을 채운다. 받은 경로가 이 디렉터리 밖을 가리키면(경로조작)

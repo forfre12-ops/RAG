@@ -390,7 +390,7 @@ paths:
                 file_path:
                   type: string
                   nullable: true
-                  description: '[2026-10-07] file 대신 서버가 직접 읽을 경로(선택). documents_shared_mount_dir 로 지정된 공유 디렉터리
+                  description: '[2026-10-06] file 대신 서버가 직접 읽을 경로(선택). documents_shared_mount_dir 로 지정된 공유 디렉터리
                     안에 있어야 한다 — 이 설정이 배포에 없으면(기본) 422. 그 디렉터리 밖을 가리키면 경로조작 방어로 거절(422).'
       responses:
         '201':

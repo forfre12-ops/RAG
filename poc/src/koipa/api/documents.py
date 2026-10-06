@@ -33,7 +33,7 @@ def _get_ingestion_service() -> DocumentIngestionService:
 
 
 def _read_shared_mount_file(raw_path: str) -> tuple[str, bytes]:
-    """[2026-10-07] KL 요청 — 업로드 대신 "이미 같은 VM에 있는 파일"을 경로로 등록.
+    """[2026-10-06] KL 요청 — 업로드 대신 "이미 같은 VM에 있는 파일"을 경로로 등록.
 
     documents_shared_mount_dir 가 비어 있으면(기본) 기능 자체를 끈다. 설정돼 있어도
     받은 경로가 그 디렉터리 밖을 가리키면 거절한다(경로조작 방어) — "같은 VM"이라는
@@ -172,7 +172,7 @@ async def upload_document(
     # [2026-10-06] KL 요청 — doc_id dedupe·job_id 선후관계 때문에 둘 다 호출자 쪽 매칭 키가
     # 못 된다. 그대로 저장해 응답·작업 조회·콜백에 돌려준다(서버는 해석하지 않음).
     client_request_id: Optional[str] = Form(default=None),
-    # [2026-10-07] KL 요청 — 파일을 업로드하지 않고, 같은 VM에 이미 있는 파일의 경로로
+    # [2026-10-06] KL 요청 — 파일을 업로드하지 않고, 같은 VM에 이미 있는 파일의 경로로
     # 등록. file 과 file_path 중 정확히 하나만 보낸다. documents_shared_mount_dir 가
     # 설정돼 있어야 하고, 그 디렉터리 밖을 가리키면 거절한다(_read_shared_mount_file).
     file_path: Optional[str] = Form(

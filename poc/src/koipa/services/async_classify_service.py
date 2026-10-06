@@ -235,7 +235,7 @@ class AsyncClassifyService:
         # 가 callback_url 을 떼어내 분류 자체엔 영향 없게 하면서도, 여기서 결과를
         # outbox 로 publish 해 webhook 이 실제로 울리게 한다(과거엔 영원히 안 울림).
         self._publish_callback(getattr(req, "callback_url", None), callback_payload)
-        # [2026-10-07] KL Stream — callback_url 유무와 무관하게 매 작업 종결마다 시도한다
+        # [2026-10-06] KL Stream — callback_url 유무와 무관하게 매 작업 종결마다 시도한다
         # (kl_stream_redis_url 미설정이면 no-op).
         self._publish_kl_stream(callback_payload)
         # in-process 경로는 이미 처리가 끝났으므로 'queued' 거짓표기 대신 실제 최종 상태
@@ -340,7 +340,7 @@ class AsyncClassifyService:
             "results": [self._to_kl_result_json(r) for r in results],
         }
         self._publish_callback(callback_url, _batch_wire_payload)
-        # [2026-10-07] KL Stream — callback_url 유무와 무관하게 매 배치 종결마다 시도한다.
+        # [2026-10-06] KL Stream — callback_url 유무와 무관하게 매 배치 종결마다 시도한다.
         self._publish_kl_stream(_batch_wire_payload)
 
         return ClassifyBatchResponse(
@@ -469,7 +469,7 @@ class AsyncClassifyService:
 
     @staticmethod
     def _publish_kl_stream(payload: dict) -> None:
-        """[2026-10-07] KL Consumer Group 직접구독용 Stream 발사 — outbox.publish_kl_stream 위임.
+        """[2026-10-06] KL Consumer Group 직접구독용 Stream 발사 — outbox.publish_kl_stream 위임.
 
         kl_stream_redis_url 미설정이면 no-op. callback_url 과 무관하게 매 작업 종결마다 시도.
         """

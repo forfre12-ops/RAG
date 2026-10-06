@@ -218,7 +218,7 @@ def _publish_callback_webhook(callback_url: str | None, payload: dict) -> None:
 
 
 def _publish_kl_stream_webhook(payload: dict) -> None:
-    """[2026-10-07] 워커 완료/실패 시 KL Stream 에도 발사 — outbox.publish_kl_stream 위임.
+    """[2026-10-06] 워커 완료/실패 시 KL Stream 에도 발사 — outbox.publish_kl_stream 위임.
 
     kl_stream_redis_url 미설정이면 no-op. callback_url 유무와 무관하게 매 종결마다 시도한다
     (in-process 경로 AsyncClassifyService._publish_kl_stream 과 동일 계약).

@@ -61,7 +61,7 @@ def assert_production_auth_config() -> None:
         return
     mode = (getattr(settings, "auth_mode", "api_key") or "api_key").lower()
     if mode == "none":
-        # 막지 않는다(사용자 결정, 2026-10-07 — 폐쇄망 전용 배포) — 다만 운영 기동 로그에
+        # 막지 않는다(사용자 결정, 2026-10-06 — 폐쇄망 전용 배포) — 다만 운영 기동 로그에
         # 눈에 띄게 남긴다. 이 서버가 외부에 열리면(네트워크 설정 변경 등) 그 순간부터
         # 무방비이므로, 로그만으로라도 "인증이 꺼진 채 떴다"가 조용히 지나가지 않게 한다.
         logger.warning(

@@ -139,7 +139,7 @@ def test_publish_callback_no_url_is_noop():
 
 
 # ---------------------------------------------------------------------------
-# [2026-10-07] publish_kl_stream — KL Consumer Group 직접구독용 Stream (사용자 결정)
+# [2026-10-06] publish_kl_stream — KL Consumer Group 직접구독용 Stream (사용자 결정)
 # ---------------------------------------------------------------------------
 
 
