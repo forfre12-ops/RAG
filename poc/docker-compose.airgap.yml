@@ -52,7 +52,13 @@ services:
   # 안에는 koipa:classify:results 스트림 말고는 아무것도 안 둔다(api·worker 가 쓰는
   # 유일한 키). 기본적으로 꺼져 있다 — KL_STREAM_REDIS_URL 을 .env 에 채워야 켜진다
   # (api/worker 환경변수, 아래).
+  # [2026-10-06] profiles 없이는 KL_STREAM_REDIS_URL 이 비어 있어도(기본값)
+  # 이 컨테이너가 매번 뜬다 — "기능이 꺼지면 아무것도 안 돈다"는 주석과 실제 동작이 어긋나
+  # 있었다(제3자 검토로 발견). nginx-mtls·ops 와 같은 방식으로 profile 뒤로 옮긴다 — 켜려면
+  # KL_STREAM_REDIS_URL 설정과 별개로 `--profile kl-stream` 을 explicit 하게 줘야 한다.
+  # 예: docker compose --profile kl-stream up -d redis-kl-stream
   redis-kl-stream:
+    profiles: ["kl-stream"]
     image: redis:7.2-alpine
     restart: unless-stopped
     command: redis-server --appendonly yes --stop-writes-on-bgsave-error no
@@ -75,7 +81,9 @@ services:
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       REDIS_URL: redis://redis:6379/0
       # [2026-10-06] 비우면(기본) KL Stream 기능 꺼짐. 켤 때는 반드시 redis-kl-stream
-      # 처럼 메인 redis 와 분리된 인스턴스를 가리킬 것(redis-kl-stream 서비스 주석 참조).
+      # 처럼 메인 redis 와 분리된 인스턴스를 가리킬 것(redis-kl-stream 서비스 주석 참조) —
+      # 그 컨테이너 자체는 profiles: ["kl-stream"] 뒤에 있어 이 값만으로는 안 뜬다.
+      # `docker compose --profile kl-stream up -d` 를 같이 줘야 한다.
       KL_STREAM_REDIS_URL: ${KL_STREAM_REDIS_URL:-}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS(/app/.storage). MinIO 미사용.
       POC_MODE: ${POC_MODE:-full}
