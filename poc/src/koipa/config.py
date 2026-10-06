@@ -986,9 +986,12 @@ class Settings(BaseSettings):
     # [2026-10-06] KL 요청 — 등록 시스템과 같은 VM에서 돈다는 전제로, 파일을 업로드하지
     # 않고 "이 경로에 이미 있는 파일을 읽어라"로 등록. 비워두면(기본) 기능 자체가 꺼진다
     # (file_path 를 보내도 422) — 반드시 호출측 저장소가 실제로 이 컨테이너에 마운트된
-    # 디렉터리를 가리킬 때만 값을 채운다. 받은 경로가 이 디렉터리 밖을 가리키면(경로조작)
-    # 거절한다 — "같은 VM"이라는 전제만으로 임의 경로를 그대로 읽지 않는다.
-    documents_shared_mount_dir: str = ""
+    # 디렉터리를 가리킬 때만 값을 채운다. 받은 경로가 이 디렉터리들 중 하나의 안쪽이
+    # 아니면(경로조작) 거절한다 — "같은 VM"이라는 전제만으로 임의 경로를 그대로 읽지 않는다.
+    # 공유 폴더가 여러 곳이면(예: 부서별로 다른 마운트) 전부 나열한다 — 파일이 그중
+    # 하나에만 속해도 통과한다. 환경변수는 JSON 배열(cors_allow_origins 와 같은 관례):
+    # DOCUMENTS_SHARED_MOUNT_DIRS=["/mnt/kl_share", "/data/incoming"]
+    documents_shared_mount_dirs: list[str] = []
 
     # #13: JSON 본문 크기 DoS 가드 — 일반 JSON body(/classify/batch 등)의 상한.
     # 멀티파트 업로드는 위 max_upload_mb로 막히지만, JSON body는 Pydantic 파싱 후에야

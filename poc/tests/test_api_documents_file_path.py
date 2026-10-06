@@ -1,7 +1,8 @@
 """POST /api/v1/documents — file_path 옵션 (2026-10-06 신설).
 
 KL 요청 — 파일을 업로드하지 않고 같은 VM에 이미 있는 파일을 경로로 등록.
-documents_shared_mount_dir 로 지정한 디렉터리 밖을 가리키면 거절(경로조작 방어).
+documents_shared_mount_dirs 로 지정한 디렉터리들(여러 개 가능) 밖을 가리키면
+거절(경로조작 방어).
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ def _actor() -> str:
 
 class TestDocumentsFilePath:
     def test_disabled_by_default_422(self, client, monkeypatch, tmp_path):
-        monkeypatch.setattr(settings, "documents_shared_mount_dir", "")
+        monkeypatch.setattr(settings, "documents_shared_mount_dirs", [])
         shared = tmp_path / "shared"
         shared.mkdir()
         f = shared / "doc.txt"
@@ -58,7 +59,7 @@ class TestDocumentsFilePath:
         shared.mkdir()
         f = shared / "doc.txt"
         f.write_text("핵심 공정 레시피 ALD 증착 조건", encoding="utf-8")
-        monkeypatch.setattr(settings, "documents_shared_mount_dir", str(shared))
+        monkeypatch.setattr(settings, "documents_shared_mount_dirs", [str(shared)])
 
         r = client.post(
             "/api/v1/documents",
@@ -70,12 +71,29 @@ class TestDocumentsFilePath:
         assert j["filename"] == "doc.txt"
         assert j["char_count"] > 0
 
+    def test_reads_file_inside_second_of_multiple_configured_mounts(self, client, monkeypatch, tmp_path):
+        shared_a = tmp_path / "shared_a"
+        shared_a.mkdir()
+        shared_b = tmp_path / "shared_b"
+        shared_b.mkdir()
+        f = shared_b / "doc.txt"
+        f.write_text("핵심 공정 레시피 2공장", encoding="utf-8")
+        monkeypatch.setattr(settings, "documents_shared_mount_dirs", [str(shared_a), str(shared_b)])
+
+        r = client.post(
+            "/api/v1/documents",
+            headers=_hdr(),
+            data={"actor": _actor(), "file_path": str(f)},
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["filename"] == "doc.txt"
+
     def test_rejects_path_outside_configured_mount(self, client, monkeypatch, tmp_path):
         shared = tmp_path / "shared"
         shared.mkdir()
         outside = tmp_path / "outside.txt"
         outside.write_text("바깥 파일", encoding="utf-8")
-        monkeypatch.setattr(settings, "documents_shared_mount_dir", str(shared))
+        monkeypatch.setattr(settings, "documents_shared_mount_dirs", [str(shared)])
 
         r = client.post(
             "/api/v1/documents",
@@ -83,14 +101,31 @@ class TestDocumentsFilePath:
             data={"actor": _actor(), "file_path": str(outside)},
         )
         assert r.status_code == 422, r.text
-        assert "shared directory" in r.text
+        assert "shared director" in r.text
+
+    def test_rejects_path_outside_all_configured_mounts(self, client, monkeypatch, tmp_path):
+        shared_a = tmp_path / "shared_a"
+        shared_a.mkdir()
+        shared_b = tmp_path / "shared_b"
+        shared_b.mkdir()
+        outside = tmp_path / "outside.txt"
+        outside.write_text("바깥 파일", encoding="utf-8")
+        monkeypatch.setattr(settings, "documents_shared_mount_dirs", [str(shared_a), str(shared_b)])
+
+        r = client.post(
+            "/api/v1/documents",
+            headers=_hdr(),
+            data={"actor": _actor(), "file_path": str(outside)},
+        )
+        assert r.status_code == 422, r.text
+        assert "shared director" in r.text
 
     def test_rejects_traversal_out_of_mount(self, client, monkeypatch, tmp_path):
         shared = tmp_path / "shared"
         shared.mkdir()
         secret = tmp_path / "secret.env"
         secret.write_text("API_KEY=sensitive", encoding="utf-8")
-        monkeypatch.setattr(settings, "documents_shared_mount_dir", str(shared))
+        monkeypatch.setattr(settings, "documents_shared_mount_dirs", [str(shared)])
 
         traversal_path = str(shared / ".." / "secret.env")
         r = client.post(
@@ -103,7 +138,7 @@ class TestDocumentsFilePath:
     def test_nonexistent_path_422(self, client, monkeypatch, tmp_path):
         shared = tmp_path / "shared"
         shared.mkdir()
-        monkeypatch.setattr(settings, "documents_shared_mount_dir", str(shared))
+        monkeypatch.setattr(settings, "documents_shared_mount_dirs", [str(shared)])
 
         r = client.post(
             "/api/v1/documents",
@@ -117,7 +152,7 @@ class TestDocumentsFilePath:
         shared.mkdir()
         f = shared / "doc.txt"
         f.write_text("content", encoding="utf-8")
-        monkeypatch.setattr(settings, "documents_shared_mount_dir", str(shared))
+        monkeypatch.setattr(settings, "documents_shared_mount_dirs", [str(shared)])
 
         r = client.post(
             "/api/v1/documents",

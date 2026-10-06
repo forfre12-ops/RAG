@@ -35,28 +35,38 @@ def _get_ingestion_service() -> DocumentIngestionService:
 def _read_shared_mount_file(raw_path: str) -> tuple[str, bytes]:
     """[2026-10-06] KL 요청 — 업로드 대신 "이미 같은 VM에 있는 파일"을 경로로 등록.
 
-    documents_shared_mount_dir 가 비어 있으면(기본) 기능 자체를 끈다. 설정돼 있어도
-    받은 경로가 그 디렉터리 밖을 가리키면 거절한다(경로조작 방어) — "같은 VM"이라는
-    전제를 받은 문자열 그대로 신뢰하지 않고, 실제로 컨테이너에 마운트된 그 폴더
-    안에 있는지 매번 다시 확인한다. 반환: (파일명, 바이트).
+    documents_shared_mount_dirs 가 비어 있으면(기본) 기능 자체를 끈다. 설정돼 있어도
+    받은 경로가 그 디렉터리들 중 하나의 안쪽이 아니면 거절한다(경로조작 방어) — "같은
+    VM"이라는 전제를 받은 문자열 그대로 신뢰하지 않고, 실제로 컨테이너에 마운트된 그
+    폴더들 안에 있는지 매번 다시 확인한다. 공유 폴더가 여러 곳이면 그중 하나에만
+    속해도 통과한다. 반환: (파일명, 바이트).
     """
-    base = (getattr(settings, "documents_shared_mount_dir", "") or "").strip()
-    if not base:
+    bases = [
+        b.strip()
+        for b in (getattr(settings, "documents_shared_mount_dirs", None) or [])
+        if b and b.strip()
+    ]
+    if not bases:
         raise HTTPException(
             status_code=422,
-            detail="file_path is disabled on this deployment (documents_shared_mount_dir unset)",
+            detail="file_path is disabled on this deployment (documents_shared_mount_dirs unset)",
         )
-    base_resolved = Path(base).resolve(strict=False)
     try:
         candidate = Path(raw_path).resolve(strict=False)
     except (OSError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=f"invalid file_path: {exc}") from exc
-    try:
-        candidate.relative_to(base_resolved)
-    except ValueError:
+    inside_any = False
+    for base in bases:
+        try:
+            candidate.relative_to(Path(base).resolve(strict=False))
+            inside_any = True
+            break
+        except ValueError:
+            continue
+    if not inside_any:
         raise HTTPException(
             status_code=422,
-            detail="file_path must be inside the shared directory configured on this deployment",
+            detail="file_path must be inside one of the shared directories configured on this deployment",
         )
     if not candidate.is_file():
         raise HTTPException(status_code=422, detail="file_path does not exist or is not a file")
@@ -173,12 +183,14 @@ async def upload_document(
     # 못 된다. 그대로 저장해 응답·작업 조회·콜백에 돌려준다(서버는 해석하지 않음).
     client_request_id: Optional[str] = Form(default=None),
     # [2026-10-06] KL 요청 — 파일을 업로드하지 않고, 같은 VM에 이미 있는 파일의 경로로
-    # 등록. file 과 file_path 중 정확히 하나만 보낸다. documents_shared_mount_dir 가
-    # 설정돼 있어야 하고, 그 디렉터리 밖을 가리키면 거절한다(_read_shared_mount_file).
+    # 등록. file 과 file_path 중 정확히 하나만 보낸다. documents_shared_mount_dirs 가
+    # 설정돼 있어야 하고(여러 폴더 등록 가능), 그 디렉터리들 밖을 가리키면 거절한다
+    # (_read_shared_mount_file).
     file_path: Optional[str] = Form(
         default=None,
-        description="file 대신 서버가 읽을 절대경로(선택). documents_shared_mount_dir 로 "
-                    "지정된 공유 디렉터리 안에 있어야 한다 — 이 설정이 없으면 422.",
+        description="file 대신 서버가 읽을 절대경로(선택). documents_shared_mount_dirs 로 "
+                    "지정된 공유 디렉터리들(여러 개 가능) 중 하나 안에 있어야 한다 — "
+                    "이 설정이 없으면 422.",
     ),
     file: Optional[UploadFile] = File(default=None),
     svc: DocumentIngestionService = Depends(_get_ingestion_service),
