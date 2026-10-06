@@ -1189,9 +1189,10 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "# KL_STREAM_MAXLEN=10000\n"
         "\n"
         "# 인증을 전부 끈다(X-API-Key·JWT 검증 생략). 역할은 그래도 위 API_KEY_ROLE 그대로 적용된다.\n"
-        "# 인터넷에서 닿지 않는 폐쇄 배포에서만 켤 것 — 바인드 주소가 바뀌면 그 순간부터 인증 없이\n"
-        "# 전체 API 가 열린다. 일반 배포는 주석 처리된 상태(= api_key 유지)를 권장한다.\n"
-        "# AUTH_MODE=none\n",
+        "# [2026-10-06 사용자 결정] 이 배포는 폐쇄망 전용이라 기본으로 켜 둔다. 이 네트워크가\n"
+        "# 인터넷·다른 네트워크에 연결되는 순간부터 인증 없이 전체 API 가 열리므로, 망 구성이\n"
+        "# 바뀌면 이 줄을 지우고 api_key 로 되돌릴 것.\n"
+        "AUTH_MODE=none\n",
         encoding="utf-8",
         newline="\n",
     )
