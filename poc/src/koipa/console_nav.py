@@ -163,7 +163,7 @@ BRAND_NAME = "한국지식재산보호원"
 
 
 def header_html(product: str, current: str = "", *, trailing: str = "",
-                exclude: tuple[str, ...] = ()) -> str:
+                exclude: tuple[str, ...] = (), show_logout: bool = True) -> str:
     """화면 다섯 면이 공유하는 상단 바.
 
     `product` 는 화면 이름, `current` 는 CONSOLE_LINKS 의 키(현재 화면 표시),
@@ -194,10 +194,17 @@ def header_html(product: str, current: str = "", *, trailing: str = "",
     # [2026-10-02] 로그아웃 — 지금까지 다섯 화면 어디에도 없었다(쿠키를 지우는 유일한 통로가
     # "로그인 실패 시 조용히 지움"뿐이었다). 쿠키만 지우고 로그인 화면으로 보낸다 — 서버에
     # 상태를 안 두므로(토큰은 무상태) 지울 것은 이 쿠키 하나뿐이다.
+    # [2026-10-07 KL 발견] 로그인 화면 자체에도 이 버튼이 그대로 떴다 — 눌러도 지울 쿠키가
+    # 없고 같은 로그인 화면으로 다시 보내니 화면이 안 바뀌어 "안 눌러진다"로 보였다.
+    # show_logout=False 로 로그인 화면에서만 뺀다.
     logout = (
-        '<a href="#" class="logout-link" '
-        "onclick=\"document.cookie='koipa_access_token=; path=/; Max-Age=0; SameSite=Lax';"
-        "location.href='/api/v1/golden/candidates/login.html';return false\">로그아웃</a>"
+        (
+            '<a href="#" class="logout-link" '
+            "onclick=\"document.cookie='koipa_access_token=; path=/; Max-Age=0; SameSite=Lax';"
+            "location.href='/api/v1/golden/candidates/login.html';return false\">로그아웃</a>"
+        )
+        if show_logout
+        else ""
     )
     return (
         '<header class="top">'

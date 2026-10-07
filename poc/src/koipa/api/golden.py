@@ -1372,7 +1372,7 @@ def _render_console_login_html() -> str:
         "</style><body>"
         # 로그인 화면은 아직 쿠키가 없다 - 메뉴를 눌러도 401 이 정상이다.
         # 그래도 '어떤 화면들이 있는지' 를 보여주는 것이 주소를 외우게 하는 것보다 낫다.
-        + header_html("검증문서 검수 로그인", exclude=REVIEW_SCREEN_EXCLUDE)
+        + header_html("검증문서 검수 로그인", exclude=REVIEW_SCREEN_EXCLUDE, show_logout=False)
         + '<main class="wrap"><div class="eyebrow">CONSOLE ACCESS</div>'
         "<h1>아이디와 <em>비밀번호</em>로<br>로그인합니다.</h1>"
         "<p>발급받은 아이디와 비밀번호를 입력하십시오. 이 브라우저에만 로그인 상태가 저장됩니다.</p>"

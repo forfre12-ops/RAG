@@ -88,6 +88,19 @@ def test_every_screen_has_the_same_header_skeleton(name):
         assert '<span class="product">' in head, f"{name}: 메뉴에 없는 화면인데 이름이 없다"
 
 
+# [2026-10-07 KL 발견] 로그인 화면이 "로그아웃" 버튼을 보여줬다 — 눌러도 지울 쿠키가 없고
+# 같은 로그인 화면으로 다시 보내니 화면이 안 바뀌어 "안 눌러진다"로 보였다(console_nav.py
+# show_logout=False 로 수정). 로그인 화면만 없고, 로그인된 화면들은 그대로 있어야 한다.
+def test_login_screen_has_no_logout_link_other_screens_do():
+    screens = _screens()
+    login_head = _header_of(screens["login"])
+    assert "logout-link" not in login_head
+    assert "로그아웃" not in login_head
+    for name in ("manage", "signoff"):
+        head = _header_of(screens[name])
+        assert "logout-link" in head, f"{name}: 로그아웃 버튼이 없다"
+
+
 @pytest.mark.parametrize("name", list(_screens()))
 def test_old_header_skeletons_are_gone(name):
     """옛 골격이 남아 있으면 화면마다 상단이 두 개가 된다.
