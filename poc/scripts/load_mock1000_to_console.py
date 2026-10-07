@@ -72,6 +72,7 @@ def main() -> int:
             # 조회·가이드별 생성 통계(admin.html)가 이 필드로 거르고 묶는다.
             "department": m["department"],
             "info_type": m["info_type"],
+            "doc_format": m["doc_format"],
             "authoring_method": "mock1000_guide40_structure_20261002",
             "requires_manual_audit": True,
             "candidate_status": "proposed",

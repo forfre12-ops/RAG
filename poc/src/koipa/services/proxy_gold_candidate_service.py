@@ -294,7 +294,7 @@ class ProxyGoldCandidateService:
         self, *, status: str | None = None, grade: str | None = None,
         origin: str | None = None, query: str | None = None,
         review_batch: str | None = None,
-        department: str | None = None, info_type: str | None = None,
+        department: str | None = None, info_type: str | None = None, doc_format: str | None = None,
         visible_doc_ids: AbstractSet[str] | None = None,
         view: CandidateView | None = None,
         query_match: QueryMatch | None = None,
@@ -335,6 +335,8 @@ class ProxyGoldCandidateService:
             candidates = [c for c in candidates if c["department"] == department]
         if info_type:
             candidates = [c for c in candidates if c["info_type"] == info_type]
+        if doc_format:
+            candidates = [c for c in candidates if c.get("doc_format") == doc_format]
         # [검수 배치] 콘솔 전체가 306건인데 이번 검수 대상은 그중 120건이다. 표식이
         # 없으면 검수자가 어느 문서를 봐야 하는지 알 수 없다(실측 2026-08-14: 적재만
         # 해 놓고 배포했으면 검수자가 306건 앞에서 멈췄을 자리다).
@@ -388,6 +390,11 @@ class ProxyGoldCandidateService:
             # 화면이 서버 상태를 **문장으로 단정하면** 데이터가 바뀌어도 문장은 안 바뀐다.
             # 원장 전량 기준으로 세므로 상태·등급 필터를 어떻게 걸어도 목록이 흔들리지 않는다.
             "available_batches": self._available_batches(all_candidates),
+            # [2026-10-08] 카테고리 검색(KL 요청) — 등급 드롭다운은 고정 4값이라 이미 화면에 있고,
+            # 업무 분야·문서 유형은 배치마다 값이 달라 review_batch 와 같은 방식(실제 존재하는
+            # 값+건수)으로 채운다.
+            "available_departments": self._available_departments(all_candidates),
+            "available_doc_formats": self._available_doc_formats(all_candidates),
             "candidates": [{k: v for k, v in c.items() if k != "text"} for c in page],
         }
 
@@ -422,6 +429,22 @@ class ProxyGoldCandidateService:
             b for c in candidates if (b := str(c.get("review_batch") or "").strip())
         )
         return [{"review_batch": b, "total": n} for b, n in sorted(counter.items())]
+
+    @staticmethod
+    def _available_departments(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """실제로 존재하는 업무 분야(부서)와 그 후보 수 — 카테고리 검색 드롭다운이 쓴다."""
+        counter = Counter(
+            d for c in candidates if (d := str(c.get("department") or "").strip())
+        )
+        return [{"department": d, "total": n} for d, n in sorted(counter.items())]
+
+    @staticmethod
+    def _available_doc_formats(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """실제로 존재하는 문서 유형(보고서·이메일·회의 메모 등)과 그 후보 수."""
+        counter = Counter(
+            f for c in candidates if (f := str(c.get("doc_format") or "").strip())
+        )
+        return [{"doc_format": f, "total": n} for f, n in sorted(counter.items())]
 
     def summary(
         self, *, visible_doc_ids: AbstractSet[str] | None = None, view: CandidateView | None = None,
@@ -1285,6 +1308,9 @@ class ProxyGoldCandidateService:
             # 적재분)는 None — 조회·통계에서는 "미분류"로 묶인다.
             "department": str(meta.get("department") or "") or None,
             "info_type": str(meta.get("info_type") or "") or None,
+            # [2026-10-08] 문서 유형(보고서·이메일·회의 메모 등) — KL 요청으로 카테고리 검색에 추가.
+            # 생성 스크립트 다수가 이미 meta 에 적어 두는 값이라 여기서 꺼내기만 하면 된다.
+            "doc_format": str(meta.get("doc_format") or "") or None,
             "requires_manual_audit": bool(meta.get("requires_manual_audit")),
             # 검수 배치 표식. 전달본 단위로 묶어 목록을 좁힌다.
             "review_batch": str(meta.get("review_batch") or "") or None,

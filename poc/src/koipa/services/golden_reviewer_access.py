@@ -133,7 +133,7 @@ BLIND_KEPT_CANDIDATE_FIELDS = frozenset({
     "document_origin", "requires_manual_audit", "review_batch",
     "claim_scope", "content_revision", "characters", "document_sha256",
     "extraction", "provenance", "source_file_sha256", "is_actual_document", "text",
-    "department", "info_type",  # [2026-10-02] 등급을 말하지 않는다 — 카테고리 조회에 쓴다
+    "department", "info_type", "doc_format",  # [2026-10-02·10-08] 등급을 말하지 않는다 — 카테고리 조회에 쓴다
 })
 
 # ── 결정 이벤트 (원장 한 줄 = decide 가 적는 dict). 숨김 검수자가 보는 이벤트는 **자기 것뿐**이다.
