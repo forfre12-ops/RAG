@@ -1,7 +1,7 @@
 [내부 전용 — 검수자 배포 금지]
 review_id: MK-0410
 true_grade: S2
-department: 연구개발 / info_type: 연구개발 예산정보 / doc_format: 메신저 대화
+department: 연구개발 / info_type: 연구개발 예산정보 / doc_format: 회의록
 source_type: internal / security_marking: none / access_scope: none
 label_basis: 가이드 카탈로그 표(정보유형->등급) 직접 배정
 ============================================================

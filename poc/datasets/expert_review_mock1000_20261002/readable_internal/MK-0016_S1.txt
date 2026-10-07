@@ -1,7 +1,7 @@
 [내부 전용 — 검수자 배포 금지]
 review_id: MK-0016
 true_grade: S1
-department: 생산제조 / info_type: 생산기술 정보 / doc_format: 메신저 대화
+department: 생산제조 / info_type: 생산기술 정보 / doc_format: 점검 기록
 source_type: internal / security_marking: none / access_scope: none
 label_basis: 가이드 카탈로그 표(정보유형->등급) 직접 배정
 ============================================================
