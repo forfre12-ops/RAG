@@ -56,3 +56,5 @@ Makefile      text eol=lf
 # 기록하므로, git 이 줄바꿈을 정규화하면 신선한 clone 에서 검증이 반드시 실패한다.
 # → 텍스트 처리 일체 비활성(-text). 정본(doc/result/open/)은 위 정책(eol=lf) 그대로.
 doc/releases/** -text
+poc/models/classifier-trained/*.safetensors filter=lfs diff=lfs merge=lfs -text
+poc/models/classifier-trained/*.bin filter=lfs diff=lfs merge=lfs -text
