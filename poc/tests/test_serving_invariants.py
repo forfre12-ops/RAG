@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m6_evaluation.serving_invariants import (
+from koipa.modules.m6_evaluation.serving_invariants import (
     ServingCase,
     build_serving_invariant_report,
 )

@@ -1,15 +1,13 @@
-"""KL ↔ Lloydk 통합 8시나리오 — doc/19 명세 자동화.
+"""KL ↔ Koipa 통합 7시나리오 — doc/19 명세 자동화.
 
 설계:
-- 8 시나리오 (S1~S8) 1:1 매핑된 테스트 클래스
+- 7 시나리오 (S1~S4 · S6~S8) 1:1 매핑된 테스트 클래스. S5(가이드 업로드)는 그 기능을 없애면서(2026-09-26) 뺐다
 - PG/ES/LLM 가용성에 따라 자동 skip (best-effort)
 - 모든 시나리오는 TestClient로 in-process — KL 측은 mock (headers로 actor 전달)
 """
 
 from __future__ import annotations
 
-import io
-import json
 import sys
 import uuid
 
@@ -20,9 +18,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.api.app import app
-from lloydk.config import settings
-from lloydk.db import engine
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.db import engine
 
 pytestmark = pytest.mark.slow
 
@@ -58,6 +56,11 @@ def _actor(user_id: str = "kl-user-1", role: str = "kl_backend") -> dict:
 # ============================================================
 
 class TestS1SyncClassify:
+    # [2026-10-02] 이 파일의 다른 IF-0x 시험(169·241·281·306행)은 전부 이 표식으로 DB 없으면
+    # 건너뛴다. 이 시험만 빠져 있었다 — 분류 자체는 DB 없이도 200을 내지만, elapsed_ms<5000
+    # 예산은 실패한 영속화 재시도(_try_persist)의 DB 접속 시도 비용을 포함해서 잰다. DB가
+    # 없는 환경에서는 그 비용이 예산을 넘긴다(실측 9.6s) — 의미 있게 잴 수 없으니 건너뛴다.
+    @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_single_document_classification(self):
         with TestClient(app) as cli:
             r = cli.post(
@@ -66,7 +69,6 @@ class TestS1SyncClassify:
                 json={
                     "doc_id": str(uuid.uuid4()),
                     "content": "특급기밀 차세대 제품 설계도 핵심 원천기술 — KL 통합 시나리오 S1",
-                    "use_rag": False,
                     "return_evidence": True,
                 },
             )
@@ -185,51 +187,6 @@ class TestS4SchemaGrades:
 
 
 # ============================================================
-# S5. 가이드 문서 업로드 → RAG 인덱싱
-# ============================================================
-
-class TestS5GuideUpload:
-    def test_upload_text_guide_indexes(self):
-        gid = f"kl-guide-{uuid.uuid4().hex[:6]}"
-        text_body = "본 가이드는 영업비밀의 등급 분류 기준을 정의한다. " * 30
-        with TestClient(app) as cli:
-            r = cli.post(
-                "/api/v1/guide/documents",
-                headers=_hdr(),
-                data={
-                    "guide_id": gid,
-                    "version": "v1.0",
-                    "effective_date": "2026-06-01",
-                    "change_summary": "S5 시나리오 가이드",
-                    "actor": json.dumps(_actor(role="admin")),
-                    "doc_type": "guideline",
-                },
-                files={"file": ("guide.txt", io.BytesIO(text_body.encode("utf-8")), "text/plain")},
-            )
-        assert r.status_code == 201
-        body = r.json()
-        assert body["guide_id"] == gid
-        assert isinstance(body["indexed"], bool)
-        assert body["embedding_vector_count"] >= 0  # ES 미가용 시 0도 허용
-
-    def test_list_versions_after_upload(self):
-        gid = f"kl-list-{uuid.uuid4().hex[:6]}"
-        with TestClient(app) as cli:
-            cli.post(
-                "/api/v1/guide/documents",
-                headers=_hdr(),
-                data={
-                    "guide_id": gid, "version": "v1.0",
-                    "actor": json.dumps(_actor(role="admin")),
-                },
-                files={"file": ("g.txt", io.BytesIO(b"content " * 100), "text/plain")},
-            )
-            r = cli.get(f"/api/v1/guide/documents/{gid}", headers=_hdr())
-        assert r.status_code == 200
-        assert r.json()["guide_id"] == gid
-
-
-# ============================================================
 # S6. 합성 문서 생성 → 검수 → 데이터셋 편입
 # ============================================================
 
@@ -289,7 +246,7 @@ class TestS7ActiveLearningUrgent:
     @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_underclass_accumulates_then_urgent_active_learning(self):
         """corrections 10건 누적 → evaluate_retraining_need → URGENT_RETRAIN."""
-        from lloydk.modules.m6_evaluation.active_learning import evaluate_retraining_need
+        from koipa.modules.m6_evaluation.active_learning import evaluate_retraining_need
 
         status = evaluate_retraining_need(urgent_underclass_threshold=10)
         assert status.retrain_status in {"OK", "RETRAIN_RECOMMENDED", "URGENT_RETRAIN"}
@@ -326,11 +283,20 @@ class TestS8MetricsViews:
 # ============================================================
 
 class TestCrossCutting:
+    @pytest.fixture(autouse=True)
+    def _unset_audit_disabled(self, monkeypatch):
+        """[2026-10-03] conftest가 2026-10-02부터 AUDIT_DISABLED=1을 기본값으로 둔다.
+        audit_log 기록을 직접 검증하는 이 클래스만 풀어준다(파일 전체에 걸면 audit와
+        무관한 다른 클래스들까지 매 요청 DB connect를 다시 시도하게 됨 — conftest가
+        막으려던 바로 그 회귀).
+        """
+        monkeypatch.delenv("AUDIT_DISABLED", raising=False)
+
     @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_kl_scenarios_recorded_in_audit_log(self):
         """KL 시나리오 호출 시 audit_log에 actor_role=kl_backend로 기록되는지."""
-        from lloydk.db import session_scope
-        from lloydk.repositories import AuditRepo
+        from koipa.db import session_scope
+        from koipa.repositories import AuditRepo
 
         unique_actor = f"kl-audit-{uuid.uuid4().hex[:8]}"
         with TestClient(app) as cli:
@@ -349,12 +315,15 @@ class TestCrossCutting:
         assert len(rows) >= 1
         assert any(r.actor_role == "kl_backend" for r in rows)
 
+    # /metrics-prom 은 DB 게이지를 동기 수집하므로 PG 미가용 시 커넥션 타임아웃으로 실패한다.
+    # 같은 클래스의 형제 테스트와 동일하게 가드 — 미기동 환경에서 fail 이 아니라 skip 이어야 한다.
+    @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_prometheus_endpoint_records_kl_calls(self):
-        """KL 시나리오 호출이 lloydk_requests_total에 카운트되는지."""
+        """KL 시나리오 호출이 koipa_requests_total에 카운트되는지."""
         with TestClient(app) as cli:
             cli.get("/api/v1/schema/grades", headers=_hdr())
             r = cli.get("/api/v1/metrics-prom")
         assert r.status_code == 200
         body = r.text
-        # schema/grades 호출이 lloydk_requests_total에 잡혔는지
+        # schema/grades 호출이 koipa_requests_total에 잡혔는지
         assert "/api/v1/schema/grades" in body

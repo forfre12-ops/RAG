@@ -1,0 +1,9 @@
+{
+  "temperature": 2.03,
+  "ece_before": 0.0592,
+  "ece_after": 0.0196,
+  "nll_before": 0.3884,
+  "nll_after": 0.2527,
+  "n_samples": 256,
+  "source": "trainer-auto"
+}

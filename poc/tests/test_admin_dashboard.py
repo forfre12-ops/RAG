@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
-import lloydk.api.admin as admin
-from lloydk.api.admin import DashboardResponse, _drift_snapshot, _section, dashboard
+import koipa.api.admin as admin
+from koipa.api.admin import DashboardResponse, _drift_snapshot, _section, dashboard
 
 
 def test_dashboard_returns_full_structure_without_db():
@@ -45,7 +45,7 @@ def test_section_passthrough_on_success():
 
 def test_dashboard_section_failure_isolated(monkeypatch):
     # 한 소스가 던져도 전체는 200 구조 + degraded에 그 섹션만 표기.
-    import lloydk.services.confirm_service as cs
+    import koipa.services.confirm_service as cs
 
     def _boom():
         raise RuntimeError("db down")

@@ -1,0 +1,56 @@
+# docker-compose.gpu-train.yml — 지재원(모델 공장) 노드에서 **학습만** GPU 로 돌린다
+# ─────────────────────────────────────────────────────────────────────────────
+# 왜 gpu.yml 과 따로 두나. `docker-compose.gpu.yml` 은 **장치 예약만** 한다. 그 파일
+# 머리말이 스스로 적고 있다 — "이 오버레이만 얹고 CPU 휠 이미지를 쓰면 GPU 는 보이지만
+# 연산은 CPU 로 돈다". 실제로 GPU 를 쓰려면 **CUDA 휠로 빌드한 이미지**가 함께 있어야 한다.
+# 그 두 조각을 한 파일로 묶어, 한쪽만 얹어 "GPU 를 쓰는 줄 알았는데 아니었던" 상태를 막는다.
+#
+# 왜 api 는 그대로 두나. api 는 서빙이다. 분류 1건이 CPU 에서 150ms 라 GPU 이득이 작고,
+# 서빙 경로를 흔들면 고객사 배포본과 갈린다. 무거운 것은 학습이고 그건 worker 가 한다.
+# beat 는 스케줄만 발행하지만 worker 와 같은 이미지를 쓰므로 함께 따라온다(무해).
+#
+# 사전 준비 둘 — 없으면 기동이 실패한다:
+#   1) 호스트에 NVIDIA Container Toolkit 이 설치되고 도커에 런타임이 등록돼 있을 것
+#        dnf install -y nvidia-container-toolkit
+#        nvidia-ctk runtime configure --runtime=docker && systemctl restart docker
+#        docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi   # 먼저 이게 돼야 한다
+#   2) CUDA 휠 이미지를 빌드해 둘 것 (배포 이미지는 건드리지 않는다)
+#        docker build -f Dockerfile.api.prod \
+#          --build-arg TORCH_INDEX=https://download.pytorch.org/whl/cu130 \
+#          -t koipa-gpu:cu130 .
+#      ⚠ cu 판을 아무거나 고르면 안 된다. 락파일이 torch==2.12.1 인데 cu124 는 최대 2.6.0,
+#        cu128 은 최대 2.11.0 이라 그 판이 **없다.** cu126·cu129·cu130 에만 있다.
+#        드라이버가 보고하는 CUDA 판에 맞춘다(211 서버는 13.0 → cu130).
+#
+# 사용:
+#   docker compose --env-file .env \
+#     -f infra-config/docker-compose.airgap.yml \
+#     -f infra-config/docker-compose.gpu-train.yml up -d worker beat
+#
+# 실측 근거 (211.233.204.32 · NVIDIA L4 24GB · 2026-09-09 · 1,000행·8스레드·5에폭):
+#     CPU(torch 2.12.1+cpu)   9.90 s/it   625스텝  1.7시간
+#     GPU(torch 2.12.1+cu130) 0.55 s/it   625스텝  0.1시간      → 18배
+#   재는 법: scripts/measure_train_step_rate.py --rows 1000 --threads 8 --device {cpu,cuda}
+#
+# 되돌리려면 이 파일만 빼고 `up -d worker beat` 를 다시 부른다.
+
+services:
+  worker:
+    image: ${GPU_IMAGE:-koipa-gpu:cu130}
+    environment:
+      # 배포 이미지의 오프라인 강제를 그대로 잇는다 — 학습 베이스 모델은 ../models 의
+      # HF 캐시에서 읽는다. 캐시에 없으면 학습이 시작조차 못 한다(2026-09-09 실측:
+      # kf-deberta-base 가 없어 full-train 인데 학습이 불가능한 상태였다).
+      HF_HOME: /models/hf
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  beat:
+    image: ${GPU_IMAGE:-koipa-gpu:cu130}

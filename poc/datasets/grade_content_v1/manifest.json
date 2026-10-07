@@ -1,0 +1,53 @@
+{
+ "built_at": "2026-09-12",
+ "n": 2400,
+ "val": 400,
+ "seed": 20260912,
+ "label_source": "rule_from_content_svm (grade_from_svm)",
+ "human_confirmed_count": 0,
+ "use": "내용을 읽어야 풀리는 과제. 사람 확정 정답 아님 · 실문서 일반화 근거 아님.",
+ "sha256": {
+  "train": "ff744513e43be6681cc117fceca7dfc0400a0433d467a3a46936f6aca5b25c84",
+  "val": "668e1ea4f13f98fb17ab278f2a03e4d5fa499897890b3ec037ebb7901afcea08",
+  "test": "dc6337291ef1e581e417e27224d04c1c46a9b287da432d09647e6c29810d4730"
+ },
+ "shortcut_audit": {
+  "n": 2400,
+  "by_grade": {
+   "S1": 600,
+   "S2": 600,
+   "S3": 600,
+   "TS": 600
+  },
+  "majority_rate": 25.0,
+  "axes": {
+   "document_type": {
+    "rate": 27.7,
+    "null": 28.1,
+    "excess_pp": -0.4
+   },
+   "theme": {
+    "rate": 28.1,
+    "null": 28.5,
+    "excess_pp": -0.4
+   },
+   "length": {
+    "rate": 30.2,
+    "null": 29.0,
+    "excess_pp": 1.3
+   },
+   "phrase": {
+    "rate": 78.1,
+    "null": 36.8,
+    "excess_pp": 41.3
+   }
+  },
+  "median_chars": {
+   "S1": 818,
+   "S2": 816,
+   "S3": 817,
+   "TS": 817
+  },
+  "median_ratio": 1.0
+ }
+}

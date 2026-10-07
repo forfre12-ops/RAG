@@ -3,7 +3,7 @@
 재설계: conf 제거, 게이트 = 합의(rule==llm) + 실제 근거 span + self-consistency.
 gold_candidate(자동 후보)만 만들고 평가정답은 사람(P3). 구 path A/B/C·conf 게이트는 삭제됨.
 """
-from lloydk.modules.m3_labeling.consensus import evaluate_consensus
+from koipa.modules.m3_labeling.consensus import evaluate_consensus
 
 
 def test_gold_candidate_agreement_with_evidence():
@@ -89,7 +89,3 @@ def test_require_evidence_false_admits_agree_without_evidence():
     assert not r3.is_gold and r3.status == "needs_review_no_evidence"
 
 
-def test_legacy_keyword_args_swallowed():
-    # 구 keyword 인자(min_rule_conf/min_llm_conf)는 **_legacy로 흡수 — TypeError 안 남(1릴리스 한시).
-    r = evaluate_consensus("S2", "S2", has_real_evidence=True, min_rule_conf=0.5, min_llm_conf=0.7)
-    assert r.is_gold

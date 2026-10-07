@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from lloydk.modules.m6_evaluation.deploy_gate import (
+from koipa.modules.m6_evaluation.deploy_gate import (
     DeployDecision,
     evaluate_deploy_gate,
 )
@@ -68,6 +68,66 @@ def test_floor_ignored_when_baseline_present():
     )
     assert dec.passed is True   # +0.01 ≤ 회귀허용 0.02 통과, floor(0.01)는 미적용
     assert not any(c.name == "first_deploy_fnr_floor" for c in dec.checks)
+
+
+# ── [게이트=가시성] 외부팩트 신호(앵커·메타모픽) OFF 상태 명시 ────────────────────
+
+
+def test_external_fact_signals_visible_when_absent():
+    # 앵커·메타모픽 리포트 미제공(기본 OFF) → 통과하되 '미수행'을 checks에 명시(무음 통과 방지).
+    dec = evaluate_deploy_gate(_report(fnr_high=0.03, f1_macro=0.85), None)
+    assert dec.passed is True
+    names = {c.name for c in dec.checks}
+    assert "anchor_eval_skipped" in names
+    assert "metamorphic_eval_skipped" in names
+    # 스킵 정보성 check는 통과를 막지 않는다(강제 ON 아님 — 비용/경로 opt-in).
+    assert all(c.passed for c in dec.checks if c.name.endswith("_eval_skipped"))
+    # 리포트 없으니 실제 검사 이름은 부재(이중 계상 없음).
+    assert not any(c.name == "anchor_high_grade_miss" for c in dec.checks)
+    assert not any(c.name == "metamorphic_forward_regression" for c in dec.checks)
+
+
+# ── [강제 옵트인 fail-closed] 외부팩트 리포트 무음 누락 → hard block ──────────────
+
+
+def test_require_metamorphic_blocks_when_report_absent():
+    # require_metamorphic=True 인데 리포트 미제공 = 생성이 조용히 깨진 상태 → 통과 대신 hard block.
+    dec = evaluate_deploy_gate(
+        _report(fnr_high=0.03, f1_macro=0.85), None, require_metamorphic=True,
+    )
+    assert dec.passed is False
+    assert "metamorphic_eval_skipped" in dec.reason
+    assert not any(
+        c.passed for c in dec.checks if c.name == "metamorphic_eval_skipped"
+    )
+
+
+def test_require_anchor_blocks_when_report_absent():
+    dec = evaluate_deploy_gate(
+        _report(fnr_high=0.03, f1_macro=0.85), None, require_anchor=True,
+    )
+    assert dec.passed is False
+    assert "anchor_eval_skipped" in dec.reason
+
+
+def test_require_flags_default_false_preserve_passthrough():
+    # 기본 False → 스킵은 여전히 통과(동작 보존). Fix 3 회귀 가드.
+    dec = evaluate_deploy_gate(_report(fnr_high=0.03, f1_macro=0.85), None)
+    assert dec.passed is True
+    assert all(c.passed for c in dec.checks if c.name.endswith("_eval_skipped"))
+
+
+def test_require_metamorphic_does_not_block_when_report_present():
+    # 리포트가 있으면(측정됨) 강제해도 skip 분기로 안 감 — 실제 회귀검사가 판정한다.
+    report = {"forward": {"n": 10, "violations": 0}, "forward_failures": []}
+    dec = evaluate_deploy_gate(
+        _report(fnr_high=0.03, f1_macro=0.85), None,
+        metamorphic_report=report, require_metamorphic=True,
+    )
+    assert dec.passed is True
+    # skip check 는 아예 없고(리포트 있음), 실제 회귀검사가 존재.
+    assert not any(c.name == "metamorphic_eval_skipped" for c in dec.checks)
+    assert any(c.name == "metamorphic_forward_regression" for c in dec.checks)
 
 
 # ── fnr_high 회귀 차단 (미탐 악화) ───────────────────────────────────────────
@@ -174,7 +234,7 @@ def test_decision_to_dict_serializable():
 
 # ── 앵커 연결 (외부 사실 앵커 측정 미탐을 게이트에 주입) ─────────────────────────
 
-from lloydk.modules.m6_evaluation.deploy_gate import summarize_anchor_high_grade  # noqa: E402
+from koipa.modules.m6_evaluation.deploy_gate import summarize_anchor_high_grade  # noqa: E402
 
 
 def _anchor_report(cards):
@@ -231,3 +291,62 @@ def test_summarize_anchor_high_grade_counts():
     s = summarize_anchor_high_grade(anchor)
     assert s["high_grade_cards"] == 2 and s["fail"] == 1 and s["pass"] == 1
     assert s["fail_cells"] == ["a/TS"]
+
+
+# ── [P0#6] 메타모픽 순방향 회귀 hard-signal ─────────────────────────────────────
+from koipa.modules.m6_evaluation.deploy_gate import summarize_metamorphic  # noqa: E402
+from koipa.modules.m6_evaluation.metamorphic import build_metamorphic_report  # noqa: E402
+
+
+def _metamorphic(n, violations):
+    """순방향 쌍 n개 중 violations개가 앵커(TS)보다 낮은 등급(S3)으로 예측=미탐 회귀."""
+    pairs = [
+        {"anchor_id": f"a{i}", "anchor_grade": "TS",
+         "paraphrase_pred": "S3" if i < violations else "TS"}
+        for i in range(n)
+    ]
+    return build_metamorphic_report(pairs).to_dict()
+
+
+def test_metamorphic_forward_regression_blocks_even_if_synthetic_gate_passes():
+    # 합성 fnr/f1 게이트는 통과(깨끗)하지만 메타모픽 순방향 미탐 회귀가 hard block.
+    rep = _metamorphic(n=6, violations=2)
+    dec = evaluate_deploy_gate(_report(fnr_high=0.0, f1_macro=0.9), _report(),
+                               metamorphic_report=rep)
+    assert dec.passed is False
+    assert "metamorphic_forward_regression" in dec.reason
+
+
+def test_metamorphic_clean_passes_and_records_check():
+    rep = _metamorphic(n=6, violations=0)
+    dec = evaluate_deploy_gate(_report(), _report(), metamorphic_report=rep)
+    assert dec.passed is True
+    assert any(c.name == "metamorphic_forward_regression" and c.passed for c in dec.checks)
+
+
+def test_metamorphic_small_sample_not_measurable_does_not_block():
+    # n < min_n(기본 5) → 측정 불가(게이트 안 깸) — 표본부족으로 자동활성 막지 않음.
+    rep = _metamorphic(n=3, violations=1)
+    dec = evaluate_deploy_gate(_report(), _report(), metamorphic_report=rep)
+    assert dec.passed is True
+    chk = [c for c in dec.checks if c.name == "metamorphic_forward_regression"][0]
+    assert chk.passed is True and "측정 불가" in chk.detail
+
+
+def test_metamorphic_ceiling_can_tolerate_low_rate():
+    # ceiling을 올리면 낮은 위반율은 통과(운영 튜닝). 6쌍 중 1위반(CI하한 낮음).
+    rep = _metamorphic(n=6, violations=1)
+    dec = evaluate_deploy_gate(_report(), _report(), metamorphic_report=rep,
+                               metamorphic_forward_ceiling=0.5)
+    assert dec.passed is True
+
+
+def test_metamorphic_report_none_preserves_behavior():
+    dec = evaluate_deploy_gate(_report(), _report())
+    assert not any(c.name == "metamorphic_forward_regression" for c in dec.checks)
+
+
+def test_summarize_metamorphic_forward_signal():
+    s = summarize_metamorphic(_metamorphic(n=5, violations=2), min_n=5)
+    assert s["n"] == 5 and s["violations"] == 2
+    assert s["measurable"] is True and s["regression"] is True and s["ci_low"] > 0.0

@@ -2,9 +2,9 @@
 
 체크 항목:
 1. 최신 pg dump 파일이 24h 이내에 존재하는가
-2. ES snapshot이 24h 이내에 존재하는가
-3. MinIO mirror가 7일 이내에 존재하는가
-4. verify_infra.py 통과 가능한가 (PG·ES·MinIO·Redis 다 살아있는가)
+2. 원문 스토리지 아카이브(storage-*.tar.gz)가 24h 이내에 존재하는가 (--storage-dir 지정 시)
+3. MinIO mirror가 7일 이내에 존재하는가 (dev/연결망 — 폐쇄망은 미사용)
+4. verify_infra.py 통과 가능한가 (PG·MinIO·Redis 다 살아있는가)
 
 리포트:
 - 결과를 JSON으로 출력 + reports/dr_check_YYYYMMDD.json 적재
@@ -17,7 +17,6 @@ import argparse
 import datetime as dt
 import json
 import logging
-import os
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -83,6 +82,25 @@ def check_minio_mirror_recency(mirror_dir: Path, *, hours: int = 168) -> CheckRe
     )
 
 
+def check_storage_backup_recency(storage_dir: Path, *, hours: int = 24) -> CheckResult:
+    """원문 스토리지 아카이브(backup_storage.py: storage-*.tar.gz) 신선도 — RPO 1일."""
+    name = "storage_backup_recency"
+    if not storage_dir.exists():
+        return CheckResult(name, False, f"directory missing: {storage_dir}", _now())
+    candidates = [f for f in storage_dir.glob("*.tar.gz") if f.is_file()]
+    candidates += [f for f in storage_dir.glob("*.tar") if f.is_file()]
+    if not candidates:
+        return CheckResult(name, False, f"no storage archive in {storage_dir}", _now())
+    latest = max(candidates, key=lambda f: f.stat().st_mtime)
+    age_h = (dt.datetime.now() - dt.datetime.fromtimestamp(latest.stat().st_mtime)).total_seconds() / 3600
+    ok = age_h <= hours
+    return CheckResult(
+        name, ok,
+        f"latest={latest.name} age={age_h:.1f}h limit={hours}h",
+        _now(),
+    )
+
+
 def check_infra_health() -> CheckResult:
     """verify_infra.py 호출 — 실패 항목 수집."""
     name = "infra_health"
@@ -114,10 +132,12 @@ def run_checks(
     *,
     pg_dir: Path,
     mirror_dir: Path,
+    storage_dir: Path | None = None,
     rto_hours: int = 4,
     pg_recency_hours: int = 24,
     es_recency_hours: int = 24,
     mirror_recency_hours: int = 168,
+    storage_recency_hours: int = 24,
     skip_infra: bool = False,
 ) -> DrReport:
     report = DrReport(
@@ -127,6 +147,9 @@ def run_checks(
     )
     report.checks.append(check_pg_backup_recency(pg_dir, hours=pg_recency_hours))
     report.checks.append(check_minio_mirror_recency(mirror_dir, hours=mirror_recency_hours))
+    # 원문 스토리지 백업 신선도 — storage_dir 지정 시에만(폐쇄망 로컬FS 아카이브).
+    if storage_dir is not None:
+        report.checks.append(check_storage_backup_recency(storage_dir, hours=storage_recency_hours))
     if not skip_infra:
         report.checks.append(check_infra_health())
     return report
@@ -134,9 +157,11 @@ def run_checks(
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    p = argparse.ArgumentParser(description="Lloydk DR readiness check")
+    p = argparse.ArgumentParser(description="Koipa DR readiness check")
     p.add_argument("--pg-dir", type=Path, default=Path("backups/pg"))
     p.add_argument("--mirror-dir", type=Path, default=Path("backups/minio"))
+    p.add_argument("--storage-dir", type=Path, default=Path("backups/storage"),
+                   help="원문 스토리지 아카이브 경로. 'none' 이면 스토리지 검사 생략.")
     p.add_argument("--rto-hours", type=int, default=4)
     p.add_argument("--rpo-hours", type=int, default=24)
     p.add_argument("--report-dir", type=Path, default=Path("reports/dr"))
@@ -145,9 +170,11 @@ def main(argv: list[str] | None = None) -> int:
                    help="검사 실패해도 exit 0 (리포트만 적재할 때)")
     args = p.parse_args(argv)
 
+    storage_dir = None if str(args.storage_dir).lower() == "none" else args.storage_dir
     report = run_checks(
         pg_dir=args.pg_dir,
         mirror_dir=args.mirror_dir,
+        storage_dir=storage_dir,
         rto_hours=args.rto_hours,
         pg_recency_hours=args.rpo_hours,
         skip_infra=args.skip_infra,

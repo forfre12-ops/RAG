@@ -1,0 +1,88 @@
+{
+  "leakage": {
+    "documents": 2822,
+    "grade_token_exposed": 175,
+    "length_by_grade": {
+      "S1": {
+        "max": 6091,
+        "min": 150,
+        "n": 649,
+        "p50": 1509
+      },
+      "S2": {
+        "max": 8011,
+        "min": 126,
+        "n": 649,
+        "p50": 1349
+      },
+      "S3": {
+        "max": 8062,
+        "min": 120,
+        "n": 875,
+        "p50": 1149
+      },
+      "TS": {
+        "max": 8031,
+        "min": 149,
+        "n": 649,
+        "p50": 1508
+      }
+    },
+    "length_only_1nn": 0.378,
+    "length_only_random": 0.25,
+    "length_theils_u": 0.023,
+    "tell_coverage": 0.0,
+    "tell_sentences": 0
+  },
+  "policy": {
+    "family_disjoint_split": true,
+    "grade_rule": "proxy_corpus.grade_from_svm (value=0 -> S3 무조건)",
+    "length_quartile_balanced": true,
+    "max_court_share_in_s3": 0.1
+  },
+  "schema": "v7-diverse-training-v1",
+  "sources": {
+    "mundane": "datasets\\mundane_s3\\raw.scored.jsonl",
+    "patent": "datasets\\patent_proxy\\holdout_eval_clean.jsonl",
+    "v5train": "datasets\\labeled_p1_v5_clean\\train.jsonl",
+    "v6": "datasets\\proxy_gold\\direct_authored_catalog_training.v6.jsonl"
+  },
+  "splits": {
+    "test": {
+      "court_share": 0.0113,
+      "documents": 443,
+      "families": 299,
+      "grades": {
+        "S1": 103,
+        "S2": 103,
+        "S3": 132,
+        "TS": 105
+      },
+      "sha256": "54394a2f711dba4c466dbe4900e430aea289fc8aa5ced8f3cb67b2f7a4e98ef6"
+    },
+    "train": {
+      "court_share": 0.0263,
+      "documents": 1936,
+      "families": 1307,
+      "grades": {
+        "S1": 441,
+        "S2": 438,
+        "S3": 610,
+        "TS": 447
+      },
+      "sha256": "2fd1bd44d089a1dd60c872280d99196b5416da15622c3396f8d5c99fed113799"
+    },
+    "val": {
+      "court_share": 0.0181,
+      "documents": 443,
+      "families": 287,
+      "grades": {
+        "S1": 105,
+        "S2": 108,
+        "S3": 133,
+        "TS": 97
+      },
+      "sha256": "f8c00d9065fafb97b6929464d1cbc41e194b9e1cdbe589256377cde78c287c61"
+    }
+  }
+}

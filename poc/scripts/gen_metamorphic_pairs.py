@@ -10,10 +10,19 @@ predict_via_serving(분류) + metamorphic.build_metamorphic_report(채점, 실�
 
 사용(로컬 Qwen, Ollama):
   python scripts/gen_metamorphic_pairs.py --provider ollama --max-anchors 8 \
-    --model-dir artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9 \
+    --model-dir artifacts/classifier_p1_v5_clean/v-fe4b386b \
     --report reports/metamorphic_pairs.md
 """
 from __future__ import annotations
+
+# 콘솔 출구를 UTF-8 로 고정한다 — cp949 콘솔에서 em dash 하나에 죽던 것을 막는다.
+# 정본은 scripts/_cli_io.py 한 곳이다(같은 코드가 133벌 복사돼 있었다).
+try:  # 스크립트로 직접 실행 - scripts/ 가 sys.path 에 들어온다
+    from _cli_io import force_utf8_stdio  # noqa: E402
+except ImportError:  # 패키지로 import - 릴리스 번들의 import 폐쇄 검사가 이 경로다
+    from scripts._cli_io import force_utf8_stdio  # noqa: E402
+
+force_utf8_stdio()
 
 import argparse
 import json
@@ -29,53 +38,149 @@ HIGH_GRADES = ("TS", "S1")
 LOWEST = "S3"
 
 
+def _load_samples_fixture(path: Path, sample_cls) -> dict:
+    """커밋된 패러프레이즈 픽스처(dump 포맷)를 generate_minimal_pairs 반환형으로 재구성.
+
+    live LLM 없이 재현 — 같은 픽스처+같은 모델 → 같은 리포트(release-gate 와 동일 결정성).
+    픽스처는 forward/reverse 샘플(생성 텍스트+채택 여부)만 담는다. 분류는 호출부가 서빙으로 한다.
+    """
+    forward: list = []
+    reverse: list = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        row = json.loads(line)
+        s = sample_cls(
+            anchor_id=row.get("anchor_id", ""),
+            anchor_grade=row.get("anchor_grade", ""),
+            kind=row.get("kind", "forward"),
+            original_text=row.get("original_text", ""),
+            generated_text=row.get("generated_text", ""),
+            required_tokens=list(row.get("required_tokens", []) or []),
+            admitted=bool(row.get("admitted", False)),
+            reason=row.get("reason", ""),
+        )
+        (forward if s.kind == "forward" else reverse).append(s)
+    return {
+        "forward": forward, "reverse": reverse,
+        "skipped_no_tokens": 0, "reverse_skipped_weak_tokens": 0,
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9")
+    ap.add_argument("--model-dir", default="artifacts/classifier_p1_v5_clean/v-fe4b386b")
+    # [2026-09-10] 요소모델(v8)을 같은 하니스에 물린다. 왜 필요한가 — v8 은 문턱을 풀면
+    # 체계적으로 낮게 본다(실측 reports/FACTOR_THRESHOLD_SWEEP_2026-09-10.json: 자동확정분의
+    # 70.8~91.7% 가 의도등급보다 낮음). "사실이 그대로인데 등급이 내려간다"는 이 모듈의
+    # **순방향 위반** 정의와 같은 것이라, 여기서 재는 것이 맞다.
+    # ⚠ 기본 문턱(0.99)에서는 요소가 거의 전부 unknown → 보수적 완성 → 최고등급이라
+    #   순방향이 **공허 통과**한다(이 모듈 docstring 이 경고하는 바로 그 경우다).
+    #   그래서 kappa 를 낮춰 가며 재야 하고, 역방향을 반드시 같이 본다.
+    ap.add_argument("--factor-model", default="",
+                    help="요소모델 디렉터리. 주면 v5 대신 이 모델로 분류한다")
+    ap.add_argument("--factor-kappa", type=float, default=-1.0, help="미지정=settings 값")
+    ap.add_argument("--factor-tau", type=float, default=-1.0, help="미지정=settings 값")
     ap.add_argument("--provider", default="", help="LLM provider(빈칸=settings.llm_provider). 예: ollama")
     ap.add_argument("--max-anchors", type=int, default=8, help="생성할 고등급 앵커 수(LLM 비용 제어)")
     ap.add_argument("--max-public", type=int, default=20, help="과분류 베이스라인용 공개(S3) 앵커 수")
     ap.add_argument("--temperature", type=float, default=0.3)
     ap.add_argument("--report", default="reports/metamorphic_pairs.md")
     ap.add_argument("--dump-pairs", default="reports/metamorphic_pairs.samples.jsonl")
+    ap.add_argument(
+        "--from-samples", default="",
+        help="재현 모드: 커밋된 패러프레이즈 픽스처(dump jsonl)를 그대로 분류(live LLM 불요). "
+             "같은 픽스처+같은 모델 → 같은 리포트(release-gate 와 동일 결정성).",
+    )
     args = ap.parse_args()
 
-    from lloydk.adapters.llm import build_provider
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
-    from lloydk.modules.m6_evaluation.anchor_corpus import load_anchor_corpus
-    from lloydk.modules.m6_evaluation.metamorphic import build_metamorphic_report
-    from lloydk.modules.m6_evaluation.paraphrase_gen import generate_minimal_pairs
-    from lloydk.modules.m6_evaluation.serving_eval import predict_via_serving
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
+    from koipa.modules.m6_evaluation.anchor_corpus import load_anchor_corpus
+    from koipa.modules.m6_evaluation.metamorphic import build_metamorphic_report
+    from koipa.modules.m6_evaluation.paraphrase_gen import GeneratedSample, generate_minimal_pairs
+    from koipa.modules.m6_evaluation.serving_eval import predict_via_serving
 
     records = load_anchor_corpus()
-    # 고등급(TS/S1) + 필수토큰 보유만 생성 대상(보존 게이트가 의미 있는 것). 결정적 정렬 후 절단.
-    hi = sorted([r for r in records if r.anchor_grade in HIGH_GRADES and r.required_tokens],
-                key=lambda r: r.anchor_id)[:args.max_anchors]
+    # 공개(S3) 과분류 베이스라인용 앵커 — 결정적(LLM 불요), 두 모드 공통.
     pub = sorted([r for r in records if r.anchor_grade == LOWEST],
                  key=lambda r: r.anchor_id)[:args.max_public]
-    if not hi:
-        print("고등급+토큰 앵커 0건 — 생성 불가", file=sys.stderr)
-        return 2
 
-    provider = build_provider(args.provider or None)
+    if args.from_samples:
+        # 재현 모드: 커밋된 패러프레이즈 픽스처를 그대로 분류(live LLM 불요).
+        gen = _load_samples_fixture(Path(args.from_samples), GeneratedSample)
+        provider_name = f"fixture:{Path(args.from_samples).name}"
+        n_hi = len({s.anchor_id for s in gen["forward"]})
+        if not gen["forward"]:
+            print(f"픽스처에 forward 샘플 0건: {args.from_samples}", file=sys.stderr)
+            return 2
+    else:
+        from koipa.adapters.llm import build_provider  # noqa: PLC0415
+        # 고등급(TS/S1) + 필수토큰 보유만 생성 대상(보존 게이트가 의미 있는 것). 결정적 정렬 후 절단.
+        hi = sorted([r for r in records if r.anchor_grade in HIGH_GRADES and r.required_tokens],
+                    key=lambda r: r.anchor_id)[:args.max_anchors]
+        if not hi:
+            print("고등급+토큰 앵커 0건 — 생성 불가", file=sys.stderr)
+            return 2
+        provider = build_provider(args.provider or None)
 
-    def generate_fn(prompt: str, system: str | None = None) -> str:
-        return provider.generate(prompt, system=system, max_tokens=1200,
-                                 temperature=args.temperature).text
+        def generate_fn(prompt: str, system: str | None = None) -> str:
+            return provider.generate(prompt, system=system, max_tokens=1200,
+                                     temperature=args.temperature).text
 
-    gen = generate_minimal_pairs(hi, generate_fn=generate_fn, do_reverse=True)
+        gen = generate_minimal_pairs(hi, generate_fn=generate_fn, do_reverse=True)
+        provider_name = f"{provider.name}/{getattr(provider, 'model', '?')}"
+        n_hi = len(hi)
 
-    model_dir = Path(args.model_dir)
-    if not model_dir.is_absolute():
-        model_dir = _HERE.parent / model_dir
-    pipe = InferencePipeline(model_dir=str(model_dir))
+    if args.factor_model:
+        from koipa.config import settings as _fs  # noqa: PLC0415
+        from koipa.modules.m5_inference.factor_model import (  # noqa: PLC0415
+            apply_serving_gate,
+            get_factor_inference,
+        )
+
+        _kappa = args.factor_kappa if args.factor_kappa >= 0 else _fs.factor_kappa
+        _tau = args.factor_tau if args.factor_tau >= 0 else _fs.factor_tau
+        _fdir = Path(args.factor_model)
+        if not _fdir.is_absolute():
+            _fdir = _HERE.parent / _fdir
+        _inf = get_factor_inference(str(_fdir), base=_fs.factor_model_base,
+                                    max_len=_fs.factor_model_max_len)
+        if not _inf.load():
+            print(f"요소모델 로드 실패: {_inf.load_error}", file=sys.stderr)
+            return 2
+        model_name = f"factor:{_fdir.name} kappa={_kappa} tau={_tau}"
+
+        def predict_rows(rows):
+            # metadata=None · source_is_public=False — 본문만으로 판정한다. 앵커에는 출처
+            # 메타데이터가 없고, 공개 앵커에 layer1 을 태우면 S3 가 공짜로 나와 베이스라인이
+            # 무의미해진다.
+            out = []
+            for r in rows:
+                pred = _inf.predict(r["text"])
+                if pred is None:
+                    out.append({"pred": None})
+                    continue
+                codes, probs = pred
+                fp = apply_serving_gate(codes, probs, metadata=None, tau=_tau, kappa=_kappa)
+                out.append({"pred": fp.serving_grade})
+            return out
+    else:
+        model_dir = Path(args.model_dir)
+        if not model_dir.is_absolute():
+            model_dir = _HERE.parent / model_dir
+        pipe = InferencePipeline(model_dir=str(model_dir))
+        model_name = str(args.model_dir)
+
+        def predict_rows(rows):
+            return predict_via_serving(rows, pipeline=pipe, labels=["TS", "S1", "S2", "S3"])
 
     def classify(samples):
-        """채택된 GeneratedSample 들을 서빙으로 분류 → pred 부착(리스트 of dict)."""
+        """채택된 GeneratedSample 들을 분류 → pred 부착(리스트 of dict)."""
         admitted = [s for s in samples if s.admitted]
         rows = [{"text": s.generated_text, "label": s.anchor_grade} for s in admitted]
-        preds = predict_via_serving(rows, pipeline=pipe, labels=["TS", "S1", "S2", "S3"])
-        return [(s, p["pred"]) for s, p in zip(admitted, preds)]
+        preds = predict_rows(rows)
+        return [(s, p["pred"]) for s, p in zip(admitted, preds) if p["pred"]]
 
     fwd = classify(gen["forward"])
     rev = classify(gen["reverse"])
@@ -87,8 +192,8 @@ def main() -> int:
 
     # 공개(S3) 과분류 베이스라인 — 분류만.
     pub_rows = [{"text": r.text, "label": r.anchor_grade} for r in pub]
-    pub_preds = predict_via_serving(pub_rows, pipeline=pipe, labels=["TS", "S1", "S2", "S3"]) if pub else []
-    public_records = [{"pred": p["pred"]} for p in pub_preds]
+    pub_preds = predict_rows(pub_rows) if pub else []
+    public_records = [{"pred": p["pred"]} for p in pub_preds if p["pred"]]
 
     report = build_metamorphic_report(
         forward_pairs, reverse_pairs=reverse_pairs, public_records=public_records,
@@ -122,8 +227,8 @@ def main() -> int:
     md = [
         "# 메타모픽 최소쌍 회귀 — D (실패만 정보, 통과는 품질 아님)",
         "",
-        f"- model_dir: `{args.model_dir}` · provider: `{provider.name}/{getattr(provider,'model','?')}`",
-        f"- 생성 앵커: 고등급 {len(hi)} · 공개(S3) {len(pub)}",
+        f"- model: `{model_name}` · provider: `{provider_name}`",
+        f"- 생성 앵커: 고등급 {n_hi} · 공개(S3) {len(pub)}",
         f"- 사실보존 게이트 채택: forward {admit_fwd}/{len(gen['forward'])} · "
         f"reverse {admit_rev}/{len(gen['reverse'])} (토큰없음 스킵 {gen['skipped_no_tokens']})",
         "",
@@ -151,8 +256,8 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(md), encoding="utf-8")
     out.with_suffix(".json").write_text(json.dumps({
-        "model_dir": args.model_dir, "provider": provider.name,
-        "n_high_anchors": len(hi), "n_public": len(pub),
+        "model_dir": model_name, "provider": provider_name,
+        "n_high_anchors": n_hi, "n_public": len(pub),
         "admitted": {"forward": admit_fwd, "reverse": admit_rev,
                      "skipped_no_tokens": gen["skipped_no_tokens"],
                      "reverse_skipped_weak_tokens": rev_weak},

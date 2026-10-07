@@ -12,9 +12,9 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.db import SessionLocal, engine, session_scope
-from lloydk.db.models import Classification, ClassificationLevel, Correction, Document
-from lloydk.modules.m6_evaluation.reviewer_trust import (
+from koipa.db import SessionLocal, engine, session_scope
+from koipa.db.models import Classification, ClassificationLevel, Correction, Document
+from koipa.modules.m6_evaluation.reviewer_trust import (
     compute_reviewer_reliability,
     reviewer_reliability,
 )
@@ -24,7 +24,7 @@ from lloydk.modules.m6_evaluation.reviewer_trust import (
 
 
 def test_reliability_db_unavailable_graceful(monkeypatch):
-    import lloydk.modules.m6_evaluation.reviewer_trust as mod
+    import koipa.modules.m6_evaluation.reviewer_trust as mod
 
     class _Boom:
         def __enter__(self):

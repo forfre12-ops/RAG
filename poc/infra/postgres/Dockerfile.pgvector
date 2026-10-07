@@ -8,7 +8,7 @@
 #    태그/URL 가용성을 확인할 것. 폐쇄망 배포는 이 이미지를 오프라인 번들에 동봉하고
 #    런타임엔 인터넷 불요(빌드는 인터넷 있는 환경에서 1회).
 #
-# 빌드:  docker build -t lloydk/postgres:16-pgvector-pgbigm -f Dockerfile.pgvector .
+# 빌드:  docker build -t koipa/postgres:16-pgvector-pgbigm -f Dockerfile.pgvector .
 # 또는:  docker compose -f ../../docker-compose.pgvector.yml up -d --build
 
 FROM pgvector/pgvector:pg16

@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 from sqlalchemy.exc import OperationalError
 
-import lloydk.services.training_service as ts
+import koipa.services.training_service as ts
 
 
 @contextmanager
@@ -23,7 +23,7 @@ def _patch(monkeypatch, *, active, live):
     """session_scope/TrainingRepo/compute_metrics_from_db 모킹."""
     monkeypatch.setattr(ts, "session_scope", lambda: _cm(object()))
     monkeypatch.setattr(ts, "TrainingRepo", lambda db: SimpleNamespace(get_active=lambda: active))
-    import lloydk.modules.m6_evaluation.metrics as m
+    import koipa.modules.m6_evaluation.metrics as m
     monkeypatch.setattr(m, "compute_metrics_from_db", lambda label: live)
 
 
@@ -92,8 +92,8 @@ def test_within_tolerance_no_rollback(monkeypatch):
 
 
 def test_tick_disabled_does_not_rollback(monkeypatch):
-    from lloydk.config import settings
-    from lloydk.workers.tasks import auto_rollback_tick
+    from koipa.config import settings
+    from koipa.workers.tasks import auto_rollback_tick
     monkeypatch.setattr(settings, "auto_rollback_enabled", False)
     monkeypatch.setattr(ts, "evaluate_rollback_need",
                         lambda: {"should_rollback": True, "live_fnr_high": 0.3})
@@ -106,8 +106,8 @@ def test_tick_disabled_does_not_rollback(monkeypatch):
 
 
 def test_tick_enabled_rolls_back(monkeypatch):
-    from lloydk.config import settings
-    from lloydk.workers.tasks import auto_rollback_tick
+    from koipa.config import settings
+    from koipa.workers.tasks import auto_rollback_tick
     monkeypatch.setattr(settings, "auto_rollback_enabled", True)
     monkeypatch.setattr(ts, "evaluate_rollback_need",
                         lambda: {"should_rollback": True, "live_fnr_high": 0.3,

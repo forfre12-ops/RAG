@@ -1,0 +1,59 @@
+{
+  "built_at_git_sha": "182293e7564b",
+  "seed": 20260816,
+  "sample_weight": 0.5,
+  "split_rule": "sha256(path)[:8] % 2 == 0 -> work, else sealed (eval_public_form_specificity.py 와 동일)",
+  "folders": [
+    "100가지 회사 업무용 서식",
+    "각종 법률 서식 모음",
+    "계약서 모음",
+    "문서양식총람",
+    "XLS 엑셀 서식 자료"
+  ],
+  "excluded_folder": "마케팅자료 (빈 양식 아님 - 정답 불확실)",
+  "filters": {
+    "min_chars": 120,
+    "max_chars": 20000,
+    "near_dup_jaccard": 0.9,
+    "ngram": 3,
+    "exclude_train": "datasets/labeled_p1_v5_clean/train.jsonl"
+  },
+  "counts": {
+    "채택": 1000,
+    "너무짧음": 147,
+    "근접중복": 14,
+    "학습셋문장겹침": 10,
+    "중복본문": 23
+  },
+  "unverified": [
+    "원 출처 URL·기관 (사용자 확인 필요)",
+    "학습·재배포 이용 근거 (공개 다운로드 가능 != 재배포 가능)",
+    "수집일"
+  ],
+  "train_s3.jsonl": {
+    "n": 600,
+    "median_chars": 494,
+    "sha256": "f2cfcdbef795ae2ea6f5706b29aede28d07f0f03fc40cd2076e816a2c8df74d2",
+    "by_source": {
+      "문서양식총람": 343,
+      "XLS 엑셀 서식 자료": 134,
+      "각종 법률 서식 모음": 93,
+      "100가지 회사 업무용 서식": 15,
+      "계약서 모음": 15
+    },
+    "weight_sum": 300.0
+  },
+  "sealed_s3.jsonl": {
+    "n": 400,
+    "median_chars": 495,
+    "sha256": "e04d07fa850d401231ac40e0c0695eca0390c3d6b3a603b857921411f98f5db6",
+    "by_source": {
+      "XLS 엑셀 서식 자료": 102,
+      "각종 법률 서식 모음": 67,
+      "문서양식총람": 210,
+      "계약서 모음": 12,
+      "100가지 회사 업무용 서식": 9
+    },
+    "weight_sum": 200.0
+  }
+}

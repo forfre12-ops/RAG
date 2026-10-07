@@ -6,7 +6,12 @@
 출력: datasets/mundane_s3/raw.jsonl  ({text,label,source,domain,doc_type})
 주의: 합성이지만 '비민감 음성예시'라 secret 합성과 달리 위험 낮음. 테스트는 별도 손작성셋으로 분리(정직성)."""
 from __future__ import annotations
-import argparse, json, re, sys, urllib.request, time
+import argparse
+import json
+import re
+import sys
+import urllib.request
+import time
 import concurrent.futures as cf
 from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8")

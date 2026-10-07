@@ -61,8 +61,8 @@ def build_tiny_dataset() -> dict:
 
 def seed_correction():
     """doc(+chunk text) + classification(S3) + correction(→TS) 시드. 반환: ids dict."""
-    from lloydk.db import SessionLocal
-    from lloydk.db.models import (
+    from koipa.db import SessionLocal
+    from koipa.db.models import (
         Chunk, Classification, ClassificationLevel, Correction, Document, Tenant,
     )
     s = SessionLocal()
@@ -94,8 +94,8 @@ def seed_correction():
 
 
 def cleanup(seed, run_id, version_label):
-    from lloydk.db import session_scope
-    from lloydk.db.models import (
+    from koipa.db import session_scope
+    from koipa.db.models import (
         Chunk, Classification, Correction, Document, ModelVersion, Tenant, TrainingRun,
     )
     try:
@@ -123,7 +123,7 @@ def main() -> int:
     seed = seed_correction()
     print(f"seeded correction id={seed['correction_id']} (S3→TS, e2e-reviewer)")
 
-    from lloydk.workers.tasks import train_classifier_task
+    from koipa.workers.tasks import train_classifier_task
 
     spec_kwargs = {
         "base_model": "kakaobank/kf-deberta-base",
@@ -161,8 +161,8 @@ def main() -> int:
             "배포 게이트 평가됨": isinstance(deploy.get("gate"), dict) and "passed" in deploy["gate"],
         }
         # DB 확인: 교정이 실제로 consumed_in_run 마킹됐는지 + ModelVersion 존재
-        from lloydk.db import session_scope
-        from lloydk.db.models import Correction, ModelVersion
+        from koipa.db import session_scope
+        from koipa.db.models import Correction, ModelVersion
         with session_scope() as db:
             c = db.get(Correction, seed["correction_id"])
             checks["DB: 교정 consumed_in_run 마킹"] = c is not None and c.consumed_in_run is not None

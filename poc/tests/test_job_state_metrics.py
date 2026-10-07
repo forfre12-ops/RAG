@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import uuid
 
-from lloydk.api import prom_metrics as pm
-from lloydk.services.job_store import InMemoryJobStore, _emit_job_state_metric
+from koipa.api import prom_metrics as pm
+from koipa.services.job_store import InMemoryJobStore, _emit_job_state_metric
 
 
 def _state_val(state) -> float:
@@ -20,7 +20,7 @@ def _state_val(state) -> float:
 def _dur_count(state) -> float:
     # Histogram의 _count 표본(observe 호출 횟수) — registry exposition으로 조회.
     v = pm.registry.get_sample_value(
-        "lloydk_job_completion_duration_seconds_count", {"state": state}
+        "koipa_job_completion_duration_seconds_count", {"state": state}
     )
     return 0.0 if v is None else v
 

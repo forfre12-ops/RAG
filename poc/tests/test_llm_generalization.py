@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.adapters.embedding import build_embedder
-from lloydk.adapters.llm import NoopProvider, build_provider
-from lloydk.adapters.llm.local_openai_provider import LocalOpenAIProvider
+from koipa.adapters.embedding import build_embedder
+from koipa.adapters.llm import NoopProvider, build_provider
+from koipa.adapters.llm.local_openai_provider import LocalOpenAIProvider
 
 pytestmark = pytest.mark.model_download
 
@@ -40,7 +40,7 @@ class TestBuildProviderAliases:
         assert "1234" in str(p._client.base_url)
 
     def test_local_openai_uses_settings_default(self):
-        from lloydk.config import settings
+        from koipa.config import settings
         p = build_provider("local_openai")
         assert isinstance(p, LocalOpenAIProvider)
         assert p.name == "local_openai"
@@ -94,25 +94,25 @@ class TestSeedsV2:
     """시드 키워드 v2 — 등급당 ~35개, 총 140+개, 도메인 균형."""
 
     def test_total_seed_count(self):
-        from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
+        from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS
         assert len(KEYWORD_SEEDS) >= 140
 
     def test_per_grade_balance(self):
         from collections import Counter
-        from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
+        from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS
         per_grade = Counter(s["grade"] for s in KEYWORD_SEEDS)
         # 모든 4등급이 최소 30개
         for g in ("TS", "S1", "S2", "S3"):
             assert per_grade[g] >= 30, f"{g} has only {per_grade[g]} seeds"
 
     def test_factor_codes_valid(self):
-        from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
+        from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS
         valid_factors = {"ECONOMIC_VALUE", "NON_PUBLICITY", "MANAGEMENT_LEVEL", "LEAK_IMPACT"}
         for s in KEYWORD_SEEDS:
             assert s["factor"] in valid_factors, f"invalid factor in {s}"
 
     def test_weights_in_range(self):
-        from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
+        from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS
         for s in KEYWORD_SEEDS:
             assert 0.0 < s["weight"] <= 1.0, f"weight out of range in {s}"
 

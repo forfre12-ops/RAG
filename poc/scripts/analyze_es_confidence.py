@@ -9,8 +9,10 @@ measure_es_only_quality.py 의 결과(reports/es_only_quality.json)를 읽어:
 재임베딩 없음 — 기존 결과만 재집계.
 """
 from __future__ import annotations
-import io, json, sys
-from collections import Counter, defaultdict
+import io
+import json
+import sys
+from collections import defaultdict
 from pathlib import Path
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-sig"):

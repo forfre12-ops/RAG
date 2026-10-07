@@ -2,16 +2,62 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
-from lloydk.adapters.embedding import HashEmbedding
-from lloydk.modules.m3_labeling import (
+from koipa.adapters.embedding import HashEmbedding
+from koipa.modules.m3_labeling import (
     FACTOR_SEEDS,
     GRADE_ORDER,
     KEYWORD_SEEDS,
     LabelingPipeline,
     LabelRuleEngine,
 )
+
+
+class _TextProvider:
+    name = "fake"
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def generate(self, *_args, **_kwargs):
+        return SimpleNamespace(text=self.text, usage=None)
+
+
+def test_reconcile_grade_fnr_safe_fixes_prompt_drift():
+    """LLM 자가등급을 정본 grade_from_svm(v2.2)과 FNR-safe 정합 (프롬프트 산술 드리프트 교정).
+
+    - (2,2,1) 곱4를 LLM이 S1로 깎아도 → TS 로 상향(정본 grade_from_svm).
+    - (2,2,0) 고가치·미관리를 LLM이 S3로 떨궈도 → S1 로 상향.
+    - LLM이 더 높게(severe) 보고하면 그대로 둠(절대 낮추지 않음 = 과대분류는 게이트가 처리).
+    - S/V/M 불완전·무효 등급이면 LLM 자가등급 보존.
+    """
+    from koipa.modules.m3_labeling.llm_labeler import _reconcile_grade
+
+    assert _reconcile_grade("S1", {"secrecy": 2, "value": 2, "management": 1}) == "TS"
+    assert _reconcile_grade("S3", {"secrecy": 2, "value": 2, "management": 0}) == "S1"
+    # LLM이 더 위험하게 봤으면 보존(상향만 — svm이 더 낮아도 안 낮춤)
+    assert _reconcile_grade("TS", {"secrecy": 1, "value": 1, "management": 1}) == "TS"
+    # svm 일치 시 동일
+    assert _reconcile_grade("S2", {"secrecy": 1, "value": 1, "management": 1}) == "S2"
+    # S/V/M 불완전 → 자가등급 보존
+    assert _reconcile_grade("S2", {"secrecy": 2, "value": 2}) == "S2"
+    # 무효 등급 → 그대로
+    assert _reconcile_grade("PARSE_FAIL", {"secrecy": 2, "value": 2, "management": 2}) == "PARSE_FAIL"
+    # float·범위초과 입력도 안전(반올림·클램프)
+    assert _reconcile_grade("S2", {"secrecy": 2.0, "value": 2.4, "management": 0.0}) == "S1"
+
+
+def test_llm_labeler_parse_fail_is_not_s3():
+    from koipa.modules.m3_labeling.llm_labeler import LLMLabeler
+
+    out = LLMLabeler(provider=_TextProvider("not json")).label("doc")
+    assert out.grade == "PARSE_FAIL"
+    assert out.confidence == 0.0
+    assert out.parse_ok is False
+    assert out.parse_error == "llm_json_parse_failed"
 
 
 def test_canonical_factors_are_three_requisites():
@@ -23,6 +69,16 @@ def test_canonical_factors_are_three_requisites():
 def test_grade_order_has_all_four_levels():
     assert set(GRADE_ORDER) == {"TS", "S1", "S2", "S3"}
     assert GRADE_ORDER["TS"] < GRADE_ORDER["S1"] < GRADE_ORDER["S2"] < GRADE_ORDER["S3"]
+
+
+def test_source_prior_public_detection_rejects_negated_public_terms():
+    from koipa.modules.m5_inference.pipeline import _source_prior_is_public
+
+    assert _source_prior_is_public("public_disclosure") is True
+    assert _source_prior_is_public("공시") is True
+    assert _source_prior_is_public("미공시 내부자료") is False
+    assert _source_prior_is_public("보도자료 초안") is False
+    assert _source_prior_is_public("unpublished patent draft") is False
 
 
 def test_keyword_seeds_cover_all_grades():
@@ -61,14 +117,21 @@ def test_rule_engine_fnr_safe_picks_higher_grade_on_tie():
 
 @pytest.mark.slow
 def test_pipeline_returns_evaluation_factors():
+    """[2026-10-02] 축마다 FactorDetail(state/value/evidence) — 역산 제거 후 스키마.
+
+    근거가 실제로 없으면 state="unknown"·value=None으로 정직하게 비므로, 숫자를
+    더해 0보다 큰지 보는 식으로는 더는 검증할 수 없다(그게 바로 없앤 역산이다).
+    대신 적어도 한 축은 observed(실제 시드 매치)인지를 본다.
+    """
     pipe = LabelingPipeline()
     out = pipe.label("1급 비밀 영업비밀 공정 노하우 원가 구조")
     assert hasattr(out.factors, "secrecy")
     assert hasattr(out.factors, "value")
     assert hasattr(out.factors, "management")
-    # 적어도 한 factor는 점수가 잡혀야 함
-    total = out.factors.secrecy + out.factors.value + out.factors.management
-    assert total > 0.0
+    axes = (out.factors.secrecy, out.factors.value, out.factors.management)
+    assert any(a.state == "observed" and a.value is not None for a in axes), (
+        f"세 축 모두 unknown — 적어도 하나는 시드 매치가 있어야 하는 입력이다: {axes}"
+    )
 
 
 @pytest.mark.slow

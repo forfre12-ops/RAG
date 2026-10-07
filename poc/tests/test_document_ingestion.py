@@ -2,7 +2,7 @@
 
 OSS 코퍼스(정제된 JSON)가 아니라 "현장처럼" 실제 .txt/.docx 바이너리를 올려서:
   추출 → 원본 보관(storage) → provenance → 청크 까지 전 구간을 검증.
-HWP/PDF(스캔)·OCR 은 라이브러리 미설치 — 별도 increment 에서 추가.
+스캔 PDF·이미지는 OCR 을 하지 않는다 — 본문 없이 등록된다(아래 TestImageIsNotOcrd).
 """
 
 from __future__ import annotations
@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.adapters.storage import LocalStorage
-from lloydk.db.models import Chunk, Document
-from lloydk.services.document_ingestion_service import DocumentIngestionService
+from koipa.adapters.storage import LocalStorage
+from koipa.db.models import Chunk, Document
+from koipa.services.document_ingestion_service import DocumentIngestionService
 
 pytestmark = pytest.mark.slow
 
@@ -73,6 +73,10 @@ class _StubSession:
     def execute(self, _stmt):
         class _R:
             rowcount = 0
+
+            def scalar_one_or_none(self):
+                # 멱등 file_hash 조회 — stub 은 '기존 문서 없음'으로 응답(→ create 경로 진행).
+                return None
 
         return _R()
 
@@ -163,7 +167,6 @@ class TestPdfIngestion:
         )
         assert res.source_format == "pdf"
         assert res.extraction_method == "parser"
-        assert res.ocr_used is False
         norm = storage.get(svc.NORM_BUCKET, f"{res.file_hash}/normalized.txt").decode("utf-8")
         assert "Trade Secret" in norm
 
@@ -173,32 +176,32 @@ class TestPdfIngestion:
 # tests/fixtures/sample.{hwp,hwpx,pdf} 가 있으면 자동 실행, 없으면 skip.
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-# 이미지 파일 OCR (Tesseract + kor 팩)
+# 이미지 파일 — OCR 을 하지 않으므로 본문 없이 등록된다
 # ---------------------------------------------------------------------------
-class TestImageOcr:
-    def test_image_ocr_extracts_text(self, tmp_path):
-        PIL = pytest.importorskip("PIL.Image")
-        ImageDraw = pytest.importorskip("PIL.ImageDraw")
-        pytest.importorskip("pytesseract")
+def _tiny_png() -> bytes:
+    """1x1 흰색 PNG. 이미지 내용은 읽지 않으므로(OCR 안 함) Pillow 없이 만든다."""
+    import struct
+    import zlib
 
-        img = PIL.new("RGB", (600, 80), color="white")
-        ImageDraw.Draw(img).text((10, 20), "Trade Secret ALD process", fill="black")
-        png = tmp_path / "scan.png"
-        img.save(str(png))
-        body = png.read_bytes()
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
 
-        storage = _storage(tmp_path)
-        svc = DocumentIngestionService(storage=storage)
-        res = svc.ingest(
-            filename="scan.png", content_bytes=body, persist=False
-        )
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"\x00\xff\xff\xff"))
+        + chunk(b"IEND", b"")
+    )
+
+
+class TestImageIsNotOcrd:
+    def test_image_is_registered_without_text(self, tmp_path):
+        svc = DocumentIngestionService(storage=_storage(tmp_path))
+        res = svc.ingest(filename="scan.png", content_bytes=_tiny_png(), persist=False)
 
         assert res.source_format == "png"
-        assert res.ocr_used is True
-        assert res.extraction_method == "ocr"
-        assert "Trade Secret" in storage.get(
-            svc.NORM_BUCKET, f"{res.file_hash}/normalized.txt"
-        ).decode("utf-8")
+        assert res.char_count == 0
+        assert any("unsupported" in w for w in res.warnings)
 
 
 class TestRealFixtures:
@@ -239,7 +242,6 @@ class TestPersistence:
         res = svc.ingest(
             filename="a.txt",
             content_bytes=body,
-            doc_type="가이드",
             created_by="u1",
             db=sess,
             persist=True,
@@ -260,10 +262,64 @@ class TestPersistence:
         assert doc.extraction_method == "plain"
         assert doc.processing_status == "ready"
         assert doc.created_by == "u1"
-        assert doc.metadata_ == {"doc_type": "가이드"}
+        # 선택 메타(source_type·security_marking·access_scope)를 안 주면 metadata_ 는 비어 있다.
+        # txt 는 페이지 개념이 없어 pages_total 도 기록되지 않는다.
+        assert doc.metadata_ == {}
         # chunks 적재
         assert len(chunks) >= 1
         assert all(c.doc_id == doc.doc_id for c in chunks)
+
+    def test_idempotent_returns_existing_doc_on_hash_hit(self, tmp_path):
+        """동일 file_hash 가 이미 있으면 새 Document 를 만들지 않고 기존 doc_id 를 반환(멱등 적재)."""
+        storage = _storage(tmp_path)
+        svc = DocumentIngestionService(storage=storage)
+        existing_id = uuid.uuid4()
+
+        class _HitSession(_StubSession):
+            def execute(self, _stmt):
+                class _R:
+                    rowcount = 1
+
+                    def scalar_one_or_none(self):
+                        return existing_id
+
+                return _R()
+
+        sess = _HitSession()
+        body = ("동일 바이트 재업로드 본문 한국어 " * 30).encode("utf-8")
+        res = svc.ingest(filename="dup.txt", content_bytes=body, db=sess, persist=True)
+
+        assert res.persisted is True
+        assert res.doc_id == existing_id
+        # 기존 재사용 → 새 Document add 안 함(멱등)
+        assert not [o for o in sess.added if isinstance(o, Document)]
+
+    def test_idempotent_lookup_failure_falls_back_to_create(self, tmp_path):
+        """멱등 조회가 실패해도(불완전 Result 등) persist 전체를 죽이지 않고 create 로 진행 —
+        무음 적재실패(persisted=False·doc_id=None) 방지(TEST-3 회귀 가드). chunk upsert 는
+        rowcount 만 쓰므로 정상, 오직 멱등 조회의 scalar_one_or_none 만 깨뜨려 재현한다."""
+        storage = _storage(tmp_path)
+        svc = DocumentIngestionService(storage=storage)
+
+        class _BrokenLookupSession(_StubSession):
+            def execute(self, _stmt):
+                class _R:
+                    rowcount = 0
+
+                    def scalar_one_or_none(self):
+                        raise AttributeError("'_R' object has no attribute (불완전 Result 재현)")
+
+                return _R()
+
+        sess = _BrokenLookupSession()
+        body = ("조회 실패해도 반드시 적재되어야 하는 본문 " * 30).encode("utf-8")
+        res = svc.ingest(
+            filename="b.txt", content_bytes=body, created_by="u1", db=sess, persist=True
+        )
+
+        assert res.persisted is True, "멱등 조회 실패가 무음 적재실패로 번지면 안 됨"
+        assert res.doc_id is not None
+        assert len([o for o in sess.added if isinstance(o, Document)]) == 1
 
     def test_unsupported_format_degrades_gracefully(self, tmp_path):
         storage = _storage(tmp_path)

@@ -12,19 +12,23 @@ import asyncio
 
 import pytest
 
-from lloydk.api import _jwt_auth
-from lloydk.api._jwt_auth import (
+import types
+
+from koipa.api import _jwt_auth
+from koipa.api._jwt_auth import (
     JWTClaims,
     _highest_role,
     _resolve_api_key_roles,
+    require_auth,
 )
-from lloydk.api._rbac import require_role
+from koipa.api._rbac import require_role
 
 
 class _FakeRequest:
     def __init__(self, headers: dict[str, str]):
         # 헤더 키는 소문자로 조회됨 (Starlette Headers 동작 모사)
         self.headers = {k.lower(): v for k, v in headers.items()}
+        self.state = types.SimpleNamespace()
 
 
 def _run_require_role(allowed: tuple[str, ...], auth_context: dict) -> dict:
@@ -125,3 +129,77 @@ def test_jwt_claims_roles_wiring():
     valid = tuple(r for r in claims.roles if r in _jwt_auth.VALID_ROLES)
     assert valid == ("admin",)
     assert _highest_role(valid) == "admin"
+
+
+# ---------------------------------------------------------------------------
+# [2026-10-06] api_key 교체 유예(rotation grace) — api_key_previous
+# ---------------------------------------------------------------------------
+
+def test_require_auth_accepts_current_key(monkeypatch):
+    monkeypatch.setattr(_jwt_auth.settings, "auth_mode", "api_key")
+    monkeypatch.setattr(_jwt_auth.settings, "api_key", "new-key")
+    monkeypatch.setattr(_jwt_auth.settings, "api_key_previous", "old-key")
+    req = _FakeRequest({})
+    out = require_auth(req, authorization=None, x_api_key="new-key", koipa_access_token=None)
+    assert out["mode"] == "api_key"
+
+
+def test_require_auth_accepts_previous_key_during_rotation(monkeypatch):
+    monkeypatch.setattr(_jwt_auth.settings, "auth_mode", "api_key")
+    monkeypatch.setattr(_jwt_auth.settings, "api_key", "new-key")
+    monkeypatch.setattr(_jwt_auth.settings, "api_key_previous", "old-key")
+    req = _FakeRequest({})
+    out = require_auth(req, authorization=None, x_api_key="old-key", koipa_access_token=None)
+    assert out["mode"] == "api_key"
+
+
+def test_require_auth_rejects_unrelated_key_even_with_rotation_configured(monkeypatch):
+    monkeypatch.setattr(_jwt_auth.settings, "auth_mode", "api_key")
+    monkeypatch.setattr(_jwt_auth.settings, "api_key", "new-key")
+    monkeypatch.setattr(_jwt_auth.settings, "api_key_previous", "old-key")
+    req = _FakeRequest({})
+    with pytest.raises(_jwt_auth.HTTPException) as exc:
+        require_auth(req, authorization=None, x_api_key="someone-else", koipa_access_token=None)
+    assert exc.value.status_code == 401
+
+
+def test_require_auth_previous_key_empty_by_default_does_not_widen_acceptance(monkeypatch):
+    """api_key_previous 를 안 쓰면(빈 문자열) 옛 키 비교 자체를 안 한다 — 평소 동작 불변."""
+    monkeypatch.setattr(_jwt_auth.settings, "auth_mode", "api_key")
+    monkeypatch.setattr(_jwt_auth.settings, "api_key", "new-key")
+    monkeypatch.setattr(_jwt_auth.settings, "api_key_previous", "")
+    req = _FakeRequest({})
+    with pytest.raises(_jwt_auth.HTTPException):
+        require_auth(req, authorization=None, x_api_key="", koipa_access_token=None)
+
+
+# ---------------------------------------------------------------------------
+# [2026-10-06] auth_mode=none — 사용자 결정(폐쇄망 전용 배포), 검증 전부 생략
+# ---------------------------------------------------------------------------
+
+def test_require_auth_none_mode_needs_no_key_at_all(monkeypatch):
+    monkeypatch.setattr(_jwt_auth.settings, "auth_mode", "none")
+    monkeypatch.setattr(_jwt_auth.settings, "api_key", "")
+    monkeypatch.setattr(_jwt_auth.settings, "api_key_role", "system")
+    req = _FakeRequest({})
+    out = require_auth(req, authorization=None, x_api_key=None, koipa_access_token=None)
+    assert out["mode"] == "none"
+    assert out["actor_role"] == "system"
+
+
+def test_require_auth_none_mode_uses_configured_role_not_blanket_admin(monkeypatch):
+    """인증 생략이 전권(admin) 승인으로 저절로 번지지 않는다 — api_key_role 그대로 쓴다."""
+    monkeypatch.setattr(_jwt_auth.settings, "auth_mode", "none")
+    monkeypatch.setattr(_jwt_auth.settings, "api_key_role", "kl_backend")
+    req = _FakeRequest({})
+    out = require_auth(req, authorization=None, x_api_key=None, koipa_access_token=None)
+    assert out["actor_role"] == "kl_backend"
+    assert "admin" not in out["actor_roles"]
+
+
+def test_require_auth_none_mode_rejected_by_admin_only_route():
+    """none 모드도 역할은 그대로 검사된다 — api_key_role 이 admin 이 아니면 admin 전용 라우트는 여전히 403."""
+    ctx = {"mode": "none", "actor_role": "kl_backend", "actor_roles": ("kl_backend",)}
+    with pytest.raises(_jwt_auth.HTTPException) as exc:
+        _run_require_role(("admin",), ctx)
+    assert exc.value.status_code == 403

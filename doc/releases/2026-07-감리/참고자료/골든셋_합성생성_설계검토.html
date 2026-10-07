@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>골든셋·평가셋 합성 생성 — 설계 검토 보고서 (내부용)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-elevated:#ffffff; --bg-code:#f4f4f4;
+  --bg-nav:rgba(255,255,255,0.80);
+  --text:#0a0a0a; --text-soft:#525252; --text-dim:#737373; --text-faint:#a3a3a3;
+  --border:rgba(0,0,0,0.08); --border-strong:rgba(0,0,0,0.16); --border-soft:rgba(0,0,0,0.05);
+  --accent:#0a0a0a; --accent-blue:rgba(0,0,0,0.04);
+  --pass:#2a2a2a; --fail:#525252; --warn:#737373; --pend:#737373;
+  --radius-sm:6px; --radius:8px; --radius-lg:12px; --radius-pill:999px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04);
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.06);
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-0.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+
+.nav{position:sticky;top:0;z-index:50;background:var(--bg-nav);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:1320px;margin:0 auto;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;white-space:nowrap;min-width:0;line-height:1;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#ffffff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,0.12);overflow:visible;}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:600;font-size:15px;letter-spacing:-0.02em;color:var(--text);}
+.brand-sep{color:var(--text-dim);font-size:14px;margin:0 6px;font-weight:400;}
+.brand-url{font-family:var(--font-mono);font-size:13.5px;font-weight:400;color:var(--text-dim);letter-spacing:0;}
+.nav-search{display:inline-flex;align-items:center;gap:8px;padding:6px 10px 6px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:13px;cursor:pointer;transition:all .15s;min-width:200px;}
+.nav-search:hover{border-color:var(--border-strong);color:var(--text-soft);}
+.nav-actions{display:flex;align-items:center;gap:8px;}
+
+.page{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:0;padding:0 32px;}
+.sidebar{order:2;position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:32px 0 32px 0;border-right:1px solid var(--border);}
+.sidebar::-webkit-scrollbar{width:3px;} .sidebar::-webkit-scrollbar-thumb{background:var(--border-strong);}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);padding:0 24px 10px;font-family:var(--font-mono);}
+.toc-item{display:block;padding:5px 24px;font-size:13px;color:var(--text-dim);text-decoration:none;border-left:2px solid transparent;transition:all .15s;line-height:1.4;}
+.toc-item:hover{color:var(--text);border-left-color:var(--border-strong);}
+.toc-item.active{color:var(--text);border-left-color:var(--text);font-weight:600;}
+
+article{padding:40px 0 120px 40px;min-width:0;}
+
+.meta-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px;font-size:12.5px;}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:var(--radius-pill);background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;font-family:var(--font-mono);}
+.badge.blue{background:#404040;}
+.badge.warn{background:#7a1f1f;}
+.meta-dot{color:var(--text-faint);}
+.meta-soft{color:var(--text-dim);}
+h1.title{font-size:48px;font-weight:800;letter-spacing:-0.04em;line-height:1.07;margin:0 0 20px;color:var(--text);}
+.lede{font-size:18px;font-weight:300;color:var(--text-soft);line-height:1.55;margin:0 0 28px;letter-spacing:-0.012em;max-width:720px;}
+.hero-kpis{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 32px;}
+.hero-kpi{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--text-soft);font-family:var(--font-mono);}
+.hero-kpi b{color:var(--text);font-weight:600;}
+.hero-sep{border:none;border-top:1px solid var(--border-strong);margin:44px 0 52px;}
+
+article h2{font-size:28px;font-weight:700;letter-spacing:-0.028em;line-height:1.2;margin:76px 0 10px;scroll-margin-top:80px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+article h2 .num{font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--text-dim);padding:2px 8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);line-height:1;}
+article h2+.h2-sub{color:var(--text-dim);font-size:15px;margin:0 0 24px;max-width:720px;}
+article h3{font-size:17px;font-weight:600;letter-spacing:-0.018em;margin:32px 0 10px;}
+article h4{font-size:14px;font-weight:600;margin:20px 0 6px;color:var(--text);}
+article p{margin:12px 0;color:var(--text);}
+article ul,article ol{padding-left:22px;}
+article li{margin:6px 0;}
+article a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--border-strong);transition:border-color .15s;}
+article a:hover{border-bottom-color:var(--text);}
+section{position:relative;padding-top:8px;}
+
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;position:relative;overflow:hidden;min-width:0;}
+.card-grid{display:grid;gap:12px;min-width:0;}
+.card-grid>*{min-width:0;}
+.card-grid.col2{grid-template-columns:repeat(2,minmax(0,1fr));}
+.card-grid.col3{grid-template-columns:repeat(3,minmax(0,1fr));}
+.card-grid.col4{grid-template-columns:repeat(4,minmax(0,1fr));}
+.card-label{font-size:10.5px;font-weight:700;letter-spacing:0.06em;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:6px;}
+.card-value{font-size:22px;font-weight:700;letter-spacing:-0.03em;line-height:1.1;margin-bottom:4px;}
+.card-value.sm{font-size:17px;}
+.card-desc{font-size:12.5px;color:var(--text-dim);word-break:keep-all;overflow-wrap:break-word;}
+.card-pass{border-left:3px solid rgba(0,0,0,.25);border-radius:0;}
+.card-fail{border-left:3px solid rgba(0,0,0,.55);border-radius:0;}
+.card-warn{border-left:3px solid rgba(0,0,0,.4);border-radius:0;}
+[class*="card"][style*="border-left"]{border-radius:0 !important;}
+
+.tbl-wrap{overflow-x:auto;margin:16px 0;border-radius:var(--radius-lg);border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+thead{background:var(--bg-surface);}
+th{padding:10px 14px;text-align:left;font-weight:600;font-size:12px;letter-spacing:0.02em;color:var(--text-soft);border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:10px 14px;border-bottom:1px solid var(--border-soft);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--bg-surface);}
+.td-code{font-family:var(--font-mono);font-size:12.5px;}
+.td-pass{color:var(--text);font-weight:600;}
+.td-fail{color:rgba(0,0,0,.5);font-weight:600;}
+.td-center{text-align:center;}
+
+pre{background:var(--bg-code);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:var(--font-mono);font-size:12.5px;line-height:1.6;margin:16px 0;}
+code{font-family:var(--font-mono);font-size:12.5px;background:var(--bg-code);padding:2px 5px;border-radius:4px;border:1px solid var(--border);}
+pre code{background:none;border:none;padding:0;}
+
+.callout{display:flex;gap:12px;padding:14px 16px;border-radius:var(--radius);margin:16px 0;}
+.callout.warn{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.16);border-left:3px solid rgba(0,0,0,.5);border-radius:0;}
+.callout.info{background:rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.1);}
+.callout.pass{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.12);}
+.callout.danger{background:rgba(0,0,0,.05);border:1px solid rgba(0,0,0,.2);border-left:3px solid #7a1f1f;border-radius:0;}
+.callout-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.callout-body{font-size:13.5px;line-height:1.6;}
+
+.appendix-link{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--border);border-radius:var(--radius);font-size:13.5px;color:var(--text);text-decoration:none;transition:all .15s;background:var(--bg-surface);}
+.appendix-link:hover{border-color:var(--border-strong);background:var(--bg);box-shadow:var(--shadow-sm);}
+.appendix-link .al-arrow{color:var(--text-dim);}
+.appendix-links{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0;}
+
+footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size:12.5px;color:var(--text-dim);display:flex;justify-content:space-between;max-width:1380px;margin-left:auto;margin-right:auto;flex-wrap:wrap;gap:8px;}
+
+@media(max-width:1200px){ .nav-search{display:none;} }
+@media(max-width:1024px){ .page{padding:0 24px;} article{padding:36px 0 80px 32px;} .card-grid.col4{grid-template-columns:repeat(2,minmax(0,1fr));} h1.title{font-size:40px;} }
+@media(max-width:900px){
+  .page{grid-template-columns:1fr;padding:0 24px;}
+  .sidebar{display:none;}
+  article{padding:32px 0 80px;}
+  h1.title{font-size:32px;letter-spacing:-0.03em;}
+  article h2{font-size:23px;margin:54px 0 8px;}
+  .lede{font-size:16px;}
+  .card-grid.col3,.card-grid.col4{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:680px){
+  .page{padding:0 16px;}
+  h1.title{font-size:27px;}
+  article h2{font-size:20px;}
+  .card-grid.col2,.card-grid.col3,.card-grid.col4{grid-template-columns:minmax(0,1fr);}
+  pre{font-size:11.5px;}
+  table{font-size:12.5px;}
+  th,td{padding:7px 10px;}
+  footer{flex-direction:column;}
+}
+@media print{ .nav,.sidebar,footer{display:none !important;} .page{grid-template-columns:1fr;padding:0;} article{padding:0;} .card,pre{break-inside:avoid;} }
+</style>
+</head>
+
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark"><img src="data:image/png;base64,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" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">·</span>
+      <span class="brand-url">www.koipa.re.kr</span>
+    </a>
+    <div class="nav-actions">
+      <div class="nav-search" role="search" aria-label="Search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        골든셋·평가셋 합성 생성 — 설계 검토 (내부용)
+      </div>
+    </div>
+  </div>
+</header>
+<div class="page">
+  <aside class="sidebar">
+    <div class="toc-title">목차</div>
+    <a class="toc-item active" href="#s01">01 결론 — 한눈에 보기</a>
+    <a class="toc-item" href="#s02">02 산출물 정체 — "평가셋"이 아니다</a>
+    <a class="toc-item" href="#s03">03 평가 신뢰 — 앵커 중심 다층 평가</a>
+    <a class="toc-item" href="#s04">04 잘 된 부분 (구현·검증)</a>
+    <a class="toc-item" href="#s05">05 빠진 것 — 1,000을 뽑으려면</a>
+    <a class="toc-item" href="#s06">06 권장 파이프라인</a>
+    <a class="toc-item" href="#s07">07 완전성 점검 — 놓치기 쉬운 4가지</a>
+    <a class="toc-item" href="#s08">08 다음 단계</a>
+    <a class="toc-item" href="#s09">09 한계·전제</a>
+  </aside>
+
+  <article id="top">
+    <div class="meta-row">
+      <span class="badge">검토 보고서</span>
+      <span class="badge warn">내부용 · 대외공유 금지</span>
+      <span class="meta-dot">·</span>
+      <span class="meta-soft">골든셋·평가셋 합성 생성 — 앵커 중심 다층 평가</span>
+      <span class="meta-dot">·</span>
+      <span class="meta-soft">2026-06-29 · Koipa AI Engine · rev.2</span>
+    </div>
+
+    <h1 class="title">골든셋·평가셋 합성 생성 — 설계 검토</h1>
+    <p class="lede"><b>"평가셋(골든셋 1,000개)를 합성으로 만든다"</b>는 방향이 설계로 받쳐지는지를 <b>코드 기준</b>으로 점검한 보고서다. 결론: 라벨·합의·티어 코드는 견고하나, <b>사람 서명이 양쪽(빌드·운영) 다 막혀</b> 합성은 평가 진실이 될 수 없다. 그래서 산출물을 <b>"골든셋 1,000 생성"이 아니라 → 합성 학습코퍼스 1,000 + 합성 holdout + 외부 앵커 기반 다층 평가 + 메타모픽 최소쌍 회귀 테스트</b>(+ 배포 후 운영 능동감사로 실분포 보완)로 정확히 명명한다.</p>
+
+    <div class="hero-kpis">
+      <div class="hero-kpi">명명 <b>골든셋 1,000 ❌ → 학습코퍼스+holdout+다층평가+회귀테스트</b></div>
+      <div class="hero-kpi">평가 중심 <b>외부 사실 앵커(legal_floor)</b></div>
+      <div class="hero-kpi">D <b>1순위 메타모픽 회귀(정답 아님)</b></div>
+      <div class="hero-kpi">실분포 측정 <b>운영 능동감사 A (별도)</b></div>
+      <div class="hero-kpi">검증 <b>Claude 고등급 0건 → 4중일치 강등</b></div>
+    </div>
+    <hr class="hero-sep">
+
+    <div class="callout info">
+      <span class="callout-icon">ℹ</span>
+      <div class="callout-body"><b>한눈에 보기.</b> 합성으로 등급분류 <b>골든셋 1,000건</b>을 만들려 한다. 부품(생성·합의·티어·서명)은 이미 코드로 있다. 그런데 두 가지가 발목을 잡는다 — ① <b>"평가셋"이라는 말이 함정</b>: 합성은 절대 "평가 진실(정답)"이 될 수 없고(사람 서명 전용인데 그 사람 서명이 빌드·운영 양쪽 다 막힘), ② <b>심판도 못 믿는다</b>: 단일 LLM(Claude)으로 591건을 재판정하니 <b>고등급(TS·S1)을 단 한 건도 못 냈다</b>. 그래서 "정답지 하나"는 불가능하다. 대신 <b>등급이 바깥 사실로 박힌 앵커(공개 판례→S3, 국가핵심기술→TS)를 중심</b>으로, 약점이 안 겹치는 <b>여러 측정을 층으로 쌓고 절대 한 숫자로 합치지 않는</b> 것이 사람 없이 가능한 가장 정직한 평가다.</div>
+    </div>
+
+    <section id="s01">
+      <h2><span class="num">01</span> 결론 — 한눈에 보기</h2>
+      <p class="h2-sub">이번 검토가 확정한 것 5가지.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:22%;">항목</th><th>확정 내용</th></tr></thead>
+          <tbody>
+            <tr><td><b>설계 품질</b></td><td>생성·합의 게이트·티어 계약·빌드 서비스 — <b>견고하고 적대적 검증까지 마침</b>. 재설계 불필요</td></tr>
+            <tr><td><b>산출물 정체</b></td><td>합성 1,000건 = <b>silver_train ~700 + 합성 holdout ~250</b> · <b>평가 진실 아님</b>("일반화 아님" 스탬프 필수)</td></tr>
+            <tr><td><b>평가 진실</b></td><td><code>locked_gold_eval</code> = 사람 서명 전용 → <b>빌드(검수 0)·운영(반출 0) 둘 다 막힘 → 영구히 빔(휴면)</b></td></tr>
+            <tr><td><b>정확한 명명</b></td><td>"골든셋 1,000 생성" ❌ → <b>합성 학습코퍼스 1,000 + 합성 holdout + 외부 앵커 다층 평가 + 메타모픽 최소쌍 회귀 테스트</b> (+ 배포 후 운영 능동감사)</td></tr>
+            <tr><td><b>평가 신뢰 방법</b></td><td>단일 정답지 불가 → <b>외부 사실 앵커 중심 다층 측정</b> + <b>D=1순위 메타모픽 회귀 테스트(정답 아님)</b> + C·B·E + 운영 능동감사(A)</td></tr>
+            <tr><td><b>검증된 사실</b></td><td>단일 LLM 심판으로 고등급 정답 못 만듦(591건: Claude 고등급 <b>0건</b>) → <b>③ 4중일치 층 보조 강등</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="s02">
+      <h2><span class="num">02</span> 산출물 정체 — "평가셋"이 아니다</h2>
+      <p class="h2-sub">가장 먼저 짚을 개념 충돌. 합성 1,000은 "평가 정답"이 될 수 없다.</p>
+      <p>티어 계약(<code>golden_tiers.py</code>)과 설계서 §04가 명시한다 — <b>합성·무검수는 <code>gold_candidate</code>/<code>silver</code>까지만</b>. <code>locked_gold_eval</code>(평가 진실)은 <b>사람 서명 전용</b>이다. 그런데 그 사람 서명이 <b>양쪽 다 막혀</b> 있다:</p>
+      <div class="card-grid col2" style="margin:16px 0;">
+        <div class="card card-fail"><div class="card-label">빌드 시점 (지재원)</div><div class="card-value sm">검수 0</div><div class="card-desc">전문가가 문서에 "정답 등급" 서명 불가 (VP 합성-only 지시)</div></div>
+        <div class="card card-fail"><div class="card-label">운영 시점 (고객사)</div><div class="card-value sm">반출 0</div><div class="card-desc">관리자가 확정해도 그 결과가 우리(지재원)에게 영영 안 옴</div></div>
+      </div>
+      <p>→ 즉 <code>locked_gold_eval</code>은 <b>현 제약에서 구조적으로 영구히 빈다.</b> <code>golden_signoff.promote_to_locked</code>·사람 서명 기계장치는 <b>호출될 일 없는 휴면 코드</b>다(지우진 말고 "제약 완화 시 전용"으로 표시). 따라서 합성 1,000건의 정체는:</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:24%;">무엇</th><th style="width:38%;">설계상 정체</th><th>양 (1,000 기준)</th></tr></thead>
+          <tbody>
+            <tr><td class="td-code">silver_train</td><td>학습 시드 — <b>평가 금지</b></td><td>~700</td></tr>
+            <tr><td class="td-code">합성 holdout</td><td><b>상대비교용</b> — "일반화 아님" 명시 필수</td><td>~250 (25%)</td></tr>
+            <tr><td class="td-code">locked_gold_eval</td><td><b>진짜 평가 진실 → 합성·LLM 불가, 사람 서명 막힘</b></td><td>0 (영구 휴면)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn">
+        <span class="callout-icon">⚠</span>
+        <div class="callout-body"><b>"1,000"의 의미 정정.</b> 설계서의 1,000은 <b>합성 코퍼스 총량</b>(TS20·S130·S230·S320, ~1,600 과생성 → 순통과 1,000)이지 <b>평가 1,000건</b>이 아니다. 우리가 만드는 1,000은 <b>학습코퍼스(silver ~700) + holdout(~250)</b>으로 확정하고, 이를 "평가셋"이라 부르지 않는다. 평가를 어떻게 신뢰할지는 §03에서 다층 측정으로 푼다.</div>
+      </div>
+    </section>
+
+    <section id="s03">
+      <h2><span class="num">03</span> 평가 신뢰 — 앵커 중심 다층 평가</h2>
+      <p class="h2-sub">사람 정답지가 없으면 "어떤 라벨을 믿느냐"가 전부다. 단일 정답지는 불가능 → 약점이 안 겹치는 층을 쌓는다.</p>
+
+      <h3>먼저 — 검증된 사실: 단일 LLM 심판으로 고등급 정답을 못 만든다</h3>
+      <p><code>datasets/gold_real/_rejudge_claude/summary.json</code> 직접 확인 (claude-opus로 591건 재판정):</p>
+      <div class="card-grid col3" style="margin:12px 0;">
+        <div class="card card-fail"><div class="card-label">CLAUDE 분포</div><div class="card-value sm">TS·S1 = 0건</div><div class="card-desc">S3 577 / S2 14 — 고등급 전무</div></div>
+        <div class="card card-warn"><div class="card-label">이동</div><div class="card-value sm">하향 208 / 상향 1</div><div class="card-desc">Qwen S1 30·S2 191 → 대거 S3</div></div>
+        <div class="card"><div class="card-label">함의</div><div class="card-value sm">고등급 정답 0</div><div class="card-desc">LLM 합의로 고등급 평가셋 못 채움</div></div>
+      </div>
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>정직한 해석(과장 금지).</b> 이걸 "Claude가 고장난 채점자"로만 보면 안 된다. 이 591건은 <b>60%가 공개 판례 프록시</b>라, 비공지성 법리상 <b>공개 판례는 S3가 맞다</b> — Claude의 하향은 "규칙을 올바르게 적용"한 것일 수도 있다. 하지만 <b>어느 해석이든 결론은 같다</b>: 단일 LLM 합의로 "고등급 정답"을 만들 수 없다(편향이든 코퍼스 오염이든). → 고등급 평가는 LLM이 아니라 <b>외부 사실 앵커</b>에 얹어야 한다.</div>
+      </div>
+
+      <h3>다층 평가 — 빌드 평가(사람 불필요) + 운영 평가(별도)</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:7%;">층</th><th style="width:23%;">무엇</th><th>역할 · 신뢰도</th></tr></thead>
+          <tbody>
+            <tr><td><b>1 ★</b></td><td><b>외부 사실 앵커</b> (legal_floor)</td><td>공개 판례→S3·국가핵심기술→TS·법원 인정 판례→S1/S2. <b>비순환·고신뢰</b>(릴리스 차단 floor), 단 분포 OOD(판례≠내부문서)</td></tr>
+            <tr><td>2</td><td>AI 합의 holdout</td><td>룰==심판+근거+self-consist 통과분 25%. 양 많아 등급별 수치, 단 <b>순환=천장 한정</b></td></tr>
+            <tr><td>3 <span class="td-fail">↓강등</span></td><td>4중일치 (target==룰==주심==섀도)</td><td>고등급에서 구조적 0건(위 591건) → <b>평가 backbone에서 내리고 저등급 보조 교차확인으로만</b></td></tr>
+            <tr><td><b>+D ⭐</b></td><td><b>앵커→사내문서체 패러프레이즈</b><br><span class="td-fail">회귀 테스트(정답 아님)</span></td><td>외부확정 <b>고등급</b> 앵커를 Qwen으로 내부문서처럼 재작성. <b>정답 평가셋이 아니라 1순위 메타모픽 회귀 테스트</b> — ↓ 전용 블록·강화 사양 참조</td></tr>
+            <tr><td>+C</td><td>출처별 분리 카드 + 단일숫자 금지</td><td>칸마다 N·신뢰구간, 표본 부족 시 PASS 아닌 <b>INCONCLUSIVE</b>(판단보류). 거짓 헤드라인 코드 차단</td></tr>
+            <tr><td>+B</td><td>심판 신뢰도 폭로 리포트</td><td>합의 천장이 얼마나 부풀려졌는지 신뢰구간 부착. <b>591 데이터 이미 존재</b>, 라벨 안 고침</td></tr>
+            <tr><td>+E</td><td>서빙 메타모픽 불변식</td><td>정답 없이 회귀 잠금. 핵심=고위험 본문에 보도자료 출처 붙여 cap될 때 <b>경고 누락(조용한 미탐)</b> 탐지</td></tr>
+            <tr><td><b>운영 A</b></td><td><b>능동 감사 표집</b> (배포 후·별도)</td><td><b>유일하게 실분포 미탐을 비편향 측정.</b> 단 운영 검수(사람)+집계만 반출 합의 필요 — 빌드 평가 아님(§아래 주의)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn">
+        <span class="callout-icon">⚠</span>
+        <div class="callout-body"><b>A(운영 능동감사)는 결이 다르다.</b> 합성·순환 천장 위에서 <b>진짜 분포의 미탐율</b>을 재는 건 이것뿐이지만 — (a) <b>고객사 관리자의 노동</b>이 들고(빌드 검수 0과 별개인 "운영 검수 필수" 루프), (b) <b>반출 0이라 문서가 아닌 집계 수치만</b> 받으며(정기 집계 리포트 합의=KL/부사장 항목), (c) 고등급 미탐이 희소해 분기 수백 건으론 신뢰구간이 [0%,5%]로 넓다. → <b>지금 만드는 1,000 합성 평가셋에 넣는 게 아니라, 배포 후 4번째 층</b>으로 둔다.</div>
+      </div>
+      <div class="callout pass">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body"><b>핵심 원칙: 절대 한 숫자로 합치지 않는다.</b> "앵커 FNR / holdout recall / 일치율"을 <b>나란히</b> 보고해야 어디가 약한지(특히 치명적 고등급 미탐) 드러난다. 가중평균 F1 같은 단일 헤드라인은 <b>C가 코드로 금지</b>한다.</div>
+      </div>
+
+      <h3>D — 1순위: 메타모픽 최소쌍 회귀 테스트 (정답 평가셋 아님)</h3>
+      <p>D는 <b>"정답 평가셋"으로 쓰지 않는다.</b> <b>회귀 테스트</b>로 1순위 포지셔닝한다 — 불변식: <b>같은 사실을 내부문서체로 바꿔도 등급이 내려가면 안 된다.</b> 이러면 절대 정답을 완전히 믿을 필요가 줄어든다(검증 불가능한 "이게 TS인가" 대신, 검증 가능한 "내려가면 안 된다"만 본다). <code>anchor=TS · paraphrase=S3</code>면 거의 확실한 위험 신호 — 이게 D의 가장 강한 사용법이다.</p>
+      <div class="callout danger">
+        <span class="callout-icon">⚠</span>
+        <div class="callout-body"><b>핵심 규율 — 실패만 정보다. 통과는 정보가 아니다.</b> <code>anchor=TS·paraphrase=S3</code>(실패)=강한 위험 신호지만, <code>paraphrase=TS</code>(통과)는 "좋다"는 증거가 <b>아니다</b> — 모든 걸 TS로 찍는 분류기도 만점 통과한다(공허). 그리고 우리 시스템은 FNR-safe min(<code>rule_engine.py:399</code>)·공개 판례 <b>85% 과분류</b> 실측으로 <b>구조적으로 과분류 쪽으로 기운다</b>. 순방향만 보면 과분류 시스템에서 거짓 안심한다.</div>
+      </div>
+      <p>→ 그래서 D는 <b>대칭 3종을 같이</b> 보고한다(한쪽만 보면 반대로 무너짐):</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:24%;">검사</th><th style="width:16%;">불변식</th><th>잡는 것</th></tr></thead>
+          <tbody>
+            <tr><td><b>순방향 ★</b> (사실 유지·문체 변경)</td><td>등급 <b>안 내려가야</b></td><td>고등급 OOD <b>미탐(FN)</b> — anchor=TS, paraphrase=S3 = 위험</td></tr>
+            <tr><td><b>역방향</b> (등급 결정 사실 제거/중화)</td><td>등급 <b>내려가야</b></td><td><b>과분류(FP)</b> — 안 내려가면 사실이 아니라 표면 단서에 패닉</td></tr>
+            <tr><td><b>과분류율</b> (공개→S3)</td><td>S3 유지</td><td>과분류 베이스라인 — <code>eval_real_public_fpr.py</code> 기존 활용</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="color:var(--text-dim);font-size:13.5px;">D는 합성·순환 holdout과 <b>같은 평가 숫자로 섞지 않는다</b>. 회귀 테스트 PASS/FAIL은 별도 산출이며, 위 §"한 숫자로 안 합침" 원칙의 가장 엄격한 적용이다.</p>
+      <div class="callout pass">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body"><b>채점 코어 구현 완료.</b> <code>m6_evaluation/metamorphic.py</code> — 사실보존 게이트(<code>check_fact_preservation</code>: 토큰 보존 + 부정 가드, 룰/심판 아님)와 대칭 채점(<code>build_metamorphic_report</code>: 순방향/역방향/과분류 + Wilson CI, <code>quality_score</code>는 NotImplementedError로 "통과=품질 아님" 강제). 테스트 10건. <b>패러프레이즈 생성</b>(앵커→사내문서체, Qwen)은 앵커 파이프라인 소관으로 분리 — 이 코어는 생성 결과를 받아 채점/검사만 한다.</div>
+      </div>
+
+      <h3>D 강화 사양 — 라벨 상속 조건 (느슨하면 위험 데이터)</h3>
+      <p>D의 가치는 <b>"앵커의 권위 + 합성의 유연함"</b>을 동시에 얻는 데 있다. 그런데 재작성이 사실을 희석하는 순간, <b>앵커의 권위(외부 사실로 등급이 박혔다는 신뢰)는 가져오면서 그 근거는 합성으로 깨진</b> — "합성인데 앵커인 척하는" 데이터가 된다. 이건 품질 저하가 아니라 <b>틀린 라벨에 고신뢰 도장이 찍혀 평가를 반대 방향으로 오염</b>시킨다. 따라서 D는 아래 조건을 <b>모두</b> 통과한 쌍만 채택한다.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:6%;">#</th><th style="width:26%;">조건</th><th>내용</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><b>고등급 앵커에만 적용</b></td><td>S3 <b>공개 앵커는 패러프레이즈 금지</b>. 공개 판례→S3의 등급 근거는 본문이 아니라 <b>"공개됨"이라는 메타데이터</b> — 내부문서체로 재작성하면 그 유일한 S3 근거가 사라지고 <b>내용상 고등급으로 보이는 가짜 내부문서</b>가 된다(<code>relabel_public_to_s3.py</code>가 막으려던 바로 그것). → D는 TS/S1/S2 앵커에만.</td></tr>
+            <tr><td>2</td><td><b>소스별 핵심 사실 체크리스트 보존</b></td><td>한 종류로 안 됨. NKT 특허(TS)=국가핵심기술 <b>소분류 기술용어</b>; 법원 판례(S1/S2)=법원이 영업비밀로 <b>판시한 그 대상 명사구</b>(<code>mine_trade_secret_cases.py</code>의 verbatim trap). 등급을 만든 사실이 보존돼야 함.</td></tr>
+            <tr><td>3</td><td><b>등급 결정 근거 보존</b></td><td>2의 사실이 <b>등급을 정한 논리</b>(왜 TS인가)까지 살아 있어야 함. 키워드만 남고 맥락이 빠지면 탈락.</td></tr>
+            <tr><td>4</td><td><b>부정/방향 가드</b></td><td>토큰이 살아도 의미가 뒤집히면 끝. <i>"이 기술은 국가핵심기술이 <b>아니다</b>"</i>는 토큰 보존·사실 반전. 등급 근거 문장이 <b>부정·완화·조건절에 묶이지 않았는지</b> 검사.</td></tr>
+            <tr><td>5</td><td><b>한·영 쌍 둘 다 통과</b></td><td>번역/영문 생성은 <b>또 하나의 희석 경로</b>. KO 통과·EN 실패면 그 쌍 폐기(영어 OOD 보완하려다 영어 라벨이 깨지면 본전 손실).</td></tr>
+            <tr><td>6</td><td><b>원본 앵커 id 추적</b></td><td>각 쌍에 <b>원 앵커 id + 변환 로그</b>(모델·프롬프트·버전) 스탬프. 감사·재현, 그리고 원 앵커가 오라벨로 밝혀지면 파생 일괄 정정.</td></tr>
+            <tr><td>7</td><td><b>검사 = 룰/심판 아님, 결정적 사실 검사</b></td><td>룰·심판으로 거르면 <b>D가 탈출하려던 순환이 복귀</b>(심판 동의 케이스만 남김=쉬운 것만 선택). 하드 게이트는 <b>결정적 체크리스트(1~4)</b>. NLI 함의 검사를 쓰려면 <b>학습/라벨/심판 계열이 아닌 별도 모델</b>로 보조 신호만.</td></tr>
+            <tr><td>8</td><td><b>폐기 아니라 격리 + 폐기율 로깅</b></td><td>그냥 버리면 "D 잘 됨" 착시. <b>소스별 폐기율 기록</b> — 높으면 "그 앵커 종류는 재작성으로 라벨 유지 불가"가 결과 자체(조용한 누락 금지).</td></tr>
+            <tr><td>9</td><td><b>앵커당 패러프레이즈 수 상한 + 가중</b></td><td>1 앵커서 10개 뽑으면 정보량 1을 10으로 분장. 앵커당 개수 제한 + 통계 가중.</td></tr>
+            <tr><td>10</td><td><b>원본·패러프레이즈 같은 숫자로 안 섞기</b></td><td>같은 소스라 상관됨 → 합치면 N·신뢰구간 거짓 부풀림. 분리 보고(C 원칙).</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn">
+        <span class="callout-icon">⚠</span>
+        <div class="callout-body"><b>정직한 잔여 한계(오버셀 금지).</b> 패러프레이즈도 Qwen, 학습 silver도 Qwen 생성 → D 패러프레이즈는 학습셋과 <b>같은 생성기 문체</b>다. 분류기가 잘 맞춰도 "등급 학습"인지 "Qwen 문체 인식"인지 섞인다. → D는 엄밀히는 진짜 실세계 OOD가 아니라 <b>"Qwen 분포 안에서의 문체 전이 견고성"</b>. 안 하는 것보단 훨씬 낫고 고등급을 비순환으로 겨냥하는 유일한 합성법이라 가치는 크나, <b>모델카드엔 그렇게 정직하게</b> 적는다.</div>
+      </div>
+    </section>
+
+    <section id="s04">
+      <h2><span class="num">04</span> 잘 된 부분 (구현·검증)</h2>
+      <p class="h2-sub">설계로서 그대로 신뢰 가능. 부품은 다 코드로 있다.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:20%;">부품</th><th style="width:12%;">상태</th><th>근거 (코드)</th></tr></thead>
+          <tbody>
+            <tr><td><b>합성 생성기</b></td><td class="td-pass">✅ 구현</td><td>등급명 leakage 차단·상황프롬프트 V2·PII 필터·JSON 재시도 — <code>m1_synthesis/generator.py</code></td></tr>
+            <tr><td><b>합의 게이트</b></td><td class="td-pass">✅ 구현</td><td>conf 안 봄. <code>근거 span ∧ 룰==심판 ∧ self-consist≥0.67 ∧ ¬ts_downgrade ∧ ¬섀도불일치</code> — <code>consensus.py:49</code></td></tr>
+            <tr><td><b>빌더 코어</b></td><td class="td-pass">✅ 구현</td><td>위생(중복·누출 드롭)→라벨→합의→조립 — <code>golden_builder.py:98</code></td></tr>
+            <tr><td><b>3-tier 파생</b></td><td class="td-pass">✅ 구현</td><td>물리분할 없이 <code>label_source</code>로 파생 — <code>golden_tiers.py:44</code></td></tr>
+            <tr><td><b>외부 사실 앵커 데이터</b></td><td class="td-pass">✅ 존재</td><td>공개판례→S3·NKT지정→TS·KOIPA판례→S1/S2 — <code>collect_public_gold.py</code>·<code>kipris_aihub_nkt_ingest.py</code>·<code>relabel_public_to_s3.py</code></td></tr>
+            <tr><td><b>FNR-safe 룰</b></td><td class="td-pass">✅ 구현</td><td>최종 등급 = 더 위험한 쪽(min) — <code>rule_engine.py:399-403</code> (E·하드네거티브 평가의 토대)</td></tr>
+            <tr><td><b>C 분리 리포트 카드</b></td><td class="td-pass">✅ 신규 구현</td><td>Wilson CI·출처×등급·INCONCLUSIVE·단일숫자 코드차단(combined_score raise) — <code>m6_evaluation/eval_cards.py</code> (테스트 10건)</td></tr>
+            <tr><td><b>B 심판 신뢰도 폭로</b></td><td class="td-pass">✅ 신규 구현</td><td>591 rejudged.jsonl 출처별 층화·proxy 양가 플래그·라벨 미수정 — <code>m6_evaluation/judge_reliability.py</code> (테스트 7건, 실데이터 회귀 락 포함)</td></tr>
+            <tr><td><b>D 메타모픽 회귀 코어</b></td><td class="td-pass">✅ 신규 구현</td><td>사실보존 게이트(토큰+부정가드, 룰/심판 아님)·순/역방향·과분류 대칭·quality_score 금지(통과=품질 아님) — <code>m6_evaluation/metamorphic.py</code> (테스트 10건). 패러프레이즈 *생성*은 별개(앵커 파이프라인·Qwen)</td></tr>
+            <tr><td><b>E 서빙 불변식 체커</b></td><td class="td-pass">✅ 신규 구현</td><td>공개출처 cap이 고등급 덮음+검수신호 없음=조용한 미탐(FN)·표기 상향 누락(floor) 탐지 — <code>m6_evaluation/serving_invariants.py</code> (테스트 10건). pipeline.py 미변경(순수 체커, 라이브 배선은 서빙 트랙 E1/E2와 함께)</td></tr>
+            <tr><td><b>holdout 분할 + 누출 가드</b></td><td class="td-pass">✅ 신규 구현</td><td>gold_candidate → silver_train/synthetic_holdout 등급층화 75/25 <b>결정적</b> 분할 + 기존 코퍼스 누출 드롭(빌드 러너가 holdout_texts 미전달하던 구멍 폐쇄) + split_role 스탬프(golden_tiers와 직교) — <code>golden_split.py</code> (테스트 9건)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="s05">
+      <h2><span class="num">05</span> 빠진 것 — 1,000을 뽑으려면</h2>
+      <p class="h2-sub">"부재가 아니라 미조립" — 부품은 있는데 한 번에 1,000을 산출하는 글루와 게이트가 없다.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:6%;">#</th><th style="width:26%;">빠진 것</th><th>설명 · 위치</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><b>엔드투엔드 오케스트레이션</b></td><td>쿼터대로 ~1,600 생성 → <code>build_golden_set</code> → 25% holdout 분할 → 티어 출력을 묶는 스크립트 부재(<code>golden_pilot.py</code>는 소량·구 경로)</td></tr>
+            <tr><td>2</td><td><b>25% holdout 분할</b> <span class="td-pass">✅ 해소</span></td><td><code>golden_split.split_for_training</code>: 등급층화 75/25 결정적 분할 + 누출 가드 + split_role. 빌드 러너 산출(gold_candidate)을 받아 silver/holdout으로 가름(테스트 9건)</td></tr>
+            <tr><td>3</td><td><b>파일럿 통과율 미측정</b></td><td>ConsensusJudge 경로로 통과율 미측정 → 과생성 배수(1,600) 추측</td></tr>
+            <tr><td>4</td><td><b>readiness 게이트 = locked 전용만</b></td><td><code>eval_readiness</code>(<code>golden_tiers.py:89</code>, min_per_grade=5)는 <b>locked tier만</b> 보고 locked 비면 ready=False. 합성 holdout·앵커엔 출처별 CI/판단보류 기준 없음 → <b>C(eval_cards)가 모든 출처×등급으로 확장</b>(구현됨)</td></tr>
+            <tr><td>5</td><td><b>deploy gate 미연결</b></td><td>여전히 합성 <code>test.jsonl</code>을 봄 → 앵커/holdout 미연결(설계 §07 하드닝 #2)</td></tr>
+            <tr><td>6</td><td><b>근사중복·다양성 점검 없음</b></td><td><code>text_hash</code>는 완전일치만. near-dup·도메인 편중 별도 점검(C의 누출/기억 분리)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="s06">
+      <h2><span class="num">06</span> 권장 파이프라인</h2>
+      <p class="h2-sub">앵커를 중심에 두고 부품을 잇는 한 흐름. 신규 코드는 holdout 분할·통과율 계측·앵커 패러프레이즈(D)·분리 리포트(C)뿐.</p>
+      <pre><code>① 생성(과생성)   SyntheticDocGenerator × 쿼터 (탈락 보정 ~1,600)
+                  └ 등급명 leakage 차단 프롬프트(이미 구현)
+
+② 앵커 적재      legal_floor 외부확정 데이터 로드(공개판례 S3 · NKT TS · KOIPA S1/S2)
+  +D 패러프레이즈   고등급 앵커(TS/S1/S2)만 Qwen으로 사내문서체 재작성(등급 상속) ← (신규)
+                  └ 결정적 사실검사(룰/심판 아님): 소스별 체크리스트+부정가드+한영 둘다
+                  └ 통과쌍만 채택 · 앵커id/변환로그 스탬프 · 실패=격리(폐기율 로깅)
+                  └ 메타모픽 최소쌍: "문체 바꿔도 등급 안 내려감"(원본과 안 섞음)
+
+③ 라벨·합의      build_golden_set(docs, label_fn=ConsensusJudge)
+                  └ 룰==심판 ∧ 근거 ∧ self-consist≥0.67 ∧ ¬ts_downgrade ∧ ¬섀도불일치
+                  → gold_candidate(통과) / needs_review(탈락)
+
+④ 통과율 계측    등급별 통과율 → 과생성 배수 사이징(파일럿 100건 선행)
+
+⑤ holdout 분할   gold_candidate를 등급층화 75/25 분할  ← (신규)
+                  silver_train ~700 + 합성 holdout ~250("일반화 아님")
+
+⑥ 다층 리포트    C: 출처별 분리 카드(앵커/holdout/패러프레이즈) ← (신규)
+                  └ 칸마다 N·Wilson CI, 표본부족=INCONCLUSIVE, 단일숫자 금지
+                  B: 심판 신뢰도 폭로(591 데이터)  E: 메타모픽 불변식 스위트
+
+(배포 후)        A: 운영 능동감사 표집 → 실분포 미탐율(집계만 반출)
+(휴면)           promote_to_locked → 사람 서명 막힘(제약 완화 시 전용)</code></pre>
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>신규 코드는 ②D·④·⑤·⑥뿐.</b> ①③은 기존 부품 호출이다. holdout 분할은 <b>등급층화</b>로 해서 ~250 안에 TS/S1이 충분히 들어가게 해야 고등급 회귀를 그나마 잡는다. 앵커 패러프레이즈(D)는 <b>한·영 짝을 강제</b>해 영어 OOD까지 덮는다(§07).</div>
+      </div>
+    </section>
+
+    <section id="s07">
+      <h2><span class="num">07</span> 완전성 점검 — 놓치기 쉬운 4가지</h2>
+      <p class="h2-sub">다각도 적대 검증이 끝에서 잡아낸, 평가가 통째로 빠뜨리기 쉬운 위험(메모리 대조 확인).</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:24%;">놓친 것</th><th>왜 위험 · 보완</th></tr></thead>
+          <tbody>
+            <tr><td><b>영어 OOD 통째 누락</b></td><td>학습셋 영어 0%·S1 약점 절반이 영어인데 모든 안이 한국어 기준. → <b>D 패러프레이즈에 한·영 짝 강제</b>(가장 싼 보완)</td></tr>
+            <tr><td><b>고객사 자가재학습이 평가 없이 돎</b></td><td>고객사에서 <code>enable_training</code> 미게이트 버그로 재학습 루프가 돎(교정 admission 게이트 0). 빌드 평가가 좋아도 무의미. → <b>A 측정을 재학습 hard gate</b>로</td></tr>
+            <tr><td><b>보정(calibration) 평가 부재</b></td><td>미보정 서빙 시 OOD 과신(T≈3 필요). FNR만 보고 <b>과신은 안 봄</b> → 보정 지표를 리포트에 추가</td></tr>
+            <tr><td><b>"미탐의 미탐"</b></td><td>희소 고등급은 A조차 표본분산으로 [0,5%] 무력. 데이터 부족의 근본 한계라 어떤 측정으로도 못 풂 → <b>"측정 해상도 천장"을 모델카드에 박음</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="s08">
+      <h2><span class="num">08</span> 다음 단계</h2>
+      <p class="h2-sub">코드는 본 보고서 합의 후 착수. 쉬운 정직성 장치(C·B)부터, 그다음 산출·앵커.</p>
+      <ol>
+        <li><b>[정직성·쉬움] C 분리 리포트 + B 심판 폭로</b> — <b>✅ 구현 완료</b>: <code>eval_cards.py</code>(Wilson CI·INCONCLUSIVE·단일숫자 코드차단) + <code>judge_reliability.py</code>(591 층화·proxy 양가). 테스트 17건 통과(실데이터 회귀 락 포함). 데이터 0 추가.</li>
+        <li><b>[계측] 파일럿 통과율</b> — ConsensusJudge 경로로 등급별 ~25건(100건) 통과율 측정 → 과생성 배수 사이징.</li>
+        <li><b>[빌드] 1,000 산출 오케스트레이션</b> — 생성→앵커 적재(+D 한·영 패러프레이즈)→<code>build_golden_set</code>→25% 등급층화 분할→다층 리포트. run-스코프 파일만(정본 보호).</li>
+        <li><b>[연결] deploy gate</b> — 합성 <code>test.jsonl</code> 대신 앵커/holdout으로 FNR 재측정(§05 하드닝). 앵커 비면 fail-closed.</li>
+        <li><b>[잠금] E 메타모픽 스위트</b> — 출처 cap 시 경고 누락 회귀 테스트.</li>
+        <li><b>[거버넌스] A 운영 능동감사</b> — 집계 반출·재학습 gate 합의(KL/부사장). 배포 후 4번째 층.</li>
+      </ol>
+    </section>
+
+    <section id="s09">
+      <h2><span class="num">09</span> 한계·전제 (정직)</h2>
+      <p class="h2-sub">이 평가가 할 수 있는 것과 없는 것.</p>
+      <ul>
+        <li><b>합성 천장</b> — 고등급·영어·실분포는 합성으로 못 채움(실측). 앵커·holdout은 "상대비교 출발선"이지 일반화 보증이 아니다.</li>
+        <li><b>평가 진실은 영구 0</b> — 사람 서명이 빌드·운영 양쪽 다 막혀 <code>locked_gold_eval</code>은 채워지지 않는다. 운영 능동감사(A)도 집계·표본 한계라 진짜 정답지를 대신하진 못한다.</li>
+        <li><b>앵커는 비순환이나 OOD</b> — 공개 판례≠내부 비밀문서. D 패러프레이즈로 갭을 줄이되, 재작성이 사실을 희석하면 라벨 상속이 깨진다 → <b>§03 D 강화 사양 10조건</b>(결정적 사실검사·부정가드·격리·최소쌍)으로만 안전. 그래도 패러프레이즈가 Qwen이라 진짜 OOD가 아닌 <b>"Qwen 문체 전이 견고성"</b>임은 잔존.</li>
+        <li><b>심판 공통편향은 못 깸</b> — B는 순환을 "측정"할 뿐 제거하지 못한다(Qwen·Claude 같은 기반·RLHF).</li>
+        <li><b>이 보고서는 코드 미변경</b> — 검토·결정 문서다. 실제 생성·평가는 §08 합의 후 착수한다.</li>
+      </ul>
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>종합.</b> 사람 서명이 막힌 세계에서 "완벽한 정답지"는 못 만든다. 대신 <b>외부 사실 앵커를 중심에 두고, 약점이 안 겹치는 측정을 층으로 쌓아 절대 한 숫자로 합치지 않는</b> 것이 가능한 최선이다. 4중일치는 보조로 내리고, 고등급 미탐은 <b>D(앵커→사내문서체)</b>로 비순환 측정하며, 진짜 분포는 <b>운영 능동감사(A)</b>로만 — 그것도 집계·표본 한계 안에서 — 본다. 모든 한계는 모델카드·계약에 정직히 명시한다.</div>
+      </div>
+    </section>
+
+    <div class="appendix-links" style="margin-top:36px;">
+      <a class="appendix-link" href="무실데이터_분류기_설계서.html"><span>모체 — 무실데이터 분류기 설계서</span><span class="al-arrow">→</span></a>
+    </div>
+  </article>
+</div>
+
+<footer>
+  <span>골든셋·평가셋 합성 생성 설계 검토 · 내부용(대외공유 금지) · 2026-06-29 · Koipa AI Engine</span>
+  <span>rev.3 — D=1순위 메타모픽 회귀 테스트 승격 · 명명: 학습코퍼스 1,000+holdout+앵커 다층평가+회귀테스트(평가 진실 아님)</span>
+</footer>
+<script>
+const items = document.querySelectorAll('.toc-item[href^="#"]');
+const sections = [...items].map(i => document.querySelector(i.getAttribute('href'))).filter(Boolean);
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      items.forEach(i => i.classList.remove('active'));
+      const link = document.querySelector(`.toc-item[href="#${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>

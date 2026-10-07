@@ -12,10 +12,10 @@ import pytest
 pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-from lloydk.config import settings
-from lloydk.schemas.classify import ClassifyRequest
-from lloydk.services.classify_service import ClassifyService
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.schemas.classify import ClassifyRequest
+from koipa.services.classify_service import ClassifyService
 
 
 @pytest.fixture
@@ -30,7 +30,6 @@ def _make_req() -> dict:
     return ClassifyRequest(
         doc_id="not-a-uuid",
         content="이 문서는 영업비밀 등급 분류 대상입니다.",
-        use_rag=False,
         return_evidence=False,
     ).model_dump()
 
@@ -42,7 +41,6 @@ def test_classify_unit_invokes_on_stage_callback():
     req = ClassifyRequest(
         doc_id="not-a-uuid",
         content="테스트 문서",
-        use_rag=False,
         return_evidence=False,
     )
     svc.classify(req, on_stage=seen.append)

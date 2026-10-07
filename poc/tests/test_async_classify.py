@@ -1,6 +1,6 @@
 """AsyncClassifyService 기본 동작 검증.
 
-대상: lloydk.services.async_classify_service.AsyncClassifyService
+대상: koipa.services.async_classify_service.AsyncClassifyService
 - submit_async 단일건 처리 + JobStore에 done 상태 기록
 - submit_async 실패 시 status=failed + error 메시지 기록
 - submit_batch 정상 경로 (총량·상태 url 형식·get_status round-trip)
@@ -14,15 +14,15 @@ from __future__ import annotations
 import pytest
 pytestmark = pytest.mark.slow
 
-from lloydk.schemas.classify import ClassifyRequest
-from lloydk.schemas.classify_async import ClassifyAsyncRequest, ClassifyBatchRequest
-from lloydk.services.async_classify_service import AsyncClassifyService
+from koipa.schemas.classify import ClassifyRequest
+from koipa.schemas.classify_async import ClassifyAsyncRequest, ClassifyBatchRequest
+from koipa.services.async_classify_service import AsyncClassifyService
 
 
 @pytest.fixture(autouse=True)
 def _reset_singleton():
     yield
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.services.classify_service import ClassifyService
     ClassifyService._instance = None
 
 
@@ -75,7 +75,7 @@ def test_celery_dispatch_disabled_under_testing_env():
 
     conftest가 TESTING=1을 세팅하므로 in-process 경로만 타고, 라이브 redis 없이 통과.
     """
-    from lloydk.services.async_classify_service import _celery_dispatch_available
+    from koipa.services.async_classify_service import _celery_dispatch_available
 
     assert _celery_dispatch_available() is False
 

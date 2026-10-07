@@ -13,8 +13,8 @@ sys.path.insert(0, "src")
 from dotenv import load_dotenv
 load_dotenv(".env")
 
-from lloydk.modules.m1_synthesis.generator import SyntheticDocGenerator, SynthRequest
-from lloydk.modules.m3_labeling.pipeline import LabelingPipeline
+from koipa.modules.m1_synthesis.generator import SyntheticDocGenerator, SynthRequest
+from koipa.modules.m3_labeling.pipeline import LabelingPipeline
 
 DOMAINS = ["tech", "business", "finance", "hr", "legal", "security"]
 GRADES  = ["TS", "S1", "S2", "S3"]

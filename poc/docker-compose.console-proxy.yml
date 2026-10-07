@@ -1,0 +1,54 @@
+# 콘솔을 **HTTPS 역프록시 뒤에서만** 외부에 여는 오버레이.
+# docker-compose.expose.yml 의 대체재다 — 둘을 같이 쓰면 안 된다.
+#
+# 왜(2026-08-19 KL 서버 223 실측):
+#   docker ps → 0.0.0.0:8000->8000/tcp   앱이 평문 HTTP 로 직접 외부에 붙어 있었다
+#   :443 닫힘 · 보안 헤더 0개 · /docs·/openapi.json 무인증 200
+#   무인증 login.html 본문에 admin JWT(sub=kl-admin-test·roles=[admin]·exp 2026-12-31) 565자
+#   → 내 PC(KL 망 밖, 공인 IP)에서 그대로 받아졌다.
+#
+# 저장소 기본값은 이미 안전하다 — prod.yml:66-67 · dual.yml:18-19 가 `127.0.0.1:8000` 이다.
+# expose.yml 은 **서버에서만 만들어진 파일**로 그것을 0.0.0.0 으로 덮고 있었다.
+# 이 파일은 그 자리를 대신하되, 바깥에 서는 것은 앱이 아니라 nginx 다.
+#
+# 사용:
+#   docker compose -p <project> \
+#     -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.dual.yml \
+#     -f docker-compose.console-proxy.yml up -d
+#
+#   ⚠ deploy_kl_223.sh 는 docker-compose.expose.yml 이 **있으면** 자동으로 포함한다.
+#     전환할 때 그 파일을 반드시 지우거나 이름을 바꿔야 한다. 남겨 두면 배포가 매번
+#     0.0.0.0 노출을 되살린다(스크립트 주석: "서버가 정한 노출 방식을 배포가 되돌리지 않게").
+#
+# 준비물(호스트):
+#   ./infra/proxy/nginx.console.conf   저장소에 있음
+#   ./infra/certs/server.crt|server.key  사내 PKI 또는 공인 인증서 — **저장소에 넣지 말 것**
+#
+# 검증:
+#   curl -sI https://<host>/api/v1/golden/candidates/login.html   보안 헤더 6종
+#   curl -so /dev/null -w '%{http_code}\n' http://<host>:8000/    → 연결 거부(앱이 루프백에만)
+services:
+  # api 는 오버라이드하지 않는다 — dual 이 이미 127.0.0.1 에 묶는다.
+  # 여기서 ports 를 다시 쓰면 그 의도를 흐린다.
+  console-proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      # 외부에 서는 유일한 지점. 앱은 이 뒤에 있다.
+      - "0.0.0.0:443:443"
+      - "0.0.0.0:80:80"
+    volumes:
+      # ⚠ default.conf **자리에** 덮어쓴다. 이미지가 기본으로 넣어 두는 default.conf 는
+      #   listen 80 default_server 를 잡고 있어, 새 이름(console.conf)으로 추가만 하면
+      #   80 이 두 번 선언되고 기본 서버가 먼저 응답해 리다이렉트가 안 먹는다.
+      #   두 경로에 같은 파일을 마운트하면 server 블록이 통째로 중복 로드된다 — 하지 말 것.
+      - ./infra/proxy/nginx.console.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/certs:/etc/nginx/certs:ro
+    healthcheck:
+      # 설정 문법이 깨진 채 기동되면 콘솔이 통째로 안 열린다 — 기동 자체를 판정에 넣는다.
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

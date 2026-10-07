@@ -1,0 +1,146 @@
+{
+  "source_dir": "datasets/labeled_p1_v5_clean",
+  "status": "CANDIDATE — 미학습·미배포",
+  "rule": "label_source=llm_judge_primary ∧ rule_grade=S3 ∧ label≠S3 → label=S3",
+  "reason": "llm_judge_primary 가 규칙 판정 S3 를 덮어씀 — 본문이 증권사 시황·산업 통계·IR 후기·공개 조사 요약이라 비공지성 실패로 S3 (holdout109 정정 22건과 같은 유형). AI 정독 2026-09-20, 사람 서명 아님",
+  "splits": {
+    "train": {
+      "rows": 2042,
+      "changed": 56,
+      "changed_from": {
+        "S1": 4,
+        "S2": 44,
+        "TS": 8
+      },
+      "label_before": {
+        "S1": 365,
+        "S2": 463,
+        "S3": 813,
+        "TS": 401
+      },
+      "label_after": {
+        "S1": 361,
+        "S3": 869,
+        "S2": 419,
+        "TS": 393
+      },
+      "source_sha256": "47543528ad007d335fcd0f111f545eafebee3c243a630a03e5ddb98bb86a8c06",
+      "out_sha256": "63cd1d852dbe4084f7d6d1d00de92a8a905d479d6988989e11d31beedd11d2fa",
+      "changed_doc_ids": [
+        "c1410f2c06147184",
+        "883a87777fdac6e3",
+        "46d687f25b593621",
+        "51f3cf2c9372d126",
+        "79c96475e7850488",
+        "42f43d062670186c",
+        "55730a407798edf7",
+        "dded6a0c84ddd265",
+        "85c6cb458093ab3c",
+        "57b2b348b6d50f88",
+        "1c5db03466688606",
+        "cfff7c61af88e516",
+        "33fa4681098bb057",
+        "4af11710e6cb017d",
+        "4f6d9924ae012a41",
+        "ead5fb6f6bd8fe84",
+        "c69a716c2b77cfea",
+        "be87e7e1b1f8f087",
+        "976424afa7e58b4e",
+        "864ecb96f252bfbe",
+        "d28880f869bf1493",
+        "f8b1e2e59e63e699",
+        "f41caa41f1fd4fa6",
+        "21be37e3f346eda9",
+        "651ba279ca7533a9",
+        "c4364d3467074638",
+        "203d0ebf5156953b",
+        "3a7afc2e547433d7",
+        "ea3584cb5f64d3fb",
+        "51a09377360b9627",
+        "ef937dcebbb889c1",
+        "9080c284c2ec51f1",
+        "7b9ab99ee1597151",
+        "a8451f0cb7cf74dd",
+        "b19a2dcfac7d4e3c",
+        "0a963242468b0947",
+        "78ccb9276c9728b0",
+        "f7aa5aee26eaa213",
+        "84ac3699f83cd587",
+        "f835f55f204f0b8a",
+        "d59138fdd31a3d0f",
+        "7217561823de6743",
+        "63fa97cf4b2fa83e",
+        "a114db35250158b0",
+        "91b2601aa8d93a97",
+        "2bbcb2d1a6da3bd8",
+        "c9a23389384a9687",
+        "304b479598136e74",
+        "168287ce92ce74e3",
+        "d98762f9a4e25714",
+        "fab9303f117aa0eb",
+        "d391fa90453da148",
+        "990662bfb5127f9b",
+        "f5125a947f2158ec",
+        "b36edcc32c94546c",
+        "bd01afc9010c402d"
+      ]
+    },
+    "val": {
+      "rows": 256,
+      "changed": 6,
+      "changed_from": {
+        "S1": 1,
+        "S2": 5
+      },
+      "label_before": {
+        "S1": 46,
+        "S2": 58,
+        "S3": 102,
+        "TS": 50
+      },
+      "label_after": {
+        "S1": 45,
+        "S3": 108,
+        "S2": 53,
+        "TS": 50
+      },
+      "source_sha256": "7485d838294a80a5d5ba7f7110bc5d99bf0b24d5b26073a93a23f54be354e2c8",
+      "out_sha256": "f885cd6a82e084b84ce49fd6937e88834e8d7237703fcaa637977893390a2c7c",
+      "changed_doc_ids": [
+        "af504024b5b918f8",
+        "6fe1d33d65012db2",
+        "750538f69685995e",
+        "0970f754d2713992",
+        "9891c1bd13db3349",
+        "8a1cde277f7e1af9"
+      ]
+    },
+    "test": {
+      "rows": 256,
+      "changed": 3,
+      "changed_from": {
+        "S1": 1,
+        "S2": 2
+      },
+      "label_before": {
+        "S1": 46,
+        "S2": 58,
+        "S3": 102,
+        "TS": 50
+      },
+      "label_after": {
+        "S1": 45,
+        "S3": 105,
+        "S2": 56,
+        "TS": 50
+      },
+      "source_sha256": "e25cdd2e371c7d6524f7d29a0bcf48c45982dc677fd066d59fec62049dfcafc1",
+      "out_sha256": "3ae0acba4a48663c9e6c351b0ff8cf19c67ac8c4e7a900cb9b0ea3926cb535c6",
+      "changed_doc_ids": [
+        "4e88a89fca83a8ac",
+        "e8a557615cbafe8f",
+        "4b67d0ac40c0061d"
+      ]
+    }
+  }
+}

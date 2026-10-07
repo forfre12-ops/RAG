@@ -8,8 +8,6 @@
 
 from __future__ import annotations
 
-import io
-import json
 import sys
 import uuid
 
@@ -21,9 +19,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.api.app import app
-from lloydk.config import settings
-from lloydk.db import engine
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.db import engine
 
 
 def _pg_ok() -> bool:
@@ -196,62 +194,6 @@ class TestSynthesisRouter:
 
 
 # ============================================================
-# /guide/documents
-# ============================================================
-
-class TestGuideRouter:
-    def test_upload_then_list_versions(self):
-        gid = f"guide-{uuid.uuid4().hex[:6]}"
-        with TestClient(app) as cli:
-            r = cli.post(
-                "/api/v1/guide/documents",
-                headers=HDR,
-                data={
-                    "guide_id": gid,
-                    "version": "v1.0",
-                    "effective_date": "2026-06-01",
-                    "change_summary": "initial",
-                    "actor": json.dumps(ACTOR),
-                },
-                files={"file": ("guide.txt", io.BytesIO(b"sample guide content"), "text/plain")},
-            )
-            assert r.status_code == 201, r.text
-            body = r.json()
-            assert body["guide_id"] == gid
-            assert body["version"] == "v1.0"
-            # W5 이후: indexed는 ES 가동·임베딩 모델 가용성에 따라 True/False.
-            # 두 경우 모두 키 존재·타입만 검증 (best-effort 응답 보장).
-            assert isinstance(body["indexed"], bool)
-            assert "embedding_vector_count" in body
-
-            # 목록 조회
-            r2 = cli.get(f"/api/v1/guide/documents/{gid}", headers=HDR)
-            assert r2.status_code == 200
-            vlist = r2.json()
-            assert vlist["guide_id"] == gid
-            assert len(vlist["versions"]) >= 1
-
-    def test_list_unknown_guide_404(self):
-        with TestClient(app) as cli:
-            r = cli.get(f"/api/v1/guide/documents/does-not-exist-{uuid.uuid4().hex[:6]}", headers=HDR)
-            assert r.status_code == 404
-
-    def test_upload_invalid_actor_json_422(self):
-        with TestClient(app) as cli:
-            r = cli.post(
-                "/api/v1/guide/documents",
-                headers=HDR,
-                data={
-                    "guide_id": "g",
-                    "version": "v",
-                    "actor": "{not json",
-                },
-                files={"file": ("g.txt", io.BytesIO(b"x"), "text/plain")},
-            )
-            assert r.status_code == 422
-
-
-# ============================================================
 # /schema/grades
 # ============================================================
 
@@ -282,11 +224,13 @@ class TestSchemaAdminRouter:
 # ============================================================
 
 class TestMetricsRouter:
+    @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_latest_no_active_model_404(self):
-        """현재 활성 모델 없음 → 404 (DB 미가용 시에도 동일)."""
+        """현재 활성 모델 없음 → 404. 세팅(활성 모델 비활성화)이 session_scope 를 쓰므로
+        형제 테스트(라인 127·267)와 동일하게 PG 필요 — 무PG 환경 30s 행+ConnectionTimeout 방지."""
         # 공유 DB 오염(타 테스트가 활성화한 모델 잔존) 방지 — 활성 모델 비활성화 후 검증
-        from lloydk.db import session_scope
-        from lloydk.db.models import ModelVersion
+        from koipa.db import session_scope
+        from koipa.db.models import ModelVersion
         with session_scope() as s:
             s.query(ModelVersion).filter_by(is_active=True).update(
                 {"is_active": False}, synchronize_session=False

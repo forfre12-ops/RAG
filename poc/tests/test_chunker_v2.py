@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lloydk.modules.m2_preprocess import split_v2
+from koipa.modules.m2_preprocess import split_v2
 
 
 def test_split_v2_short_text_single_chunk():

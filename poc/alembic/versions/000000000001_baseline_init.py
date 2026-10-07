@@ -29,7 +29,13 @@ from alembic import op
 
 revision: str = "000000000001"
 down_revision: Union[str, Sequence[str], None] = None
-branch_labels: Union[str, Sequence[str], None] = None
+# [2026-09-09] MariaDB 계열은 폐기했다(PostgreSQL + pgvector 복귀). 이름표는 남긴다 —
+# 계열이 다시 갈릴 때 이 라벨이 없으면 head 가 모호해진다.
+# [2026-09] 이름표를 붙였다. MariaDB 전용 계열(f2a3b4c5d6e7)이 생기면서 head 가 둘이
+# 됐고 `alembic upgrade head` 가 모호해졌다. 이제 두 계열을 이름으로 부른다:
+#   PostgreSQL  alembic upgrade postgres@head
+# 이름표는 스크립트 메타데이터라 이미 적용된 DB 의 alembic_version 에 영향이 없다.
+branch_labels: Union[str, Sequence[str], None] = ("postgres",)
 depends_on: Union[str, Sequence[str], None] = None
 
 

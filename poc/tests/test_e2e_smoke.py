@@ -12,8 +12,8 @@ pytestmark = pytest.mark.slow
 
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-from lloydk.config import settings
+from koipa.api.app import app
+from koipa.config import settings
 
 
 HDR = {"X-API-Key": settings.api_key, "X-Actor-Role": "admin"}
@@ -30,7 +30,6 @@ def test_e2e_classify_confirm_metrics_golden_path():
             json={
                 "doc_id": "smoke-e2e-001",
                 "content": "특급기밀 차세대 제품 설계도 핵심 원천기술 M&A 계획",
-                "use_rag": False,
                 "return_evidence": True,
             },
         )

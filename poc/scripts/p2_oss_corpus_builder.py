@@ -56,7 +56,7 @@ def extract_title(text: str, max_len: int = 80) -> str:
 def assign_grade(text: str) -> tuple[str, float]:
     """M3 룰 라벨러 기반 등급 부여. (grade, confidence) 반환."""
     try:
-        from lloydk.modules.m3_labeling.rule_labeler import RuleLabeler
+        from koipa.modules.m3_labeling.rule_labeler import RuleLabeler
         labeler = RuleLabeler()
         result = labeler.label(text)
         return result.grade, result.confidence

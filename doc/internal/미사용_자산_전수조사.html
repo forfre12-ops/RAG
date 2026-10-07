@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>미사용 자산 전수조사</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+h3{font-size:13px;font-weight:800;margin:20px 0 6px}
+p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+pre{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 14px;margin:10px 0;font-size:11.5px;font-family:ui-monospace,monospace;overflow-x:auto}
+.tw{overflow-x:auto}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .note,.docinfo{break-inside:avoid;page-break-inside:avoid}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+</style></head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">미사용 자산 전수조사</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">내부 · 미제출</span></div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">내부 문서 · 자산 점검</div>
+    <h1>미사용 자산 전수조사</h1>
+    <div class="meta">테이블 · 컬럼 · 엔드포인트 · 설정 — 실제 사용 여부 전수 확인 · 2026-08-29</div>
+  </div>
+
+    <table class="docinfo">
+    <tbody>
+      <tr><th>목적</th><td>&ldquo;안 쓰는 기능이 있는가&rdquo;에 분모를 대고 답한다</td></tr>
+      <tr><th>도구</th><td><code>poc/scripts/audit_unused.py</code> — 다시 물으면 다시 세지 말고 다시 돌린다</td></tr>
+      <tr><th>범위</th><td>테이블 19 · 컬럼 188 · 엔드포인트 68 · 설정 161</td></tr>
+      <tr><th>작성일</th><td>2026-08-29</td></tr>
+      <tr><th>배포</th><td><b>내부 문서.</b> 제출본에 미사용 목록을 싣지 않는다(2026-08-02 방침)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    이 문서는 <b>제출용이 아니다.</b> 감리인이 빈 테이블을 보고 물었을 때 즉시 답하기 위한
+    내부 기록이며, 제출본에 미사용 목록을 실어 불필요한 검토 표면을 만들지 않는다는
+    방침에 따른다. 수치는 전부 도구가 센 값이고, 판정은 코드·마이그레이션·실 DB 를
+    직접 확인해 붙였다.
+  </div>
+
+  <h2>1. 요약</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:22%">대상</th><th style="width:14%">분모</th><th style="width:16%">참조 0</th><th>실제 죽은 것</th></tr></thead>
+    <tbody>
+      <tr><td>테이블</td><td class="c">19</td><td class="c">쓰기 0 · 2<br />읽기 0 · 2</td><td class="c"><b>2</b></td></tr>
+      <tr><td>컬럼</td><td class="c">188</td><td class="c">19</td><td class="c"><b>17</b>(2건은 오탐)</td></tr>
+      <tr><td>엔드포인트</td><td class="c">68</td><td class="c">1</td><td class="c">확인 필요</td></tr>
+      <tr><td>설정</td><td class="c">161</td><td class="c">0</td><td class="c">0</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>설정 161개는 <b>전부 쓰인다.</b> 코드·compose·<code>.env</code> 를 모두 확인한 결과다.</p>
+
+  <h2>2. 테이블 — 19개 중 2개가 죽었다</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr>
+      <th style="width:26%">테이블</th><th style="width:8%">쓰기</th><th style="width:8%">읽기</th>
+      <th style="width:10%">실 DB</th><th>판정</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><code>tb_document_factor_scores</code></td>
+        <td class="c">0</td><td class="c">0</td><td class="c">0행</td>
+        <td><b>죽었다.</b> 문서별 3요건 점수를 담으려던 표인데, 실제 요소 점수는
+        <code>tb_classifications</code> 에 저장된다. 어느 코드도 참조하지 않는다</td>
+      </tr>
+      <tr>
+        <td><code>tb_prompt_versions</code></td>
+        <td class="c">1</td><td class="c">0</td><td class="c">0행</td>
+        <td><b>사실상 죽었다.</b> 쓰기 1건은 <code>synth_repo.py:145</code> 인데 그 경로가
+        실제로 돌지 않아 0행이다. 합성 검수 콘솔의 &ldquo;품질&rdquo; 배지가 뜨지 않는 원인</td>
+      </tr>
+      <tr>
+        <td><code>tb_evaluation_factors</code></td>
+        <td class="c">0</td><td class="c">8</td><td class="c"><b>7행</b></td>
+        <td><b>살아 있다 — 도구의 오탐.</b> 파이썬 코드가 아니라
+        <b>마이그레이션이 시드</b>한다(<code>c7d8e9f0a1b2</code>). 3요건 정본이 여기 들어 있다</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note warn">
+    <b>제거하려면 함께 처리해야 하는 것.</b> <code>tb_sample_documents</code> 가
+    <code>tb_prompt_versions</code> 를 외래키 <b>3개</b>로 참조한다
+    (<code>outline_prompt_version</code> · <code>body_prompt_version</code> ·
+    <code>qc_prompt_version</code>). 표만 지우면 스키마가 깨지므로 세 칼럼도 함께 없애야 한다.
+    <br><br>
+    또한 두 표는 <b>제출 문서 5곳</b>에 명세되어 있다(RFP 구현현황 · 백서 부록A ×2 ·
+    테이블 정의서 · 테이블정의서·ERD). 코드에서만 지우면 제출본이 사실과 달라진다.
+  </div>
+
+  <h2>3. 컬럼 — 188개 중 19개가 참조 0</h2>
+
+  <p>성격이 셋으로 갈린다. 같은 &ldquo;미사용&rdquo;이라도 조치가 다르다.</p>
+
+  <h3>3-1. 쓰기 경로가 없어 영원히 비는 것 — 9건</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:28%">컬럼</th><th style="width:26%">테이블</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td><code>processed_at</code></td><td><code>tb_documents</code></td><td>처리 완료 시각. 세팅하는 곳이 없다</td></tr>
+      <tr><td><code>page_start</code> · <code>page_end</code></td><td><code>tb_chunks</code></td><td>청크의 원문 쪽 범위. 추출기가 쪽 정보를 넘기지 않는다</td></tr>
+      <tr><td><code>section_path</code></td><td><code>tb_chunks</code></td><td>청크의 문서 내 절 경로</td></tr>
+      <tr><td><code>split_method</code> · <code>gpu_info</code></td><td><code>tb_training_runs</code></td><td>분할 방식·GPU 정보. 학습 기록에 안 남는다</td></tr>
+      <tr><td><code>logged_at</code></td><td><code>tb_training_epochs</code></td><td>에폭 기록 시각(server_default 는 있음)</td></tr>
+      <tr><td><code>labeled_at</code></td><td><code>tb_document_labels</code></td><td>라벨 부여 시각(server_default 는 있음)</td></tr>
+      <tr><td><code>rag_agreement</code></td><td><code>tb_classifications</code></td><td>RAG 근거와 판정의 일치 여부</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">이 아홉은 <b>기록 누락</b>이지 죽은 기능이 아니다. 지우는 것이 아니라
+  <b>채우는 것</b>이 맞다. 특히 <code>page_start</code>·<code>page_end</code> 는 검수자가
+  근거 위치를 찾는 데 쓰인다.</p>
+
+  <h3>3-2. 기능이 미구현이라 비는 것 — 3건</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:28%">컬럼</th><th style="width:26%">테이블</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>attention_scores</code></td><td><code>tb_classification_evidence</code></td>
+        <td>모델 내부 신호 기반 근거. <b>발주처 질의 가-3-2(XAI)와 직결</b>된다 —
+        요건으로 확정되면 이 칼럼이 채워진다</td>
+      </tr>
+      <tr>
+        <td><code>loss_weight</code></td><td><code>tb_classification_levels</code></td>
+        <td>등급별 손실 가중. <b>등급분류 기준 적용서 R4 가 &ldquo;유출영향도를 여기 보존한다&rdquo;고
+        선언</b>했으나 코드가 한 번도 읽지 않는다 — 문서와 코드가 어긋난 자리</td>
+      </tr>
+      <tr>
+        <td><code>example_context</code></td><td><code>tb_level_keywords</code></td>
+        <td>키워드 예시 문맥. 관리자 화면에서 쓸 자리인데 배선 전이다</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>3-3. 죽은 표에 딸린 것 · 오탐 — 7건</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:34%">컬럼</th><th>구분</th></tr></thead>
+    <tbody>
+      <tr><td><code>approval_rate</code> · <code>avg_quality_score</code> · <code>usage_count</code></td>
+          <td><code>tb_prompt_versions</code> 소속. 표가 죽으면 함께 정리된다</td></tr>
+      <tr><td><code>model_size_mb</code> · <code>model_type</code></td>
+          <td><code>tb_model_versions</code>. 등록은 되나 조회에 쓰지 않는다</td></tr>
+      <tr><td><code>evidence_id</code> · <code>usage_id</code></td>
+          <td><b>오탐.</b> 기본키라 ORM 이 자동 처리해 이름이 코드에 나타나지 않는다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>4. 엔드포인트 — 68개 중 1개</h2>
+  <pre>GET /golden/candidates/summary</pre>
+  <p>콘솔·시험·스크립트·문서 어디서도 호출하지 않는다. 다만 <b>KL 포털이 부를 수 있는
+  계약</b>이므로 제거 전에 연동 규약을 확인해야 한다.</p>
+
+  <h2>5. 판단 — 지금은 지우지 않는다</h2>
+
+  <div class="note">
+    <b>2026-08-29 결정.</b> 설계감리(8/31)가 이틀 앞이다. 스키마 변경은 마이그레이션 ·
+    재배포 · 재검증을 부르고, 제출 문서 5곳을 동시에 고쳐야 한다. 감리에서 나올 질문은
+    &ldquo;이 표가 왜 비어 있는가&rdquo;이고 그 답은 이 문서로 즉시 가능하다.
+    <b>실제 제거는 종료감리(11/23) 이후로 미룬다.</b>
+  </div>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">#</th><th style="width:30%">항목</th><th>시점</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>기록 누락 9칼럼 채우기</td>
+          <td><b>지금 가능</b> — 스키마 변경 없이 쓰기 경로만 추가한다. 특히 청크 쪽 범위는
+          검수 품질에 직접 기여한다</td></tr>
+      <tr><td class="c">2</td><td>적용서 R4 ↔ <code>loss_weight</code> 불일치</td>
+          <td><b>지금 처리</b> — 문서가 선언한 것을 코드가 안 한다. 둘 중 하나를 맞춰야 한다</td></tr>
+      <tr><td class="c">3</td><td>표 2개 · FK 3칼럼 제거</td>
+          <td>종료감리 이후. 마이그레이션 + 제출 문서 5곳 동시 갱신</td></tr>
+      <tr><td class="c">4</td><td><code>/golden/candidates/summary</code></td>
+          <td>KL 연동 규약 확인 후 판단</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>6. 재현</h2>
+  <pre>cd poc
+python scripts/audit_unused.py            # 요약
+python scripts/audit_unused.py --detail   # 항목별 전체</pre>
+  <p>같은 질문을 다시 받으면 <b>다시 세는 것이 아니라 다시 돌린다.</b></p>
+
+  <h2>7. 개정 이력</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">판</th><th style="width:18%">일자</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td class="n">2026-08-29</td><td>최초 작성 — 테이블·컬럼·엔드포인트·설정 전수조사</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">내부 문서 · 제출 대상 아님 · 근거 도구 <code>poc/scripts/audit_unused.py</code></div>
+</div>
+</body>
+</html>

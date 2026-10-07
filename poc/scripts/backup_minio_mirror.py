@@ -1,7 +1,7 @@
 """MinIO 객체 미러 백업 (doc/11 §6.1 — 주 1회, 90일).
 
 MinIO 소스 버킷을 별도 백업 NAS/디렉터리로 복사.
-- 소스: lloydk-docs / lloydk-models / mlflow
+- 소스: koipa-docs / koipa-models / mlflow
 - 대상: 호스트 로컬 디렉터리 (운영은 NFS 또는 별도 NAS)
 - 증분 복사: 파일 크기·mtime 비교, 동일하면 skip
 """
@@ -17,7 +17,7 @@ from pathlib import Path
 
 logger = logging.getLogger("backup_minio_mirror")
 
-DEFAULT_BUCKETS = ["lloydk-docs", "lloydk-models", "mlflow"]
+DEFAULT_BUCKETS = ["koipa-docs", "koipa-models", "mlflow"]
 DEFAULT_TARGET = Path("backups/minio")
 
 
@@ -69,7 +69,7 @@ def cleanup_old_files(directory: Path, retention_days: int) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    p = argparse.ArgumentParser(description="Lloydk MinIO mirror backup")
+    p = argparse.ArgumentParser(description="Koipa MinIO mirror backup")
     p.add_argument("--target", type=Path, default=DEFAULT_TARGET)
     p.add_argument("--buckets", nargs="+", default=DEFAULT_BUCKETS)
     p.add_argument("--retention-days", type=int, default=90)
@@ -86,8 +86,8 @@ def main(argv: list[str] | None = None) -> int:
     secure = os.environ.get("MINIO_SECURE", "false").lower() == "true"
     client = Minio(
         endpoint,
-        access_key=os.environ.get("MINIO_ACCESS_KEY", "lloydk"),
-        secret_key=os.environ.get("MINIO_SECRET_KEY", "lloydk_dev_minio"),
+        access_key=os.environ.get("MINIO_ACCESS_KEY", "koipa"),
+        secret_key=os.environ.get("MINIO_SECRET_KEY", "koipa_dev_minio"),
         secure=secure,
     )
 

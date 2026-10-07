@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 
-from lloydk.services.drift_monitor import compute_drift, cosine, export_to_prometheus
+from koipa.services.drift_monitor import compute_drift, cosine, export_to_prometheus
 
 
 def _make_vectors(seed: int, n: int, dim: int = 16, shift: float = 0.0) -> list[list[float]]:
@@ -49,9 +49,9 @@ def test_export_to_prometheus_keys():
     prod = _make_vectors(seed=2, n=10)
     r = compute_drift(train, prod)
     metrics = export_to_prometheus(r)
-    assert "lloydk_drift_kl_divergence" in metrics
-    assert "lloydk_drift_cosine_mean" in metrics
-    assert "lloydk_drift_alert" in metrics
+    assert "koipa_drift_kl_divergence" in metrics
+    assert "koipa_drift_cosine_mean" in metrics
+    assert "koipa_drift_alert" in metrics
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@ def test_export_to_prometheus_keys():
 
 
 def test_save_and_load_train_centroid(tmp_path):
-    from lloydk.services.drift_monitor import load_train_centroid, save_train_centroid
+    from koipa.services.drift_monitor import load_train_centroid, save_train_centroid
 
     p = tmp_path / "centroid.json"
     vectors = _make_vectors(seed=1, n=50, dim=16)
@@ -73,8 +73,8 @@ def test_save_and_load_train_centroid(tmp_path):
 
 
 def test_publish_to_prom_sets_gauges():
-    from lloydk.api import prom_metrics
-    from lloydk.services.drift_monitor import compute_drift, publish_to_prom
+    from koipa.api import prom_metrics
+    from koipa.services.drift_monitor import compute_drift, publish_to_prom
 
     train = _make_vectors(seed=1, n=50)
     prod = _make_vectors(seed=2, n=50, shift=2.0)
@@ -84,10 +84,10 @@ def test_publish_to_prom_sets_gauges():
     # collect → text 노출에 4개 게이지가 들어 있는지
     from prometheus_client import generate_latest
     text = generate_latest(prom_metrics.registry).decode()
-    assert "lloydk_drift_kl_divergence" in text
-    assert "lloydk_drift_cosine_mean" in text
-    assert "lloydk_drift_alert" in text
-    assert "lloydk_drift_sample_size" in text
+    assert "koipa_drift_kl_divergence" in text
+    assert "koipa_drift_cosine_mean" in text
+    assert "koipa_drift_alert" in text
+    assert "koipa_drift_sample_size" in text
 
 
 def test_run_drift_check_no_centroid_returns_empty(tmp_path, monkeypatch):
@@ -97,10 +97,10 @@ def test_run_drift_check_no_centroid_returns_empty(tmp_path, monkeypatch):
     한 번 더 reload하여 후속 테스트(prometheus 게이지·다른 drift 테스트)의
     drift_monitor 모듈 상태 오염을 차단.
     """
-    monkeypatch.setenv("LLOYDK_DRIFT_CENTROID_PATH", str(tmp_path / "missing.json"))
+    monkeypatch.setenv("KOIPA_DRIFT_CENTROID_PATH", str(tmp_path / "missing.json"))
     # 모듈 reload — env가 module-load 시점에 캐시됨
     import importlib
-    import lloydk.services.drift_monitor as dm
+    import koipa.services.drift_monitor as dm
     importlib.reload(dm)
 
     try:
@@ -108,5 +108,5 @@ def test_run_drift_check_no_centroid_returns_empty(tmp_path, monkeypatch):
         assert r.sample_size == 0
         assert r.alert is False
     finally:
-        monkeypatch.delenv("LLOYDK_DRIFT_CENTROID_PATH", raising=False)
+        monkeypatch.delenv("KOIPA_DRIFT_CENTROID_PATH", raising=False)
         importlib.reload(dm)

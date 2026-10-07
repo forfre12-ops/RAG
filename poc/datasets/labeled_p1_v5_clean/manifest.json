@@ -1,0 +1,107 @@
+{
+  "purpose": "v5_clean: 원천풀 dedup·출처보존·공개판결S3·판례캡·균형영어·누출0 split 재빌드.",
+  "built_from": {
+    "oss": {
+      "dir": "datasets/labeled_oss_v1",
+      "rows": 4554,
+      "note": "train+val+test 통합 후 재분할"
+    },
+    "rag_corpus_v2": {
+      "rows": 720,
+      "skipped_no_label_match": 0
+    },
+    "gold_real": {
+      "path": "datasets/gold_real/classification_gold.jsonl",
+      "rows_train_tier": 776,
+      "dropped_locked_or_held": 1,
+      "note": "TRAIN_TIERS만(평가정답 locked·격리 held 제외) · 디오염 라벨 사용"
+    },
+    "bilingual_en": {
+      "rows": 120,
+      "per_grade": 30
+    }
+  },
+  "pipeline": {
+    "raw_pool": 6170,
+    "eval_independence_removed": 165,
+    "public_ruling_relabeled_to_S3": 2620,
+    "dedup_rows_removed": 437,
+    "label_conflicts_resolved": 64,
+    "court_rows_downsampled": 3014,
+    "final_rows": 2554
+  },
+  "final": {
+    "total": 2554,
+    "grade_distribution": {
+      "S1": 457,
+      "S2": 579,
+      "S3": 1017,
+      "TS": 501
+    },
+    "origin_dataset_distribution": {
+      "bilingual_en": 120,
+      "gold_real": 297,
+      "labeled_oss_v1": 1417,
+      "rag_corpus_v2": 720
+    },
+    "document_origin_distribution": {
+      "public_real": 203,
+      "synthetic": 94,
+      "unknown": 2257
+    },
+    "tier_distribution": {
+      "legal_floor": 94,
+      "silver_train": 2460
+    },
+    "court_rows": 383,
+    "english_rows": 120,
+    "long_docs": 384,
+    "split_sizes": {
+      "train": 2042,
+      "val": 256,
+      "test": 256
+    },
+    "split_grade_distribution": {
+      "train": {
+        "S1": 365,
+        "S2": 463,
+        "S3": 813,
+        "TS": 401
+      },
+      "val": {
+        "S1": 46,
+        "S2": 58,
+        "S3": 102,
+        "TS": 50
+      },
+      "test": {
+        "S1": 46,
+        "S2": 58,
+        "S3": 102,
+        "TS": 50
+      }
+    }
+  },
+  "gates": {
+    "cross_split_exact_overlap": {
+      "train_val": 0,
+      "train_test": 0,
+      "val_test": 0
+    },
+    "unresolved_label_collisions": 0,
+    "rows_with_collision_audit_stamp": 62,
+    "court_fraction": 0.15,
+    "court_cap": 0.15,
+    "provenance_present": true,
+    "eval_independence_rows_removed": 165,
+    "PASS": true
+  },
+  "honest_baseline_note": "이 val/test는 dedup으로 train과 정확중복 0이 보장된 최초의 leak-free split이다. 구 내부성능 0.783은 train↔oss val/test 41/52건 누출 산물이므로 폐기하고, 재학습 후 이 v5 val/test + hardened holdout + 공개문서 FPR로 재측정한 값을 정직 기준선으로 쓴다. 모든 eval은 여전히 machine-silver(사람서명 0) — 모델 교체는 인간 adjudicated eval 후.",
+  "training_notes": {
+    "no_physical_replication": "구 gold x3 물리복제 폐지 → sample_weight(tier×희소도)로 대체. 트레이너는 WeightedRandomSampler 또는 per-sample loss weight로 소비.",
+    "long_doc_head_tail": ">2000자 문서는 long_doc/truncation_strategy=head_tail 플래그. 트레이너가 head+tail로 512토큰 예산 배분(등급근거 말미 잘림 방지).",
+    "provenance_preserved": "tier·document_origin·rule_grade·review_status·label_source·doc_id 보존 → 출처·검수 게이트가 학습까지 관통."
+  },
+  "promotion_gate": "재학습 후 hardened holdout macro-F1 + 공개문서 FPR + adversarial veto(고→S3=0) 동시 통과 시에만 배포 후보. raw f1 단독 승격 금지.",
+  "train_command": "python scripts/p1_train_classifier.py --mode full --train-path datasets/labeled_p1_v5_clean/train.jsonl --val-path datasets/labeled_p1_v5_clean/val.jsonl --test-path datasets/labeled_p1_v5_clean/test.jsonl --epochs 5 --max-seq-len 512 --no-mlflow --output-dir artifacts/classifier_p1_v5_clean # 트레이너에 sample_weight·head_tail truncation 지원 추가 필요(training_notes 참조)"
+}

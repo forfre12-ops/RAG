@@ -1,0 +1,193 @@
+# 배포 정본 — 번들과 도커 이미지에 실리는 파일은 여기 적힌 것뿐이다.
+#
+# 빌더(scripts/build_offline_bundle.py)는 이 파일이 적은 것만 복사하고, 검사기
+# (scripts/check_deploy_manifest.py)와 시험(tests/test_deploy_manifest.py)이 실제 산출물과 대조한다.
+# 새 파일을 싣거나 빼려면 여기를 고친다. 코드에 목록을 따로 두지 않는다.
+#
+# 검사:   python scripts/check_deploy_manifest.py
+#         python scripts/check_deploy_manifest.py --bundle <번들 폴더>
+# 갱신:   python scripts/check_deploy_manifest.py --write   (Dockerfile COPY 블록·.dockerignore)
+schema = 1
+
+# ── 번들 루트 ───────────────────────────────────────────────
+[bundle.root]
+# poc/scripts 에서 번들 루트로 복사한다(줄바꿈은 LF 로 고정).
+scripts = [
+  "preflight_host.sh",   # setup.sh 가 호스트 점검에 부른다
+  "setup.sh",            # 원커맨드 설치기(INSTALL.md §0-2)
+  "deploy.sh",           # install.sh 가 안내하는 통합 진입점 → deploy_airgap.sh
+  "deploy_airgap.sh",    # setup.sh 가 부르는 전체 스택 기동
+  "db_probe.sh",         # deploy_airgap.sh 가 4단계에서 읽는다
+  "verify_install.sh",   # setup.sh 마지막 검증
+  "deploy_rollback.sh",  # 모델 롤백(운영 절차)
+]
+# 빌더가 만들어 넣는 파일
+generated = ["install.sh", "verify.sh", "manifest.yaml", "manifest.json", "CHECKSUMS.sha256"]
+# manifest.json 은 CI 아티팩트(.github/workflows/poc-ci.yml)와 EXPORT_IMPORT_RUNBOOK.md 가 읽는다.
+readme = { source = "docs/BUNDLE_README.md", dest = "README.md" }
+
+[bundle.docs]
+files = ["INSTALL.md", "OPERATION.md", "TROUBLESHOOTING.md"]
+
+[bundle.infra]                      # infra-config/
+files = ["docker-compose.airgap.yml", "docker-compose.gpu.yml", ".env.template", "mtls/nginx.mtls.conf"]
+[bundle.infra.sources]              # 리포에 원본이 있는 것(.env.template 은 빌더가 생성)
+"docker-compose.airgap.yml" = "docker-compose.airgap.yml"
+"docker-compose.gpu.yml"    = "docker-compose.gpu.yml"
+"mtls/nginx.mtls.conf"      = "infra/mtls/nginx.mtls.conf"
+
+[bundle.licenses]                   # 공급망 감사 산출물. GPL-3.0.txt 는 전문 동봉 의무(커밋 18ca5499)
+files = ["GPL-3.0.txt", "sbom.cyclonedx.json", "third-party-licenses.txt"]
+
+[bundle.acceptance]                 # acceptance/ — 표본 문서(docs/)는 expected_labels.json 이 가리키는 전부
+files = ["expected_labels.json", "run_acceptance.sh"]
+
+[bundle.observability]              # observability/ — 안전 알림 소비자(빌더 도움말: 폐쇄망 운영 필수)
+files = [
+  "alert_rules.yml", "alertmanager.yml", "docker-compose.observability.airgap.yml",
+  "prometheus.yml", "loki-config.yaml", "promtail-config.yaml", "grafana/*",
+]
+
+[bundle.review_batch]               # golden_review_batch/ — 선택은 빌더의 select_review_batch_files()
+patterns = ["*_review.md", "*.metadata.json"]
+# [2026-10-03 사용자 결정 — 같은 날 재확정] 배포본에 mock1000(guide40 구조, 1,001건)을
+# 싣는다. 검수자 계정 20개를 이미 발급했고(6800b315) 그 계정들이 검수할 대상이 이 배치다.
+# 1,711건 배치는 더 안 쓴다(보관함으로 이동, single_document_candidates 에 없음).
+# doc_id 접두사로 하드코딩했다가 조용히 0건을 실은 결함을 2026-10-03 에 고쳤다 — 배치를
+# 바꾸려면 반드시 이 값을 거쳐서만 고를 것(코드에 다시 하드코딩하지 말 것).
+batch = "expert_review_mock1000_20261002"
+
+[bundle.models]
+# models/classifier-trained/ 는 디렉터리째 싣는다 — 모델 신원을 디렉터리 해시(tree_sha256)로 확인하므로
+# 서빙이 안 읽는 파일(training_args.bin·val_logits.jsonl)이 있어도 골라 빼지 않는다.
+# HF 캐시로 싣는 모델. refs/main 이 가리키는 리비전 하나만 싣는다(다른 리비전은 같은 가중치의 중복).
+# Qwen/Qwen3-14B — 폐쇄망에서 클라우드 LLM(anthropic 등)을 못 쓰므로 로컬 LLM 백엔드(local_llm_model·
+# vllm_model 기본값, config.py:431,455)가 쓰는 유일한 모델. 2026-10-03 사용자 결정으로 동봉(이전엔
+# "동봉 모델"로 표시만 돼 있고 실물은 없었다 — bundle-20260928-identity-mismatch-review 지적).
+hf_cache = ["nlpai-lab/KURE-v1", "kakaobank/kf-deberta-base", "Qwen/Qwen3-14B"]
+
+[bundle.images]
+# docker save 로 tar 를 만드는 이미지. beat 는 worker 와 같은 koipa-worker 이미지라 tar 가 없다.
+# ops(2026-10-03) — 수동 실행 전용(compose profile "tools"), 상시 기동 서비스는 아니지만
+# 운영 도구를 쓰려면 이미지가 번들에 있어야 한다.
+# api-customer·worker-customer(2026-10-07) — 번들 하나가 지재원(NODE=jjw)·고객사
+# (NODE=customer) 둘 다 설치할 수 있어야 하므로, 고객사 전용(합성 생성 코드 없는) 이미지도
+# 같이 싣는다. setup.sh 가 NODE 로 어느 쪽을 쓸지 고른다(docker-compose.airgap.yml 참고).
+# 순서 주의: build_offline_bundle.py 의 build_manifest() 가 compose 파싱 뒤에 이 둘을
+# 덧붙이므로 여기서도 맨 뒤에 둔다(test_builder_image_tars_equal_manifest 가 순서까지 본다).
+save = ["postgres", "redis", "api", "worker", "ops", "nginx-mtls", "api-customer", "worker-customer"]
+# 관측성 이미지(docker-images/obs-<이름>.tar). redis-exporter 는 알림 규칙·대시보드가 쓰지 않아 뺐다.
+observability = [
+  "prometheus-v2.55.1", "alertmanager-v0.27.0", "grafana-11.3.0",
+  "loki-3.2.1", "promtail-3.2.1", "postgres-exporter-v0.16.0",
+]
+
+# 싣지 않기로 한 것과 이유 — 검사기가 번들에 다시 들어오는 것을 막는다(위 목록 밖은 전부 '선언 외 파일'이다).
+[excluded]
+"docker-images/beat.tar"                     = "worker.tar 와 바이트까지 같은 이미지 — compose 의 beat 는 koipa-worker 를 쓴다"
+"docker-images/obs-redis_exporter-*.tar"     = "prometheus 규칙·grafana 대시보드가 redis 메트릭을 쓰지 않는다"
+"models/hf/hub/…KURE-v1 의 refs/main 아닌 리비전" = "가중치가 refs/main 리비전과 완전히 같은 중복(2.29GB)"
+"python-deps/"                               = "컨테이너 배포는 의존성이 이미지에 있다. 호스트 pip 설치 경로(INSTALL_HOST_DEPS)를 없앴다"
+"db-migrations/"                             = "alembic 은 api 이미지 안에서 실행된다(INSTALL.md §6). 어느 스크립트도 이 사본을 읽지 않았다"
+"licenses/{third-party-licenses.md,third-party-licenses.json,sbom.json}" = "같은 내용의 다른 형식 — 공급망 산출물은 .txt 와 CycloneDX 를 기준으로 한다"
+"acceptance/{README.md,real_fixtures.json}"  = "러너가 읽지 않는다(real_fixtures 는 expected_labels.json 에 이미 병합됨)"
+
+# ── 도커 이미지(koipa-api · koipa-worker — 상시 기동, 요청을 처리한다) ──────
+[container.scripts]
+# Dockerfile.api.prod · Dockerfile.worker 의 COPY 는 이 목록에서 자동 생성된다(--write).
+# 여기엔 **진짜 런타임 import**가 있는 것만 둔다 — 운영자가 수동으로 돌리는 도구는
+# [container.ops_scripts] 로 옮겼다(2026-10-03, 상시 기동 이미지의 공격면·용량을 줄이려고 분리).
+allow = [
+  "_cli_io.py",                       # [2026-10-04 정정] register_deployed_model.py·setup_console_test_login.py
+                                       #   둘 다 `from _cli_io import force_utf8_stdio` — api 컨테이너 안에서
+                                       #   두 스크립트를 되돌렸을 때 이 공유 헬퍼를 빠뜨려 ModuleNotFoundError로
+                                       #   또 실패하는 걸 실제 Rocky 재설치로 발견(2차 실패). ops 쪽에도 유지(dr_drill.py).
+  "analyze_golden_run.py",            # 골든 빌드 서비스가 런타임 import(golden_build_service.py:909)
+  "check_domain_leakage_gate.py",     # 골든 빌드 서비스가 런타임 import(golden_build_service.py:910)
+  "docker_install_locked.sh",         # Dockerfile.api.prod · Dockerfile.worker 의 RUN(빌드 시점)
+  "register_deployed_model.py",       # [2026-10-04 정정] setup.sh:307 이 `exec -T api python
+                                       #   scripts/register_deployed_model.py` 로 api 컨테이너 **안에서**
+                                       #   돈다 — ops 로 옮겼다가 설치 6-2 단계가 실패하는 걸 실제
+                                       #   설치 리허설로 발견. python import 여부만 보고 놓쳤다.
+  "setup_console_test_login.py",      # [2026-10-04 정정] setup.sh:259 가 같은 방식으로 api 안에서
+                                       #   돈다(토큰 발급, 설치 7단계) — 이유는 위와 동일.
+                                       #   batch_issue_reviewer_tokens.py 가 ops 쪽에서도 불러 그
+                                       #   목록에는 중복으로 남긴다(공유 허용, docker_install_locked.sh 와 같은 패턴).
+]
+[container.scripts.not_in_image]
+"build_offline_bundle.py"            = "번들 빌드 호스트 전용(INSTALL.md 가 빌드 호스트에서 돌리라고 안내)"
+"cache_kure_v1.py"                   = "빌드 호스트에서 임베더 HF 캐시를 채우는 도구(INSTALL.md §임베더)"
+"block_1731_trained_docs_from_eval.py" = "저장소에서 평가 제외 목록을 만들 때 쓴다(INSTALL.md 가 번들 절차가 아니라고 명시)"
+
+# ── 도커 이미지(koipa-ops — 수동 실행 전용, compose profile "tools") ────────
+[container.ops_scripts]
+# Dockerfile.ops 의 COPY 는 이 목록에서 자동 생성된다(--write). 전부 운영자가
+# `docker compose --profile tools run --rm ops python3 scripts/<이름>.py ...` 로 직접
+# 부르는 도구다 — api·worker 코드가 import 하지 않는다(근거: 각 스크립트 뒤 주석).
+allow = [
+  "_cli_io.py",                       # dr_drill.py 가 부른다(ops 안에서 체인)
+  "assign_golden_reviewers_randomly.py", # 전문가 검수 배정을 무작위·비중복으로 나눈다(이상민 요청#3)
+  "backup_postgres.py",               # dr_restore.py 가 부른다(ops 안에서 체인)
+  "batch_issue_reviewer_tokens.py",   # setup_console_test_login.py 를 여러 명분 한 번에 돌린다(이상민 요청#3)
+  "calibrate_classifier.py",          # 운영자가 학습 후 수동으로 돌리는 온도 보정 도구
+  "compare_proxy_models.py",          # 프록시 모델 비교 CLI(라이브러리 함수는 자기 스크립트 존재만 확인, api·worker 미호출)
+  "db_engine.py",                     # dr_restore.py 가 부른다(ops 안에서 체인)
+  "demo_e2e_8010.py",                 # OPERATION.md §8 시연 스크립트
+  "demo_e2e_golden.py",               # OPERATION.md §8 시연 스크립트
+  "docker_install_locked.sh",         # Dockerfile.ops 의 RUN(빌드 시점) — api/worker 와 공유, 중복 허용
+  "dr_discovery.py",                  # dr_restore.py 가 부른다(ops 안에서 체인)
+  "dr_drill.py",                      # OPERATION.md DR 드릴
+  "dr_restore.py",                    # dr_drill.py 가 부른다(ops 안에서 체인)
+  "eval_p1_model_gold.py",            # gate_p1_candidate.py 가 부른다(ops 안에서 체인)
+  "eval_real_public_fpr.py",          # gate_p1_candidate.py 가 부른다(ops 안에서 체인)
+  "eval_seal.py",                     # 평가 봉인 — 운영자가 수동으로 여는 도구
+  "evaluate_public_s3_challenge.py",  # 공개 S3 도전셋 평가 — 운영자가 수동으로 돌림
+  "gate_p1_candidate.py",             # 3축 게이트 — 운영자가 재학습 후보마다 수동으로 돌림
+  "import_review_corrections.py",     # OPERATION.md 검수 결과 반입
+  "p5_e2e_smoke.py",                  # dr_drill.py 가 부른다(ops 안에서 체인)
+  "probe_ingest_capacity.py",         # 문서 처리량 재고 — 운영자가 수동으로 돌림
+  "promote_golden_candidates.py",     # 골든 후보 정본 병합 게이트 — 운영자가 수동으로 돌림
+  "register_review_signoff_job.py",   # 골든 서명 잡 등록 — 운영자가 수동으로 돌림
+  "set_reviewer_passwords.py",        # 아이디+비밀번호 로그인 계정 발급 — 운영자가 수동으로 돌림
+  "setup_console_test_login.py",      # batch_issue_reviewer_tokens.py 가 ops 안에서 부른다(위 container.scripts 참고 — api 쪽에도 중복)
+  "verify_deploy_live.sh",            # OPERATION.md 배포 검증
+  "verify_infra.py",                  # INSTALL.md · OPERATION.md 인프라 점검
+]
+
+[container.exclude_paths]
+# 화면(app.js)은 samples.js 의 인라인 데이터를 쓰고 이 폴더의 파일을 어디서도 부르지 않는다.
+# four_path_shadow.py — 미커밋 실험 코드. src/ 전체가 COPY 대상이라 이름을 적어 빼지 않으면
+# 다음 빌드에 그대로 실린다(2026-10-03 발견, 호출자 0건).
+paths = ["src/koipa/api/static/samples/", "src/koipa/four_path_shadow.py"]
+
+# ── 고객사 전용 이미지(Dockerfile.api.customer·Dockerfile.worker.customer) ──────
+[container.customer_exclude]
+# [2026-10-07 KL 요청] "고객사 PC(문서 분류)에는 지재원 전용(합성 문서 생성·학습) 코드가
+# 설정으로 꺼진 채로가 아니라 물리적으로 없어야 한다"는 지적에 대한 2차 방어선(1차=
+# enable_synthetic_generation 플래그, app.py). check_deploy_manifest.py --write 가 이 목록으로
+# 두 Dockerfile의 `RUN rm -f` 블록을 생성한다 — 손으로 그 블록을 고치지 않는다.
+#
+# golden.py 생태계(golden_build_service.py·golden_signoff.py·console_signoff.py 등)와
+# api/training.py·services/training_service.py는 **여기 넣지 않는다** — 고객사도 야간 증분
+# 재학습본에 서명(locked_eval)하려고 검수·서명 화면과 학습 라우터를 그대로 쓴다(admin.html
+# applyProfileVisibility 주석, 2026-08-24 결정). 지재원 전용 전체학습·URGENT 자동재학습
+# (enable_training 단독 게이트)은 workers/tasks.py 안에 고객사 공유 함수와 같은 파일로
+# 섞여 있어 파일 단위로 뺄 수 없다 — 기존 플래그 게이트가 유일한 분리선이다(2026-10-07 조사,
+# Explore 트레이스로 확인). 그래서 실제로 파일 단위 분리가 가능한 것은 합성 생성뿐이다.
+#
+# 실제 import 그래프(런타임 reachability)로 구했다 — grep 으로 찾으면 간접 참조를 놓친다
+# (golden_build_service.py 가 scripts/analyze_golden_run.py 를 sys.path 로 끌어오는 식의
+# 숨은 경로가 실제로 있었다, 2026-10-03 ops 이미지 분리 때의 교훈을 재확인).
+paths = [
+  "src/koipa/api/synthesis.py",
+  "src/koipa/dataset_leakage.py",
+  "src/koipa/modules/m1_synthesis/__init__.py",
+  "src/koipa/modules/m1_synthesis/generation_playbook.py",
+  "src/koipa/modules/m1_synthesis/generator.py",
+  "src/koipa/modules/m1_synthesis/witness_taxonomy.py",
+  "src/koipa/schemas/synthesis.py",
+  "src/koipa/services/synth_coverage.py",
+  "src/koipa/services/synth_provider_status.py",
+  "src/koipa/services/synth_quality.py",
+  "src/koipa/services/synthesis_service.py",
+]

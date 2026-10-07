@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI 분류 엔진 연동 안내서</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:17px;font-weight:800;letter-spacing:-.02em;margin:38px 0 12px}
+h3{font-size:14.5px;font-weight:700;margin:22px 0 6px 18px}
+p{margin:8px 0 8px 18px}
+ul,ol{margin:8px 0 8px 18px;padding-left:20px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);padding:12px 16px;margin:14px 0 14px 18px;font-size:13px}
+pre{background:var(--surf);border:1px solid var(--line);padding:12px 14px;margin:10px 0 10px 18px;font-size:11.5px;font-family:ui-monospace,monospace;overflow-x:auto;line-height:1.55}
+.q{background:var(--mid);border-left:3px solid #a1a1aa;padding:10px 14px;margin:18px 0 10px 18px;font-size:13px;font-weight:700}
+.tw{overflow-x:auto;margin-left:18px}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace;margin-left:18px}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .docinfo{break-inside:avoid;page-break-inside:avoid}
+  /* [2026-08-29] .note 까지 통째로 avoid 하면 긴 안내 상자가 다음 쪽으로 밀리면서
+     앞쪽에 빈 면이 생긴다(인쇄 실측). 상자는 나뉘도록 두되 첫/끝 줄만 붙잡는다. */
+  .note{orphans:3;widows:3}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+.flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
+details{margin:8px 0 8px 18px}summary{cursor:pointer;font-size:12.5px;color:var(--dim)}details pre{margin-left:0}pre,code,.flow{font-family:Consolas,"Cascadia Mono","D2Coding",Menlo,"Courier New",monospace}</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">AI 분류 엔진 연동 안내서</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">연동 안내</span></div>
+  </div>
+</nav>
+<div class="wrap">
+<div class="top"><div class="eyebrow">연계 규약 · 호출 안내</div><h1>AI 분류 엔진 연동 안내서</h1><div class="meta">KL 웹시스템 → 분류 엔진 호출 규격과 예시 · 2026-09-25 · 엔진 모델 v-fe4b386b 기준</div></div>
+<table class="docinfo"><tbody><tr><th>대상</th><td>KL 웹시스템 개발자</td></tr><tr><th>범위</th><td>KL 이 호출하는 7개 인터페이스(IF-01 · 02 · 03 · 05 · 06 · 07 · 08)와, 엔진이 KL 로 보내는 선택 통보(IF-04)</td></tr><tr><th>근거</th><td>엔진에 직접 요청을 보내 확인한 결과와 소스 코드. 이 안내서의 예시 응답은 모두 실행 결과입니다</td></tr><tr><th>함께 드리는 파일</th><td><code>koipa_kl_openapi.yaml</code> (OpenAPI 3.0.3, 위 인터페이스만 수록) · <code>samples/</code> (예시 응답 JSON)</td></tr></tbody></table>
+<div class="note">문서를 <b>등록</b>해 <code>doc_id</code> 를 받고(①), 그 <code>doc_id</code> 로 <b>분류를 요청</b>한 뒤(②), <b>작업 조회</b>로 결과를 받습니다(③). 인증은 <code>X-API-Key</code> 헤더 하나입니다.</div>
+<h2>1. 호출 순서</h2>
+<div class="tw"><table><thead><tr><th style="width:7%">순서</th><th style="width:33%">KL → 엔진</th><th style="width:20%">엔진 응답</th><th style="width:40%">다음 동작</th></tr></thead><tbody><tr><td class="c">①</td><td><code>POST /api/v1/documents</code><br>파일 + actor (IF-02)</td><td>201 · <code>doc_id</code></td><td><code>doc_id</code> 를 저장합니다</td></tr><tr><td class="c">②</td><td><code>POST /api/v1/classify/async</code><br><code>{"doc_id": …}</code> (IF-03)</td><td>202 · <code>job_id</code></td><td>작업 조회를 시작합니다(또는 <code>callback_url</code> 지정)</td></tr><tr><td class="c">③</td><td><code>GET /api/v1/classify/jobs/{job_id}</code> (IF-05)</td><td>200 · <code>status</code></td><td><code>done</code> 이면 <code>results[0]</code> 에 결과가 있습니다. <code>queued</code> 면 잠시 뒤 다시 조회합니다</td></tr><tr><td class="c">④</td><td><code>GET /api/v1/classify/{doc_id}</code> (IF-06)</td><td>200 · 저장된 결과</td><td>이후 언제든 등급과 사람이 확정한 등급을 조회합니다</td></tr></tbody></table></div>
+<p>①과 ②를 한 번에 하려면 등록 요청에 <code>enqueue_classification=true</code> 를 넣습니다. 응답의 <code>classification_job_id</code> 로 ③을 바로 진행합니다.</p>
+<div class="tw"><table><thead><tr><th style="width:8%">IF</th><th style="width:34%">호출</th><th style="width:30%">용도</th><th style="width:28%">비고</th></tr></thead><tbody><tr><td>IF-01</td><td><code>GET /api/v1/healthz</code></td><td>준비 상태 확인</td><td>인증 없음</td></tr><tr><td>IF-02</td><td><code>POST /api/v1/documents</code></td><td>문서 등록(multipart) → <code>doc_id</code></td><td>분류의 전제입니다</td></tr><tr><td>IF-03</td><td><code>POST /api/v1/classify/async</code></td><td>비동기 분류 요청</td><td>분당 60건 한도</td></tr><tr><td>IF-04</td><td><code>POST {callback_url}</code></td><td>엔진 → KL 완료·실패 통보</td><td><code>callback_url</code> 을 보낸 경우에만 발생합니다(7장)</td></tr><tr><td>IF-05</td><td><code>GET /api/v1/classify/jobs/{job_id}</code></td><td>작업 상태·결과 조회</td><td>결과 전체(근거·경고 포함)는 여기와 IF-04 통보에 있습니다</td></tr><tr><td>IF-06</td><td><code>GET /api/v1/classify/{doc_id}</code></td><td>문서 단위 최근 결과 조회</td><td>저장된 요약과 사람이 확정한 등급을 돌려줍니다</td></tr><tr><td>IF-07</td><td><code>POST /api/v1/confirm</code></td><td>지재원 포털의 검수 확정 등급을 돌려받음</td><td>①~④ 와 반대 방향(KL → 엔진, 검수 확정 시). 저희는 이 값을 재학습 입력으로 씁니다(3-5)</td></tr><tr><td>IF-08</td><td><code>POST /api/v1/classify/batch</code></td><td>다건 문서 일괄 분류(최대 1,000건)</td><td>한 건씩 ①②를 반복하는 대신 한 번에 보냅니다. 결과는 IF-05 로 조회합니다(3-6)</td></tr></tbody></table></div>
+<h2>2. 접속과 인증</h2>
+<ul><li>주소 형식은 <code>http://&lt;엔진 주소&gt;:8000/api/v1</code> 입니다(온프레미스 Docker 내부망 기준 <code>http://koipa-api:8000/api/v1</code>). 실제 주소와 키 값은 배포 시 확정됩니다.</li><li>서버 간 호출은 <code>X-API-Key: &lt;키&gt;</code> 헤더로 인증합니다. 헤더가 없거나 키가 다르면 401 입니다. 예: <code>{"detail":"missing authorization"}</code></li><li>요청은 JSON(<code>Content-Type: application/json</code>) 또는 등록만 multipart/form-data 입니다. 응답은 UTF-8 JSON, 시각은 ISO 8601 UTC 입니다.</li><li>준비 확인 <code>GET /api/v1/healthz</code> 는 인증이 없고, 200 과 함께 <code>status</code> · <code>model_version</code> · <code>uptime_sec</code> 를 돌려줍니다. 그 밖의 필드는 운영 진단용이라 바뀔 수 있습니다.</li></ul>
+<pre>export BASE=&quot;http://&lt;엔진 주소&gt;:8000/api/v1&quot;
+export KOIPA_API_KEY=&quot;&lt;발급받은 키&gt;&quot;
+
+curl &quot;$BASE/healthz&quot;</pre>
+<h2>3. 호출 상세와 예시</h2>
+<h3>3-1. 문서 등록 — IF-02</h3>
+<pre>curl -X POST &quot;$BASE/documents&quot; \
+  -H &quot;X-API-Key: $KOIPA_API_KEY&quot; \
+  -F &#x27;actor={&quot;user_id&quot;:&quot;kl-portal&quot;,&quot;role&quot;:&quot;kl_backend&quot;}&#x27; \
+  -F &#x27;source_type=internal&#x27; \
+  -F &#x27;security_marking=confidential&#x27; \
+  -F &#x27;access_scope=department&#x27; \
+  -F &#x27;file=@cost_report.txt;type=text/plain&#x27;</pre>
+<p><code>actor</code> 는 JSON 문자열이며 <code>role</code> 은 <code>admin · reviewer · system · kl_backend</code> 중 하나입니다. KL 자체 문서번호는 엔진에 저장하지 않습니다 — 응답의 <code>doc_id</code> 와 KL 문서번호의 대응은 KL 쪽에서 보관하십시오.</p>
+<div class="tw"><table><thead><tr><th style="width:22%">필드</th><th style="width:20%">형식</th><th style="width:7%">필수</th><th style="width:51%">설명</th></tr></thead><tbody><tr><td><code>actor</code></td><td>문자열</td><td class="c">필수</td><td>호출자 정보 JSON 문자열: {&quot;user_id&quot;: &quot;...&quot;, &quot;role&quot;: &quot;...&quot;}. 감사 기록에 남습니다.</td></tr><tr><td><code>source_type</code></td><td>문자열</td><td class="c">선택</td><td>ICD §3.1 출처: public | registered_patent | academic | internal | external_confidential. 공개 출처면 분류 시 S3 로 cap 된다.</td></tr><tr><td><code>security_marking</code></td><td>문자열</td><td class="c">선택</td><td>ICD §3.2 보안표시: top_secret | secret | confidential | none. 표기가 있으면 접근범위보다 우선한다.</td></tr><tr><td><code>access_scope</code></td><td>문자열</td><td class="c">선택</td><td>ICD §3.3 접근범위: approved_only | designated | department | all_employees. 보안표시가 none 일 때 관리수준(M)을 정하는 주 입력.</td></tr><tr><td><code>enqueue_classification</code></td><td>true/false</td><td class="c">선택</td><td>true 면 등록과 동시에 비동기 분류를 큐에 건다(응답에 classification_job_id).</td></tr><tr><td><code>callback_url</code></td><td>문자열</td><td class="c">선택</td><td>enqueue_classification=true 일 때 분류 완료·실패 결과를 받을 webhook 주소(선택). POST /classify/async(IF-03)의 callback_url 과 같은 규칙(6장).</td></tr><tr><td><code>client_request_id</code></td><td>문자열</td><td class="c">선택</td><td>호출자가 지정하는 임의 식별자(선택). doc_id 는 내용 해시로 재사용(dedupe)되고 job_id 는 응답을 받은 뒤에야 알 수 있어, 이 요청과 결과를 미리 묶을 키가 둘 다 못 된다. 보낸 값은 응답·작업 조회·콜백에 그대로 돌아온다.</td></tr><tr><td><code>file</code></td><td>파일</td><td class="c">선택</td><td>등록할 원본 파일. 지원 형식은 아래 &#x27;등록에서 알아 둘 점&#x27;을 봅니다.</td></tr><tr><td><code>file_path</code></td><td>문자열</td><td class="c">선택</td><td>[2026-10-06] file 대신 서버가 직접 읽을 경로(선택). documents_shared_mount_dirs 로 지정된 공유 디렉터리들(여러 개 등록 가능) 중 하나 안에 있어야 한다 — 이 설정이 배포에 없으면(기본) 422. 전부의 바깥을 가리키면 경로조작 방어로 거절(422).</td></tr></tbody></table></div>
+<p>응답(201) 예시:</p>
+<pre>{
+  &quot;doc_id&quot;: &quot;ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73&quot;,
+  &quot;filename&quot;: &quot;cost_report.txt&quot;,
+  &quot;source_format&quot;: &quot;txt&quot;,
+  &quot;file_hash&quot;: &quot;d21c841ea4a451a398e6047d2884f69d8885efb3968b6a10d66d14e4104dc4e4&quot;,
+  &quot;file_size_bytes&quot;: 592,
+  &quot;extraction_method&quot;: &quot;plain&quot;,
+  &quot;extraction_quality&quot;: 1.0,
+  &quot;char_count&quot;: 247,
+  &quot;chunk_count&quot;: 1,
+  &quot;pages_total&quot;: null,
+  &quot;classification_job_id&quot;: null,
+  &quot;classification_status&quot;: null,
+  &quot;classification_status_url&quot;: null,
+  &quot;persisted&quot;: true,
+  &quot;warnings&quot;: [],
+  &quot;requires_review&quot;: false,
+  &quot;review_reasons&quot;: []
+}</pre>
+<div class="tw"><table><thead><tr><th style="width:22%">필드</th><th style="width:20%">형식</th><th style="width:7%">필수</th><th style="width:51%">설명</th></tr></thead><tbody><tr><td><code>doc_id</code></td><td>문자열 · null 가능</td><td class="c">필수</td><td>DB 적재 성공 시 UUID, 미가용 시 null. 같은 내용(SHA-256 동일)의 파일을 다시 등록하면 새로 만들지 않고 기존 doc_id 를 돌려준다.</td></tr><tr><td><code>filename</code></td><td>문자열</td><td class="c">필수</td><td>업로드한 파일 이름</td></tr><tr><td><code>source_format</code></td><td>문자열</td><td class="c">필수</td><td>감지한 파일 형식(확장자)</td></tr><tr><td><code>file_hash</code></td><td>문자열</td><td class="c">필수</td><td>SHA-256 hex</td></tr><tr><td><code>file_size_bytes</code></td><td>정수</td><td class="c">필수</td><td>파일 크기(바이트)</td></tr><tr><td><code>extraction_method</code></td><td>문자열</td><td class="c">필수</td><td>본문 추출 방식</td></tr><tr><td><code>extraction_quality</code></td><td>숫자</td><td class="c">필수</td><td>추출 품질(0~1). 낮으면 requires_review 가 켜질 수 있다.</td></tr><tr><td><code>char_count</code></td><td>정수</td><td class="c">필수</td><td>추출된 글자 수. 0 이면 분류할 본문이 없다(지원하지 않는 형식 등) — warnings 를 확인한다.</td></tr><tr><td><code>chunk_count</code></td><td>정수</td><td class="c">필수</td><td>본문을 나눈 조각 수</td></tr><tr><td><code>pages_total</code></td><td>정수 · null 가능</td><td class="c">선택</td><td>전체 쪽수. 쪽 개념이 없는 형식은 null</td></tr><tr><td><code>client_request_id</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>요청 때 보낸 값을 그대로 돌려준다(POST /documents, POST /documents/batch). 안 보냈으면 null.</td></tr><tr><td><code>classification_job_id</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>enqueue_classification=true 로 등록했을 때만 채워진다.</td></tr><tr><td><code>classification_status</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>enqueue_classification=true 로 등록했을 때만 채워진다.</td></tr><tr><td><code>classification_status_url</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>enqueue_classification=true 로 등록했을 때만 채워진다(호스트 없는 경로).</td></tr><tr><td><code>persisted</code></td><td>true/false</td><td class="c">필수</td><td>DB/storage 저장 성공 여부</td></tr><tr><td><code>warnings</code></td><td>문자열 배열</td><td class="c">필수</td><td></td></tr><tr><td><code>requires_review</code></td><td>true/false</td><td class="c">선택</td><td>저품질 추출 등으로 분류 전 검수가 필요하면 true. 자동분류를 그대로 통과하지 않는다.</td></tr><tr><td><code>review_reasons</code></td><td>문자열 배열</td><td class="c">선택</td><td>requires_review 가 true 인 사유 목록</td></tr></tbody></table></div>
+<h3>등록에서 알아 둘 점</h3>
+<ul><li><b>같은 내용의 파일을 다시 등록</b>하면 새 문서를 만들지 않고 <b>기존 <code>doc_id</code></b> 를 돌려줍니다(파일 내용의 SHA-256 기준). 이때 함께 보낸 메타데이터는 갱신되지 않습니다. 바꿀 값은 분류 요청의 <code>metadata</code> 로 보냅니다(5장).</li><li><b>지원하지 않는 형식이거나 본문이 추출되지 않아도 201</b> 로 등록됩니다. 이때 <code>char_count</code> 가 0 이고 <code>warnings</code> 에 사유가 담깁니다(예: <code>["extract: unsupported: exe", "no text extracted"]</code>). 분류를 요청하기 전에 <code>char_count</code> 를 확인하십시오.</li><li>지원 형식: <code>txt · md · log · csv</code> / <code>hwp · hwpx</code> / <code>docx · doc</code> / <code>xlsx · xlsm · xls</code> / <code>pptx · pptm</code> / <code>pdf</code>. 이미지(<code>jpg · png</code> 등)와 스캔 PDF 는 OCR 을 하지 않으므로 본문 없이 등록됩니다(<code>char_count</code> 0).</li><li><code>requires_review</code> 가 <code>true</code> 이면 추출 품질이 낮아 분류 전에 검수가 필요하다는 표시이며, 자동분류를 그대로 통과하지 않습니다.</li></ul>
+<h3>3-2. 분류 요청 — IF-03</h3>
+<pre>curl -X POST &quot;$BASE/classify/async&quot; \
+  -H &quot;X-API-Key: $KOIPA_API_KEY&quot; -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{&quot;doc_id&quot;:&quot;ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73&quot;}&#x27;</pre>
+<p><code>content</code> 는 보내지 않는 것이 표준입니다. 생략하면 등록할 때 저장한 본문을 사용합니다.</p>
+<div class="tw"><table><thead><tr><th style="width:22%">필드</th><th style="width:20%">형식</th><th style="width:7%">필수</th><th style="width:51%">설명</th></tr></thead><tbody><tr><td><code>doc_id</code></td><td>문자열</td><td class="c">필수</td><td>등록(IF-02)이 돌려준 doc_id(UUID). KL 자체 문서번호가 아닙니다.</td></tr><tr><td><code>content</code></td><td>문자열</td><td class="c">선택</td><td>분류할 본문 텍스트(선택). <b>생략하는 것이 표준</b>이며, 생략하면 POST /documents 로 등록할 때 저장한 본문을 쓴다. 최대 1,048,576자.</td></tr><tr><td><code>metadata</code></td><td>객체</td><td class="c">선택</td><td>선택. 5장의 세 필드(source_type · security_marking · access_scope)를 담는 객체입니다. 요청에 있는 값이 저장된 값보다 우선합니다.</td></tr><tr><td><code>text_already_preprocessed</code></td><td>true/false</td><td class="c">선택</td><td>true 면 엔진의 본문 정규화 단계를 건너뛴다. 보내지 않아도 된다.</td></tr><tr><td><code>return_evidence</code></td><td>true/false</td><td class="c">선택</td><td>근거(evidence)를 응답에 담을지 여부</td></tr><tr><td><code>callback_url</code></td><td>문자열</td><td class="c">선택</td><td>완료·실패 시 엔진이 결과 JSON 을 POST 할 주소(선택). http/https 만 허용하고 loopback· link-local 주소는 거부한다 — 거부돼도 요청은 202 로 접수되므로 상태는 IF-05 로도 확인한다. 응답이 2xx 가 아니면 최대 5회 재시도하고 그래도 실패하면 엔진 쪽 DLQ 에 보관한다. 본문은 완료 시 {&quot;job_id&quot;,&quot;status&quot;:&quot;done&quot;,&quot;results&quot;:[ClassifyJobResult]}, 실패 시 {&quot;job_id&quot;,&quot;status&quot;:&quot;failed&quot;,&quot;error&quot;} 이다. 서명 헤더는 붙이지 않는다.</td></tr><tr><td><code>client_request_id</code></td><td>문자열</td><td class="c">선택</td><td>호출자가 지정하는 임의 식별자(선택). doc_id 는 내용 해시로 재사용(dedupe)되고 job_id 는 응답을 받은 뒤에야 알 수 있어, 이 요청과 결과를 미리 묶을 키가 둘 다 못 된다. 보낸 값은 그대로 작업(job)에 저장되고 IF-05 조회·콜백 본문에 동일하게 돌아온다. 서버는 값의 의미를 해석하지 않는다(그대로 보관·반환만).</td></tr></tbody></table></div>
+<p>응답(202) 예시:</p>
+<pre>{
+  &quot;job_id&quot;: &quot;aea27889-4f0e-4b38-a70c-262b05a9a62a&quot;,
+  &quot;status&quot;: &quot;queued&quot;,
+  &quot;status_url&quot;: &quot;/api/v1/classify/jobs/aea27889-4f0e-4b38-a70c-262b05a9a62a&quot;
+}</pre>
+<div class="tw"><table><thead><tr><th style="width:22%">필드</th><th style="width:20%">형식</th><th style="width:7%">필수</th><th style="width:51%">설명</th></tr></thead><tbody><tr><td><code>job_id</code></td><td>문자열</td><td class="c">필수</td><td>작업 식별자. IF-05 조회에 쓴다.</td></tr><tr><td><code>status</code></td><td>문자열</td><td class="c">선택</td><td>접수 직후 값. 큐 처리 경로는 queued, 즉시 처리 경로는 이미 done 또는 failed 일 수 있다.</td></tr><tr><td><code>status_url</code></td><td>문자열</td><td class="c">필수</td><td>상태 조회 경로(호스트 없는 상대 경로). 예 /api/v1/classify/jobs/{job_id}</td></tr></tbody></table></div>
+<ul><li>같은 <code>doc_id</code> 로 다시 요청하면 <b>새 작업</b>이 만들어집니다. IF-06 은 가장 최근 결과를 돌려줍니다.</li><li>등록하지 않은 <code>doc_id</code> 를 보내면 오류가 아니라 <b>최고 등급(TS) · <code>needs_review</code></b> 결과가 오고, 사유는 <code>warnings</code> 에 담깁니다(본문을 확인할 수 없어 안전 쪽으로 처리). 이 결과는 검수 목록과 판정 이력에 저장되지 않습니다. 반드시 등록한 뒤 분류를 요청하십시오.</li></ul>
+<h3>3-3. 결과 조회 — IF-05</h3>
+<pre>curl &quot;$BASE/classify/jobs/aea27889-4f0e-4b38-a70c-262b05a9a62a&quot; -H &quot;X-API-Key: $KOIPA_API_KEY&quot;</pre>
+<p><code>status</code> 가 <code>done</code> 이 될 때까지 조회합니다. 시험 환경에서 1건은 접수부터 완료까지 약 7초가 걸렸고(1회 측정), 배포 환경과 문서 길이에 따라 다릅니다. 1초 간격 조회를 권장하며, 작업 상태는 기본 24시간 보관하므로 그 안에 <b>결과를 KL 쪽에 저장</b>하십시오.</p>
+<div class="tw"><table><thead><tr><th style="width:16%">status</th><th style="width:56%">뜻</th><th style="width:28%">조치</th></tr></thead><tbody><tr><td><code>queued</code></td><td>큐에 접수되어 처리 전</td><td>잠시 뒤 다시 조회합니다</td></tr><tr><td><code>done</code></td><td>성공. <code>results[0]</code> 에 결과가 있습니다(단건 요청은 길이 1)</td><td>결과를 저장합니다</td></tr><tr><td><code>failed</code></td><td>실패. <code>error</code> 에 사유가 있습니다</td><td>사유를 확인하고 요청을 다시 보냅니다</td></tr><tr><td><code>partial</code></td><td>다건 작업에서 일부만 성공. <code>failed_doc_ids</code> · <code>errors</code> 참조</td><td>단건 연동에서는 나오지 않습니다</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th style="width:22%">필드</th><th style="width:20%">형식</th><th style="width:7%">필수</th><th style="width:51%">설명</th></tr></thead><tbody><tr><td><code>job_id</code></td><td>문자열</td><td class="c">필수</td><td>작업 식별자</td></tr><tr><td><code>status</code></td><td>string (queued | running | done | failed | partial | cancelled)</td><td class="c">필수</td><td>현행 코드가 내는 값은 queued · done · failed · partial 이다. partial — 일부 건은 성공·일부는 영구 실패(다건 작업). completed/failed 로 분포를 확인한다.</td></tr><tr><td><code>client_request_id</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>POST /classify/async(또는 POST /documents) 요청 때 보낸 값을 그대로 돌려준다. 안 보냈으면 null.</td></tr><tr><td><code>total</code></td><td>정수 · null 가능</td><td class="c">선택</td><td>요청 건수(단건은 1)</td></tr><tr><td><code>completed</code></td><td>정수 · null 가능</td><td class="c">선택</td><td>성공 건 수</td></tr><tr><td><code>failed</code></td><td>정수 · null 가능</td><td class="c">선택</td><td>retry 모두 실패한 건 수</td></tr><tr><td><code>failed_doc_ids</code></td><td>문자열 배열</td><td class="c">선택</td><td>영구 실패한 doc_id 목록</td></tr><tr><td><code>errors</code></td><td>객체 배열</td><td class="c">선택</td><td>영구 실패 사유(doc_id · error_type · message · attempts)</td></tr><tr><td><code>results</code></td><td>ClassifyJobResult 객체 배열</td><td class="c">선택</td><td>분류 결과. done 이면 채워지고 단건 요청은 길이 1 이다.</td></tr><tr><td><code>error</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>failed 일 때 사유</td></tr></tbody></table></div>
+<p>완료 응답(200) 예시 — 전체는 아래에서 펼쳐 볼 수 있습니다:</p>
+<details><summary>전체 응답 보기 (03_job_done.json)</summary><pre>{
+  &quot;job_id&quot;: &quot;aea27889-4f0e-4b38-a70c-262b05a9a62a&quot;,
+  &quot;status&quot;: &quot;done&quot;,
+  &quot;total&quot;: 1,
+  &quot;completed&quot;: 1,
+  &quot;failed&quot;: null,
+  &quot;failed_doc_ids&quot;: [],
+  &quot;errors&quot;: [],
+  &quot;results&quot;: [
+    {
+      &quot;inference_id&quot;: &quot;739c4fed-1db8-4e00-b105-d61b3e23a367&quot;,
+      &quot;doc_id&quot;: &quot;ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73&quot;,
+      &quot;label&quot;: &quot;S2&quot;,
+      &quot;confidence&quot;: 0.8803578615188599,
+      &quot;scores&quot;: {},
+      &quot;evaluation_factors&quot;: {
+        &quot;secrecy&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 1,
+          &quot;evidence&quot;: [
+            &quot;대외비 표시 없음&quot;
+          ]
+        },
+        &quot;value&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 1,
+          &quot;evidence&quot;: [
+            &quot;원가 구조&quot;
+          ]
+        },
+        &quot;management&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 1,
+          &quot;evidence&quot;: [
+            &quot;접근 권한 미설정&quot;
+          ]
+        },
+        &quot;scores&quot;: {
+          &quot;SECRECY&quot;: 1.0,
+          &quot;VALUE&quot;: 1.0,
+          &quot;MANAGEMENT&quot;: 1.0
+        }
+      },
+      &quot;factors_source&quot;: &quot;model_estimated&quot;,
+      &quot;rule_evaluation_factors&quot;: {
+        &quot;secrecy&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 2,
+          &quot;evidence&quot;: [
+            &quot;원가 구조&quot;,
+            &quot;거래선 정보&quot;
+          ]
+        },
+        &quot;value&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 2,
+          &quot;evidence&quot;: [
+            &quot;원가 구조&quot;
+          ]
+        },
+        &quot;management&quot;: {
+          &quot;state&quot;: &quot;observed&quot;,
+          &quot;value&quot;: 0,
+          &quot;evidence&quot;: []
+        },
+        &quot;scores&quot;: {
+          &quot;SECRECY&quot;: 2.0,
+          &quot;VALUE&quot;: 2.0,
+          &quot;MANAGEMENT&quot;: 0.0
+        }
+      },
+      &quot;evidence&quot;: [
+        {
+          &quot;start&quot;: 64,
+          &quot;end&quot;: 69,
+          &quot;text&quot;: &quot;원가 구조&quot;,
+          &quot;weight&quot;: 0.8,
+          &quot;tag&quot;: &quot;ECONOMIC_VALUE&quot;
+        }
+      ],
+      &quot;model_version&quot;: &quot;v-fe4b386b&quot;,
+      &quot;status&quot;: &quot;needs_review&quot;,
+      &quot;warnings&quot;: [
+        &quot;factors aligned to model grade S2 (rule under-detected S/V/M)&quot;,
+        &quot;agreement-gate: model=S2 vs rule=S1 disagree on non-public grade — routed to human review (conf alone insufficient)&quot;
+      ],
+      &quot;rule_grade&quot;: &quot;S1&quot;,
+      &quot;model_grade&quot;: null,
+      &quot;decision_path&quot;: &quot;룰 S1 · 모델 S2 불일치 (검수 사유는 아래 경고 참조)&quot;,
+      &quot;grade_candidates&quot;: [],
+      &quot;grade_candidates_reason&quot;: null,
+      &quot;regulation_reference&quot;: null,
+      &quot;regulation_summary&quot;: null,
+      &quot;confidence_tier&quot;: &quot;높음&quot;
+    }
+  ],
+  &quot;error&quot;: null
+}</pre></details>
+<h3>3-4. 문서 단위 조회 — IF-06</h3>
+<pre>curl &quot;$BASE/classify/ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73&quot; -H &quot;X-API-Key: $KOIPA_API_KEY&quot;</pre>
+<p><code>doc_id</code> 는 등록이 돌려준 UUID 여야 합니다(아니면 422). 분류 이력이 없으면 404 입니다. IF-06 은 <b>저장된 값으로 응답을 만들기 때문에</b> 등급 · 확률 · 모델 버전 · 상태와 사람이 확정한 등급(<code>confirmed_*</code>)만 담습니다. 근거(<code>evidence</code>) · 경고(<code>warnings</code>) · 룰/모델 판정이 필요하면 IF-05 의 작업 결과를 사용합니다.</p>
+<div class="tw"><table><thead><tr><th style="width:22%">필드</th><th style="width:20%">형식</th><th style="width:7%">필수</th><th style="width:51%">설명</th></tr></thead><tbody><tr><td><code>inference_id</code></td><td>문자열</td><td class="c">필수</td><td>분류 결과 식별자</td></tr><tr><td><code>doc_id</code></td><td>문자열</td><td class="c">필수</td><td>분류한 문서의 doc_id</td></tr><tr><td><code>label</code></td><td>string (TS | S1 | S2 | S3)</td><td class="c">필수</td><td>예측 등급 코드. 사람이 확정한 등급은 confirmed_label 입니다.</td></tr><tr><td><code>confidence</code></td><td>숫자</td><td class="c">필수</td><td>선택한 등급(label)의 확률(0~1)</td></tr><tr><td><code>confidence_tier</code></td><td>string (낮음 | 보통 | 높음)</td><td class="c">필수</td><td>[2026-10-02] confidence 를 검수 우선순위 3단계로 나눈 계산 필드 — ClassifyOutcome 과 같다.</td></tr><tr><td><code>scores</code></td><td>객체</td><td class="c">필수</td><td>등급별 확률 분포</td></tr><tr><td><code>model_version</code></td><td>문자열</td><td class="c">필수</td><td>판정에 쓴 모델 버전</td></tr><tr><td><code>status</code></td><td>string (staging | needs_review | needs_second_review)</td><td class="c">선택</td><td>staging=자동확정 후보 · needs_review/needs_second_review=검수 라우팅. 검수가 필요한지만 나타내며 &#x27;confirmed&#x27; 값은 나오지 않는다(사람 확정은 confirmed_* 로 따로 온다).</td></tr><tr><td><code>confirmed_label</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>사람이 검수로 확정한 등급. 예측(label)과 별개이며 확정 전에는 null.</td></tr><tr><td><code>confirmed_by</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>확정한 검수자 식별자</td></tr><tr><td><code>confirmed_at</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>확정 시각(ISO 8601 UTC)</td></tr></tbody></table></div>
+<details><summary>응답 예시 보기 (04_classify_by_doc_response.json)</summary><pre>{
+  &quot;inference_id&quot;: &quot;739c4fed-1db8-4e00-b105-d61b3e23a367&quot;,
+  &quot;doc_id&quot;: &quot;ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73&quot;,
+  &quot;label&quot;: &quot;S2&quot;,
+  &quot;confidence&quot;: 0.8804,
+  &quot;confidence_tier&quot;: &quot;높음&quot;,
+  &quot;scores&quot;: {
+    &quot;S2&quot;: 0.8804,
+    &quot;TS&quot;: 0.02003907598555088,
+    &quot;S1&quot;: 0.08763943612575531,
+    &quot;S3&quot;: 0.011963642202317715
+  },
+  &quot;model_version&quot;: &quot;v-fe4b386b&quot;,
+  &quot;status&quot;: &quot;needs_review&quot;,
+  &quot;confirmed_label&quot;: null,
+  &quot;confirmed_by&quot;: null,
+  &quot;confirmed_at&quot;: null
+}</pre></details>
+<h3>3-5. 검수 확정 통보 — IF-07</h3>
+<p>지재원 포털에서 사람이 검수해 등급을 확정하면, KL 웹시스템이 이 결과를 엔진으로 <b>돌려보냅니다</b> (①~④ 와 반대 방향 — KL → 엔진). 저희는 예측 <code>label</code> 을 그대로 감사 증적으로 남기고, 확정 등급은 다음 재학습의 입력으로 씁니다.</p>
+<pre>curl -X POST &quot;$BASE/confirm&quot; -H &quot;X-API-Key: $KOIPA_API_KEY&quot; -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{&quot;doc_id&quot;:&quot;ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73&quot;,&quot;confirmed_label&quot;:&quot;S2&quot;,&quot;actor&quot;:{&quot;user_id&quot;:&quot;&lt;지재원 포털의 실제 검수자 ID&gt;&quot;,&quot;role&quot;:&quot;kl_backend&quot;}}}&#x27;</pre>
+<p><code>actor.user_id</code> 에는 저희 쪽 계정이 아니라 <b>지재원 포털에서 실제로 검수한 사람의 식별자</b>를 담아 보내 주십시오 — 감사 로그와 재학습 라벨 출처에 그 값이 그대로 남습니다. <code>actor.role</code> 은 <code>kl_backend</code> 로 고정입니다.</p>
+<div class="tw"><table><thead><tr><th style="width:22%">필드</th><th style="width:20%">형식</th><th style="width:7%">필수</th><th style="width:51%">설명</th></tr></thead><tbody><tr><td><code>doc_id</code></td><td>문자열</td><td class="c">필수</td><td></td></tr><tr><td><code>inference_id</code></td><td>문자열</td><td class="c">선택</td><td></td></tr><tr><td><code>confirmed_label</code></td><td>string (TS | S1 | S2 | S3)</td><td class="c">필수</td><td>등급체계 코드. 관리자가 수정 가능하지만 기본 4단계 제공.</td></tr><tr><td><code>actor</code></td><td>객체 (Actor)</td><td class="c">필수</td><td>호출자(관리자/시스템) 정보. 감사 로그용.</td></tr><tr><td><code>note</code></td><td>문자열</td><td class="c">선택</td><td></td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th style="width:22%">필드</th><th style="width:20%">형식</th><th style="width:7%">필수</th><th style="width:51%">설명</th></tr></thead><tbody><tr><td><code>confirmation_id</code></td><td>문자열</td><td class="c">필수</td><td></td></tr><tr><td><code>confirmed_at</code></td><td>문자열</td><td class="c">필수</td><td></td></tr><tr><td><code>persisted</code></td><td>true/false</td><td class="c">선택</td><td>DB 영속 여부. false=분류 미존재/DB 일시 장애로 감사로만 기록(무음 성공 아님) — 재확인 필요.</td></tr><tr><td><code>warnings</code></td><td>문자열 배열</td><td class="c">선택</td><td>비치명 경고(분류 미존재·미지정 라벨·멱등 중복·영속 실패 등).</td></tr><tr><td><code>second_review_required</code></td><td>true/false</td><td class="c">선택</td><td>고등급 2인검토 게이트로 needs_second_review 로 보류됐는지.</td></tr></tbody></table></div>
+<p>응답 예시:</p>
+<details><summary>응답 예시 보기 (05_confirm_response.json — ConfirmService 를 직접 호출해 받은 실제 응답)</summary><pre>{
+  &quot;confirmation_id&quot;: &quot;a3f1c2d4-5e6b-47a8-9c0d-1e2f3a4b5c6d&quot;,
+  &quot;confirmed_at&quot;: &quot;2026-09-29T04:12:33Z&quot;,
+  &quot;persisted&quot;: true,
+  &quot;warnings&quot;: [],
+  &quot;second_review_required&quot;: false
+}</pre></details>
+<p><code>persisted=false</code> 이면 분류 이력을 못 찾아 <b>감사 기록으로만</b> 남았다는 뜻입니다(200 이지만 무음 성공이 아닙니다) — <code>warnings</code> 에 사유가 있습니다. 같은 <code>doc_id</code> 로 다시 보내도 안전합니다(멱등).</p>
+<h3>3-6. 일괄 분류 — IF-08</h3>
+<p>문서를 한 건씩 ①②로 보내는 대신, 이미 등록된 <code>doc_id</code> 여러 건을 한 번에 보냅니다(최대 1,000건). 요청 한 건의 항목 구성은 <code>POST /classify/async</code>(②)와 같습니다 — <code>content</code> 를 같이 보내면 그 문서에 한해 등록 시 저장한 본문 대신 그 값을 씁니다.</p>
+<pre>curl -X POST &quot;$BASE/classify/batch&quot; -H &quot;X-API-Key: $KOIPA_API_KEY&quot; -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{&quot;documents&quot;:[{&quot;doc_id&quot;:&quot;ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73&quot;},{&quot;doc_id&quot;:&quot;&lt;다른 doc_id&gt;&quot;}]}&#x27;</pre>
+<div class="tw"><table><thead><tr><th style="width:22%">필드</th><th style="width:20%">형식</th><th style="width:7%">필수</th><th style="width:51%">설명</th></tr></thead><tbody><tr><td><code>documents</code></td><td>ClassifyRequest 객체 배열</td><td class="c">필수</td><td></td></tr><tr><td><code>callback_url</code></td><td>문자열</td><td class="c">선택</td><td>완료·실패 시 결과 webhook 을 받을 주소(선택). 단건 요청(IF-03)과 같은 규칙(6장).</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th style="width:22%">필드</th><th style="width:20%">형식</th><th style="width:7%">필수</th><th style="width:51%">설명</th></tr></thead><tbody><tr><td><code>job_id</code></td><td>문자열</td><td class="c">필수</td><td></td></tr><tr><td><code>total</code></td><td>정수</td><td class="c">필수</td><td></td></tr><tr><td><code>status</code></td><td>string (queued | running | done | failed | partial)</td><td class="c">선택</td><td></td></tr><tr><td><code>status_url</code></td><td>문자열</td><td class="c">필수</td><td></td></tr><tr><td><code>completed</code></td><td>정수</td><td class="c">선택</td><td>성공적으로 처리된 건 수 (부분 실패 처리 도입)</td></tr><tr><td><code>failed</code></td><td>정수</td><td class="c">선택</td><td>retry까지 모두 실패한 건 수</td></tr><tr><td><code>failed_doc_ids</code></td><td>문자열 배열</td><td class="c">선택</td><td>영구 실패한 doc_id 목록</td></tr><tr><td><code>errors</code></td><td>객체 배열</td><td class="c">선택</td><td>영구 실패 사유 (doc_id·error_type·message·attempts). [2026-09-30] error_type=DocumentTooLarge 는 그 문서 한 건이 너무 커서 (단건 동기 경로와 같은 청크 상한) 배치 전체를 오래 막지 않도록 재시도 없이(attempts=0) 즉시 실패 처리한 것이다 — 재제출해도 같은 이유로 다시 실패하니, 그 문서만 POST /classify/async 로 단건 제출할 것.</td></tr></tbody></table></div>
+<p><code>completed</code> · <code>failed</code> · <code>failed_doc_ids</code> · <code>errors</code> 는 접수 시점 값입니다 — PoC(즉시 실행) 환경에서는 이미 채워져 있고, 운영 Celery 모드에서는 0 · 0 · <code>[]</code> · <code>[]</code> 로 시작해 <code>status_url</code>(=IF-05)로 진행 상황을 조회합니다. 한 건이 영구 실패해도 나머지는 계속 처리됩니다(부분 실패 허용, <code>status=partial</code>). 개별 문서의 등급 결과는 이 응답이 아니라 IF-05 의 <code>results[]</code> 에 있습니다(4장 규칙 그대로 적용).</p>
+<h2>4. 결과 읽는 법</h2>
+<p>IF-05 의 <code>results[]</code> 한 건(<code>ClassifyJobResult</code>)의 필드입니다. IF-06 은 이 중 등급 · 확률 · 모델 버전 · 상태만 담고 확정 등급을 더합니다(3-4).</p>
+<div class="tw"><table><thead><tr><th style="width:22%">필드</th><th style="width:20%">형식</th><th style="width:7%">필수</th><th style="width:51%">설명</th></tr></thead><tbody><tr><td><code>inference_id</code></td><td>문자열</td><td class="c">필수</td><td>분류 결과 식별자</td></tr><tr><td><code>doc_id</code></td><td>문자열</td><td class="c">필수</td><td>분류한 문서의 doc_id</td></tr><tr><td><code>label</code></td><td>string (TS | S1 | S2 | S3)</td><td class="c">필수</td><td>예측 등급 코드. 사람이 확정한 등급은 confirmed_label 입니다.</td></tr><tr><td><code>confidence</code></td><td>숫자</td><td class="c">필수</td><td>선택한 등급(label)의 확률(0~1)</td></tr><tr><td><code>confidence_tier</code></td><td>string (낮음 | 보통 | 높음)</td><td class="c">필수</td><td>[2026-10-02] confidence 를 검수 우선순위 3단계로 나눈 계산 필드(항상 confidence 에서 그대로 파생, 서버가 직접 설정하지 않는다). 자동확정 여부를 가르는 게이트가 아니다 — KL포털이 문서마다 매번 사람 검수를 하므로 이 값은 어느 문서를 먼저 볼지 고르는 참고 일 뿐이다. 경계(1/3·2/3)는 아직 사람 검수 결과로 실측하지 않은 균등분할이라 바뀔 수 있다.</td></tr><tr><td><code>scores</code></td><td>객체</td><td class="c">필수</td><td>등급별 확률 분포</td></tr><tr><td><code>evaluation_factors</code></td><td>객체 (EvaluationFactors) · null 가능</td><td class="c">선택</td><td>정본 가이드 3요건(S 비공지성 · V 경제적 유용성 · M 비밀관리성) 점수. 각 0~2.</td></tr><tr><td><code>factors_source</code></td><td>string (rule_evidenced | model_estimated)</td><td class="c">선택</td><td>[2026-10-02 정정] evaluation_factors 출처 요약 — rule_evidenced(S/V/M 세 축 모두 실제 근거가 관측됨) / model_estimated(한 축 이상 근거 없음, 해당 축은 evaluation_factors.&lt;축&gt;.state 가 &quot;unknown&quot;). &quot;역산 추정치&quot;가 아니다 — 2026-10-02 부터 등급에서 거꾸로 채우는 역산 자체를 없앴다(근거가 없으면 축이 바로 &quot;unknown&quot;으로 온다). 세세한 판단은 evaluation_factors 의 각 축 state 를 직접 볼 것, 이 필드는 요약용 파생값이다.</td></tr><tr><td><code>rule_evaluation_factors</code></td><td>객체 (EvaluationFactors) · null 가능</td><td class="c">선택</td><td>[2026-10-02 폐기 예정] 역산이 있었을 때 역산 전 원래 관측값을 보존하던 필드 — 역산 자체가 없어져 항상 null 이다(그때는 evaluation_factors 가 곧 룰 관측값). 하위 호환을 위해 필드만 남겼다.</td></tr><tr><td><code>evidence</code></td><td>EvidenceSpan 객체 배열</td><td class="c">선택</td><td>근거 키워드·문맥 span</td></tr><tr><td><code>model_version</code></td><td>문자열</td><td class="c">필수</td><td>판정에 쓴 모델 버전</td></tr><tr><td><code>status</code></td><td>string (staging | needs_review | needs_second_review)</td><td class="c">선택</td><td>staging=자동확정 후보 · needs_review/needs_second_review=검수 라우팅. 이 필드는 검수가 필요한지만 나타내며 &#x27;confirmed&#x27; 값은 나오지 않는다(사람이 확정한 등급은 confirmed_label).</td></tr><tr><td><code>warnings</code></td><td>문자열 배열</td><td class="c">선택</td><td>판정 사유·주의를 담은 문장 목록(영문). 형식이 바뀔 수 있으므로 화면 표시와 로그에만 쓴다.</td></tr><tr><td><code>rule_grade</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>룰 엔진(시드 키워드 S×V×M) 단독 판정.</td></tr><tr><td><code>model_grade</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>학습 분류기(BERT) 단독 판정(override/cap/floor 이전). 모델 미로드 시 null.</td></tr><tr><td><code>decision_path</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>최종 label 도출 경로(agreement/rule-override/source-cap/rule-only 등) — 룰·모델 이중판정 투명성.</td></tr><tr><td><code>grade_candidates</code></td><td>문자열 배열</td><td class="c">선택</td><td>비밀관리성(M)을 받지 못해 아직 하나로 정해지지 않은 등급 후보. 비어 있으면 label 이 유일한 답이다. label 을 대체하지 않는다.</td></tr><tr><td><code>grade_candidates_reason</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>후보가 남은 사유(사람이 읽는 문장)</td></tr><tr><td><code>regulation_reference</code></td><td>RegulationEvidenceItem 객체 배열</td><td class="c">선택</td><td>[2026-09-29] RAG+LLM 규정참고 — 이 문서에 해당하는 사내 규정 원문이 있을 때만 채운다(등급 판정과 무관, 참고용). 기능이 꺼져 있거나 해당 규정이 없으면 null. GPU 가 없는 배포에서는 로컬 LLM 옵션이 제한 시간 안에 끝나지 못해 항상 null 이 된다(GPU 도입은 별도 과제).</td></tr><tr><td><code>regulation_summary</code></td><td>문자열 · null 가능</td><td class="c">선택</td><td>[2026-10-02] regulation_reference 를 사람 말로 요약한 한두 문장(&quot;당연히 설명이 나가야지&quot; 요건). regulation_reference 가 없거나 로컬 LLM 요약 옵션이 꺼져 있으면(기본) null. ⛔ 로컬 LLM 이 새로 쓴 글이다 — regulation_reference(원문)와 항상 같이 보일 것, 이 문장만 단독으로 등급·법리 근거로 쓰지 않는다. GPU 가 없는 배포에서는 항상 null.</td></tr></tbody></table></div>
+<div class="note">[2026-10-02 갱신] <b>위 표는 필드 전체 목록이며, 실제로 귀사가 받으시는 값은 이보다 좁혀져 있습니다.</b> 항상 비어 있는 것은 <code>scores</code> · <code>model_grade</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> 넷뿐입니다(<code>scores</code> 는 <code>{}</code>, 나머지는 <code>null</code> 또는 빈 배열). <code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>evidence</code> · <code>decision_path</code> 는 2026-10-02 부터 채워진 그대로 나갑니다(그 전에는 저희 내부 전용이라 비웠습니다) — <code>confidence</code> 를 뒷받침하는 근거로 같이 봐 주십시오. <code>label</code>(최종 판정) · <code>rule_grade</code>(룰 판정이 <code>label</code> 과 다를 때만) · <code>confidence_tier</code>(2026-10-02 추가, <code>confidence</code> 를 검수 우선순위 3단계로 나눈 참고값 — 등급을 가르는 값이 아닙니다) · <code>regulation_reference</code>(해당 규정이 있을 때만) · <code>regulation_summary</code>(2026-10-02 추가, 규정 원문을 사람 말로 요약한 한두 문장 — 로컬 LLM 옵션을 켰을 때만, 반드시 <code>regulation_reference</code> 원문과 같이 봐 주십시오) · <code>status</code> · <code>confidence</code> · <code>model_version</code> · <code>warnings</code> 도 함께 채워집니다 — 등급이 같으면 <code>label</code> 하나, 갈리면 <code>label</code> 을 메인으로 <code>rule_grade</code> 를 함께 보시면 됩니다. 같은 엔드포인트를 저희 내부 관리 화면도 호출하는데, 그쪽은 이 값들을 그대로 받습니다 — 구분은 호출 인증(서버 간 자격) 기준이며 요청 쪽에서 고를 수 없습니다.</div>
+<h3>등급 코드</h3>
+<div class="tw"><table><thead><tr><th style="width:20%">label</th><th style="width:80%">이름</th></tr></thead><tbody><tr><td class="c"><code>TS</code></td><td>특급기밀</td></tr><tr><td class="c"><code>S1</code></td><td>1급 비밀</td></tr><tr><td class="c"><code>S2</code></td><td>2급 대외비</td></tr><tr><td class="c"><code>S3</code></td><td>3급 공개</td></tr></tbody></table></div>
+<h3>status — 검수가 필요한가</h3>
+<div class="tw"><table><thead><tr><th style="width:28%">status</th><th style="width:72%">뜻</th></tr></thead><tbody><tr><td><code>staging</code></td><td>자동 확정 후보입니다(검수 라우팅 조건에 걸리지 않았습니다)</td></tr><tr><td><code>needs_review</code></td><td>사람이 확인해야 합니다. 오류가 아니며 <code>label</code> 은 예측값으로 채워져 있습니다. 엔진의 검수 큐에 올라갑니다</td></tr><tr><td><code>needs_second_review</code></td><td>2차 검수 대상입니다</td></tr></tbody></table></div>
+<ul><li><code>label</code> 은 <b>예측 등급</b>입니다. 사람이 검수로 등급을 확정해도 바뀌지 않고, 확정 등급은 <code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> 으로 따로 옵니다(확정 전에는 null). 모델이 무엇이라 했는지와 사람이 무엇으로 정했는지를 둘 다 남기는 설계입니다.</li><li><code>warnings</code> 는 사람이 읽는 사유 문자열입니다. 형식이 바뀔 수 있으므로 화면 표시와 로그에 쓰고, 문자열로 분기하지 않습니다.</li><li><code>grade_candidates</code> 는 비밀관리성(M)을 판단할 접근범위·보안표시를 받지 못해 등급이 하나로 정해지지 않을 때 남는 후보입니다. 비어 있으면 <code>label</code> 이 유일한 답입니다. <code>label</code> 을 대체하지 않으며, 접근범위·보안표시를 보내면(5장) 줄어듭니다.</li><li><code>confidence</code> 는 선택한 등급(<code>label</code>)의 확률(0~1)이고 <code>scores</code> 는 등급별 확률입니다. [2026-10-02] <code>confidence_tier</code> 는 <code>confidence</code> 를 검수 우선순위 3단계(낮음·보통·높음)로 나눈 계산값입니다 — 자동확정 여부를 가르는 게이트가 아니라, 어느 문서를 먼저 볼지 고르는 참고일 뿐입니다.</li><li>필수는 <code>inference_id</code> · <code>doc_id</code> · <code>label</code> · <code>confidence</code> · <code>scores</code> · <code>model_version</code> 여섯입니다. <code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>evidence</code> · <code>rule_grade</code> · <code>model_grade</code> · <code>decision_path</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> 은 분류를 끝까지 수행했을 때만 채워지는 <b>선택 항목</b>이라 두 경우에는 비어 있습니다(<code>null</code> 또는 빈 배열이며 <code>factors_source</code> 는 의미 없는 기본값입니다). ① 본문을 읽을 수 없어(등록된 <code>doc_id</code> 를 찾지 못하고 <code>content</code> 도 없음) 사람 검수로 격리한 경우 — <code>label</code> 은 최고 등급(<code>TS</code>), <code>confidence</code> 는 0, <code>status</code> 는 <code>needs_review</code>, <code>model_version</code> 은 <code>none</code> 입니다. ② 사람이 이미 확정한 등급이 있어 추론을 건너뛴 경우 — <code>model_version</code> 이 <code>human_review:…</code> 로 시작하고 <code>status</code> 는 <code>staging</code> 입니다. 두 경우는 <code>model_version</code> 과 <code>warnings</code> 로 구분합니다.</li><li>[2026-09-29] <code>rule_grade</code> 는 룰 엔진(시드 키워드 S×V×M) 단독 판정입니다. <b><code>label</code>(최종 판정)과 같으면 null 입니다</b> — 다를 때만 참고로 채워집니다. 즉 두 판정이 같으면 <code>label</code> 하나만 보시면 되고, 갈렸을 때만 <code>rule_grade</code> 를 함께 확인하시면 됩니다.</li><li>[2026-09-29] <code>regulation_reference</code> 는 귀사 사내 규정 중 이 문서에 해당하는 원문 조항입니다(등급 판정과 무관한 <b>참고용</b>). 기능이 꺼져 있거나 해당 규정을 찾지 못하면 null 입니다. GPU 가 없는 배포에서는 로컬 LLM 판정이 제한 시간 안에 끝나지 못해 항상 null 이 됩니다 — GPU 도입 전까지는 이 필드를 기대하지 마십시오. [2026-10-02] <code>regulation_summary</code> 는 그 원문을 사람 말로 요약한 한두 문장입니다 — 로컬 LLM 요약 옵션을 추가로 켰을 때만 채워지고, 기본은 null 입니다. 로컬 LLM 이 새로 쓴 글이므로 반드시 <code>regulation_reference</code>(원문)와 함께 보시고, 이 문장만으로 등급·법리 근거를 판단하지 마십시오.</li><li><code>automation_assessment</code> 는 이 결과에 없습니다(2026-09-27 부터). 저희 내부 자동확정 정책을 검증하는 그림자 관측치라 연동에 쓰지 않으며, 동기 응답(<code>POST /classify</code>, 내부 화면 전용)에만 남겨 뒀습니다.</li></ul>
+<h2>5. 메타데이터 세 필드 (ICD 협의안 v0.9 기준)</h2>
+<p>본문에서 관측되지 않는 정보(출처·보안표시·접근범위)는 KL 이 알려 주시면 등급에 반영됩니다. 등록 폼 필드로 보내면 저장되고, 분류 요청의 <code>metadata</code> 객체로도 보낼 수 있습니다. 둘 다 있으면 <b>요청 값이 우선</b>이고, 없는 필드만 저장된 값으로 채웁니다.</p>
+<div class="tw"><table><thead><tr><th style="width:20%">필드</th><th style="width:42%">값</th><th style="width:38%">효과</th></tr></thead><tbody><tr><td><code>source_type</code></td><td><code>public · registered_patent · academic · internal · external_confidential</code></td><td>공개 출처면 분류 시 S3 로 상한(cap)이 걸립니다</td></tr><tr><td><code>security_marking</code></td><td><code>top_secret · secret · confidential</code> (등록 폼은 <code>none</code> 도 가능)</td><td>등급의 하한(floor)입니다. <code>top_secret</code>→TS · <code>secret</code>→S1 · <code>confidential</code>→S2 로 올리기만 하고 내리지는 않습니다. 소문자 정확 일치이며 한글 표기는 무시됩니다</td></tr><tr><td><code>access_scope</code></td><td><code>approved_only · designated · department · all_employees</code></td><td>비밀관리성(M) 신호입니다. 보안표시가 없을 때 관리수준을 정하는 주 입력입니다</td></tr></tbody></table></div>
+<pre># 분류 요청에서 덮어쓰기(예: 이미 등록한 문서의 접근범위를 바꿀 때)
+curl -X POST &quot;$BASE/classify/async&quot; -H &quot;X-API-Key: $KOIPA_API_KEY&quot; -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{&quot;doc_id&quot;:&quot;ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73&quot;,&quot;metadata&quot;:{&quot;access_scope&quot;:&quot;approved_only&quot;}}&#x27;</pre>
+<h2>6. 오류와 재시도</h2>
+<p>오류는 <b>HTTP 상태 코드로 구분</b>합니다. 본문은 대부분 <code>{"detail": "사유"}</code> 이며(422 는 항목별 배열), <code>code</code> 필드는 413(JSON 본문 한도) · 429 · 500 에만 있습니다. <code>code</code> 문자열이 아니라 상태 코드로 분기하십시오.</p>
+<div class="tw"><table><thead><tr><th style="width:6%">상태</th><th style="width:40%">본문 예</th><th style="width:24%">언제</th><th style="width:30%">처리</th></tr></thead><tbody><tr><td>401</td><td><code>{"detail":"missing authorization"}</code></td><td>키가 없거나 틀림</td><td>키를 확인합니다. 재시도해도 같습니다</td></tr><tr><td>404</td><td><code>{"detail":"job not found"}</code><br><code>{"detail":"no classification for doc_id"}</code></td><td>없는 job_id(보관 24시간 경과 포함) / 분류 이력 없는 doc_id</td><td>IF-05 는 IF-06 으로, IF-06 은 분류 요청부터 다시 진행합니다</td></tr><tr><td>413</td><td><code>{"detail":"file too large: …"}</code><br><code>{"detail":"request body too large","code":"KOIPA_BODY_TOO_LARGE"}</code></td><td>파일 20MB 초과 / JSON 본문 25MB 초과(기본값)</td><td>크기를 줄여 다시 보냅니다</td></tr><tr><td>422</td><td><code>{"detail":[{"type":"missing","loc":["body","doc_id"],"msg":"Field required",…}]}</code><br><code>{"detail":"empty file"}</code><br><code>{"detail":"doc_id must be a UUID"}</code></td><td>필수 필드 누락 · 형식 오류 · 빈 파일</td><td><code>loc</code> 가 가리키는 필드를 고쳐 다시 보냅니다</td></tr><tr><td>429</td><td><code>{"code":"KOIPA_RATE_LIMIT","message":"rate limit exceeded: 60 per 1 minute","retry_after_sec":60}</code></td><td>분류 요청이 분당 60건 초과</td><td><code>Retry-After</code> 헤더(초) 뒤에 다시 보냅니다</td></tr><tr><td>500</td><td><code>{"code":"KOIPA_INTERNAL","message":"internal server error","request_id":"…","retryable":true}</code></td><td>엔진 내부 오류</td><td><code>retryable</code> 이 true 이므로 다시 보낼 수 있습니다. 반복되면 <code>request_id</code> 와 함께 알려 주십시오</td></tr><tr><td>503</td><td><code>{"detail":"service temporarily unavailable"}</code></td><td>IF-06 조회 중 DB 일시 장애</td><td>잠시 뒤 다시 조회합니다</td></tr></tbody></table></div>
+<p>등록(IF-02)은 같은 파일이면 같은 <code>doc_id</code> 를 돌려주므로 재시도해도 안전합니다.</p>
+<h2>7. 완료 통보(IF-04) — 선택</h2>
+<p>분류 요청(IF-03)에 <code>callback_url</code> 을 넣으면, 작업이 끝났을 때 엔진이 그 주소로 JSON 을 <code>POST</code> 합니다. 넣지 않으면 통보는 없고 IF-05 로 조회합니다.</p>
+<pre>완료   {&quot;job_id&quot;: &quot;…&quot;, &quot;status&quot;: &quot;done&quot;,   &quot;results&quot;: [ { …ClassifyJobResult… } ]}
+실패   {&quot;job_id&quot;: &quot;…&quot;, &quot;status&quot;: &quot;failed&quot;, &quot;error&quot;: &quot;…&quot;}</pre>
+<ul><li>발송은 <b>60초 주기</b>로 처리되므로 완료 후 최대 약 1분 뒤에 도착할 수 있습니다. 즉시성이 필요하면 IF-05 조회를 사용하십시오.</li><li>수신 서버가 2xx 를 돌려주면 성공입니다. 그 밖의 응답이면 <b>최대 5회</b>까지 다시 보내고, 그래도 실패하면 엔진의 실패 보관함에 남으며 더는 자동으로 보내지 않습니다.</li><li>허용 주소는 <code>http</code> · <code>https</code> 입니다. loopback(<code>localhost</code> · 127.x) · link-local(169.254.x) · 클라우드 메타데이터 · 예약·멀티캐스트 주소는 거부되며, 이때에도 분류 요청은 202 로 접수되고 통보만 가지 않습니다. 사설망 주소(10.x · 172.16~31.x · 192.168.x)는 기본 설정에서 허용됩니다.</li><li>엔진은 통보에 <b>서명이나 인증 헤더를 붙이지 않습니다</b>. 수신 주소는 내부망 접근 제한이나 URL 에 넣은 1회용 토큰 등으로 보호하시기 바랍니다.</li><li>통보가 유실될 수 있으므로 IF-05 조회를 함께 두는 것을 권장합니다.</li></ul>
+<h2>8. 제한값과 보존 기간</h2>
+<p>아래 값은 현행 기본 설정입니다. 배포 설정에 따라 달라질 수 있습니다.</p>
+<div class="tw"><table><thead><tr><th style="width:36%">항목</th><th style="width:24%">값</th><th style="width:40%">넘거나 지나면</th></tr></thead><tbody><tr><td>업로드 파일 크기</td><td>20MB</td><td>413</td></tr><tr><td>JSON 요청 본문</td><td>25MB</td><td>413 (<code>KOIPA_BODY_TOO_LARGE</code>)</td></tr><tr><td><code>content</code> 길이</td><td>1,048,576자</td><td>422</td></tr><tr><td>분류 요청(IF-03) 호출 한도</td><td>분당 60건</td><td>429 + <code>Retry-After</code></td></tr><tr><td>작업 상태 보관(IF-05)</td><td>24시간</td><td>404 — 이후에는 IF-06 으로 최근 결과를 조회합니다</td></tr></tbody></table></div>
+<p>문서 등록과 조회에는 호출 한도를 두지 않았습니다(현행 설정).</p>
+<h2>9. 이전 명세서 초안과 달라진 점</h2>
+<p>이전 명세서 초안(<code>1.0.0-draft</code>)과 실제 동작이 달랐던 항목입니다. 초안으로 클라이언트를 만드셨다면 확인해 주십시오. 이 안내서와 <code>koipa_kl_openapi.yaml</code> 이 실제 동작 기준입니다.</p>
+<div class="tw"><table><thead><tr><th style="width:4%">#</th><th style="width:20%">항목</th><th style="width:30%">이전 명세서</th><th style="width:46%">실제 동작</th></tr></thead><tbody><tr><td class="c">1</td><td>작업 조회(IF-05) 응답</td><td><code>result</code>(객체) · <code>progress</code></td><td><code>results</code>(배열, 단건은 길이 1). <code>progress</code> 는 없습니다</td></tr><tr><td class="c">2</td><td>분류 접수(IF-03) 응답</td><td><code>job_id</code> · <code>status_url</code> · <code>estimated_sec</code></td><td><code>estimated_sec</code> 없음. <code>status</code> 가 있고 <code>status_url</code> 은 호스트 없는 경로입니다</td></tr><tr><td class="c">3</td><td>분류 요청의 <code>content</code></td><td>필수</td><td>선택. 생략하면 등록 때 저장한 본문을 씁니다</td></tr><tr><td class="c">4</td><td>등록 후 분류 호출</td><td><code>POST /classify?doc_id=…</code></td><td>본문 <code>{"doc_id": …}</code> 로 보냅니다(쿼리 파라미터는 받지 않음)</td></tr><tr><td class="c">5</td><td>등록 폼 필드</td><td><code>doc_type</code> · <code>external_ref</code></td><td><code>doc_type</code> · <code>external_ref</code> 는 받지 않습니다(보내도 무시). <code>source_type</code> · <code>security_marking</code> · <code>access_scope</code> · <code>enqueue_classification</code> 추가</td></tr><tr><td class="c">6</td><td>분류 결과 필드</td><td>15개</td><td>IF-05 결과 한 건은 20개 — <code>rule_evaluation_factors</code> · <code>grade_candidates</code> · <code>grade_candidates_reason</code> · <code>regulation_reference</code>(2026-09-29 추가) · <code>confidence_tier</code> · <code>regulation_summary</code>(2026-10-02 추가, 4장) 가 늘었습니다. 같은 날부터 <code>evaluation_factors</code> · <code>rule_evaluation_factors</code> · <code>evidence</code> · <code>decision_path</code> 도 채워진 그대로 나갑니다(그 전에는 늘 비어 있었습니다). (<code>automation_assessment</code> 는 안 실립니다 — 내부 전용이라 2026-09-27 부터 뺐습니다). 사람이 확정한 등급 <code>confirmed_label</code> · <code>confirmed_by</code> · <code>confirmed_at</code> 은 IF-06 에서만 옵니다</td></tr><tr><td class="c">7</td><td>오류 본문</td><td><code>{code, message, …}</code></td><td>대부분 <code>{"detail": …}</code>. <code>code</code> 는 413·429·500 에만 있고 값은 <code>KOIPA_BODY_TOO_LARGE</code> · <code>KOIPA_RATE_LIMIT</code> · <code>KOIPA_INTERNAL</code> 셋뿐입니다</td></tr><tr><td class="c">8</td><td>문서 조회(IF-06)</td><td>분류 결과 전체</td><td>저장된 요약 10개 항목만 담습니다(3-4장 표)</td></tr><tr><td class="c">9</td><td>검수 확정 통보</td><td>없음</td><td>IF-07(<code>POST /confirm</code>, 2026-09-29 추가) — 지재원 포털의 검수 확정 등급을 KL 이 엔진으로 돌려보내는 통로입니다(3-5장)</td></tr><tr><td class="c">10</td><td>일괄 분류</td><td>없음</td><td>IF-08(<code>POST /classify/batch</code>, 2026-09-29 추가) — 최대 1,000건을 한 번에 보냅니다(3-6장). 기존에도 코드는 있었으나 이 문서 범위 밖이었습니다</td></tr></tbody></table></div>
+<div class="foot">AI 분류 엔진 연동 안내서 — 한국지식재산보호원 AI 영업비밀 등급분류 시스템 · 2026-09-25 · 규격 파일 koipa_kl_openapi.yaml</div>
+</div>
+</body>
+</html>

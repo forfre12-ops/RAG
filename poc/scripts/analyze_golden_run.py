@@ -21,8 +21,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from lloydk.modules.m6_evaluation.eval_cards import GRADE_ORDER, build_eval_cards  # noqa: E402
-from lloydk.modules.m6_evaluation.judge_reliability import build_judge_reliability  # noqa: E402
+from koipa.golden_defense import assess_defense_liveness  # noqa: E402
+from koipa.modules.m6_evaluation.eval_cards import GRADE_ORDER, build_eval_cards  # noqa: E402
+from koipa.modules.m6_evaluation.judge_reliability import build_judge_reliability  # noqa: E402
 
 
 def _load(path: str) -> list[dict]:
@@ -107,8 +108,12 @@ def analyze(run_dir: str) -> dict:
         a_name="rule", b_name="llm", min_stratum_n=10,
     )
 
+    # defense_liveness: 5개 방어 축이 실제로 발화했나(무음으로 꺼진 방어 폭로) — gold+review 전체.
+    defense = assess_defense_liveness(records)
+
     return {"run_dir": run_dir, "summary": summary,
             "domain_leakage": domain_leakage(gold),
+            "defense_liveness": defense,
             "eval_cards": cards.to_dict(), "judge_reliability": jr.to_dict()}
 
 
@@ -143,6 +148,15 @@ def main(argv=None):
         print(f"[누출] 도메인→등급 trivial baseline={dl['trivial_domain_baseline']} "
               f"(낮을수록 좋음; 0.856=본생성714 블로커) Theil_U={dl['theil_u']} "
               f"H(grade|domain)={dl['H_grade_given_domain']}/{dl['H_grade']} 도메인수={dl['n_domains']}")
+    dfl = out.get("defense_liveness", {})
+    if dfl:
+        ax = dfl.get("axes", {})
+        print(f"[방어 liveness] verdict={dfl['verdict']} (shadow_active={dfl['shadow_active']}, "
+              f"차단축 발화={dfl['blocking_axes_active']}/3)")
+        print(f"  shadow cov={ax.get('shadow',{}).get('coverage')} fired={ax.get('shadow',{}).get('fired')} | "
+              f"disagree={ax.get('agreement',{}).get('fired')} | ts_down={ax.get('ts_downgrade',{}).get('fired')} | "
+              f"self_consist fired={ax.get('self_consistency',{}).get('fired')} informative={ax.get('self_consistency',{}).get('informative')}")
+        print(f"  → {dfl['recommendation']}")
     o = out["judge_reliability"]["overall"]
     print(f"[judge] rule vs llm: agree={o['agreement_rate']} "
           f"up(llm>rule)={o['upgrade_rate']} down(llm<rule)={o['downgrade_rate']}")

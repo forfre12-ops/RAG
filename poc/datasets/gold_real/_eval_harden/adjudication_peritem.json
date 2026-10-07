@@ -1,0 +1,1181 @@
+[
+ {
+  "doc_id": "8fb5d09ed3bb91e7",
+  "gold_intended": "S2",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "2024년 3분기 내부 경영실적 검토 보고서 (미확정)  본 보고서는 2024년 3분기 영업 실적을 내부 경영진 검토 목적으로 작성한 미확정 자",
+  "grades": [
+   "S3",
+   "S3",
+   "S3"
+  ],
+  "tally": {
+   "S3": 3
+  },
+  "consensus": "S3",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 1,
+   "v": 1,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "\"본 자료는 공시 전 내부 검토용이며 외부 배포를 금합니다\"는 전형적 보일러플레이트 관리'의도'일 뿐. 접근통제·암호화·지정등록·키관리 등 형식적 관리 메커니즘이 본문에 전혀 명시되지 않음 → anti-bias 규칙에 따라 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 관리 문구는 \"내부 경영진 검토 목적\", \"공시 전 내부 검토용이며 외부 배포를 금합니다\"뿐 — 접근통제·암호화·지정등록·키관리 등 형식적 관리 메커니즘 전무, 순수 보일러플레이트(내부용/외부금지) → 안티바이어스 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 관리 문구는 \"외부 배포를 금합니다\", \"외부 유출 시 투자자 판단에 영향\"뿐 — 접근통제·암호화·국가핵심기술/영업비밀 지정등록·키관리·NDA 등 구체 메커니즘이 본문에 전혀 적혀있지 않음. anti-bias 규칙상 '내부 검토용·외부배포금지' 보일러플레이트는 관리 의도일 뿐 형식적 관리 증거 아님 → M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "fdd5193d796eb246",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "M&A 대상 기업 실사 예비 검토 보고서  인수 검토 중인 대상 기업에 대한 예비 실사 보고서입니다.  대상 기업: 인수 대상 기업 (업종: 제",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 전체에 접근통제·암호화·영업비밀 지정등록·키/토큰관리·NDA·추적배포 등 형식적 관리 메커니즘이 단 하나도 적혀 있지 않음. \"유출 시 위험\"은 관리 의도/우려일 뿐 형식적 관리 증거 아님(anti-bias 규칙 → M=0)."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 접근통제·암호화·영업비밀/국가핵심기술 지정·키관리·NDA통제 등 형식적 관리 메커니즘이 전혀 적혀 있지 않음. \"유출 시 위험\"은 위험 인식 진술일 뿐 관리 '증거' 아니며, \"내부용\" 보일러플레이트조차 없음 → M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 접근통제·암호화·지정등록·키/토큰관리·NDA·추적배포 등 구체적 형식 관리 메커니즘이 전무함. \"정보 유출 시 위험\"은 관리 의도/결과 경고일 뿐 형식적 관리 증거 아님(anti-bias 규칙 → M=0)."
+   }
+  ]
+ },
+ {
+  "doc_id": "0c3081341e618ab2",
+  "gold_intended": "S2",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "2024년 연구개발 투자 계획 내부 검토안  2024년도 R&D 투자 우선순위 및 예산 배분 내부 검토 자료입니다.  투자 집중 분야: 신소재 ",
+  "grades": [
+   "S3",
+   "S3",
+   "S3"
+  ],
+  "tally": {
+   "S3": 3
+  },
+  "consensus": "S3",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 1.3333333333333333,
+   "v": 1,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 \"내부 검토안\", \"내부 검토 자료\", \"외부 미발표\"만 있을 뿐 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키관리·NDA 같은 구체적 형식적 관리 메커니즘이 전혀 적히지 않음 — 이는 anti-bias 규칙상 관리 '의도'일 뿐 증거 아님 → M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 \"내부 검토안/내부 검토 자료/외부 미발표\"라는 보일러플레이트 의도 문구만 있을 뿐, 접근통제·암호화·영업비밀 지정등록·키관리·NDA통제 등 어떤 형식적 관리 메커니즘도 적혀 있지 않으므로 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 2,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "\"내부 검토안 / 내부 검토 자료 / 외부 미발표\"만 존재 — 접근통제·암호화·지정등록·키관리·NDA통제 등 구체 메커니즘 본문 부재. anti-bias 규칙상 '내부용·외부 미발표' 보일러플레이트는 M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "2b830c3133a25055",
+  "gold_intended": "S2",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "경쟁사 분석 내부 보고서 (미공개)  주요 경쟁사 4개사의 제품 라인업, 가격 전략, 시장 점유율 변화를 분석한 내부 보고서입니다.  경쟁사 A",
+  "grades": [
+   "S3",
+   "S3",
+   "S3"
+  ],
+  "tally": {
+   "S3": 3
+  },
+  "consensus": "S3",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 1,
+   "v": 1,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "\"미공개\", \"외부 공개 금지\", \"내부 전략 수립용\"이라는 보일러플레이트 문구뿐이며, 접근통제·암호화·지정등록·키관리 등 형식적 관리 메커니즘이 본문에 전혀 명시되지 않음. anti-bias 규칙에 따라 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 관리 문구는 \"경쟁사 분석 내부 보고서 (미공개)\"와 \"내부 전략 수립용으로 외부 공개 금지\"뿐 — 접근통제·암호화·지정등록·키관리 등 형식적 관리 메커니즘이 전혀 명시되지 않은 보일러플레이트 '내부용/외부금지'이므로 anti-bias 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "관리 신호는 \"내부 보고서\"·\"내부 전략 수립용\"·\"외부 공개 금지\"뿐으로, anti-bias 규칙상 보일러플레이트(관리 '의도')에 해당; 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·키/토큰 관리·추적배포·NDA 등 구체 형식적 메커니즘이 본문에 전무 → M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "a1beb524ceafe108",
+  "gold_intended": "S2",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "고객 데이터 기반 맞춤형 상품 개발 전략  보유 고객 데이터 분석 기반의 맞춤형 상품 개발 전략 자료입니다.  분석 데이터: 구매 이력 3년치,",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 전체에 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키관리·추적배포·NDA 등 어떤 형식적 관리 메커니즘도 명시되지 않음. \"내부용·외부배포금지\" 보일러플레이트조차 없는 순수 전략보고서 → M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "위 m_reason 참조: 형식적 관리 메커니즘 본문 명시 없음, M=0"
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 접근통제·암호화·영업비밀 지정등록·키/토큰 관리·NDA·추적배포 등 형식적 관리 메커니즘이 전혀 명시되지 않음. \"핵심 자산\"이라는 가치 진술뿐이며 보일러플레이트조차 없는 관리 증거 부재."
+   }
+  ]
+ },
+ {
+  "doc_id": "3f2fc2527eab5667",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "금융 리스크 관리 모델 파라미터 및 내부 한도  신용 리스크 평가 모델 파라미터 및 내부 리스크 한도 설정 자료입니다.  신용 평가 모델: 독자",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 관리 신호는 \"외부 미공개\"·\"내부 기준\"뿐 — 이는 비공개 의도/보일러플레이트일 뿐 형식적 관리 증거 아님. 접근통제 매트릭스·암호화·영업비밀 지정등록·키/토큰 관리·추적배포·NDA 같은 구체 메커니즘이 본문에 전혀 없음. anti-bias 규칙에 따라 M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 관리 신호는 \"외부 미공개\"·\"내부 기준\"뿐 — 전형적 보일러플레이트(관리 의도). 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·키/토큰 관리·NDA 통제 등 구체 형식 메커니즘이 본문에 일절 없음 → anti-bias 규칙상 M=0"
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 \"외부 미공개\"·\"내부 기준\"·\"내부 리스크 한도\" 같은 보일러플레이트 비공개 문구만 있을 뿐, 접근통제 매트릭스·암호화·국가핵심기술/영업비밀 지정등록·토큰/키 관리·NDA통제 등 구체적 형식적 관리 메커니즘이 전혀 적혀 있지 않음 → anti-bias 규칙에 따라 M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "444159316eb8737d",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "고급 제조 공정 수율 개선 연구 보고서  불량률 감소 및 수율 향상을 위한 제조 공정 개선 연구 결과입니다.  현황: 불량률 2.3% → 개선 ",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 어디에도 접근통제·암호화·국가핵심기술/영업비밀 지정등록·키관리·NDA통제 등 형식적 관리 메커니즘이 적혀 있지 않음; \"내부용\" 보일러플레이트조차 없이 순수 연구결과만 기술 → M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키/토큰 관리·추적배포·NDA 등 형식적 관리 메커니즘이 전혀 명시되지 않음. \"내부용/외부금지\" 보일러플레이트조차 없는 순수 연구결과 서술뿐 → M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·NDA통제 등 구체적 형식적 관리 메커니즘이 전혀 적혀 있지 않다(단순 연구보고서 서술뿐, '내부용' 보일러플레이트조차 명시 없음) → M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "6cb0732ddae72484",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "AI 기반 수요 예측 모델 내부 설계 문서  판매 수요 예측을 위한 자체 AI 모델 설계 문서입니다.  모델 아키텍처: Transformer 기",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 형식적 관리 메커니즘 전무: \"AI 기반 수요 예측 모델 내부 설계 문서\" 제목의 '내부 설계 문서'는 anti-bias 규칙상 관리 '의도'일 뿐 증거 아님. 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·추적배포·NDA 어느 것도 본문에 적히지 않음."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 접근통제·암호화·영업비밀/핵심기술 지정등록·키관리·추적배포·NDA 등 형식적 관리 메커니즘이 전혀 없음. 제목의 \"내부 설계 문서\"는 보일러플레이트 '내부용'에 해당 → anti-bias 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 형식적 관리 메커니즘 전무 — 제목 \"내부 설계 문서\"라는 내부용 라벨뿐이며, 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·추적배포·NDA 통제 중 어느 것도 본문에 명시되지 않음(anti-bias 규칙: '내부용'은 관리 의도일 뿐 형식적 관리 증거 아님)."
+   }
+  ]
+ },
+ {
+  "doc_id": "823545b7edf3a0ef",
+  "gold_intended": "S2",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "공급망 위기 내부 대응 계획  주요 원자재 공급 차질에 대한 내부 비상 대응 계획입니다.  예상 공급 부족 기간: 3~6개월 대체 공급사 발굴 ",
+  "grades": [
+   "S1",
+   "S1",
+   "S3"
+  ],
+  "tally": {
+   "S1": 2,
+   "S3": 1
+  },
+  "consensus": "S1",
+  "agreement": "2/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 1.6666666666666667,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 형식적 관리 메커니즘(접근통제·암호화·영업비밀/핵심기술 지정등록·키/토큰관리·NDA·추적배포) 전무. 존재하는 문구는 \"내부 비상 대응 계획\", \"공개 전 유출 시 협상력 약화\" 같은 보일러플레이트 비밀유지 '의도'뿐이라 anti-bias 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "형식적 관리 메커니즘 부재: 본문에 적힌 것은 \"내부 비상 대응 계획\", \"내부 비상 대응 계획입니다\", \"공개 전 유출 시...\" 같은 비공개 의도/보일러플레이트뿐. 접근통제 매트릭스·암호화·지정등록·키관리·NDA 등 구체적 형식 관리 증거가 전혀 명시되지 않음 → M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 2,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 \"내부 비상 대응 계획\", \"공개 전 유출 시 ... 우려\"라는 보일러플레이트 비밀유지 의도뿐 — 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·키관리·NDA통제·추적배포 등 구체적 형식적 관리 메커니즘이 본문에 전혀 명시되지 않음. anti-bias 규칙에 따라 M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "e9021472b249648c",
+  "gold_intended": "S2",
+  "claude_rejudge": "S1",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "ESG 공시 전 내부 검토 보고서  2024년 ESG 보고서 발간 전 내부 검토 자료입니다.  탄소 배출량: 공시 기준 대비 3% 초과 (개선 ",
+  "grades": [
+   "S3",
+   "S3",
+   "S3"
+  ],
+  "tally": {
+   "S3": 3
+  },
+  "consensus": "S3",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 1,
+   "v": 1,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "\"내부 검토 자료입니다\"라는 보일러플레이트 표현뿐, 접근통제·암호화·영업비밀 지정등록·키/토큰 관리·NDA 등 구체적 형식적 관리 메커니즘이 본문에 전혀 명시되지 않음 → M=0(anti-bias 규칙 적용)."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 \"내부 검토 보고서\"·\"내부 검토 자료\"·\"공시 전 유출 시\"라는 내부용 보일러플레이트뿐, 접근통제·암호화·영업비밀/국가핵심기술 지정·키/토큰관리·NDA 등 형식적 관리 메커니즘이 전혀 적혀 있지 않음 → anti-bias 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문엔 \"내부 검토 자료\", \"공시 전 유출 시 평판 리스크\"라는 관리 '의도' 보일러플레이트만 있고, 접근통제·암호화·영업비밀/국가핵심기술 지정·키/토큰 관리·NDA·추적배포 등 형식적 관리 '메커니즘'이 전혀 명시되지 않음 → anti-bias 규칙상 M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "0951ba69a6be1063",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "고객 행동 데이터 분석 모델 설계서  빅데이터 기반 고객 행동 예측 모델 설계 및 운영 문서입니다.  분석 데이터: 3년치 구매·행동 로그 (5",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·토큰/키 관리·추적배포·NDA 등 형식적 관리 메커니즘이 전혀 명시되지 않음. '실시간 스코어링 (100ms 이내)'은 운영현황일 뿐 관리증거 아니며, '내부용' 보일러플레이트조차 없음. M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 전체(분석데이터·모델구조·예측항목·운영현황 \"실시간 스코어링 100ms 이내\")에 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키관리·추적배포·NDA 같은 형식적 관리 메커니즘이 단 한 줄도 명시되지 않음. \"내부용\" 보일러플레이트조차 없음 → M=0"
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·토큰/키 관리·추적배포·NDA 등 구체적 형식적 관리 메커니즘이 전혀 적혀 있지 않음(보일러플레이트 '내부용' 문구조차 없음, 데이터/모델/운영현황/가치 주장만 기술) → M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "5cc711520698d2dc",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "mixed",
+  "text_head": "글로벌 특허 포트폴리오 방어 전략  핵심 기술 영역의 글로벌 특허 방어 전략 내부 문서입니다.  보유 특허: 국내외 340건 방어 공백: 중국·",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 \"내부 문서입니다\"라는 보일러플레이트뿐, 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·NDA·추적배포 등 구체적 형식 관리 메커니즘이 전혀 명시되지 않음 → anti-bias 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 \"핵심 기술 영역의 글로벌 특허 방어 전략 내부 문서입니다\"라는 보일러플레이트뿐 — 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키/토큰 관리·추적배포·NDA 등 형식적 관리 메커니즘이 일절 기재되지 않음. anti-bias 규칙상 '내부 문서' 의도만으로는 M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 형식적 관리증거는 \"핵심 기술 영역의 글로벌 특허 방어 전략 내부 문서입니다\"라는 보일러플레이트뿐 — 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·NDA·추적배포 등 구체 메커니즘 전무. anti-bias 규칙상 '내부 문서' 문구는 M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "1655fcc25715b5e3",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "sales",
+  "text_head": "Customer database export risk review  VIP customer database, renewal probability",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문은 데이터 항목 인벤토리뿐 — 접근통제 매트릭스·암호화·영업비밀/핵심기술 지정등록·키/토큰관리·추적배포·NDA 등 구체적 형식 관리 메커니즘이 한 줄도 명시되지 않음. 제목 \"export risk review\"는 관리 '의도/인식' 신호일 뿐 형식적 관리 '증거' 아님 → anti-bias 규칙 적용 M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문은 \"Customer database export risk review\"와 데이터 항목 나열뿐 — 접근통제 매트릭스·암호화·영업비밀 지정등록·토큰/키 관리·NDA통제 같은 구체적 형식적 관리 메커니즘이 한 줄도 적혀 있지 않다. \"export risk review\"라는 제목은 관리 의도일 뿐 형식적 관리 증거가 아니므로 anti-bias 규칙에 따라 M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "제목 \"export risk review\"와 본문 어디에도 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·토큰/키 관리·추적배포·NDA통제 같은 구체적 형식적 관리 메커니즘이 적혀 있지 않음(데이터 항목 나열뿐). 형식적 관리 증거 0 → M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "0a17cd97d0444d97",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "manufacturing",
+  "text_head": "Yield improvement know-how memo  Production yield improvement know-how, defect-r",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·NDA·추적배포 등 형식적 관리 메커니즘이 전혀 없음; \"used by the factory engineering team\"은 사용 주체 서술일 뿐 관리 증거 아님(보일러플레이트 '내부용' 문구조차 없음 → anti-bias 규칙상 M=0)."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 형식적 관리 메커니즘이 전혀 없음 — 접근통제 매트릭스·암호화·국가핵심기술/영업비밀 지정등록·키/토큰 관리·NDA·추적배포 어느 것도 적혀 있지 않다. \"used by the factory engineering team\"은 사용 주체 언급일 뿐 관리 증거가 아니며, \"내부용\"류 보일러플레이트조차 없다. anti-bias 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "The body describes only the content of the know-how. No formal management mechanism is stated anywhere — no access-control matrix, no encryption, no trade-secret/national-core-technology designation, no key/token management, no tracked distribution, no NDA control. There is not even a boilerplate \"internal use only\" line. Zero formal management evidence in the body → M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "9a4ace0da18602c1",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "software",
+  "text_head": "Internal API credential rotation plan  Internal API credential inventory, source",
+  "grades": [
+   "TS",
+   "TS",
+   "S2"
+  ],
+  "tally": {
+   "TS": 2,
+   "S2": 1
+  },
+  "consensus": "TS",
+  "agreement": "2/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 1.6666666666666667,
+   "m": 2
+  },
+  "votes": [
+   {
+    "lens_grade": "TS",
+    "s": 2,
+    "v": 2,
+    "m": 2,
+    "ts_justified": true,
+    "m_reason": "본문에 형식적 관리 메커니즘이 내용으로 직접 명시됨: \"privileged token rotation plan\"=토큰/키 관리, \"repository access control matrix\"=접근통제 매트릭스. 단순 '내부용' 보일러플레이트가 아니라 루브릭이 열거한 구체 메커니즘 2종이 본문에 적힘."
+   },
+   {
+    "lens_grade": "TS",
+    "s": 2,
+    "v": 2,
+    "m": 2,
+    "ts_justified": true,
+    "m_reason": "본문에 구체적 형식적 관리 메커니즘이 직접 명시됨: \"privileged token rotation plan\"(키/토큰 회전 관리)과 \"repository access control matrix\"(접근통제 매트릭스). 단순 '내부용' 보일러플레이트가 아니라 토큰 회전·접근통제 매트릭스라는 실제 관리 메커니즘이므로 M=2."
+   },
+   {
+    "lens_grade": "S2",
+    "s": 2,
+    "v": 1,
+    "m": 2,
+    "ts_justified": false,
+    "m_reason": "보일러플레이트가 아니라 본문이 구체 관리 메커니즘 자체를 명시: \"privileged token rotation plan\"(토큰/키 관리)과 \"repository access control matrix\"(접근통제 매트릭스)는 루브릭이 M≥1 예시로 든 형식적 관리증거에 정확히 해당. M=2."
+   }
+  ]
+ },
+ {
+  "doc_id": "e5c18dde49a41611",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "finance",
+  "text_head": "Private pricing model and margin table  Cost structure, EBITDA bridge, BUY targe",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "제목의 \"Private\"만 있을 뿐 접근통제·암호화·영업비밀 지정등록·키/토큰 관리·NDA통제 등 형식적 관리 메커니즘이 본문에 전혀 명시되지 않음(보일러플레이트 'Private'는 anti-bias 규칙상 M=0)."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "제목 \"Private pricing model\"의 'Private'는 비밀유지 '의도' 보일러플레이트일 뿐. 본문에 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·추적배포·NDA통제 등 형식적 관리 메커니즘이 단 한 줄도 적혀 있지 않음 → M=0"
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문은 내용 카테고리(원가구조·EBITDA bridge·할인밴드·협상하한)만 나열할 뿐, 접근통제 매트릭스·암호화·영업비밀 지정등록·키/토큰관리·NDA통제 등 형식적 관리 메커니즘이 단 하나도 적혀 있지 않음. 제목의 \"Private\"는 관리 '의도' 보일러플레이트일 뿐 형식적 관리 '증거' 아님 → anti-bias 규칙상 M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "f7c79d1718734220",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "legal",
+  "text_head": "Patent license negotiation draft  Patent license term sheet, royalty ceiling, cr",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문은 문서 '내용'(term sheet·ceiling·fallback·threshold·analysis)만 나열할 뿐 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키·추적배포·NDA통제 등 구체적 형식 관리 메커니즘이 한 줄도 명시되지 않음. \"unpublished\"는 비공개 서술(보일러플레이트)일 뿐 관리 증거 아님 → M=0"
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문은 협상초안의 '내용'(term sheet·royalty ceiling·infringement analysis)만 기술; 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·추적배포·NDA통제 등 구체적 형식적 관리 메커니즘이 본문에 일절 명시되지 않음. \"unpublished\"는 비공개 상태 서술일 뿐 관리 증거 아님 → M=0"
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 접근통제·암호화·영업비밀 지정등록·키/토큰관리·NDA통제 등 형식적 관리 메커니즘이 전혀 명시되지 않음. \"draft/unpublished\"는 미공개 상태 서술일 뿐 관리 '증거' 아님(anti-bias 규칙: 보일러플레이트 미공개 문구 M=0)."
+   }
+  ]
+ },
+ {
+  "doc_id": "202c81580de90fcc",
+  "gold_intended": "S1",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "bio",
+  "text_head": "GMP process transfer checklist  GMP batch-transfer know-how, DMF preparation not",
+  "grades": [
+   "S1",
+   "S1",
+   "S1"
+  ],
+  "tally": {
+   "S1": 3
+  },
+  "consensus": "S1",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 2,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 전체(\"GMP process transfer checklist ... process deviation handling rule\")에 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키/토큰 관리·추적배포·NDA 등 형식적 관리 메커니즘이 단 한 줄도 명시되지 않음. '내부용' 보일러플레이트조차 없음 → M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 전체에 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·NDA통제 등 형식적 관리 메커니즘이 단 한 줄도 명시되지 않음(단순 체크리스트 항목 나열뿐, \"내부용\"조차 없음). 따라서 M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 접근통제·암호화·국가핵심기술/영업비밀 지정등록·키/토큰 관리·추적배포·NDA 등 어떤 형식적 관리 메커니즘도 명시되지 않음. checklist/note/status/rule 나열뿐이고 '내부용' 보일러플레이트조차 없어 anti-bias 규칙상 M=0"
+   }
+  ]
+ },
+ {
+  "doc_id": "9e4b03d3deaf83ee",
+  "gold_intended": "S2",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "operations",
+  "text_head": "Internal weekly supplier risk brief  Internal weekly supplier risk brief coverin",
+  "grades": [
+   "S3",
+   "S3",
+   "S3"
+  ],
+  "tally": {
+   "S3": 3
+  },
+  "consensus": "S3",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 1.3333333333333333,
+   "v": 1,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 \"Internal weekly supplier risk brief\"라는 '내부용' 보일러플레이트만 있을 뿐, 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·키/토큰 관리·추적배포·NDA통제 등 어떤 구체적 형식적 관리 메커니즘도 본문에 적혀 있지 않음 → anti-bias 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문은 \"Internal weekly supplier risk brief\"라는 '내부용' 보일러플레이트 표시뿐이며, 접근통제·암호화·영업비밀 지정등록·키/토큰 관리·NDA 등 구체적 형식적 관리 메커니즘이 전혀 인용되지 않음 → anti-bias 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 2,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 관리 신호는 제목의 \"Internal\" 단어뿐. anti-bias 규칙상 '내부용' 보일러플레이트는 M=0. 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·추적배포·NDA 등 형식적 관리 메커니즘이 본문에 전혀 명시되지 않음."
+   }
+  ]
+ },
+ {
+  "doc_id": "862835307c74dc28",
+  "gold_intended": "S2",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "planning",
+  "text_head": "Draft business plan review  Draft quarterly business plan, forecast gap, BEV lau",
+  "grades": [
+   "S3",
+   "S3",
+   "S3"
+  ],
+  "tally": {
+   "S3": 3
+  },
+  "consensus": "S3",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 1,
+   "v": 1.3333333333333333,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "\"internal review comments before executive approval\" — '내부' 의도 표현뿐 접근통제/암호화/지정등록/키관리 등 형식적 관리 메커니즘 본문 부재(M=0)."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 어디에도 접근통제·암호화·국가핵심기술/영업비밀 지정등록·키관리·NDA·추적배포 등 형식적 관리 메커니즘이 명시되지 않음. \"internal review comments / before executive approval\"는 내부용 보일러플레이트일 뿐 형식적 관리 증거 아님 → anti-bias 규칙에 따라 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 관리신호는 \"before executive approval\"(승인워크플로)·\"internal review comments\"뿐 — 접근통제/암호화/영업비밀 지정등록/키관리/NDA 등 구체 메커니즘 전무. anti-bias 규칙상 '내부·승인전'은 관리의도 보일러플레이트라 M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "d0598defd004ded7",
+  "gold_intended": "S2",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "finance",
+  "text_head": "Budget forecast variance memo  Budget forecast, WTI sensitivity, AMPC scenario, ",
+  "grades": [
+   "S3",
+   "S3",
+   "S3"
+  ],
+  "tally": {
+   "S3": 3
+  },
+  "consensus": "S3",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 1.3333333333333333,
+   "v": 1,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "관리 신호는 \"internal-only\"가 유일 — anti-bias 규칙이 명시한 보일러플레이트 그 자체. 접근통제 매트릭스·암호화·지정등록·키관리·NDA 같은 구체 형식적 관리 메커니즘이 본문에 전혀 적히지 않음(M=0)."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문의 유일한 관리 신호는 \"internal-only\"라는 보일러플레이트 문구뿐. 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·키/토큰 관리·추적배포·NDA 등 구체적 형식적 관리 메커니즘이 본문에 전혀 적혀 있지 않음 → anti-bias 규칙 적용 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 2,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 관리신호는 \"internal-only\" 문구뿐 — 정확히 anti-bias 규칙이 M=0으로 규정한 '내부용' 보일러플레이트. 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·추적배포·NDA통제 등 구체적 형식적 관리 메커니즘이 본문에 전혀 적히지 않음."
+   }
+  ]
+ },
+ {
+  "doc_id": "6ea073680b55d1e9",
+  "gold_intended": "S2",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "procurement",
+  "text_head": "Vendor negotiation status note  Vendor negotiation draft, supplier quotation, CD",
+  "grades": [
+   "S1",
+   "S1",
+   "S3"
+  ],
+  "tally": {
+   "S1": 2,
+   "S3": 1
+  },
+  "consensus": "S1",
+  "agreement": "2/3",
+  "avg_svm": {
+   "s": 2,
+   "v": 1.6666666666666667,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 \"internal approval route\"(내부 승인경로)만 있을 뿐 접근통제 매트릭스·암호화·영업비밀 지정등록·키/토큰 관리·NDA통제 등 구체적 형식적 관리 메커니즘이 전혀 명시되지 않음. \"internal\"은 관리 의도 보일러플레이트로 anti-bias 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S1",
+    "s": 2,
+    "v": 2,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 \"internal approval route\"만 언급될 뿐 접근통제 매트릭스·암호화·영업비밀 지정등록·키/토큰 관리·NDA통제 등 형식적 관리 메커니즘이 전혀 명시되지 않음. \"internal\"은 보일러플레이트로 anti-bias 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 2,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문 유일 관리성 후보는 \"internal approval route\"인데 이는 결재 워크플로우일 뿐 접근통제·암호화·지정등록·키관리·추적배포·NDA 같은 형식적 관리 메커니즘이 본문에 전혀 명시되지 않음 → anti-bias 규칙상 M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "657e55b2c348103b",
+  "gold_intended": "S2",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "telecom",
+  "text_head": "Network rollout internal review  Internal review of GHz band rollout, LTE fallba",
+  "grades": [
+   "S3",
+   "S3",
+   "S3"
+  ],
+  "tally": {
+   "S3": 3
+  },
+  "consensus": "S3",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 1,
+   "v": 1,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문은 \"Internal review\" 보일러플레이트뿐 — 접근통제·암호화·지정등록·키/토큰관리·NDA·추적배포 등 구체적 형식적 관리 메커니즘이 본문에 전무 → anti-bias 규칙상 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "Only \"Internal review\" appears — pure boilerplate intent. Body contains NO formal management mechanism: no access-control matrix, no encryption, no trade-secret/national-core-tech designation, no key/token management, no tracked distribution, no NDA. Per anti-bias rule, bare \"internal\" = M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문은 \"Internal review\"라는 내부용 표시뿐, 접근통제·암호화·영업비밀/국가핵심기술 지정등록·키관리·NDA통제 등 구체적 형식적 관리 메커니즘이 전혀 명시되지 않음. anti-bias 규칙상 '내부용' 보일러플레이트는 M=0."
+   }
+  ]
+ },
+ {
+  "doc_id": "005ec1d624eff4fa",
+  "gold_intended": "S2",
+  "claude_rejudge": "TS",
+  "tier": "koipa_case_based",
+  "domain": "market",
+  "text_head": "Weekly market and ETF exposure note  Weekly internal market note with ETF exposu",
+  "grades": [
+   "S3",
+   "S3",
+   "S3"
+  ],
+  "tally": {
+   "S3": 3
+  },
+  "consensus": "S3",
+  "agreement": "3/3",
+  "avg_svm": {
+   "s": 1,
+   "v": 1,
+   "m": 0
+  },
+  "votes": [
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 \"Weekly internal market note\"의 'internal' 표기 외 형식적 관리 메커니즘 전무 — 접근통제 매트릭스·암호화·영업비밀/국가핵심기술 지정등록·키/토큰관리·NDA통제 어느 것도 명시되지 않음; 'internal'은 anti-bias 규칙상 보일러플레이트로 M=0."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문에 형식적 관리 메커니즘이 전무함. 등장하는 관리 단서는 \"Weekly internal market note\"의 'internal'이라는 보일러플레이트뿐 — anti-bias 규칙상 '내부용'만으로는 M=0. 접근통제·암호화·영업비밀 지정등록·키/토큰관리·NDA·추적배포 어느 것도 명시되지 않음."
+   },
+   {
+    "lens_grade": "S3",
+    "s": 1,
+    "v": 1,
+    "m": 0,
+    "ts_justified": false,
+    "m_reason": "본문은 \"internal\"이라는 보일러플레이트뿐 — 접근통제·암호화·영업비밀 지정등록·키/토큰관리·NDA·추적배포 등 구체적 형식 관리 메커니즘이 전혀 적혀있지 않음. anti-bias 규칙상 M=0."
+   }
+  ]
+ }
+]

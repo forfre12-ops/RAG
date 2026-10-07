@@ -1,0 +1,484 @@
+"""Async classify service — /classify/async·/batch·/jobs.
+
+PoC: in-process 즉시 실행. 운영은 Celery classify_async.delay(...).
+JobStore로 상태 추적.
+
+부분 실패 처리 (2026-05 추가):
+- submit_batch는 건별로 독립적인 try/except + retry (지수 백오프 최대 2회).
+- 한 건이 영구 실패해도 다음 건 계속 진행.
+- 응답에 completed/failed/failed_doc_ids/errors 포함.
+- 모든 retry 실패 시 status="partial" (일부 성공) 또는 "failed" (전부 실패).
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import threading
+import time
+import uuid
+from typing import Callable, Optional
+
+from koipa.schemas.classify import ClassifyJobResult, ClassifyRequest, kl_wire_projection
+from koipa.schemas.classify_async import (
+    ClassifyAsyncRequest,
+    ClassifyAsyncResponse,
+    ClassifyBatchRequest,
+    ClassifyBatchResponse,
+    ClassifyJobStatus,
+)
+from koipa.services._retry import iter_with_partial_failure
+from koipa.services.classify_service import ClassifyService
+from koipa.services.job_store import get_default_store
+
+logger = logging.getLogger(__name__)
+
+
+def _oversized_batch_doc_reason(doc: ClassifyRequest) -> Optional[str]:
+    """배치 문서 한 건이 너무 커서 배치 전체를 오래 막는지 검사.
+
+    [2026-09-30] `/classify/batch`는 건별 순차 처리라(iter_with_partial_failure), 문서 하나가
+    100쪽대면 그 한 건이 수십~백여 초를 끌어 나머지 999건이 뒤에서 기다린다. 단건 동기 경로
+    (`api/documents.py`의 analyze_sync_max_chunks)와 같은 상한을 여기도 적용한다 — 재시도로는
+    크기가 줄지 않으므로 재시도 없이 즉시 실패 처리한다(아래 _process_batch_documents).
+    content가 없으면(문서 조회 등 다른 입력 경로) 크기를 알 수 없어 검사하지 않는다.
+    """
+    if not doc.content:
+        return None
+    try:
+        from koipa.config import settings  # noqa: PLC0415
+        from koipa.modules.m5_inference.pipeline import chunk_text  # noqa: PLC0415
+
+        cap = int(getattr(settings, "analyze_sync_max_chunks", 0) or 0)
+        if cap <= 0:
+            return None
+        n_chunks = len(chunk_text(doc.content, settings.max_seq_len * 3, settings.chunk_overlap))
+        if n_chunks > cap:
+            return (
+                f"document too large for batch: {n_chunks} chunks > {cap} "
+                f"({len(doc.content):,} chars). 대용량 문서는 POST /classify/async 로 단건 제출할 것."
+            )
+    except Exception:  # noqa: BLE001 — 검사 자체가 실패하면 통과시킨다(과대 차단보다 처리 시도가 안전)
+        return None
+    return None
+
+
+# [2026-09-11] 브로커 확인 결과를 잠깐 저장한다 (PER-002 "등록 3초 이내").
+#
+# 종전에는 비동기 요청마다 브로커에 TCP 연결을 새로 시도했다(0.5초 제한). 브로커가 살아 있으면
+# 즉시 붙어 비용이 없지만, **죽어 있으면 요청마다 0.5초**를 기다린 뒤 in-process 로 떨어진다.
+# localhost 가 ::1·127.0.0.1 두 주소로 풀리면 두 번 기다려 약 1초다(실측 1,020~1,080ms, Windows).
+# 등록 여유 3초의 3분의 1을 요청마다 깎아 먹는 셈이다.
+#
+# 결과(가용·불가 둘 다)를 _DISPATCH_TTL_S 동안 재사용한다. 짧게 두는 이유: 브로커가 죽은 직후에도
+# 저장된 값이 '가용'이면 발사가 실패한다 — 그때 호출부는 in-process 로 폴백하고
+# invalidate_dispatch_cache() 로 값을 즉시 버린다. 되살아난 브로커는 늦어도 TTL 뒤에 다시 쓴다.
+# 시험 환경(TESTING/PYTEST) 판정은 저장보다 먼저 한다 — 저장된 값이 시험 사이로 새지 않게.
+_DISPATCH_TTL_S = 10.0
+_dispatch_cache: dict = {"at": None, "value": False}
+_dispatch_lock = threading.Lock()
+
+
+def invalidate_dispatch_cache() -> None:
+    """저장해 둔 브로커 확인 결과를 버린다 — 다음 호출이 다시 확인한다."""
+    with _dispatch_lock:
+        _dispatch_cache["at"] = None
+
+
+def _celery_dispatch_available() -> bool:
+    """브로커로 발사해도 되는가 — 확인 결과를 _DISPATCH_TTL_S 동안 재사용한다.
+
+    판정 조건 자체는 _probe_broker_uncached() 에 있다(시험 환경 · eager · 브로커 연결).
+    """
+    if os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return False
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
+    now = time.monotonic()
+    with _dispatch_lock:
+        at = _dispatch_cache["at"]
+        if at is not None and now - at < _DISPATCH_TTL_S:
+            return bool(_dispatch_cache["value"])
+    value = _probe_broker_uncached()
+    with _dispatch_lock:
+        _dispatch_cache["at"] = time.monotonic()
+        _dispatch_cache["value"] = value
+    return value
+
+
+def _probe_broker_uncached() -> bool:
+    """실 Celery 브로커로 task.delay()를 발사해도 안전한지 런타임 감지.
+
+    Top-7 배선: submit()이 영구 'queued' 거짓표기·in-process 동기실행에 머물지 않고,
+    **운영(브로커 가용)** 에서만 실제 비동기 발사하도록 분기하기 위한 게이트.
+
+    True를 반환하는 조건(모두 충족):
+      1) 테스트 환경이 아님 (TESTING/PYTEST). 테스트는 라이브 redis 없이 통과해야 하므로
+         항상 in-process 경로를 유지한다.
+      2) Celery eager 모드가 아님. eager면 .delay()가 in-process 동기실행이라 현재
+         경로와 동작이 같으니, JobStore 갱신 의미를 보존하는 in-process 경로를 그대로 쓴다.
+      3) 브로커가 실제로 연결 가능(빠른 non-blocking 프로브, max_retries=0).
+
+    하나라도 불충족이면 False → 호출부는 기존 in-process 즉시 실행을 유지(동작·테스트 보존).
+    프로브 자체의 예외는 흡수하고 False(보수적). config.py는 건드리지 않고 런타임만 본다.
+    """
+    if os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return False
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
+    try:
+        import socket  # noqa: PLC0415
+
+        from koipa.workers.celery_app import celery_app  # noqa: PLC0415
+
+        if celery_app.conf.task_always_eager:
+            return False
+        # 빠른 TCP 프로브(0.5s) — 브로커 미가용 시 kombu 재시도 루프(수초 블로킹) 대신
+        # 즉시 False로 떨어져 in-process 폴백한다. conftest._check_postgres와 동일 패턴.
+        # 운영(브로커 가용)은 즉시 연결되어 True. 포트 파싱 실패는 보수적으로 False.
+        try:
+            conn = celery_app.connection_for_write()
+            host = getattr(conn, "host", None) or "localhost"
+            port = int(getattr(conn, "port", None) or 6379)
+            # kombu redis transport은 host에 'host:port' 형태를 담기도 한다 — 포트 분리.
+            if ":" in host:
+                host = host.rsplit(":", 1)[0]
+        except Exception:  # noqa: BLE001
+            return False
+        try:
+            sock = socket.create_connection((host, port), timeout=0.5)
+            sock.close()
+            return True
+        except OSError:
+            return False
+    except Exception:  # noqa: BLE001
+        return False
+
+
+class AsyncClassifyService:
+    # 클래스 수준 — 테스트에서 빠른 진행 위해 monkeypatch 가능.
+    BATCH_MAX_ATTEMPTS = 3       # 1회 본 시도 + 2회 retry
+    BATCH_BASE_DELAY = 0.1       # base_delay; 지수 백오프 0.1/0.2초 (기존 0.5에서 단축)
+
+    def __init__(self, sleep_fn: Callable[[float], None] = time.sleep):
+        self.jobs = get_default_store()
+        self.classify = ClassifyService.get_instance()
+        self._sleep_fn = sleep_fn
+
+    def submit_async(self, req: ClassifyAsyncRequest) -> ClassifyAsyncResponse:
+        logger.debug(
+            "async classify submit enter: doc_id=%s",
+            req.doc_id,
+        )
+        job_id = uuid.uuid4()
+        self.jobs.create(
+            job_id,
+            payload={"total": 1, "completed": 0, "client_request_id": getattr(req, "client_request_id", None)},
+        )
+        # 운영(브로커 가용): 실제 Celery classify_async.delay() 발사 후 'queued' 반환.
+        # job은 'queued'로 남고 worker가 done/failed로 전이 → status가 실제 상태 반영.
+        # callback_url은 worker가 결과를 가지므로 여기선 outbox 발사하지 않는다(중복 방지).
+        if _celery_dispatch_available():
+            try:
+                from koipa.workers.tasks import classify_async  # noqa: PLC0415
+
+                payload = self._strip_async_fields(req).model_dump(mode="json")
+                # callback_url 을 워커로 넘겨 완료 시 webhook 을 발사하게 한다(과거엔 떼어내
+                # 워커에 전달조차 안 돼 운영 경로 webhook 이 영원히 안 울렸다).
+                classify_async.delay(
+                    payload, job_id=str(job_id), callback_url=getattr(req, "callback_url", None),
+                    client_request_id=getattr(req, "client_request_id", None),
+                )
+                logger.info("async classify enqueued to celery: job_id=%s doc_id=%s", job_id, req.doc_id)
+                return ClassifyAsyncResponse(
+                    job_id=job_id,
+                    status="queued",
+                    status_url=f"/api/v1/classify/jobs/{job_id}",
+                )
+            except Exception:  # noqa: BLE001
+                # 발사 실패는 치명적이지 않게 — in-process 폴백으로 진행(가용성 우선).
+                logger.warning(
+                    "celery enqueue failed for async classify — falling back to in-process: job_id=%s",
+                    job_id, exc_info=True,
+                )
+                # 발사가 실패했으면 저장해 둔 '가용' 판정은 틀린 것이다 — 다음 요청이 다시 확인한다.
+                invalidate_dispatch_cache()
+        # PoC/테스트/브로커 미가용: 즉시 in-process 실행 (Celery 발사 대신)
+        callback_payload: dict
+        try:
+            result = self.classify.classify(self._strip_async_fields(req))
+            result_json = result.job_result()
+            self.jobs.update(job_id, status="done", completed=1, results=[result_json])
+            # [2026-09-29] 콜백은 정의상 항상 KL 수신 — 저장값(results, GET 조회가 읽는 값)은
+            # 전체를 두고 webhook 본문만 kl_wire_projection 으로 좁힌다.
+            kl_result_json = self._to_kl_result_json(result_json)
+            callback_payload = {
+                "job_id": str(job_id),
+                "status": "done",
+                "client_request_id": getattr(req, "client_request_id", None),
+                "results": [kl_result_json],
+            }
+            logger.info("async classify done: job_id=%s doc_id=%s", job_id, req.doc_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "async classify failed: job_id=%s doc_id=%s err=%s",
+                job_id, req.doc_id, type(exc).__name__, exc_info=True,
+            )
+            self.jobs.update(job_id, status="failed", error=str(exc))
+            callback_payload = {
+                "job_id": str(job_id),
+                "status": "failed",
+                "client_request_id": getattr(req, "client_request_id", None),
+                "error": str(exc),
+            }
+        # M-callback: callback_url 이 있으면 outbox webhook 발사 — _strip_async_fields
+        # 가 callback_url 을 떼어내 분류 자체엔 영향 없게 하면서도, 여기서 결과를
+        # outbox 로 publish 해 webhook 이 실제로 울리게 한다(과거엔 영원히 안 울림).
+        self._publish_callback(getattr(req, "callback_url", None), callback_payload)
+        # [2026-10-06] KL Stream — callback_url 유무와 무관하게 매 작업 종결마다 시도한다
+        # (kl_stream_redis_url 미설정이면 no-op).
+        self._publish_kl_stream(callback_payload)
+        # in-process 경로는 이미 처리가 끝났으므로 'queued' 거짓표기 대신 실제 최종 상태
+        # (done/failed)를 반환한다. status_url 폴링은 동일 값을 다시 보게 된다.
+        return ClassifyAsyncResponse(
+            job_id=job_id,
+            status=callback_payload["status"],
+            status_url=f"/api/v1/classify/jobs/{job_id}",
+        )
+
+    def _process_batch_documents(
+        self, documents: list[ClassifyRequest], job_id: uuid.UUID
+    ) -> tuple[list[dict], list[str], list[dict]]:
+        """건별 isolation+retry로 배치를 처리한다 — in-process 경로·Celery 워커 경로 공용.
+
+        [2026-09-30] 너무 큰 문서(_oversized_batch_doc_reason)는 재시도 없이 즉시 실패
+        처리한다 — 크기는 재시도로 줄지 않으니 재시도 지연만 낭비한다. 진행 카운터는
+        이미 판정된 과대 문서까지 포함해 갱신한다(폴링 화면이 "멈춘 것처럼" 보이지 않게).
+        """
+        oversized_ids: list[str] = []
+        oversized_errors: list[dict] = []
+        valid_docs: list[ClassifyRequest] = []
+        for doc in documents:
+            reason = _oversized_batch_doc_reason(doc)
+            if reason:
+                oversized_ids.append(doc.doc_id)
+                oversized_errors.append({
+                    "doc_id": doc.doc_id, "error_type": "DocumentTooLarge",
+                    "message": reason, "attempts": 0,
+                })
+            else:
+                valid_docs.append(doc)
+
+        def _handle(doc: ClassifyRequest) -> dict:
+            res = self.classify.classify(doc)
+            return res.job_result()
+
+        # 진행 카운터 업데이트용 wrapper — 매 건 완료 시 jobs.update. 과대 판정분을 base로 시작.
+        completed_counter = {"n": len(oversized_ids)}
+        if oversized_ids:
+            self.jobs.update(job_id, completed=completed_counter["n"])
+
+        def _handle_and_track(doc: ClassifyRequest) -> dict:
+            out = _handle(doc)
+            completed_counter["n"] += 1
+            self.jobs.update(job_id, completed=completed_counter["n"])
+            return out
+
+        results, failed_ids, errors = iter_with_partial_failure(
+            valid_docs,
+            _handle_and_track,
+            max_attempts=self.BATCH_MAX_ATTEMPTS,
+            base_delay=self.BATCH_BASE_DELAY,
+            sleep_fn=self._sleep_fn,
+            id_of=lambda d: d.doc_id,
+        )
+        return results, [*oversized_ids, *failed_ids], [*oversized_errors, *errors]
+
+    def _finalize_batch(
+        self,
+        job_id: uuid.UUID,
+        *,
+        total: int,
+        results: list[dict],
+        failed_ids: list[str],
+        errors: list[dict],
+        callback_url: str | None,
+    ) -> ClassifyBatchResponse:
+        """처리 결과를 JobStore에 최종 기록 + 콜백 발사 — in-process·워커 공용 종결부."""
+        completed = len(results)
+        failed = len(failed_ids)
+        if failed == 0:
+            final_status = "done"
+        elif completed == 0:
+            final_status = "failed"
+        else:
+            final_status = "partial"
+
+        self.jobs.update(
+            job_id,
+            status=final_status,
+            results=results,
+            completed=completed,
+            failed=failed,
+            failed_doc_ids=failed_ids,
+            errors=errors,
+        )
+        logger.info(
+            "async batch done: job_id=%s total=%d completed=%d failed=%d status=%s",
+            job_id, total, completed, failed, final_status,
+        )
+
+        # M-callback: 배치도 동일하게 callback_url 이 있으면 outbox webhook 발사.
+        # 저장값(results)은 전체를 두고, webhook 본문만 kl_wire_projection 으로 좁힌다.
+        _batch_wire_payload = {
+            "job_id": str(job_id),
+            "status": final_status,
+            "total": total,
+            "completed": completed,
+            "failed": failed,
+            "failed_doc_ids": failed_ids,
+            "results": [self._to_kl_result_json(r) for r in results],
+        }
+        self._publish_callback(callback_url, _batch_wire_payload)
+        # [2026-10-06] KL Stream — callback_url 유무와 무관하게 매 배치 종결마다 시도한다.
+        self._publish_kl_stream(_batch_wire_payload)
+
+        return ClassifyBatchResponse(
+            job_id=job_id,
+            total=total,
+            status=final_status,
+            status_url=f"/api/v1/classify/jobs/{job_id}",
+            completed=completed,
+            failed=failed,
+            failed_doc_ids=failed_ids,
+            errors=errors,
+        )
+
+    def submit_batch(
+        self, req: ClassifyBatchRequest
+    ) -> ClassifyBatchResponse:
+        """건별 isolation + retry 패턴.
+
+        한 건이 영구 실패해도 다음 건 계속 진행. 응답에 부분 실패 정보 포함.
+        모두 성공: status="done". 일부 성공: "partial". 전부 실패: "failed".
+
+        [2026-09-30] 운영(브로커 가용) — 전건을 워커(koipa.classify_batch)로 넘기고
+        즉시 'queued'를 반환한다(submit_async 와 동일 판단 · _celery_dispatch_available).
+        예전엔 이 분기가 없어 최대 1000건을 이 요청 안에서 전부 순차 처리했다 — 문서가
+        작아도 수 분, 큰 문서가 섞이면 수십 분까지 걸려 호출자 연결이 응답 전에 끊기고,
+        job_id는 그 응답 안에만 있어 끊기면 폴링할 방법도 없었다(실사용 문제, 이 커밋에서
+        고침). PoC/시험/브로커 미가용은 기존과 동일하게 in-process 로 끝까지 처리한다.
+        """
+        logger.debug("async batch submit enter: total=%d", len(req.documents))
+        job_id = uuid.uuid4()
+        total = len(req.documents)
+        self.jobs.create(
+            job_id, payload={"total": total, "completed": 0}
+        )
+
+        if _celery_dispatch_available():
+            try:
+                from koipa.workers.tasks import classify_batch  # noqa: PLC0415
+
+                payload = [d.model_dump(mode="json") for d in req.documents]
+                classify_batch.delay(
+                    payload, job_id=str(job_id), callback_url=getattr(req, "callback_url", None)
+                )
+                logger.info("async batch enqueued to celery: job_id=%s total=%d", job_id, total)
+                return ClassifyBatchResponse(
+                    job_id=job_id,
+                    total=total,
+                    status="queued",
+                    status_url=f"/api/v1/classify/jobs/{job_id}",
+                    completed=0,
+                    failed=0,
+                    failed_doc_ids=[],
+                    errors=[],
+                )
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "celery enqueue failed for batch — falling back to in-process: job_id=%s",
+                    job_id, exc_info=True,
+                )
+                invalidate_dispatch_cache()
+
+        results, failed_ids, errors = self._process_batch_documents(req.documents, job_id)
+        return self._finalize_batch(
+            job_id, total=total, results=results, failed_ids=failed_ids, errors=errors,
+            callback_url=getattr(req, "callback_url", None),
+        )
+
+    def get_status(
+        self,
+        job_id: uuid.UUID,
+    ) -> Optional[ClassifyJobStatus]:
+        """job 상태 조회.
+
+        tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진이라 job 격리 불요).
+        """
+        logger.debug("async get_status enter: job_id=%s", job_id)
+        job = self.jobs.get(job_id)
+        if job is None:
+            return None
+        raw_results = job.get("results")
+        results = None
+        if raw_results:
+            results = [ClassifyJobResult.model_validate(r) for r in raw_results]
+        return ClassifyJobStatus(
+            job_id=job_id,
+            status=job.get("status", "queued"),
+            client_request_id=job.get("client_request_id"),
+            total=job.get("total"),
+            completed=job.get("completed"),
+            failed=job.get("failed"),
+            failed_doc_ids=job.get("failed_doc_ids", []) or [],
+            errors=job.get("errors", []) or [],
+            results=results,
+            error=job.get("error"),
+        )
+
+    @staticmethod
+    def _to_kl_result_json(result_json: dict) -> dict:
+        """job_result() 딕셔너리 1건 → KL 콜백에 실릴 좁힌 사본.
+
+        [2026-09-29] 콜백 수신자는 정의상 항상 KL(callback_url 은 KL 이 준다). GET 조회가
+        읽는 저장값(results)은 건드리지 않고, 여기서 만든 사본만 webhook 본문에 쓴다 —
+        async_classify.py 의 kl_backend 역할 분기와 같은 규칙(kl_wire_projection).
+        """
+        from koipa.services.regulation_evidence_service import (  # noqa: PLC0415
+            regulation_reference_for_kl_wire,
+            regulation_summary_for_kl_wire,
+        )
+
+        doc_id = result_json.get("doc_id", "")
+        reference = regulation_reference_for_kl_wire(doc_id)
+        return kl_wire_projection(
+            ClassifyJobResult.model_validate(result_json),
+            regulation_reference=reference,
+            regulation_summary=regulation_summary_for_kl_wire(doc_id, reference),
+        ).model_dump(mode="json")
+
+    @staticmethod
+    def _publish_callback(callback_url: str | None, payload: dict) -> None:
+        """callback_url 로 job 결과 webhook 발사 — outbox.publish_callback(공용 계약)로 위임.
+
+        발사 로직(best-effort·재시도·DLQ)은 outbox 로 통합했다(celery 워커 경로와 중복 제거).
+        """
+        from koipa.services.outbox import publish_callback  # noqa: PLC0415
+        publish_callback(callback_url, payload)
+
+    @staticmethod
+    def _publish_kl_stream(payload: dict) -> None:
+        """[2026-10-06] KL Consumer Group 직접구독용 Stream 발사 — outbox.publish_kl_stream 위임.
+
+        kl_stream_redis_url 미설정이면 no-op. callback_url 과 무관하게 매 작업 종결마다 시도.
+        """
+        from koipa.services.outbox import publish_kl_stream  # noqa: PLC0415
+        publish_kl_stream(payload)
+
+    @staticmethod
+    def _strip_async_fields(req: ClassifyAsyncRequest) -> ClassifyRequest:
+        """ClassifyAsyncRequest → ClassifyRequest (callback_url 등 제거)."""
+        return ClassifyRequest.model_validate(
+            req.model_dump(exclude={"callback_url", "client_request_id"})
+        )

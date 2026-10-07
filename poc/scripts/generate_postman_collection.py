@@ -4,9 +4,9 @@ KL 측 통합 시간 단축 목적. CI에서 main push 시 산출하여 artifact
 
 사용:
   python scripts/generate_postman_collection.py \
-      --spec doc/03_openapi_lloydk_kl.yaml \
-      --output dist/lloydk_kl_postman.json \
-      --base-url https://api.lloydk.example.com
+      --spec doc/03_openapi_koipa_kl.yaml \
+      --output dist/koipa_kl_postman.json \
+      --base-url https://api.koipa.example.com
 """
 
 from __future__ import annotations
@@ -106,7 +106,7 @@ def convert(spec: dict, base_url: str) -> dict:
 
     return {
         "info": {
-            "name": info.get("title", "Lloydk KL Integration"),
+            "name": info.get("title", "Koipa KL Integration"),
             "description": info.get("description", ""),
             "version": info.get("version", "0.1.0"),
             "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -121,9 +121,9 @@ def convert(spec: dict, base_url: str) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="E1: OpenAPI → Postman")
-    parser.add_argument("--spec", type=Path, default=Path("doc/03_openapi_lloydk_kl.yaml"))
+    parser.add_argument("--spec", type=Path, default=Path("doc/03_openapi_koipa_kl.yaml"))
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--base-url", default="https://api.lloydk.example.com")
+    parser.add_argument("--base-url", default="https://api.koipa.example.com")
     args = parser.parse_args()
 
     spec = yaml.safe_load(args.spec.read_text(encoding="utf-8"))

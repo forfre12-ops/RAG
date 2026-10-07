@@ -144,8 +144,8 @@ def test_write_to_db_dry_run_signature_has_no_tenant():
 def test_write_to_db_constructs_document_without_tenant(monkeypatch):
     # 테넌트 제거 후 Document(tenant_id=...) 잔재로 write_to_db 가 런타임에 깨졌었다(TypeError).
     # 페이크 세션으로 DB 없이 Document 생성 경로를 태워 더는 깨지지 않음을 확인.
-    import lloydk.db as db_mod
-    import lloydk.repositories.classify_repo as repo_mod
+    import koipa.db as db_mod
+    import koipa.repositories.classify_repo as repo_mod
 
     fake = _FakeSession()
     monkeypatch.setattr(db_mod, "SessionLocal", lambda: fake)
@@ -158,3 +158,60 @@ def test_write_to_db_constructs_document_without_tenant(monkeypatch):
     assert fake.committed is True
     assert len(fake.added) == 1                       # Document 1건 생성됨
     assert not hasattr(fake.added[0], "tenant_id")    # tenant 컬럼 부재(제거 정합)
+
+
+# ── [G2] --as-candidate: 고객사 반입이 locked_gold_eval(평가정답)을 오염하지 않음 ──
+
+from koipa import golden_tiers  # noqa: E402
+
+
+def test_merge_gold_default_human_review_is_held(tmp_path, monkeypatch):
+    # 2026-07-22: CSV import는 인증 서명 envelope(gate_version·signed_at·reviewer_ids)가 없으므로
+    # human_review 라벨이어도 TIER_HELD(격리). real 평가정답 승격은 인증 서명(promote_to_locked)으로만
+    # — CSV가 곧 eval 진실이 되던 구멍을 tier 게이트에서 닫는다(사람 검수 이력 자체는 보존).
+    gold = tmp_path / "classification_gold.jsonl"
+    _seed_gold(gold, [])
+    monkeypatch.setattr(iric, "GOLD_REAL_PATH", gold)
+    iric.merge_into_gold([_correction("c1", "S3", "TS")], dry_run=False)
+    rec = [json.loads(l) for l in gold.read_text(encoding="utf-8").splitlines() if l.strip()][0]
+    assert rec["label_source"] == "human_review"                    # 사람 검수 이력 보존
+    assert golden_tiers.tier_of(rec) == golden_tiers.TIER_HELD       # 단, envelope 없어 격리
+    assert golden_tiers.tier_of(rec) != golden_tiers.TIER_LOCKED
+
+
+def test_merge_gold_as_candidate_is_not_locked(tmp_path, monkeypatch):
+    # 고객사 반입(as_candidate) = customer_review/gold_candidate → TIER_CANDIDATE(학습용, 평가정답 아님).
+    gold = tmp_path / "classification_gold.jsonl"
+    _seed_gold(gold, [])
+    monkeypatch.setattr(iric, "GOLD_REAL_PATH", gold)
+    iric.merge_into_gold([_correction("c1", "S3", "TS")], dry_run=False, as_candidate=True)
+    rec = [json.loads(l) for l in gold.read_text(encoding="utf-8").splitlines() if l.strip()][0]
+    assert rec["label_source"] != "human_review"          # 고객 라벨을 human_review로 굳히지 않음
+    assert rec["review_status"] == "gold_candidate"
+    assert golden_tiers.tier_of(rec) == golden_tiers.TIER_CANDIDATE
+    assert golden_tiers.tier_of(rec) != golden_tiers.TIER_LOCKED
+
+
+def test_to_gold_record_neither_import_path_is_eval_truth():
+    r = _correction("c1", "S3", "TS")
+    held = iric._to_gold_record(r)                     # 기본 = human_review(envelope無) → HELD
+    cand = iric._to_gold_record(r, as_candidate=True)  # 고객 반입 = customer_review → CANDIDATE
+    assert golden_tiers.tier_of(held) == golden_tiers.TIER_HELD
+    assert golden_tiers.tier_of(cand) == golden_tiers.TIER_CANDIDATE
+    # eval 정답 집합엔 둘 다 없음 — 인증 서명 없는 import는 평가 정답이 되지 않는다.
+    locked_eval, _ = golden_tiers.eval_records([held, cand], allow_floor_fallback=False)
+    assert held not in locked_eval and cand not in locked_eval
+
+
+def test_write_to_db_as_candidate_runs(monkeypatch):
+    import koipa.db as db_mod
+    import koipa.repositories.classify_repo as repo_mod
+
+    fake = _FakeSession()
+    monkeypatch.setattr(db_mod, "SessionLocal", lambda: fake)
+    monkeypatch.setattr(repo_mod, "ClassifyRepo", _FakeRepo)
+
+    rec = _correction("b1c2d3e4" * 5, "S3", "S1", text="영업비밀 본문")
+    out = iric.write_to_db([rec], dry_run=False, as_candidate=True)
+    assert out["written"] == 1
+    assert fake.committed is True

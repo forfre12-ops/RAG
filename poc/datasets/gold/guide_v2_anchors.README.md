@@ -2,7 +2,7 @@
 
 출처: 발주처 **영업비밀 등급분류 가이드**(특허청·한국지식재산보호원) p11·p12 + p6~9 예시표.
 용도: ① S/V/M 스코어러 calibration 앵커, ② 합성(M1) 등급·토픽 시드, ③ 룰 라벨러 등급 회귀 정답.
-관련: [doc/22 v2 §3·§4](../../../doc/22_영업비밀_등급분류_기준_적용서_v2_정본가이드기반.md) · [grade_from_svm](../../src/lloydk/modules/m3_labeling/rule_engine.py)
+관련: [doc/22 v2 §3·§4](../../../doc/22_영업비밀_등급분류_기준_적용서_v2_정본가이드기반.md) · [grade_from_svm](../../src/koipa/modules/m3_labeling/rule_engine.py)
 
 ## 레코드 종류 (`kind`)
 

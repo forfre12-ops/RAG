@@ -1,0 +1,39 @@
+{
+  "schema": "aihub-approval-receipt-v1",
+  "dataset_id": "71813",
+  "dataset_title": "멀티모달 정보검색 데이터",
+  "dataset_version": "REPLACE_WITH_APPROVED_VERSION",
+  "dataset_page_url": "https://www.aihub.or.kr/aihubdata/data/view.do?aihubDataSe=realm&currMenu=115&dataSetSn=71813&topMenu=100",
+  "terms_url": "https://www.aihub.or.kr/intrcn/guid/usagepolicy.do",
+  "approved_recipient_legal_name": "REPLACE_WITH_APPROVED_LEGAL_ENTITY",
+  "approval_reference": "REPLACE_WITH_APPROVAL_REFERENCE",
+  "approval_granted": false,
+  "approval_issued_at": "REPLACE_WITH_TIMEZONE_AWARE_ISO8601",
+  "download_completed_at": "REPLACE_WITH_TIMEZONE_AWARE_ISO8601",
+  "terms_accepted": false,
+  "terms_accepted_at": "REPLACE_WITH_TIMEZONE_AWARE_ISO8601",
+  "training_use_approved": false,
+  "use_scope": "model_training_only",
+  "redistribution_permitted": false,
+  "third_party_access_permitted": false,
+  "foreign_transfer_permitted": false,
+  "evaluation_use_permitted": false,
+  "golden_set_use_permitted": false,
+  "dataset_sale_permitted": false,
+  "attribution_required": true,
+  "attribution_text": "본 학습에는 과학기술정보통신부와 한국지능정보사회진흥원(NIA)의 AI-Hub 데이터가 사용되었습니다.",
+  "restrictions": [
+    "model_training_only",
+    "nia_attribution_required",
+    "no_dataset_sale_without_separate_agreement",
+    "no_foreign_transfer_without_separate_agreement",
+    "no_reidentification",
+    "no_redistribution",
+    "no_third_party_access",
+    "report_personal_data_and_delete_dataset"
+  ],
+  "receipt_evidence": {
+    "path": "REPLACE_WITH_EVIDENCE_FILENAME_IN_SAME_DIRECTORY",
+    "sha256": "REPLACE_WITH_64_LOWERCASE_HEX_SHA256"
+  }
+}

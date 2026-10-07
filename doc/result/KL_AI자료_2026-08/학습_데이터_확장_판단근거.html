@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>학습 데이터 확장 판단 근거 — AI 파트</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+h3{font-size:13px;font-weight:800;margin:20px 0 6px}
+p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+code{font-family:ui-monospace,monospace;font-size:11.5px;background:var(--mid);border:1px solid var(--line);padding:1px 5px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+.kpi{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);margin:14px 0}
+.kpi div{flex:1 1 180px;padding:12px 16px;border-right:1px solid var(--line)}
+.kpi div:last-child{border-right:none}
+.kpi .k{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+.kpi .v{font-size:20px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi .s{font-size:11.5px;color:var(--dim)}
+.tw{overflow-x:auto}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#0a0a0a;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">학습 데이터 확장 판단 근거</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">DATA</span></div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">감리 대응 · AI 파트</div>
+    <h1>학습 데이터 확장 판단 근거</h1>
+    <div class="meta">분류 모델 <code>v-fe4b386b</code> 기준 · 학습 <b>모델 27회 + 생성기 비교 12회</b> 전수 대조 · 2026-08-25 · <b>실측만 기재</b></div>
+  </div>
+
+  <div class="note"><b>기재 기준 — 실측만.</b> 아래 수치는 전부 리포지토리에 남아 있는 학습 산출물·평가 리포트·데이터셋 명세에서 직접 읽었습니다. 각 표 아래에 산출 파일 경로를 적었습니다.
+  <b>서로 다른 평가셋으로 잰 값은 행끼리 비교하지 마십시오</b> — 학습 산출물의 내부 검증 점수는 학습 분포 상한이며, 대외 인용값은 §5 의 경화 홀드아웃 수치입니다.</div>
+
+  <h2>1. 한눈에 보기</h2>
+  <p>이 문서는 <b>학습 데이터를 왜 지금 형태로 구성했는지</b>를 실측으로 설명합니다. 요약하면 세 가지입니다.</p>
+  <p><b>첫째, 데이터를 바꿔가며 39회(모델 27 · 생성기 비교 12) 학습해 비교했습니다.</b> 양을 늘리는 방향, 공개 코퍼스를 섞는 방향, 라벨을 뒤집는 방향, 손실 가중을 바꾸는 방향을 각각 시험했고 결과를 전부 산출물로 남겼습니다.</p>
+  <p><b>둘째, 생성 문서를 더 만들어 넣는 방식은 측정 결과 한계에 도달했습니다.</b> 생성 모델을 바꿔가며 같은 조건에서 반복 측정했으나 개선이 확인되지 않았습니다.</p>
+  <p><b>셋째, 정확도를 올리는 남은 수단은 실제 문서의 확정 라벨입니다.</b> 그래서 현재 구조는 생성 규모를 키우는 대신 검수·게이트·안전 라우팅에 무게를 두고 있습니다.</p>
+
+  <div class="kpi">
+    <div><div class="k">학습한 모델</div><div class="v">27</div><div class="s">+ 생성기 비교 실험 12회</div></div>
+    <div><div class="k">현행 배포본 F1</div><div class="v">0.917</div><div class="s">경화 홀드아웃 n=42 · 누출 0</div></div>
+    <div><div class="k">고등급 위험 미탐</div><div class="v">0</div><div class="s">고등급 &rarr; 3급 오분류 0건</div></div>
+    <div><div class="k">공개문서 과분류</div><div class="v">0.04</div><div class="s">정제 전 0.79 &rarr; 후 0.04</div></div>
+  </div>
+
+  <h2>2. 데이터 구성을 바꿔가며 학습한 이력</h2>
+  <p>모델 구조(KF-DeBERTa)를 고정하고 <b>학습 데이터만</b> 바꿔가며 반복했습니다. 계보별로 묶으면 다음과 같습니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr>
+      <th style="width:15%">계보</th><th style="width:13%">학습셋 규모</th><th style="width:29%">무엇을 시험했나</th><th style="width:16%">고등급 미탐율<br /><span class="src">자체 평가셋 · 표본수</span></th><th style="width:30%">확인된 것</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>① 생성 문서 부트스트랩</td><td class="n">3,187행</td>
+        <td>실제 문서가 없는 상태에서 생성 문서만으로 4등급 분류가 성립하는지</td>
+        <td class="n">미측정<br /><span class="src">지표 미기록</span></td>
+        <td>분류 자체는 성립. 다만 실문서 분포와의 간격은 이 단계에서 측정 불가</td>
+      </tr>
+      <tr>
+        <td>② 공개 코퍼스 혼합</td><td class="n">5,737 &rarr; 8,597행</td>
+        <td>판례·금융보고서를 섞어 <b>양을 2.7배</b>로 늘리면 좋아지는지</td>
+        <td class="n">미측정<br /><span class="src">지표 미기록</span></td>
+        <td>내부 검증 점수만 오르고 실문서 평가로는 확인되지 않음. 오염 점검의 계기가 됨</td>
+      </tr>
+      <tr>
+        <td>③ 균형·반복횟수 조정</td><td class="n">3,907행</td>
+        <td>등급 균형과 학습 반복 횟수 같은 <b>설정값</b>으로 올릴 수 있는지</td>
+        <td class="n">미측정<br /><span class="src">지표 미기록</span></td>
+        <td>데이터를 그대로 두고 설정만 바꾸는 방식의 한계 확인</td>
+      </tr>
+      <tr>
+        <td>④ 업무문서 파일럿</td><td class="n">4,727행</td>
+        <td>실제 업무문서 형태에 가까운 구성에서의 미탐율</td>
+        <td class="n">0.201 / 0.210<br /><span class="src">n=593</span></td>
+        <td><b>고등급 다섯 건 중 한 건을 놓침.</b> 이 수치가 이후 모든 작업의 기준선이 됨</td>
+      </tr>
+      <tr>
+        <td>⑤ 법률 코퍼스 정제</td><td class="n">2,071행</td>
+        <td>공개 판례·심결이 고등급으로 잘못 붙어 있던 오염을 제거하면 어떻게 되는지</td>
+        <td class="n">0.080<br /><span class="src">n=261</span></td>
+        <td>오염 제거 후 미탐율 0.080. 앞 계보와 평가셋이 달라 직접 비교는 하지 않음</td>
+      </tr>
+      <tr>
+        <td>⑥ 손실 가중 조정</td><td class="n">5,911행</td>
+        <td>고등급을 놓치는 오류에 더 큰 벌점을 주면 미탐이 줄어드는지</td>
+        <td class="n">0.179 / 0.124<br /><span class="src">n=687</span></td>
+        <td>줄어들기는 하나 ⑤ 만큼은 아님. 가중치는 데이터 품질을 대신하지 못함</td>
+      </tr>
+      <tr>
+        <td>⑦ 판례 라벨 일괄 전환</td><td class="n">5,911행 중<br />2,374행 전환</td>
+        <td>공개 판례를 <b>데이터 단계에서</b> 전부 3급으로 바꾸면 과분류가 잡히는지</td>
+        <td class="n">0.798 ~ 0.801<br /><span class="src">n=687</span></td>
+        <td><b>실패.</b> 3급이 4,466행으로 쏠림. <b>같은 평가셋(n=687)의 ⑥ 0.124 대비 0.80 으로 6.4배 악화.</b> 되돌리고 판정 단계 게이트로 해결</td>
+      </tr>
+      <tr>
+        <td>⑧ 원천 재구축 <b>(현행)</b></td><td class="n">2,042행</td>
+        <td>양을 늘리는 대신 <b>중복 제거·출처 보존·판례 비중 상한·누출 차단</b>으로 다시 만들면</td>
+        <td class="n">0.063<br /><span class="src">n=256</span></td>
+        <td><b>가장 좋음.</b> 학습셋을 5,911 &rarr; 2,042행으로 <b>줄였는데</b> 모든 지표가 개선</td>
+      </tr>
+      <tr>
+        <td>⑨ 실서식 추가</td><td class="n">2,642행</td>
+        <td>현행 구성에 실제 공개 서식 문서를 더 넣으면 더 좋아지는지</td>
+        <td class="n">0.063 / 0.094<br /><span class="src">n=256</span></td>
+        <td>현행보다 나아지지 않음. 승격하지 않음</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">산출: artifacts/classifier*/v-*/report.json · datasets/*/manifest.json · 고등급 미탐율 = report.json 의 fnr_high<br />⚠ 각 값은 <b>그 구성의 자체 평가셋</b>에서 잰 것입니다. <b>표본수(n)가 같은 행끼리만 비교 가능</b>합니다 — ⑥↔⑦(n=687), ⑧↔⑨(n=256).</p>
+
+  <div class="note"><b>⑦ 과 ⑧ 이 이 문서의 핵심입니다.</b> ⑦ 은 “데이터를 크게 손보면 문제가 풀린다”는 가정이 <b>정반대 결과</b>를 낸 사례이고, ⑧ 은 “데이터를 줄이고 정리하는 쪽”이 실제로 통한 사례입니다. 공개 판례 과분류 문제는 결국 학습 데이터를 뒤집는 방식이 아니라 <b>판정 단계의 출처 게이트</b>로 해결했습니다.</div>
+
+  <h2>3. 실패로 확인한 것</h2>
+  <p>성공한 구성만 남기지 않고 실패한 구성도 산출물로 보존했습니다. 판단 근거로 쓰이기 때문입니다.</p>
+
+  <h3>3.1 학습 데이터에 공개문서가 섞여 있었다</h3>
+  <p>초기 학습셋 5,911건을 점검한 결과 <b>3,320건(56%)이 판례·심결</b>이었고, 그중 <b>2,210건(67%)이 고등급으로 잘못 라벨</b>되어 있었습니다. 이미 공개되어 비밀로 성립할 수 없는 문서가 고등급으로 학습되면 미탐과 과분류가 동시에 커집니다. 법률 코퍼스를 분리해 재학습한 결과 모든 지표가 개선됐습니다(§2 계보 ⑤).</p>
+  <p class="src">근거: 기술구현 백서 v7 §7.7</p>
+
+  <h3>3.2 평가셋 자체가 답을 흘리고 있었다</h3>
+  <p>모델을 재기 전에 재는 자를 먼저 점검했습니다. 봉인해 둔 평가셋 800건을 검사하자 <b>본문 길이만 보고도 등급을 96% 맞힐 수 있었습니다.</b> 등급별 글자 수 구간이 거의 겹치지 않게 만들어져 있었기 때문입니다. 이 상태로는 “새 모델이 더 좋다”는 판단 자체가 성립하지 않습니다. 평가셋을 다시 만들어 무작위 수준으로 되돌렸습니다.</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th>평가셋</th><th>길이만으로 맞히는 비율</th><th>등급-길이 연관도</th><th>판정</th></tr></thead>
+    <tbody>
+      <tr><td>재발행 전</td><td class="n">0.960</td><td class="n">0.794</td><td>사용 불가</td></tr>
+      <tr><td>재발행 후</td><td class="n">0.264</td><td class="n">0.012</td><td>사용 가능 (무작위 수준 0.25)</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">산출: reports/holdout_independence_v6_final800.json · reports/holdout_independence_v6_v3_final_800.locked.json</p>
+
+  <h3>3.3 자동 게이트가 나쁜 후보를 실제로 막았다</h3>
+  <p>재학습으로 만들어진 후보 모델은 자동 배포되지 않고 게이트를 통과해야 합니다. 2026-08-16 재학습 후보는 <b>고등급 미탐 지표가 나빠져 게이트에서 차단</b>됐고 배포되지 않았습니다. 8월 15일 후보 두 건은 게이트를 통과했으나 설계대로 후보 등록 단계에 머물렀습니다.</p>
+  <p class="src">근거: tb_training_runs.final_metrics-&gt;deploy-&gt;gate</p>
+
+  <h3>3.4 실패한 접근을 다른 방식으로 해결했다</h3>
+  <p>§2 계보 ⑦ 에서 학습 데이터의 판례 라벨을 통째로 바꾸는 방식은 실패했습니다. 같은 문제(공개문서를 비밀로 과분류)를 <b>학습 단계가 아니라 판정 단계</b>에서 다시 풀었습니다 — 이미 공개된 출처의 문서는 내용과 무관하게 3급으로 제한하는 규칙을 판정에 넣었습니다. 그 결과 공개 판례 400건 기준 과분류가 <b>0.79 에서 0.04 로</b> 내려갔고, 학습 데이터는 건드리지 않았으므로 고등급 미탐이 악화되지 않았습니다.</p>
+
+  <h2>4. 생성 문서를 더 만드는 방식의 한계</h2>
+  <p>가장 약한 등급인 1급 비밀을 대상으로 <b>학습 데이터만 늘렸을 때 좋아지는지</b>를 직접 측정했습니다. 기준 구성과 학습 조건을 고정하고 <b>생성 모델만</b> 바꿔, 서로 다른 난수 조건으로 네 번씩 반복했습니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th>구성</th><th>1급 학습 데이터</th><th>F1 평균</th><th>반복 간 편차</th><th>1급 재현율 평균</th><th>4회 중 개선</th></tr></thead>
+    <tbody>
+      <tr><td>기준 (추가 없음)</td><td class="n">27행</td><td class="n">0.3178</td><td class="n">0.041</td><td class="n">0.000</td><td class="n">&mdash;</td></tr>
+      <tr><td>생성 모델 A 로 60건 추가</td><td class="n">87행</td><td class="n">0.3477</td><td class="n">0.041</td><td class="n">0.063<br /><span class="src">n=256</span></td><td class="n">1회</td></tr>
+      <tr><td>생성 모델 B 로 60건 추가</td><td class="n">87행</td><td class="n">0.2816</td><td class="n">0.068</td><td class="n">0.000</td><td class="n">0회</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">산출: reports/ab_s1/summary_multiseed.json · 평가셋 datasets/gold_real/holdout_eval.clean.jsonl (42건 중 1급 12건)</p>
+
+  <p><b>읽는 법.</b> 1급 학습 데이터를 <b>3.2배</b>로 늘린 조건입니다. 그런데 A 의 개선폭(+0.030)은 <b>반복 간 편차(0.041)보다 작습니다</b> — 난수 조건을 바꾸면 사라지는 크기입니다. B 는 오히려 나빠졌습니다. 1급 재현율은 여덟 번 중 일곱 번이 변화 없음이었습니다.</p>
+
+  <p><b>생성 품질 문제가 아닙니다.</b> 같은 측정에서 생성문의 다양성 지표는 A 0.751 · B 0.754 로 정상이었고 생성 실패는 0건이었습니다. 문장은 제대로 만들어졌으나 분류 성능으로 이어지지 않았습니다.</p>
+
+  <div class="note"><b>측정의 한계도 함께 적습니다.</b> 이 실험의 평가셋은 42건(1급 12건), 추가 문서는 60건, 반복은 4회입니다. <b>작은 폭의 개선은 이 규모로 판별할 수 없습니다.</b> 따라서 확인된 결론은 “3.2배 증량으로는 확인 가능한 개선이 없었다”이며, “어떤 규모로도 불가능하다”가 아닙니다.</div>
+
+  <h2>5. 현행 배포본을 유지하는 근거</h2>
+  <p>현재 운영 중인 분류 모델 <code>v-fe4b386b</code> 의 지표입니다. 학습셋과 본문이 겹치지 않도록 정제한 경화 홀드아웃 42건 기준이며, 2026-07-29 자동 게이트 3축을 통과해 승격됐습니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">지표</th><th style="width:16%">값</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td>F1 (macro)</td><td class="n">0.917</td><td>4등급 전체를 고르게 본 정확도</td></tr>
+      <tr><td>1급 비밀 재현율</td><td class="n">0.857</td><td>실제 1급 문서를 1급으로 찾아내는 비율</td></tr>
+      <tr><td>고등급 &rarr; 3급 오분류</td><td class="n">0건</td><td>가장 위험한 형태의 미탐. 발생 없음</td></tr>
+      <tr><td>공개문서 과분류</td><td class="n">0.79 &rarr; 0.04</td><td>공개 판례 400건을 비밀로 잘못 올리던 비율</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">근거: 골든셋 종합 · 평가셋 datasets/gold_real/holdout_eval.hardened.jsonl (42건, 누출 0)</p>
+  <div class="note"><b>이 수치는 운영 정확도가 아닙니다.</b> 평가셋이 공개·합성 데이터 기반이고 표본이 42건이며, 사람이 서명한 평가 정본은 아직 확보 전입니다. 추세와 무회귀 확인에 쓰는 값이며, 운영 환경의 정확도는 실문서 검수 확정 후에 산정합니다. (제출본 「골든셋 종합」·「기술구현 백서」의 동일 단서와 같은 기준입니다.)</div>
+
+  <p>이후 만들어진 재학습 후보와 대안 구성(§2 계보 ⑨)은 <b>모두 현행보다 나아지지 않았습니다.</b> 그래서 교체하지 않고 유지하고 있습니다.</p>
+
+  <h2>6. 그래서 구조를 이렇게 구성했습니다</h2>
+  <p>위 측정이 가리키는 방향은 일관됩니다. <b>생성 문서를 더 만드는 축에서는 더 얻을 것이 없고, 실제 문서의 확정 라벨에서만 얻을 수 있습니다.</b> 교차 검증에서도 같은 결론이 나옵니다 — 생성 문서만으로 학습한 모델을 실문서로 평가하면 F1 0.26, 실제 문서를 포함해 학습한 모델은 0.736 입니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">구성 요소</th><th>왜 이렇게 했나</th></tr></thead>
+    <tbody>
+      <tr><td>생성 규모를 키우지 않음</td><td>§4 의 측정 결과. 생성 기능 자체는 유지하되 규모 확대에는 자원을 쓰지 않음</td></tr>
+      <tr><td>검수 확정 경로에 무게</td><td>정확도를 올릴 수 있는 유일한 입력이 사람이 확정한 라벨이기 때문</td></tr>
+      <tr><td>미탐 우선 안전 설계</td><td>정확도 상한이 정해져 있으므로, 놓치는 쪽을 막고 애매한 건은 검수로 보내는 구조</td></tr>
+      <tr><td>자동 배포 게이트</td><td>재학습 후보가 지표를 나쁘게 만들면 자동 차단(§3.3 에서 실제 작동 확인)</td></tr>
+      <tr><td>출처 기반 판정 게이트</td><td>공개문서 과분류를 학습 데이터가 아니라 판정 단계에서 해결(§2 계보 ⑦ 의 교훈)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>검수 대상 문서는 <b>120건</b>이 준비되어 있으며, 현재 서명 기록은 테스트 계정 2건으로 실 검수는 시작 전입니다. 이 단계가 진행되면 평가 정본이 확보되고, 그때부터 운영 환경의 정확도를 수치로 확정해 보고할 수 있습니다.</p>
+
+  <div class="foot">
+    본 문서의 모든 수치는 리포지토리 산출물에서 직접 읽은 값이며, 표마다 산출 파일 경로를 병기했습니다.<br />
+    작성 2026-08-25 · 기준 모델 v-fe4b386b · 학습 시도 39회(모델 27 · 생성기 비교 12) 전수 대조
+  </div>
+</div>
+</body>
+</html>

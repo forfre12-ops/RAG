@@ -1,0 +1,152 @@
+"""GET /golden/jobs — 골든 잡 목록.
+
+목록이 없으면 콘솔은 마지막 job_id 를 메모리에만 들고 있어, 새로고침 한 번에 검수하던
+후보로 돌아갈 길이 사라진다(2026-08-02 실환경 점검). JobStore.list_recent 는 이미 있었으나
+레코드에 job_id 가 없어(키로만 존재) 목록으로 쓸 수 없던 것을 함께 고쳤다.
+"""
+from __future__ import annotations
+
+import uuid
+
+import pytest
+from fastapi.testclient import TestClient
+
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.golden_builder import LabelPair
+from koipa.schemas.common import Actor
+from koipa.schemas.golden import GoldenBuildRequest
+from koipa.services.golden_build_service import GoldenBuildService
+from koipa.services.job_store import InMemoryJobStore, get_default_store
+
+client = TestClient(app)
+API = "/api/v1"
+
+
+@pytest.fixture(autouse=True)
+def _own_job_store(monkeypatch):
+    """이 시험들은 잡 목록 **전체**를 본다 — 남의 잡이 섞이면 답이 달라진다.
+
+    [2026-09-05] 실측: 잡 저장소가 Redis 라 앞선 실행의 golden_register 잡 84개가
+    남아 있었고, 이 파일도 두 번째 실행부터 4건이 계속 깨졌다. 기능이 아니라 시험
+    격리의 문제다. 시험마다 process-local 저장소를 새로 끼운다.
+    """
+    from koipa.services import job_store as _js  # noqa: PLC0415
+
+    monkeypatch.setattr(_js, "_default", _js.InMemoryJobStore(), raising=False)
+    yield
+_ACTOR = Actor(user_id="builder1", role="admin")
+_AUTH = {"X-API-Key": "test-key", "X-Actor-Role": "admin"}
+
+
+def _make_job(tmp_path, grade: str = "S2") -> str:
+    req = GoldenBuildRequest(
+        source_type="inline",
+        docs=[{"doc_id": "a", "text": "본문 내용", "source": "판례"}],
+        out_dir=str(tmp_path), actor=_ACTOR,
+    )
+    resp = GoldenBuildService().submit(
+        req, label_fn=lambda _t: LabelPair(grade, 0.8, grade, 0.9, has_real_evidence=True)
+    )
+    return str(resp.golden_job_id)
+
+
+def test_list_recent_carries_job_id():
+    """레코드에 job_id 가 실려야 목록에서 개별 잡으로 진입할 수 있다."""
+    store = InMemoryJobStore()
+    jid = uuid.uuid4()
+    store.create(jid, {"kind": "golden_build", "actor": "u1"})
+    store.update(jid, status="done", gold_count=3)
+    rows = store.list_recent(10)
+    assert rows and rows[0]["job_id"] == str(jid)
+    assert rows[0]["status"] == "done" and rows[0]["gold_count"] == 3
+
+
+def test_job_list_returns_created_job(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "api_key", "test-key")
+    job_id = _make_job(tmp_path)
+    r = client.get(f"{API}/golden/jobs", headers=_AUTH)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ordering"] == "best_effort"      # 정렬 신뢰도 고지(무음 오도 방지)
+    ids = [j["job_id"] for j in body["jobs"]]
+    assert job_id in ids
+    row = next(j for j in body["jobs"] if j["job_id"] == job_id)
+    assert row["kind"] == "golden_build"
+    assert row["status"] == "done"
+    # 목록에서 바로 검수/서명으로 진입할 수 있어야 한다
+    assert row["review_url"] and job_id in row["review_url"]
+    assert row["signoff_url"] and job_id in row["signoff_url"]
+
+
+def test_job_list_excludes_non_golden_jobs(monkeypatch):
+    """JobStore 에는 분류·학습 잡도 섞인다 — 골든 목록에 새면 안 된다."""
+    monkeypatch.setattr(settings, "api_key", "test-key")
+    other = uuid.uuid4()
+    get_default_store().create(other, {"kind": "classify_batch", "actor": "u1"})
+    r = client.get(f"{API}/golden/jobs", headers=_AUTH)
+    assert r.status_code == 200
+    assert str(other) not in [j["job_id"] for j in r.json()["jobs"]]
+
+
+def test_job_list_requires_auth():
+    assert client.get(f"{API}/golden/jobs").status_code in (401, 403)
+
+
+def test_job_list_limit_is_clamped(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "api_key", "test-key")
+    _make_job(tmp_path)
+    assert len(client.get(f"{API}/golden/jobs?limit=1", headers=_AUTH).json()["jobs"]) <= 1
+    # 상한 초과·하한 미만도 거절이 아니라 클램프(운영 중 목록이 통째로 죽지 않게)
+    assert client.get(f"{API}/golden/jobs?limit=9999", headers=_AUTH).status_code == 200
+    assert client.get(f"{API}/golden/jobs?limit=0", headers=_AUTH).status_code == 200
+
+
+def test_signed_urls_present_when_secret_set(tmp_path, monkeypatch):
+    """비밀키가 켜져 있으면 목록의 링크에도 ?t= 토큰이 실려야 한다(링크만 복사해도 열리게)."""
+    monkeypatch.setattr(settings, "api_key", "test-key")
+    monkeypatch.setattr(settings, "golden_html_url_secret", "s" * 40)
+    job_id = _make_job(tmp_path)
+    body = client.get(f"{API}/golden/jobs", headers=_AUTH).json()
+    row = next(j for j in body["jobs"] if j["job_id"] == job_id)
+    assert "?t=" in row["review_url"] and "?t=" in row["signoff_url"]
+
+
+def test_row_says_which_file_the_bundle_came_from(tmp_path, monkeypatch):
+    """행마다 원본 파일이 실린다 — 같은 파일을 두 번 등록한 행을 구분할 유일한 값이다.
+
+    왜(2026-08-24 실측 223). 목록 열은 id 앞 8자·종류·상태·건수·시각뿐이었다. 같은 묶음을
+    두 번 등록하면 그 값들이 사실상 같아 **여섯 행이 같은 것으로 보였다.** 저장소에는
+    경로가 이미 있었는데(gold_path) 목록 응답에만 없었다.
+    """
+    monkeypatch.setattr(settings, "api_key", "test-key")
+    job_id = _make_job(tmp_path)
+    body = client.get(f"{API}/golden/jobs", headers=_AUTH).json()
+    row = next(j for j in body["jobs"] if j["job_id"] == job_id)
+    assert row["source_path"], "어느 파일에서 온 잡인지 목록이 말하지 않는다"
+    assert row["source_path"].endswith(".jsonl")
+    # 서버 파일시스템 구조를 그대로 싣지 않는다(절대경로 금지).
+    assert not row["source_path"].startswith("/")
+    assert ":" not in row["source_path"][:3]
+
+
+def test_two_registrations_of_different_files_are_distinguishable(tmp_path, monkeypatch):
+    """건수·종류·상태가 모두 같아도 원본 파일로 갈린다."""
+    import json
+
+    monkeypatch.setattr(settings, "api_key", "test-key")
+    rows = [{"doc_id": "a", "text": "본문 내용", "label": "S2"}]
+    made = []
+    for name in ("bundle_one.jsonl", "bundle_two.jsonl"):
+        f = tmp_path / name
+        f.write_text(json.dumps(rows[0], ensure_ascii=False), encoding="utf-8")
+        jid = GoldenBuildService().register_build(str(f), actor_user_id="reviewer1")
+        assert jid is not None
+        made.append(str(jid))
+
+    body = client.get(f"{API}/golden/jobs", headers=_AUTH).json()
+    got = {j["job_id"]: j for j in body["jobs"] if j["job_id"] in made}
+    assert len(got) == 2
+    a, b = (got[j] for j in made)
+    assert a["gold_count"] == b["gold_count"] and a["kind"] == b["kind"]   # 이 값들로는 못 가른다
+    assert a["source_path"] != b["source_path"]                            # 이 값이 가른다

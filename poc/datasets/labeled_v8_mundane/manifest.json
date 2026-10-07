@@ -1,0 +1,27 @@
+{
+  "built_at": "2026-09-14",
+  "why": "평범한 업무문서 과탐 86.2% — gen_mundane_s3 가 만든 처방을 배포 학습셋에 적용",
+  "base": "datasets/labeled_p1_v5_clean",
+  "added": {
+    "from": "datasets/mundane_s3/raw.jsonl",
+    "rows": 350,
+    "label": "S3"
+  },
+  "split_rule": "본문 sha256 정렬 후 앞 70% 를 학습 — 난수 없음",
+  "train_rows": 2392,
+  "val_rows": 256,
+  "test_rows": 256,
+  "mundane_holdout_rows": 150,
+  "train_label_dist": {
+    "S1": 365,
+    "S2": 463,
+    "S3": 1163,
+    "TS": 401
+  },
+  "leak_checks": {
+    "train_vs_holdout": 0,
+    "mundane_vs_base": 0
+  },
+  "warning": "mundane_holdout 150건은 **이 학습셋으로 학습한 모델의 평가면**이다. 기준선도 같은 150건으로 다시 잡아야 비교가 성립한다.",
+  "tool": "scripts/build_v8_mundane_trainset.py"
+}

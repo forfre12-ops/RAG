@@ -11,6 +11,11 @@ verify_infra.check_postgres는 baseline 4개 테이블 존재만 확인하므로
 
 in-process 비교(외부 alembic CLI 파싱 회피): 프로젝트 alembic/env.py가 settings.database_url과
 Base.metadata를 쓰는 패턴을 그대로 재사용한다.
+
+[2026-09-09] MariaDB 계열을 걷어냈다 — 남은 계열은 postgres 하나다. dialect→계열 매핑
+(_DIALECT_BRANCH)은 그대로 둔다: 계열이 다시 갈리면 "접속한 DB 의 dialect 에 해당하는
+head 만 기대값으로 잡는다"는 이 구조가 그때 다시 필요하다. 둘 다 기대하면 한쪽 DB 가
+다른 쪽 판을 안 올렸다고 상시 DRIFT 를 낸다 — 9/7 에 실제로 겪은 자리다.
 """
 
 from __future__ import annotations
@@ -24,8 +29,10 @@ def compare_heads(db_heads, script_heads) -> dict:
     """적용 리비전 집합 vs 기대 head 집합 비교(순수 함수 — 단위 테스트 가능)."""
     db = set(db_heads or [])
     expected = set(script_heads or [])
-    missing = sorted(expected - db)   # 적용돼야 하는데 안 된 것(=upgrade 필요)
-    unknown = sorted(db - expected)   # DB엔 있는데 스크립트에 없는 것(=다운그레이드/리비전 삭제)
+    missing = sorted(expected - db)  # 적용돼야 하는데 안 된 것(=upgrade 필요)
+    unknown = sorted(
+        db - expected
+    )  # DB엔 있는데 스크립트에 없는 것(=다운그레이드/리비전 삭제)
     return {
         "db_current": sorted(db),
         "expected_heads": sorted(expected),
@@ -35,12 +42,34 @@ def compare_heads(db_heads, script_heads) -> dict:
     }
 
 
-def _db_heads(database_url: str) -> list[str]:
+def _connect_args(database_url: str, connect_timeout: int) -> dict[str, int]:
+    """Return driver options that bound a production PostgreSQL connection."""
+    if database_url.startswith("postgresql") and connect_timeout > 0:
+        return {"connect_timeout": connect_timeout}
+    return {}
+
+
+def _resolve_connect_timeout(requested: int | None, configured: int | None) -> int:
+    """Choose a bounded timeout; this operational check must never wait forever."""
+    timeout = requested if requested is not None else int(configured or 0)
+    if timeout <= 0:
+        raise ValueError(
+            "connect timeout must be positive to avoid an unbounded drift check"
+        )
+    return timeout
+
+
+def _db_heads(database_url: str, *, connect_timeout: int) -> list[str]:
     from alembic.runtime.migration import MigrationContext
     from sqlalchemy import create_engine
     from sqlalchemy.pool import NullPool
 
-    engine = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+    engine = create_engine(
+        database_url,
+        poolclass=NullPool,
+        pool_pre_ping=True,
+        connect_args=_connect_args(database_url, connect_timeout),
+    )
     try:
         with engine.connect() as conn:
             ctx = MigrationContext.configure(conn)
@@ -49,12 +78,32 @@ def _db_heads(database_url: str) -> list[str]:
         engine.dispose()
 
 
-def _script_heads(ini_path: str) -> list[str]:
+# dialect → 그 DB 가 적용해야 하는 alembic branch label.
+# [2026-09-09] mariadb 계열을 걷어냈다 — 남은 계열은 postgres 하나다.
+_DIALECT_BRANCH = {"postgresql": "postgres"}
+
+
+def _branch_for_url(database_url: str) -> str | None:
+    """접속 URL 의 dialect 에 해당하는 branch label. 모르는 dialect 면 None(전체 head)."""
+    from sqlalchemy.engine import make_url
+
+    try:
+        backend = make_url(database_url).get_backend_name()
+    except Exception:  # noqa: BLE001
+        return None
+    return _DIALECT_BRANCH.get(backend)
+
+
+def _script_heads(ini_path: str, *, branch: str | None = None) -> list[str]:
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
     cfg = Config(ini_path)
-    return list(ScriptDirectory.from_config(cfg).get_heads())
+    script = ScriptDirectory.from_config(cfg)
+    if branch is None:
+        return list(script.get_heads())
+    # `<label>@head` 를 실제 리비전으로 풀어 그 계열의 head 만 돌려준다.
+    return [r.revision for r in script.get_revisions(f"{branch}@head")]
 
 
 def main() -> int:
@@ -62,31 +111,56 @@ def main() -> int:
     # (import 시 stdout 교체는 pytest capture를 깨뜨림).
     import io  # noqa: PLC0415
     import sys  # noqa: PLC0415
+
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
     ap = argparse.ArgumentParser(description="Alembic applied-vs-head drift check")
     ap.add_argument("--alembic-ini", default="alembic.ini")
     ap.add_argument("--out", default="reports/migration_drift.json")
     ap.add_argument(
-        "--exit-zero-on-fail", action="store_true",
+        "--connect-timeout",
+        type=int,
+        default=None,
+        metavar="SECONDS",
+        help="PostgreSQL connection timeout; defaults to DB_CONNECT_TIMEOUT (5 seconds)",
+    )
+    ap.add_argument(
+        "--exit-zero-on-fail",
+        action="store_true",
         help="드리프트/오류여도 exit 0 (점검 리포트만 — 비차단 모드)",
     )
     args = ap.parse_args()
 
     result: dict
+    connect_timeout: int | None = None
     try:
-        from lloydk.config import settings  # noqa: PLC0415
+        from koipa.config import settings  # noqa: PLC0415
 
-        expected = _script_heads(args.alembic_ini)
-        applied = _db_heads(settings.database_url)
+        connect_timeout = _resolve_connect_timeout(
+            args.connect_timeout,
+            getattr(settings, "db_connect_timeout", 5),
+        )
+
+        branch = _branch_for_url(settings.database_url)
+        expected = _script_heads(args.alembic_ini, branch=branch)
+        applied = _db_heads(settings.database_url, connect_timeout=connect_timeout)
         result = compare_heads(applied, expected)
         result["ok"] = not result["drift"]
         result["error"] = None
+        result["branch"] = branch
+        result["connect_timeout_seconds"] = connect_timeout
     except Exception as exc:  # noqa: BLE001
         # DB 미가용 등 — 점검 자체 실패. 드리프트 여부 미확정이므로 비-OK.
         result = {
-            "db_current": [], "expected_heads": [], "missing": [], "unknown": [],
-            "drift": None, "ok": False, "error": f"{type(exc).__name__}: {exc}",
+            "db_current": [],
+            "expected_heads": [],
+            "missing": [],
+            "unknown": [],
+            "drift": None,
+            "ok": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "branch": None,
+            "connect_timeout_seconds": connect_timeout,
         }
 
     out = Path(args.out)
@@ -98,7 +172,8 @@ def main() -> int:
     elif result["drift"]:
         print(
             f"[migration-drift] DRIFT: db={result['db_current']} expected={result['expected_heads']} "
-            f"missing={result['missing']} unknown={result['unknown']} — run `alembic upgrade head`"
+            f"missing={result['missing']} unknown={result['unknown']} — "
+            f"run `alembic upgrade {result.get('branch') or 'head'}@head`"
         )
     else:
         print(f"[migration-drift] OK: db at head {result['db_current']}")

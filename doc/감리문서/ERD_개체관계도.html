@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ERD 개체관계도</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:17px;font-weight:800;letter-spacing:-.02em;margin:38px 0 12px}
+h3{font-size:14.5px;font-weight:700;margin:22px 0 6px 18px}
+p{margin:8px 0 8px 18px}
+ul,ol{margin:8px 0 8px 18px;padding-left:20px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);padding:12px 16px;margin:14px 0 14px 18px;font-size:13px}
+.tw{overflow-x:auto;margin-left:18px}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace;margin-left:18px}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .docinfo{break-inside:avoid;page-break-inside:avoid}
+  /* [2026-08-29] .note 까지 통째로 avoid 하면 긴 안내 상자가 다음 쪽으로 밀리면서
+     앞쪽에 빈 면이 생긴다(인쇄 실측). 상자는 나뉘도록 두되 첫/끝 줄만 붙잡는다. */
+  .note{orphans:3;widows:3}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+.flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">ERD 개체관계도</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">감리 산출물</span></div>
+  </div>
+</nav>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">감리 산출물 · 데이터</div>
+    <h1>ERD 개체관계도</h1>
+    <div class="meta">완료보고 제출물(개체관계도) · 테이블 20 · 관계 22 · 2026-09-27</div>
+  </div>
+
+  <table class="docinfo">
+    <tbody>
+      <tr><th>요구사항</th><td>완료보고 제출물 “데이터베이스 스키마 및 개체관계도” · <code>DAR-005</code></td></tr>
+      <tr><th>생성 원본</th><td><code>poc/src/koipa/db/models.py</code> — SQLAlchemy <code>Base.metadata</code> 외래키</td></tr>
+      <tr><th>짝 문서</th><td><code>테이블_정의서</code> (컬럼 상세)</td></tr>
+      <tr><th>작성일</th><td>2026-08-26</td></tr>
+      <tr><th>최종 개정</th><td>2026-09-27 (개정 이력 판 3)</td></tr>
+      <tr><th>근거 커밋</th><td><code>d3fe51c3</code> · <code>aaea98c3</code> · <code>5e2ddbd1</code></td></tr>
+    </tbody>
+  </table>
+
+
+  <div class="note">
+    AI 엔진 스키마의 개체 관계를 나타낸다. 상자는 테이블, 화살표는 외래키이며 자식 테이블에서
+    부모 테이블 방향이다. ORM 메타데이터에서 생성했으며 컬럼 상세는 <code>테이블_정의서</code> 에 있다.
+    <br><br>
+    <b>범위 &mdash; ORM 이 매핑하는 20표입니다.</b> 정의서는 21표 232칼럼이고, 차이 1표는
+    <code>tad_dm_doc_vctr_mng</code>(문서 벡터 — 유사문서 조회용)입니다. 이 표는 원시 SQL 로 만들어
+    ORM 에 없으므로 도식에 그리지 않았습니다(<code>doc_id</code> 로 <code>tad_dm_doc_mng</code> 를
+    기본키이자 외래키로 참조하는 1:1 표입니다). 2026-09-26 쓰는 곳이 없던 표 4개(요건 점수 · 학습 에폭 ·
+    학습 문서 목록 · 가이드 버전)를 지우면서 도식과 관계 목록을 다시 만들었고, 2026-09-27 규정 참고 표시용 표 3개
+    (<code>tad_rm_rgltn_mng</code> · <code>tad_rm_rgltn_artcl_mng</code> · <code>tad_rm_rgltn_stc_mng</code>)를 더해 다시 만들었습니다.
+  
+  </div>
+
+  <h2>1. 개체 관계도</h2>
+  <div class="tw">
+  <svg id="erd-root" viewBox="0 0 940 853" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="개체 관계도 — 상자를 클릭하면 그 표의 관계만 표시된다">
+<defs><marker id="erd-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#3f3f46"/></marker><marker id="erd-arrow-on" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/></marker></defs>
+<style>.erd-box{cursor:pointer;outline:none}.erd-box rect{fill:#fff;stroke:#18181b;stroke-width:1.2}.erd-edge{fill:none;stroke:#52525b;stroke-width:1.4;marker-end:url(#erd-arrow)}.erd-edge.logical{stroke-dasharray:6 4}#erd-root:has(.erd-box:hover) .erd-edge,#erd-root:has(.erd-box:focus) .erd-edge{stroke:#e4e4e7;stroke-width:1;marker-end:none}#erd-root:has(.erd-box:hover) .erd-box rect,#erd-root:has(.erd-box:focus) .erd-box rect{stroke:#d4d4d8}#erd-root:has(.erd-box:hover) .erd-box text,#erd-root:has(.erd-box:focus) .erd-box text{fill:#a1a1aa}@media print{#erd-root .erd-edge{stroke:#52525b;stroke-width:1.4}#erd-root .erd-box rect{stroke:#18181b}}#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:hover ~ .erd-edge[data-c="tad_am_adt_log_mng"],#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:hover ~ .erd-edge[data-p="tad_am_adt_log_mng"],#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:focus ~ .erd-edge[data-c="tad_am_adt_log_mng"],#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:focus ~ .erd-edge[data-p="tad_am_adt_log_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:hover rect,#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:hover text,#erd-root .erd-box[data-t="tad_am_adt_log_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:hover ~ .erd-edge[data-c="tad_cm_chnk_mng"],#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:hover ~ .erd-edge[data-p="tad_cm_chnk_mng"],#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:focus ~ .erd-edge[data-c="tad_cm_chnk_mng"],#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:focus ~ .erd-edge[data-p="tad_cm_chnk_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:hover rect,#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:hover text,#erd-root .erd-box[data-t="tad_cm_chnk_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:hover ~ .erd-edge[data-c="tad_cm_clsf_bss_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:hover ~ .erd-edge[data-p="tad_cm_clsf_bss_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:focus ~ .erd-edge[data-c="tad_cm_clsf_bss_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:focus ~ .erd-edge[data-p="tad_cm_clsf_bss_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:hover rect,#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:hover text,#erd-root .erd-box[data-t="tad_cm_clsf_bss_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:hover ~ .erd-edge[data-c="tad_cm_clsf_grd_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:hover ~ .erd-edge[data-p="tad_cm_clsf_grd_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:focus ~ .erd-edge[data-c="tad_cm_clsf_grd_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:focus ~ .erd-edge[data-p="tad_cm_clsf_grd_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:hover rect,#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:hover text,#erd-root .erd-box[data-t="tad_cm_clsf_grd_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:hover ~ .erd-edge[data-c="tad_cm_clsf_rslt_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:hover ~ .erd-edge[data-p="tad_cm_clsf_rslt_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:focus ~ .erd-edge[data-c="tad_cm_clsf_rslt_mng"],#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:focus ~ .erd-edge[data-p="tad_cm_clsf_rslt_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:hover rect,#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:hover text,#erd-root .erd-box[data-t="tad_cm_clsf_rslt_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_cm_crct_mng"]:hover ~ .erd-edge[data-c="tad_cm_crct_mng"],#erd-root .erd-box[data-t="tad_cm_crct_mng"]:hover ~ .erd-edge[data-p="tad_cm_crct_mng"],#erd-root .erd-box[data-t="tad_cm_crct_mng"]:focus ~ .erd-edge[data-c="tad_cm_crct_mng"],#erd-root .erd-box[data-t="tad_cm_crct_mng"]:focus ~ .erd-edge[data-p="tad_cm_crct_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_cm_crct_mng"]:hover rect,#erd-root .erd-box[data-t="tad_cm_crct_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_cm_crct_mng"]:hover text,#erd-root .erd-box[data-t="tad_cm_crct_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:hover ~ .erd-edge[data-c="tad_dm_doc_lbl_mng"],#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:hover ~ .erd-edge[data-p="tad_dm_doc_lbl_mng"],#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:focus ~ .erd-edge[data-c="tad_dm_doc_lbl_mng"],#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:focus ~ .erd-edge[data-p="tad_dm_doc_lbl_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:hover rect,#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:hover text,#erd-root .erd-box[data-t="tad_dm_doc_lbl_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_dm_doc_mng"]:hover ~ .erd-edge[data-c="tad_dm_doc_mng"],#erd-root .erd-box[data-t="tad_dm_doc_mng"]:hover ~ .erd-edge[data-p="tad_dm_doc_mng"],#erd-root .erd-box[data-t="tad_dm_doc_mng"]:focus ~ .erd-edge[data-c="tad_dm_doc_mng"],#erd-root .erd-box[data-t="tad_dm_doc_mng"]:focus ~ .erd-edge[data-p="tad_dm_doc_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_dm_doc_mng"]:hover rect,#erd-root .erd-box[data-t="tad_dm_doc_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_dm_doc_mng"]:hover text,#erd-root .erd-box[data-t="tad_dm_doc_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:hover ~ .erd-edge[data-c="tad_em_evl_rqmt_mng"],#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:hover ~ .erd-edge[data-p="tad_em_evl_rqmt_mng"],#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:focus ~ .erd-edge[data-c="tad_em_evl_rqmt_mng"],#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:focus ~ .erd-edge[data-p="tad_em_evl_rqmt_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:hover rect,#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:hover text,#erd-root .erd-box[data-t="tad_em_evl_rqmt_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:hover ~ .erd-edge[data-c="tad_gm_grd_kywd_mng"],#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:hover ~ .erd-edge[data-p="tad_gm_grd_kywd_mng"],#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:focus ~ .erd-edge[data-c="tad_gm_grd_kywd_mng"],#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:focus ~ .erd-edge[data-p="tad_gm_grd_kywd_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:hover rect,#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:hover text,#erd-root .erd-box[data-t="tad_gm_grd_kywd_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:hover ~ .erd-edge[data-c="tad_lm_llm_usqty_mng"],#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:hover ~ .erd-edge[data-p="tad_lm_llm_usqty_mng"],#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:focus ~ .erd-edge[data-c="tad_lm_llm_usqty_mng"],#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:focus ~ .erd-edge[data-p="tad_lm_llm_usqty_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:hover rect,#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:hover text,#erd-root .erd-box[data-t="tad_lm_llm_usqty_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:hover ~ .erd-edge[data-c="tad_lm_lrn_excn_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:hover ~ .erd-edge[data-p="tad_lm_lrn_excn_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:focus ~ .erd-edge[data-c="tad_lm_lrn_excn_mng"],#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:focus ~ .erd-edge[data-p="tad_lm_lrn_excn_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:hover rect,#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:hover text,#erd-root .erd-box[data-t="tad_lm_lrn_excn_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:hover ~ .erd-edge[data-c="tad_mm_mdl_ver_mng"],#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:hover ~ .erd-edge[data-p="tad_mm_mdl_ver_mng"],#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:focus ~ .erd-edge[data-c="tad_mm_mdl_ver_mng"],#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:focus ~ .erd-edge[data-p="tad_mm_mdl_ver_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:hover rect,#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:hover text,#erd-root .erd-box[data-t="tad_mm_mdl_ver_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:hover ~ .erd-edge[data-c="tad_pm_prmpt_ver_mng"],#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:hover ~ .erd-edge[data-p="tad_pm_prmpt_ver_mng"],#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:focus ~ .erd-edge[data-c="tad_pm_prmpt_ver_mng"],#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:focus ~ .erd-edge[data-p="tad_pm_prmpt_ver_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:hover rect,#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:hover text,#erd-root .erd-box[data-t="tad_pm_prmpt_ver_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_rm_rgltn_artcl_mng"]:hover ~ .erd-edge[data-c="tad_rm_rgltn_artcl_mng"],#erd-root .erd-box[data-t="tad_rm_rgltn_artcl_mng"]:hover ~ .erd-edge[data-p="tad_rm_rgltn_artcl_mng"],#erd-root .erd-box[data-t="tad_rm_rgltn_artcl_mng"]:focus ~ .erd-edge[data-c="tad_rm_rgltn_artcl_mng"],#erd-root .erd-box[data-t="tad_rm_rgltn_artcl_mng"]:focus ~ .erd-edge[data-p="tad_rm_rgltn_artcl_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_rm_rgltn_artcl_mng"]:hover rect,#erd-root .erd-box[data-t="tad_rm_rgltn_artcl_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_rm_rgltn_artcl_mng"]:hover text,#erd-root .erd-box[data-t="tad_rm_rgltn_artcl_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_rm_rgltn_mng"]:hover ~ .erd-edge[data-c="tad_rm_rgltn_mng"],#erd-root .erd-box[data-t="tad_rm_rgltn_mng"]:hover ~ .erd-edge[data-p="tad_rm_rgltn_mng"],#erd-root .erd-box[data-t="tad_rm_rgltn_mng"]:focus ~ .erd-edge[data-c="tad_rm_rgltn_mng"],#erd-root .erd-box[data-t="tad_rm_rgltn_mng"]:focus ~ .erd-edge[data-p="tad_rm_rgltn_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_rm_rgltn_mng"]:hover rect,#erd-root .erd-box[data-t="tad_rm_rgltn_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_rm_rgltn_mng"]:hover text,#erd-root .erd-box[data-t="tad_rm_rgltn_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_rm_rgltn_stc_mng"]:hover ~ .erd-edge[data-c="tad_rm_rgltn_stc_mng"],#erd-root .erd-box[data-t="tad_rm_rgltn_stc_mng"]:hover ~ .erd-edge[data-p="tad_rm_rgltn_stc_mng"],#erd-root .erd-box[data-t="tad_rm_rgltn_stc_mng"]:focus ~ .erd-edge[data-c="tad_rm_rgltn_stc_mng"],#erd-root .erd-box[data-t="tad_rm_rgltn_stc_mng"]:focus ~ .erd-edge[data-p="tad_rm_rgltn_stc_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_rm_rgltn_stc_mng"]:hover rect,#erd-root .erd-box[data-t="tad_rm_rgltn_stc_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_rm_rgltn_stc_mng"]:hover text,#erd-root .erd-box[data-t="tad_rm_rgltn_stc_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:hover ~ .erd-edge[data-c="tad_sm_syn_datst_cpst_mng"],#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:hover ~ .erd-edge[data-p="tad_sm_syn_datst_cpst_mng"],#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:focus ~ .erd-edge[data-c="tad_sm_syn_datst_cpst_mng"],#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:focus ~ .erd-edge[data-p="tad_sm_syn_datst_cpst_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:hover rect,#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:hover text,#erd-root .erd-box[data-t="tad_sm_syn_datst_cpst_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:hover ~ .erd-edge[data-c="tad_sm_syn_doc_mng"],#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:hover ~ .erd-edge[data-p="tad_sm_syn_doc_mng"],#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:focus ~ .erd-edge[data-c="tad_sm_syn_doc_mng"],#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:focus ~ .erd-edge[data-p="tad_sm_syn_doc_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:hover rect,#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:hover text,#erd-root .erd-box[data-t="tad_sm_syn_doc_mng"]:focus text{fill:#1e3a8a}#erd-root .erd-box[data-t="tad_sy_lck_mng"]:hover ~ .erd-edge[data-c="tad_sy_lck_mng"],#erd-root .erd-box[data-t="tad_sy_lck_mng"]:hover ~ .erd-edge[data-p="tad_sy_lck_mng"],#erd-root .erd-box[data-t="tad_sy_lck_mng"]:focus ~ .erd-edge[data-c="tad_sy_lck_mng"],#erd-root .erd-box[data-t="tad_sy_lck_mng"]:focus ~ .erd-edge[data-p="tad_sy_lck_mng"]{stroke:#1d4ed8;stroke-width:2.2;marker-end:url(#erd-arrow-on)}#erd-root .erd-box[data-t="tad_sy_lck_mng"]:hover rect,#erd-root .erd-box[data-t="tad_sy_lck_mng"]:focus rect{fill:#eff6ff;stroke:#1d4ed8;stroke-width:2.4}#erd-root .erd-box[data-t="tad_sy_lck_mng"]:hover text,#erd-root .erd-box[data-t="tad_sy_lck_mng"]:focus text{fill:#1e3a8a}</style>
+<g class="erd-box" data-t="tad_am_adt_log_mng" tabindex="0">
+<rect x="26" y="330" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="349" font-size="12.5" font-weight="700" fill="#0a0a0a">감사 로그</text>
+<text class="t2" x="36" y="365" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_am_adt_log_mng · 13칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_cm_chnk_mng" tabindex="0">
+<rect x="366" y="368" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="387" font-size="12.5" font-weight="700" fill="#0a0a0a">문서 청크</text>
+<text class="t2" x="376" y="403" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_cm_chnk_mng · 10칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_cm_clsf_bss_mng" tabindex="0">
+<rect x="706" y="368" width="208" height="46" rx="4"/>
+<text class="t1" x="716" y="387" font-size="12.5" font-weight="700" fill="#0a0a0a">분류 판정 근거</text>
+<text class="t2" x="716" y="403" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_cm_clsf_bss_mng · 9칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_cm_clsf_grd_mng" tabindex="0">
+<rect x="26" y="178" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="197" font-size="12.5" font-weight="700" fill="#0a0a0a">등급 체계</text>
+<text class="t2" x="36" y="213" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_cm_clsf_grd_mng · 11칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_cm_clsf_rslt_mng" tabindex="0">
+<rect x="366" y="292" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="311" font-size="12.5" font-weight="700" fill="#0a0a0a">분류 결과</text>
+<text class="t2" x="376" y="327" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_cm_clsf_rslt_mng · 11칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_cm_crct_mng" tabindex="0">
+<rect x="706" y="292" width="208" height="46" rx="4"/>
+<text class="t1" x="716" y="311" font-size="12.5" font-weight="700" fill="#0a0a0a">검수 교정 이력</text>
+<text class="t2" x="716" y="327" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_cm_crct_mng · 10칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_dm_doc_lbl_mng" tabindex="0">
+<rect x="366" y="444" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="463" font-size="12.5" font-weight="700" fill="#0a0a0a">문서 라벨</text>
+<text class="t2" x="376" y="479" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_dm_doc_lbl_mng · 10칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_dm_doc_mng" tabindex="0">
+<rect x="26" y="254" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="273" font-size="12.5" font-weight="700" fill="#0a0a0a">문서</text>
+<text class="t2" x="36" y="289" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_dm_doc_mng · 18칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_em_evl_rqmt_mng" tabindex="0">
+<rect x="26" y="406" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="425" font-size="12.5" font-weight="700" fill="#0a0a0a">평가요소</text>
+<text class="t2" x="36" y="441" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_em_evl_rqmt_mng · 7칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_gm_grd_kywd_mng" tabindex="0">
+<rect x="366" y="520" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="539" font-size="12.5" font-weight="700" fill="#0a0a0a">등급 키워드</text>
+<text class="t2" x="376" y="555" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_gm_grd_kywd_mng · 9칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_lm_llm_usqty_mng" tabindex="0">
+<rect x="26" y="558" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="577" font-size="12.5" font-weight="700" fill="#0a0a0a">LLM 사용량</text>
+<text class="t2" x="36" y="593" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_lm_llm_usqty_mng · 14칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_lm_lrn_excn_mng" tabindex="0">
+<rect x="26" y="102" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="121" font-size="12.5" font-weight="700" fill="#0a0a0a">학습 실행</text>
+<text class="t2" x="36" y="137" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_lm_lrn_excn_mng · 13칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_mm_mdl_ver_mng" tabindex="0">
+<rect x="366" y="216" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="235" font-size="12.5" font-weight="700" fill="#0a0a0a">모델 버전</text>
+<text class="t2" x="376" y="251" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_mm_mdl_ver_mng · 16칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_pm_prmpt_ver_mng" tabindex="0">
+<rect x="26" y="26" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="45" font-size="12.5" font-weight="700" fill="#0a0a0a">프롬프트 버전</text>
+<text class="t2" x="36" y="61" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_pm_prmpt_ver_mng · 6칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_rm_rgltn_artcl_mng" tabindex="0">
+<rect x="366" y="596" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="615" font-size="12.5" font-weight="700" fill="#0a0a0a">규정 조항</text>
+<text class="t2" x="376" y="631" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_rm_rgltn_artcl_mng · 11칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_rm_rgltn_mng" tabindex="0">
+<rect x="26" y="482" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="501" font-size="12.5" font-weight="700" fill="#0a0a0a">규정</text>
+<text class="t2" x="36" y="517" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_rm_rgltn_mng · 25칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_rm_rgltn_stc_mng" tabindex="0">
+<rect x="706" y="444" width="208" height="46" rx="4"/>
+<text class="t1" x="716" y="463" font-size="12.5" font-weight="700" fill="#0a0a0a">규정 문장</text>
+<text class="t2" x="716" y="479" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_rm_rgltn_stc_mng · 7칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_sm_syn_datst_cpst_mng" tabindex="0">
+<rect x="26" y="634" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="653" font-size="12.5" font-weight="700" fill="#0a0a0a">학습셋 편입 이력</text>
+<text class="t2" x="36" y="669" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_sm_syn_datst_cpst_mng · 5칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_sm_syn_doc_mng" tabindex="0">
+<rect x="366" y="140" width="208" height="46" rx="4"/>
+<text class="t1" x="376" y="159" font-size="12.5" font-weight="700" fill="#0a0a0a">합성·샘플 문서</text>
+<text class="t2" x="376" y="175" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_sm_syn_doc_mng · 20칼럼</text>
+</g>
+<g class="erd-box" data-t="tad_sy_lck_mng" tabindex="0">
+<rect x="26" y="710" width="208" height="46" rx="4"/>
+<text class="t1" x="36" y="729" font-size="12.5" font-weight="700" fill="#0a0a0a">동시성 잠금</text>
+<text class="t2" x="36" y="745" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tad_sy_lck_mng · 1칼럼</text>
+</g>
+<path class="erd-edge" data-c="tad_gm_grd_kywd_mng" data-p="tad_cm_clsf_grd_mng" d="M366,538 C300,538 300,188 234,188"><title>등급 키워드.grd_sn → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_gm_grd_kywd_mng" data-p="tad_em_evl_rqmt_mng" d="M366,548 C300,548 300,429 234,429"><title>등급 키워드.rqmt_sn → 평가요소</title></path>
+<path class="erd-edge" data-c="tad_dm_doc_lbl_mng" data-p="tad_dm_doc_mng" d="M366,462 C300,462 300,266 234,266"><title>문서 라벨.doc_id → 문서</title></path>
+<path class="erd-edge" data-c="tad_dm_doc_lbl_mng" data-p="tad_cm_clsf_grd_mng" d="M366,472 C300,472 300,192 234,192"><title>문서 라벨.grd_sn → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_cm_clsf_rslt_mng" data-p="tad_dm_doc_mng" d="M366,310 C300,310 300,277 234,277"><title>분류 결과.doc_id → 문서</title></path>
+<path class="erd-edge" data-c="tad_cm_clsf_rslt_mng" data-p="tad_cm_clsf_grd_mng" d="M366,320 C300,320 300,197 234,197"><title>분류 결과.predc_grd_sn → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_cm_clsf_bss_mng" data-p="tad_cm_clsf_rslt_mng" d="M706,386 C640,386 640,310 574,310"><title>분류 판정 근거.clsf_id → 분류 결과</title></path>
+<path class="erd-edge" data-c="tad_mm_mdl_ver_mng" data-p="tad_mm_mdl_ver_mng" d="M574,229 C614,220 614,258 574,249"><title>모델 버전.rlbk_src_ver_id → 모델 버전</title></path>
+<path class="erd-edge" data-c="tad_cm_crct_mng" data-p="tad_cm_clsf_rslt_mng" d="M706,302 C640,302 640,320 574,320"><title>검수 교정 이력.clsf_id → 분류 결과</title></path>
+<path class="erd-edge" data-c="tad_cm_crct_mng" data-p="tad_cm_clsf_grd_mng" d="M706,311 H638 Q629,311 629,320 V773 Q629,782 620,782 H298 Q289,782 289,773 V210 Q289,201 280,201 H234"><title>검수 교정 이력.orgnl_grd_sn → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_cm_crct_mng" data-p="tad_cm_clsf_grd_mng" d="M706,319 H649 Q640,319 640,328 V788 Q640,797 631,797 H309 Q300,797 300,788 V214 Q300,205 291,205 H234"><title>검수 교정 이력.cfmtn_grd_sn → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_cm_crct_mng" data-p="tad_lm_lrn_excn_mng" d="M706,328 H660 Q651,328 651,337 V803 Q651,812 642,812 H320 Q311,812 311,803 V128 Q311,120 302,120 H234"><title>검수 교정 이력.rflt_lrn_excn_id → 학습 실행</title></path>
+<path class="erd-edge" data-c="tad_sm_syn_doc_mng" data-p="tad_cm_clsf_grd_mng" d="M366,150 C300,150 300,210 234,210"><title>합성·샘플 문서.goal_grd_sn → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_sm_syn_doc_mng" data-p="tad_cm_clsf_grd_mng" d="M366,156 C300,156 300,214 234,214"><title>합성·샘플 문서.cfmtn_grd_sn → 등급 체계</title></path>
+<path class="erd-edge" data-c="tad_sm_syn_doc_mng" data-p="tad_pm_prmpt_ver_mng" d="M366,163 C300,163 300,38 234,38"><title>합성·샘플 문서.otln_prmpt_ver_nm → 프롬프트 버전</title></path>
+<path class="erd-edge" data-c="tad_sm_syn_doc_mng" data-p="tad_pm_prmpt_ver_mng" d="M366,170 C300,170 300,49 234,49"><title>합성·샘플 문서.mtxt_prmpt_ver_nm → 프롬프트 버전</title></path>
+<path class="erd-edge" data-c="tad_sm_syn_doc_mng" data-p="tad_pm_prmpt_ver_mng" d="M366,176 C300,176 300,60 234,60"><title>합성·샘플 문서.qlty_insp_prmpt_ver_nm → 프롬프트 버전</title></path>
+<path class="erd-edge" data-c="tad_rm_rgltn_artcl_mng" data-p="tad_rm_rgltn_mng" d="M366,619 C300,619 300,505 234,505"><title>규정 조항.rgltn_id → 규정</title></path>
+<path class="erd-edge" data-c="tad_rm_rgltn_stc_mng" data-p="tad_rm_rgltn_artcl_mng" d="M706,467 C640,467 640,619 574,619"><title>규정 문장.artcl_id → 규정 조항</title></path>
+<path class="erd-edge logical" data-c="tad_cm_chnk_mng" data-p="tad_dm_doc_mng" d="M366,391 C300,391 300,288 234,288"><title>문서 청크.doc_id → 문서</title></path>
+<path class="erd-edge logical" data-c="tad_cm_clsf_bss_mng" data-p="tad_cm_chnk_mng" d="M706,396 C640,396 640,391 574,391"><title>분류 판정 근거.chnk_id → 문서 청크</title></path>
+<path class="erd-edge logical" data-c="tad_mm_mdl_ver_mng" data-p="tad_lm_lrn_excn_mng" d="M366,239 C300,239 300,130 234,130"><title>모델 버전.lrn_excn_id → 학습 실행</title></path>
+<text x="26" y="845" font-size="10.5" fill="#71717a">상자에 마우스를 올리거나 클릭하면 그 표에 걸린 관계만 파랗게 남습니다. 다른 곳을 클릭하면 풀립니다.</text>
+</svg>
+  </div>
+  <p class="src">테이블 20 개 · 관계 22 개(외래키 19 · 논리 참조 3). 왼쪽이 참조당하는 표(부모), 오른쪽이 참조하는 표(자식)이며 화살표는 자식에서 부모로 향한다. 점선은 외래키 제약 없이 논리적으로만 참조하는 관계다.</p>
+
+  <h2>2. 관계 목록</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:32%">자식 테이블</th><th style="width:22%">외래키 컬럼</th><th style="width:32%">부모 테이블</th><th style="width:14%">영역</th></tr></thead>
+    <tbody>
+      <tr><td>분류 판정 근거<br /><span class="src">tad_cm_clsf_bss_mng</span></td><td><code>clsf_id</code></td><td>분류 결과<br /><span class="src">tad_cm_clsf_rslt_mng</span></td><td class="c">추론</td></tr>
+      <tr><td>분류 결과<br /><span class="src">tad_cm_clsf_rslt_mng</span></td><td><code>doc_id</code></td><td>문서<br /><span class="src">tad_dm_doc_mng</span></td><td class="c">추론</td></tr>
+      <tr><td>분류 결과<br /><span class="src">tad_cm_clsf_rslt_mng</span></td><td><code>predc_grd_sn</code></td><td>등급 체계<br /><span class="src">tad_cm_clsf_grd_mng</span></td><td class="c">추론</td></tr>
+      <tr><td>검수 교정 이력<br /><span class="src">tad_cm_crct_mng</span></td><td><code>cfmtn_grd_sn</code></td><td>등급 체계<br /><span class="src">tad_cm_clsf_grd_mng</span></td><td class="c">보정</td></tr>
+      <tr><td>검수 교정 이력<br /><span class="src">tad_cm_crct_mng</span></td><td><code>clsf_id</code></td><td>분류 결과<br /><span class="src">tad_cm_clsf_rslt_mng</span></td><td class="c">보정</td></tr>
+      <tr><td>검수 교정 이력<br /><span class="src">tad_cm_crct_mng</span></td><td><code>orgnl_grd_sn</code></td><td>등급 체계<br /><span class="src">tad_cm_clsf_grd_mng</span></td><td class="c">보정</td></tr>
+      <tr><td>검수 교정 이력<br /><span class="src">tad_cm_crct_mng</span></td><td><code>rflt_lrn_excn_id</code></td><td>학습 실행<br /><span class="src">tad_lm_lrn_excn_mng</span></td><td class="c">보정</td></tr>
+      <tr><td>문서 라벨<br /><span class="src">tad_dm_doc_lbl_mng</span></td><td><code>doc_id</code></td><td>문서<br /><span class="src">tad_dm_doc_mng</span></td><td class="c">라벨링</td></tr>
+      <tr><td>문서 라벨<br /><span class="src">tad_dm_doc_lbl_mng</span></td><td><code>grd_sn</code></td><td>등급 체계<br /><span class="src">tad_cm_clsf_grd_mng</span></td><td class="c">라벨링</td></tr>
+      <tr><td>등급 키워드<br /><span class="src">tad_gm_grd_kywd_mng</span></td><td><code>grd_sn</code></td><td>등급 체계<br /><span class="src">tad_cm_clsf_grd_mng</span></td><td class="c">등급체계</td></tr>
+      <tr><td>등급 키워드<br /><span class="src">tad_gm_grd_kywd_mng</span></td><td><code>rqmt_sn</code></td><td>평가요소<br /><span class="src">tad_em_evl_rqmt_mng</span></td><td class="c">등급체계</td></tr>
+      <tr><td>모델 버전<br /><span class="src">tad_mm_mdl_ver_mng</span></td><td><code>rlbk_src_ver_id</code></td><td>모델 버전<br /><span class="src">tad_mm_mdl_ver_mng</span></td><td class="c">자기참조</td></tr>
+      <tr><td>규정 조항<br /><span class="src">tad_rm_rgltn_artcl_mng</span></td><td><code>rgltn_id</code></td><td>규정<br /><span class="src">tad_rm_rgltn_mng</span></td><td class="c">규정</td></tr>
+      <tr><td>규정 문장<br /><span class="src">tad_rm_rgltn_stc_mng</span></td><td><code>artcl_id</code></td><td>규정 조항<br /><span class="src">tad_rm_rgltn_artcl_mng</span></td><td class="c">규정</td></tr>
+      <tr><td>합성·샘플 문서<br /><span class="src">tad_sm_syn_doc_mng</span></td><td><code>cfmtn_grd_sn</code></td><td>등급 체계<br /><span class="src">tad_cm_clsf_grd_mng</span></td><td class="c">합성</td></tr>
+      <tr><td>합성·샘플 문서<br /><span class="src">tad_sm_syn_doc_mng</span></td><td><code>goal_grd_sn</code></td><td>등급 체계<br /><span class="src">tad_cm_clsf_grd_mng</span></td><td class="c">합성</td></tr>
+      <tr><td>합성·샘플 문서<br /><span class="src">tad_sm_syn_doc_mng</span></td><td><code>mtxt_prmpt_ver_nm</code></td><td>프롬프트 버전<br /><span class="src">tad_pm_prmpt_ver_mng</span></td><td class="c">합성</td></tr>
+      <tr><td>합성·샘플 문서<br /><span class="src">tad_sm_syn_doc_mng</span></td><td><code>otln_prmpt_ver_nm</code></td><td>프롬프트 버전<br /><span class="src">tad_pm_prmpt_ver_mng</span></td><td class="c">합성</td></tr>
+      <tr><td>합성·샘플 문서<br /><span class="src">tad_sm_syn_doc_mng</span></td><td><code>qlty_insp_prmpt_ver_nm</code></td><td>프롬프트 버전<br /><span class="src">tad_pm_prmpt_ver_mng</span></td><td class="c">합성</td></tr>
+      <tr><td>문서 청크<br /><span class="src">tad_cm_chnk_mng</span></td><td><code>doc_id</code></td><td>문서<br /><span class="src">tad_dm_doc_mng</span></td><td class="c">논리 참조</td></tr>
+      <tr><td>분류 판정 근거<br /><span class="src">tad_cm_clsf_bss_mng</span></td><td><code>chnk_id</code></td><td>문서 청크<br /><span class="src">tad_cm_chnk_mng</span></td><td class="c">논리 참조</td></tr>
+      <tr><td>모델 버전<br /><span class="src">tad_mm_mdl_ver_mng</span></td><td><code>lrn_excn_id</code></td><td>학습 실행<br /><span class="src">tad_lm_lrn_excn_mng</span></td><td class="c">논리 참조</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><code>tad_mm_mdl_ver_mng.rlbk_src_ver_id</code> 는 같은 테이블의 <code>mdl_ver_id</code> 를 참조하는 자기참조 관계로, 롤백 대상 버전을 가리킨다. 도식에는 상자 오른쪽의 작은 고리로 그렸다.</p>
+
+  <h2>3. 읽는 법 — 세 갈래</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:16%">갈래</th><th style="width:40%">경로</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td>판정</td><td>문서 → 분류 결과 → 분류 판정 근거<br><span class="src">tad_dm_doc_mng → tad_cm_clsf_rslt_mng → tad_cm_clsf_bss_mng</span></td><td>문서 1 건이 분류 결과를 가지고, 그 결과가 평가요소별 근거를 가진다</td></tr>
+      <tr><td>기준</td><td>등급 체계 · 평가요소 ← 등급 키워드<br><span class="src">tad_cm_clsf_grd_mng · tad_em_evl_rqmt_mng ← tad_gm_grd_kywd_mng</span></td><td>등급과 평가요소가 정본이고 키워드가 이 둘을 참조한다. 운영 중 변경할 수 있다</td></tr>
+      <tr><td>학습</td><td>검수 교정 이력 → 학습 실행 → 모델 버전<br><span class="src">tad_cm_crct_mng → tad_lm_lrn_excn_mng → tad_mm_mdl_ver_mng</span></td><td>사람이 교정한 내용이 학습 실행에 반영되고, 학습 실행이 모델 버전을 생성한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>4. 개정 이력</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. ORM 외래키에서 관계도와 관계 목록을 생성했으며 감리 산출물로 신규 편입했다</td></tr>
+      <tr><td class="c">2</td><td class="n">2026-09-26</td><td><code>aaea98c3</code></td><td>쓰는 곳이 없던 표 4개를 지운 것(마이그레이션 <code>b7d3f5a19c24</code>)에 맞춰 도식과 관계 목록을 다시 만들었다(20표 → 17표 · 관계 27 → 20). 표 이름을 표준 이름(<code>tad_*_mng</code>)으로 바꿨고, 관계 목록의 외래키 칼럼도 ORM 속성명이 아니라 DB 물리명으로 적었다. 문서 벡터 표는 ORM 에 없어 그리지 않는다는 범위 설명을 넣었다</td></tr>
+      <tr><td class="c">3</td><td class="n">2026-09-27</td><td><code>5e2ddbd1</code></td><td>규정 참고 표시용 표 3개를 넣은 것(마이그레이션 <code>a1d4c7e9b302</code>)에 맞춰 도식과 관계 목록을 다시 만들었다(17표 → 20표 · 관계 20 → 22)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">근거 파일 — <code>poc/src/koipa/db/models.py</code> · <code>poc/alembic/</code></div>
+</div>
+</body>
+</html>

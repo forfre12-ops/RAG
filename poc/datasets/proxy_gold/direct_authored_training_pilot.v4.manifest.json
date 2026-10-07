@@ -1,0 +1,14 @@
+{
+  "claim_scope": "Proxy training pilot only; not customer-real accuracy evidence or Locked Gold.",
+  "families": 25,
+  "grade_counts": {
+    "S1": 25,
+    "S2": 25,
+    "S3": 25,
+    "TS": 25
+  },
+  "records": 100,
+  "records_sha256": "2350b217755af73e28ba2268180d9c3d055e9be9a44fe88f8035970150501df6",
+  "schema": "direct-authored-proxy-training-pilot-v1",
+  "training_only": true
+}

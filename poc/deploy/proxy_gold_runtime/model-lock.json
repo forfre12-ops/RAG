@@ -1,0 +1,48 @@
+{
+  "schema": "proxy-model-lock-v1",
+  "resolved_at": "2026-08-08T04:50:00+09:00",
+  "ollama_image": {
+    "tag": "0.32.5",
+    "platform": "linux/amd64",
+    "index_digest": "sha256:4dea9fb511947e24a84237bb636b0203abcb2ff0d3fbc7b4ff865deb91362131",
+    "image_digest": "sha256:98c19ced6600f2924e80b92d701cd867d8f7ef0c4dde516c619484e31e47f103",
+    "source": "https://hub.docker.com/r/ollama/ollama/tags"
+  },
+  "models": [
+    {
+      "role": "generator",
+      "name": "qwen3:14b",
+      "manifest_url": "https://registry.ollama.ai/v2/library/qwen3/manifests/14b",
+      "manifest_digest": "sha256:bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+      "model_layer_digest": "sha256:a8cc1361f3145dc01f6d77c6c82c9116b9ffe3c97b34716fe20418455876c40e",
+      "model_layer_bytes": 9276184896,
+      "license": "Apache-2.0"
+    },
+    {
+      "role": "generator_candidate",
+      "name": "qwen3:4b",
+      "manifest_url": "https://registry.ollama.ai/v2/library/qwen3/manifests/4b",
+      "manifest_digest": "sha256:359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+      "model_layer_digest": "sha256:3e4cb14174460404e7a233e531675303b2fbf7749c02f91864fe311ab6344e4f",
+      "model_layer_bytes": 2497280480,
+      "license": "Apache-2.0",
+      "admission": "pilot_only_until_same-scenario semantic-quality comparison passes"
+    },
+    {
+      "role": "independent_primary_judge",
+      "name": "gemma3:12b",
+      "manifest_url": "https://registry.ollama.ai/v2/library/gemma3/manifests/12b",
+      "manifest_digest": "sha256:f4031aab637d1ffa37b42570452ae0e4fad0314754d17ded67322e4b95836f8a",
+      "model_layer_digest": "sha256:e8ad13eff07a78d89926e9e8b882317d082ef5bf9768ad7b50fcdbbcd63748de",
+      "model_layer_bytes": 8149180896,
+      "license": "Gemma Terms of Use"
+    }
+  ],
+  "runtime_policy": {
+    "host_ports": [],
+    "max_loaded_models": 1,
+    "parallel_requests": 1,
+    "network": "internal_only_after_prefetch",
+    "api_service_restart_allowed": false
+  }
+}

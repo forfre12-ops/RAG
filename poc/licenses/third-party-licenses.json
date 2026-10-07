@@ -1,0 +1,1435 @@
+{
+  "generated_by": "scripts/dump_licenses.py",
+  "total": 202,
+  "tier_counts": {
+    "permissive": 192,
+    "weak": 5,
+    "unknown": 5
+  },
+  "packages": [
+    {
+      "name": "Deprecated",
+      "version": "1.3.1",
+      "license": "MIT License",
+      "url": "https://github.com/laurent-laporte-pro/deprecated",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "Flask",
+      "version": "3.1.3",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/pallets/flask/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "GitPython",
+      "version": "3.1.50",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/gitpython-developers/GitPython",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "Jinja2",
+      "version": "3.1.6",
+      "license": "BSD License",
+      "url": "https://github.com/pallets/jinja/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "Mako",
+      "version": "1.3.12",
+      "license": "MIT License",
+      "url": "https://www.makotemplates.org/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "MarkupSafe",
+      "version": "3.0.3",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/pallets/markupsafe/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "PyJWT",
+      "version": "2.13.0",
+      "license": "MIT",
+      "url": "https://github.com/jpadilla/pyjwt",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "PyYAML",
+      "version": "6.0.3",
+      "license": "MIT License",
+      "url": "https://pyyaml.org/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "Pygments",
+      "version": "2.20.0",
+      "license": "BSD-2-Clause",
+      "url": "https://pygments.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "SQLAlchemy",
+      "version": "2.0.51",
+      "license": "MIT",
+      "url": "https://www.sqlalchemy.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "Werkzeug",
+      "version": "3.1.8",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/pallets/werkzeug/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "accelerate",
+      "version": "1.14.0",
+      "license": "Apache Software License",
+      "url": "https://github.com/huggingface/accelerate",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "aiohappyeyeballs",
+      "version": "2.7.1",
+      "license": "Python Software Foundation License",
+      "url": "https://github.com/aio-libs/aiohappyeyeballs",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "aiohttp",
+      "version": "3.14.1",
+      "license": "Apache-2.0 AND MIT",
+      "url": "https://github.com/aio-libs/aiohttp",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "aiosignal",
+      "version": "1.4.0",
+      "license": "Apache Software License",
+      "url": "https://github.com/aio-libs/aiosignal",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "alembic",
+      "version": "1.18.5",
+      "license": "MIT",
+      "url": "https://alembic.sqlalchemy.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "amqp",
+      "version": "5.3.1",
+      "license": "BSD License",
+      "url": "http://github.com/celery/py-amqp",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "annotated-doc",
+      "version": "0.0.4",
+      "license": "MIT",
+      "url": "https://github.com/fastapi/annotated-doc",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "annotated-types",
+      "version": "0.7.0",
+      "license": "MIT License",
+      "url": "https://github.com/annotated-types/annotated-types",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "anyio",
+      "version": "4.14.1",
+      "license": "MIT",
+      "url": "https://anyio.readthedocs.io/en/stable/versionhistory.html",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "asgiref",
+      "version": "3.11.1",
+      "license": "BSD License",
+      "url": "https://github.com/django/asgiref/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "attrs",
+      "version": "26.1.0",
+      "license": "MIT",
+      "url": "https://www.attrs.org/en/stable/changelog.html",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "backports.tarfile",
+      "version": "1.2.0",
+      "license": "MIT License",
+      "url": "https://github.com/jaraco/backports.tarfile",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "bcrypt",
+      "version": "5.0.0",
+      "license": "Apache Software License",
+      "url": "https://github.com/pyca/bcrypt/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "billiard",
+      "version": "4.2.4",
+      "license": "BSD License",
+      "url": "https://github.com/celery/billiard",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "blinker",
+      "version": "1.9.0",
+      "license": "MIT License",
+      "url": "https://github.com/pallets-eco/blinker/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "cachetools",
+      "version": "7.1.4",
+      "license": "MIT",
+      "url": "https://github.com/tkem/cachetools/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "celery",
+      "version": "5.6.3",
+      "license": "BSD-3-Clause",
+      "url": "https://docs.celeryq.dev/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "certifi",
+      "version": "2026.6.17",
+      "license": "Mozilla Public License 2.0 (MPL 2.0)",
+      "url": "https://github.com/certifi/python-certifi",
+      "tier": "weak",
+      "dual_license_note": null
+    },
+    {
+      "name": "cffi",
+      "version": "2.0.0",
+      "license": "MIT",
+      "url": "https://cffi.readthedocs.io/en/latest/whatsnew.html",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.4.7",
+      "license": "MIT",
+      "url": "https://github.com/jawah/charset_normalizer/blob/master/CHANGELOG.md",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "click",
+      "version": "8.4.2",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/pallets/click/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "click-didyoumean",
+      "version": "0.3.1",
+      "license": "MIT License",
+      "url": "https://github.com/click-contrib/click-didyoumean",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "click-plugins",
+      "version": "1.1.1.2",
+      "license": "BSD License",
+      "url": "https://github.com/click-contrib/click-plugins",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "click-repl",
+      "version": "0.3.0",
+      "license": "MIT",
+      "url": "https://github.com/untitaker/click-repl",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "cloudpickle",
+      "version": "3.1.2",
+      "license": "BSD License",
+      "url": "https://github.com/cloudpipe/cloudpickle",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "contourpy",
+      "version": "1.3.3",
+      "license": "BSD License",
+      "url": "https://github.com/contourpy/contourpy",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "cryptography",
+      "version": "48.0.1",
+      "license": "Apache-2.0 OR BSD-3-Clause",
+      "url": "https://github.com/pyca/cryptography",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "cycler",
+      "version": "0.12.1",
+      "license": "BSD License",
+      "url": "https://matplotlib.org/cycler/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "databricks-sdk",
+      "version": "0.120.0",
+      "license": "Apache Software License",
+      "url": "https://databricks-sdk-py.readthedocs.io",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "datasets",
+      "version": "5.0.0",
+      "license": "Apache Software License",
+      "url": "https://github.com/huggingface/datasets",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "dill",
+      "version": "0.4.1",
+      "license": "BSD License",
+      "url": "https://github.com/uqfoundation/dill",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "distro",
+      "version": "1.9.0",
+      "license": "Apache Software License",
+      "url": "https://github.com/python-distro/distro",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "docker",
+      "version": "7.1.0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/docker/docker-py",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "et_xmlfile",
+      "version": "2.0.0",
+      "license": "MIT License",
+      "url": "https://foss.heptapod.net/openpyxl/et_xmlfile",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "evaluate",
+      "version": "0.4.6",
+      "license": "Apache Software License",
+      "url": "https://github.com/huggingface/evaluate",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "fastapi",
+      "version": "0.139.0",
+      "license": "MIT",
+      "url": "https://github.com/fastapi/fastapi",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "filelock",
+      "version": "3.29.5",
+      "license": "MIT",
+      "url": "https://github.com/tox-dev/py-filelock",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "flask-cors",
+      "version": "6.0.5",
+      "license": "MIT",
+      "url": "https://corydolphin.github.io/flask-cors/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "fonttools",
+      "version": "4.63.0",
+      "license": "MIT",
+      "url": "http://github.com/fonttools/fonttools",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "frozenlist",
+      "version": "1.8.0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/aio-libs/frozenlist",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "fsspec",
+      "version": "2026.4.0",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/fsspec/filesystem_spec",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "gitdb",
+      "version": "4.0.12",
+      "license": "BSD License",
+      "url": "https://github.com/gitpython-developers/gitdb",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "google-auth",
+      "version": "2.55.1",
+      "license": "Apache Software License",
+      "url": "https://github.com/googleapis/google-cloud-python/tree/main/packages/google-auth",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "googleapis-common-protos",
+      "version": "1.75.0",
+      "license": "Apache Software License",
+      "url": "https://github.com/googleapis/google-cloud-python/tree/main/packages/googleapis-common-protos",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "graphene",
+      "version": "3.4.3",
+      "license": "MIT",
+      "url": "https://github.com/graphql-python/graphene",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "graphql-core",
+      "version": "3.2.11",
+      "license": "MIT License",
+      "url": "https://github.com/graphql-python/graphql-core",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "graphql-relay",
+      "version": "3.2.0",
+      "license": "MIT License",
+      "url": "https://github.com/graphql-python/graphql-relay-py",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "greenlet",
+      "version": "3.5.3",
+      "license": "MIT AND PSF-2.0",
+      "url": "https://greenlet.readthedocs.io",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "grpcio",
+      "version": "1.81.1",
+      "license": "Apache-2.0",
+      "url": "https://grpc.io",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "gunicorn",
+      "version": "26.0.0",
+      "license": "MIT",
+      "url": "https://gunicorn.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "h11",
+      "version": "0.16.0",
+      "license": "MIT License",
+      "url": "https://github.com/python-hyper/h11",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "hf-xet",
+      "version": "1.5.1",
+      "license": "Apache-2.0",
+      "url": "https://github.com/huggingface/xet-core",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "httpcore",
+      "version": "1.0.9",
+      "license": "BSD-3-Clause",
+      "url": "https://www.encode.io/httpcore/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "httptools",
+      "version": "0.8.0",
+      "license": "MIT",
+      "url": "https://github.com/MagicStack/httptools",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "httpx",
+      "version": "0.28.1",
+      "license": "BSD License",
+      "url": "https://github.com/encode/httpx",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "huey",
+      "version": "3.1.1",
+      "license": "UNKNOWN",
+      "url": "https://github.com/coleifer/huey",
+      "tier": "unknown",
+      "dual_license_note": null
+    },
+    {
+      "name": "huggingface_hub",
+      "version": "1.22.0",
+      "license": "Apache Software License",
+      "url": "https://github.com/huggingface/huggingface_hub",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "idna",
+      "version": "3.18",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/kjd/idna",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "importlib_metadata",
+      "version": "9.0.0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/python/importlib_metadata",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "itsdangerous",
+      "version": "2.2.0",
+      "license": "BSD License",
+      "url": "https://github.com/pallets/itsdangerous/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "jaraco.context",
+      "version": "6.1.2",
+      "license": "MIT",
+      "url": "https://github.com/jaraco/jaraco.context",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "jiter",
+      "version": "0.16.0",
+      "license": "MIT",
+      "url": "https://github.com/pydantic/jiter/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "joblib",
+      "version": "1.5.3",
+      "license": "BSD-3-Clause",
+      "url": "https://joblib.readthedocs.io",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "kiwisolver",
+      "version": "1.5.0",
+      "license": "BSD License",
+      "url": "https://github.com/nucleic/kiwi",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "koipa-ai",
+      "version": "0.1.0",
+      "license": "UNKNOWN",
+      "url": "UNKNOWN",
+      "tier": "unknown",
+      "dual_license_note": null
+    },
+    {
+      "name": "koipa-ai",
+      "version": "0.1.0",
+      "license": "UNKNOWN",
+      "url": "UNKNOWN",
+      "tier": "unknown",
+      "dual_license_note": null
+    },
+    {
+      "name": "kombu",
+      "version": "5.6.2",
+      "license": "BSD-3-Clause",
+      "url": "https://kombu.readthedocs.io",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "limits",
+      "version": "5.8.0",
+      "license": "MIT",
+      "url": "https://limits.readthedocs.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "lxml",
+      "version": "6.1.1",
+      "license": "BSD-3-Clause",
+      "url": "https://lxml.de/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "markdown-it-py",
+      "version": "4.2.0",
+      "license": "MIT License",
+      "url": "https://github.com/executablebooks/markdown-it-py",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "matplotlib",
+      "version": "3.11.0",
+      "license": "Python Software Foundation License",
+      "url": "https://matplotlib.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "mdurl",
+      "version": "0.1.2",
+      "license": "MIT License",
+      "url": "https://github.com/executablebooks/mdurl",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "mlflow",
+      "version": "3.14.0",
+      "license": "Apache Software License",
+      "url": "https://mlflow.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "mlflow-skinny",
+      "version": "3.14.0",
+      "license": "Apache Software License",
+      "url": "https://mlflow.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "mlflow-tracing",
+      "version": "3.14.0",
+      "license": "Apache Software License",
+      "url": "https://mlflow.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "mpmath",
+      "version": "1.3.0",
+      "license": "BSD License",
+      "url": "http://mpmath.org/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "multidict",
+      "version": "6.7.1",
+      "license": "Apache License 2.0",
+      "url": "https://github.com/aio-libs/multidict",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "multiprocess",
+      "version": "0.70.19",
+      "license": "BSD License",
+      "url": "https://github.com/uqfoundation/multiprocess",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "narwhals",
+      "version": "2.23.0",
+      "license": "MIT",
+      "url": "https://github.com/narwhals-dev/narwhals",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "networkx",
+      "version": "3.6.1",
+      "license": "BSD-3-Clause",
+      "url": "https://networkx.org/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "numpy",
+      "version": "2.4.6",
+      "license": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+      "url": "https://numpy.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "openai",
+      "version": "2.44.0",
+      "license": "Apache Software License",
+      "url": "https://github.com/openai/openai-python",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "openpyxl",
+      "version": "3.1.5",
+      "license": "MIT License",
+      "url": "https://openpyxl.readthedocs.io",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-api",
+      "version": "1.43.0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python/tree/main/opentelemetry-api",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-exporter-otlp",
+      "version": "1.43.0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python/tree/main/exporter/opentelemetry-exporter-otlp",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-exporter-otlp-proto-common",
+      "version": "1.43.0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python/tree/main/exporter/opentelemetry-exporter-otlp-proto-common",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-exporter-otlp-proto-grpc",
+      "version": "1.43.0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python/tree/main/exporter/opentelemetry-exporter-otlp-proto-grpc",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-exporter-otlp-proto-http",
+      "version": "1.43.0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python/tree/main/exporter/opentelemetry-exporter-otlp-proto-http",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-instrumentation",
+      "version": "0.64b0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/opentelemetry-instrumentation",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-instrumentation-asgi",
+      "version": "0.64b0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation/opentelemetry-instrumentation-asgi",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-instrumentation-fastapi",
+      "version": "0.64b0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation/opentelemetry-instrumentation-fastapi",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-instrumentation-httpx",
+      "version": "0.64b0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation/opentelemetry-instrumentation-httpx",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-instrumentation-redis",
+      "version": "0.64b0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation/opentelemetry-instrumentation-redis",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-instrumentation-sqlalchemy",
+      "version": "0.64b0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation/opentelemetry-instrumentation-sqlalchemy",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-proto",
+      "version": "1.43.0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python/tree/main/opentelemetry-proto",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-sdk",
+      "version": "1.43.0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python/tree/main/opentelemetry-sdk",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-semantic-conventions",
+      "version": "0.64b0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python/tree/main/opentelemetry-semantic-conventions",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "opentelemetry-util-http",
+      "version": "0.64b0",
+      "license": "Apache-2.0",
+      "url": "https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/util/opentelemetry-util-http",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "packaging",
+      "version": "26.2",
+      "license": "Apache-2.0 OR BSD-2-Clause",
+      "url": "https://github.com/pypa/packaging",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pandas",
+      "version": "2.3.3",
+      "license": "BSD License",
+      "url": "https://pandas.pydata.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pdfminer.six",
+      "version": "20260107",
+      "license": "MIT",
+      "url": "https://github.com/pdfminer/pdfminer.six",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pdfplumber",
+      "version": "0.11.10",
+      "license": "MIT License",
+      "url": "https://github.com/jsvine/pdfplumber",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pillow",
+      "version": "12.3.0",
+      "license": "MIT-CMU",
+      "url": "https://python-pillow.github.io",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "prometheus_client",
+      "version": "0.25.0",
+      "license": "Apache-2.0 AND BSD-2-Clause",
+      "url": "https://github.com/prometheus/client_python",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "prompt_toolkit",
+      "version": "3.0.52",
+      "license": "BSD License",
+      "url": "https://github.com/prompt-toolkit/python-prompt-toolkit",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "propcache",
+      "version": "0.5.2",
+      "license": "Apache Software License",
+      "url": "https://github.com/aio-libs/propcache",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "protobuf",
+      "version": "6.33.6",
+      "license": "3-Clause BSD License",
+      "url": "https://developers.google.com/protocol-buffers/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "psutil",
+      "version": "7.2.2",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/giampaolo/psutil",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "psycopg",
+      "version": "3.3.4",
+      "license": "LGPL-3.0-only",
+      "url": "https://psycopg.org/",
+      "tier": "weak",
+      "dual_license_note": null
+    },
+    {
+      "name": "psycopg-binary",
+      "version": "3.3.4",
+      "license": "LGPL-3.0-only",
+      "url": "https://psycopg.org/",
+      "tier": "weak",
+      "dual_license_note": null
+    },
+    {
+      "name": "pyarrow",
+      "version": "24.0.0",
+      "license": "Apache-2.0",
+      "url": "https://arrow.apache.org/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pyasn1",
+      "version": "0.6.3",
+      "license": "BSD-2-Clause",
+      "url": "https://github.com/pyasn1/pyasn1",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pyasn1_modules",
+      "version": "0.4.2",
+      "license": "BSD License",
+      "url": "https://github.com/pyasn1/pyasn1-modules",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pycparser",
+      "version": "3.0",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/eliben/pycparser",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pydantic",
+      "version": "2.13.4",
+      "license": "MIT",
+      "url": "https://github.com/pydantic/pydantic",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pydantic-settings",
+      "version": "2.14.2",
+      "license": "MIT",
+      "url": "https://github.com/pydantic/pydantic-settings",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pydantic_core",
+      "version": "2.46.4",
+      "license": "MIT",
+      "url": "https://github.com/pydantic",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pyparsing",
+      "version": "3.3.2",
+      "license": "MIT",
+      "url": "https://github.com/pyparsing/pyparsing/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pypdfium2",
+      "version": "5.11.0",
+      "license": "BSD-3-Clause, Apache-2.0, dependency licenses",
+      "url": "https://github.com/pypdfium2-team/pypdfium2",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "license": "Apache Software License; BSD License",
+      "url": "https://github.com/dateutil/dateutil",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "python-docx",
+      "version": "1.2.0",
+      "license": "MIT License",
+      "url": "https://github.com/python-openxml/python-docx",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "python-dotenv",
+      "version": "1.2.2",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/theskumar/python-dotenv",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "python-multipart",
+      "version": "0.0.32",
+      "license": "Apache-2.0",
+      "url": "https://github.com/Kludex/python-multipart",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "python-pptx",
+      "version": "1.0.2",
+      "license": "MIT License",
+      "url": "https://github.com/scanny/python-pptx",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "pytz",
+      "version": "2026.2",
+      "license": "MIT License",
+      "url": "http://pythonhosted.org/pytz",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "redis",
+      "version": "6.4.0",
+      "license": "MIT",
+      "url": "https://github.com/redis/redis-py",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "regex",
+      "version": "2026.6.28",
+      "license": "Apache-2.0 AND CNRI-Python",
+      "url": "https://github.com/mrabarnett/mrab-regex",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "requests",
+      "version": "2.34.2",
+      "license": "Apache Software License",
+      "url": "https://github.com/psf/requests",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "rhwp-python",
+      "version": "0.8.1",
+      "license": "MIT",
+      "url": "https://github.com/DanMeon/rhwp-python",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "rich",
+      "version": "15.0.0",
+      "license": "MIT License",
+      "url": "https://github.com/Textualize/rich",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "safetensors",
+      "version": "0.8.0",
+      "license": "Apache Software License",
+      "url": "https://github.com/huggingface/safetensors",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "scikit-learn",
+      "version": "1.9.0",
+      "license": "BSD-3-Clause",
+      "url": "https://scikit-learn.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "scipy",
+      "version": "1.17.1",
+      "license": "BSD License",
+      "url": "https://scipy.org/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "sentence-transformers",
+      "version": "5.6.0",
+      "license": "Apache-2.0",
+      "url": "https://www.SBERT.net",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "shellingham",
+      "version": "1.5.4",
+      "license": "ISC License (ISCL)",
+      "url": "https://github.com/sarugaku/shellingham",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "six",
+      "version": "1.17.0",
+      "license": "MIT License",
+      "url": "https://github.com/benjaminp/six",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "skops",
+      "version": "0.14.0",
+      "license": "UNKNOWN",
+      "url": "http://github.com/skops-dev/skops",
+      "tier": "unknown",
+      "dual_license_note": null
+    },
+    {
+      "name": "slowapi",
+      "version": "0.1.10",
+      "license": "MIT License",
+      "url": "https://github.com/laurents/slowapi",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "smmap",
+      "version": "5.0.3",
+      "license": "BSD License",
+      "url": "https://github.com/gitpython-developers/smmap",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "sniffio",
+      "version": "1.3.1",
+      "license": "Apache Software License; MIT License",
+      "url": "https://github.com/python-trio/sniffio",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "sqlparse",
+      "version": "0.5.5",
+      "license": "BSD License",
+      "url": "https://github.com/andialbrecht/sqlparse",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "starlette",
+      "version": "1.3.1",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/Kludex/starlette",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "sympy",
+      "version": "1.14.0",
+      "license": "BSD License",
+      "url": "https://sympy.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "threadpoolctl",
+      "version": "3.6.0",
+      "license": "BSD License",
+      "url": "https://github.com/joblib/threadpoolctl",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "tokenizers",
+      "version": "0.22.2",
+      "license": "Apache Software License",
+      "url": "https://github.com/huggingface/tokenizers",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "torch",
+      "version": "2.12.1+cpu",
+      "license": "BSD-3-Clause",
+      "url": "https://pytorch.org",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "tqdm",
+      "version": "4.68.3",
+      "license": "MPL-2.0 AND MIT",
+      "url": "https://tqdm.github.io",
+      "tier": "weak",
+      "dual_license_note": null
+    },
+    {
+      "name": "transformers",
+      "version": "5.13.0",
+      "license": "Apache 2.0 License",
+      "url": "https://github.com/huggingface/transformers",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "typer",
+      "version": "0.26.8",
+      "license": "MIT",
+      "url": "https://github.com/fastapi/typer",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "typing-inspection",
+      "version": "0.4.2",
+      "license": "MIT",
+      "url": "https://github.com/pydantic/typing-inspection",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "typing_extensions",
+      "version": "4.16.0",
+      "license": "PSF-2.0",
+      "url": "https://github.com/python/typing_extensions",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "tzdata",
+      "version": "2026.2",
+      "license": "Apache-2.0",
+      "url": "https://github.com/python/tzdata",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "tzlocal",
+      "version": "5.4.4",
+      "license": "MIT",
+      "url": "https://github.com/regebro/tzlocal/blob/master/CHANGES.txt",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "unhwp",
+      "version": "0.8.0",
+      "license": "MIT License",
+      "url": "https://github.com/iyulab/unhwp",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "urllib3",
+      "version": "2.7.0",
+      "license": "MIT",
+      "url": "https://github.com/urllib3/urllib3/blob/main/CHANGES.rst",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "uv",
+      "version": "0.11.26",
+      "license": "MIT OR Apache-2.0",
+      "url": "https://pypi.org/project/uv/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "uvicorn",
+      "version": "0.50.0",
+      "license": "BSD-3-Clause",
+      "url": "https://uvicorn.dev/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "uvloop",
+      "version": "0.22.1",
+      "license": "Apache Software License; MIT License",
+      "url": "UNKNOWN",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "vine",
+      "version": "5.1.0",
+      "license": "BSD License",
+      "url": "https://github.com/celery/vine",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "watchfiles",
+      "version": "1.2.0",
+      "license": "MIT License",
+      "url": "https://github.com/samuelcolvin/watchfiles",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "websockets",
+      "version": "15.0.1",
+      "license": "BSD License",
+      "url": "https://github.com/python-websockets/websockets",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "wrapt",
+      "version": "2.2.2",
+      "license": "BSD-2-Clause",
+      "url": "https://github.com/GrahamDumpleton/wrapt",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "xlrd",
+      "version": "2.0.2",
+      "license": "BSD License",
+      "url": "http://www.python-excel.org/",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "xlsxwriter",
+      "version": "3.2.9",
+      "license": "BSD License",
+      "url": "https://github.com/jmcnamara/XlsxWriter",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "xxhash",
+      "version": "3.8.0",
+      "license": "BSD-2-Clause",
+      "url": "https://github.com/ifduyue/python-xxhash",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "yarl",
+      "version": "1.24.2",
+      "license": "Apache-2.0",
+      "url": "https://github.com/aio-libs/yarl",
+      "tier": "permissive",
+      "dual_license_note": null
+    },
+    {
+      "name": "zipp",
+      "version": "4.1.0",
+      "license": "MIT",
+      "url": "https://github.com/jaraco/zipp",
+      "tier": "permissive",
+      "dual_license_note": null
+    }
+  ]
+}

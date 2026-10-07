@@ -1,0 +1,98 @@
+{
+  "job_id": "aea27889-4f0e-4b38-a70c-262b05a9a62a",
+  "status": "done",
+  "total": 1,
+  "completed": 1,
+  "failed": null,
+  "failed_doc_ids": [],
+  "errors": [],
+  "results": [
+    {
+      "inference_id": "739c4fed-1db8-4e00-b105-d61b3e23a367",
+      "doc_id": "ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73",
+      "label": "S2",
+      "confidence": 0.8803578615188599,
+      "scores": {},
+      "evaluation_factors": {
+        "secrecy": {
+          "state": "observed",
+          "value": 1,
+          "evidence": [
+            "대외비 표시 없음"
+          ]
+        },
+        "value": {
+          "state": "observed",
+          "value": 1,
+          "evidence": [
+            "원가 구조"
+          ]
+        },
+        "management": {
+          "state": "observed",
+          "value": 1,
+          "evidence": [
+            "접근 권한 미설정"
+          ]
+        },
+        "scores": {
+          "SECRECY": 1.0,
+          "VALUE": 1.0,
+          "MANAGEMENT": 1.0
+        }
+      },
+      "factors_source": "model_estimated",
+      "rule_evaluation_factors": {
+        "secrecy": {
+          "state": "observed",
+          "value": 2,
+          "evidence": [
+            "원가 구조",
+            "거래선 정보"
+          ]
+        },
+        "value": {
+          "state": "observed",
+          "value": 2,
+          "evidence": [
+            "원가 구조"
+          ]
+        },
+        "management": {
+          "state": "observed",
+          "value": 0,
+          "evidence": []
+        },
+        "scores": {
+          "SECRECY": 2.0,
+          "VALUE": 2.0,
+          "MANAGEMENT": 0.0
+        }
+      },
+      "evidence": [
+        {
+          "start": 64,
+          "end": 69,
+          "text": "원가 구조",
+          "weight": 0.8,
+          "tag": "ECONOMIC_VALUE"
+        }
+      ],
+      "model_version": "v-fe4b386b",
+      "status": "needs_review",
+      "warnings": [
+        "factors aligned to model grade S2 (rule under-detected S/V/M)",
+        "agreement-gate: model=S2 vs rule=S1 disagree on non-public grade — routed to human review (conf alone insufficient)"
+      ],
+      "rule_grade": "S1",
+      "model_grade": null,
+      "decision_path": "룰 S1 · 모델 S2 불일치 (검수 사유는 아래 경고 참조)",
+      "grade_candidates": [],
+      "grade_candidates_reason": null,
+      "regulation_reference": null,
+      "regulation_summary": null,
+      "confidence_tier": "높음"
+    }
+  ],
+  "error": null
+}

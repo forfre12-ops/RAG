@@ -6,7 +6,7 @@ dryrun/CI: 둘 다 부재 → silent no-op, False 반환.
 
 from __future__ import annotations
 
-from lloydk.obs.otel import setup_tracing
+from koipa.obs.otel import setup_tracing
 
 
 def test_setup_tracing_no_endpoint_returns_false(monkeypatch):
@@ -39,7 +39,7 @@ def test_app_lifespan_imports_setup_tracing():
     lifespan E2E 통합은 ML 모델 로드로 무거우니, 정적 wiring 존재만 확인.
     """
     from pathlib import Path
-    src = Path(__file__).resolve().parents[1] / "src" / "lloydk" / "api" / "app.py"
+    src = Path(__file__).resolve().parents[1] / "src" / "koipa" / "api" / "app.py"
     text = src.read_text(encoding="utf-8")
-    assert "from lloydk.obs.otel import setup_tracing" in text
+    assert "from koipa.obs.otel import setup_tracing" in text
     assert "setup_tracing(app)" in text
