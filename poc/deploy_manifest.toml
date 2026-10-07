@@ -70,7 +70,12 @@ hf_cache = ["nlpai-lab/KURE-v1", "kakaobank/kf-deberta-base", "Qwen/Qwen3-14B"]
 # docker save 로 tar 를 만드는 이미지. beat 는 worker 와 같은 koipa-worker 이미지라 tar 가 없다.
 # ops(2026-10-03) — 수동 실행 전용(compose profile "tools"), 상시 기동 서비스는 아니지만
 # 운영 도구를 쓰려면 이미지가 번들에 있어야 한다.
-save = ["postgres", "redis", "api", "worker", "ops", "nginx-mtls"]
+# api-customer·worker-customer(2026-10-07) — 번들 하나가 지재원(NODE=jjw)·고객사
+# (NODE=customer) 둘 다 설치할 수 있어야 하므로, 고객사 전용(합성 생성 코드 없는) 이미지도
+# 같이 싣는다. setup.sh 가 NODE 로 어느 쪽을 쓸지 고른다(docker-compose.airgap.yml 참고).
+# 순서 주의: build_offline_bundle.py 의 build_manifest() 가 compose 파싱 뒤에 이 둘을
+# 덧붙이므로 여기서도 맨 뒤에 둔다(test_builder_image_tars_equal_manifest 가 순서까지 본다).
+save = ["postgres", "redis", "api", "worker", "ops", "nginx-mtls", "api-customer", "worker-customer"]
 # 관측성 이미지(docker-images/obs-<이름>.tar). redis-exporter 는 알림 규칙·대시보드가 쓰지 않아 뺐다.
 observability = [
   "prometheus-v2.55.1", "alertmanager-v0.27.0", "grafana-11.3.0",

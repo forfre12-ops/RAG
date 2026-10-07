@@ -603,6 +603,25 @@ def build_manifest(
             ComponentEntry(image=f"koipa-{svc}:{version}", version=version),
         )
 
+    # [2026-10-07 KL 요청] 고객사 전용 이미지(Dockerfile.api.customer·worker.customer)도
+    # 같은 compose 서비스(api/worker)가 가리키는데, API_IMAGE_NAME·WORKER_IMAGE_NAME 변수
+    # 값만 다르다(docker-compose.airgap.yml·setup.sh 참고) — 같은 파서를 다른 override 로
+    # 한 번 더 돌려서 "api-customer"·"worker-customer" 컴포넌트로 추가한다. 번들 하나가
+    # 두 NODE(jjw·customer)를 다 설치할 수 있어야 하므로 둘 다 싣는다.
+    customer_overrides = extract_components_from_compose(
+        compose_path,
+        var_overrides={
+            "IMAGE_TAG": version,
+            "API_IMAGE_NAME": "koipa-api-customer",
+            "WORKER_IMAGE_NAME": "koipa-worker-customer",
+        },
+    )
+    for svc in ("api", "worker"):
+        entry = customer_overrides.get(
+            svc, ComponentEntry(image=f"koipa-{svc}-customer:{version}", version=version),
+        )
+        components[f"{svc}-customer"] = entry
+
     models = extract_models_from_config(config_path)
     # #40: 학습된 분류기 가중치 + temperature.json을 번들에 동봉. config.py가 가리키는
     # HF 베이스 모델만으론 폐쇄망에서 미학습·무보정으로 동작한다.
