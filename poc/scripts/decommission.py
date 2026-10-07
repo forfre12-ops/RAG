@@ -58,6 +58,10 @@ _VOLUMES = (
     ("storagedata", "원본 문서 보관소 (암호문)"),
     ("golden_data", "골든 후보·검수 원장·사람 서명"),
     ("artifacts_out", "재학습 산출 모델"),
+    # [2026-10-06 발견 2026-10-07] KL Stream 기능용 전용 redis — 메인 redisdata 와 분리된
+    # 별도 볼륨이라 여기 따로 적어야 한다(test_decommission_safety.py 가 compose 볼륨
+    # 목록과 대조해 빠짐을 잡는다).
+    ("redis_kl_stream_data", "Redis - KL Consumer Group 전달용 분류 결과 Stream"),
 )
 
 # 호스트 경로. 번들 배치에 따라 없을 수 있다 - 없으면 건너뛴다.

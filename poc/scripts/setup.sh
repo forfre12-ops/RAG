@@ -66,8 +66,12 @@ else
   NODE_AUTO=0
 fi
 case "$NODE" in
-  jjw)      PROFILE=full-train;   NODE_LABEL="지재원 학습·골든 노드" ;;
-  customer) PROFILE=onprem-local; NODE_LABEL="고객사 운영 노드" ;;
+  jjw)      PROFILE=full-train;   NODE_LABEL="지재원 학습·골든 노드"
+            API_IMAGE_NAME=koipa-api;          WORKER_IMAGE_NAME=koipa-worker ;;
+  customer) PROFILE=onprem-local; NODE_LABEL="고객사 운영 노드"
+            # [2026-10-07 KL 요청] 고객사는 합성 문서 생성 코드가 물리적으로 빠진 이미지를 쓴다
+            # (Dockerfile.api.customer·worker.customer — 골든 검수·학습은 고객사도 그대로 쓰므로 남아 있다).
+            API_IMAGE_NAME=koipa-api-customer; WORKER_IMAGE_NAME=koipa-worker-customer ;;
   *) printf "NODE 는 jjw 또는 customer 여야 한다 (받은 값: %s)\n" "$NODE" >&2; exit 1 ;;
 esac
 
@@ -175,6 +179,9 @@ else
 DEPLOY_PROFILE=${PROFILE}
 POC_MODE=full
 IMAGE_TAG=${IMAGE_TAG_DEFAULT}
+# [2026-10-07] NODE=${NODE} 에 맞춘 이미지 — docker-compose.airgap.yml 참고.
+API_IMAGE_NAME=${API_IMAGE_NAME}
+WORKER_IMAGE_NAME=${WORKER_IMAGE_NAME}
 API_PORT=${API_PORT}
 
 POSTGRES_USER=koipa

@@ -72,7 +72,11 @@ services:
   # 의존했으므로 minio 제거와 함께 제거.)
 
   api:
-    image: koipa-api:${IMAGE_TAG:-1.0.0-rc1}        # docker load 로 복원된 태그
+    # [2026-10-07] 이미지 이름도 태그처럼 .env 로 뺐다 — setup.sh 가 NODE=customer 면
+    # API_IMAGE_NAME=koipa-api-customer 를 .env 에 적는다(고객사=분류+증분재학습 전용
+    # 이미지, Dockerfile.api.customer). NODE=jjw·미지정은 기본값(koipa-api, 전체 이미지)
+    # 그대로라 기존 설치 경로는 아무 영향 없다.
+    image: ${API_IMAGE_NAME:-koipa-api}:${IMAGE_TAG:-1.0.0-rc1}        # docker load 로 복원된 태그
     restart: unless-stopped
     env_file: .env
     environment:
@@ -149,7 +153,9 @@ services:
     # 기동 자체가 막혔다(고객사 운영노드는 CPU 전용 — 기본값이 반대였다).
 
   worker:
-    image: koipa-worker:${IMAGE_TAG:-1.0.0-rc1}
+    # [2026-10-07] api 와 같은 이유 — WORKER_IMAGE_NAME(기본 koipa-worker, 고객사는
+    # koipa-worker-customer).
+    image: ${WORKER_IMAGE_NAME:-koipa-worker}:${IMAGE_TAG:-1.0.0-rc1}
     restart: unless-stopped
     command: celery -A koipa.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     env_file: .env
@@ -201,7 +207,8 @@ services:
 
   # 주기작업 발행기 — 단일 인스턴스만 (다중 beat = 중복 tick). dev compose엔 누락돼 있었음.
   beat:
-    image: koipa-worker:${IMAGE_TAG:-1.0.0-rc1}
+    # beat 는 주기 tick 만 발행하고 실행은 worker 가 한다 — 같은 이미지 변수를 쓴다.
+    image: ${WORKER_IMAGE_NAME:-koipa-worker}:${IMAGE_TAG:-1.0.0-rc1}
     restart: unless-stopped
     # --schedule 경로 고정 → 헬스체크가 이 파일의 신선도로 beat tick 생존을 판정.
     command: celery -A koipa.workers.celery_app beat -l info --schedule /tmp/celerybeat-schedule
