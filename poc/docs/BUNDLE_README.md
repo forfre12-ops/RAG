@@ -24,7 +24,7 @@ sudo NODE=customer bash setup.sh   # 고객사 서버 (운영 노드)
 
 | 서버 | 열 주소 (`<서버주소>` 는 이 서버의 IP, 포트 8000 은 기본값) | 화면 |
 |---|---|---|
-| 지재원 | `http://<서버주소>:8000/api/v1/golden/candidates/manage.html` | 전문가 검수 화면 — 검수할 문서 1,711건이 보여야 합니다 |
+| 지재원 | `http://<서버주소>:8000/api/v1/golden/candidates/manage.html` | 전문가 검수 화면 — 검수할 문서 1,001건이 보여야 합니다 |
 | 고객사 | `http://<서버주소>:8000/console/admin.html` | 관리 콘솔 |
 
 설치 상태를 다시 확인하려면 `bash verify_install.sh` 를 실행합니다. 서비스 준비 상태와 문서 한 건의 파싱·분류를 확인합니다.
