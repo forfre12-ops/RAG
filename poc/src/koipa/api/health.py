@@ -34,9 +34,19 @@ def _synth_domains_supported() -> list[str]:
 
     생성기 import 는 여기서 한다 — health 모듈이 LLM 어댑터 사슬을 모듈 로드 시점에
     끌고 오지 않게 한다(앱은 어차피 합성 라우터를 통해 이미 싣는다).
+
+    [2026-10-07 KL 분리 조사] 이 healthz 엔드포인트는 플래그 무관하게 항상 등록된다
+    (health_api.router, app.py 에 조건 없음). 고객사 전용 이미지(Dockerfile.api.customer)는
+    synthesis 생성기·스키마 자체가 없으므로, 여기서 ModuleNotFoundError 를 못 잡으면
+    **인증도 없는 기본 healthz 가 고객사에서 매 호출마다 500**이 된다(2026-10-07 조사에서
+    발견 — 발견 전까지 아무도 겪지 않은 건 이 두 파일을 아직 아무 이미지에서도 빼 본 적이
+    없었기 때문).
     """
-    from koipa.modules.m1_synthesis.generator import canonical_domain  # noqa: PLC0415
-    from koipa.schemas.synthesis import _SYNTH_DOMAINS  # noqa: PLC0415
+    try:
+        from koipa.modules.m1_synthesis.generator import canonical_domain  # noqa: PLC0415
+        from koipa.schemas.synthesis import _SYNTH_DOMAINS  # noqa: PLC0415
+    except ModuleNotFoundError:
+        return []
 
     return sorted({canonical_domain(d) for d in _SYNTH_DOMAINS})
 

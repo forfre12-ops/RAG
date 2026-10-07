@@ -1,0 +1,68 @@
+# [2026-10-07 KL 요청] 고객사 PC 배포 전용 워커 — 분류·색인·야간 증분 재학습 태스크만 돈다.
+#
+# Dockerfile.worker(지재원·개발 겸용)와 베이스·설치 과정이 전부 같고, 두 가지만 다르다:
+#   ① src 복사 직후 합성 생성 전용 모듈을 지운다(Dockerfile.api.customer 와 동일 블록 —
+#      정본은 deploy_manifest.toml 의 container.customer_exclude).
+#   ② CMD 의 큐 목록에서 `synthesis` 를 뺐다 — synthesize_batch 태스크를 구독해도 그 태스크가
+#      부르는 모듈이 이미지에 없어 실행 시점에 실패할 뿐이고, 어차피 디스패치할 코드
+#      (api/synthesis.py)도 고객사 이미지엔 없다.
+# golden_build_task(골든셋 빌드)·active_learning_tick(지재원 전용 자동재학습)은 그대로 둔다
+# — 상세 근거는 Dockerfile.api.customer 머리말 참고(같은 조사, 같은 결정).
+#
+# 빌드:
+#   docker build -f Dockerfile.worker.customer -t koipa-worker-customer:1.0.0-rc1 .
+
+FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93
+
+ARG KOIPA_BUILD_SHA=unknown
+ARG KOIPA_BUILD_AT=unknown
+ENV KOIPA_BUILD_SHA=${KOIPA_BUILD_SHA} KOIPA_BUILD_AT=${KOIPA_BUILD_AT}
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential libpq-dev libfreetype6 libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+COPY src ./src
+# BEGIN deploy_manifest:customer_exclude — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
+# 고객사 전용 이미지에서 빼는 파일. 정본: deploy_manifest.toml 의 container.customer_exclude.
+RUN rm -f src/koipa/api/synthesis.py \
+           src/koipa/dataset_leakage.py \
+           src/koipa/modules/m1_synthesis/__init__.py \
+           src/koipa/modules/m1_synthesis/generation_playbook.py \
+           src/koipa/modules/m1_synthesis/generator.py \
+           src/koipa/modules/m1_synthesis/witness_taxonomy.py \
+           src/koipa/schemas/synthesis.py \
+           src/koipa/services/synth_coverage.py \
+           src/koipa/services/synth_provider_status.py \
+           src/koipa/services/synth_quality.py \
+           src/koipa/services/synthesis_service.py
+# END deploy_manifest:customer_exclude
+# BEGIN deploy_manifest:container_scripts — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
+# 이미지에는 정본(deploy_manifest.toml)의 container.scripts.allow 만 싣는다.
+COPY scripts/_cli_io.py \
+     scripts/analyze_golden_run.py \
+     scripts/check_domain_leakage_gate.py \
+     scripts/docker_install_locked.sh \
+     scripts/register_deployed_model.py \
+     scripts/setup_console_test_login.py \
+     ./scripts/
+# END deploy_manifest:container_scripts
+COPY evidence ./evidence
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
+
+RUN pip install --upgrade pip && \
+    TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh \
+        hwp hwp-tables pdf-tables xls llm
+
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
+
+RUN useradd -m -u 1000 koipa && mkdir -p /app/.storage /app/datasets && chown -R koipa:koipa /app
+USER koipa
+ENV HF_HOME=/home/koipa/.cache/huggingface
+
+CMD ["celery", "-A", "koipa.workers.celery_app", "worker", "--loglevel=info", "-Q", "classify,index,learning"]

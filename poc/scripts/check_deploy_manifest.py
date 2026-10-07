@@ -40,6 +40,8 @@ OPS_BLOCK_BEGIN = "# BEGIN deploy_manifest:container_ops_scripts"
 OPS_BLOCK_END = "# END deploy_manifest:container_ops_scripts"
 IGNORE_BEGIN = "# BEGIN deploy_manifest:exclude_paths"
 IGNORE_END = "# END deploy_manifest:exclude_paths"
+CUSTOMER_EXCLUDE_BEGIN = "# BEGIN deploy_manifest:customer_exclude"
+CUSTOMER_EXCLUDE_END = "# END deploy_manifest:customer_exclude"
 
 
 # ── 텍스트 도구 ─────────────────────────────────────────────
@@ -127,6 +129,7 @@ def derive_container_scripts(manifest: dict) -> dict[str, str]:
         if "__pycache__" not in p.parts:
             roots[p.relative_to(POC).as_posix()] = _exec_text(p)
     for name in ("Dockerfile.api.prod", "Dockerfile.worker", "Dockerfile.ops",
+                 "Dockerfile.api.customer", "Dockerfile.worker.customer",
                  "docker-compose.airgap.yml", "docker-compose.gpu.yml"):
         q = POC / name
         if q.exists():
@@ -182,6 +185,16 @@ def _ignore_block(paths: list[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _customer_exclude_block(paths: list[str]) -> str:
+    lines = [
+        CUSTOMER_EXCLUDE_BEGIN + " — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.",
+        "# 고객사 전용 이미지에서 빼는 파일. 정본: deploy_manifest.toml 의 container.customer_exclude.",
+        "RUN rm -f " + " \\\n           ".join(paths),
+        CUSTOMER_EXCLUDE_END,
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def _replace_block(text: str, begin: str, end: str, block: str) -> str | None:
     """begin~end 줄 사이를 block 으로 바꾼다. 표지가 없으면 None."""
     m = re.search(re.escape(begin) + r".*?" + re.escape(end) + r"\n", text, flags=re.S)
@@ -191,11 +204,21 @@ def _replace_block(text: str, begin: str, end: str, block: str) -> str | None:
 
 
 def _dockerfiles() -> list[Path]:
-    return [POC / "Dockerfile.api.prod", POC / "Dockerfile.worker"]
+    # [2026-10-07] Dockerfile.api.customer·Dockerfile.worker.customer(고객사 전용, 합성 생성
+    # 모듈만 뺀 분류+증분재학습 이미지)도 같은 container.scripts.allow COPY 블록을 쓴다 —
+    # api.prod·worker 와 똑같이 정본과 동기화 검사·자동 생성 대상이다.
+    return [
+        POC / "Dockerfile.api.prod", POC / "Dockerfile.worker",
+        POC / "Dockerfile.api.customer", POC / "Dockerfile.worker.customer",
+    ]
 
 
 def _ops_dockerfiles() -> list[Path]:
     return [POC / "Dockerfile.ops"]
+
+
+def _customer_dockerfiles() -> list[Path]:
+    return [POC / "Dockerfile.api.customer", POC / "Dockerfile.worker.customer"]
 
 
 # ── 검사 ────────────────────────────────────────────────────
@@ -238,6 +261,14 @@ def check(manifest: dict) -> list[str]:
     for s, why in dm.container_scripts_not_in_image().items():
         if s in allow or s in ops_allow:
             errs.append(f"not_in_image 인데 allow/ops_allow 에도 있다: {s} ({why})")
+    customer_exclude = dm.container_customer_exclude_paths()
+    for p in customer_exclude:
+        if not (POC / p).exists():
+            errs.append(f"container.customer_exclude 에 있는데 원본이 없다: {p}")
+    if len(customer_exclude) != len(set(customer_exclude)):
+        errs.append("container.customer_exclude 에 중복이 있다")
+    if customer_exclude != sorted(customer_exclude):
+        errs.append("container.customer_exclude 가 정렬돼 있지 않다(diff 가독성)")
 
     # 2) 런타임 근거 폐포 == 허용 목록(두 이미지 합집합) — docker_install_locked.sh 처럼
     #    두 쪽 다 쓰는 빌드 도구는 겹쳐도 된다, 안 겹쳐야 하는 건 아니다.
@@ -277,6 +308,14 @@ def check(manifest: dict) -> list[str]:
         errs.append(f".dockerignore: 표지({IGNORE_BEGIN})가 없다 — --write 로 만들 것")
     elif inew != itext:
         errs.append(".dockerignore: 제외 경로가 정본과 다르다 — --write 로 다시 쓸 것")
+    want_customer_rm = _customer_exclude_block(dm.container_customer_exclude_paths())
+    for df in _customer_dockerfiles():
+        text = _read(df)
+        new = _replace_block(text, CUSTOMER_EXCLUDE_BEGIN, CUSTOMER_EXCLUDE_END, want_customer_rm)
+        if new is None:
+            errs.append(f"{df.name}: customer_exclude 블록 표지({CUSTOMER_EXCLUDE_BEGIN})가 없다 — --write 로 만들 것")
+        elif new != text:
+            errs.append(f"{df.name}: customer_exclude 블록이 정본과 다르다 — --write 로 다시 쓸 것")
     return errs
 
 
@@ -312,6 +351,15 @@ def write(manifest: dict) -> list[str]:
     if inew != itext:
         ign.write_text(inew, encoding="utf-8", newline="\n")
         changed.append(".dockerignore")
+    want_customer_rm = _customer_exclude_block(dm.container_customer_exclude_paths())
+    for df in _customer_dockerfiles():
+        text = _read(df)
+        new = _replace_block(text, CUSTOMER_EXCLUDE_BEGIN, CUSTOMER_EXCLUDE_END, want_customer_rm)
+        if new is None:
+            raise SystemExit(f"{df.name}: customer_exclude 블록 표지({CUSTOMER_EXCLUDE_BEGIN})가 없어 바꿀 자리를 못 찾았다")
+        if new != text:
+            df.write_text(new, encoding="utf-8", newline="\n")
+            changed.append(df.name)
     return changed
 
 

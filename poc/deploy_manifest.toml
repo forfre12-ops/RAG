@@ -154,3 +154,35 @@ allow = [
 # four_path_shadow.py — 미커밋 실험 코드. src/ 전체가 COPY 대상이라 이름을 적어 빼지 않으면
 # 다음 빌드에 그대로 실린다(2026-10-03 발견, 호출자 0건).
 paths = ["src/koipa/api/static/samples/", "src/koipa/four_path_shadow.py"]
+
+# ── 고객사 전용 이미지(Dockerfile.api.customer·Dockerfile.worker.customer) ──────
+[container.customer_exclude]
+# [2026-10-07 KL 요청] "고객사 PC(문서 분류)에는 지재원 전용(합성 문서 생성·학습) 코드가
+# 설정으로 꺼진 채로가 아니라 물리적으로 없어야 한다"는 지적에 대한 2차 방어선(1차=
+# enable_synthetic_generation 플래그, app.py). check_deploy_manifest.py --write 가 이 목록으로
+# 두 Dockerfile의 `RUN rm -f` 블록을 생성한다 — 손으로 그 블록을 고치지 않는다.
+#
+# golden.py 생태계(golden_build_service.py·golden_signoff.py·console_signoff.py 등)와
+# api/training.py·services/training_service.py는 **여기 넣지 않는다** — 고객사도 야간 증분
+# 재학습본에 서명(locked_eval)하려고 검수·서명 화면과 학습 라우터를 그대로 쓴다(admin.html
+# applyProfileVisibility 주석, 2026-08-24 결정). 지재원 전용 전체학습·URGENT 자동재학습
+# (enable_training 단독 게이트)은 workers/tasks.py 안에 고객사 공유 함수와 같은 파일로
+# 섞여 있어 파일 단위로 뺄 수 없다 — 기존 플래그 게이트가 유일한 분리선이다(2026-10-07 조사,
+# Explore 트레이스로 확인). 그래서 실제로 파일 단위 분리가 가능한 것은 합성 생성뿐이다.
+#
+# 실제 import 그래프(런타임 reachability)로 구했다 — grep 으로 찾으면 간접 참조를 놓친다
+# (golden_build_service.py 가 scripts/analyze_golden_run.py 를 sys.path 로 끌어오는 식의
+# 숨은 경로가 실제로 있었다, 2026-10-03 ops 이미지 분리 때의 교훈을 재확인).
+paths = [
+  "src/koipa/api/synthesis.py",
+  "src/koipa/dataset_leakage.py",
+  "src/koipa/modules/m1_synthesis/__init__.py",
+  "src/koipa/modules/m1_synthesis/generation_playbook.py",
+  "src/koipa/modules/m1_synthesis/generator.py",
+  "src/koipa/modules/m1_synthesis/witness_taxonomy.py",
+  "src/koipa/schemas/synthesis.py",
+  "src/koipa/services/synth_coverage.py",
+  "src/koipa/services/synth_provider_status.py",
+  "src/koipa/services/synth_quality.py",
+  "src/koipa/services/synthesis_service.py",
+]

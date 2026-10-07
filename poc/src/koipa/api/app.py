@@ -24,7 +24,6 @@ from koipa.api import health as health_api
 from koipa.api import confirm as confirm_api
 from koipa.api import promotion as promotion_api
 from koipa.api import training as training_api
-from koipa.api import synthesis as synthesis_api
 from koipa.api import golden as golden_api
 from koipa.api import documents as documents_api
 from koipa.api import schema_admin as schema_admin_api
@@ -440,6 +439,9 @@ app.include_router(promotion_api.router, prefix="/api/v1")
 # 학습 라우터는 학습 노드에서만 등록: enable_training(지재원 full-train) 또는
 # enable_incremental_retrain(고객사 onprem-local 야간 증분 재학습). 순수 추론 노드(lite-*)에서는
 # OpenAPI에도 노출되지 않는다. 등록되더라도 모든 엔드포인트는 admin/kl_backend/system RBAC 보호.
+# [2026-10-07 KL 요청 조사] training.py·services/training_service.py는 고객사 야간 증분
+# 재학습이 그대로 쓰는 공유 코드라 고객사 전용 이미지에서도 빼지 않는다 — Dockerfile.api.customer
+# 에서 지운 것은 synthesis 관련 모듈뿐이다(아래 참고).
 if settings.enable_training or settings.enable_incremental_retrain:
     app.include_router(
         training_api.router, prefix="/api/v1",
@@ -453,8 +455,24 @@ else:
 # 학습은 다른 기능인데 한 축에 묶여 있어, 학습을 끄면 요건 기능이 화면에서도 API 에서도
 # 조용히 사라졌다. 지재원(full-train)에서는 반드시 열려 있어야 한다 —
 # tests/test_deploy_profile.py 가 그 계약을 잠근다.
+#
+# [2026-10-07 KL 요청] import도 이 블록 안으로 옮겼다 — 고객사 전용 이미지(Dockerfile.api.customer·
+# Dockerfile.worker.customer)에는 synthesis.py 와 그 생성기(modules/m1_synthesis/)가 물리적으로
+# 없다(1차 방어선=이 플래그, 2차 방어선=코드 자체 부재 — deploy_manifest.toml 의
+# container.customer_exclude 가 정본). golden.py 는 여기 포함하지 않는다 — 고객사도 야간
+# 증분 재학습본에 서명(locked_eval)하려고 검수·서명 화면을 그대로 쓴다(admin.html 의
+# applyProfileVisibility 주석, 2026-08-24 결정 — 지우면 고객사가 모델을 켤 때마다 검수게이트
+# force 우회를 영구히 써야 한다).
 if settings.enable_synthetic_generation:
-    app.include_router(synthesis_api.router, prefix="/api/v1")
+    try:
+        from koipa.api import synthesis as synthesis_api  # noqa: PLC0415
+    except ImportError:
+        logger.error(
+            "synthesis router enabled but koipa.api.synthesis is not in this image "
+            "(customer-split build) — staying disabled"
+        )
+    else:
+        app.include_router(synthesis_api.router, prefix="/api/v1")
 else:
     logger.info("synthesis router disabled (deploy_profile=%s)", settings.deploy_profile)
 # 골든 검수·서명 HTML 뷰 — 브라우저 window.open/직접 URL 로 열리게 별도 라우터로 분리.

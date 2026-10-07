@@ -227,6 +227,34 @@ def test_synthesis_router_visibility(
         importlib.reload(app_mod)
 
 
+@pytest.mark.parametrize("profile", ["lite-noapi", "lite-cloud", "onprem-local", "full-train"])
+def test_golden_router_always_registered(profile: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """[2026-10-07 KL 분리 조사] golden.py 는 플래그로 빼지 않는다 — 모든 프로파일에서 등록된다.
+
+    KL 요청(고객사 PC엔 검수 화면 없이)과 기존 결정(고객사도 야간 증분 재학습본에 서명하려면
+    검수·서명 화면이 필요 — admin.html applyProfileVisibility 주석, 2026-08-24)이 충돌해
+    사용자가 "golden.py는 남긴다"로 결정했다. 이 시험은 그 결정을 잠근다 — 누군가 나중에
+    enable_golden_review 같은 플래그로 다시 끄려 하면 이 시험이 먼저 깨진다.
+    """
+    monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
+    monkeypatch.setenv("DEPLOY_PROFILE", profile)
+
+    import koipa.config as cfg_mod
+    _orig_settings = cfg_mod.settings
+    importlib.reload(cfg_mod)
+    import koipa.api.app as app_mod
+    importlib.reload(app_mod)
+
+    try:
+        paths = set(app_mod.app.openapi().get("paths", {}))
+        golden_paths = {p for p in paths if p.startswith("/api/v1/golden")}
+        assert golden_paths, f"{profile}: 골든 검수·서명 라우터가 등록되어야 함(고객사 locked_eval 서명 경로)"
+    finally:
+        monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+        cfg_mod.settings = _orig_settings
+        importlib.reload(app_mod)
+
+
 def test_admin_console_mounts_without_enabling_purge(monkeypatch: pytest.MonkeyPatch) -> None:
     """[하드닝 콘솔] serve_admin_console=True + demo_console_enabled=False → /demo 마운트되되
     파괴적 purge 는 계속 OFF. 관리 UI(검수→재학습→활성화)만 노출하고 데모/물리삭제 표면은 닫는다.

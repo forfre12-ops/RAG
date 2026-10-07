@@ -74,3 +74,8 @@ def container_scripts_not_in_image(path: Path | None = None) -> dict[str, str]:
 def container_excluded_paths(path: Path | None = None) -> list[str]:
     """이미지 빌드 컨텍스트에서 빼는 경로(.dockerignore 로 실현)."""
     return list(load(path)["container"]["exclude_paths"]["paths"])
+
+
+def container_customer_exclude_paths(path: Path | None = None) -> list[str]:
+    """고객사 전용 이미지(Dockerfile.api.customer·Dockerfile.worker.customer)에서 지우는 경로."""
+    return list(load(path)["container"]["customer_exclude"]["paths"])
