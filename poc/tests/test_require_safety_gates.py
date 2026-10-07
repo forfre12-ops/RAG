@@ -314,3 +314,95 @@ def test_assert_allows_non_hardened_with_gate_off() -> None:
         for k, v in snap.items():
             setattr(config_mod.settings, k, v)
         config_mod._SECRETS_FILLED = False
+
+
+def _cors_wildcard_fields() -> tuple[str, ...]:
+    return (
+        "poc_mode",
+        "api_key",
+        "auth_mode",
+        "minio_secret_key",
+        "audit_chain_secret",
+        "cors_allow_origins",
+        "api_key_trust_actor_role_header",
+        "classifier_model_dir",
+        "agreement_gate_enabled",
+        "metadata_floor_enabled",
+        "storage_encryption_enabled",
+        "require_safety_gates",
+    )
+
+
+def test_cors_wildcard_blocked_in_full_mode_without_auth_mode_none() -> None:
+    """[2026-10-07] CORS=["*"] + auth_mode!=none 은 여전히 운영 모드에서 차단된다(기존 동작 유지)."""
+    config_mod._SECRETS_FILLED = True
+    snap = {k: getattr(config_mod.settings, k) for k in _cors_wildcard_fields()}
+    config_mod.settings.poc_mode = "full"
+    config_mod.settings.api_key = "x"
+    config_mod.settings.auth_mode = "api_key"
+    config_mod.settings.minio_secret_key = "y"
+    config_mod.settings.audit_chain_secret = "z"
+    config_mod.settings.cors_allow_origins = ["*"]
+    config_mod.settings.api_key_trust_actor_role_header = False
+    config_mod.settings.classifier_model_dir = ""
+    config_mod.settings.require_safety_gates = False
+    config_mod.settings.agreement_gate_enabled = False
+    config_mod.settings.metadata_floor_enabled = False
+    config_mod.settings.storage_encryption_enabled = False
+    try:
+        with patch.dict(
+            os.environ,
+            {
+                "TESTING": "",
+                "PYTEST_CURRENT_TEST": "",
+                "RATE_LIMIT_DISABLED": "",
+                "AUDIT_DISABLED": "",
+                "KOIPA_AUDIT_CHAIN_SECRET": "z",
+            },
+        ):
+            try:
+                config_mod.assert_production_credentials()
+                raised = False
+            except RuntimeError as exc:
+                raised = True
+                assert "CORS" in str(exc)
+            assert raised, "CORS 와일드카드는 auth_mode=none 이 아니면 여전히 차단돼야 한다"
+    finally:
+        for k, v in snap.items():
+            setattr(config_mod.settings, k, v)
+        config_mod._SECRETS_FILLED = False
+
+
+def test_cors_wildcard_allowed_when_auth_mode_none() -> None:
+    """[2026-10-07] KL 요청(VM 내부 전용) — auth_mode=none 이면 CORS=["*"] 도 fail-fast 대상에서 뺀다."""
+    config_mod._SECRETS_FILLED = True
+    snap = {k: getattr(config_mod.settings, k) for k in _cors_wildcard_fields()}
+    config_mod.settings.poc_mode = "full"
+    config_mod.settings.api_key = ""  # auth_mode=none 이면 키 자체도 요구하지 않는다
+    config_mod.settings.auth_mode = "none"
+    config_mod.settings.minio_secret_key = "y"
+    config_mod.settings.audit_chain_secret = "z"
+    config_mod.settings.cors_allow_origins = ["*"]
+    config_mod.settings.api_key_trust_actor_role_header = False
+    config_mod.settings.classifier_model_dir = ""
+    config_mod.settings.require_safety_gates = False
+    config_mod.settings.agreement_gate_enabled = False
+    config_mod.settings.metadata_floor_enabled = False
+    config_mod.settings.storage_encryption_enabled = False
+    try:
+        with patch.dict(
+            os.environ,
+            {
+                "TESTING": "",
+                "PYTEST_CURRENT_TEST": "",
+                "RATE_LIMIT_DISABLED": "",
+                "AUDIT_DISABLED": "",
+                "KOIPA_AUDIT_CHAIN_SECRET": "z",
+            },
+        ):
+            # CORS 사유로 raise 하면 안 됨(다른 운영 체크는 위에서 모두 통과하도록 구성).
+            config_mod.assert_production_credentials()
+    finally:
+        for k, v in snap.items():
+            setattr(config_mod.settings, k, v)
+        config_mod._SECRETS_FILLED = False

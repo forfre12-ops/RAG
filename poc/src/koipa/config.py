@@ -1515,15 +1515,18 @@ def assert_production_credentials() -> None:
                 "의도를 명시하세요(권장하지 않음)."
             )
 
-    # CORS=["*"] 운영에서 오류
-    if settings.cors_allow_origins == ["*"]:
+    # CORS=["*"] 운영에서 오류. [2026-10-07] auth_mode=none(=VM 내부 전용, 외부에 노출하지
+    # 않는다는 명시적 선언, KL 요청)이면 같은 신호로 CORS 와일드카드도 허용한다 — 인증을
+    # 꺼도 되는 토폴로지면서 교차출처 요청만 따로 차단할 이유가 없다.
+    if settings.cors_allow_origins == ["*"] and settings.auth_mode != "none":
         raise RuntimeError(
             "SECURITY: CORS allow-origins=[\"*\"]는 운영 모드에서 허용되지 않습니다. "
             # [2026-08-02] 종전 문구는 KOIPA_ 접두어를 안내했는데 Settings 는 접두어 없이
             # 필드명 그대로 읽는다(model_config: env_prefix 없음) → 시키는 대로 해도 안 고쳐지고
             # 설치자가 같은 오류를 반복해서 만났다(리허설 실측). 실제로 읽히는 이름으로 안내한다.
             "환경변수 CORS_ALLOW_ORIGINS 에 JSON 배열로 명시하세요. "
-            "예) CORS_ALLOW_ORIGINS=[\"https://your.domain.com\"]"
+            "예) CORS_ALLOW_ORIGINS=[\"https://your.domain.com\"] "
+            "(VM 내부 전용으로 와일드카드가 필요하면 AUTH_MODE=none 도 함께 설정하세요.)"
         )
 
     # 원본 at-rest 암호화가 켜졌는데 키가 없으면 평문 저장 위험 — fail-fast.
