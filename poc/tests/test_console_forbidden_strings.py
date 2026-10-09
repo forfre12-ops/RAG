@@ -26,7 +26,8 @@ import re
 from pathlib import Path
 
 
-from koipa.api.golden import _render_console_login_html, _render_specledger_gold_console_html
+from koipa.api.console_login import _render_console_login_html
+from koipa.api.golden import _render_specledger_gold_console_html
 from koipa.golden_review_html import _nav_html
 
 _POC = Path(__file__).resolve().parents[1]

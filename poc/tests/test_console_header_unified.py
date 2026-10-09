@@ -21,7 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from koipa.api.golden import _as_reviewer_view, _render_console_login_html, _render_specledger_gold_console_html
+from koipa.api.console_login import _render_console_login_html
+from koipa.api.golden import _as_reviewer_view, _render_specledger_gold_console_html
 from koipa.console_nav import CONSOLE_LINKS, HEADER_CSS, REVIEW_SCREEN_EXCLUDE, header_html
 
 # 검수 화면 — 관리자 콘솔로 가는 메뉴를 두지 않는다(2026-09-11, 설계단계 감리 지적).

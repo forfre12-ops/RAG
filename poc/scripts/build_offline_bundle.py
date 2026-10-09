@@ -1467,6 +1467,37 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
                 file=sys.stderr,
             )
 
+    # [2026-10-09 #9 이미지 분리] 고객사 이미지엔 api/golden.py(검수·서명 화면)가 없다 —
+    # 야간 증분 재학습 활성화의 사람서명 locked-eval readiness 게이트를 고객사 쪽에서 채울
+    # 수단이 없다는 뜻이다. deploy_manifest.toml 의 [bundle.locked_eval].source(지재원이 만든
+    # locked_eval.jsonl)가 있으면 스냅샷으로 동봉한다 — 없으면(실서명 0건 등) 조용히 건너뛰고
+    # 그 사실을 알린다(review_batch 와 같은 "설정은 있는데 데이터 없음" 구분 원칙).
+    locked_eval_rel = str(_dm.load()["bundle"]["locked_eval"]["source"] or "").strip()
+    if locked_eval_rel:
+        locked_eval_src = _REPO_ROOT / locked_eval_rel
+        if locked_eval_src.exists() and locked_eval_src.stat().st_size > 0:
+            import shutil as _sh_locked  # noqa: PLC0415
+
+            locked_dst = out_dir / "golden_locked_eval"
+            locked_dst.mkdir(parents=True, exist_ok=True)
+            _sh_locked.copy2(locked_eval_src, locked_dst / "locked_eval.jsonl")
+            n_lines = sum(1 for ln in locked_eval_src.read_text(encoding="utf-8").splitlines() if ln.strip())
+            print(
+                f"  [golden] locked_eval 스냅샷({n_lines}건) → {locked_dst}. 적재는 설치 후 별도 수행: "
+                "`cp golden_locked_eval/locked_eval.jsonl <배포경로>/datasets/gold_real/locked_eval.jsonl` "
+                "— ⚠ 이미 돌고 있는 환경에 다시 적용할 때는 기존 서명을 덮어쓸 수 있다(병합 도구 없음, "
+                "신규 설치에서만 안전).",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "  [golden] locked_eval 스냅샷 미동봉 — 지재원 쪽에 실서명(human_review) locked 레코드가 "
+                "아직 없다(또는 비어 있다). 고객사는 이 모델 그대로는 야간 증분 재학습 활성화 전 "
+                "deploy_gate_manual_require_locked_eval 게이트를 못 넘긴다 — force 우회(사유 필수)나 "
+                "실서명 누적을 기다려야 한다.",
+                file=sys.stderr,
+            )
+
 
 def _copy_observability(out_dir: Path) -> None:
     """관측성 스택 설정(prometheus·alert_rules·grafana·loki·airgap overlay compose)을 번들에 복사.

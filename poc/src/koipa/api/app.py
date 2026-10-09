@@ -24,7 +24,7 @@ from koipa.api import health as health_api
 from koipa.api import confirm as confirm_api
 from koipa.api import promotion as promotion_api
 from koipa.api import training as training_api
-from koipa.api import golden as golden_api
+from koipa.api import console_login as console_login_api
 from koipa.api import documents as documents_api
 from koipa.api import schema_admin as schema_admin_api
 from koipa.api import metrics as metrics_api
@@ -459,10 +459,7 @@ else:
 # [2026-10-07 KL 요청] import도 이 블록 안으로 옮겼다 — 고객사 전용 이미지(Dockerfile.api.customer·
 # Dockerfile.worker.customer)에는 synthesis.py 와 그 생성기(modules/m1_synthesis/)가 물리적으로
 # 없다(1차 방어선=이 플래그, 2차 방어선=코드 자체 부재 — deploy_manifest.toml 의
-# container.customer_exclude 가 정본). golden.py 는 여기 포함하지 않는다 — 고객사도 야간
-# 증분 재학습본에 서명(locked_eval)하려고 검수·서명 화면을 그대로 쓴다(admin.html 의
-# applyProfileVisibility 주석, 2026-08-24 결정 — 지우면 고객사가 모델을 켤 때마다 검수게이트
-# force 우회를 영구히 써야 한다).
+# container.customer_exclude 가 정본).
 if settings.enable_synthetic_generation:
     try:
         from koipa.api import synthesis as synthesis_api  # noqa: PLC0415
@@ -478,12 +475,45 @@ else:
 # 골든 검수·서명 HTML 뷰 — 브라우저 window.open/직접 URL 로 열리게 별도 라우터로 분리.
 # (require_auth 라우터에 있으면 브라우저 네비게이션이 헤더를 못 붙여 401. POST signoff 는 보호 유지.)
 #
+# [2026-10-09 정정] 2026-08-24 결정("golden.py 는 고객사 이미지에 남긴다 — 야간 재학습본
+# 서명에 검수 화면이 필요하다")을 뒤집는다. locked_eval_readiness()(m6_evaluation/
+# locked_readiness.py)를 직접 읽어 확인한 결과 서명 게이트는 locked_eval.jsonl 파일 I/O 뿐이고
+# 살아있는 검수 UI 에 의존하지 않는다 — 고객사가 필요한 건 "이미 등급 확정된 결과로 재학습"
+# 기능뿐, 골든셋 검수 화면 자체가 아니다(사용자 지적, 2026-10-09). golden.py 는 이제
+# enable_golden_review_console 로 synthesis_api 와 같은 패턴으로 묶는다 — 지재원(full-train)만
+# 켜고, 고객사(onprem-local)는 꺼서 이미지에서도 물리적으로 뺀다(deploy_manifest.toml 의
+# container.customer_exclude 참고). 고객사의 locked_eval.jsonl 은 검수 화면이 아니라 설치
+# 패키지에 미리 구워 넣은 스냅샷 파일로 공급한다.
+#
+# ⚠ [2026-10-09 실제로 띄워보고 발견] golden.py 를 통째로 빼면 **고객사 관리 콘솔 전체가
+# 로그인조차 안 된다** — admin.html 의 유일한 로그인 경로(LOGIN_URL)와 `koipa_access_token`
+# 쿠키 발급(토큰 붙여넣기·아이디+비밀번호 둘 다)이 golden.py 안의
+# /golden/candidates/login.html·/golden/candidates/login·/golden/candidates/session 뿐이었다.
+# 검수 화면만 빼려다 모델 활성화·재학습 화면까지 전부 잠그는 게 될 뻔했다 — 로그인 발급
+# 로직만 koipa.api.console_login 으로 분리해 **양쪽 이미지에 항상** 남긴다(아래,
+# console_login_api — URL 경로는 그대로라 admin.html·golden.py 자신의 LOGIN_URL 문자열도
+# 고칠 필요가 없다). 자세한 이유는 console_login.py 머리말.
+app.include_router(console_login_api.html_router, prefix="/api/v1")
+app.include_router(console_login_api.router, prefix="/api/v1")
 # ⚠ html_router 를 **먼저** 등록해야 한다. golden_api.router 에 있는
 # `/golden/candidates/{doc_id}` 가 `/golden/candidates/manage.html` 을 doc_id="manage.html"
 # 로 삼켜서, 인증을 통과하면 404 "proxy-gold candidate not found" 가 났다(2026-08-09 실측).
-# FastAPI 는 등록 순서대로 매칭하므로 정적 경로를 가변 경로보다 앞에 둔다.
-app.include_router(golden_api.html_router, prefix="/api/v1")
-app.include_router(golden_api.router, prefix="/api/v1")
+# FastAPI 는 등록 순서대로 매칭하므로 정적 경로를 가변 경로보다 앞에 둔다. (console_login_api
+# 가 위에서 이미 /golden/candidates/login.html 등 정적 경로를 선점했으므로 golden_api 의
+# {doc_id} 가 그걸 삼킬 일은 없다 — 등록 순서상 더 앞선 라우트가 FastAPI 에서 항상 이긴다.)
+if settings.enable_golden_review_console:
+    try:
+        from koipa.api import golden as golden_api  # noqa: PLC0415
+    except ImportError:
+        logger.error(
+            "golden review console enabled but koipa.api.golden is not in this image "
+            "(customer-split build) — staying disabled"
+        )
+    else:
+        app.include_router(golden_api.html_router, prefix="/api/v1")
+        app.include_router(golden_api.router, prefix="/api/v1")
+else:
+    logger.info("golden review console disabled (deploy_profile=%s)", settings.deploy_profile)
 app.include_router(documents_api.router, prefix="/api/v1")
 app.include_router(
     schema_admin_api.router, prefix="/api/v1",

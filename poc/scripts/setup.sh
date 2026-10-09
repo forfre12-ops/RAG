@@ -320,6 +320,32 @@ _load_review_batch() {
 # 배포된 분류기를 모델 버전 표에 '등록만' 한다(활성화 안 함 — 관리자 콘솔의 게이트를 거쳐서만). 이 단계가
 # 없으면 GET /metrics/latest 가 404 "no active model" 이고 모델 활성화가 '미등록'으로 실패해 관제 화면이
 # 빈다(서빙 자체는 CLASSIFIER_MODEL_DIR 로 정상). 멱등이다.
+# [2026-10-09 #9 이미지 분리] 고객사 이미지엔 api/golden.py(검수·서명 화면)가 없어 고객사가
+# locked_eval.jsonl 을 직접 만들 수 없다 — 지재원이 만든 스냅샷을 번들에 실어 보내 여기서 적재한다.
+# ⚠ cp -n 은 "파일이 아예 없을 때"만 돕는다(review_batch 처럼 문서별 여러 파일이 아니라 jsonl
+# 한 파일이라, 이미 그 이름으로 파일이 있으면 — 즉 고객사가 이미 서명을 좀 쌓았으면 — 새 스냅샷은
+# 통째로 건너뛴다. dedup 병합 도구는 아직 없다, 2026-10-09 기준 실서명 0건이라 당장은 영향 없음).
+_locked_eval_into_volume() {
+  ${CRT_COMPOSE} --env-file "$ENV_FILE" -f infra-config/docker-compose.airgap.yml \
+    run --rm --no-deps -T -v "$1":/incoming:ro,z --entrypoint sh api -c '
+      d=/app/datasets/gold_real
+      mkdir -p "$d" || exit 1
+      cp -n /incoming/locked_eval.jsonl "$d"/ || true
+      [ -f "$d/locked_eval.jsonl" ] && wc -l < "$d/locked_eval.jsonl" || echo 0' 2>/dev/null | tail -1 | tr -d ' \r'
+}
+_load_locked_eval() {
+  local _src="$BUNDLE/golden_locked_eval/locked_eval.jsonl" _got
+  if [ ! -f "$_src" ]; then
+    inf "golden_locked_eval/locked_eval.jsonl 없음 — 적재를 건너뛴다(지재원 실서명이 아직 없으면 정상). 야간 증분 재학습 활성화는 force 우회(사유 필수)가 필요할 수 있다"
+    return 0
+  fi
+  _got="$(_locked_eval_into_volume "$BUNDLE/golden_locked_eval")" || _got=""
+  if [ -n "$_got" ] && [ "$_got" -gt 0 ] 2>/dev/null; then
+    ok "locked_eval 스냅샷 적재 — 볼륨에 ${_got}줄. 이미 파일이 있었으면 덮어쓰지 않았다(cp -n)"
+  else
+    inf "locked_eval 적재를 확인하지 못했다 — bash setup.sh 를 다시 돌리거나 수동으로 golden_locked_eval/locked_eval.jsonl 을 datasets/gold_real/ 에 복사한다"
+  fi
+}
 _register_model() {
   if ${CRT_COMPOSE} --env-file "$ENV_FILE" -f infra-config/docker-compose.airgap.yml \
       exec -T api python scripts/register_deployed_model.py >/dev/null 2>&1; then
@@ -382,6 +408,16 @@ if [ "$NODE" = "jjw" ]; then
     inf "(dry-run) golden_review_batch/ 를 golden_data 볼륨에 복사(cp -n)하고 건수를 확인한다"
   else
     _load_review_batch
+  fi
+fi
+# ── 6-1b. locked_eval 스냅샷 적재(고객사 노드) — #9 이미지 분리로 고객사는 검수 화면이 없어
+# 직접 못 만든다. 지재원이 만들어 번들에 실은 스냅샷을 여기서 적재한다 ──
+if [ "$NODE" = "customer" ]; then
+  b "6-1b. locked_eval 스냅샷 적재"
+  if [ "$DRY_RUN" = "1" ]; then
+    inf "(dry-run) golden_locked_eval/locked_eval.jsonl 을 golden_data 볼륨에 복사(cp -n)한다"
+  else
+    _load_locked_eval
   fi
 fi
 # ── 6-2. 배포 모델 등록 ────────────────────────────────────────

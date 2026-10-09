@@ -57,6 +57,17 @@ patterns = ["*_review.md", "*.metadata.json"]
 # 바꾸려면 반드시 이 값을 거쳐서만 고를 것(코드에 다시 하드코딩하지 말 것).
 batch = "expert_review_mock1000_20261002"
 
+[bundle.locked_eval]                # golden_locked_eval/ — 지재원 서명 locked_eval 스냅샷(선택, 없으면 미동봉)
+# [2026-10-09] #9(이미지 분리) 때문에 생겼다 — 고객사 이미지에는 api/golden.py(검수·서명 화면)가
+# 없다(container.customer_exclude). 고객사가 야간 증분 재학습을 활성화하려면 사람서명 locked-eval
+# readiness(deploy_gate_manual_require_locked_eval)를 통과해야 하는데, 화면이 없으니 고객사 쪽에서
+# 직접 만들 수 없다 — 그래서 지재원이 만든 스냅샷을 설치 패키지에 실어 보낸다.
+# source 가 없으면(아직 지재원 쪽에 실서명 레코드가 0건이면) 조용히 미동봉 — build_offline_bundle.py
+# 가 그 사실을 알린다. 적재는 review_batch 와 같은 방식(설치 후 operator가 직접 cp, 자동 아님) —
+# 이미 돌고 있는 환경에 다시 적용할 때는 덮어쓰기가 아니라 병합이어야 한다(review_batch 주석과 동일한
+# 주의, 머지 도구는 아직 없음 — scripts/run_golden_split_signoff.py 는 지재원 run_dir 전용이라 재사용 불가).
+source = "datasets/gold_real/locked_eval.jsonl"
+
 [bundle.models]
 # models/classifier-trained/ 는 디렉터리째 싣는다 — 모델 신원을 디렉터리 해시(tree_sha256)로 확인하므로
 # 서빙이 안 읽는 파일(training_args.bin·val_logits.jsonl)이 있어도 골라 빼지 않는다.
@@ -167,18 +178,30 @@ paths = ["src/koipa/api/static/samples/", "src/koipa/four_path_shadow.py"]
 # enable_synthetic_generation 플래그, app.py). check_deploy_manifest.py --write 가 이 목록으로
 # 두 Dockerfile의 `RUN rm -f` 블록을 생성한다 — 손으로 그 블록을 고치지 않는다.
 #
-# golden.py 생태계(golden_build_service.py·golden_signoff.py·console_signoff.py 등)와
-# api/training.py·services/training_service.py는 **여기 넣지 않는다** — 고객사도 야간 증분
-# 재학습본에 서명(locked_eval)하려고 검수·서명 화면과 학습 라우터를 그대로 쓴다(admin.html
-# applyProfileVisibility 주석, 2026-08-24 결정). 지재원 전용 전체학습·URGENT 자동재학습
+# [2026-10-09 정정] 위 2026-08-24 결정("golden.py 는 여기 넣지 않는다 — 고객사도 서명에
+# 검수 화면이 필요하다")을 뒤집는다. locked_eval_readiness()(m6_evaluation/locked_readiness.py)를
+# 직접 읽어 확인하니 서명 게이트는 locked_eval.jsonl 파일 I/O 뿐이고 살아있는 검수 UI 에
+# 의존하지 않는다 — 고객사가 필요한 건 "이미 등급 확정된 결과로 재학습"뿐, 골든셋 검수
+# 화면 자체가 아니다(사용자 지적). api/golden.py(API 라우터·임베디드 admin HTML/JS)는
+# app.py 에서 import 하는 유일한 곳이라(2026-10-09 grep 확인) 파일 단위로 뺄 수 있다.
+#
+# golden.py **생태계**(golden_build_service.py·golden_signoff.py·console_signoff.py·
+# golden_tiers.py·proxy_gold_candidate_service.py 등)는 **여기 넣지 않는다** — workers/tasks.py
+# 가 고객사 야간 증분 재학습 경로에서 같이 쓰는 공유 서비스 코드다. 빼는 건 API 라우터·HTML
+# 뷰 하나뿐이고, locked_eval.jsonl 은 검수 화면이 아니라 설치 패키지에 미리 구워 넣은 스냅샷
+# 파일로 공급한다(아래 [bundle.*] 참고).
+#
+# api/training.py·services/training_service.py는 여기 넣지 않는다 — 고객사 야간 증분
+# 재학습이 그대로 쓰는 공유 코드다. 지재원 전용 전체학습·URGENT 자동재학습
 # (enable_training 단독 게이트)은 workers/tasks.py 안에 고객사 공유 함수와 같은 파일로
 # 섞여 있어 파일 단위로 뺄 수 없다 — 기존 플래그 게이트가 유일한 분리선이다(2026-10-07 조사,
-# Explore 트레이스로 확인). 그래서 실제로 파일 단위 분리가 가능한 것은 합성 생성뿐이다.
+# Explore 트레이스로 확인).
 #
 # 실제 import 그래프(런타임 reachability)로 구했다 — grep 으로 찾으면 간접 참조를 놓친다
 # (golden_build_service.py 가 scripts/analyze_golden_run.py 를 sys.path 로 끌어오는 식의
 # 숨은 경로가 실제로 있었다, 2026-10-03 ops 이미지 분리 때의 교훈을 재확인).
 paths = [
+  "src/koipa/api/golden.py",
   "src/koipa/api/synthesis.py",
   "src/koipa/dataset_leakage.py",
   "src/koipa/modules/m1_synthesis/__init__.py",

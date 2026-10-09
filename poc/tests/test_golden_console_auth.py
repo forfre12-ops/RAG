@@ -5,10 +5,8 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from koipa.api import _jwt_auth
-from koipa.api.golden import (
-    _console_actor_id,
-    _render_specledger_gold_console_html,
-)
+from koipa.api.console_login import _console_actor_id
+from koipa.api.golden import _render_specledger_gold_console_html
 from koipa.api._jwt_auth import JWTClaims
 from koipa.config import settings
 

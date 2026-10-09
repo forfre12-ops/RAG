@@ -70,10 +70,8 @@ def test_static_page_hrefs_match(page):
 
 def test_dynamic_screens_carry_nav():
     """golden.py 의 세 화면과 review/signoff 의 _nav_html 에 링크가 들어갔는지."""
-    from koipa.api.golden import (
-        _render_console_login_html,
-        _render_specledger_gold_console_html,
-    )
+    from koipa.api.console_login import _render_console_login_html
+    from koipa.api.golden import _render_specledger_gold_console_html
     from koipa.golden_review_html import _nav_html
 
     # [D1 2026-08-17] actual-intake 는 후보 관리의 업로드 모달로 흡수돼 화면이 사라졌다.

@@ -57,6 +57,14 @@ os.environ.setdefault("ENABLE_TRAINING", "true")
 # 환경변수를 세워 따로 확인하므로 이 기본값에 영향받지 않는다.
 os.environ.setdefault("ENABLE_SYNTHETIC_GENERATION", "true")
 
+# [2026-10-09 #9 이미지 분리] 골든 검수·서명 라우터도 자기 스위치로 붙는다
+# (enable_golden_review_console, 코드 기본 False). 종전엔 golden_api가 app.py에 무조건
+# 등록돼 있었는데, 고객사 이미지에서 api/golden.py를 통째로 빼면서(container.customer_exclude)
+# synthesis_api와 같은 패턴으로 바꿨다 — 시험 환경은 /api/v1/golden* 라우트를 검증하는 기존
+# 시험이 많으므로(test_golden_*·test_console_*·test_signoff_* 등) 기본 켠다. 프로파일 계약
+# (지재원 열림 · 고객사 닫힘)은 test_golden_router_visibility 가 자기 환경변수로 따로 확인한다.
+os.environ.setdefault("ENABLE_GOLDEN_REVIEW_CONSOLE", "true")
+
 # [2026-09-25] 규정 참고 표시 라우터도 자기 스위치(regulation_reference_enabled, 코드 기본 False)로 붙는다.
 # 시험 환경은 라우트·콘솔 계약을 검증하므로 켠다. **코드 기본값이 False 인지**는 test_regulation_api 가 필드 기본값으로 잠근다.
 os.environ.setdefault("REGULATION_REFERENCE_ENABLED", "true")

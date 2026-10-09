@@ -132,6 +132,10 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # [고객사 관리자 콘솔] 거버넌스 콘솔(검수→재학습→활성화) 서빙 ON. demo_console_enabled와
         # 분리 — 파괴적 purge/데모 SPA는 계속 OFF(위), 관리 UI만 노출. 모든 쓰기는 RBAC 보호.
         "serve_admin_console": True,
+        # [2026-10-09 정정] 골든셋 검증 화면은 고객사에 필요 없다(위 enable_golden_review_console
+        # 주석 — locked_eval.jsonl 은 지재원이 만들어 설치 패키지로 보낸다, 화면이 있어야 하는
+        # 게 아니었다). 명시적으로 꺼서 "onprem-local 은 켜져 있었다"는 드리프트를 막는다.
+        "enable_golden_review_console": False,
     },
     "full-train": {
         "llm_provider": "anthropic",
@@ -178,6 +182,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # 한다. 학습 스위치(enable_training)와 분리해 두었으므로, 학습을 끄고 운영해도 사라지지
         # 않는다. 고객사(onprem-local)에는 기본값 False 그대로 둔다(사용자 확인 2026-09-06).
         "enable_synthetic_generation": True,
+        # [골든셋 검증 화면] 지재원은 검수·서명(locked_eval 생성) 주체다 — 반드시 켜져 있어야 한다.
+        "enable_golden_review_console": True,
     },
 }
 
@@ -228,6 +234,21 @@ class Settings(BaseSettings):
     # 고객사(onprem-local)에는 필요 없다 — 고객사는 추론·검수만 하고 합성은 지재원이 만든다
     # (사용자 확인 2026-09-06). 필요하면 .env 로 켤 수 있게 값 자체는 열어 둔다.
     enable_synthetic_generation: bool = False
+
+    # [골든셋 검증 화면] FUN-005 요건 기능(검수·서명 화면, api/golden.py). 지재원(full-train)
+    # 전용 — **고객사(onprem-local)에는 필요 없다.**
+    #
+    # [2026-10-09 KL 요청 재조사·정정] 2026-08-24/2026-10-07 두 차례 결정은 "화면을 빼면
+    # 고객사가 증분재학습 활성화 때마다 force 우회를 영구히 써야 한다"는 전제였다 — **그 전제가
+    # 틀렸다.** 재학습 게이트(locked_eval_readiness, m6_evaluation/locked_readiness.py)가 실제로
+    # 요구하는 건 settings.locked_eval_jsonl 경로의 **파일 하나**(읽기 전용)뿐, 그 화면이
+    # 살아있어야 하는 게 아니다. 그 파일은 golden_build_service.py(이 이미지에 그대로 남아있다)
+    # 가 만드는데, 호출할 API(golden.py)가 없으면 고객사 쪽에서 새로 못 만들 뿐 — **지재원이
+    # 만든 locked_eval.jsonl 스냅샷을 설치 패키지에 같이 넣어주면 된다**(배포 매니페스트의
+    # bundled_data 참조). 그래서 화면(api/golden.py)만 빼고 그 밑의 서비스 코드는 그대로 둔다.
+    #
+    # 프로파일 기본값: full-train True · onprem-local False(아래 _PROFILE_DEFAULTS).
+    enable_golden_review_console: bool = False
 
     # --- 인프라 ---
     # 디폴트는 localhost dev DB. 운영은 DATABASE_URL env 필수.

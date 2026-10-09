@@ -270,6 +270,11 @@ def _operational_config() -> dict:
         # 시연 전용 표면이 켜져 있는가. 시연 화면이 상태를 바꾸는 버튼(실시간 반영 시연)을
         # 이 값으로 감춘다 — 프로덕션(onprem-local·full-train)은 False 다.
         "demo_console_enabled": bool(getattr(settings, "demo_console_enabled", False)),
+        # [2026-10-09 #9 이미지 분리] 골든셋 검수 화면(api/golden.py)이 이 이미지에 있는가.
+        # admin.html 의 「검증문서 후보 관리」·「데이터 생성 현황」·「검수 시작」 카드가 이 값으로
+        # 자신을 감춘다 — golden.py 가 없는 고객사 이미지에서 그 카드 버튼을 누르면 404 가
+        # 나던 것을 막는다(로그인 자체는 koipa.api.console_login 이 항상 담당해 이 값과 무관).
+        "golden_review_console_enabled": bool(getattr(settings, "enable_golden_review_console", False)),
         # [2026-09-05] 보존기간 삭제 설정. 켜져 있으면 오래된 감사로그·LLM 사용량이
         # 지워진다 — 운영자가 "지금 얼마나 남기고 있나"를 화면에서 확인할 수 있어야 한다.
         # 오래된 파티션을 떼는 코드가 없어 표가 무한히 자라는 것을 막는 유일한 장치이기도 하다.

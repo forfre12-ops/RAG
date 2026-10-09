@@ -18,9 +18,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from koipa.api._jwt_auth import JWTClaims, require_auth
+from koipa.api.console_login import _render_console_login_html
 from koipa.api.golden import (
     _as_reviewer_view,
-    _render_console_login_html,
     _render_specledger_gold_console_html,
 )
 from koipa.api.app import app

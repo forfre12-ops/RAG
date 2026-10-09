@@ -697,9 +697,14 @@ ROUTE_TABLE: dict[tuple[str, str], str] = {
 
 def _golden_routes() -> set[tuple[str, str]]:
     import koipa.api.golden as g
+    # [2026-10-09 #9 이미지 분리] 로그인/세션 3라우트(NO_DATA 분류 — 후보 데이터 없음)는
+    # koipa.api.console_login 으로 옮겼다(golden.py 가 고객사 이미지에 없어도 관리 콘솔
+    # 로그인은 살아야 해서). URL·분류는 그대로라 ROUTE_TABLE 은 안 바꾼다 — 라우트를 찾는
+    # 곳만 그 모듈도 같이 본다.
+    import koipa.api.console_login as cl
 
     out = set()
-    for router in (g.router, g.html_router):
+    for router in (g.router, g.html_router, cl.router, cl.html_router):
         for route in router.routes:
             for method in getattr(route, "methods", None) or ():
                 out.add((method, route.path))

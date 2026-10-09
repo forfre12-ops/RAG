@@ -43,6 +43,13 @@
   ].join('\n');
 
   function mount() {
+    // [2026-10-09 #9 이미지 분리] 이 패널의 새로고침 버튼은 GET /api/v1/golden/jobs 를 부른다 —
+    // golden.py 가 없는 고객사 이미지에서는 404 다(실패해도 이 카드 안에서만 에러 박스로
+    // 끝난다 — 화면 전체가 깨지진 않는다). admin.html 의 applyProfileVisibility 가 healthz
+    // 응답을 보고 세우는 플래그를 여기서도 보고 애초에 패널을 넣지 않는다 — healthz 응답이
+    // 이 스크립트보다 늦게 오면(드문 경합) 이번 로드에서는 패널이 그대로 뜬다(다음 새로고침엔
+    // 사라짐). 탭(data-golden="1")이 이미 숨어 있으므로 사용자가 이 카드를 볼 일도 없다.
+    if (window.__hideGoldenReview) return;
     // 골든 빌더 카드 바로 뒤에 붙인다(검수 흐름상 인접).
     var summary = document.getElementById('gold-summary');
     var anchor = summary && summary.closest ? summary.closest('section.card') : null;

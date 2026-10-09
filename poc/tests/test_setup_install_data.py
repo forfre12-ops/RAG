@@ -60,14 +60,25 @@ fi
 """
 
 
-def _bundle(tmp: Path, *, docs: int = 3, with_batch: bool = True) -> Path:
+def _bundle(tmp: Path, *, docs: int = 3, with_batch: bool = True, locked_eval_lines: int = 0) -> Path:
     if with_batch:
         b = tmp / "golden_review_batch"
         b.mkdir()
         for n in range(1, docs + 1):
             (b / f"MD-{n:04d}.metadata.json").write_text(f'{{"doc_id":"MD-{n:04d}","from":"bundle"}}', encoding="utf-8")
             (b / f"MD-{n:04d}_review.md").write_text(f"본문 {n}", encoding="utf-8")
+    if locked_eval_lines:
+        le = tmp / "golden_locked_eval"
+        le.mkdir()
+        (le / "locked_eval.jsonl").write_text(
+            "\n".join(f'{{"doc_id":"L-{n:04d}"}}' for n in range(1, locked_eval_lines + 1)) + "\n",
+            encoding="utf-8",
+        )
     return tmp / "vol"
+
+
+def _locked_eval_file(tmp: Path) -> Path:
+    return tmp / "vol" / "gold_real" / "locked_eval.jsonl"
 
 
 def _run(tmp: Path, *, node: str, dry: str = "0", extra_env: dict | None = None) -> subprocess.CompletedProcess:
@@ -126,7 +137,7 @@ def test_the_customer_node_registers_the_model_but_loads_no_review_documents(tmp
     assert not _candidates(tmp_path).exists()
     calls = _calls(tmp_path)
     assert "incoming" not in calls and "register_deployed_model.py" in calls
-    assert "6-1" not in r.stdout
+    assert "전문가 검수 문서 적재" not in r.stdout
 
 
 def test_a_bundle_without_review_documents_says_so_and_still_registers_the_model(tmp_path):
@@ -168,3 +179,59 @@ def test_dry_run_changes_nothing(tmp_path):
     assert not _candidates(tmp_path).exists()
     assert _calls(tmp_path) == ""
     assert r.stdout.count("(dry-run)") == 2
+
+
+# ── 6-1b. locked_eval 스냅샷 적재(고객사 노드, #9 이미지 분리) ──────────────────────────
+
+def test_the_locked_eval_snapshot_reaches_the_volume_on_the_customer_node(tmp_path):
+    _bundle(tmp_path, with_batch=False, locked_eval_lines=2)
+
+    r = _run(tmp_path, node="customer")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _locked_eval_file(tmp_path).read_text(encoding="utf-8").count("\n") == 2
+    assert "[ok] locked_eval 스냅샷 적재 — 볼륨에 2줄" in r.stdout
+    assert "register_deployed_model.py" in _calls(tmp_path)
+
+
+def test_an_existing_locked_eval_file_is_not_overwritten(tmp_path):
+    _bundle(tmp_path, with_batch=False, locked_eval_lines=2)
+    dest = _locked_eval_file(tmp_path)
+    dest.parent.mkdir(parents=True)
+    dest.write_text("이미 있던 서명\n", encoding="utf-8")
+
+    r = _run(tmp_path, node="customer")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert dest.read_text(encoding="utf-8") == "이미 있던 서명\n"  # cp -n — 덮어쓰지 않았다
+
+
+def test_a_bundle_without_a_locked_eval_snapshot_says_so_and_still_registers_the_model(tmp_path):
+    _bundle(tmp_path, with_batch=False)
+
+    r = _run(tmp_path, node="customer")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "golden_locked_eval/locked_eval.jsonl 없음" in r.stdout
+    assert "register_deployed_model.py" in _calls(tmp_path)
+
+
+def test_the_jjw_node_does_not_load_the_locked_eval_snapshot(tmp_path):
+    _bundle(tmp_path, with_batch=False, locked_eval_lines=2)
+
+    r = _run(tmp_path, node="jjw")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not _locked_eval_file(tmp_path).exists()
+    assert "6-1b" not in r.stdout
+
+
+def test_locked_eval_dry_run_changes_nothing(tmp_path):
+    _bundle(tmp_path, with_batch=False, locked_eval_lines=2)
+
+    r = _run(tmp_path, node="customer", dry="1")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not _locked_eval_file(tmp_path).exists()
+    assert _calls(tmp_path) == ""
+    assert "(dry-run) golden_locked_eval/locked_eval.jsonl" in r.stdout

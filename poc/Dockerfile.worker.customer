@@ -30,7 +30,8 @@ COPY pyproject.toml uv.lock ./
 COPY src ./src
 # BEGIN deploy_manifest:customer_exclude — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
 # 고객사 전용 이미지에서 빼는 파일. 정본: deploy_manifest.toml 의 container.customer_exclude.
-RUN rm -f src/koipa/api/synthesis.py \
+RUN rm -f src/koipa/api/golden.py \
+           src/koipa/api/synthesis.py \
            src/koipa/dataset_leakage.py \
            src/koipa/modules/m1_synthesis/__init__.py \
            src/koipa/modules/m1_synthesis/generation_playbook.py \

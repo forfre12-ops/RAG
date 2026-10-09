@@ -26,7 +26,7 @@ import pytest
 
 from koipa.api._jwt_auth import VALID_ROLES, JWTClaims
 from koipa.api.confirm import resolve_actor_user_id
-from koipa.api.golden import proxy_gold_candidate_session
+from koipa.api.console_login import proxy_gold_candidate_session
 from koipa.golden_review_html import render_signoff_html
 from koipa.schemas.common import Actor
 

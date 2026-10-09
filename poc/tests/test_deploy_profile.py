@@ -227,17 +227,52 @@ def test_synthesis_router_visibility(
         importlib.reload(app_mod)
 
 
-@pytest.mark.parametrize("profile", ["lite-noapi", "lite-cloud", "onprem-local", "full-train"])
-def test_golden_router_always_registered(profile: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    """[2026-10-07 KL 분리 조사] golden.py 는 플래그로 빼지 않는다 — 모든 프로파일에서 등록된다.
+# [2026-10-09] koipa.api.console_login 이 항상 등록하는 경로 — golden.py 가 이미지에서
+# 빠져도(고객사) admin.html 의 로그인 자체는 살아 있어야 한다. 정본은 console_login.py.
+_ALWAYS_ON_LOGIN_PATHS = {
+    "/api/v1/golden/candidates/login.html",
+    "/api/v1/golden/candidates/login",
+    "/api/v1/golden/candidates/session",
+}
 
-    KL 요청(고객사 PC엔 검수 화면 없이)과 기존 결정(고객사도 야간 증분 재학습본에 서명하려면
-    검수·서명 화면이 필요 — admin.html applyProfileVisibility 주석, 2026-08-24)이 충돌해
-    사용자가 "golden.py는 남긴다"로 결정했다. 이 시험은 그 결정을 잠근다 — 누군가 나중에
-    enable_golden_review 같은 플래그로 다시 끄려 하면 이 시험이 먼저 깨진다.
+
+@pytest.mark.parametrize(
+    "profile,golden_expected",
+    [
+        ("lite-noapi", False),
+        ("lite-cloud", False),
+        ("onprem-local", False),   # [2026-10-09 정정] 아래 참고 — 더는 고객사에 안 열린다
+        ("full-train", True),
+    ],
+)
+def test_golden_router_visibility(
+    profile: str, golden_expected: bool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """/api/v1/golden* 등록 계약 — **자기 스위치**(enable_golden_review_console) 단독.
+
+    [2026-10-09 정정] 2026-10-07 결정("golden.py 는 플래그로 빼지 않는다 — 모든 프로파일에서
+    등록된다")을 뒤집는다. 그 결정의 전제는 "고객사도 야간 증분 재학습본에 서명하려면 검수·서명
+    화면이 필요하다"였는데, 재확인한 결과 재학습 게이트(locked_eval_readiness,
+    m6_evaluation/locked_readiness.py)가 실제로 요구하는 건 settings.locked_eval_jsonl
+    경로의 파일 하나(읽기 전용)뿐이고 살아있는 화면이 아니다 — 고객사가 필요한 건 "이미 등급
+    확정된 결과로 재학습"이지 골든셋 검수 화면 자체가 아니다(사용자 지적). 그 파일은 지재원이
+    만들어 설치 패키지에 스냅샷으로 실어 보낸다(deploy_manifest.toml [bundle.locked_eval],
+    setup.sh 6-1b단계) — 화면(api/golden.py)은 지재원(full-train)에만 남기고 고객사
+    (onprem-local)에서는 이미지에서도 물리적으로 뺀다(container.customer_exclude).
+    합성 생성(test_synthesis_router_visibility)과 같은 패턴 — 스위치를 명시적으로 지워
+    프로파일 기본값이 정하게 한다.
+
+    [2026-10-09 추가 발견] golden.py 를 실제로 고객사 이미지에서 빼고 띄워보니, admin.html
+    전체의 유일한 로그인 경로(LOGIN_URL)가 golden.py 안의 /golden/candidates/login.html ·
+    /golden/candidates/login · /golden/candidates/session 이었다 — 검수 화면만 끄려다
+    관리 콘솔 전체 로그인을 막는 꼴이었다. 그 셋은 koipa.api.console_login 으로 옮겨
+    **항상** 등록되므로(아래 _ALWAYS_ON_LOGIN_PATHS), golden_expected=False 인 프로파일에서도
+    `/api/v1/golden` 접두사 경로가 그 셋만큼은 남아 있어야 정상이다 — 이 시험은 그 셋을
+    빼고 나머지(검수·후보관리 등 진짜 golden.py 전용)만 본다.
     """
     monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
     monkeypatch.setenv("DEPLOY_PROFILE", profile)
+    monkeypatch.delenv("ENABLE_GOLDEN_REVIEW_CONSOLE", raising=False)
 
     import koipa.config as cfg_mod
     _orig_settings = cfg_mod.settings
@@ -247,8 +282,16 @@ def test_golden_router_always_registered(profile: str, monkeypatch: pytest.Monke
 
     try:
         paths = set(app_mod.app.openapi().get("paths", {}))
-        golden_paths = {p for p in paths if p.startswith("/api/v1/golden")}
-        assert golden_paths, f"{profile}: 골든 검수·서명 라우터가 등록되어야 함(고객사 locked_eval 서명 경로)"
+        all_golden_paths = {p for p in paths if p.startswith("/api/v1/golden")}
+        assert _ALWAYS_ON_LOGIN_PATHS <= all_golden_paths, (
+            f"{profile}: 로그인 경로는 golden.py 와 무관하게 항상 있어야 함 — "
+            f"없는 것: {_ALWAYS_ON_LOGIN_PATHS - all_golden_paths}"
+        )
+        golden_paths = all_golden_paths - _ALWAYS_ON_LOGIN_PATHS
+        if golden_expected:
+            assert golden_paths, f"{profile}: 골든 검수·서명 라우터가 등록되어야 함"
+        else:
+            assert not golden_paths, f"{profile}: 골든 검수·서명 라우터가 노출되면 안됨 — {golden_paths}"
     finally:
         monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
         cfg_mod.settings = _orig_settings

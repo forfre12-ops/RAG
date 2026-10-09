@@ -78,7 +78,8 @@ koipa-airgap-bundle/
 │   ├── classifier-trained/   분류기 학습 가중치 + temperature.json
 │   └── hf/hub/models--.../   HuggingFace 캐시 레이아웃(KURE-v1 등 — HF_HOME 이 가리키는 경로)
 ├── infra-config/             docker-compose.airgap.yml · docker-compose.gpu.yml · mtls/nginx.mtls.conf · .env.template(§4~5)
-├── golden_review_batch/      전문가 검수 배치 1,711건(지재원 노드에서만 적재, §10.3) — 조건부(있을 때만)
+├── golden_review_batch/      전문가 검수 배치(지재원 노드에서만 적재, §10.3) — 조건부(있을 때만)
+├── golden_locked_eval/       locked_eval.jsonl 스냅샷(고객사 노드에서만 적재, §10.3b) — 조건부(지재원 실서명이 있을 때만)
 ├── acceptance/               인수 샘플팩 — run_acceptance.sh · expected_labels.json · docs/(§10.1)
 ├── observability/            Prometheus/Grafana 스택 설정(관측성 이미지 동봉 시만, §10.5)
 ├── docs/                     INSTALL.md · OPERATION.md · TROUBLESHOOTING.md (이 문서 자체도 번들 안에 들어 있다)
@@ -86,7 +87,7 @@ koipa-airgap-bundle/
 └── README.md
 ```
 
-- `rpms/`·`golden_review_batch/`·`observability/`는 조건부다 — RPM 이 안 스테이징됐거나(비-Rocky 빌드), 검수 배치가 없거나(빌드하는 PC 에 후보 원본이 없을 때 — 대상별로 따로 빌드하는 옵션은 없다), 관측성이 `--skip-observability`로 빠지면 안 실린다. 실렸는지는 `verify.sh`(체크섬)와 §10.3 끝의 "볼륨에 후보 N건" 출력으로 확인한다.
+- `rpms/`·`golden_review_batch/`·`golden_locked_eval/`·`observability/`는 조건부다 — RPM 이 안 스테이징됐거나(비-Rocky 빌드), 검수 배치가 없거나(빌드하는 PC 에 후보 원본이 없을 때 — 대상별로 따로 빌드하는 옵션은 없다), locked_eval 스냅샷이 없거나(지재원 쪽 실서명이 아직 0건이면 정상), 관측성이 `--skip-observability`로 빠지면 안 실린다. 실렸는지는 `verify.sh`(체크섬)와 §10.3/§10.3b 끝의 "볼륨에 후보 N건"/"볼륨에 N줄" 출력으로 확인한다.
 - ⚠ 짝 문서 `폐쇄망_설치_배포_설계서`(설계 감리용)의 옛 트리는 `elasticsearch.tar`·`minio.tar`·`mlflow.tar`를 담고 있는데, 이 셋은 이미 제거된 예전 구조다(현재는 검색·벡터를 PostgreSQL+pgvector로 통합했고 MinIO·MLflow는 쓰지 않는다) — 위 트리가 현재 것이다.
 
 ---
@@ -357,6 +358,31 @@ docker compose --env-file .env -f infra-config/docker-compose.airgap.yml \
   템플릿(`.env.onprem-local`·`.env.full-train`)에는 이미 1 이 들어 있다.
 - 검수 화면 사용법은 `poc/docs/CLAUDE_EXPERT_REVIEW_1731_GUIDE_20260924.md`(내부 참고) ·
   `사용자매뉴얼_검수관리자.html` §07(고객 전달용) 참고.
+
+### 10.3b locked_eval 스냅샷 적재 — `setup.sh` 6-1b단계가 자동으로 한다(고객사 노드)
+
+[2026-10-09, #9 이미지 분리] 고객사 전용 이미지에는 `api/golden.py`(검수·서명 화면)가 물리적으로 없다
+(`container.customer_exclude`). 고객사가 야간 증분 재학습 결과를 활성화하려면 사람서명 locked-eval
+readiness 게이트(`deploy_gate_manual_require_locked_eval`)를 넘어야 하는데, 화면이 없으니 고객사
+현장에서 그 서명 레코드를 직접 만들 수 없다 — 그래서 지재원이 만든 `locked_eval.jsonl` 스냅샷을 번들에
+실어 보내고, `setup.sh` 가 이 단계에서 `golden_data` 볼륨(`/app/datasets/gold_real/locked_eval.jsonl`)에
+적재한다.
+
+- `cp -n`(no-clobber)이다 — **파일이 아직 없을 때만** 효과가 있다. locked_eval.jsonl 은 검수 배치처럼
+  문서별로 여러 파일이 아니라 단일 jsonl 이라, 볼륨에 이미 그 이름의 파일이 있으면(고객사가 이미 서명을
+  좀 쌓인 뒤 재설치) 새 스냅샷은 그대로 건너뛴다 — 두 파일을 합쳐주는 병합 도구는 아직 없다. 신규 설치에서만
+  안전하다고 보면 된다.
+- 번들에 `golden_locked_eval/locked_eval.jsonl` 자체가 없으면(지재원 쪽 실서명이 아직 0건) 조용히
+  건너뛴다 — 이 경우 재학습 활성화는 `force` 우회(사유 필수)가 필요할 수 있다.
+- 끝에 "볼륨에 N줄"이 출력된다. 확인하지 못했다고 나오면 `bash setup.sh` 를 다시 실행한다.
+- 지재원 노드(`NODE=jjw`)는 이 단계를 타지 않는다(지재원은 이 게이트 자체가 꺼져 있다).
+- `setup.sh` 를 쓰지 않은 설치에서만 손으로 한다:
+
+```bash
+docker compose --env-file .env -f infra-config/docker-compose.airgap.yml \
+  run --rm --no-deps -T -v "$PWD/golden_locked_eval":/incoming:ro,z --entrypoint sh api \
+  -c 'mkdir -p /app/datasets/gold_real && cp -n /incoming/locked_eval.jsonl /app/datasets/gold_real/'
+```
 
 ### 10.4 평가정답 오염 방지 — 이미지에 이미 들어 있다(할 일 없음)
 

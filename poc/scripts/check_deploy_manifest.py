@@ -396,6 +396,7 @@ def bundle_allow_patterns(manifest: dict) -> tuple[list[str], list[str]]:
         allow.append(f"docker-images/obs-{name}.tar")
     allow += ["observability/" + f for f in b["observability"]["files"]]
     allow += [f"golden_review_batch/{p}" for p in b["review_batch"]["patterns"]]
+    allow.append("golden_locked_eval/locked_eval.jsonl")  # 선택 동봉(소스 없으면 미생성) — required 아님
     allow.append("rpms/*.rpm")
     m = b["models"]
     allow.append("models/classifier-trained/*")
