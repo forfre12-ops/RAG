@@ -595,6 +595,67 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/TrainJobSummary' }
 
+  /train/models/{version_label}/report:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [training]
+      summary: 모델 성능 리포트(정확도·정밀도·재현율·F1·혼동행렬, 활성 모델 대비 비교)
+      description: |
+        파인튜닝 완료 모델의 저장된 지표(ModelVersion.metrics)를 꺼낸다. 활성(배포) 모델이
+        따로 있으면 그 모델 대비 정확도·F1·미탐율 증감을 함께 돌려준다(파인튜닝 전후 비교).
+        format=csv 이면 같은 내용을 CSV로 내려받는다. 에폭별 손실 추이·PDF 내보내기는
+        아직 없다(에폭 단위 이력을 저장하는 자리가 없음 — 별도 작업 필요).
+      parameters:
+        - in: path
+          name: version_label
+          required: true
+          schema: { type: string, example: v-24c7c02c }
+        - in: query
+          name: format
+          schema: { type: string, enum: [json, csv], default: json }
+      responses:
+        '200':
+          description: 모델 성능 리포트(JSON) 또는 CSV 파일
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version_label: { type: string }
+                  base_model: { type: string, nullable: true }
+                  trained_at: { type: string, format: date-time, nullable: true }
+                  training_data_count: { type: integer, nullable: true }
+                  is_active: { type: boolean }
+                  accuracy: { type: number, nullable: true }
+                  precision_macro: { type: number, nullable: true }
+                  recall_macro: { type: number, nullable: true }
+                  f1_macro: { type: number, nullable: true }
+                  fnr_overall: { type: number, nullable: true }
+                  fnr_by_grade: { type: object, additionalProperties: { type: number } }
+                  fnr_high: { type: number, nullable: true }
+                  confusion_matrix:
+                    type: array
+                    items: { type: array, items: { type: integer } }
+                  classification_report: { type: string }
+                  compared_to_active:
+                    type: object
+                    nullable: true
+                    properties:
+                      version_label: { type: string }
+                      accuracy: { type: number, nullable: true }
+                      precision_macro: { type: number, nullable: true }
+                      recall_macro: { type: number, nullable: true }
+                      f1_macro: { type: number, nullable: true }
+                      fnr_overall: { type: number, nullable: true }
+                      accuracy_delta: { type: number, nullable: true }
+                      f1_macro_delta: { type: number, nullable: true }
+                      fnr_overall_delta: { type: number, nullable: true, description: "음수=개선(미탐 감소)" }
+                  raw_metrics: { type: object, additionalProperties: true }
+            text/csv:
+              schema: { type: string, format: binary }
+        '404':
+          description: 해당 모델 버전 없음
+
   /synth/generate:
     post:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
