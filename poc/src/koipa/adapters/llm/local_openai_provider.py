@@ -230,7 +230,7 @@ class LocalOpenAIProvider:
 
 
 def ollama_provider(
-    model: str = "qwen3:14b", base_url: str = "http://localhost:11434/v1"
+    model: str | None = None, base_url: str = "http://localhost:11434/v1"
 ) -> LocalOpenAIProvider:
     """Ollama OpenAI 호환 endpoint."""
     return LocalOpenAIProvider(

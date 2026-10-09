@@ -17,9 +17,13 @@ class GoldenBuildRequest(BaseModel):
     n: int = Field(default=200, ge=1, le=5000)
     llm_provider: str = Field(
         default="noop",
-        pattern=r"^(anthropic|openai|google|gemini|vllm_qwen|vllm_exaone|local_openai|noop)$",
+        # [2026-10-09] vllm_qwen·vllm_exaone 제거 — 둘 다 build_provider 가 모르는 이름이라
+        # 서버가 422 로 거부하던 죽은 선택지였다(아래 health.py 주석 참조). 실제로 동작하는
+        # 온프렘 경로는 local_openai 하나뿐이고, settings.local_llm_model(현재 Solar-Open-100B)
+        # 을 그대로 쓴다.
+        pattern=r"^(anthropic|openai|google|gemini|local_openai|noop)$",
     )
-    sensitive: bool = Field(default=False)  # True=실고객 비밀 → airgap(Qwen), 공개 클라우드 금지
+    sensitive: bool = Field(default=False)  # True=실고객 비밀 → airgap(온프렘), 공개 클라우드 금지
     min_self_consistency: float = Field(default=0.67, ge=0.0, le=1.0)
     # False=합성 빌드 모드 — 룰 시드 근거(has_real_evidence) 미요구, rule==llm 합의+self-consistency만으로
     # admission(leakage-free 합성이 no_evidence로 무더기 탈락하던 문제 완화·레버3). 운영 기본=True.

@@ -169,7 +169,9 @@ ADMIN_ALIAS_KEY = "reviewer_alias"
 #          fixed·unfixed·deferred·discarded·out_of_scope·by_status·actual_grade_fixed_unlocked,
 #          batch_summary 의 terminal·pending·deferred·by_status.
 #  KEPT    문서 수·출처 분포·출처 기록 현황 — 결정과 무관하다.
-BLIND_HIDDEN_SUMMARY_FIELDS = frozenset({"quality", "by_proposed_grade", "by_final_grade"})
+BLIND_HIDDEN_SUMMARY_FIELDS = frozenset({
+    "quality", "by_proposed_grade", "by_final_grade", "by_proposed_grade_unfixed",
+})
 BLIND_OWN_SUMMARY_FIELDS = frozenset({
     "fixed", "unfixed", "deferred", "discarded", "out_of_scope", "by_status",
     "actual_grade_fixed_unlocked",

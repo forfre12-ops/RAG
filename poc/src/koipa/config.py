@@ -449,10 +449,16 @@ class Settings(BaseSettings):
     google_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
     # 로컬 OpenAI 호환 endpoint (vLLM·Ollama·LM Studio·llama.cpp)
+    # [2026-10-09] KL 요청(9/29 미팅, 요구사항 추적표 8절) — "QWEN 같은 중국 계열 모델을
+    # 제외하고 한국어를 잘하는 모델을 최우선으로 고려". Qwen3-14B → Solar-Open-100B(Upstage,
+    # 한국산) 로 교체. 상업 라이선스 확인 완료(Solar-Apache License 2.0) — 같은 회사의
+    # SOLAR-10.7B-Instruct 는 CC-BY-NC-4.0(비상업)이라 못 쓴다, EXAONE(LG)도 비상업 라이선스라
+    # 제외했다. MoE 구조(활성 파라미터 12B/전체 100B)라 연산량은 기존 14B급과 비슷하지만
+    # 가중치 저장용량은 더 크다 — 배포 전 GPU 서버 디스크·VRAM 여유 확인 필요.
     local_llm_base_url: str = "http://localhost:8001/v1"  # vLLM 기본
-    local_llm_model: str = "Qwen/Qwen3-14B"
+    local_llm_model: str = "upstage/Solar-Open-100B"
     local_llm_api_key: str = "EMPTY"   # vLLM은 EMPTY, Ollama는 ollama, LM Studio는 lm-studio
-    local_llm_enable_thinking: bool = False  # Qwen3 /think 지시어
+    local_llm_enable_thinking: bool = False  # Qwen3 전용 /think 지시어 — Solar에는 해당 없음(무해한 기본값)
 
     # ── 합성 생성(M1) 3설정 — 2026-09-10 신설 ─────────────────────────────────
     # [1] 구조화 출력. 프롬프트로 "JSON 으로 답해라" 부탁하는 대신 서버에 JSON 스키마를
@@ -472,9 +478,9 @@ class Settings(BaseSettings):
     #     규칙 없이 만들면 자기 기밀 진술·등급 표기 노출이 더 잦다는 게 확인돼 기본 True.
     synth_use_generation_playbook: bool = True
 
-    # 하위호환 alias (vllm_*) — 기존 코드·테스트가 참조 중
+    # 하위호환 alias (vllm_*) — 기존 코드·테스트가 참조 중. local_llm_model 과 동일 사유로 교체.
     vllm_base_url: str = "http://localhost:8001/v1"
-    vllm_model: str = "Qwen/Qwen3-14B"
+    vllm_model: str = "upstage/Solar-Open-100B"
     vllm_enable_thinking: bool = False
 
     # --- ConsensusJudge (골든 게이트 self-consistency + Qwen 섀도) ---

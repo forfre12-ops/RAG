@@ -21,9 +21,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from koipa.db import session_scope
 from koipa.repositories import TrainingRepo
 from koipa.schemas.training import (
+    ModelMetricsComparison,
     TrainJobList,
     TrainJobSummary,
     TrainRequest,
+    TrainReportResponse,
     TrainResponse,
     TrainStatus,
 )
@@ -683,6 +685,57 @@ class TrainingService:
         except SQLAlchemyError as exc:
             logger.warning("train list skipped: %s", exc)
             return TrainJobList(total=0, items=[])
+
+    # [2026-10-09] KL 요청(요구사항 추적표 6절) — 모델 성능 리포트.
+    def report(self, version_label: str) -> Optional[TrainReportResponse]:
+        try:
+            with session_scope() as db:
+                repo = TrainingRepo(db)
+                mv = repo.get_by_label(version_label)
+                if mv is None:
+                    return None
+                m = dict(mv.metrics or {})
+                active = repo.get_active()
+                comparison = None
+                if active is not None and active.version_label != version_label:
+                    am = dict(active.metrics or {})
+
+                    def _delta(key: str) -> Optional[float]:
+                        a, b = m.get(key), am.get(key)
+                        return (a - b) if isinstance(a, (int, float)) and isinstance(b, (int, float)) else None
+
+                    comparison = ModelMetricsComparison(
+                        version_label=active.version_label,
+                        accuracy=am.get("accuracy"),
+                        precision_macro=am.get("precision_macro"),
+                        recall_macro=am.get("recall_macro"),
+                        f1_macro=am.get("f1_macro"),
+                        fnr_overall=am.get("fnr_overall"),
+                        accuracy_delta=_delta("accuracy"),
+                        f1_macro_delta=_delta("f1_macro"),
+                        fnr_overall_delta=_delta("fnr_overall"),
+                    )
+                return TrainReportResponse(
+                    version_label=mv.version_label,
+                    base_model=mv.base_model,
+                    trained_at=mv.trained_at.isoformat() if mv.trained_at else None,
+                    training_data_count=mv.training_data_count,
+                    is_active=bool(mv.is_active),
+                    accuracy=m.get("accuracy"),
+                    precision_macro=m.get("precision_macro"),
+                    recall_macro=m.get("recall_macro"),
+                    f1_macro=m.get("f1_macro"),
+                    fnr_overall=m.get("fnr_overall"),
+                    fnr_by_grade=m.get("fnr_by_grade") or {},
+                    fnr_high=m.get("fnr_high"),
+                    confusion_matrix=m.get("confusion_matrix") or [],
+                    classification_report=m.get("classification_report") or "",
+                    compared_to_active=comparison,
+                    raw_metrics=m,
+                )
+        except SQLAlchemyError as exc:
+            logger.warning("train report skipped: %s", exc)
+            return None
 
     # ------------------------------------------------------------
     # internals

@@ -1359,6 +1359,14 @@ class ProxyGoldCandidateService:
             "by_origin": dict(sorted(Counter(c["document_origin"] for c in candidates).items())),
             "by_final_grade": dict(sorted(Counter(c["final_grade"] for c in candidates if c["final_grade"]).items())),
             "by_proposed_grade": dict(sorted(Counter(c["proposed_grade"] or "unassigned" for c in candidates).items())),
+            # [2026-10-09] KL 요청(요구사항 추적표 3절) — 관리자 화면 상단에 등급별 분포를
+            # "미검수"·"검수 완료"·"전체" 셋으로 보여달라는 요구. by_proposed_grade(전체)·
+            # by_final_grade(검수 완료)는 이미 있었고, "미검수"만 없어 추가한다. 조건은
+            # 위 "unfixed" 와 같다(검수 큐에서 빠지는 상태는 미검수로 안 센다).
+            "by_proposed_grade_unfixed": dict(sorted(Counter(
+                c["proposed_grade"] or "unassigned" for c in candidates
+                if not c["grade_fixed"] and c["status"] not in QUEUE_EXCLUDED_STATUSES
+            ).items())),
             "actual_document_intake": len(actual),
             "actual_provenance_recorded": sum(
                 1 for c in actual if c.get("provenance", {}).get("status") == "recorded"

@@ -108,7 +108,9 @@ def test_blind_field_lists_are_locked_literally():
         "schema_version", "event_kind", "document_sha256", "document_origin", "claim_scope",
         "provenance_at_decision"}
     # 집계
-    assert access.BLIND_HIDDEN_SUMMARY_FIELDS == {"quality", "by_proposed_grade", "by_final_grade"}
+    assert access.BLIND_HIDDEN_SUMMARY_FIELDS == {
+        "quality", "by_proposed_grade", "by_final_grade", "by_proposed_grade_unfixed",
+    }
     assert access.BLIND_OWN_SUMMARY_FIELDS == {
         "fixed", "unfixed", "deferred", "discarded", "out_of_scope", "by_status", "actual_grade_fixed_unlocked"}
     assert access.BLIND_HIDDEN_BATCH_SUMMARY_FIELDS == {"by_final_grade"}
@@ -189,7 +191,10 @@ def test_every_summary_key_is_classified_exactly_once(h):
         sorted((set(summary) | set(listed["summary"])) ^ classified))
     grade_like = {k for k in summary if "grade" in k or k == "quality"}
     # actual_grade_fixed_unlocked 는 '등급을 확정한 실문서 **건수**'(상태 집계)라 등급 값을 담지 않는다 → 결정 집계(자기 것)
-    assert grade_like == {"by_final_grade", "by_proposed_grade", "quality", "actual_grade_fixed_unlocked"}
+    assert grade_like == {
+        "by_final_grade", "by_proposed_grade", "by_proposed_grade_unfixed",
+        "quality", "actual_grade_fixed_unlocked",
+    }
     assert grade_like - {"actual_grade_fixed_unlocked"} == access.BLIND_HIDDEN_SUMMARY_FIELDS
     assert isinstance(summary["actual_grade_fixed_unlocked"], int)
     batch_classified = _exactly_one(

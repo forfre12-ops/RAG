@@ -55,3 +55,41 @@ class TrainJobSummary(BaseModel):
 class TrainJobList(BaseModel):
     total: int
     items: list[TrainJobSummary]
+
+
+# [2026-10-09] KL 요청(요구사항 추적표 6절) — "파인튜닝 완료 모델의 성능 지표를 리포트로
+# 제공". 계산 자체(정확도·정밀도·재현율·F1·혼동행렬)는 trainer.py가 이미 하고
+# ModelVersion.metrics(DB)에 저장돼 있었다 — API로 꺼내는 길이 없었을 뿐이다.
+# ⚠ 에폭별 손실 추이 그래프·PDF 내보내기는 이번에 포함하지 않았다(에폭 단위 이력을 저장하는
+# 자리가 현재 schema에 없음 — 별도 작업 필요, 메모리에 남김).
+class ModelMetricsComparison(BaseModel):
+    """파인튜닝 전(현재 활성 모델) 대비 비교 — 같은 모델이면 None."""
+
+    version_label: str
+    accuracy: Optional[float] = None
+    precision_macro: Optional[float] = None
+    recall_macro: Optional[float] = None
+    f1_macro: Optional[float] = None
+    fnr_overall: Optional[float] = None
+    accuracy_delta: Optional[float] = None
+    f1_macro_delta: Optional[float] = None
+    fnr_overall_delta: Optional[float] = None  # 음수=개선(미탐 감소)
+
+
+class TrainReportResponse(BaseModel):
+    version_label: str
+    base_model: Optional[str] = None
+    trained_at: Optional[str] = None
+    training_data_count: Optional[int] = None
+    is_active: bool = False
+    accuracy: Optional[float] = None
+    precision_macro: Optional[float] = None
+    recall_macro: Optional[float] = None
+    f1_macro: Optional[float] = None
+    fnr_overall: Optional[float] = None
+    fnr_by_grade: dict[str, float] = Field(default_factory=dict)
+    fnr_high: Optional[float] = None
+    confusion_matrix: list[list[int]] = Field(default_factory=list)
+    classification_report: str = ""
+    compared_to_active: Optional[ModelMetricsComparison] = None
+    raw_metrics: dict[str, Any] = Field(default_factory=dict)  # metrics dict 원본(화면이 모르는 새 필드도 안 잃음)

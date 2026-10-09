@@ -47,7 +47,7 @@ PRICE_TABLE: dict[str, tuple[float, float]] = {
     "gpt-4o": (2.5, 10.0),
     "gpt-4o-mini": (0.15, 0.6),
     "gemini-2.5-pro": (1.25, 10.0),
-    "Qwen/Qwen3-14B": (0.0, 0.0),
+    "upstage/Solar-Open-100B": (0.0, 0.0),
     "noop": (0.0, 0.0),
 }
 
