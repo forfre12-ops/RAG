@@ -858,21 +858,87 @@ class AssignmentLedger:
         return next(iter(groups)) if len(groups) == 1 else "existing-exact-plan"
 
     # 현황 ---------------------------------------------------------------
+    @staticmethod
+    def _reviewer_progress(
+        reviewer_id: str,
+        visible_doc_ids: AbstractSet[str],
+        decision_events: Iterable[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """배정된 문서와 그 검수자의 결정 원장을 교차해 계정별 진행 지표를 만든다.
+
+        후보의 현재 상태는 다른 검수자의 결정으로 바뀔 수 있으므로 쓰지 않는다. 반드시
+        ``actor_id == reviewer_id`` 인 결정 이벤트만, 그리고 현재 이 계정에 배정된 문서만
+        센다. append-only 원장 순서상 같은 문서의 마지막 자기 결정이 현재 진행 상태다.
+        """
+        visible = frozenset(visible_doc_ids)
+        latest_by_doc: dict[str, Mapping[str, Any]] = {}
+        action_counts: Counter[str] = Counter()
+        decision_event_count = 0
+        last_event: Mapping[str, Any] | None = None
+        for event in decision_events:
+            if str(event.get("event_kind") or "decision") != "decision":
+                continue
+            if norm_id(event.get("actor_id")) != reviewer_id:
+                continue
+            doc = norm_id(event.get("doc_id"))
+            if doc not in visible:
+                continue
+            action = str(event.get("action") or "")
+            latest_by_doc[doc] = event
+            action_counts[action] += 1
+            decision_event_count += 1
+            last_event = event
+
+        latest_actions = Counter(str(event.get("action") or "") for event in latest_by_doc.values())
+        fixed = latest_actions["approve"] + latest_actions["change"]
+        deferred = latest_actions["defer"]
+        excluded = sum(latest_actions[action] for action in ("reject", "discard", "exclude"))
+        in_progress = latest_actions["reopen"]
+        reviewed = len(latest_by_doc)
+        not_started = len(visible) - reviewed
+        remaining = not_started + in_progress
+        return {
+            "decision_event_count": decision_event_count,
+            "reviewed_doc_count": reviewed,
+            "fixed_doc_count": fixed,
+            "deferred_doc_count": deferred,
+            "excluded_doc_count": excluded,
+            "in_progress_doc_count": in_progress,
+            "not_started_doc_count": not_started,
+            "remaining_doc_count": remaining,
+            "progress_percent": round((reviewed / len(visible) * 100), 1) if visible else 0.0,
+            "last_decided_at": last_event.get("decided_at") if last_event else None,
+            "last_action": str(last_event.get("action") or "") if last_event else "",
+            "decision_actions": dict(sorted(action_counts.items())),
+        }
+
     def status(
         self, doc_batches: Mapping[str, str | None], *,
         reviewer_id: str | None = None, doc_id: str | None = None,
         review_batch: str | None = None,
+        decision_events: Iterable[Mapping[str, Any]] = (),
     ) -> dict[str, Any]:
-        """관리자용 배정 현황. 검수자별 배정 + 문서 단위 커버리지(누구에게도 안 배정된 문서 수)."""
+        """관리자용 배정·검수 진행 현황.
+
+        ``review_batch``를 주면 해당 배치 문서만 배정 수와 진행률에 포함한다. 정확 20×50
+        계획은 문서 단위 배정이라 assignment 이벤트에는 ``review_batch``가 없을 수 있으므로,
+        이벤트 필드가 아니라 문서→배치 색인으로 범위를 정한다.
+        """
         events = self.read_events()
         state = self.replay(events)
+        batch = norm_id(review_batch)
+        scoped_doc_batches = (
+            {doc: value for doc, value in doc_batches.items() if norm_id(value) == batch}
+            if batch else dict(doc_batches)
+        )
+        decision_events = tuple(decision_events)
         rows: list[dict[str, Any]] = []
         covered: set[str] = set()
         for rid in sorted(state):
             slot = state[rid]
             if not slot["doc_ids"] and not slot["review_batches"]:
                 continue        # 배정을 모두 해제한 검수자는 현황에서 뺀다(이력은 events 에 남는다)
-            visible = self._resolve(slot, doc_batches)
+            visible = self._resolve(slot, scoped_doc_batches)
             covered |= visible
             rows.append({
                 "reviewer_id": rid,
@@ -885,20 +951,49 @@ class AssignmentLedger:
             rows = [r for r in rows if r["reviewer_id"] == norm_id(reviewer_id)]
         if doc_id:
             rows = [r for r in rows if norm_id(doc_id) in r["_visible"]]
-        if review_batch:
-            rows = [r for r in rows if norm_id(review_batch) in r["review_batches"]]
+        if batch:
+            rows = [r for r in rows if r["_visible"]]
         for r in rows:
+            r.update(self._reviewer_progress(r["reviewer_id"], r["_visible"], decision_events))
             r.pop("_visible")
         # 배정 표(관리자 화면) — 위 필터를 통과한 검수자들의 배정을 한 줄씩 펼친 것. 필터를 바꿔도 reviewers 와 같은 검수자만 나온다.
         shown = {r["reviewer_id"] for r in rows}
+        assigned = sum(int(row["visible_doc_count"]) for row in rows)
+        reviewed = sum(int(row["reviewed_doc_count"]) for row in rows)
+        fixed = sum(int(row["fixed_doc_count"]) for row in rows)
+        deferred = sum(int(row["deferred_doc_count"]) for row in rows)
+        excluded = sum(int(row["excluded_doc_count"]) for row in rows)
+        in_progress = sum(int(row["in_progress_doc_count"]) for row in rows)
+        not_started = sum(int(row["not_started_doc_count"]) for row in rows)
+        assignments = [a for a in self.live_assignments(events) if a["reviewer_id"] in shown]
+        if batch:
+            # review_batch 조회는 그 배치의 현황 화면용이다. 같은 검수자가 다른 배치에서
+            # 받은 문서 단위 배정까지 함께 돌려주면 현재 배치의 배정표가 오해를 만든다.
+            assignments = [
+                a for a in assignments
+                if (a["kind"] == "review_batch" and norm_id(a["target"]) == batch)
+                or (a["kind"] == "doc_id" and norm_id(a["target"]) in scoped_doc_batches)
+            ]
         return {
-            "total_candidates": len(doc_batches),
+            "total_candidates": len(scoped_doc_batches),
             "assigned_candidate_count": len(covered),
-            "unassigned_candidate_count": len(doc_batches) - len(covered),
+            "unassigned_candidate_count": len(scoped_doc_batches) - len(covered),
             "reviewers": rows,
-            "assignments": [a for a in self.live_assignments(events) if a["reviewer_id"] in shown],
+            "assignments": assignments,
             "ledger_events_total": len(events),
             "by_event": dict(sorted(Counter(str(e.get("event")) for e in events).items())),
+            "progress_summary": {
+                "reviewer_count": len(rows),
+                "assigned_doc_count": assigned,
+                "reviewed_doc_count": reviewed,
+                "fixed_doc_count": fixed,
+                "deferred_doc_count": deferred,
+                "excluded_doc_count": excluded,
+                "in_progress_doc_count": in_progress,
+                "not_started_doc_count": not_started,
+                "remaining_doc_count": not_started + in_progress,
+                "progress_percent": round((reviewed / assigned * 100), 1) if assigned else 0.0,
+            },
         }
 
 

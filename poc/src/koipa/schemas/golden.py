@@ -452,6 +452,7 @@ class GoldenAssignmentStatusResponse(BaseModel):
     unassigned_candidate_count: int
     reviewers: list[dict]
     assignments: list[GoldenAssignmentRow]
+    progress_summary: dict[str, int | float]
     ledger_events_total: int
     by_event: dict[str, int]
     enforced: dict[str, bool]

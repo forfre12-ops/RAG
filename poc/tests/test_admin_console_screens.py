@@ -239,6 +239,8 @@ def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_bound
         'id="expert-reviewer-ids"',
         'id="expert-reviewer-roster"',
         'id="expert-plan-submit"',
+        'progress_summary',
+        'expert-progress-metrics',
         'data-product-requires-golden="1"',
         'id="overview-help"',
         'data-resize="left"',
@@ -255,14 +257,17 @@ def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_bound
         'function appendSelectedExpertReviewers(',
         'function productGoldenReviewAvailable()',
         "document.dispatchEvent(new Event('koipa:profile-ready'))",
-        "'/golden/assignments/review-plan'",
+        "'/golden/assignments/expert-review-plan'",
         "'/golden/reviewers'",
         "'/golden/candidates?review_batch='+encoded+'&limit=1'",
     ):
         assert marker in console
     for wording in (
         "문서 검토 및 확정",
-        "검수자 배정·진행",
+        "검수 계정별 진행 현황",
+        "판정 완료",
+        "미시작",
+        "최근 활동",
         "분류 정책 및 근거",
         "모델 학습 및 릴리스",
         "감사 기록",
@@ -274,6 +279,45 @@ def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_bound
     assert "전문가 검수 운영" not in console
     assert "배포 준비 상태" not in console
     assert "안전 정지" not in console
+
+
+def test_console_overview_metric_cards_filter_the_document_screen_by_status(console: str):
+    """운영 개요의 검수완료·미검수·보류·폐기 카드를 누르면 그 상태로 문서 검토 화면이 걸러진다.
+
+    카드가 눌러도 반응 없는 숫자판이면, 검수완료·폐기로 넘어간 문서를 다시 보려 할 때
+    사용자가 스스로 필터를 만들 방법이 없다(2026-10-11 사용자 요청).
+    """
+    assert "function productOpenDocumentsWithStatus(statusFilter)" in console
+    assert "card.className='metric-card'+(clickable?' metric-card-link':'')" in console
+    for call in (
+        "productMetric('전체 문서',summary.total||data.total||0,'현재 범위',''),",
+        "productMetric('검수 완료',summary.fixed||0,'등급 확정','fixed'),",
+        "productMetric('미검수',summary.unfixed||0,'검토 필요','unfixed'),",
+        "productMetric('보류',summary.deferred||0,'후속 판단 필요','deferred'),",
+        "productMetric('폐기',summary.discarded||0,'원장 보존','discarded'),",
+    ):
+        assert call in console
+    assert 'id="wb-status" onchange="applyWorkbenchStatusFilter()"' in console
+    for option in (
+        '<option value="fixed">검수완료</option>',
+        '<option value="unfixed">미검수</option>',
+        '<option value="deferred">보류</option>',
+        '<option value="discarded">폐기</option>',
+        '<option value="out_of_scope">검수대상제외</option>',
+    ):
+        assert option in console
+    assert "function workbenchStatusMatches(row,filter)" in console
+    assert "function applyWorkbenchStatusFilter()" in console
+
+
+def test_console_does_not_use_the_undefined_jargon_workbench(console: str):
+    """"작업대"는 이 화면 어디에도 정의가 없는 조어였다(2026-10-11 사용자 지적).
+
+    같은 화면이 이미 "문서 검토 화면"(product-documents 제목과 같은 말)이라는 쉬운 이름을
+    쓰고 있어, 버튼·안내문만 다른 낱말을 쓰던 것을 그 이름으로 통일한다.
+    """
+    assert "작업대" not in console
+    assert "문서 검토 화면 열기" in console
 
 
 def test_console_mobile_header_wraps_the_navigation(console: str):

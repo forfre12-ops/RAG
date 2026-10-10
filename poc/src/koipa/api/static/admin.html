@@ -490,6 +490,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .metric-card .metric-label{font-size:11px;color:var(--ui-muted);font-weight:700;}
 .metric-card b{display:block;margin-top:8px;color:var(--ui-navy);font-size:26px;letter-spacing:-.05em;font-variant-numeric:tabular-nums;}
 .metric-card small{display:block;margin-top:3px;color:var(--ui-muted);font-size:11px;}
+.metric-card-link{cursor:pointer;text-align:left;font:inherit;width:100%;}
+.metric-card-link:hover{background:#f3f6fd;border-color:var(--ui-line);}
+.metric-card-link:focus-visible{outline:2px solid var(--ui-navy);outline-offset:2px;}
 .grade-distribution{margin-top:16px;padding-top:16px;border-top:1px solid var(--ui-line-soft);}
 .grade-distribution h3,.overview-side h3{margin:0 0 10px;color:var(--ui-navy);font-size:13px;}
 .grade-rows{display:grid;grid-template-columns:76px repeat(4,minmax(0,1fr));gap:8px;align-items:center;}
@@ -583,8 +586,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .expert-field textarea{resize:vertical;}
 .expert-message{min-height:19px;margin:10px 0 0;color:#1d4ed8;font-size:12px;line-height:1.5;}
 .expert-assignment-list{display:grid;gap:7px;margin-top:12px;}
-.expert-assignment-row{display:grid;grid-template-columns:minmax(110px,1fr) auto;gap:10px;align-items:center;padding:10px 11px;border:1px solid var(--ui-line-soft);background:#fbfcfe;font-size:12px;}
-.expert-assignment-row small{display:block;margin-top:3px;color:var(--ui-muted);font-size:10.5px;}
+.expert-assignment-row{display:grid;gap:10px;padding:14px;border:1px solid var(--ui-line-soft);border-radius:9px;background:#fbfcfe;font-size:12px;}
+.expert-progress-head{display:flex;align-items:start;justify-content:space-between;gap:12px;}.expert-progress-head strong{color:var(--ui-navy);font-size:13px;}.expert-progress-head small{display:block;margin-top:3px;color:var(--ui-muted);font-size:10.5px;}.expert-progress-rate{color:var(--ui-navy);font:800 15px var(--font-mono);white-space:nowrap;}
+.expert-progress-bar{height:7px;overflow:hidden;border-radius:99px;background:#e8edf5;}.expert-progress-bar i{display:block;height:100%;border-radius:inherit;background:var(--ui-blue);}
+.expert-progress-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;}.expert-progress-metrics span{padding:7px 8px;border-radius:6px;background:#fff;color:var(--ui-muted);font-size:10px;line-height:1.35;}.expert-progress-metrics b{display:block;margin-top:2px;color:var(--ui-ink);font:800 13px var(--font-mono);}.expert-progress-meta{display:flex;flex-wrap:wrap;gap:5px 12px;color:var(--ui-muted);font-size:10.5px;}
+@media(max-width:560px){.expert-progress-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:900px){.expert-grid{grid-template-columns:1fr;}}
 .document-sheet .doc-empty{padding:44px 12px;text-align:center;color:var(--ui-muted);font-size:13px;}
 .inspector-tabs{display:flex;padding:10px 12px 0;gap:5px;border-bottom:1px solid var(--ui-line-soft);}
@@ -643,6 +649,17 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans
 .btn.sec,.btn.ghost{background:#fff;color:var(--text);border-color:var(--border-strong)}
 .btn:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--c-s2);outline-offset:2px}
 input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:#fff;color:var(--text)}
+
+/* 운영 화면은 장식적 모서리·색 띠 없이 직선형 정보 구조만 사용한다. */
+body *,body *::before,body *::after{border-radius:0 !important;}
+.grade-cards{grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;}
+.grade-card{padding:13px 14px;}
+.grade-card::before,.dash-panel::before{display:none;}
+.grade-card-head{align-items:center;}
+.grade-card-code,.grade-card-name{white-space:nowrap;}
+.grade-card-total{margin:12px 0;}
+.grade-card-total b{font-size:28px;}
+.profile-banner{border-left:1px solid var(--border-mid);}
 /* console-theme:end */
 </style>
 <script src="./errors_ko.js"></script>
@@ -697,7 +714,7 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
       </div>
       <div class="console-view-actions">
         <button class="btn sec sm" type="button" onclick="loadProductOverview(true)">새로고침</button>
-        <button class="btn sm" type="button" data-product-requires-golden="1" onclick="showProductView('documents')">문서 작업대 열기</button>
+        <button class="btn sm" type="button" data-product-requires-golden="1" onclick="showProductView('documents')">문서 검토 화면 열기</button>
       </div>
     </div>
     <div class="overview-grid">
@@ -718,7 +735,7 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
     </div>
     <section class="category-panel" data-product-requires-golden="1" aria-labelledby="category-heading">
       <div class="category-panel-head">
-        <div><h2 id="category-heading">카테고리별 문서 지표</h2><p>문서유형을 누르면 해당 유형으로 문서 작업대를 엽니다.</p></div>
+        <div><h2 id="category-heading">카테고리별 문서 지표</h2><p>문서유형을 누르면 해당 유형의 문서 검토 화면을 엽니다.</p></div>
         <span class="category-status" id="category-batch-label">배치 확인 중</span>
       </div>
       <div id="product-category-body" class="overview-state" data-state="loading">문서유형 지표를 불러오는 중입니다.</div>
@@ -733,7 +750,7 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
     </div>
     <div id="document-workbench" class="workbench" aria-live="polite">
       <aside class="workbench-drawer" id="wb-drawer">
-        <div class="workbench-pane-head"><h2>문서함</h2><p id="wb-count">문서 목록을 불러오는 중입니다.</p><div class="workbench-filter"><input id="wb-query" type="text" placeholder="제목·ID 검색" onkeydown="workbenchSearchKey(event)" /><select id="wb-format" onchange="loadWorkbench(true)"><option value="">전체 유형</option></select></div></div>
+        <div class="workbench-pane-head"><h2>문서함</h2><p id="wb-count">문서 목록을 불러오는 중입니다.</p><div class="workbench-filter"><input id="wb-query" type="text" placeholder="제목·ID 검색" onkeydown="workbenchSearchKey(event)" /><select id="wb-format" onchange="loadWorkbench(true)"><option value="">전체 유형</option></select><select id="wb-status" onchange="applyWorkbenchStatusFilter()"><option value="">전체 상태</option><option value="fixed">검수완료</option><option value="unfixed">미검수</option><option value="deferred">보류</option><option value="discarded">폐기</option><option value="out_of_scope">검수대상제외</option></select></div></div>
         <div id="wb-list" class="workbench-list"><div class="inspector-empty">문서 목록을 불러오는 중입니다.</div></div>
       </aside>
       <div class="workbench-handle" role="separator" aria-orientation="vertical" aria-label="문서함 너비 조절" data-resize="left"></div>
@@ -745,12 +762,12 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
 
   <section id="product-experts" class="product-view" data-product-requires-golden="1" aria-labelledby="experts-heading">
     <div class="console-view-head">
-      <div><h2 id="experts-heading" class="console-view-title">검수자 배정·진행</h2><p class="console-view-help">현재 검수 배치를 선택한 검수자에게 균등하게 배정합니다.</p></div>
-      <div class="console-view-actions"><button class="btn sec sm" type="button" onclick="loadExpertOperations()">배정 현황 새로고침</button><button class="btn sm" type="button" onclick="showProductView('documents')">문서 검토 화면</button></div>
+      <div><h2 id="experts-heading" class="console-view-title">검수 계정별 진행 현황</h2><p class="console-view-help">각 검수 계정의 배정·결정·보류·미처리 현황과 마지막 활동을 확인합니다.</p></div>
+      <div class="console-view-actions"><button class="btn sec sm" type="button" onclick="loadExpertOperations()">진행 현황 새로고침</button><button class="btn sm" type="button" onclick="showProductView('documents')">문서 검토 화면</button></div>
     </div>
     <div class="expert-grid">
-      <section class="expert-panel"><h3>배정 상태</h3><div id="expert-assignment-summary" class="overview-state" data-state="loading">배정 현황을 불러오는 중입니다.</div><div id="expert-assignment-list" class="expert-assignment-list"></div></section>
-      <section class="expert-panel"><h3>검수자 균등 배정</h3><p class="expert-note">배정 강제와 블라인드 검수가 켜진 경우에만 저장됩니다. 문서는 검수자별 수량 차이가 최대 한 건이 되도록 나뉩니다.</p><label class="expert-field" for="expert-reviewer-roster">배정 가능한 활성 검수자 <span>현재 이 서버에서 로그인 가능한 reviewer 계정만 표시합니다.</span><select id="expert-reviewer-roster" multiple size="7" aria-describedby="expert-roster-note"></select></label><button class="btn sec sm" type="button" onclick="appendSelectedExpertReviewers()">선택 계정 추가</button><p id="expert-roster-note" class="expert-note">계정 명부를 불러오는 중입니다.</p><label class="expert-field" for="expert-reviewer-ids">선택한 검수자 계정 <span>선택 계정을 추가하거나 한 줄에 하나씩 입력합니다. 저장 전 서버가 활성 계정을 다시 확인합니다.</span><textarea id="expert-reviewer-ids" rows="9" placeholder="reviewer-01&#10;reviewer-02&#10;…"></textarea></label><label class="expert-field" for="expert-assignment-reason">배정 메모 <span>선택</span><input id="expert-assignment-reason" maxlength="1000" placeholder="예: 2026-10 검수 1차" /></label><button class="btn black" id="expert-plan-submit" type="button" onclick="submitBalancedReviewPlan()">균등 배정</button><p id="expert-plan-message" class="expert-message" role="status" aria-live="polite"></p></section>
+      <section class="expert-panel"><h3>검수 계정별 진행 상태</h3><p class="expert-note">처리율은 이 계정이 자기 배정 문서에 남긴 결정 기준입니다. 보류는 결정 기록이 있으나 후속 판단이 필요한 건입니다.</p><div id="expert-assignment-summary" class="overview-state" data-state="loading">진행 현황을 불러오는 중입니다.</div><div id="expert-assignment-list" class="expert-assignment-list"></div></section>
+      <section class="expert-panel"><h3>20명 × 50건 배정</h3><p class="expert-note">배정 강제와 블라인드 검수가 켜진 경우에만 저장됩니다. 정확히 1,000건을 서로 다른 20명에게 50건씩 배정합니다.</p><label class="expert-field" for="expert-reviewer-roster">배정 가능한 활성 검수자 <span>현재 이 서버에서 로그인 가능한 reviewer 계정만 표시합니다.</span><select id="expert-reviewer-roster" multiple size="7" aria-describedby="expert-roster-note"></select></label><button class="btn sec sm" type="button" onclick="appendSelectedExpertReviewers()">선택 계정 추가</button><p id="expert-roster-note" class="expert-note">계정 명부를 불러오는 중입니다.</p><label class="expert-field" for="expert-reviewer-ids">선택한 검수자 계정 <span>선택 계정을 추가하거나 한 줄에 하나씩 입력합니다. 저장 전 서버가 활성 계정을 다시 확인합니다.</span><textarea id="expert-reviewer-ids" rows="9" placeholder="reviewer-01&#10;reviewer-02&#10;…"></textarea></label><label class="expert-field" for="expert-assignment-reason">배정 메모 <span>선택</span><input id="expert-assignment-reason" maxlength="1000" placeholder="예: 2026-10 검수 1차" /></label><button class="btn black" id="expert-plan-submit" type="button" onclick="submitBalancedReviewPlan()">20명에게 50건씩 배정</button><p id="expert-plan-message" class="expert-message" role="status" aria-live="polite"></p></section>
     </div>
   </section>
 
@@ -1889,12 +1906,18 @@ function expertSetState(state, text){
 function renderExpertAssignmentRows(reviewers){
   const host=$('expert-assignment-list');if(!host)return;host.replaceChildren();
   const rows=Array.isArray(reviewers)?reviewers:[];
-  if(!rows.length){host.append(Object.assign(document.createElement('div'),{className:'inspector-empty',textContent:'현재 선택한 배치에 유효한 검수자 배정이 없습니다.'}));return;}
+  if(!rows.length){host.append(Object.assign(document.createElement('div'),{className:'inspector-empty',textContent:'현재 선택한 배치에 진행 중인 검수 계정이 없습니다.'}));return;}
   rows.forEach(row=>{
     const item=document.createElement('div');item.className='expert-assignment-row';
-    const who=document.createElement('div');who.textContent=row.reviewer_id||'검수자 미상';
-    const note=document.createElement('small');note.textContent='배정 문서 '+Number(row.visible_doc_count||0).toLocaleString()+'건';who.append(note);
-    const target=document.createElement('span');target.className='category-status';target.textContent=(row.review_batches||[]).join(', ')||'문서 단위 배정';item.append(who,target);host.append(item);
+    const assigned=Number(row.visible_doc_count||0), reviewed=Number(row.reviewed_doc_count||0), rate=Number(row.progress_percent||0);
+    const head=document.createElement('div');head.className='expert-progress-head';
+    const who=document.createElement('div');const name=document.createElement('strong');name.textContent=row.reviewer_id||'검수자 미상';const note=document.createElement('small');note.textContent='배정 '+assigned.toLocaleString()+'건 · 결정 기록 '+reviewed.toLocaleString()+'건';who.append(name,note);
+    const percent=document.createElement('span');percent.className='expert-progress-rate';percent.textContent=rate.toFixed(1)+'%';head.append(who,percent);
+    const bar=document.createElement('div');bar.className='expert-progress-bar';const fill=document.createElement('i');fill.style.width=Math.max(0,Math.min(100,rate))+'%';bar.append(fill);
+    const metrics=document.createElement('div');metrics.className='expert-progress-metrics';
+    [['판정 완료',row.fixed_doc_count],['보류',row.deferred_doc_count],['제외·폐기',row.excluded_doc_count],['재검토',row.in_progress_doc_count],['미시작',row.not_started_doc_count],['미처리',row.remaining_doc_count]].forEach(([label,value])=>{const metric=document.createElement('span');metric.textContent=label;const count=document.createElement('b');count.textContent=Number(value||0).toLocaleString()+'건';metric.append(count);metrics.append(metric);});
+    const meta=document.createElement('div');meta.className='expert-progress-meta';const action={approve:'승인',change:'등급 변경',defer:'보류',reject:'폐기',discard:'폐기',exclude:'검수 대상 제외',reopen:'재검토'}[row.last_action]||'';meta.textContent=row.last_decided_at?'최근 활동: '+action+' · '+new Date(row.last_decided_at).toLocaleString('ko-KR'):'최근 활동: 아직 결정 기록 없음';
+    item.append(head,bar,metrics,meta);host.append(item);
   });
 }
 let EXPERT_REVIEWER_ROSTER=[];
@@ -1929,7 +1952,7 @@ function appendSelectedExpertReviewers(){
 async function loadExpertOperations(){
   const roster=loadExpertReviewerRoster();
   if(!PRODUCT_REVIEW_BATCH){await roster;expertSetState('empty','현재 검수 배치를 먼저 선택하세요.');renderExpertAssignmentRows([]);return;}
-  expertSetState('loading','배정 현황을 불러오는 중입니다.');
+  expertSetState('loading','검수 계정별 진행 현황을 불러오는 중입니다.');
   try{
     const encoded=encodeURIComponent(PRODUCT_REVIEW_BATCH);
     const [data,probe]=await Promise.all([
@@ -1939,15 +1962,19 @@ async function loadExpertOperations(){
     await roster;
     const enforced=data&&data.enforcement||{};
     const reviewers=Array.isArray(data&&data.reviewers)?data.reviewers:[];
+    const progress=data&&data.progress_summary||{};
     const batchCount=Number(probe&&probe.total||0);
     const flags='배정 강제 '+(enforced.assignment_enforced?'켜짐':'꺼짐')+' · 블라인드 검수 '+(enforced.blind_enforced?'켜짐':'꺼짐');
     const blockers=[];
-    if(batchCount<1) blockers.push('배정할 문서 없음');
+    // 이 배정 흐름의 계약은 20명 × 50건이다. 문서가 하나라도 있으면 된다는 식으로
+    // 열어 두면 3건 배치를 20명에게 나누는 허위 "균등 배정"이 된다.
+    if(batchCount!==1000) blockers.push('1,000건 필요 (현재 '+batchCount.toLocaleString()+'건)');
     if(!enforced.assignment_enforced) blockers.push('배정 강제 설정 필요');
     if(!enforced.blind_enforced) blockers.push('블라인드 검수 설정 필요');
     const ready=blockers.length===0;
     const submit=$('expert-plan-submit');if(submit){submit.disabled=!ready;submit.title=ready?'선택한 검수자에게 균등 배정합니다.':blockers.join(' · ');}
-    expertSetState('empty',PRODUCT_REVIEW_BATCH+' · 검수자 '+reviewers.length+'명 · '+flags+' · 문서 '+batchCount.toLocaleString()+'건'+(ready?' · 배정 가능':' · 배정 대기: '+blockers.join(', ')));
+    const progressNote='배정 '+Number(progress.assigned_doc_count||0).toLocaleString()+'건 · 결정 '+Number(progress.reviewed_doc_count||0).toLocaleString()+'건 ('+Number(progress.progress_percent||0).toFixed(1)+'%) · 미처리 '+Number(progress.remaining_doc_count||0).toLocaleString()+'건 · 보류 '+Number(progress.deferred_doc_count||0).toLocaleString()+'건';
+    expertSetState('empty',PRODUCT_REVIEW_BATCH+' · 검수 계정 '+reviewers.length+'명 · '+progressNote+' · '+flags+(ready?'':' · 배정 대기: '+blockers.join(', ')));
     renderExpertAssignmentRows(reviewers);
   }catch(error){await roster;expertSetState('error','배정 현황을 불러오지 못했습니다. '+errKoText(error));renderExpertAssignmentRows([]);}
 }
@@ -1958,7 +1985,8 @@ function expertReviewerIds(){
 async function submitBalancedReviewPlan(){
   const message=$('expert-plan-message');const reviewerIds=expertReviewerIds();
   if(!PRODUCT_REVIEW_BATCH){if(message)message.textContent='현재 검수 배치를 먼저 선택하세요.';return;}
-  if(!reviewerIds.length||new Set(reviewerIds).size!==reviewerIds.length){if(message)message.textContent='서로 다른 검수자 계정 ID를 한 줄에 하나씩 입력하세요.';return;}
+  if(reviewerIds.length!==20){if(message)message.textContent='검수자는 정확히 20개 계정을 한 줄에 하나씩 입력하세요.';return;}
+  if(new Set(reviewerIds).size!==reviewerIds.length){if(message)message.textContent='검수자 20개 계정은 서로 달라야 합니다.';return;}
   if(EXPERT_REVIEWER_ROSTER.length){
     const active=new Set(EXPERT_REVIEWER_ROSTER.map(row=>row.reviewer_id));
     const missing=reviewerIds.filter(id=>!active.has(id));
@@ -1967,19 +1995,29 @@ async function submitBalancedReviewPlan(){
   const body={review_batch:PRODUCT_REVIEW_BATCH,reviewer_ids:reviewerIds,reason:(($('expert-assignment-reason')||{}).value||'').trim()};
   try{
     if(message)message.textContent='배정 전 서버 계약을 확인하는 중입니다…';
-    const result=await api('POST','/golden/assignments/review-plan',body);
-    const allocation=result.min_documents_per_reviewer===result.max_documents_per_reviewer?'1인 '+result.max_documents_per_reviewer+'건':'1인 '+result.min_documents_per_reviewer+'~'+result.max_documents_per_reviewer+'건';
+    // 이 화면은 20명 × 50건만 허용하므로, 가변 인원·가변 문서 수용 일반 배정 API가
+    // 아니라 서버가 같은 계약을 보장하는 전용 API를 호출한다.
+    const result=await api('POST','/golden/assignments/expert-review-plan',body);
+    const allocation='1인 '+result.documents_per_reviewer+'건';
     if(message)message.textContent='배정 완료: '+result.reviewer_count+'명 · '+allocation+' · 총 '+result.total_documents+'건'+(result.already_applied?' (기존 동일 계획 확인)':'');
     await loadExpertOperations();
   }catch(error){if(message)message.textContent='배정하지 않았습니다. '+errKoText(error);}
 }
 
-function productMetric(label,value,hint){
-  const card=document.createElement('div'); card.className='metric-card';
+function productMetric(label,value,hint,statusFilter){
+  const clickable=statusFilter!==undefined;
+  const card=document.createElement(clickable?'button':'div');
+  card.className='metric-card'+(clickable?' metric-card-link':'');
+  if(clickable){card.type='button';card.title='눌러서 이 상태로 문서 목록을 봅니다';card.onclick=()=>productOpenDocumentsWithStatus(statusFilter);}
   const l=document.createElement('div'); l.className='metric-label'; l.textContent=label;
   const b=document.createElement('b'); b.textContent=Number(value||0).toLocaleString();
   const s=document.createElement('small'); s.textContent=hint;
   card.append(l,b,s); return card;
+}
+function productOpenDocumentsWithStatus(statusFilter){
+  const sel=$('wb-status'); if(sel) sel.value=statusFilter||'';
+  productShowView('documents');
+  loadWorkbench();
 }
 function productGradeRows(summary){
   const wrap=document.createElement('div'); wrap.className='grade-distribution';
@@ -2002,7 +2040,7 @@ function productCategoryTable(rows,total,partial){
   ['문서유형','문서 수','구성 비율','바로가기'].forEach(v=>{const th=document.createElement('th');th.textContent=v;hr.append(th);});thead.append(hr);table.append(thead);
   const tbody=document.createElement('tbody');
   rows.forEach(row=>{
-    const tr=document.createElement('tr'); tr.tabIndex=0; tr.title='이 문서유형으로 문서 작업대를 엽니다';
+    const tr=document.createElement('tr'); tr.tabIndex=0; tr.title='이 문서유형의 문서 검토 화면을 엽니다';
     const type=document.createElement('td');type.textContent=row.type;
     const count=document.createElement('td');count.className='category-total';count.textContent=Number(row.count).toLocaleString()+'건';
     const share=document.createElement('td');share.textContent=(total?((row.count/total)*100).toFixed(1):'0.0')+'%';
@@ -2036,11 +2074,11 @@ async function loadProductOverview(force){
     const overview=$('overview-scope'); if(overview) overview.textContent=scope+' · 목록 '+Number(data.total||0).toLocaleString()+'건';
     const body=document.createElement('div'); body.className='metrics-grid';
     body.append(
-      productMetric('전체 문서',summary.total||data.total||0,'현재 범위'),
-      productMetric('검수 완료',summary.fixed||0,'등급 확정'),
-      productMetric('미검수',summary.unfixed||0,'검토 필요'),
-      productMetric('보류',summary.deferred||0,'후속 판단 필요'),
-      productMetric('폐기',summary.discarded||0,'원장 보존'),
+      productMetric('전체 문서',summary.total||data.total||0,'현재 범위',''),
+      productMetric('검수 완료',summary.fixed||0,'등급 확정','fixed'),
+      productMetric('미검수',summary.unfixed||0,'검토 필요','unfixed'),
+      productMetric('보류',summary.deferred||0,'후속 판단 필요','deferred'),
+      productMetric('폐기',summary.discarded||0,'원장 보존','discarded'),
       productMetric('문서 유형',new Set(items.map(x=>x.doc_format||x.info_type).filter(Boolean)).size,'응답 기준')
     );
     body.append(productGradeRows(summary));
@@ -2081,9 +2119,31 @@ function renderWorkbenchList(rows){
     button.append(title,sub);button.onclick=()=>selectWorkbenchDocument(row.doc_id);list.append(button);
   });
 }
+function workbenchStatusMatches(row,filter){
+  if(!filter) return true;
+  if(filter==='fixed') return !!row.grade_fixed;
+  if(filter==='unfixed') return !row.grade_fixed && !['discarded','out_of_scope'].includes(row.status);
+  return row.status===filter;
+}
+function workbenchStatusLabel(filter){
+  return {fixed:'검수완료',unfixed:'미검수',deferred:'보류',discarded:'폐기',out_of_scope:'검수대상제외'}[filter]||'';
+}
+function workbenchFilteredRows(){
+  const filter=($('wb-status')||{}).value||'';
+  return WORKBENCH_ROWS.filter(row=>workbenchStatusMatches(row,filter));
+}
+function applyWorkbenchStatusFilter(){
+  const count=$('wb-count');
+  const filter=($('wb-status')||{}).value||'';
+  const rows=workbenchFilteredRows();
+  const label=workbenchStatusLabel(filter);
+  if(count)count.textContent=(PRODUCT_REVIEW_BATCH?PRODUCT_REVIEW_BATCH+' · ':'')+(label?label+' '+rows.length.toLocaleString()+'건 (전체 '+WORKBENCH_ROWS.length.toLocaleString()+'건 중)':'총 '+WORKBENCH_ROWS.length.toLocaleString()+'건');
+  renderWorkbenchList(rows);
+  if(rows.length && !WORKBENCH_SELECTED)selectWorkbenchDocument(rows[0].doc_id);
+}
 async function loadWorkbench(force){
   const list=$('wb-list'), count=$('wb-count');if(!list)return;
-  if(WORKBENCH_ROWS.length && !force){return;}
+  if(WORKBENCH_ROWS.length && !force){applyWorkbenchStatusFilter();return;}
   workbenchEmpty('문서 목록을 불러오는 중입니다.');if(count)count.textContent='문서 목록을 불러오는 중입니다.';
   const q=applyProductReviewBatch(new URLSearchParams());q.set('limit','2000');
   const query=($('wb-query')||{}).value||'';const format=($('wb-format')||{}).value||'';
@@ -2092,9 +2152,7 @@ async function loadWorkbench(force){
     const data=await api('GET','/golden/candidates?'+q.toString());
     WORKBENCH_ROWS=Array.isArray(data&&data.candidates)?data.candidates:[];
     syncWorkbenchFormats((data&&data.available_doc_formats||[]).map(x=>x.doc_format).filter(Boolean));
-    if(count)count.textContent=(PRODUCT_REVIEW_BATCH?PRODUCT_REVIEW_BATCH+' · ':'')+'총 '+Number(data&&data.total||0).toLocaleString()+'건';
-    renderWorkbenchList(WORKBENCH_ROWS);
-    if(WORKBENCH_ROWS.length && !WORKBENCH_SELECTED)selectWorkbenchDocument(WORKBENCH_ROWS[0].doc_id);
+    applyWorkbenchStatusFilter();
   }catch(e){workbenchEmpty('목록을 불러오지 못했습니다. '+errKoText(e));if(count)count.textContent='조회 실패';}
 }
 function addInspectorCard(title, content){
@@ -2211,7 +2269,7 @@ function renderWorkbenchDocument(candidate){
   article.append(eyebrow,h,meta,copy);
 }
 async function selectWorkbenchDocument(docId){
-  WORKBENCH_SELECTED=docId;renderWorkbenchList(WORKBENCH_ROWS);
+  WORKBENCH_SELECTED=docId;renderWorkbenchList(workbenchFilteredRows());
   const article=$('wb-document');if(article){article.replaceChildren(Object.assign(document.createElement('div'),{className:'doc-empty',textContent:'문서 원문을 불러오는 중입니다.'}));}
   renderInspector(null);
   try{const candidate=await api('GET',`/golden/candidates/${encodeURIComponent(docId)}`);renderWorkbenchDocument(candidate);renderInspector(candidate);}

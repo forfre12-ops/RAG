@@ -917,7 +917,8 @@ def golden_assignment_status(
     svc = ProxyGoldCandidateService()
     ledger = access.AssignmentLedger(svc.root)
     out = ledger.status(
-        svc.review_batch_index(), reviewer_id=reviewer_id, doc_id=doc_id, review_batch=review_batch)
+        svc.review_batch_index(), reviewer_id=reviewer_id, doc_id=doc_id,
+        review_batch=review_batch, decision_events=svc.ledger_rows())
     assignment_on = bool(getattr(settings, "golden_reviewer_assignment_enforced", False))
     blind_on = bool(getattr(settings, "golden_review_blind_enforced", False))
     out["enforced"] = {"assignment": assignment_on, "blind": blind_on}

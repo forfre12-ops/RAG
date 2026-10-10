@@ -2171,7 +2171,9 @@ paths:
       tags: [golden]
       summary: 검수 배정 현황 (관리자 전용)
       description: >-
-        검수자별 배정(문서 단위·배치 단위)과 어느 검수자에게도 배정되지 않은 후보 수를 돌려준다.
+        검수자별 배정(문서 단위·배치 단위), 해당 계정이 자기 배정 문서에 남긴 결정 진행 지표,
+        그리고 어느 검수자에게도 배정되지 않은 후보 수를 돌려준다. 진행 지표는 다른 검수자의
+        결정이나 단순 출처 기록을 섞지 않으며, review_batch를 주면 그 배치 문서만 집계한다.
         include_events=true 이면 배정 원장(candidate_assignments.jsonl) 이벤트를 최신순으로 함께 준다.
         enforced 는 두 강제 손잡이(golden_reviewer_assignment_enforced · golden_review_blind_enforced)의
         현재 값이다 — 꺼져 있으면(기본) 배정은 기록만 되고 검수자에게는 종전처럼 전체가 보인다.
@@ -2193,15 +2195,34 @@ paths:
                 type: object
                 additionalProperties: true
                 required: [total_candidates, assigned_candidate_count, unassigned_candidate_count, reviewers,
-                           assignments, ledger_events_total, by_event, enforced, enforcement]
+                           assignments, progress_summary, ledger_events_total, by_event, enforced, enforcement]
                 properties:
                   total_candidates: { type: integer }
                   assigned_candidate_count: { type: integer }
                   unassigned_candidate_count: { type: integer }
                   reviewers:
                     type: array
-                    description: 검수자별 현재 배정(배정을 모두 해제한 검수자는 뺀다)
-                    items: { type: object, additionalProperties: true }
+                    description: 검수자별 현재 배정과 자기 결정 기준 진행 상태(배정을 모두 해제한 검수자는 뺀다)
+                    items:
+                      type: object
+                      additionalProperties: true
+                      required: [reviewer_id, visible_doc_count, reviewed_doc_count, fixed_doc_count,
+                                 deferred_doc_count, excluded_doc_count, in_progress_doc_count,
+                                 not_started_doc_count, remaining_doc_count, progress_percent]
+                      properties:
+                        reviewer_id: { type: string }
+                        visible_doc_count: { type: integer, description: 이 계정에 현재 배정된 문서 수 }
+                        reviewed_doc_count: { type: integer, description: 이 계정이 결정 이벤트를 남긴 서로 다른 배정 문서 수 }
+                        fixed_doc_count: { type: integer, description: 승인 또는 등급 변경으로 판정 완료한 문서 수 }
+                        deferred_doc_count: { type: integer, description: 보류로 기록한 문서 수 }
+                        excluded_doc_count: { type: integer, description: 폐기 또는 검수 대상 제외로 처리한 문서 수 }
+                        in_progress_doc_count: { type: integer, description: 재검토(reopen) 상태인 문서 수 }
+                        not_started_doc_count: { type: integer, description: 이 계정의 결정 기록이 아직 없는 배정 문서 수 }
+                        remaining_doc_count: { type: integer, description: 미시작과 재검토를 합친 미처리 문서 수 }
+                        progress_percent: { type: number, description: reviewed_doc_count / visible_doc_count * 100 }
+                        last_decided_at: { type: string, nullable: true, description: 이 계정의 마지막 결정 시각(UTC ISO) }
+                        last_action: { type: string, description: 이 계정의 마지막 결정 action }
+                        decision_actions: { type: object, additionalProperties: { type: integer }, description: 이 계정이 남긴 결정 이벤트 action별 건수 }
                   assignments:
                     type: array
                     items:
@@ -2214,6 +2235,23 @@ paths:
                         assigned_at: { type: string, nullable: true, description: 배정 시각(UTC ISO) }
                         assigned_by: { type: string, nullable: true, description: 배정한 관리자(서버가 확정한 포털 JWT sub) }
                         reason: { type: string }
+                  progress_summary:
+                    type: object
+                    required: [reviewer_count, assigned_doc_count, reviewed_doc_count, fixed_doc_count,
+                               deferred_doc_count, excluded_doc_count, in_progress_doc_count,
+                               not_started_doc_count, remaining_doc_count, progress_percent]
+                    description: 현재 필터 범위의 계정별 진행 지표 합계
+                    properties:
+                      reviewer_count: { type: integer }
+                      assigned_doc_count: { type: integer }
+                      reviewed_doc_count: { type: integer }
+                      fixed_doc_count: { type: integer }
+                      deferred_doc_count: { type: integer }
+                      excluded_doc_count: { type: integer }
+                      in_progress_doc_count: { type: integer }
+                      not_started_doc_count: { type: integer }
+                      remaining_doc_count: { type: integer }
+                      progress_percent: { type: number }
                   ledger_events_total: { type: integer }
                   by_event: { type: object, additionalProperties: { type: integer } }
                   enforced:

@@ -355,7 +355,12 @@ def test_status_reports_who_has_what_and_what_nobody_has(h):
     assert {r["reviewer_id"] for r in shared["reviewers"]} == {"expert-a", "expert-b"}, \
         "A3 는 배치로(a)·문서로(b) 두 사람에게 보인다"
     by_batch = h.get(ADMIN, "/golden/assignments", params={"review_batch": "batch-A"}).json()
-    assert [r["reviewer_id"] for r in by_batch["reviewers"]] == ["expert-a"]
+    # 20×50 계획은 문서 단위 배정으로 기록된다. 따라서 배치 필터는 assignment 이벤트의
+    # review_batch 칸이 아니라 문서→배치 색인으로, 직접 배정된 A3의 expert-b도 포함한다.
+    assert [r["reviewer_id"] for r in by_batch["reviewers"]] == ["expert-a", "expert-b"]
+    assert {(row["reviewer_id"], row["kind"], row["target"]) for row in by_batch["assignments"]} == {
+        ("expert-a", "review_batch", "batch-A"), ("expert-b", "doc_id", A3),
+    }
     ev = h.get(ADMIN, "/golden/assignments", params={"include_events": "true", "limit": 2}).json()
     assert len(ev["events"]) == 2 and ev["ledger_events_total"] == 4 and ev["by_event"] == {"assign": 4}
     # 해제한 검수자는 현황에서 빠지지만 이력(원장)에는 남는다
@@ -686,6 +691,7 @@ ROUTE_TABLE: dict[tuple[str, str], str] = {
     ("POST", "/golden/candidates/promote"): ADMIN_ONLY,
     ("POST", "/golden/assignments"): ADMIN_ONLY,
     ("POST", "/golden/assignments/expert-review-plan"): ADMIN_ONLY,
+    ("POST", "/golden/assignments/review-plan"): ADMIN_ONLY,
     ("POST", "/golden/assignments/revoke"): ADMIN_ONLY,
     ("GET", "/golden/assignments"): ADMIN_ONLY,
     ("GET", "/golden/reviewers"): ADMIN_ONLY,
@@ -750,6 +756,7 @@ def test_admin_only_routes_are_403_for_reviewers_under_every_flag_combination(h,
         ("POST", "/golden/candidates/promote"): {"json": {}},
         ("POST", "/golden/assignments"): {"json": {}},
         ("POST", "/golden/assignments/expert-review-plan"): {"json": {}},
+        ("POST", "/golden/assignments/review-plan"): {"json": {}},
         ("POST", "/golden/assignments/revoke"): {"json": {}},
         ("GET", "/golden/assignments"): {},
         ("GET", "/golden/reviewers"): {},

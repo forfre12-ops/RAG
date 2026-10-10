@@ -243,17 +243,24 @@ def test_status_enforcement_follows_the_two_flags(h, monkeypatch, who, flags):
     assert body["enforced"] == {"assignment": a, "blind": b}, "옛 표기는 그대로이고 같은 값이어야 한다"
 
 
-def test_status_keeps_every_existing_key_and_adds_only_enforcement_and_assignments(h):
+def test_status_preserves_existing_keys_and_adds_assignment_progress(h):
     h.standard_assignments()
     body = h.get(ADMIN, "/golden/assignments").json()
-    assert set(body) == OLD_KEYS | {"enforcement", "assignments"}
+    new_keys = {"enforcement", "assignments", "progress_summary"}
+    assert set(body) == OLD_KEYS | new_keys
     assert set(h.get(ADMIN, "/golden/assignments", params={"include_events": "true"}).json()) == \
-        OLD_KEYS | {"enforcement", "assignments", "events"}
+        OLD_KEYS | new_keys | {"events"}
     # 기존 키의 값은 종전 그대로 — 아래는 test_golden_reviewer_assignment 가 잠근 값과 같다
     assert body["total_candidates"] == 7 and body["assigned_candidate_count"] == 5 and body["unassigned_candidate_count"] == 2
     by = {r["reviewer_id"]: r for r in body["reviewers"]}
-    assert set(by["expert-a"]) == {"reviewer_id", "doc_ids", "review_batches", "visible_doc_count"}
+    assert {"reviewer_id", "doc_ids", "review_batches", "visible_doc_count"} <= set(by["expert-a"])
     assert by["expert-a"]["review_batches"] == ["batch-A"] and by["expert-a"]["visible_doc_count"] == 3
+    assert body["progress_summary"] == {
+        "reviewer_count": 2, "assigned_doc_count": 6, "reviewed_doc_count": 0,
+        "fixed_doc_count": 0, "deferred_doc_count": 0, "excluded_doc_count": 0,
+        "in_progress_doc_count": 0, "not_started_doc_count": 6,
+        "remaining_doc_count": 6, "progress_percent": 0.0,
+    }
     assert body["ledger_events_total"] == 4 and body["by_event"] == {"assign": 4}
 
 
@@ -328,11 +335,14 @@ def test_status_still_needs_admin_or_kl_backend(h):
 
 def test_openapi_documents_the_new_keys_in_code_and_in_the_yaml():
     schema = app.openapi()["components"]["schemas"]["GoldenAssignmentStatusResponse"]
-    assert {"enforcement", "assignments", "enforced", "reviewers"} <= set(schema["properties"])
+    assert {"enforcement", "assignments", "enforced", "reviewers", "progress_summary"} <= set(schema["properties"])
     yaml_text = (ROOT.parent / "doc" / "03_openapi_koipa_kl.yaml").read_text(encoding="utf-8")
     block = yaml_text.split("  /golden/assignments:\n", 1)[1].split("\n  /golden/assignments/revoke:", 1)[0]
     get_block = block.split("    post:\n", 1)[0]
-    for word in ("enforcement:", "assignments:", "assignment_enforced", "blind_enforced", "assigned_at", "assigned_by"):
+    for word in (
+        "enforcement:", "assignments:", "progress_summary:", "reviewed_doc_count", "remaining_doc_count",
+        "assignment_enforced", "blind_enforced", "assigned_at", "assigned_by",
+    ):
         assert word in get_block, word
 
 

@@ -47,6 +47,64 @@ def test_exact_expert_plan_assigns_every_document_once_and_each_reviewer_gets_50
     assert {row["visible_doc_count"] for row in state["reviewers"]} == {50}
 
 
+def test_exact_plan_status_reports_per_reviewer_decision_progress_in_its_batch(tmp_path):
+    ledger = access.AssignmentLedger(tmp_path)
+    _, _, _, plan = ledger.apply_exact_expert_review_plan(
+        review_batch=BATCH, reviewer_ids=REVIEWERS, doc_batches=_index(), actor_id="admin-operator",
+    )
+    first_docs = plan["reviewer-01"]
+    decisions = [
+        {"doc_id": first_docs[0], "actor_id": "reviewer-01", "action": "approve", "decided_at": "2026-10-11T01:00:00+00:00"},
+        {"doc_id": first_docs[1], "actor_id": "reviewer-01", "action": "defer", "decided_at": "2026-10-11T01:01:00+00:00"},
+        {"doc_id": first_docs[2], "actor_id": "reviewer-01", "action": "reopen", "decided_at": "2026-10-11T01:02:00+00:00"},
+        # 다른 검수자의 기록과 결정이 아닌 출처 기록은 reviewer-01 진행률에 섞이면 안 된다.
+        {"doc_id": plan["reviewer-02"][0], "actor_id": "reviewer-02", "action": "change", "decided_at": "2026-10-11T01:03:00+00:00"},
+        {"doc_id": first_docs[3], "actor_id": "reviewer-01", "event_kind": "provenance", "action": "record_provenance"},
+    ]
+
+    status = ledger.status(_index(), review_batch=BATCH, decision_events=decisions)
+    first = next(row for row in status["reviewers"] if row["reviewer_id"] == "reviewer-01")
+    assert len(status["reviewers"]) == 20
+    assert first["visible_doc_count"] == 50
+    assert first["reviewed_doc_count"] == 3
+    assert first["fixed_doc_count"] == 1
+    assert first["deferred_doc_count"] == 1
+    assert first["in_progress_doc_count"] == 1
+    assert first["not_started_doc_count"] == 47
+    assert first["remaining_doc_count"] == 48
+    assert first["last_action"] == "reopen"
+    assert status["progress_summary"]["assigned_doc_count"] == 1000
+    assert status["progress_summary"]["reviewed_doc_count"] == 4
+
+
+def test_assignment_status_endpoint_reads_decision_progress_from_the_candidate_ledger(monkeypatch, tmp_path):
+    ledger = access.AssignmentLedger(tmp_path)
+    _, _, _, plan = ledger.apply_exact_expert_review_plan(
+        review_batch=BATCH, reviewer_ids=REVIEWERS, doc_batches=_index(), actor_id="admin-operator",
+    )
+
+    class FakeService:
+        root = tmp_path
+
+        @staticmethod
+        def review_batch_index():
+            return _index()
+
+        @staticmethod
+        def ledger_rows():
+            return [{
+                "doc_id": plan["reviewer-01"][0], "actor_id": "reviewer-01",
+                "action": "change", "decided_at": "2026-10-11T01:00:00+00:00",
+            }]
+
+    monkeypatch.setattr(golden, "ProxyGoldCandidateService", FakeService)
+    out = golden.golden_assignment_status(review_batch=BATCH, auth=_auth())
+
+    first = next(row for row in out["reviewers"] if row["reviewer_id"] == "reviewer-01")
+    assert first["reviewed_doc_count"] == first["fixed_doc_count"] == 1
+    assert out["progress_summary"]["reviewed_doc_count"] == 1
+
+
 def test_exact_expert_plan_is_idempotent_only_for_the_same_exclusive_plan(tmp_path):
     ledger = access.AssignmentLedger(tmp_path)
     first = ledger.apply_exact_expert_review_plan(
