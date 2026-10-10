@@ -294,3 +294,9 @@ poc/datasets/new_build_candidates_2026-09-17/
 poc/datasets/proxy_gold/single_document_candidates_archive_*/
 # Rocky Linux 설치 리허설 스크래치(23GB, 10/1) — git add -A 사고 방지(2026-10-02)
 wsl_images/
+
+# 2026-10-11에 별도 복구본으로 검증한 과거 모의문서·학습셋. 현행 RF-1001
+# 원본 및 검수 배치에는 쓰이지 않으며, 실수로 다시 원격 저장소에 올리지 않는다.
+poc/datasets/_archived_mock_docs_superseded_by_full1001_20261011/
+poc/datasets/_archive_unused_20261011/
+poc/datasets/proxy_gold/_archived_ms1_superseded_by_rf_20261011/
