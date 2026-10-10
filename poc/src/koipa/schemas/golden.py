@@ -379,6 +379,13 @@ class GoldenExpertReviewPlanResponse(BaseModel):
     reviewer_document_counts: dict[str, int]
 
 
+class GoldenReviewerRosterEntry(BaseModel):
+    """배정 UI에만 주는 비밀 없는 활성 검수자 계정 정보."""
+
+    reviewer_id: str
+    roles: list[str]
+
+
 class GoldenAssignmentEnforcement(BaseModel):
     """두 격리 손잡이의 현재 값 — 관리자 화면의 「배정 강제」·「제안 등급 숨김」 표시가 읽는다(읽기 전용)."""
 

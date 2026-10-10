@@ -8,20 +8,21 @@ Current release status: `CONDITIONALLY_READY` (strict release gate = **FAIL**).
 - Strict `release-gate` still fails until `human_review` reaches the configured minimum and passes agreement checks.
 > Do not fake-green this with `ai_assist`, `llm_*`, blank, or placeholder reviewer IDs; the importer must reject them.
 
-## 0. 由대━???ы쁽??& 紐⑤뜽 parity (pre-flight, 留?由대━??
+## 0. 릴리스 재현성 및 모델 일치 사전점검
 
-**(a) Clean-tree + tag + manifest 濡쒕쭔 由대━?ㅽ븳??** dirty ?묒뾽?몃━?먯꽌 諛고룷 湲덉?(?꾩옱 ~60媛?蹂寃?.
+**(a) 깨끗한 작업 트리·태그·매니페스트에서만 릴리스합니다.** 변경이 남은 작업 트리에서는 배포하지 않습니다.
 ```bash
-git status --porcelain     # 鍮꾩뼱 ?덉뼱?????꾨땲硫?而ㅻ컠/?ㅽ깭??
-git tag -a vX.Y.Z -m "..." # 由대━?ㅻ뒗 ?쒓렇?먯꽌留?鍮뚮뱶
-make release-manifest      # ?곗텧臾??댁떆 怨좎젙(reports/release_manifest.json)
+git status --porcelain     # 출력이 비어 있지 않으면 커밋 또는 스태시 후 다시 확인
+git tag -a vX.Y.Z -m "..." # 릴리스는 태그가 가리키는 커밋에서만 빌드
+make release-manifest      # 산출물·소스 버전을 reports/release_manifest.json에 고정
 ```
 
-**(b) 諛고룷 紐⑤뜽 == ?됯? 紐⑤뜽 (parity 寃뚯씠??.** 由대━???꾨낫??`v-dd3abab9`?대ŉ,
-`CLASSIFIER_MODEL_DIR`, `P1_MODEL`, readiness 湲곕낯媛믪씠 紐⑤몢 ??紐⑤뜽??媛由ъ폒???쒕떎. 由대━????
-1. 由대━???꾨낫 紐⑤뜽??**?섎굹濡??뺤젙**(湲곕낯媛? v-dd3abab9).
-2. 洹?紐⑤뜽濡?P1 eval **?ъ깮??*(`reports/p1_release_legal_direct.json`쨌`reports/p1_release_holdout_direct.json` ??   `model_dir` == `CLASSIFIER_MODEL_DIR`). eval ?뚯씠?꾨씪?몄쑝濡쒕쭔 ?ъ깮???섍린 ?몄쭛 湲덉?).
-3. `make operational-readiness` ??parity 寃뚯씠?멸? PASS ?몄? ?뺤씤(F1/FNR 由ы룷?멸? ?쇱씠釉?紐⑤뜽??湲곗닠).
+**(b) 배포 모델과 평가 모델을 일치시킵니다(parity gate).** 릴리스 후보 `v-dd3abab9`,
+`CLASSIFIER_MODEL_DIR`, `P1_MODEL`, readiness 기본값은 모두 같은 모델을 가리켜야 합니다.
+
+1. 배포 후보 모델을 하나로 확정합니다(현재 기본값: `v-dd3abab9`).
+2. 그 모델로 P1 평가를 다시 만듭니다. `reports/p1_release_legal_direct.json`과 `reports/p1_release_holdout_direct.json`의 `model_dir`는 `CLASSIFIER_MODEL_DIR`와 같아야 합니다. 평가 파일만 바꿔 수치를 맞추지 않습니다.
+3. `make operational-readiness`의 parity gate가 PASS인지 확인합니다. F1/FNR 보고서가 실제 배포 모델의 결과를 가리켜야 합니다.
 > Parity is an internal deploy action: set `CLASSIFIER_MODEL_DIR` to the evaluated model and regenerate readiness.
 > After parity passes, the remaining external blocker is `human_review=40/40`.
 

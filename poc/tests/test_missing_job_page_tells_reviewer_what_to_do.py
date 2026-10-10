@@ -34,6 +34,7 @@ def test_missing_job_returns_a_page_not_raw_json():
     r, html = _page()
     assert r.status_code == 404, "상태 코드는 정직해야 한다 — 화면만 바꾼다"
     assert html.startswith("<!doctype html")
+    assert "state-card" in html and "한국지식재산보호원" in html, "상태 화면도 콘솔 제품 셸을 쓴다"
 
 
 def test_page_says_the_link_is_not_the_problem():

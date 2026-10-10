@@ -14,6 +14,7 @@ status 값:
 from __future__ import annotations
 
 import json
+import hashlib
 import time
 from pathlib import Path
 
@@ -237,15 +238,23 @@ def _check_compute() -> dict:
 
 
 def _build_identity() -> dict:
-    """이미지에 구워진 빌드 신원. 미주입이면 unknown(배포 확인 불가 신호)."""
+    """이미지와 운영 콘솔 정적 자산의 신원. 미주입이면 unknown(배포 확인 불가 신호)."""
     import os as _os
 
     sha = (_os.environ.get("KOIPA_BUILD_SHA") or "").strip() or "unknown"
+    admin_html = Path(__file__).with_name("static") / "admin.html"
+    try:
+        admin_html_sha256 = hashlib.sha256(admin_html.read_bytes()).hexdigest()
+    except OSError:
+        admin_html_sha256 = "unavailable"
     return {
         "git_sha": sha,
         "git_sha_short": sha[:12] if sha != "unknown" else "unknown",
         "built_at": (_os.environ.get("KOIPA_BUILD_AT") or "").strip() or "unknown",
         "classifier_model_dir": getattr(settings, "classifier_model_dir", "") or "",
+        # 서버 코드 SHA만 같아도 정적 파일을 재복사하지 않으면 사용자가 과거 콘솔을 본다.
+        # 이 값은 비밀이나 문서 내용 없이 /healthz와 실제 admin.html을 바인딩한다.
+        "console_admin_html_sha256": admin_html_sha256,
     }
 
 

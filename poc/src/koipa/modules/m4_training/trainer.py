@@ -342,6 +342,8 @@ class TrainReport:
     f1_macro: float
     fnr_overall: float
     fnr_by_grade: dict[str, float]
+    # test split 예측·지표 계산이 끝난 시점. proxy candidate(테스트 평가를 하지 않음)는 None.
+    evaluated_at: str | None = None
     fnr_high: float = 0.0   # 고등급(TS/S1) 미탐율 — 핵심 KPI
     confusion_matrix: list[list[int]] = field(default_factory=list)
     classification_report: str = ""
@@ -1413,6 +1415,7 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         acc = accuracy_score(test_y, preds)
         p, r, f, _ = precision_recall_fscore_support(test_y, preds, average="macro", zero_division=0)
         report = classification_report(test_y, preds, target_names=_LABEL_LIST, zero_division=0)
+        evaluation_finished_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
 
         out_dir = Path(spec.output_dir) / f"v-{run.info.run_id[:8]}"
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -1512,6 +1515,7 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
             f1_macro=float(f),
             fnr_overall=float(fnr),
             fnr_by_grade=fnr_by,
+            evaluated_at=evaluation_finished_at,
             fnr_high=float(fnr_high),
             confusion_matrix=cm.tolist(),
             classification_report=report,

@@ -88,33 +88,35 @@ def _render_console_login_html() -> str:
     return (
         '<!doctype html><html lang="ko"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<title>한국지식재산보호원 | 골든셋 검수 로그인</title><style>"
-        ":root{--ink:#111;--red:#e72d44;--line:#dededb;--mute:#70757a}"
+        "<title>한국지식재산보호원 | 관리 콘솔 로그인</title><style>"
+        ":root{--ink:#0b1f3a;--accent:#1b4ea8;--line:#dbe3ef;--mute:#667085;--canvas:#f5f7fb;--panel:#fff}"
         # [2026-08-21] 로그인 화면만 Arial 이었다 — 다섯 화면 한 벌로 맞춘다.
-        '*{box-sizing:border-box}body{margin:0;color:var(--ink);font:15px -apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}'
+        '*{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink);font:15px -apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}'
         # [2026-08-20] .top/.mark/.brand/.product 를 여기서 따로 갖고 있었고 값이 검수
         # 화면과 달랐다(높이 86 vs 84 · padding 40 vs 34 · 자간 2 vs 1px). 다섯 화면을
         # 합치면서 console_nav.HEADER_CSS 한 곳으로 옮겼다.
-        ".wrap{max-width:720px;margin:0 auto;padding:64px 40px}"
-        ".eyebrow{font:700 12px monospace;letter-spacing:1px;color:#8d949b}"
+        ".wrap{max-width:720px;margin:46px auto;padding:46px 48px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 45px rgba(15,42,82,.10)}"
+        ".eyebrow{font:800 11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:1px;color:var(--accent)}"
         "h1{font-size:40px;line-height:1.1;letter-spacing:-2px;margin:14px 0 10px}"
-        "h1 em{font-style:normal;color:var(--red)}p{line-height:1.7;color:#535960}"
-        "textarea{width:100%;height:150px;border:1px solid #cfd0ce;padding:13px;font:13px monospace;"
+        "h1 em{font-style:normal;color:var(--accent)}p{line-height:1.7;color:#475467}"
+        "textarea{width:100%;height:150px;border:1px solid var(--line);border-radius:8px;padding:13px;font:13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;"
         "word-break:break-all}"
-        "input[type=text],input[type=password]{width:100%;border:1px solid #cfd0ce;padding:13px;"
+        "input[type=text],input[type=password]{width:100%;border:1px solid var(--line);border-radius:8px;padding:13px;"
         "font:15px inherit;margin-top:10px}"
-        "button{margin-top:18px;width:100%;border:0;background:#111;color:#fff;"
-        "padding:15px;font-weight:800;font-size:15px;cursor:pointer}"
-        ".msg{margin-top:16px;padding:14px;background:#fff0f1;color:#a31429;display:none}"
-        ".note{border-left:4px solid var(--red);padding:16px 20px;background:#fafafa;margin:24px 0}"
+        "textarea:focus,input:focus{outline:2px solid rgba(27,78,168,.24);outline-offset:1px;border-color:var(--accent)}"
+        "button{margin-top:18px;width:100%;border:0;border-radius:8px;background:var(--ink);color:#fff;"
+        "padding:15px;font-weight:800;font-size:15px;cursor:pointer}button:hover{background:var(--accent)}"
+        ".msg{margin-top:16px;padding:14px;border-radius:8px;background:#fff1f2;color:#b42318;display:none}"
+        ".note{border-left:4px solid var(--accent);padding:16px 20px;border-radius:0 8px 8px 0;background:#f4f7fc;margin:24px 0}"
         ".divider{display:flex;align-items:center;gap:14px;margin:40px 0 24px;color:var(--mute);font-size:13px}"
+        "@media(max-width:760px){.wrap{margin:22px 14px;padding:32px 24px}h1{font-size:32px}}"
         ".divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--line)}"
         + HEADER_CSS + NAV_CSS +
         "</style><body>"
         # 로그인 화면은 아직 쿠키가 없다 - 메뉴를 눌러도 401 이 정상이다.
         # 그래도 '어떤 화면들이 있는지' 를 보여주는 것이 주소를 외우게 하는 것보다 낫다.
-        + header_html("검증문서 검수 로그인", exclude=REVIEW_SCREEN_EXCLUDE, show_logout=False)
-        + '<main class="wrap"><div class="eyebrow">CONSOLE ACCESS</div>'
+        + header_html("관리 콘솔 로그인", exclude=REVIEW_SCREEN_EXCLUDE, show_logout=False)
+        + '<main class="wrap"><div class="eyebrow">관리 콘솔 인증</div>'
         "<h1>아이디와 <em>비밀번호</em>로<br>로그인합니다.</h1>"
         "<p>발급받은 아이디와 비밀번호를 입력하십시오. 이 브라우저에만 로그인 상태가 저장됩니다.</p>"
         '<div class="note">누가 등급을 정했는지 기록에 남기기 위해 공유 계정으로는 열 수 없습니다. '
@@ -185,6 +187,17 @@ def proxy_gold_console_login_html() -> HTMLResponse:
 _PASSWORD_LOGIN_TTL_SECONDS = 60 * 86400
 
 
+def _request_uses_https(request: Request) -> bool:
+    """TLS 역프록시 뒤의 실제 브라우저 요청이면 Secure 쿠키를 쓴다.
+
+    개발·설치 리허설의 loopback HTTP 로그인도 지원해야 하므로 무조건 Secure로 고정하지는
+    않는다. 콘솔 프록시는 ``X-Forwarded-Proto``를 설정하므로, 그 경로에서는 브라우저가
+    평문 HTTP 연결로 세션 쿠키를 재전송하지 않게 한다.
+    """
+    forwarded = (request.headers.get("x-forwarded-proto") or "").split(",", 1)[0].strip().lower()
+    return request.url.scheme.lower() == "https" or forwarded == "https"
+
+
 @html_router.post("/golden/candidates/login", summary="검수자 아이디+비밀번호 로그인")
 @limiter.limit("10/minute")
 def proxy_gold_console_password_login(request: Request, body: ReviewerLoginRequest) -> Response:
@@ -207,7 +220,12 @@ def proxy_gold_console_password_login(request: Request, body: ReviewerLoginReque
     resp = JSONResponse({"ok": True, "username": body.username, "roles": list(roles)})
     resp.set_cookie(
         "koipa_access_token", token, max_age=_PASSWORD_LOGIN_TTL_SECONDS,
-        path="/", samesite="lax",
+        # 비밀번호 로그인은 서버가 직접 Set-Cookie 하므로 브라우저 JavaScript가 토큰을
+        # 읽을 이유가 없다. HttpOnly로 고정해 XSS가 검수자 세션 JWT를 탈취하지 못하게
+        # 한다. (토큰 붙여넣기 레거시 경로는 document.cookie를 써야 하므로 별도이다.)
+        # HTTPS 콘솔 프록시 경로에서는 Secure도 설정한다. loopback HTTP 설치 리허설은
+        # 쿠키를 받지 못하게 되는 것을 피하기 위해 실제/전달된 스킴을 따른다.
+        path="/", samesite="lax", httponly=True, secure=_request_uses_https(request),
     )
     return resp
 

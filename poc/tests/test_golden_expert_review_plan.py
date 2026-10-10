@@ -114,6 +114,11 @@ def test_expert_plan_endpoint_records_an_auditable_atomic_group(monkeypatch, tmp
             return _index()
 
     monkeypatch.setattr(golden, "ProxyGoldCandidateService", FakeService)
+    monkeypatch.setattr(
+        golden.reviewer_credentials,
+        "list_accounts",
+        lambda: [{"username": reviewer, "roles": ("reviewer",), "active": True} for reviewer in REVIEWERS],
+    )
     monkeypatch.setattr(settings, "golden_reviewer_assignment_enforced", True)
     monkeypatch.setattr(settings, "golden_review_blind_enforced", True)
     out = golden.golden_expert_review_plan(
@@ -126,3 +131,44 @@ def test_expert_plan_endpoint_records_an_auditable_atomic_group(monkeypatch, tmp
     assert {row["assignment_group_id"] for row in access.AssignmentLedger(tmp_path).read_events()} == {
         out.assignment_group_id
     }
+
+
+def test_expert_plan_refuses_unprovisioned_reviewer_before_writing(monkeypatch, tmp_path):
+    class FakeService:
+        root = tmp_path
+
+        @staticmethod
+        def review_batch_index():
+            return _index()
+
+    monkeypatch.setattr(golden, "ProxyGoldCandidateService", FakeService)
+    monkeypatch.setattr(
+        golden.reviewer_credentials,
+        "list_accounts",
+        lambda: [{"username": reviewer, "roles": ("reviewer",), "active": True} for reviewer in REVIEWERS[:-1]],
+    )
+    monkeypatch.setattr(settings, "golden_reviewer_assignment_enforced", True)
+    monkeypatch.setattr(settings, "golden_review_blind_enforced", True)
+    with pytest.raises(golden.HTTPException) as denied:
+        golden.golden_expert_review_plan(
+            GoldenExpertReviewPlanRequest(review_batch=BATCH, reviewer_ids=REVIEWERS), _auth(),
+        )
+    assert denied.value.status_code == 422
+    assert "명부에 없는 ID" in str(denied.value.detail)
+    assert access.AssignmentLedger(tmp_path).read_events() == []
+
+
+def test_reviewer_roster_exposes_only_active_reviewer_accounts(monkeypatch):
+    monkeypatch.setattr(
+        golden.reviewer_credentials,
+        "list_accounts",
+        lambda: [
+            {"username": "expert-a", "roles": ("reviewer",), "active": True},
+            {"username": "suspended", "roles": ("reviewer",), "active": False},
+            {"username": "admin-only", "roles": ("admin",), "active": True},
+        ],
+    )
+
+    assert [entry.model_dump() for entry in golden.golden_reviewer_roster()] == [
+        {"reviewer_id": "expert-a", "roles": ["reviewer"]},
+    ]

@@ -137,6 +137,39 @@ export const scenarios = [
   },
 
   {
+    id: 'monitor.audit.actor-time-and-page-filter',
+    title: '감사 로그를 행위자·기간으로 좁히고 다음 쪽으로 이동한다',
+    why: '운영 사고를 특정 담당자·시간대에서 추적할 수 있어야 최신 50건만 보는 관제가 되지 않는다',
+    needsMock: true,
+    async run({ server, check }) {
+      server.overrides['GET /admin/audit-log'] = {
+        items: [{ occurred_at: '2026-10-05T01:00:00Z', action: 'model.activate', actor_id: 'admin-kim', actor_role: 'admin', target_type: 'model', target_id: 'v-test', success: true, error_code: null, ip_address: null, request_id: null }],
+        total: 51, limit: 50, offset: 0, actorless_ratio: 0, warnings: [],
+      };
+      const page = await auditTab(server);
+      page.set('au-actor', 'admin-kim');
+      page.set('au-from', '2026-10-01T09:00');
+      page.set('au-to', '2026-10-31T18:00');
+      page.click(page.q('button[onclick="loadAuditLog()"]'));
+      await page.settle();
+
+      const first = new URL(server.lastCall('GET', '/admin/audit-log')?.path || '/', 'http://e2e');
+      check.eq(first.searchParams.get('actor_id'), 'admin-kim', '행위자 필터가 실렸다');
+      check.ok(first.searchParams.has('occurred_from') && first.searchParams.has('occurred_to'), '기간 필터가 UTC 질의로 실렸다');
+      check.eq(first.searchParams.get('offset'), '0', '첫 쪽은 0부터 읽는다');
+      check.eq(page.$('au-next')?.disabled, false, '다음 쪽이 있으면 버튼이 열린다');
+
+      page.click(page.q('#au-next'));
+      await page.settle();
+      const next = new URL(server.lastCall('GET', '/admin/audit-log')?.path || '/', 'http://e2e');
+      check.eq(next.searchParams.get('offset'), '50', '다음 쪽은 offset 50을 보낸다');
+      check.includes(page.text('au-page'), '51', '현재 쪽 범위가 표시된다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     id: 'monitor.audit.empty-and-failure',
     title: '기록이 없을 때와 조회가 실패했을 때를 구분해 말한다',
     needsMock: true,

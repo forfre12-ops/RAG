@@ -9,7 +9,6 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import hmac
-import html as _html
 import re
 from uuid import UUID
 
@@ -30,6 +29,7 @@ from koipa.schemas.golden import (
     GoldenAssignmentResponse,
     GoldenExpertReviewPlanRequest,
     GoldenExpertReviewPlanResponse,
+    GoldenReviewerRosterEntry,
     GoldenAssignmentStatusResponse,
     GoldenBuildRequest,
     GoldenBuildResponse,
@@ -56,10 +56,12 @@ from koipa.services.golden_build_service import (
     display_source_path,
 )
 from koipa.services import golden_reviewer_access as access
+from koipa.services import reviewer_credentials
 from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService, normalize_doc_id
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
 from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
 from koipa.console_nav import HEADER_CSS, NAV_CSS, header_html, upload_progress_js
+from koipa.console_state import render_console_state_html
 
 # 한국지식재산보호원 심볼 — 폐쇄망이라 외부 이미지를 못 쓰고, 원본 파일도 리포에 없어
 # (있는 것은 Koipa 로고 3종뿐) 제공받은 도안을 보고 벡터로 옮긴 **근사본**이다.
@@ -657,9 +659,68 @@ def proxy_gold_candidate_promote(
 # 요청 본문이 아니라 서버가 확정한 포털 JWT sub 다(_console_actor_id — 본문의 자칭을 받지 않는다).
 # 손잡이(golden_reviewer_assignment_enforced)가 꺼져 있으면 배정은 **기록만** 되고 검수자에게는
 # 여전히 전체가 보인다 — 응답의 assignment_enforced 가 그 사실을 알려 준다.
+def _active_reviewer_roster() -> dict[str, GoldenReviewerRosterEntry]:
+    """파일 기반 계정 저장소에서 활성 reviewer만 정규화해 읽는다.
+
+    이 명부는 외부 인사 시스템을 흉내 내지 않는다. 현재 배포본에서 실제로 비밀번호
+    로그인·JWT 발급이 가능한 계정의 최소 권한 근거다. 해시나 비밀번호는 이 경로로
+    절대 반환하지 않는다.
+    """
+    try:
+        accounts = reviewer_credentials.list_accounts()
+    except reviewer_credentials.ReviewerCredentialError as exc:
+        raise HTTPException(status_code=503, detail="검수자 계정 명부를 읽을 수 없습니다") from exc
+
+    roster: dict[str, GoldenReviewerRosterEntry] = {}
+    for account in accounts:
+        roles = [str(role) for role in account.get("roles", ())]
+        if not bool(account.get("active", True)) or "reviewer" not in roles:
+            continue
+        try:
+            reviewer_id = access.norm_id(str(account.get("username") or ""))
+        except ValueError:
+            continue
+        if reviewer_id in roster:
+            raise HTTPException(
+                status_code=503,
+                detail="검수자 계정 명부에 정규화 후 중복된 ID가 있습니다",
+            )
+        roster[reviewer_id] = GoldenReviewerRosterEntry(reviewer_id=reviewer_id, roles=roles)
+    return roster
+
+
+def _require_active_reviewer_accounts(reviewer_ids: list[str]) -> None:
+    """배정 강제 운영에서는 원장 쓰기 전에 로그인 가능한 reviewer인지 확인한다."""
+    if not bool(getattr(settings, "golden_reviewer_assignment_enforced", False)):
+        return
+    roster = _active_reviewer_roster()
+    missing = sorted({access.norm_id(value) for value in reviewer_ids} - set(roster))
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "활성 검수자 계정 명부에 없는 ID입니다: " + ", ".join(missing[:20])
+                + (f" (+{len(missing) - 20} more)" if len(missing) > 20 else "")
+            ),
+        )
+
+
+@router.get(
+    "/golden/reviewers",
+    response_model=list[GoldenReviewerRosterEntry],
+    dependencies=[Depends(require_role("admin", "kl_backend"))],
+    summary="배정 가능한 활성 검수자 계정 목록",
+)
+def golden_reviewer_roster() -> list[GoldenReviewerRosterEntry]:
+    """관리자에게만 활성 reviewer 계정 ID를 제공한다(비밀번호·해시는 미노출)."""
+    return list(_active_reviewer_roster().values())
+
+
 def _apply_assignment(
     event: str, req: GoldenAssignmentRequest, auth: dict,
 ) -> GoldenAssignmentResponse:
+    if event == access.EVENT_ASSIGN:
+        _require_active_reviewer_accounts([req.reviewer_id])
     actor_id = _console_actor_id(auth)
     svc = ProxyGoldCandidateService()
     index = svc.review_batch_index()
@@ -742,6 +803,7 @@ def golden_expert_review_plan(
             status_code=409,
             detail="expert review plan requires GOLDEN_REVIEW_BLIND_ENFORCED=1",
         )
+    _require_active_reviewer_accounts(req.reviewer_ids)
     actor_id = _console_actor_id(auth)
     svc = ProxyGoldCandidateService()
     ledger = access.AssignmentLedger(svc.root)
@@ -931,38 +993,41 @@ def _job_gate_html(job_id: UUID) -> HTMLResponse | None:
         # API 재시작에 잡이 사라지고, Redis 라도 TTL 이 있다. 재등록은 멱등이라 관리자가
         # 스크립트를 한 번 더 돌리면 끝난다. 그 사실을 화면에서 알려 준다.
         return HTMLResponse(
-            content="<!doctype html><meta charset=utf-8>"
-            "<body style='font-family:sans-serif;padding:40px;line-height:1.7'>"
-            "<h2>이 검수 잡이 서버에 없습니다</h2>"
-            f"<p>job {_html.escape(str(job_id))}</p>"
-            "<p>링크가 잘못된 것이 아닙니다. 골든 빌드 잡은 API 재시작이나 보관 기간 만료로 "
-            "사라질 수 있습니다.</p>"
-            "<p><b>관리자에게 재등록을 요청하세요.</b> 재등록은 멱등이며, 같은 후보 파일이면 "
-            "기존 잡을 재사용합니다 — 검수 내용은 사라지지 않습니다.</p>"
-            "<pre style='background:#f6f6f4;padding:12px;border-radius:4px;white-space:pre-wrap'>"
-            "python3 scripts/register_review_signoff_job.py \\\n"
-            "    --base-url &lt;서버&gt; --actor &lt;실계정&gt; --token &lt;관리자 토큰&gt;</pre>"
-            "<p style='color:#70757a;font-size:13px'>재등록하면 새 주소(?t= 포함)가 인쇄됩니다. "
-            "그 주소를 통째로 받아 여세요.</p></body>",
+            content=render_console_state_html(
+                title="이 검수 잡을 찾을 수 없습니다",
+                eyebrow="REVIEW JOB UNAVAILABLE",
+                message="링크가 잘못된 것이 아닙니다. API 재시작 또는 보관 기간 만료로 잡 정보가 사라진 경우일 수 있습니다.",
+                detail=(
+                    f"잡 ID: {job_id}\n\n관리자에게 재등록을 요청하세요. 재등록은 멱등이며 같은 후보 파일이면 기존 "
+                    "후보를 재사용하고, 기존 검수 원장을 지우지 않습니다.\n\n"
+                    "관리자 명령: python3 scripts/register_review_signoff_job.py\n"
+                    "재등록 뒤 새 서명 URL(?t= 포함)을 통째로 받으십시오."
+                ),
+                tone="warning",
+            ),
             status_code=404,
         )
     status = getattr(st, "status", None)
     if status in ("queued", "running", "pending"):
         return HTMLResponse(
-            content="<!doctype html><meta charset=utf-8>"
-            "<body style='font-family:sans-serif;padding:40px'>"
-            f"<h2>골든 빌드 진행 중…</h2><p>job {job_id} · status={_html.escape(str(status))}. "
-            "완료 후 이 페이지를 새로고침하세요.</p></body>",
+            content=render_console_state_html(
+                title="골든 빌드를 준비하고 있습니다",
+                eyebrow="REVIEW JOB IN PROGRESS",
+                message="후보 검수 화면은 생성이 완료된 뒤에 열립니다. 잠시 후 이 페이지를 새로고침하세요.",
+                detail=f"잡 ID: {job_id}\n현재 상태: {status}",
+            ),
             status_code=202,
         )
     if status == "failed":
         err = getattr(st, "error", None) or "(사유 미기록)"
         return HTMLResponse(
-            content="<!doctype html><meta charset=utf-8>"
-            "<body style='font-family:sans-serif;padding:40px'>"
-            "<h2 style='color:#dc2626'>골든 빌드 실패</h2>"
-            f"<p>job {job_id}</p><pre style='background:#fef2f2;padding:12px;border-radius:8px;"
-            f"white-space:pre-wrap'>{_html.escape(str(err))}</pre></body>",
+            content=render_console_state_html(
+                title="골든 빌드가 완료되지 않았습니다",
+                eyebrow="REVIEW JOB FAILED",
+                message="검수 결정을 시작하지 않았습니다. 관리자에게 아래 사유와 잡 ID를 전달해 재빌드 여부를 확인하세요.",
+                detail=f"잡 ID: {job_id}\n실패 사유: {err}",
+                tone="danger",
+            ),
             status_code=200,
         )
     return None

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 from typing import Optional
 
@@ -26,6 +27,7 @@ from koipa.modules.m6_evaluation.metrics import (
     _fetch_truth_pred_pairs,
 )
 from koipa.schemas.metrics import ConfusionMatrix, MetricsHistory, MetricsReport
+from koipa.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -122,9 +124,14 @@ class MetricsService:
     @staticmethod
     def _from_stored(mv: ModelVersion) -> MetricsReport:
         m = mv.metrics or {}
+        trained_at = mv.trained_at.isoformat() if mv.trained_at else None
+        evaluated_at = m.get("evaluated_at") or None
         return MetricsReport(
             model_version=mv.version_label,
-            measured_at=mv.trained_at.isoformat() if mv.trained_at else None,
+            measured_at=evaluated_at or trained_at,
+            evaluated_at=evaluated_at,
+            trained_at=trained_at,
+            metric_timestamp_source="evaluation" if evaluated_at else ("training_fallback" if trained_at else None),
             accuracy=m.get("accuracy"),
             precision_macro=m.get("precision_macro"),
             recall_macro=m.get("recall_macro"),
@@ -134,6 +141,7 @@ class MetricsService:
             sample_count=MetricsService._eval_sample_count(mv, m),
             eval_source=m.get("eval_source"),
             fnr_high=m.get("fnr_high"),
+            fnr_warning_threshold=float(getattr(settings, "metrics_fnr_warning_threshold", 0.05)),
         )
 
     @staticmethod
@@ -161,9 +169,13 @@ class MetricsService:
 
     @staticmethod
     def _from_m6(live: MetricsResult, mv: ModelVersion) -> MetricsReport:
+        evaluated_at = dt.datetime.now(dt.timezone.utc).isoformat()
         return MetricsReport(
             model_version=mv.version_label,
-            measured_at=mv.trained_at.isoformat() if mv.trained_at else None,
+            measured_at=evaluated_at,
+            evaluated_at=evaluated_at,
+            trained_at=mv.trained_at.isoformat() if mv.trained_at else None,
+            metric_timestamp_source="live_evaluation",
             accuracy=live.accuracy,
             precision_macro=live.precision_macro,
             recall_macro=live.recall_macro,
@@ -171,4 +183,5 @@ class MetricsService:
             fnr_overall=live.fnr_overall,
             fnr_by_grade=live.fnr_by_grade,
             sample_count=live.sample_count,
+            fnr_warning_threshold=float(getattr(settings, "metrics_fnr_warning_threshold", 0.05)),
         )

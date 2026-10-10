@@ -104,3 +104,30 @@ def verify_password(username: str, password: str, *, path: Path | str | None = N
 
 def list_usernames(*, path: Path | str | None = None) -> list[str]:
     return sorted(_load(_resolve(path)).keys())
+
+
+def list_accounts(*, path: Path | str | None = None) -> list[dict[str, object]]:
+    """관리자가 배정에 사용할 수 있는 **비밀 없는** 계정 명부를 돌려준다.
+
+    비밀번호 해시나 생성 시각은 관리 화면에도 줄 이유가 없다. 다만 계정이 실제로
+    로그인 가능한 검수자 역할인지 확인하지 않고 임의 문자열을 배정하면, 20×50 배정이
+    원장에는 남아도 사람이 열 수 없는 문서 묶음이 된다. 기존 파일에는 ``active``가
+    없으므로 하위호환상 활성으로 해석한다.
+    """
+    data = _load(_resolve(path))
+    out: list[dict[str, object]] = []
+    for raw_username, raw_record in data.items():
+        username = str(raw_username).strip()
+        record = raw_record if isinstance(raw_record, dict) else {}
+        if not username:
+            continue
+        roles = tuple(
+            str(role).strip() for role in (record.get("roles") or ("reviewer",))
+            if str(role).strip()
+        )
+        out.append({
+            "username": username,
+            "roles": roles,
+            "active": bool(record.get("active", True)),
+        })
+    return sorted(out, key=lambda item: str(item["username"]))

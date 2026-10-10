@@ -230,7 +230,7 @@ export const scenarios = [
       check.includes(cards, 'F1', 'F1 카드가 있다');
       check.data.includes(page.bodyText(), 'hardened42', '이 수치가 어느 셋에서 나왔는지 밝힌다');
       check.includes(page.bodyText(), '섞어 인용하지', '다른 셋과 섞지 말라는 경고가 있다');
-      check.includes(page.html('metrics-extra'), '등급별 FNR', '등급별 FNR 이 보인다');
+      check.includes(page.html('metrics-extra'), '등급별 미탐률(FNR)', '등급별 미탐률이 보인다');
 
       page.click(page.q('button[onclick="loadHistory()"]'));
       await page.settle();

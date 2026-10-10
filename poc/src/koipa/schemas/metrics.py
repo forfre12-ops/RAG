@@ -10,6 +10,11 @@ from pydantic import BaseModel
 class MetricsReport(BaseModel):
     model_version: str
     measured_at: Optional[str] = None
+    # measured_at의 실제 의미를 분리한다. 과거 레코드는 학습완료 시각만 있어 그 사실을
+    # 숨기지 않고 training_fallback으로 표시한다.
+    evaluated_at: Optional[str] = None
+    trained_at: Optional[str] = None
+    metric_timestamp_source: Optional[str] = None
     accuracy: Optional[float] = None
     precision_macro: Optional[float] = None
     recall_macro: Optional[float] = None
@@ -25,6 +30,9 @@ class MetricsReport(BaseModel):
     #     화면이 출처를 함께 띄운다.
     eval_source: Optional[str] = None
     fnr_high: Optional[float] = None
+    # 자동확정·배포 게이트가 아닌 콘솔 표시 경계. 서버가 내려 주므로 화면이 5%를
+    # 독자적으로 정책처럼 해석하지 않는다.
+    fnr_warning_threshold: Optional[float] = None
 
 
 class MetricsHistory(BaseModel):

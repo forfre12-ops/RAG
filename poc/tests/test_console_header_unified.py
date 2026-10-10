@@ -102,6 +102,20 @@ def test_login_screen_has_no_logout_link_other_screens_do():
         assert "logout-link" in head, f"{name}: 로그아웃 버튼이 없다"
 
 
+def test_login_uses_the_console_surface_and_focus_tokens():
+    """로그인이 과거의 빨간 단일 폼이 아니라 콘솔 패널 체계를 따른다."""
+    html = _render_console_login_html()
+    for fragment in (
+        "background:var(--canvas)",
+        "border-radius:14px",
+        "box-shadow:0 18px 45px",
+        "textarea:focus,input:focus",
+        "color:var(--accent)",
+    ):
+        assert fragment in html
+    assert "--red:#e72d44" not in html
+
+
 @pytest.mark.parametrize("name", list(_screens()))
 def test_old_header_skeletons_are_gone(name):
     """옛 골격이 남아 있으면 화면마다 상단이 두 개가 된다.

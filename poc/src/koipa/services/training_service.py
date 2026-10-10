@@ -56,7 +56,12 @@ def _advisory_xact_lock(db, _key=None) -> None:
 
 
 def _report_metrics(report: Any) -> dict:
-    """TrainReport(dataclass)/dict/객체 → metric dict 정규화 (ModelVersion.metrics 저장용)."""
+    """TrainReport(dataclass)/dict/객체 → metric dict 정규화 (ModelVersion.metrics 저장용).
+
+    여기서 저장 시각을 평가 시각으로 만들어 넣지 않는다. 과거 report를 나중에 등록해도
+    평가가 그 순간 실행된 것은 아니기 때문이다. 실제 학습 평가는 trainer가 test 예측을
+    끝낸 시점의 ``evaluated_at``을 명시해 넘긴다.
+    """
     if isinstance(report, dict):
         return dict(report)
     if dataclasses.is_dataclass(report) and not isinstance(report, type):

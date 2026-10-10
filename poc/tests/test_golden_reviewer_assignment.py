@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from koipa.api import _jwt_auth
+from koipa.api import _jwt_auth, golden
 from koipa.api._jwt_auth import JWTClaims, require_auth
 from koipa.api.app import app
 from koipa.config import Settings, settings
@@ -81,6 +81,19 @@ def make_auth(role: str, sub: str) -> dict:
 def set_flags(monkeypatch, *, assignment: bool = False, blind: bool = False) -> None:
     monkeypatch.setattr(settings, "golden_reviewer_assignment_enforced", assignment)
     monkeypatch.setattr(settings, "golden_review_blind_enforced", blind)
+    if assignment:
+        # 배정 강제 운영 경로는 활성 reviewer 계정만 받을 수 있다. 이 격리 시험의
+        # 임시 인물도 실제 계정 명부와 같은 계약을 통해서만 배정되게 한다.
+        monkeypatch.setattr(
+            golden.reviewer_credentials,
+            "list_accounts",
+            lambda: [
+                {"username": "expert-a", "roles": ("reviewer",), "active": True},
+                {"username": "expert-b", "roles": ("reviewer",), "active": True},
+                {"username": "expert-c", "roles": ("reviewer",), "active": True},
+                {"username": "지재원관리자", "roles": ("reviewer",), "active": True},
+            ],
+        )
 
 
 class Harness:
@@ -675,6 +688,7 @@ ROUTE_TABLE: dict[tuple[str, str], str] = {
     ("POST", "/golden/assignments/expert-review-plan"): ADMIN_ONLY,
     ("POST", "/golden/assignments/revoke"): ADMIN_ONLY,
     ("GET", "/golden/assignments"): ADMIN_ONLY,
+    ("GET", "/golden/reviewers"): ADMIN_ONLY,
     ("GET", "/golden/candidates"): REVIEWER_SCOPED,
     ("GET", "/golden/candidates/summary"): REVIEWER_SCOPED,
     ("GET", "/golden/candidates/category-stats"): ADMIN_ONLY,
@@ -735,6 +749,7 @@ def test_admin_only_routes_are_403_for_reviewers_under_every_flag_combination(h,
         ("POST", "/golden/assignments/expert-review-plan"): {"json": {}},
         ("POST", "/golden/assignments/revoke"): {"json": {}},
         ("GET", "/golden/assignments"): {},
+        ("GET", "/golden/reviewers"): {},
         ("GET", "/golden/candidates/category-stats"): {},
         ("POST", "/golden/candidates/export"): {"json": {}},
     }

@@ -17,6 +17,7 @@ def test_healthz_ok():
         body = r.json()
         assert body["status"] == "ok"
         assert "uptime_sec" in body
+        assert len(body["build"]["console_admin_html_sha256"]) == 64
 
 
 def test_classify_requires_api_key():
