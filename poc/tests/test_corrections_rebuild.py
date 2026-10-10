@@ -14,10 +14,9 @@ import uuid
 from pathlib import Path
 
 import pytest
-from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from koipa.db import SessionLocal, engine, session_scope
+from koipa.db import SessionLocal, session_scope
 from koipa.db.models import (
     Chunk,
     Classification,
@@ -129,13 +128,7 @@ def test_admission_bypass_when_disabled():
 # ── DB-backed ────────────────────────────────────────────────────────────────
 
 
-def _pg_ok() -> bool:
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return True
-    except Exception:  # noqa: BLE001
-        return False
+from _pg_probe import postgres_available
 
 
 def db_backed(obj):
@@ -145,7 +138,7 @@ def db_backed(obj):
 
 @pytest.fixture
 def require_pg():
-    if not _pg_ok():
+    if not postgres_available():
         pytest.skip("Postgres not reachable")
 
 

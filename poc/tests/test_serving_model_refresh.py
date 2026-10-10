@@ -165,18 +165,6 @@ def test_same_model_dir_normalizes():
     assert not cs._same_model_dir("a/b", "a/c")
 
 
-def _pg_ok() -> bool:
-    try:
-        from sqlalchemy import text
-
-        from koipa.db import engine
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return True
-    except Exception:  # noqa: BLE001
-        return False
-
-
 def test_follows_active_version_through_real_db(svc, tmp_path, monkeypatch):
     """ORM 경로(TrainingRepo.get_active)를 **실제 DB** 로 태운다.
 
@@ -184,7 +172,8 @@ def test_follows_active_version_through_real_db(svc, tmp_path, monkeypatch):
     시험들은 초록인 채로 실제 조회만 실패한다(2026-09-11 표준명 개명 직후라 특히). 활성 버전을
     심고 → 엄격 조회가 그 경로를 돌려주는지 → 주기 확인이 실제로 따라가는지까지 한 번에 본다.
     """
-    if not _pg_ok():
+    from _pg_probe import postgres_available
+    if not postgres_available():
         pytest.skip("Postgres not reachable")
     import uuid
 

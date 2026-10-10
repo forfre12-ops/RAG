@@ -9,7 +9,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from sqlalchemy import text
 
 from koipa.services.confirm_service import _apply_dual_review_gate
 
@@ -155,14 +154,7 @@ def test_new_reviewer_trusted_by_default(monkeypatch):
 # ── DB-backed: relabel 경로 통합 ─────────────────────────────────────────────
 
 
-def _pg_ok() -> bool:
-    from koipa.db import engine
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return True
-    except Exception:  # noqa: BLE001
-        return False
+from _pg_probe import postgres_available
 
 
 def db_backed(obj):
@@ -172,7 +164,7 @@ def db_backed(obj):
 
 @pytest.fixture
 def require_pg():
-    if not _pg_ok():
+    if not postgres_available():
         pytest.skip("Postgres not reachable")
 
 

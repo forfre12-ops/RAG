@@ -16,27 +16,18 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from sqlalchemy import text
 
 import koipa.config as config_mod
-from koipa.db import engine, session_scope
+from koipa.db import session_scope
 from koipa.db.models import ModelVersion
 from koipa.repositories.training_repo import TrainingRepo
 from koipa.services.training_service import activate_model_manually
-
-
-def _pg_ok() -> bool:
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return True
-    except Exception:  # noqa: BLE001
-        return False
+from _pg_probe import postgres_available
 
 
 @pytest.fixture(autouse=True)
 def _require_pg():
-    if not _pg_ok():
+    if not postgres_available():
         pytest.skip("Postgres not reachable")
 
 
