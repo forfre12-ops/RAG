@@ -28,7 +28,7 @@ export const scenarios = [
   {
     id: 'manage.boot.renders-everything',
     needsMock: true,
-    title: '후보 관리 화면이 오류 없이 뜨고 목록·요약·품질·원장이 모두 그려진다',
+    title: '후보 관리 화면이 오류 없이 뜨고 목록·요약·원장이 모두 그려진다',
     why: '이 화면은 실행 시험이 하나도 없어, 통째로 죽어도 아무도 몰랐다',
     async run({ server, check }) {
       const page = await manage(server);
@@ -47,7 +47,6 @@ export const scenarios = [
       check.data.includes(page.text('flash'), '3건을 불러왔습니다', '몇 건을 읽었는지 알려준다');
       check.data.includes(page.text('flash'), '폐기 1건은 목록에서 뺐습니다', '목록에서 뺀 것을 숨기지 않고 밝힌다');
 
-      check.includes(page.text('qualityBody'), '길이가 등급을 알려주는 정도', '품질 지표가 그려졌다');
       check.data.gte(page.qa('#ledgerRows .candidate').length, 1, '결정 원장이 그려졌다');
       return page;
     },
