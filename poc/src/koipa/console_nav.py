@@ -242,9 +242,8 @@ def header_html(product: str, current: str = "", *, trailing: str = "",
         (
             '<a href="#" class="logout-link" '
             "onclick=\"fetch('/api/v1/golden/candidates/logout',{method:'POST',credentials:'same-origin'})"
-            ".then(function(r){if(!r.ok)throw new Error('logout');"
-            "location.href='/api/v1/golden/candidates/login.html'})"
-            ".catch(function(){alert('로그아웃 처리에 실패했습니다. 다시 시도하십시오.')});return false\">로그아웃</a>"
+            ".finally(function(){location.href='/api/v1/golden/candidates/login.html'});"
+            "return false\">로그아웃</a>"
         )
         if show_logout
         else ""

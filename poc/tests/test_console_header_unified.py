@@ -107,6 +107,7 @@ def test_login_screen_has_no_logout_link_other_screens_do():
         head = _header_of(screens[name])
         assert "logout-link" in head, f"{name}: 로그아웃 버튼이 없다"
         assert "/golden/candidates/logout" in head
+        assert ".finally(function(){location.href='/api/v1/golden/candidates/login.html'})" in head
         assert "document.cookie" not in head
 
 
