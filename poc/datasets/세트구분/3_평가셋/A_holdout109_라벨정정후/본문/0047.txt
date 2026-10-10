@@ -1,3 +1,0 @@
-Solid electrolyte composition trial
-
-Li6PS5Cl solid electrolyte synthesis with Li2S P2S5 LiCl molar ratio, milling rpm, thermal profile, ionic conductivity, and scale-up risk for all-solid-state batteries.

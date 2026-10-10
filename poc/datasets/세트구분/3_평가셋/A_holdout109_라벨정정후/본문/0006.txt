@@ -1,3 +1,0 @@
-Network rollout internal review
-
-Internal review of GHz band rollout, LTE fallback, equipment delivery risk, vendor schedule, and draft launch-readiness checklist.

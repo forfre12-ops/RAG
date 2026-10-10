@@ -1,3 +1,0 @@
-HSM master key ceremony procedure
-
-HSM master key generation, quorum rule, FIPS level control, root CA private-key storage, escrow procedure, and emergency rotation checklist.

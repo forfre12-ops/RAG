@@ -15,6 +15,14 @@ __pycache__/
 *.env.bak*
 poc/*.log
 
+# 2026-10-11 git-add-dash-a-incident-23a380d0 정리 — git add -A가 실수로 추적시킨 것들.
+# 다른 프로젝트 파일·스크래치 작업물·역할별 재구성 폴더로, 이 리포 코드와 무관하다.
+/driftkeeper_demo.sqlite
+/tmp/
+poc/to_replace_list.json
+poc/datasets/세트구분/
+poc/datasets/signoff_batch/
+
 # Data / artifacts (PoC)
 poc/datasets/raw/
 poc/datasets/external/

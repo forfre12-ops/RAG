@@ -1,3 +1,0 @@
-Private pricing model and margin table
-
-Cost structure, EBITDA bridge, BUY target-price assumption, customer-level discount band, and negotiation floor for strategic accounts.
