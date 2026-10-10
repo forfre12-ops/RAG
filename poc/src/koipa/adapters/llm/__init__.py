@@ -59,15 +59,18 @@ def build_provider(name: str | None = None) -> LLMProvider:
         from koipa.adapters.llm.local_openai_provider import LocalOpenAIProvider
 
         # Ollama는 기본 base_url/api_key가 다르므로 alias별 디폴트 주입.
+        # [2026-10-10] 컨테이너 안에서는 localhost가 컨테이너 자신을 가리켜 호스트 서버에
+        # 못 닿는다(로컬 e2e 실측 — noop_fallback으로 조용히 떨어짐) — google_base_url과 같은
+        # override 패턴으로 settings.ollama_base_url/lm_studio_base_url을 우선 쓴다.
         if chosen == "ollama":
             return LocalOpenAIProvider(
-                base_url="http://localhost:11434/v1",
+                base_url=getattr(settings, "ollama_base_url", "") or "http://localhost:11434/v1",
                 api_key="ollama",
                 provider_label="ollama",
             )
         if chosen == "lm_studio":
             return LocalOpenAIProvider(
-                base_url="http://localhost:1234/v1",
+                base_url=getattr(settings, "lm_studio_base_url", "") or "http://localhost:1234/v1",
                 api_key="lm-studio",
                 provider_label="lm_studio",
             )

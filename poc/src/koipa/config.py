@@ -473,6 +473,12 @@ class Settings(BaseSettings):
     anthropic_base_url: str = ""
     openai_base_url: str = ""
     google_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    # [2026-10-10] ollama/lm_studio는 build_provider()가 주소를 코드에 직접 박아 둬서(localhost
+    # 고정) 컨테이너 안에서는 호스트의 실제 서버에 닿을 수 없었다(로컬 e2e 실측 — ollama 호출이
+    # 전부 noop_fallback으로 떨어짐). google_base_url과 같은 override 패턴을 그대로 따른다 —
+    # 비워 두면 기존 하드코딩 기본값을 그대로 쓴다(하위호환, 값 안 주면 동작 안 바뀜).
+    ollama_base_url: str = ""
+    lm_studio_base_url: str = ""
 
     # 로컬 OpenAI 호환 endpoint (vLLM·Ollama·LM Studio·llama.cpp)
     # [2026-10-09] KL 요청(9/29 미팅, 요구사항 추적표 8절) — "QWEN 같은 중국 계열 모델을

@@ -1065,7 +1065,13 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
     # 이라 kwargs 가 비어, 검증부만 사후 기록하고 다운로드는 무핀이었다.
     _pinned_revision = _effective_base_revision(spec)
     revision_kwargs = {"revision": _pinned_revision} if _pinned_revision else {}
-    tok = AutoTokenizer.from_pretrained(spec.base_model, **revision_kwargs)
+    # [2026-10-10] HF_HUB_OFFLINE 만으로는 안 끊기는 배경 네트워크 호출이 있다(아래
+    # safetensors 변환검사 스레드류) — local_files_only=True 로 명시해 완전 차단한다.
+    # 로컬 e2e 실측: 이 플래그 없이 모델 로드까지는 되는데 그 직후 CPU 0%대로 멈춰 있었다
+    # (py-spy 로 스택을 못 봐 확정은 못 했지만, 네트워크 egress 가 막힌 환경에서 fire-and-forget
+    # 백그라운드 스레드가 응답 없는 소켓을 기다리는 쪽이 가장 유력).
+    _offline = bool(os.environ.get("HF_HUB_OFFLINE") or os.environ.get("TRANSFORMERS_OFFLINE"))
+    tok = AutoTokenizer.from_pretrained(spec.base_model, local_files_only=_offline, **revision_kwargs)
 
     def tokenize(batch):
         return tok(batch["text"], truncation=True, max_length=spec.max_seq_len)
@@ -1136,6 +1142,7 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         num_labels=len(_LABEL_LIST),
         id2label=_ID2LABEL,
         label2id=_LABEL2ID,
+        local_files_only=_offline,
         **revision_kwargs,
     )
     base_model_attestation = (
