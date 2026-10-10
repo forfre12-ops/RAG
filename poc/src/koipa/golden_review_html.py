@@ -30,7 +30,7 @@ from koipa.console_nav import (
     header_html,
 )
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
-from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
+from koipa.console_shell import REVIEWER_WORKSPACE_CSS, SHELL_CSS, SHELL_MEDIA_CSS
 
 # 검수·서명은 단독 HTML로도 전달될 수 있어 CSS 링크를 걸지 않는다. 대신 관리자·로그인과
 # 정확히 같은 정본 문자열을 인라인한다.
@@ -332,24 +332,24 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + DOC_CSS + """
 .result{margin:14px 0;padding:12px 16px;border-radius:var(--radius);font-size:13px;display:none}
 .result.ok{background:#f0fdf4;border:1px solid var(--c-s3);border-left:3px solid var(--c-s3);color:#166534;display:block}
 .result.err{background:#fef2f2;border:1px solid var(--c-ts);border-left:3px solid var(--c-ts);color:#991b1b;display:block}
-""" + HEADER_CSS + NAV_CSS + SHELL_MEDIA_CSS + """
+""" + HEADER_CSS + NAV_CSS + SHELL_MEDIA_CSS + REVIEWER_WORKSPACE_CSS + """
 </style>"""
 
 _SIGNOFF_BODY = r"""
 <body>
 __NAV__
-<div class="frame">
+<div class="frame reviewer-workspace">
   <aside class="side">
-    <div class="cap">CURRENT WORKSPACE</div>
-    <div class="workname">koipa-ai</div>
-    <div class="workdesc">Koipa AI Engine for KOIPA Trade-Secret System (PoC)</div>
-    <div class="branch">goldset/signoff</div>
-    <nav class="sidenav">
-      <a href="#s-overview" class="active"><span>01</span>개요</a>
-      <a href="#s-list"><span>02</span>후보 검수</a>
+    <div class="cap">검수 작업공간</div>
+    <div class="workname">내 검수 문서함</div>
+    <div class="workdesc">배정된 문서를 확인하고 등급 결정을 기록합니다.</div>
+    <div class="branch">REVIEWER / SIGN-OFF</div>
+    <nav class="sidenav" aria-label="검수 작업 메뉴">
+      <a href="#s-overview" class="active"><span>O</span>검수 현황</a>
+      <a href="#s-list"><span>D</span>문서 검수</a>
     </nav>
     <div class="ledger">
-      <div class="cap">SIGN-OFF IDENTITY</div>
+      <div class="cap">검수자 계정</div>
       <b id="who" class="who">확인 중…</b>
       <div>이 계정으로 기록됩니다</div>
     </div>
@@ -357,13 +357,13 @@ __NAV__
   <main class="main">
     <section id="s-overview" class="hero">
       <div>
-        <div class="eyebrow">GOLDEN SET SIGN-OFF</div>
-        <h1>검수한 것만<br><em>평가 정답</em>이 됩니다.</h1>
-        <p>job __JOB__ · 후보 __TOTAL__건. 승인·등급변경·거부를 고르고 서명하면
-           <b>locked_gold_eval</b>(사람 서명 평가정답)로 승격됩니다. 고르지 않은 후보는 제출에서 빠집니다.</p>
+        <div class="eyebrow">REVIEW WORKSPACE</div>
+        <h1>배정 문서를<br><em>검수하고 확정합니다.</em></h1>
+        <p>job __JOB__ · 후보 __TOTAL__건. 원문을 확인한 뒤 승인·등급변경·거부를 선택하고 서명하십시오.
+           고르지 않은 후보는 제출에서 제외되며, 결정은 이 계정의 검수 기록으로 남습니다.</p>
       </div>
       <aside class="gate">
-        <div class="glabel">서명 진행</div>
+        <div class="glabel">내 검수 진행</div>
         <strong id="deccount">–</strong>
         <p>등급별 최소 건수를 채워야 배포 게이트가 열립니다. 라이브에 반영하려면 아래를 체크하고 제출하십시오.</p>
         <label class="gchk"><input type="checkbox" id="publish"> 라이브 반영(publish)</label>
@@ -375,8 +375,8 @@ __NAV__
     <div class="result" id="result" role="status" aria-live="polite"></div>
     <section id="s-list" class="section">
       <div class="sectionTop">
-        <div><span class="secNum">02</span><h2 class="sechead">후보 검수</h2>
-        <p class="secdesc">문서 전문을 읽고 결정하십시오. 결정은 이 브라우저에 남아 창을 닫아도 사라지지 않습니다.</p></div>
+        <div><span class="secNum">D</span><h2 class="sechead">배정 문서 검수</h2>
+        <p class="secdesc">문서 전문과 판단 근거를 확인하고 결정하십시오. 임시 결정은 이 브라우저에 보존됩니다.</p></div>
       </div>
   <div class="rubric">
     <!-- [2026-08-21] 곱=4 를 S1 이라 가르치고 있었다. 실제 판정식은 TS 다 —

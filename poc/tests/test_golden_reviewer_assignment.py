@@ -786,6 +786,25 @@ def test_manage_html_carries_no_candidate_data_inline(h, monkeypatch):
         h.get(EXPERT_B, "/golden/candidates/manage.html").text
 
 
+def test_reviewer_manage_html_uses_the_reviewer_workspace_without_admin_actions(h):
+    """검수 문서함은 관리자와 같은 작업 셸을 쓰되 관리자 조작을 노출하지 않는다."""
+    html = h.get(EXPERT_A, "/golden/candidates/manage.html").text
+    for expected in (
+        'class="frame reviewer-workspace"',
+        'aria-label="검수 작업 메뉴"',
+        "검수 작업공간",
+        "내 검수 문서함",
+        "REVIEW WORKSPACE",
+        "내 검수 진행",
+        "내 결정 이력",
+        "#openUpload,#promote,#provBox{display:none!important}",
+    ):
+        assert expected in html
+    assert "CURRENT WORKSPACE" not in html
+    assert "goldset/console-review" not in html
+    assert 'href="/console/admin.html"' not in html
+
+
 # ══ 5. 이 시험이 정말 격리를 잠그는가 — 무력화하면 잡아내야 한다 ═══════════════════════════════
 
 

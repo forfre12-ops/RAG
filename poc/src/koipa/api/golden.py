@@ -61,7 +61,7 @@ from koipa.services import golden_reviewer_access as access
 from koipa.services import reviewer_credentials
 from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService, normalize_doc_id
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
-from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
+from koipa.console_shell import REVIEWER_WORKSPACE_CSS, SHELL_CSS, SHELL_MEDIA_CSS
 from koipa.console_nav import CONSOLE_THEME_CSS, HEADER_CSS, NAV_CSS, header_html, upload_progress_js
 from koipa.console_state import render_console_state_html
 
@@ -1436,7 +1436,12 @@ load(true);
 # 바꿀 필요가 없다.
 # 검수자(reviewer)로 연 후보 관리 화면에서 감추는 관리자 전용 조작 — 업로드 · 출처 기록 · 평가정답 승격.
 # 서버가 이미 403 으로 막는 조작이다(권한은 그대로). 늘 실패할 버튼을 보이지 않게 할 뿐이다.
-_REVIEWER_VIEW_CSS = "<style>#openUpload,#promote,#provBox{display:none!important}</style>"
+_REVIEWER_VIEW_CSS = (
+    "<style>"
+    "#openUpload,#promote,#provBox{display:none!important}"
+    + REVIEWER_WORKSPACE_CSS
+    + "</style>"
+)
 _REVIEWER_VIEW_NOTE = (
     '<div class="note" style="margin:10px 34px">검수자 권한으로 열었습니다 — 등급 결정과 서명을 할 수 '
     "있습니다. 문서 업로드 · 출처 기록 · 평가정답 승격은 관리자가 합니다.</div>"
@@ -1452,9 +1457,39 @@ def _as_reviewer_view(html: str) -> str:
     # 그대로 두되(관리자 세션이 관리자 콘솔로 돌아가는 것 자체는 새 권한이 아니다), reviewer
     # 응답에서만 이 replace 로 제거한다 — 검수자에게는 이 링크가 절대 나가지 않는다.
     html = html.replace('<a class="cnav-link" href="/console/admin.html">관리자 콘솔</a>', "", 1)
+    # 관리자 화면의 정보 구조를 따르되, 검수자가 자신에게 배정된 작업을 하고 있다는
+    # 사실이 분명해야 한다. 이 치환은 문구·셸 클래스만 바꾸며 API 주소나 제어 코드는 건드리지 않는다.
+    reviewer_labels = (
+        ("한국지식재산보호원 | 골든셋 등록", "한국지식재산보호원 | 검수 문서함"),
+        ("검증문서 후보 관리", "검수 문서함"),
+        ("CURRENT WORKSPACE", "검수 작업공간"),
+        ("koipa-ai", "내 검수 문서함"),
+        ("Koipa AI Engine for KOIPA Trade-Secret System (PoC)", "배정된 문서를 검토하고 등급 결정을 기록합니다."),
+        ("goldset/console-review", "REVIEWER / ASSIGNED ONLY"),
+        ("<span>01</span>개요", "<span>O</span>검수 현황"),
+        ("<span>02</span>골든셋 후보", "<span>D</span>배정 문서"),
+        ("<span>03</span>문서 상세·결정", "<span>R</span>문서 검토·결정"),
+        ("<span>04</span>보류·폐기 이력", "<span>H</span>내 결정 이력"),
+        ("GOLDEN SET REVIEW CONSOLE", "REVIEW WORKSPACE"),
+        ("검수 가능한<br><em>골든셋</em>을 관리합니다.", "배정된 문서를<br><em>검수하고 확정합니다.</em>"),
+        ("합성 후보와 실문서를 한 곳에서 검수하고, 등급 확정·보류·폐기를 누가 왜 그렇게 정했는지와 함께 남깁니다. 기록은 덮어쓰지 않고 계속 쌓입니다.",
+         "배정된 문서의 원문과 근거를 확인한 뒤 등급 결정을 남깁니다. 결정과 사유는 검수 이력에 기록되며, 관리 작업은 별도 권한으로만 수행됩니다."),
+        ("등급 확정 진행", "내 검수 진행"),
+        ("골든셋 현황", "내 검수 현황"),
+        ("현재 워크스페이스의 검수 상태와 등급 분포입니다.", "현재 계정에 보이는 배정 문서의 검수 상태입니다."),
+        ("골든셋 후보", "배정 문서"),
+        ("문서를 선택하면 전문과 등급 결정 이력이 열립니다.", "문서를 선택하면 원문, 검토 기준, 내 결정 이력이 열립니다."),
+        ("SNAPSHOT LEDGER", "검수자 계정"),
+        ("origin · audit · decision", "배정 범위 · 검토 · 결정 이력"),
+    )
+    for old, new in reviewer_labels:
+        html = html.replace(old, new, 1)
+    reviewer_frame = '<div class="frame reviewer-workspace">'
+    html = html.replace('<div class="frame">', reviewer_frame, 1)
+    html = html.replace('<nav class="nav">', '<nav class="nav" aria-label="검수 작업 메뉴">', 1)
     html = html.replace("if(s.by_proposed_grade){let gb=document.createElement('div');gb.style.cssText='grid-column:1/-1;border-top:1px solid var(--line);padding:24px 29px 29px';let cap=document.createElement('div');cap.className='cap';cap.textContent='등급별 분포 현황';gb.append(cap);let gr=document.createElement('div');gr.style.cssText='display:grid;grid-template-columns:76px repeat(4,1fr);gap:10px 24px;margin-top:16px;align-items:center;max-width:760px';const GCOLOR={TS:'#c72c40',S1:'#c47a00',S2:'#2563a8',S3:'#1a8a5f'};const hcell=(t,strong)=>{let el=document.createElement('span');el.style.cssText='font-size:12px;color:#8a9299'+(strong?';font-weight:800;color:#5f666c':'');el.textContent=t;return el};gr.append(hcell(''),hcell('특급'),hcell('1급'),hcell('2급'),hcell('3급'));const maxVal=Math.max(1,...['TS','S1','S2','S3'].map(g=>(s.by_proposed_grade||{})[g]||0));const gradeRow=(label,counts)=>{gr.append(hcell(label,true));['TS','S1','S2','S3'].forEach(g=>{let v=(counts||{})[g]||0;let cell=document.createElement('div');let num=document.createElement('b');num.style.cssText='font:800 18px ui-monospace,monospace;letter-spacing:-1px;display:block';num.textContent=v;let bar=document.createElement('div');bar.style.cssText='height:5px;border-radius:2px;margin-top:5px;background:'+GCOLOR[g]+';opacity:.82;width:'+Math.max(v>0?3:0,Math.round(v/maxVal*100))+'%';cell.append(num,bar);gr.append(cell)})};gradeRow('전체',s.by_proposed_grade);gradeRow('미검수',s.by_proposed_grade_unfixed);gradeRow('검수 완료',s.by_final_grade);gb.append(gr);$('kpis').append(gb)}", "", 1)  # [2026-10-09] 등급별 분포 카드 — 관리자 전용, 검수자에게는 보여주지 않는다
     html = html.replace("</head>", _REVIEWER_VIEW_CSS + "</head>", 1)
-    return html.replace('<div class="frame">', _REVIEWER_VIEW_NOTE + '<div class="frame">', 1)
+    return html.replace(reviewer_frame, _REVIEWER_VIEW_NOTE + reviewer_frame, 1)
 
 
 # ── 숨김 검수(golden_review_blind_enforced) 화면 조정 ────────────────────────────────
@@ -1507,6 +1542,11 @@ def _as_blind_reviewer_view(html: str) -> str:
     for old, new in _BLIND_VIEW_PATCHES:
         html = html.replace(old, new, 1)
     html = html.replace("</head>", _BLIND_VIEW_CSS + "</head>", 1)
+    # 검수자 셸은 _as_reviewer_view 에서 frame 에 클래스를 더한다. 독립 검수 안내도
+    # 그 변형을 인식해야 숨김 상태가 화면에서 분명해진다.
+    reviewer_frame = '<div class="frame reviewer-workspace">'
+    if reviewer_frame in html:
+        return html.replace(reviewer_frame, _BLIND_VIEW_NOTE + reviewer_frame, 1)
     return html.replace('<div class="frame">', _BLIND_VIEW_NOTE + '<div class="frame">', 1)
 
 

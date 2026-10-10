@@ -67,3 +67,18 @@ def test_full_text_is_embedded_not_a_preview(tmp_path):
     long_doc = dict(_GOLD, text="가" * 4000)
     data = _embedded(render_signoff_html([long_doc], job_id="J", post_url="/p"))
     assert len(data[0]["text"]) == 4000
+
+
+def test_signoff_uses_the_shared_reviewer_workspace_shell():
+    """잡 서명도 관리자 콘솔과 같은 검수 작업공간 언어를 써야 한다."""
+    html = render_signoff_html([_GOLD], job_id="J", post_url="/p")
+    for expected in (
+        'class="frame reviewer-workspace"',
+        "검수 작업공간",
+        "내 검수 문서함",
+        "REVIEW WORKSPACE",
+        "배정 문서 검수",
+        "검수자 계정",
+    ):
+        assert expected in html
+    assert "CURRENT WORKSPACE" not in html and "goldset/signoff" not in html

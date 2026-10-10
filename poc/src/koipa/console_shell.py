@@ -105,3 +105,29 @@ SHELL_MEDIA_CSS = """
 @media(max-width:1050px){.frame{grid-template-columns:1fr;padding:18px var(--shell-page-gutter) 96px}.side{display:none}.main{padding:0}.hero{grid-template-columns:1fr}.summary{grid-template-columns:repeat(3,1fr)}.summaryIntro{grid-column:1/-1}}
 @media(max-width:700px){.top{padding:0 16px}.topmid,.workspace{display:none}.frame{padding:14px 12px 84px}.main{padding:0}.hero h1{letter-spacing:-2.5px}.summary{grid-template-columns:repeat(2,1fr)}.rowhead{display:none}.section h2{font-size:31px}.sectionTop{align-items:start;flex-direction:column}.sectionTop p{margin-left:0}.filters{width:100%}.filters input{width:100%}}
 """
+
+
+# 검수자 전용 화면은 관리자 콘솔과 같은 작업공간 언어를 사용한다. 후보 관리와 잡 서명은
+# 서로 다른 렌더러지만, 이 클래스만 붙이면 같은 좌측 메뉴·작업 패널 밀도로 보인다.
+# 권한을 구분하는 수단이 아니다. 권한은 각각의 API와 golden_reviewer_access에서 계속 강제한다.
+REVIEWER_WORKSPACE_CSS = """
+.reviewer-workspace{--reviewer-navy:#111827;--reviewer-panel:#fff;--reviewer-canvas:#f7f8fa;}
+.reviewer-workspace .side{background:var(--reviewer-panel);border-color:var(--border);box-shadow:0 8px 24px rgba(9,9,11,.06);padding:15px 12px}
+.reviewer-workspace .side .cap{padding:4px 9px 12px;color:var(--text-dim)}
+.reviewer-workspace .side .workname{margin:0 9px 4px;font-size:16px;font-weight:850;letter-spacing:-.02em}
+.reviewer-workspace .side .workdesc{margin:0 9px;font-size:12px;line-height:1.55;max-width:none}
+.reviewer-workspace .side .branch{margin:8px 9px 0;font:700 10px var(--font-mono);letter-spacing:.04em}
+.reviewer-workspace .side .nav,.reviewer-workspace .side .sidenav{margin:18px 0 0;padding:0;border:0;gap:3px}
+.reviewer-workspace .side .nav a,.reviewer-workspace .side .sidenav a{min-height:42px;gap:10px;margin:0;padding:8px 10px;border:1px solid transparent;border-left:1px solid transparent;border-radius:var(--radius);font-size:13px;font-weight:700}
+.reviewer-workspace .side .nav a span,.reviewer-workspace .side .sidenav a span{display:grid;place-items:center;width:20px;height:20px;border:1px solid currentColor;border-radius:6px;font:800 10px var(--font-mono);padding:0;opacity:.86}
+.reviewer-workspace .side .nav a:hover,.reviewer-workspace .side .sidenav a:hover{background:var(--bg-mid);color:var(--reviewer-navy)}
+.reviewer-workspace .side .nav a.active,.reviewer-workspace .side .sidenav a.active{background:var(--reviewer-navy);border-color:var(--reviewer-navy);color:#fff;padding-left:10px;box-shadow:0 4px 12px rgba(9,9,11,.14)}
+.reviewer-workspace .side .ledger{margin:15px 5px 2px;padding:14px 4px 1px;border-top:1px solid var(--border);font-size:11px;line-height:1.55}
+.reviewer-workspace .hero{padding:4px 0 24px}
+.reviewer-workspace .hero h1{font-size:clamp(28px,3vw,34px);line-height:1.2;margin:12px 0 10px}
+.reviewer-workspace .hero p{font-size:14px;line-height:1.65}
+.reviewer-workspace .gate{border-left-color:var(--reviewer-navy);box-shadow:0 8px 24px rgba(9,9,11,.05)}
+.reviewer-workspace .gate strong{font-size:28px}
+.reviewer-workspace .sectionTop{padding-bottom:14px}
+@media(max-width:1050px){.reviewer-workspace .side{display:none}}
+"""
