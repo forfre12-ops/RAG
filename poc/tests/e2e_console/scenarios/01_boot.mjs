@@ -78,15 +78,20 @@ export const scenarios = [
     title: '세션에 저장된 탭으로 복원되고, 없어진 탭 이름이면 기본 탭으로 떨어진다',
     why: '탭 이름을 개편했을 때 옛 이름이 sessionStorage 에 남아 화면이 빈 채로 열린 적이 있다',
     async run({ server, check }) {
+      // [2026-10-10] .tab.active는 Product Shell V2에서 죽은 표식이다 — showPane()이 V2
+      // 모드에서는 그 클래스를 갱신하는 줄까지 가지 않고 새 내비게이션(productShowView)으로
+      // 위임한 뒤 바로 return한다(admin.html:1437-1440). 실제 복원 결과는
+      // [data-product-nav].active로 확인한다(productMapPaneToView: config→policy·model(없어진
+      // 이름)→review 쪽 기본값 review→experts).
       const p1 = await openPage(server, '/console/admin.html', { session: { koipa_admin_pane: 'config' } });
       await p1.settle();
-      check.eq(p1.q('.tab.active')?.dataset.tab, 'config', '저장된 탭(설정)으로 복원된다');
+      check.eq(p1.q('[data-product-nav].active')?.dataset.productNav, 'policy', '저장된 탭(설정)으로 복원된다');
       p1.close();
 
       // 2026-08-20 개편으로 없어진 이름
       const p2 = await openPage(server, '/console/admin.html', { session: { koipa_admin_pane: 'model' } });
       await p2.settle();
-      check.eq(p2.q('.tab.active')?.dataset.tab, 'review', '없어진 탭 이름이면 검수 탭으로 떨어진다');
+      check.eq(p2.q('[data-product-nav].active')?.dataset.productNav, 'experts', '없어진 탭 이름이면 검수 탭으로 떨어진다');
       check.ok(p2.qa('[data-pane]').some((s) => p2.visible(s)), '어느 탭이든 보이는 카드가 있다');
       return p2;
     },
