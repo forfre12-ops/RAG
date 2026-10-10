@@ -113,6 +113,35 @@ def test_missing_metric_fields_do_not_crash(monkeypatch):
     assert rep.learning_curve == [] and rep.learning_curve_status == "not_recorded"
 
 
+def test_report_surfaces_accuracy_curve(monkeypatch):
+    """[2026-10-11] 에폭별 accuracy도 learning_curve에 그대로 실린다(KL 요구사항 6절)."""
+    mv = _mv("v-acc", metrics={
+        "accuracy": 0.9,
+        "learning_curve": [
+            {"epoch": 1.0, "step": 10, "eval_accuracy": 0.7},
+            {"epoch": 2.0, "step": 20, "eval_accuracy": 0.85},
+        ],
+    })
+    svc = _svc(monkeypatch, by_label={"v-acc": mv})
+    rep = svc.report("v-acc")
+    assert [p.accuracy for p in rep.learning_curve] == [0.7, 0.85]
+
+
+def test_pdf_accuracy_chart_present_when_recorded_absent_when_not():
+    """[2026-10-11] accuracy 이력이 있으면 그리고, 없으면 추정 없이 None(=미기록 문구로 대체)."""
+    from reportlab.lib import colors
+
+    from koipa.api._training_report_pdf import _curve_drawing
+
+    series = (("정확도", "accuracy", colors.HexColor("#16a34a")),)
+
+    with_data = [SimpleNamespace(accuracy=0.7), SimpleNamespace(accuracy=0.85)]
+    assert _curve_drawing(with_data, font_name="Helvetica", title="x", series_spec=series) is not None
+
+    without_data = [SimpleNamespace(accuracy=None), SimpleNamespace(accuracy=None)]
+    assert _curve_drawing(without_data, font_name="Helvetica", title="x", series_spec=series) is None
+
+
 def test_pdf_renderer_uses_stored_values_and_is_a_valid_pdf(monkeypatch):
     """PDF는 빈 과거 곡선을 추정하지 않고, 저장된 지표만 읽어야 한다."""
     mv = _mv("v-pdf", metrics={
@@ -129,7 +158,13 @@ def test_pdf_renderer_uses_stored_values_and_is_a_valid_pdf(monkeypatch):
     assert len(payload) > 1000
 
 
-def test_trainer_loss_log_projection_keeps_only_finite_loss_values():
+def test_trainer_loss_log_projection_keeps_only_finite_loss_and_accuracy_values():
+    """[2026-10-11] eval_accuracy도 남긴다(KL 요구사항 6절 Epoch별 Accuracy 그래프).
+
+    종전엔 accuracy만 있고 loss가 없는 행(4번째)을 "손실 없음"으로 버렸다 — 이제는
+    accuracy 자체도 보존 대상이라 세 값(train_loss·eval_loss·accuracy) 중 하나라도
+    유한하면 남긴다.
+    """
     from koipa.modules.m4_training.trainer import _learning_curve_from_log_history
 
     curve = _learning_curve_from_log_history([
@@ -140,8 +175,9 @@ def test_trainer_loss_log_projection_keeps_only_finite_loss_values():
     ])
 
     assert curve == [
-        {"epoch": 0.5, "step": 10, "train_loss": 0.9, "eval_loss": None},
-        {"epoch": 1.0, "step": 20, "train_loss": None, "eval_loss": 0.6},
+        {"epoch": 0.5, "step": 10, "train_loss": 0.9, "eval_loss": None, "accuracy": None},
+        {"epoch": 1.0, "step": 20, "train_loss": None, "eval_loss": 0.6, "accuracy": None},
+        {"epoch": 2.0, "step": 40, "train_loss": None, "eval_loss": None, "accuracy": 0.9},
     ]
 
 

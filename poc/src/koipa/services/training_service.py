@@ -94,6 +94,9 @@ def _stored_learning_curve(metrics: dict[str, Any]) -> list[TrainingCurvePoint]:
     새 학습은 ``learning_curve``를 기록한다. 과거 모델 또는 실험 스크립트는
     ``loss_history``/HF ``log_history``라는 이름을 쓸 수 있어 읽기 호환만 제공한다.
     데이터가 없으면 빈 배열을 반환하며, 서비스가 가짜 곡선을 만들지 않는다.
+
+    [2026-10-11] accuracy도 같이 읽는다(KL 요구사항 6절 Epoch별 Accuracy 그래프) — 저장
+    형식은 trainer.py의 정규화 키("accuracy") 또는 HF 원본 키("eval_accuracy") 둘 다 받는다.
     """
     source: Any = None
     for key in ("learning_curve", "loss_history", "log_history"):
@@ -110,7 +113,8 @@ def _stored_learning_curve(metrics: dict[str, Any]) -> list[TrainingCurvePoint]:
             continue
         train_loss = _finite_number(row.get("train_loss", row.get("loss")))
         eval_loss = _finite_number(row.get("eval_loss", row.get("validation_loss")))
-        if train_loss is None and eval_loss is None:
+        accuracy = _finite_number(row.get("accuracy", row.get("eval_accuracy")))
+        if train_loss is None and eval_loss is None and accuracy is None:
             continue
         epoch = _finite_number(row.get("epoch"))
         step_number = _finite_number(row.get("step", row.get("global_step")))
@@ -120,6 +124,7 @@ def _stored_learning_curve(metrics: dict[str, Any]) -> list[TrainingCurvePoint]:
                 step=int(step_number) if step_number is not None and step_number >= 0 else None,
                 train_loss=train_loss,
                 eval_loss=eval_loss,
+                accuracy=accuracy,
             )
         )
     return points

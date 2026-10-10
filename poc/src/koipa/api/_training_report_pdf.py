@@ -29,16 +29,19 @@ def _font_name() -> str:
     return name
 
 
-def _curve_drawing(points: list[Any], *, font_name: str):
-    """저장된 loss 값이 있을 때만 단순 벡터 선 그래프를 만든다."""
+def _curve_drawing(points: list[Any], *, font_name: str, title: str, series_spec: tuple[tuple[str, str, Any], ...]):
+    """저장된 값이 있을 때만 단순 벡터 선 그래프를 만든다.
+
+    [2026-10-11] loss 전용이던 것을 series_spec으로 일반화 — 같은 그리기 코드로
+    Accuracy 곡선도 그린다(KL 요구사항 추적표 6절 "Epoch별 Loss 및 Accuracy 변화
+    그래프"). loss와 accuracy는 값의 범위가 달라(loss는 0 이상 임의값, accuracy는
+    0~1) 같은 좌표축에 같이 그리면 왜곡되므로 호출부에서 별도 차트로 나눠 부른다.
+    """
     from reportlab.graphics.shapes import Drawing, Line, PolyLine, String
     from reportlab.lib import colors
 
     series: list[tuple[str, list[float], Any]] = []
-    for label, attr, color in (
-        ("학습 손실", "train_loss", colors.HexColor("#2563eb")),
-        ("검증 손실", "eval_loss", colors.HexColor("#d97706")),
-    ):
+    for label, attr, color in series_spec:
         values = [getattr(point, attr, None) for point in points]
         if any(value is not None for value in values):
             series.append((label, [float(value) if value is not None else float("nan") for value in values], color))
@@ -57,7 +60,7 @@ def _curve_drawing(points: list[Any], *, font_name: str):
     drawing = Drawing(width, height)
     drawing.add(Line(left, bottom, left, height - top, strokeColor=colors.HexColor("#64748b")))
     drawing.add(Line(left, bottom, width - right, bottom, strokeColor=colors.HexColor("#64748b")))
-    drawing.add(String(left, height - 14, "에폭별 손실 추이", fontName=font_name, fontSize=10, fillColor=colors.HexColor("#0f172a")))
+    drawing.add(String(left, height - 14, title, fontName=font_name, fontSize=10, fillColor=colors.HexColor("#0f172a")))
     drawing.add(String(2, height - top - 5, f"{hi:.3f}", fontName=font_name, fontSize=7, fillColor=colors.HexColor("#64748b")))
     drawing.add(String(2, bottom - 2, f"{lo:.3f}", fontName=font_name, fontSize=7, fillColor=colors.HexColor("#64748b")))
 
@@ -142,12 +145,29 @@ def render_training_report_pdf(report: Any) -> bytes:
 
     story.append(Paragraph("학습 손실", heading))
     points = list(getattr(report, "learning_curve", None) or [])
-    chart = _curve_drawing(points, font_name=font_name)
+    loss_series = (
+        ("학습 손실", "train_loss", colors.HexColor("#2563eb")),
+        ("검증 손실", "eval_loss", colors.HexColor("#d97706")),
+    )
+    chart = _curve_drawing(points, font_name=font_name, title="에폭별 손실 추이", series_spec=loss_series)
     if chart is None:
         story.append(Paragraph("이 모델에는 에폭별 손실 이력이 저장되어 있지 않습니다. 값을 추정해 그리지 않습니다.", body))
     else:
         story.append(chart)
         story.append(Paragraph(f"저장된 손실 로그 {len(points)}건", small))
+
+    # [2026-10-11] KL 요구사항 추적표 6절 — Epoch별 Accuracy 변화 그래프.
+    # loss와 축 범위가 달라 같은 차트에 안 섞고 별도로 그린다. 이 리포트를 만들기 전
+    # 모델은 에폭별 accuracy를 안 남겨 이 값이 전부 비어 있다 — 그 경우도 추정해
+    # 그리지 않고 명시적으로 "미기록"이라 말한다.
+    story.append(Paragraph("에폭별 정확도", heading))
+    accuracy_series = (("정확도", "accuracy", colors.HexColor("#16a34a")),)
+    accuracy_chart = _curve_drawing(points, font_name=font_name, title="에폭별 정확도 추이", series_spec=accuracy_series)
+    if accuracy_chart is None:
+        story.append(Paragraph("이 모델에는 에폭별 정확도 이력이 저장되어 있지 않습니다. 값을 추정해 그리지 않습니다.", body))
+    else:
+        story.append(accuracy_chart)
+        story.append(Paragraph(f"저장된 정확도 로그 {sum(1 for p in points if getattr(p, 'accuracy', None) is not None)}건", small))
 
     comparison = getattr(report, "compared_to_active", None)
     if comparison is not None:

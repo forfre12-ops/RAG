@@ -359,10 +359,17 @@ class TrainReport:
 
 
 def _learning_curve_from_log_history(log_history: object) -> list[dict[str, float | int | None]]:
-    """HF 로그에서 손실만 골라 JSON/DB에 안전하게 보존한다.
+    """HF 로그에서 손실·정확도만 골라 JSON/DB에 안전하게 보존한다.
 
     로그 전문에는 런타임·메모리 등 배포별 잡음이 많다. 성능 리포트에는 epoch,
-    step, train/eval loss만 남긴다. 숫자가 아니거나 무한대인 값은 저장하지 않는다.
+    step, train/eval loss, eval accuracy만 남긴다. 숫자가 아니거나 무한대인
+    값은 저장하지 않는다.
+
+    [2026-10-11] eval_accuracy 추가 — compute_metrics()가 "accuracy" 키로 돌려주고
+    HF Trainer가 평가 로그에 "eval_" 접두사를 붙여 남긴다(모델 성능 리포트 PDF의
+    에폭별 Accuracy 그래프가 이 값을 읽는다, KL 요구사항 추적표 6절). 이 필드를
+    추가하기 전에 저장된 과거 리포트에는 accuracy가 없다 — 그 경우 PDF는 추정해
+    그리지 않고 "미기록"으로 표시한다.
     """
     if not isinstance(log_history, list):
         return []
@@ -379,7 +386,8 @@ def _learning_curve_from_log_history(log_history: object) -> list[dict[str, floa
             continue
         train_loss = number(row.get("loss"))
         eval_loss = number(row.get("eval_loss"))
-        if train_loss is None and eval_loss is None:
+        eval_accuracy = number(row.get("eval_accuracy"))
+        if train_loss is None and eval_loss is None and eval_accuracy is None:
             continue
         epoch = number(row.get("epoch"))
         step_raw = number(row.get("step"))
@@ -388,6 +396,7 @@ def _learning_curve_from_log_history(log_history: object) -> list[dict[str, floa
             "step": int(step_raw) if step_raw is not None and step_raw >= 0 else None,
             "train_loss": train_loss,
             "eval_loss": eval_loss,
+            "accuracy": eval_accuracy,
         })
     return out
 

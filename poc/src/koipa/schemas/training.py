@@ -60,8 +60,8 @@ class TrainJobList(BaseModel):
 # [2026-10-09] KL 요청(요구사항 추적표 6절) — "파인튜닝 완료 모델의 성능 지표를 리포트로
 # 제공". 계산 자체(정확도·정밀도·재현율·F1·혼동행렬)는 trainer.py가 이미 하고
 # ModelVersion.metrics(DB)에 저장돼 있었다 — API로 꺼내는 길이 없었을 뿐이다.
-# ⚠ 에폭별 손실 추이 그래프·PDF 내보내기는 이번에 포함하지 않았다(에폭 단위 이력을 저장하는
-# 자리가 현재 schema에 없음 — 별도 작업 필요, 메모리에 남김).
+# [2026-10-11] 에폭별 손실·정확도 추이 그래프·PDF 내보내기 추가 완료(TrainingCurvePoint·
+# _training_report_pdf.py).
 class ModelMetricsComparison(BaseModel):
     """파인튜닝 전(현재 활성 모델) 대비 비교 — 같은 모델이면 None."""
 
@@ -77,7 +77,7 @@ class ModelMetricsComparison(BaseModel):
 
 
 class TrainingCurvePoint(BaseModel):
-    """학습기가 실제로 남긴 한 시점의 손실 값.
+    """학습기가 실제로 남긴 한 시점의 손실·정확도 값.
 
     점이 없다는 것은 성능이 좋다는 뜻이 아니라, 과거 실행이 곡선을 보존하지
     않았다는 뜻이다. API와 PDF는 그 상태를 별도로 표시한다.
@@ -87,6 +87,7 @@ class TrainingCurvePoint(BaseModel):
     step: Optional[int] = None
     train_loss: Optional[float] = None
     eval_loss: Optional[float] = None
+    accuracy: Optional[float] = None  # [2026-10-11] eval_accuracy — PDF의 에폭별 정확도 그래프가 읽는다
 
 
 class TrainReportResponse(BaseModel):
