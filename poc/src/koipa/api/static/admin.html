@@ -87,8 +87,11 @@ textarea{resize:vertical;min-height:90px;font-size:12.5px;line-height:1.55;}
    화면에 **존재**해야 한다는 시험이 있다(test_admin_console_screens). 감추되 남긴다. */
 [data-tech]{display:none !important;}
 body.tech [data-tech]{display:revert !important;}
-/* 개발·시연용 설정과 합성 후보 조작은 기술 상세 주소에서도 운영 콘솔에 노출하지 않는다. */
-[data-legacy-config],[data-internal-synthesis]{display:none !important;}
+/* [2026-10-11] 합성 후보(학습 후보 생성) 카드는 관리자 콘솔에서 검수한다 — 사용자
+   확인(원문: "검수는 관리자 콘솔에서 하지...모의문서 검수"). data-internal-synthesis 로
+   이 카드를 숨기는 시도가 반복해서 들어왔는데 전부 되돌린 것이니 다시 추가하지 말 것.
+   개발·시연용 설정(data-legacy-config)만 기술 상세 주소에서도 노출하지 않는다. */
+[data-legacy-config]{display:none !important;}
 .grid > [data-product-legacy]{display:none !important;}
 .techbar{font-size:11px;color:var(--text-dim);padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:var(--bg-surface);}
 .sec-note details{margin-top:4px}
