@@ -353,6 +353,26 @@ def require_auth(
     """
     mode = (getattr(settings, "auth_mode", "api_key") or "api_key").lower()
     if mode == "none":
+        # [2026-10-10] KL 요청 — "AI API 연계 인증 생략"과 "검수 콘솔 개인 로그인"은 별개 요건이다
+        # (메일: 인증 제외는 AI API 쪽 얘기고 전문가 검수 로그인은 복구해 달라). none 은 서버간
+        # 호출(공유 role)을 위한 것이지, 사람이 로그인한 콘솔 쿠키까지 못 본 척해서 console_login.py
+        # 가 전원 403("portal JWT login" 필요)을 내게 만들 이유가 없다 — 쿠키가 있으면 그 개인
+        # 신원을 그대로 쓴다(공유 role로 뭉개면 등급확정·폐기 이력의 책임자를 가릴 수 없다,
+        # console_login._console_actor_id 주석 참조). 쿠키가 없거나 깨졌으면 기존 none 그대로.
+        if koipa_access_token:
+            try:
+                claims = verify_jwt(koipa_access_token)
+            except JWTError:
+                claims = None
+            if claims is not None:
+                jwt_roles = tuple(r for r in claims.roles if r in VALID_ROLES)
+                _stash_auth(request, mode="jwt", actor=claims.sub, role=_highest_role(jwt_roles))
+                return {
+                    "mode": "jwt",
+                    "claims": claims,
+                    "actor_role": _highest_role(jwt_roles),
+                    "actor_roles": jwt_roles,
+                }
         roles = _resolve_api_key_roles(request)
         _stash_auth(request, mode="none", actor=None, role=roles[0])
         return {"mode": "none", "actor_role": roles[0], "actor_roles": roles}

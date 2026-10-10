@@ -32,6 +32,47 @@ def test_jwt_cookie_is_accepted_without_authorization_header(monkeypatch):
     assert auth["mode"] == "jwt" and auth["claims"].sub == "portal-admin-kim"
 
 
+def test_none_mode_still_honors_a_console_login_cookie(monkeypatch):
+    """[2026-10-10] KL 요청 — "AI API 인증 생략"과 "검수 콘솔 로그인"은 별개다.
+
+    auth_mode=none 이어도 로그인 쿠키가 있으면 그 개인 신원(jwt)을 쓴다 — 그래야
+    console_login._console_actor_id 가 공유 role 로 뭉개지 않고 실제 검수자를 식별해
+    등급확정·폐기 이력에 책임자를 남길 수 있다.
+    """
+    claims = JWTClaims(sub="reviewer-07", roles=("reviewer",), exp=9999999999)
+    monkeypatch.setattr(settings, "auth_mode", "none")
+    monkeypatch.setattr(_jwt_auth, "verify_jwt", lambda token: claims)
+    auth = _jwt_auth.require_auth(
+        _request(), authorization=None, x_api_key=None, koipa_access_token="reviewer-cookie-token"
+    )
+    assert auth["mode"] == "jwt" and auth["claims"].sub == "reviewer-07"
+    assert _console_actor_id(auth) == "reviewer-07"
+
+
+def test_none_mode_without_cookie_falls_back_to_configured_role(monkeypatch):
+    """쿠키가 없으면(서버간 호출 등) 기존 none 동작 그대로 — 회귀 방지."""
+    monkeypatch.setattr(settings, "auth_mode", "none")
+    monkeypatch.setattr(settings, "api_key_role", "kl_backend")
+    auth = _jwt_auth.require_auth(
+        _request(), authorization=None, x_api_key=None, koipa_access_token=None
+    )
+    assert auth["mode"] == "none" and auth["actor_role"] == "kl_backend"
+
+
+def test_none_mode_with_broken_cookie_falls_back_instead_of_raising(monkeypatch):
+    """깨진/만료된 콘솔 쿠키가 있어도 none 모드 자체가 죽지는 않는다 — 조용히 폴백."""
+    def _raise(token):
+        raise _jwt_auth.JWTError("expired")
+
+    monkeypatch.setattr(settings, "auth_mode", "none")
+    monkeypatch.setattr(settings, "api_key_role", "system")
+    monkeypatch.setattr(_jwt_auth, "verify_jwt", _raise)
+    auth = _jwt_auth.require_auth(
+        _request(), authorization=None, x_api_key=None, koipa_access_token="stale-cookie"
+    )
+    assert auth["mode"] == "none" and auth["actor_role"] == "system"
+
+
 def test_console_has_no_manual_key_or_actor_inputs():
     html = _render_specledger_gold_console_html()
     assert 'id="apiKey"' not in html
