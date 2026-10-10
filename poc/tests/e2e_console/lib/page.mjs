@@ -336,3 +336,22 @@ export async function openPage(server, urlPath, opts = {}) {
 
   return page;
 }
+
+/* [2026-10-10] 옛 상단 탭바(.tab[data-tab=...])는 Product Shell V2 전환 후
+ * admin.html `.tabbar{display:none}` 으로 영구히 숨겨진다 — 실사용자는 좌측 내비게이션
+ * (data-product-nav)으로 같은 화면을 연다. admin.html의 productMapPaneToView()와 같은
+ * 매핑을 여기 하니스에도 둔다(8개 시나리오 파일이 옛 탭 셀렉터를 직접 눌러 "화면에 안
+ * 보이는 것을 눌렀다"로 죽던 것을 한 자리에서 고친다 — 각 파일에서 중복해서 고치지 않는다). */
+// [2026-10-10] 감사 로그 카드(admin.html:1006)처럼 옛 ops 탭 하나에 같이 있던 카드가 V2에서
+// 별도 view(audit)로 갈라진 경우가 있다 — 그런 카드를 쓰는 호출자는 pane 대신 view 이름을
+// 그대로 넘길 수 있게, 유효한 view 이름은 자기 자신으로 매핑해 둔다.
+const PANE_TO_VIEW = {
+  review: 'experts', train: 'models', config: 'policy', ops: 'overview',
+  overview: 'overview', documents: 'documents', experts: 'experts',
+  policy: 'policy', models: 'models', audit: 'audit', settings: 'settings',
+};
+export async function goToPane(page, pane) {
+  const view = PANE_TO_VIEW[pane] || 'overview';
+  page.click(page.q(`[data-product-nav="${view}"]`));
+  await page.settle();
+}

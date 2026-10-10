@@ -5,11 +5,12 @@
  * 조용히 아무 일도 안 일어난 것처럼 보이는 것이 가장 나쁜 결과다.
  */
 
-import { openPage } from '../lib/page.mjs';
+import { openPage, goToPane } from '../lib/page.mjs';
 
 const CLICKS = [
   ['관제 종합', 'button[onclick="loadDashboard()"]', 'ops'],
-  ['감사 로그', 'button[onclick="loadAuditLog()"]', 'ops'],
+  // [2026-10-10] 감사 로그 카드는 V2에서 'audit' view로 갈라졌다 — 'ops'(→overview)로는 안 보인다.
+  ['감사 로그', 'button[onclick="loadAuditLog()"]', 'audit'],
   // [2026-10-03] '검증문서 현황'(loadGoldenStatus/gs-body) 항목을 뺐다 — 그 카드를 없앴다.
   ['작업 목록', 'button[onclick="loadJobs()"]', 'train'],
   ['최신 메트릭', 'button[onclick="loadMetrics()"]', 'train'],
@@ -19,7 +20,7 @@ const CLICKS = [
 
 async function pressAll(page) {
   for (const [, sel, pane] of CLICKS) {
-    page.click(page.q(`.tab[data-tab="${pane}"]`));
+    await goToPane(page, pane);
     const btn = page.q(sel);
     if (btn) btn.click();
     await page.settle();
@@ -69,11 +70,12 @@ export const scenarios = [
       page.set('cfg-role', 'reviewer');   // 관리자 콘솔의 역할 목록은 admin·reviewer·kl_backend·system
       server.faults.push({ path: '/admin/', status: 403, body: { detail: 'admin role required' } });
 
-      page.click(page.q('.tab[data-tab="ops"]'));
+      await goToPane(page, 'ops');
       page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
       check.matches(page.text('dash-grid'), /admin 역할.*필요/, '무슨 역할이 필요한지 말한다');
 
+      await goToPane(page, 'audit');
       page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
       check.matches(page.text('au-body'), /admin 역할.*필요/, '감사 로그에서도 같은 안내를 준다');
@@ -90,7 +92,7 @@ export const scenarios = [
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
       server.faults.push({ path: '/admin/dashboard', status: 500, body: { detail: 'psycopg.OperationalError: connection refused' } });
-      page.click(page.q('.tab[data-tab="ops"]'));
+      await goToPane(page, 'ops');
       page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
       check.includes(page.text('dash-grid'), 'connection refused', '서버가 준 원문이 보인다');
@@ -110,7 +112,7 @@ export const scenarios = [
       await page.settle();
       server.faults.push({ path: '/admin/dashboard', abort: true });
 
-      page.click(page.q('.tab[data-tab="ops"]'));
+      await goToPane(page, 'ops');
       page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
 
@@ -137,7 +139,7 @@ export const scenarios = [
       await page.settle();
       server.faults.push({ path: '/admin/dashboard', status: 502, raw: '<html><head><title>502 Bad Gateway</title></head><body><h1>502</h1></body></html>' });
 
-      page.click(page.q('.tab[data-tab="ops"]'));
+      await goToPane(page, 'ops');
       page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
 
@@ -196,7 +198,7 @@ export const scenarios = [
       check.eq(page.$('health')?.className, 'health-pill bad', '빨간 상태로 바뀐다');
 
       // 헬스가 죽어도 다른 조회는 된다
-      page.click(page.q('.tab[data-tab="ops"]'));
+      await goToPane(page, 'ops');
       page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
       check.ok(!/실패|오류/.test(page.text('dash-grid')), '관제 대시보드는 정상으로 그려진다', page.text('dash-grid'));

@@ -4,13 +4,13 @@
  * 실제로 걸리는지, 게이트가 막았을 때 그 사실이 화면에 남는지를 함께 본다.
  */
 
-import { openPage } from '../lib/page.mjs';
+import { openPage, goToPane } from '../lib/page.mjs';
 import { assertNoScriptErrors } from '../lib/expect.mjs';
 
 async function trainTab(server, opts = {}) {
   const page = await openPage(server, '/console/admin.html', opts);
   await page.settle();
-  page.click(page.q('.tab[data-tab="train"]'));
+  await goToPane(page, 'train');
   return page;
 }
 

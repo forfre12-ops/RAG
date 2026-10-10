@@ -5,7 +5,7 @@
  * 확인되지 않는다.
  */
 
-import { openPage } from '../lib/page.mjs';
+import { openPage, goToPane } from '../lib/page.mjs';
 import { assertNoScriptErrors } from '../lib/expect.mjs';
 
 /* 쓰기 동작 전수 — 이름 · 누를 것 · 사전 준비 · 나가면 안 되는 요청
@@ -82,7 +82,7 @@ export const scenarios = [
       check.includes(page.text('write-gate-msg'), '읽기 전용', '읽기 전용이라고 화면이 말한다');
 
       for (const w of WRITES) {
-        page.click(page.q(`.tab[data-tab="${w.pane}"]`));
+        await goToPane(page, w.pane);
         if (w.setup) await w.setup(page);
         const before = server.calls.length;
         const btn = w.press(page);
@@ -108,7 +108,7 @@ export const scenarios = [
       await page.settle();
       page.check('cfg-write-enable', false);
 
-      page.click(page.q('.tab[data-tab="ops"]'));
+      await goToPane(page, 'ops');
       page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
       check.ok(server.lastCall('GET', '/admin/dashboard'), '관제 조회는 된다');
@@ -138,8 +138,8 @@ export const scenarios = [
       check.includes(page.text('profile-banner'), '고객사', '고객사 시스템이라고 말한다');
 
       // 탭을 눌러도 숨김이 되살아나면 안 된다(인라인 style 로 숨기던 시절의 회귀)
-      page.click(page.q('.tab[data-tab="train"]'));
-      page.click(page.q('.tab[data-tab="review"]'));
+      await goToPane(page, 'train');
+      await goToPane(page, 'review');
       for (const el of factory) check.ok(!page.visible(el), `탭 전환 후에도 숨겨져 있다: ${el.id || 'card'}`);
       return page;
     },
@@ -148,7 +148,14 @@ export const scenarios = [
   {
     id: 'safety.profile.factory-shows-all',
     title: '지재원 프로파일에서는 전 구간 카드가 보이고 배너가 그렇게 말한다',
+    // [2026-10-10] needsMock 없이 라이브 서버를 타면 그 서버의 실제 llm_provider(예: anthropic,
+    // 9/25 메모리에 기록된 의도적 전환) 가 그대로 반영돼 "LLM 안 쓴다" 단언이 거짓이 된다.
+    // customer-hides-factory-cards 와 같은 패턴으로 고정 fixture 를 강제한다.
+    needsMock: true,
     async run({ server, check }) {
+      const { FIXTURES } = await import('../lib/server.mjs');
+      server.overrides['GET /healthz'] = { ...FIXTURES['GET /healthz'], llm_provider: 'noop' };
+
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
       // [2026-08-24] 「모델 공장」은 우리가 만든 비유라 화면에서 뺐다(제출본·매뉴얼 0회).
@@ -166,7 +173,7 @@ export const scenarios = [
                     '0 이 되는 것이 결과가 아니라 학습 행이라고 말한다');
       // 프로파일 숨김과 탭 숨김을 섞지 않으려고, 각 카드를 자기 탭에서 확인한다.
       for (const el of page.qa('[data-profile="full-train"]')) {
-        page.click(page.q(`.tab[data-tab="${el.dataset.pane}"]`));
+        await goToPane(page, el.dataset.pane);
         check.ok(page.visible(el), `${el.dataset.pane} 탭에서 모델 공장 전용 카드가 보인다`);
         check.ok(!el.classList.contains('pf-hidden'), '프로파일 숨김 클래스가 붙지 않았다');
       }
@@ -210,7 +217,7 @@ export const scenarios = [
       page.set('cfg-user', '검수자홍길동');
       page.set('cfg-role', 'reviewer');
 
-      page.click(page.q('.tab[data-tab="config"]'));
+      await goToPane(page, 'config');
       page.set('kw-n-keyword', '신규키워드');
       page.click(page.q('button[onclick="createKeyword()"]'));
       await page.settle();

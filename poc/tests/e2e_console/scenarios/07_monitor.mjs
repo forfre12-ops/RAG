@@ -4,13 +4,24 @@
  * 통째로 거짓이 되므로, 부분 실패(degraded)가 그대로 표시되는지까지 본다.
  */
 
-import { openPage } from '../lib/page.mjs';
+import { openPage, goToPane } from '../lib/page.mjs';
 import { assertNoScriptErrors } from '../lib/expect.mjs';
 
 async function opsTab(server, opts = {}) {
   const page = await openPage(server, '/console/admin.html', opts);
   await page.settle();
-  page.click(page.q('.tab[data-tab="ops"]'));
+  await goToPane(page, 'ops');
+  return page;
+}
+
+// [2026-10-10] 감사 로그 카드(admin.html:1006)는 옛 "운영" 탭 하나에 같이 있었지만, Product
+// Shell V2에서 "운영 개요"(overview)와 "감사·보고서"(audit)로 갈라졌다 — data-pane="ops" 는
+// 그대로지만 data-product-view="audit" 다. opsTab()의 일반 pane→view 매핑(ops→overview)으로는
+// 안 보인다 — 이 카드를 쓰는 시나리오는 전용 내비게이션으로 바로 간다.
+async function auditTab(server, opts = {}) {
+  const page = await openPage(server, '/console/admin.html', opts);
+  await page.settle();
+  await goToPane(page, 'audit');
   return page;
 }
 
@@ -87,7 +98,7 @@ export const scenarios = [
     title: '감사 로그를 조건으로 조회하면 행이 그려지고 신원 없음도 구분된다',
     why: '공유 API 키로 부르면 행위자 신원이 안 남는다 — 그 사실을 화면이 스스로 드러내야 한다',
     async run({ server, check }) {
-      const page = await opsTab(server);
+      const page = await auditTab(server);
       page.set('au-action', 'model.activate');
       page.set('au-success', 'false');
       page.click(page.q('button[onclick="loadAuditLog()"]'));
@@ -109,7 +120,7 @@ export const scenarios = [
     title: '행위자 신원이 없는 기록이 섞이면 경고를 띄운다',
     needsMock: true,
     async run({ server, check }) {
-      const page = await opsTab(server);
+      const page = await auditTab(server);
       server.overrides['GET /admin/audit-log'] = {
         items: [{ occurred_at: '2026-08-23T02:00:00Z', action: 'confirm', actor_id: null, actor_role: null, target_type: null, target_id: null, success: true, error_code: null, ip_address: null, request_id: null }],
         total: 1, limit: 50, offset: 0,
@@ -130,7 +141,7 @@ export const scenarios = [
     title: '기록이 없을 때와 조회가 실패했을 때를 구분해 말한다',
     needsMock: true,
     async run({ server, check }) {
-      const page = await opsTab(server);
+      const page = await auditTab(server);
       server.overrides['GET /admin/audit-log'] = { items: [], total: 0, limit: 50, offset: 0, actorless_ratio: 0, warnings: [] };
       page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
@@ -187,7 +198,7 @@ export const scenarios = [
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      page.click(page.q('.tab[data-tab="train"]'));
+      await goToPane(page, 'train');
       page.click(page.q('button[onclick="loadSynthQueue()"]'));
       await page.settle();
 
@@ -235,7 +246,7 @@ export const scenarios = [
       };
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      page.click(page.q('.tab[data-tab="train"]'));
+      await goToPane(page, 'train');
       page.set('sy-status', 'approved');
       page.click(page.q('button[onclick="loadSynthQueue()"]'));
       await page.settle();
@@ -258,7 +269,7 @@ export const scenarios = [
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      page.click(page.q('.tab[data-tab="train"]'));
+      await goToPane(page, 'train');
       page.set('sy-grade', 'TS');
       page.set('sy-count', '20');
       page.click('sy-gen');

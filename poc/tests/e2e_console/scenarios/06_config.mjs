@@ -4,13 +4,13 @@
  * 편집 → 저장 → 다른 화면(합성·키워드 필터)의 등급 목록까지 따라 바뀌는지 함께 본다.
  */
 
-import { openPage } from '../lib/page.mjs';
+import { openPage, goToPane } from '../lib/page.mjs';
 import { assertNoScriptErrors } from '../lib/expect.mjs';
 
 async function configTab(server, opts = {}) {
   const page = await openPage(server, '/console/admin.html', opts);
   await page.settle();
-  page.click(page.q('.tab[data-tab="config"]'));
+  await goToPane(page, 'config');
   return page;
 }
 

@@ -10,7 +10,7 @@
  * 쓴다 — 접힌 <details> 와 [data-tech] 안은 허용(기술 담당자가 펼쳐서 본다), 기본 화면만 본다.
  */
 
-import { openPage } from '../lib/page.mjs';
+import { openPage, goToPane } from '../lib/page.mjs';
 import { assertNoScriptErrors } from '../lib/expect.mjs';
 
 /** 기본 화면에 나오면 안 되는 것 — (문자열, 왜) */
@@ -81,9 +81,9 @@ export const scenarios = [
       await page.settle();
 
       // 각 탭을 열어 카드가 실제로 그려지게 한다 — 안 그리면 문구가 생기지도 않는다.
-      for (const tab of ['ops', 'review', 'train', 'config']) {
-        const el = page.q(`.tab[data-tab="${tab}"]`);
-        if (el) { page.click(el); await page.settle(); }
+      // [2026-10-10] 'audit'(감사 로그)도 V2에서 별도 view라 빠지면 그 카드는 스캔 안 된다.
+      for (const tab of ['ops', 'review', 'train', 'config', 'audit']) {
+        await goToPane(page, tab);
         scan(page, check, `${tab} 탭`);
       }
 

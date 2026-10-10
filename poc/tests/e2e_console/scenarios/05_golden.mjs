@@ -5,7 +5,7 @@
  * 누르기 전에 잠그고 실제로 되는 경로를 위로 올리는지까지 본다.
  */
 
-import { openPage } from '../lib/page.mjs';
+import { openPage, goToPane } from '../lib/page.mjs';
 import { assertNoScriptErrors } from '../lib/expect.mjs';
 
 const LLM_ON = (base) => JSON.parse(JSON.stringify({ ...base, llm_provider: 'local' }));
@@ -13,7 +13,7 @@ const LLM_ON = (base) => JSON.parse(JSON.stringify({ ...base, llm_provider: 'loc
 async function reviewTab(server, opts = {}) {
   const page = await openPage(server, '/console/admin.html', opts);
   await page.settle();
-  page.click(page.q('.tab[data-tab="review"]'));
+  await goToPane(page, 'review');
   return page;
 }
 
