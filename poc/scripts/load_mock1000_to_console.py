@@ -67,6 +67,10 @@ def main() -> int:
             "doc_id": rid,
             "intended_label": m["true_grade"],
             "document_origin": "synthetic",
+            # [2026-10-10] title을 안 채우면 콘솔이 document_type("모의문서(...)")을 제목 대신
+            # 보여준다(proxy_gold_candidate_service.py의 title-or-document_type 폴백) — 모든 행이
+            # 똑같은 문구로 반복돼 보인다는 지적. 본문 첫 줄은 이미 자연스러운 제목이라 그대로 쓴다.
+            "title": text.split("\n", 1)[0].strip(),
             "document_type": f"모의문서({m['department']}/{m['info_type']}, {m['doc_format']})",
             # [2026-10-02] 표시용 문자열(document_type) 말고 따로도 싣는다 — 카테고리별
             # 조회·가이드별 생성 통계(admin.html)가 이 필드로 거르고 묶는다.
