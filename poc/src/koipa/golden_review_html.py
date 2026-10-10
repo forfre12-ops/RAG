@@ -30,7 +30,8 @@ from koipa.console_nav import (
     header_html,
 )
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
-from koipa.console_shell import REVIEWER_WORKSPACE_CSS, SHELL_CSS, SHELL_MEDIA_CSS
+from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
+from koipa.console_shell import REVIEWER_WORKSPACE_CSS
 
 # 검수·서명은 단독 HTML로도 전달될 수 있어 CSS 링크를 걸지 않는다. 대신 관리자·로그인과
 # 정확히 같은 정본 문자열을 인라인한다.

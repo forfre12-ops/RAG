@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from koipa.api.golden import _render_specledger_gold_console_html
@@ -51,12 +53,12 @@ def test_shell_uses_the_same_geometry_as_the_admin_console():
         assert fragment in SHELL_CSS
 
 
-@pytest.mark.parametrize("marker", ['class="frame"', 'class="side"', 'class="main"',
-                                     'class="hero"', 'class="section"'])
-def test_both_screens_use_the_same_skeleton(signoff, manage, marker):
+@pytest.mark.parametrize("class_name", ["frame", "side", "main", "hero", "section"])
+def test_both_screens_use_the_same_skeleton(signoff, manage, class_name):
     """한쪽에만 있으면 검수자가 오갈 때 다른 시스템처럼 보인다."""
-    assert marker in signoff, f"검수 화면에 {marker} 가 없다"
-    assert marker in manage, f"후보 관리 화면에 {marker} 가 없다"
+    class_token = rf'class="[^"]*\b{re.escape(class_name)}\b[^"]*"'
+    assert re.search(class_token, signoff), f"검수 화면에 {class_name} 클래스가 없다"
+    assert re.search(class_token, manage), f"후보 관리 화면에 {class_name} 클래스가 없다"
 
 
 def test_signoff_pulls_the_shell_not_its_own_copy():
