@@ -868,16 +868,17 @@
     {"reviewer_id": "reviewer-19", "roles": ["reviewer"]},
     {"reviewer_id": "reviewer-20", "roles": ["reviewer"]}
   ],
-  "POST /golden/assignments/expert-review-plan": {
+  "POST /golden/assignments/review-plan": {
     "review_batch": "2026-08-A",
-    "reviewer_count": 20,
-    "documents_per_reviewer": 50,
-    "total_documents": 1000,
+    "reviewer_count": 3,
+    "min_documents_per_reviewer": 2,
+    "max_documents_per_reviewer": 3,
+    "total_documents": 7,
     "actor_id": "e2e-admin-test",
-    "events_written": 1000,
+    "events_written": 7,
     "assignment_group_id": "eeeeeeee-0000-4000-8000-000000000099",
     "already_applied": false,
-    "reviewer_document_counts": { "reviewer-01": 50, "reviewer-02": 50 }
+    "reviewer_document_counts": { "reviewer-01": 3, "reviewer-02": 2, "reviewer-03": 2 }
   },
   "GET /golden/builds": {
     "total": 2,
