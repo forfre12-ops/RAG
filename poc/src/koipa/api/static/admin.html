@@ -1579,6 +1579,10 @@ function productSetLegacyVisibility(view){
   if(view==='models') show('.grid > [data-pane="train"]');
   if(view==='audit') show('.grid > [data-product-view="audit"]');
   if(view==='settings') show('.grid > [data-product-view="settings"]');
+  // [2026-10-10] data-pane="always"(연결·인증 상태 등)는 옛 showPane()이 뷰 이름과 무관하게
+  // 늘 보여주던 카드다. 위에서 전부 숨긴 뒤 뷰별로만 다시 보이므로, "always" 몫을 안 넣으면
+  // 어떤 뷰에서도 다시 안 보인다 — 전수 테스트(sweep.tabs.every-tab-has-visible-cards)가 잡았다.
+  show('.grid > [data-pane="always"]');
 }
 function productShowView(view, fromLegacy){
   if(!PRODUCT_VIEW_TO_PANE[view]) view='overview';
@@ -1776,7 +1780,23 @@ function setupWorkbenchResizers(){
 function initProductShell(){
   window.__KOIPA_PRODUCT_SHELL=true;
   setupWorkbenchResizers();
-  let view='overview';try{const m=(location.hash||'').match(/^#view=([^&]+)/);if(m&&PRODUCT_VIEW_TO_PANE[decodeURIComponent(m[1])])view=decodeURIComponent(m[1]);}catch(e){}
+  let view='overview';
+  try{
+    const m=(location.hash||'').match(/^#view=([^&]+)/);
+    if(m&&PRODUCT_VIEW_TO_PANE[decodeURIComponent(m[1])]){
+      view=decodeURIComponent(m[1]);
+    }else{
+      // [2026-10-10] #view= 해시가 없으면 initPane()이 이미 읽은 세션 기억(koipa_admin_pane)을
+      // 그대로 버리고 있었다 — V2 전환 전에는 showPane()이 혼자 이 값을 읽어 복원했는데,
+      // initProductShell()이 그 뒤에 항상 'overview'로 덮어썼다(전수 테스트
+      // boot.admin.saved-tab-restored가 잡음). showPane()과 같은 규칙(모르는 이름은 review로)
+      // 으로 pane→view 변환해 같은 기억을 V2에서도 지킨다.
+      let saved='review';
+      try{ saved=sessionStorage.getItem('koipa_admin_pane')||'review'; }catch(e2){}
+      if(!PANE_NOTE[saved]) saved='review';
+      view=productMapPaneToView(saved);
+    }
+  }catch(e){}
   productShowView(view,true);
 }
 window.addEventListener('hashchange',()=>{try{const m=(location.hash||'').match(/^#view=([^&]+)/);if(m)productShowView(decodeURIComponent(m[1]),true);}catch(e){}});
