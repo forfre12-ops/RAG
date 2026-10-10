@@ -575,7 +575,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .wb-decision-facts summary{cursor:pointer;color:var(--ui-navy);font-size:11px;font-weight:800;}
 .wb-decision-facts p{margin:8px 0;color:var(--ui-muted);font-size:10.5px;line-height:1.5;}
 
-/* 검수자 배정·진행 */
+/* 검수 계정별 진행 현황 */
 .expert-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:18px;}
 .expert-panel{padding:20px;border:1px solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-panel);box-shadow:var(--ui-shadow);}
 .expert-panel h3{margin:0 0 8px;color:var(--ui-navy);font-size:15px;}
@@ -680,7 +680,8 @@ body *,body *::before,body *::after{border-radius:0 !important;}
       <nav class="console-nav" aria-label="관리자 작업 메뉴">
         <button type="button" class="active" data-product-nav="overview" onclick="showProductView('overview')"><span class="nav-icon">O</span>운영 개요</button>
         <button type="button" data-product-nav="documents" data-product-requires-golden="1" onclick="showProductView('documents')"><span class="nav-icon">D</span>문서 검토 및 확정</button>
-        <button type="button" data-product-nav="experts" data-product-requires-golden="1" onclick="showProductView('experts')"><span class="nav-icon">R</span>검수자 배정·진행<span class="nav-count" id="reviewer-nav-count">—</span></button>
+        <button type="button" data-product-nav="experts" data-product-requires-golden="1" onclick="showProductView('experts')"><span class="nav-icon">R</span>검수 계정별 진행<span class="nav-count" id="reviewer-nav-count">—</span></button>
+        <button type="button" data-product-nav="synthesis" data-capability="synthesis-console" onclick="showProductView('synthesis')"><span class="nav-icon">G</span>모의 문서 생성·검토</button>
         <button type="button" data-product-nav="policy" onclick="showProductView('policy')"><span class="nav-icon">P</span>분류 정책 및 근거</button>
         <button type="button" data-product-nav="models" onclick="showProductView('models')"><span class="nav-icon">M</span>모델 학습 및 릴리스</button>
         <button type="button" data-product-nav="audit" onclick="showProductView('audit')"><span class="nav-icon">A</span>감사 기록</button>
@@ -728,8 +729,8 @@ body *,body *::before,body *::after{border-radius:0 !important;}
       <aside class="overview-side">
         <h3>바로가기</h3>
         <button class="quick-link" type="button" data-product-requires-golden="1" onclick="showProductView('documents')"><span>문서 검토 및 확정</span><span>→</span></button>
-        <button class="quick-link" type="button" data-product-requires-golden="1" onclick="showProductView('experts')"><span>검수자 배정·진행</span><span>→</span></button>
-        <button class="quick-link" type="button" onclick="showProductView('models')"><span>모델 학습 및 릴리스</span><span>→</span></button>
+        <button class="quick-link" type="button" data-product-requires-golden="1" onclick="showProductView('experts')"><span>검수 계정별 진행</span><span>→</span></button>
+        <button class="quick-link" type="button" data-capability="synthesis-console" onclick="showProductView('synthesis')"><span>모의 문서 생성·검토</span><span>→</span></button>
         <button class="quick-link" type="button" onclick="showProductView('audit')"><span>감사 기록 조회</span><span>→</span></button>
       </aside>
     </div>
@@ -1003,9 +1004,9 @@ body *,body *::before,body *::after{border-radius:0 !important;}
     </section>
 
     <!-- ===== N. 학습 후보 생성 · 검수 (FUN-003) ===== -->
-    <section class="card col-span" data-pane="train" data-product-view="models" style="order:1" data-capability="synthesis-console">
+    <section class="card col-span" data-pane="train" data-product-view="synthesis" style="order:1" data-capability="synthesis-console">
       <div class="card-head">
-        <div class="ttl">학습 후보 생성 <span class="reqtag" data-tech>FUN-003</span><span class="secmark" data-tech title="제출본 RFP 구현현황이 이 카드를 §N 으로 지목한다">§N</span></div>
+        <div class="ttl">모의 문서 생성·검토 <span class="reqtag" data-tech>FUN-003</span><span class="secmark" data-tech title="제출본 RFP 구현현황이 이 카드를 §N 으로 지목한다">§N</span></div>
         <span class="ep" data-tech>POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
       </div>
       <div class="card-body">
@@ -1783,10 +1784,10 @@ async function api(method, path, body){
  * 새 서버 계약을 만들지 않는다. 따라서 API가 비어 있거나 실패하면 0으로 보정하지 않고
  * 명시적인 empty/error 상태를 낸다.
  * -------------------------------------------------------------------------- */
-const PRODUCT_VIEWS=Object.freeze(['overview','documents','experts','policy','models','audit','settings']);
+const PRODUCT_VIEWS=Object.freeze(['overview','documents','experts','synthesis','policy','models','audit','settings']);
 // 이전 탭을 직접 호출하는 오래된 북마크·인라인 동작과 세션 키를 읽기 위한 호환용 매핑이다.
 // 새 좌측 메뉴와 카드 표시는 data-product-view 하나로만 결정한다.
-const PRODUCT_VIEW_TO_LEGACY_PANE={overview:'ops',documents:'ops',experts:'review',policy:'config',models:'train',audit:'ops',settings:'settings'};
+const PRODUCT_VIEW_TO_LEGACY_PANE={overview:'ops',documents:'ops',experts:'review',synthesis:'train',policy:'config',models:'train',audit:'ops',settings:'settings'};
 let PRODUCT_VIEW='overview';
 let PRODUCT_REVIEW_BATCH='';
 let WORKBENCH_ROWS=[];
@@ -1853,6 +1854,7 @@ function productShowView(view, fromLegacy){
   if(view==='overview' && productGoldenReviewAvailable()) loadProductOverview();
   if(view==='documents' && productGoldenReviewAvailable()) loadWorkbench(false);
   if(view==='experts' && productGoldenReviewAvailable()) loadExpertOperations();
+  if(view==='synthesis' && synthConsoleAvailable()){ loadSynthCoverage(); loadSynthQueue(); }
   if(!fromLegacy){
     try{ history.replaceState(null,'','#view='+encodeURIComponent(view)); }catch(e){}
   }
