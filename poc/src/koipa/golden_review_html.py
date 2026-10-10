@@ -21,16 +21,20 @@ import html as _html
 import json
 from pathlib import Path
 from typing import Optional, Sequence
-from koipa.console_nav import BRAND_NAME, HEADER_CSS, NAV_CSS, REVIEW_SCREEN_EXCLUDE, header_html
+from koipa.console_nav import (
+    BRAND_NAME,
+    CONSOLE_THEME_CSS,
+    HEADER_CSS,
+    NAV_CSS,
+    REVIEW_SCREEN_EXCLUDE,
+    header_html,
+)
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
 from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
 
-# 콘솔(static/styles.css)과 동일한 NovaX 토큰 — 골든 화면이 /demo 콘솔과 한 시스템으로 보이게
-# 맞춘다(radius 0·동일 폰트스택·동일 등급색). 외부 CSS 링크를 쓰지 않는 이유: 이 HTML 은
-# 감리 증적으로 단독 저장·전달될 수 있어 self-contained 여야 한다(정적 마운트 의존 금지).
-_TOKENS = """
-:root{--bg:#ffffff;--bg-surface:#fafafa;--text:#09090b;--text-soft:#52525b;--text-dim:#71717a;--border:rgba(0,0,0,.08);--border-strong:rgba(0,0,0,.18);--accent:#09090b;--accent-soft:#fafafa;--radius:0;--font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;--font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--c-ts:#dc2626;--c-s1:#d97706;--c-s2:#0070f3;--c-s3:#16a34a;--ink:#09090b;--red:#e11d2e;--paper:#fff;--soft:#fafafa;--line:rgba(0,0,0,.08);--mute:#71717a}
-"""
+# 검수·서명은 단독 HTML로도 전달될 수 있어 CSS 링크를 걸지 않는다. 대신 관리자·로그인과
+# 정확히 같은 정본 문자열을 인라인한다.
+_TOKENS = CONSOLE_THEME_CSS
 
 _DEFAULT_CSS = """<style>""" + _TOKENS + """
 *{box-sizing:border-box}

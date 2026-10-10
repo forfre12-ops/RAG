@@ -18,7 +18,7 @@
   padding·border·min-height 를 잃고 전폭으로 퍼졌다. 값을 바꿀 때 **manage 화면 렌더를
   대조**하는 이유가 이것이다.
 
-⛔ 종전 주석의 "manage.html 이 감리 정본 화면설계서 UI-01/UI-04 에 실린 화면" 은 사실이
+  ⛔ 종전 주석의 "manage.html 이 감리 정본 화면설계서 UI-01/UI-04 에 실린 화면" 은 사실이
   아니었다(2026-08-19 확인). 화면설계서에 manage.html 은 없고, UI-01=/demo/index.html ·
   UI-04·UI-05=골든 검수·서명 화면이다.
 """
@@ -43,7 +43,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system
 .cap{font:800 12px ui-monospace,monospace;letter-spacing:.7px;color:#969da3}
 .eyebrow{font:800 12px ui-monospace,monospace;letter-spacing:.8px;color:#8a9298}
 .hero{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:35px;padding-bottom:56px;border-bottom:1px solid var(--line)}
-.gate{border:1px solid var(--line);border-left:5px solid var(--red);align-self:center;padding:25px 24px;min-height:218px}
+  .gate{border:1px solid var(--line);border-left:5px solid var(--text);align-self:center;padding:25px 24px;min-height:218px}
 .gate .glabel{font:12px ui-monospace,monospace;color:#8a949a}
 .gate .status{display:inline-block;border-radius:20px;background:var(--green);color:#087341;padding:5px 10px;font-size:11px;font-weight:800}
 .actions{display:flex;gap:9px;margin-top:20px}

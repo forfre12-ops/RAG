@@ -30,7 +30,7 @@ _SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from koipa.console_nav import HEADER_CSS, NAV_CSS, header_html  # noqa: E402
+from koipa.console_nav import CONSOLE_THEME_CSS, HEADER_CSS, NAV_CSS, header_html  # noqa: E402
 
 STATIC = _SRC / "koipa" / "api" / "static"
 
@@ -38,6 +38,8 @@ MARK_START = "<!-- console-header:start — koipa/console_nav.py 가 만든다. 
 MARK_END = "<!-- console-header:end -->"
 CSS_START = "/* console-header:css:start — koipa/console_nav.py HEADER_CSS. 손으로 고치지 말 것 */"
 CSS_END = "/* console-header:css:end */"
+THEME_START = "/* console-theme:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 */"
+THEME_END = "/* console-theme:end */"
 
 # 화면별 부속 — 헤더 오른쪽 끝. JS 가 id 로 잡는 것은 반드시 남긴다.
 TRAILING = {
@@ -90,6 +92,10 @@ def _css_block() -> str:
     return f"{CSS_START}\n{HEADER_CSS}\n{NAV_CSS}\n{CSS_END}"
 
 
+def _theme_block() -> str:
+    return CONSOLE_THEME_CSS.strip()
+
+
 def _put(text: str, start: str, end: str, block: str, *, fallback) -> str:
     """표식 사이를 갈아 끼운다. 표식이 없으면 fallback 으로 자리를 잡는다."""
     if start in text and end in text:
@@ -119,6 +125,16 @@ def _install_css(text: str) -> str:
     return _put(text, CSS_START, CSS_END, _css_block(), fallback=fallback)
 
 
+def _install_theme(text: str) -> str:
+    def fallback(t: str, block: str) -> str:
+        if "</style>" in t:  # 인라인 <style> 을 쓰는 화면
+            i = t.rindex("</style>")
+            return t[:i] + "\n" + block + "\n" + t[i:]
+        return t.rstrip() + "\n\n" + block + "\n"  # 외부 스타일시트
+
+    return _put(text, THEME_START, THEME_END, _theme_block(), fallback=fallback)
+
+
 def sync(*, check: bool) -> int:
     bad = 0
     for page in ("admin.html", "index.html"):
@@ -127,7 +143,7 @@ def sync(*, check: bool) -> int:
         targets[src] = _install_markup(page, src.read_text(encoding="utf-8"))
         css_file = STATIC / CSS_TARGET[page]
         base = targets.get(css_file, (css_file.read_text(encoding="utf-8")))
-        targets[css_file] = _install_css(base)
+        targets[css_file] = _install_css(_install_theme(base))
 
         for path, new in targets.items():
             old = path.read_text(encoding="utf-8")

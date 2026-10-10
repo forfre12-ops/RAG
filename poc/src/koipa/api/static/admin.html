@@ -527,6 +527,30 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
   .top .spacer{display:none;}.top .health-pill{margin-left:auto;font-size:11px;}.top .logout-link{padding:5px 8px;font-size:11.5px;}
   .top .cnav{order:3;width:100%;overflow-x:auto;padding-bottom:1px;}
 }
+
+/* console-theme:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 */
+:root{
+  --bg:#ffffff;--bg-surface:#fafafa;--bg-mid:#f4f4f5;--bg-strong:#e4e4e7;--bg-inverse:#09090b;
+  --text:#09090b;--text-soft:#52525b;--text-dim:#71717a;--text-faint:#a1a1aa;
+  --border:rgba(0,0,0,.08);--border-mid:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.18);
+  --accent:#09090b;--accent-soft:#f4f4f5;
+  --red:#dc2626;--red-soft:#fef2f2;--red-border:#fecaca;
+  --green:#16a34a;--green-soft:#f0fdf4;--green-border:#bbf7d0;
+  --amber:#d97706;--amber-soft:#fffbeb;--amber-border:#fde68a;
+  --c-ts:#dc2626;--c-s1:#d97706;--c-s2:#0070f3;--c-s3:#16a34a;
+  --radius-sm:6px;--radius:8px;--radius-lg:12px;
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  /* 이전 검수 렌더러가 쓰는 이름도 같은 값으로만 유지한다. */
+  --ink:var(--text);--paper:var(--bg);--soft:var(--bg-surface);--line:var(--border-mid);--mute:var(--text-dim);
+}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.6;letter-spacing:-.011em;-webkit-font-smoothing:antialiased}
+.btn{border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:#fff;color:var(--text);font-family:var(--font-sans);font-weight:650;cursor:pointer}
+.btn.black,.btn.primary{background:var(--bg-inverse);border-color:var(--bg-inverse);color:#fff}
+.btn.sec,.btn.ghost{background:#fff;color:var(--text);border-color:var(--border-strong)}
+.btn:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--c-s2);outline-offset:2px}
+input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:#fff;color:var(--text)}
+/* console-theme:end */
 </style>
 <script src="./errors_ko.js"></script>
 <script src="./upload_progress.js"></script>

@@ -23,11 +23,17 @@ import pytest
 
 from koipa.api.console_login import _render_console_login_html
 from koipa.api.golden import _as_reviewer_view, _render_specledger_gold_console_html
-from koipa.console_nav import CONSOLE_LINKS, HEADER_CSS, REVIEW_SCREEN_EXCLUDE, header_html
+from koipa.console_nav import (
+    CONSOLE_LINKS,
+    CONSOLE_THEME_CSS,
+    HEADER_CSS,
+    REVIEW_SCREEN_EXCLUDE,
+    header_html,
+)
 
 # 검수 화면 — 관리자 콘솔로 가는 메뉴를 두지 않는다(2026-09-11, 설계단계 감리 지적).
 REVIEW_SCREENS = {"signoff", "manage", "login"}
-from koipa.golden_review_html import _nav_html
+from koipa.golden_review_html import _nav_html, render_signoff_html
 
 _POC = Path(__file__).resolve().parents[1]
 STATIC = _POC / "src" / "koipa" / "api" / "static"
@@ -102,18 +108,40 @@ def test_login_screen_has_no_logout_link_other_screens_do():
         assert "logout-link" in head, f"{name}: 로그아웃 버튼이 없다"
 
 
-def test_login_uses_the_console_surface_and_focus_tokens():
-    """로그인이 과거의 빨간 단일 폼이 아니라 콘솔 패널 체계를 따른다."""
+def test_login_uses_the_single_console_theme_not_a_blue_subtheme():
+    """인증 화면도 레이아웃만 다를 뿐 색·입력·포커스는 콘솔 정본을 쓴다."""
     html = _render_console_login_html()
+    assert CONSOLE_THEME_CSS.strip() in html
     for fragment in (
-        "background:var(--canvas)",
-        "border-radius:14px",
-        "box-shadow:0 18px 45px",
-        "textarea:focus,input:focus",
-        "color:var(--accent)",
+        "background:var(--bg)",
+        "border-radius:var(--radius-lg)",
+        "background:var(--bg-inverse)",
+        "textarea:focus,input:focus{border-color:var(--text)}",
+        "color:var(--text-dim)",
     ):
         assert fragment in html
-    assert "--red:#e72d44" not in html
+    for old_token in ("--ink:#0b1f3a", "--accent:#1b4ea8", "--canvas:#f5f7fb", "box-shadow:0 18px 45px"):
+        assert old_token not in html
+
+
+@pytest.mark.parametrize("name", ("manage", "login", "admin.html", "index.html"))
+def test_every_console_surface_carries_the_shared_visual_theme(name):
+    """상단만이 아니라 본문 토큰·컨트롤도 한 정본에서 나와야 한다."""
+    rendered = (
+        (STATIC / "styles.css").read_text(encoding="utf-8")
+        if name == "index.html"
+        else _screens()[name]
+    )
+    assert CONSOLE_THEME_CSS.strip() in rendered, name
+
+
+def test_signoff_carries_the_shared_visual_theme():
+    html = render_signoff_html(
+        [{"doc_id": "visual-theme", "label": "S3", "text": "검수 화면 시각 규약 확인"}],
+        job_id="visual-theme",
+        post_url="/golden/signoff",
+    )
+    assert CONSOLE_THEME_CSS.strip() in html
 
 
 @pytest.mark.parametrize("name", list(_screens()))
@@ -206,6 +234,7 @@ def test_static_pages_carry_the_header_css():
     styles = (STATIC / "styles.css").read_text(encoding="utf-8")
     for blob in (admin, styles):
         assert HEADER_CSS in blob
+        assert CONSOLE_THEME_CSS.strip() in blob
 
 
 def test_header_css_is_scoped_so_page_brand_rules_do_not_win():

@@ -24,7 +24,13 @@ from koipa.api._jwt_auth import SigningUnavailable, sign_jwt
 from koipa.api._rbac import require_role
 from koipa.api.rate_limit import limiter
 from koipa.config import settings
-from koipa.console_nav import HEADER_CSS, NAV_CSS, REVIEW_SCREEN_EXCLUDE, header_html
+from koipa.console_nav import (
+    CONSOLE_THEME_CSS,
+    HEADER_CSS,
+    NAV_CSS,
+    REVIEW_SCREEN_EXCLUDE,
+    header_html,
+)
 from koipa.schemas.golden import ReviewerLoginRequest
 from koipa.services import reviewer_credentials
 
@@ -89,28 +95,25 @@ def _render_console_login_html() -> str:
         '<!doctype html><html lang="ko"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         "<title>한국지식재산보호원 | 관리 콘솔 로그인</title><style>"
-        ":root{--ink:#0b1f3a;--accent:#1b4ea8;--line:#dbe3ef;--mute:#667085;--canvas:#f5f7fb;--panel:#fff}"
-        # [2026-08-21] 로그인 화면만 Arial 이었다 — 다섯 화면 한 벌로 맞춘다.
-        '*{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink);font:15px -apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}'
-        # [2026-08-20] .top/.mark/.brand/.product 를 여기서 따로 갖고 있었고 값이 검수
-        # 화면과 달랐다(높이 86 vs 84 · padding 40 vs 34 · 자간 2 vs 1px). 다섯 화면을
-        # 합치면서 console_nav.HEADER_CSS 한 곳으로 옮겼다.
-        ".wrap{max-width:720px;margin:46px auto;padding:46px 48px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 45px rgba(15,42,82,.10)}"
-        ".eyebrow{font:800 11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:1px;color:var(--accent)}"
+        + CONSOLE_THEME_CSS +
+        # 로그인만 가운데 인증 패널이라는 역할은 유지하되, 색·글꼴·테두리·포커스는
+        # 관리자·골든셋 화면과 같은 CONSOLE_THEME_CSS를 쓴다.
+        ".wrap{max-width:680px;margin:56px auto;padding:36px 40px;background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--radius-lg)}"
+        ".eyebrow{font:800 11px var(--font-mono);letter-spacing:1px;color:var(--text-dim)}"
         "h1{font-size:40px;line-height:1.1;letter-spacing:-2px;margin:14px 0 10px}"
-        "h1 em{font-style:normal;color:var(--accent)}p{line-height:1.7;color:#475467}"
-        "textarea{width:100%;height:150px;border:1px solid var(--line);border-radius:8px;padding:13px;font:13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;"
+        "h1 em{font-style:normal;color:var(--text)}p{line-height:1.7;color:var(--text-soft)}"
+        "textarea{width:100%;height:150px;padding:13px;font:13px var(--font-mono);"
         "word-break:break-all}"
-        "input[type=text],input[type=password]{width:100%;border:1px solid var(--line);border-radius:8px;padding:13px;"
+        "input[type=text],input[type=password]{width:100%;padding:13px;"
         "font:15px inherit;margin-top:10px}"
-        "textarea:focus,input:focus{outline:2px solid rgba(27,78,168,.24);outline-offset:1px;border-color:var(--accent)}"
-        "button{margin-top:18px;width:100%;border:0;border-radius:8px;background:var(--ink);color:#fff;"
-        "padding:15px;font-weight:800;font-size:15px;cursor:pointer}button:hover{background:var(--accent)}"
+        "textarea:focus,input:focus{border-color:var(--text)}"
+        "button{margin-top:18px;width:100%;border:1px solid var(--bg-inverse);border-radius:var(--radius-sm);background:var(--bg-inverse);color:#fff;"
+        "padding:15px;font-weight:800;font-size:15px;cursor:pointer}button:hover{opacity:.86}"
         ".msg{margin-top:16px;padding:14px;border-radius:8px;background:#fff1f2;color:#b42318;display:none}"
-        ".note{border-left:4px solid var(--accent);padding:16px 20px;border-radius:0 8px 8px 0;background:#f4f7fc;margin:24px 0}"
-        ".divider{display:flex;align-items:center;gap:14px;margin:40px 0 24px;color:var(--mute);font-size:13px}"
+        ".note{border-left:3px solid var(--text);padding:16px 20px;border-radius:var(--radius-sm);background:var(--bg-surface);margin:24px 0}"
+        ".divider{display:flex;align-items:center;gap:14px;margin:40px 0 24px;color:var(--text-dim);font-size:13px}"
         "@media(max-width:760px){.wrap{margin:22px 14px;padding:32px 24px}h1{font-size:32px}}"
-        ".divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--line)}"
+        ".divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border-strong)}"
         + HEADER_CSS + NAV_CSS +
         "</style><body>"
         # 로그인 화면은 아직 쿠키가 없다 - 메뉴를 눌러도 401 이 정상이다.
