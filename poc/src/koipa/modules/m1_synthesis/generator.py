@@ -39,9 +39,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import random
 import re
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 from koipa.adapters.llm import build_provider
@@ -234,6 +235,9 @@ body는 한국어 {len_min}자 이상 {len_max}자 이내. 단답 금지 — 여
 의사결정 근거, 예외 처리, 후속 조치 등 서로 다른 세부를 실제 사내 문서처럼 충실히 작성.
 body가 {len_max}자에 가까워지면 새 내용 추가를 멈추고 JSON의 닫는 따옴표와 중괄호까지 반드시 출력한다. JSON 완결을 분량 확대보다 우선한다.
 
+[표 포함 여부]
+{table_requirement}
+
 {revision_context}
 
 위 상황에 해당하는 가상의 사내 문서를 JSON 객체로 작성하시오.
@@ -243,8 +247,17 @@ body가 {len_max}자에 가까워지면 새 내용 추가를 멈추고 JSON의 �
 - 정량 출력이 허용된 경우에만 표와 본문의 기초값을 일치시키고 차이·비율·합계를 다시 계산한다. 검산할 수 없는 파생 수치는 쓰지 않는다.
 - 정량 출력이 허용된 경우에만 정상범위·실패경계와 원인 설명, 시험·결과·후속조치의 시간 순서를 대조한다.
 - 정량 출력이 허용된 경우에만 변경 전·후 차이를 직접 검산한다. 표에는 빈 셀이나 대시 placeholder를 두지 않는다.
-- 마지막 표 뒤에는 반드시 결론과 책임 역할·기한·완료 기준이 있는 후속 조치 문단을 둔다.
 - 등급명(비밀, 기밀, TS, S1, S2, S3, 대외비, 극비 등)은 문서 내용에 포함하지 마시오."""
+
+# [2026-10-11] req.include_table 값에 따라 _build_user_prompt가 고르는 두 문구.
+# 등급을 언급하지 않는다 — 표 유무는 target_grade가 아니라 assign_length_table_specs()가
+# 정하므로, 이 문구도 등급과 무관해야 그 설계가 실제로 지켜진다.
+_TABLE_REQUIRED_TEXT = (
+    "본문에 숫자나 항목을 비교하는 마크다운 표(파이프 `|`, 구분행 포함)를 최소 1개 포함한다. "
+    "표에는 빈 셀이나 대시 placeholder를 두지 않는다. 표 바로 뒤에는 반드시 결론과 책임 "
+    "역할·기한·완료 기준이 있는 후속 조치 문단을 둔다."
+)
+_TABLE_NOT_REQUIRED_TEXT = "표를 넣지 않는다 — 본문은 표 없이 문단과 번호매김 항목으로만 서술한다."
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 구조화 출력 스키마 — 서버가 이 틀 밖의 토큰을 만들지 못하게 한다.
@@ -553,6 +566,42 @@ _PII_PATTERNS = [
     re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),  # 이메일
 ]
 
+# [2026-10-11] 길이-등급 독립 배정 — reports/full1001_20261010 1,001건 실측으로 검증된
+# 설계다(length_only_1nn 실측 vs 라벨섞음평균 300회 차이 -1.11%p, 안전). 등급별로 길이·표
+# 유무가 갈리면 "길이만 보고 등급을 맞히는" 지름길이 생긴다 — 가상으로 등급별 길이를 2배
+# 벌린 대조실험에서는 차이가 +27.1%p까지 뛰었다(위험). 버킷 경계는 그 1,001건 생성에
+# 실제로 쓴 plan.json 값과 같다.
+#
+# ⚠ 이 함수는 target_grade를 받지 않는다 — 매개변수에 없는 것 자체가 독립성의 구조적
+# 보장이다. 호출부가 등급을 넘겨 버킷을 고르게 하면 이 설계가 무효가 된다.
+LENGTH_TABLE_BUCKETS: tuple[tuple[int, int], ...] = (
+    (700, 1000),
+    (1200, 1800),
+    (2000, 3000),
+    (3500, 5500),
+)
+
+
+def assign_length_table_specs(
+    count: int, *, seed: Optional[int] = None,
+) -> list[tuple[int, int, bool]]:
+    """count건에 (len_min, len_max, include_table)을 등급과 무관하게 배정한다.
+
+    버킷을 거의 고르게 순환시켜(나머지는 섞어서 분산) count건에 배분하고, 표 포함
+    여부도 절반씩 독립적으로 섞는다. 호출마다 결과가 달라지도록 seed 기본값은 None
+    (``random.Random(None)`` = 시스템 엔트로피) — 같은 요청을 여러 번 보내도 매번
+    같은 길이대로 쏠리지 않는다. 재현이 필요한 시험만 seed를 고정해서 쓴다.
+    """
+    if count <= 0:
+        return []
+    rng = random.Random(seed)
+    n_buckets = len(LENGTH_TABLE_BUCKETS)
+    buckets = [LENGTH_TABLE_BUCKETS[i % n_buckets] for i in range(count)]
+    rng.shuffle(buckets)
+    table_flags = [i % 2 == 0 for i in range(count)]
+    rng.shuffle(table_flags)
+    return [(lo, hi, tbl) for (lo, hi), tbl in zip(buckets, table_flags)]
+
 
 @dataclass
 class SynthRequest:
@@ -561,6 +610,12 @@ class SynthRequest:
     count: int = 1
     len_min: int = 600
     len_max: int = 2000
+    # [2026-10-11] 표 포함 여부. generate()가 매 문서마다(len_min/len_max와 함께)
+    # assign_length_table_specs()로 등급과 무관하게 다시 정해서 덮어쓴다 — 여기 적은
+    # 값은 그 재배정 전 기본값일 뿐이고, 실제 생성에 쓰이는 값은 generate() 가 정한다.
+    # generate_one()을 API 없이 직접 호출하는 기존 호출부(카탈로그 러너 등)는 재배정을
+    # 거치지 않으므로 이 필드값이 그대로 쓰인다.
+    include_table: bool = False
     # Optional proxy-corpus controls.  Existing generic generation remains
     # unchanged when these are empty; catalog-driven generation can require a
     # document-shaped scenario instead of a short grade-shaped prompt.
@@ -612,6 +667,12 @@ class SynthDoc:
     # [2026-09-28] 이 문서를 만들 때 생성규칙(generation_playbook)을 적용했는가와 그 판.
     # 빈 문자열="규칙 미적용"(use_playbook=False로 만든 문서). 규칙 내용이 바뀌면 값도 바뀐다.
     playbook_version: str = ""
+    # [2026-10-11] 이 문서에 실제로 지시한 길이대·표 여부 — generate()의
+    # assign_length_table_specs() 재배정 결과를 그대로 적어, 나중에 "길이·표가 정말
+    # 등급과 무관하게 갈렸는지"를 산출물만 보고도 재확인할 수 있게 한다.
+    assigned_len_min: int = 0
+    assigned_len_max: int = 0
+    include_table: bool = False
 
 
 class SyntheticDocGenerator:
@@ -831,6 +892,9 @@ class SyntheticDocGenerator:
             structure_requirements=structure_requirements,
             len_min=req.len_min,
             len_max=req.len_max,
+            table_requirement=(
+                _TABLE_REQUIRED_TEXT if req.include_table else _TABLE_NOT_REQUIRED_TEXT
+            ),
             revision_context=revision_context,
         )
 
@@ -969,6 +1033,9 @@ class SyntheticDocGenerator:
                 response_audit=response_audit,
                 generation_mode=generation_mode,
                 playbook_version=_playbook_version() if self.use_playbook else "",
+                assigned_len_min=req.len_min,
+                assigned_len_max=req.len_max,
+                include_table=req.include_table,
             )
 
         body = parsed.get("body", "") or ""
@@ -987,6 +1054,9 @@ class SyntheticDocGenerator:
             response_audit=response_audit,
             generation_mode=generation_mode,
             playbook_version=_playbook_version() if self.use_playbook else "",
+            assigned_len_min=req.len_min,
+            assigned_len_max=req.len_max,
+            include_table=req.include_table,
         )
 
     # ── 다단계 생성 ──────────────────────────────────────────────────────────
@@ -1138,15 +1208,26 @@ class SyntheticDocGenerator:
         ⚠ 동시성을 올린다고 늘 빨라지지 않는다. GPU 1장에 모델 서버가 겹쳐 있으면
         오히려 느려진다(2026-09-10 211 실측: vLLM·Ollama 동거 시 0.78 tokens/sec).
         올리기 전에 그 서버에서 건당 소요를 먼저 잰다.
+
+        [2026-10-11] 길이·표를 문서마다 등급과 무관하게 다시 정한다
+        (assign_length_table_specs). req.len_min/len_max/include_table 는 호출자가
+        적은 기본값일 뿐이고, 여기서 만드는 문서별 복사본(dataclasses.replace)이 실제
+        프롬프트에 쓰인다 — req.target_grade 는 이 재배정 함수에 전달하지 않는다
+        (전달하면 등급별로 버킷을 고르게 될 수 있어 설계가 무효가 된다).
         """
         count = max(0, int(req.count))
         if count == 0:
             return []
+        specs = assign_length_table_specs(count)
+        reqs = [
+            replace(req, len_min=lo, len_max=hi, include_table=tbl)
+            for lo, hi, tbl in specs
+        ]
         workers = min(self.concurrency, count)
         if workers <= 1:
-            return [self.generate_one(req) for _ in range(count)]
+            return [self.generate_one(r) for r in reqs]
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            return list(pool.map(lambda _: self.generate_one(req), range(count)))
+            return list(pool.map(self.generate_one, reqs))
 
 
 def _fallback_body(grade_code: str, domain: str) -> str:
