@@ -241,6 +241,7 @@ _ALWAYS_ON_LOGIN_PATHS = {
     "/api/v1/golden/candidates/login.html",
     "/api/v1/golden/candidates/login",
     "/api/v1/golden/candidates/session",
+    "/api/v1/golden/candidates/prefill-login",
 }
 
 

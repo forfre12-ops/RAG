@@ -86,7 +86,8 @@ def train_report(version_label: str, format: str = Query(default="json", pattern
     for point in rep.learning_curve:
         w.writerow([
             "learning_curve",
-            f"epoch={point.epoch},step={point.step},train_loss={point.train_loss},eval_loss={point.eval_loss}",
+            f"epoch={point.epoch},step={point.step},train_loss={point.train_loss},"
+            f"eval_loss={point.eval_loss},accuracy={point.accuracy}",
         ])
     buf.seek(0)
     return StreamingResponse(
