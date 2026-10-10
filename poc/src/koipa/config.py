@@ -186,6 +186,7 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # 제안 등급 비노출을 함께 켠다. 개발/단위테스트의 코드 기본값(False)은 유지한다.
         "golden_reviewer_assignment_enforced": True,
         "golden_review_blind_enforced": True,
+        "high_grade_dual_review": True,
     },
 }
 

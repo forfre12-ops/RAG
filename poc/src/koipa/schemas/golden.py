@@ -379,6 +379,40 @@ class GoldenExpertReviewPlanResponse(BaseModel):
     reviewer_document_counts: dict[str, int]
 
 
+class GoldenReviewPlanRequest(BaseModel):
+    """현재 검수 배치를 활성 검수자에게 균등 배정한다."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    review_batch: str = Field(min_length=1, max_length=128)
+    reviewer_ids: list[str] = Field(min_length=1, max_length=200)
+    reason: str = Field(default="", max_length=1000)
+
+    @model_validator(mode="after")
+    def _balanced_review_contract(self) -> "GoldenReviewPlanRequest":
+        if not self.review_batch.strip():
+            raise ValueError("review_batch 가 비어 있다(공백만은 불가)")
+        reviewers = [str(value).strip() for value in self.reviewer_ids]
+        if any(not reviewer for reviewer in reviewers):
+            raise ValueError("reviewer_ids 에 빈 값이 있다")
+        if len(set(reviewers)) != len(reviewers):
+            raise ValueError("reviewer_ids 는 서로 달라야 한다")
+        return self
+
+
+class GoldenReviewPlanResponse(BaseModel):
+    review_batch: str
+    reviewer_count: int
+    total_documents: int
+    min_documents_per_reviewer: int
+    max_documents_per_reviewer: int
+    actor_id: str
+    events_written: int
+    assignment_group_id: str
+    already_applied: bool = False
+    reviewer_document_counts: dict[str, int]
+
+
 class GoldenReviewerRosterEntry(BaseModel):
     """배정 UI에만 주는 비밀 없는 활성 검수자 계정 정보."""
 

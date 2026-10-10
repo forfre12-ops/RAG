@@ -29,6 +29,8 @@ from koipa.schemas.golden import (
     GoldenAssignmentResponse,
     GoldenExpertReviewPlanRequest,
     GoldenExpertReviewPlanResponse,
+    GoldenReviewPlanRequest,
+    GoldenReviewPlanResponse,
     GoldenReviewerRosterEntry,
     GoldenAssignmentStatusResponse,
     GoldenBuildRequest,
@@ -822,6 +824,50 @@ def golden_expert_review_plan(
         reviewer_count=len(plan),
         documents_per_reviewer=50,
         total_documents=1000,
+        actor_id=actor_id,
+        events_written=len(rows),
+        assignment_group_id=group_id,
+        already_applied=already_applied,
+        reviewer_document_counts={reviewer: len(doc_ids) for reviewer, doc_ids in plan.items()},
+    )
+
+
+@router.post(
+    "/golden/assignments/review-plan",
+    response_model=GoldenReviewPlanResponse,
+    status_code=201,
+    summary="검수 배치를 활성 검수자에게 균등 배정",
+)
+def golden_review_plan(
+    req: GoldenReviewPlanRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> GoldenReviewPlanResponse:
+    """현재 배치를 실제 활성 검수자에게 균등·독점 배정한다."""
+    if not bool(getattr(settings, "golden_reviewer_assignment_enforced", False)):
+        raise HTTPException(status_code=409, detail="review plan requires GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1")
+    if not bool(getattr(settings, "golden_review_blind_enforced", False)):
+        raise HTTPException(status_code=409, detail="review plan requires GOLDEN_REVIEW_BLIND_ENFORCED=1")
+    _require_active_reviewer_accounts(req.reviewer_ids)
+    actor_id = _console_actor_id(auth)
+    svc = ProxyGoldCandidateService()
+    ledger = access.AssignmentLedger(svc.root)
+    try:
+        rows, group_id, already_applied, plan = ledger.apply_balanced_review_plan(
+            review_batch=req.review_batch,
+            reviewer_ids=req.reviewer_ids,
+            doc_batches=svc.review_batch_index(),
+            actor_id=actor_id,
+            reason=req.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    counts = [len(doc_ids) for doc_ids in plan.values()]
+    return GoldenReviewPlanResponse(
+        review_batch=access.norm_id(req.review_batch),
+        reviewer_count=len(plan),
+        total_documents=sum(counts),
+        min_documents_per_reviewer=min(counts),
+        max_documents_per_reviewer=max(counts),
         actor_id=actor_id,
         events_written=len(rows),
         assignment_group_id=group_id,

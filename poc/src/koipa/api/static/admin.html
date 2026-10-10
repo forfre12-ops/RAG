@@ -87,6 +87,7 @@ textarea{resize:vertical;min-height:90px;font-size:12.5px;line-height:1.55;}
    화면에 **존재**해야 한다는 시험이 있다(test_admin_console_screens). 감추되 남긴다. */
 [data-tech]{display:none !important;}
 body.tech [data-tech]{display:revert !important;}
+.grid > [data-product-legacy]{display:none !important;}
 .techbar{font-size:11px;color:var(--text-dim);padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:var(--bg-surface);}
 .sec-note details{margin-top:4px}
 .sec-note summary{cursor:pointer;color:var(--text-soft)}
@@ -655,12 +656,12 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
       <div class="console-sidebar-kicker">운영 작업공간</div>
       <nav class="console-nav" aria-label="관리자 작업 메뉴">
         <button type="button" class="active" data-product-nav="overview" onclick="showProductView('overview')"><span class="nav-icon">O</span>운영 개요</button>
-        <button type="button" data-product-nav="documents" data-product-requires-golden="1" onclick="showProductView('documents')"><span class="nav-icon">D</span>검증 문서 검토·결정</button>
+        <button type="button" data-product-nav="documents" data-product-requires-golden="1" onclick="showProductView('documents')"><span class="nav-icon">D</span>문서 검토 및 확정</button>
         <button type="button" data-product-nav="experts" data-product-requires-golden="1" onclick="showProductView('experts')"><span class="nav-icon">R</span>검수자 배정·진행<span class="nav-count" id="reviewer-nav-count">—</span></button>
-        <button type="button" data-product-nav="policy" onclick="showProductView('policy')"><span class="nav-icon">P</span>분류 정책·참고 규정</button>
-        <button type="button" data-product-nav="models" onclick="showProductView('models')"><span class="nav-icon">M</span>학습·평가·릴리스</button>
+        <button type="button" data-product-nav="policy" onclick="showProductView('policy')"><span class="nav-icon">P</span>분류 정책 및 근거</button>
+        <button type="button" data-product-nav="models" onclick="showProductView('models')"><span class="nav-icon">M</span>모델 학습 및 릴리스</button>
         <button type="button" data-product-nav="audit" onclick="showProductView('audit')"><span class="nav-icon">A</span>감사 기록</button>
-        <button type="button" data-product-nav="settings" onclick="showProductView('settings')"><span class="nav-icon">S</span>연결·운영 도구</button>
+        <button type="button" data-product-nav="settings" onclick="showProductView('settings')"><span class="nav-icon">S</span>운영 설정</button>
       </nav>
       <div class="console-sidebar-foot">주요 작업과 권한 변경은 감사 기록으로 관리됩니다.</div>
     </aside>
@@ -703,9 +704,9 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
       </section>
       <aside class="overview-side">
         <h3>바로가기</h3>
-        <button class="quick-link" type="button" data-product-requires-golden="1" onclick="showProductView('documents')"><span>검증 문서 검토·결정 작업대</span><span>→</span></button>
+        <button class="quick-link" type="button" data-product-requires-golden="1" onclick="showProductView('documents')"><span>문서 검토 및 확정</span><span>→</span></button>
         <button class="quick-link" type="button" data-product-requires-golden="1" onclick="showProductView('experts')"><span>검수자 배정·진행</span><span>→</span></button>
-        <button class="quick-link" type="button" onclick="showProductView('models')"><span>학습·평가·릴리스 현황</span><span>→</span></button>
+        <button class="quick-link" type="button" onclick="showProductView('models')"><span>모델 학습 및 릴리스</span><span>→</span></button>
         <button class="quick-link" type="button" onclick="showProductView('audit')"><span>감사 기록 조회</span><span>→</span></button>
       </aside>
     </div>
@@ -721,8 +722,8 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
   <!-- 기존 후보 API의 목록·상세만 사용한다. 신규 판정 API를 만들거나 등급을 추정하지 않는다. -->
   <section id="product-documents" class="product-view" data-product-requires-golden="1" aria-labelledby="documents-heading">
     <div class="console-view-head">
-      <div><h2 id="documents-heading" class="console-view-title">검증 문서 검토·결정 작업대</h2><p class="console-view-help">좌우 패널 경계를 드래그해 문서함·본문·결정 정보 영역의 폭을 조절할 수 있습니다.</p></div>
-      <div class="console-view-actions"><button class="btn sec sm" type="button" onclick="loadWorkbench(true)">목록 새로고침</button><button class="btn sm" type="button" onclick="focusWorkbenchDecision()">선택 문서 검토</button></div>
+      <div><h2 id="documents-heading" class="console-view-title">문서 검토 및 확정</h2><p class="console-view-help">문서함, 원문, 결정 정보를 한 화면에서 확인합니다.</p></div>
+      <div class="console-view-actions"><button class="btn sec sm" type="button" onclick="loadWorkbench(true)">목록 새로고침</button><button class="btn sm" type="button" onclick="focusWorkbenchDecision()">선택 문서 보기</button></div>
     </div>
     <div id="document-workbench" class="workbench" aria-live="polite">
       <aside class="workbench-drawer" id="wb-drawer">
@@ -738,12 +739,12 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
 
   <section id="product-experts" class="product-view" data-product-requires-golden="1" aria-labelledby="experts-heading">
     <div class="console-view-head">
-      <div><h2 id="experts-heading" class="console-view-title">검수자 배정·진행</h2><p class="console-view-help">현재 검수 배치를 검수자 20명에게 50건씩 독립 배정하고 진행 상태를 확인합니다.</p></div>
-      <div class="console-view-actions"><button class="btn sec sm" type="button" onclick="loadExpertOperations()">배정 현황 새로고침</button><button class="btn sm" type="button" onclick="showProductView('documents')">검증 문서 작업대</button></div>
+      <div><h2 id="experts-heading" class="console-view-title">검수자 배정·진행</h2><p class="console-view-help">현재 검수 배치를 선택한 검수자에게 균등하게 배정합니다.</p></div>
+      <div class="console-view-actions"><button class="btn sec sm" type="button" onclick="loadExpertOperations()">배정 현황 새로고침</button><button class="btn sm" type="button" onclick="showProductView('documents')">문서 검토 화면</button></div>
     </div>
     <div class="expert-grid">
       <section class="expert-panel"><h3>배정 상태</h3><div id="expert-assignment-summary" class="overview-state" data-state="loading">배정 현황을 불러오는 중입니다.</div><div id="expert-assignment-list" class="expert-assignment-list"></div></section>
-      <section class="expert-panel"><h3>검수자 20명 × 50건 배정</h3><p class="expert-note">현재 검수 배치가 정확히 1,000건이고, 배정 강제와 블라인드 검수가 모두 켜진 경우에만 저장됩니다. 조건이 하나라도 다르면 서버가 원장을 쓰지 않고 사유를 돌려줍니다.</p><label class="expert-field" for="expert-reviewer-roster">배정 가능한 활성 검수자 <span>현재 이 서버에서 로그인 가능한 reviewer 계정만 표시합니다.</span><select id="expert-reviewer-roster" multiple size="7" aria-describedby="expert-roster-note"></select></label><button class="btn sec sm" type="button" onclick="appendSelectedExpertReviewers()">선택 계정 추가</button><p id="expert-roster-note" class="expert-note">계정 명부를 불러오는 중입니다.</p><label class="expert-field" for="expert-reviewer-ids">검수자 계정 ID 20개 <span>선택 계정을 추가하거나 한 줄에 하나씩 입력합니다. 저장 전 서버가 활성 계정을 다시 확인합니다.</span><textarea id="expert-reviewer-ids" rows="9" placeholder="reviewer-01&#10;reviewer-02&#10;…"></textarea></label><label class="expert-field" for="expert-assignment-reason">배정 메모 <span>선택</span><input id="expert-assignment-reason" maxlength="1000" placeholder="예: 2026-10 검수 1차" /></label><button class="btn black" id="expert-plan-submit" type="button" onclick="submitExactExpertPlan()">20명에게 균등 배정</button><p id="expert-plan-message" class="expert-message" role="status" aria-live="polite"></p></section>
+      <section class="expert-panel"><h3>검수자 균등 배정</h3><p class="expert-note">배정 강제와 블라인드 검수가 켜진 경우에만 저장됩니다. 문서는 검수자별 수량 차이가 최대 한 건이 되도록 나뉩니다.</p><label class="expert-field" for="expert-reviewer-roster">배정 가능한 활성 검수자 <span>현재 이 서버에서 로그인 가능한 reviewer 계정만 표시합니다.</span><select id="expert-reviewer-roster" multiple size="7" aria-describedby="expert-roster-note"></select></label><button class="btn sec sm" type="button" onclick="appendSelectedExpertReviewers()">선택 계정 추가</button><p id="expert-roster-note" class="expert-note">계정 명부를 불러오는 중입니다.</p><label class="expert-field" for="expert-reviewer-ids">선택한 검수자 계정 <span>선택 계정을 추가하거나 한 줄에 하나씩 입력합니다. 저장 전 서버가 활성 계정을 다시 확인합니다.</span><textarea id="expert-reviewer-ids" rows="9" placeholder="reviewer-01&#10;reviewer-02&#10;…"></textarea></label><label class="expert-field" for="expert-assignment-reason">배정 메모 <span>선택</span><input id="expert-assignment-reason" maxlength="1000" placeholder="예: 2026-10 검수 1차" /></label><button class="btn black" id="expert-plan-submit" type="button" onclick="submitBalancedReviewPlan()">균등 배정</button><p id="expert-plan-message" class="expert-message" role="status" aria-live="polite"></p></section>
     </div>
   </section>
 
@@ -1935,11 +1936,11 @@ async function loadExpertOperations(){
     const batchCount=Number(probe&&probe.total||0);
     const flags='배정 강제 '+(enforced.assignment_enforced?'켜짐':'꺼짐')+' · 블라인드 검수 '+(enforced.blind_enforced?'켜짐':'꺼짐');
     const blockers=[];
-    if(batchCount!==1000) blockers.push('문서 수 '+batchCount.toLocaleString()+'건(1,000건 필요)');
+    if(batchCount<1) blockers.push('배정할 문서 없음');
     if(!enforced.assignment_enforced) blockers.push('배정 강제 설정 필요');
     if(!enforced.blind_enforced) blockers.push('블라인드 검수 설정 필요');
     const ready=blockers.length===0;
-    const submit=$('expert-plan-submit');if(submit){submit.disabled=!ready;submit.title=ready?'20명에게 50건씩 배정합니다.':blockers.join(' · ');}
+    const submit=$('expert-plan-submit');if(submit){submit.disabled=!ready;submit.title=ready?'선택한 검수자에게 균등 배정합니다.':blockers.join(' · ');}
     expertSetState('empty',PRODUCT_REVIEW_BATCH+' · 검수자 '+reviewers.length+'명 · '+flags+' · 문서 '+batchCount.toLocaleString()+'건'+(ready?' · 배정 가능':' · 배정 대기: '+blockers.join(', ')));
     renderExpertAssignmentRows(reviewers);
   }catch(error){await roster;expertSetState('error','배정 현황을 불러오지 못했습니다. '+errKoText(error));renderExpertAssignmentRows([]);}
@@ -1948,10 +1949,10 @@ function expertReviewerIds(){
   const raw=(($('expert-reviewer-ids')||{}).value||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
   return raw;
 }
-async function submitExactExpertPlan(){
+async function submitBalancedReviewPlan(){
   const message=$('expert-plan-message');const reviewerIds=expertReviewerIds();
   if(!PRODUCT_REVIEW_BATCH){if(message)message.textContent='현재 검수 배치를 먼저 선택하세요.';return;}
-  if(reviewerIds.length!==20||new Set(reviewerIds).size!==20){if(message)message.textContent='서로 다른 검수자 계정 ID 20개를 한 줄에 하나씩 입력하세요.';return;}
+  if(!reviewerIds.length||new Set(reviewerIds).size!==reviewerIds.length){if(message)message.textContent='서로 다른 검수자 계정 ID를 한 줄에 하나씩 입력하세요.';return;}
   if(EXPERT_REVIEWER_ROSTER.length){
     const active=new Set(EXPERT_REVIEWER_ROSTER.map(row=>row.reviewer_id));
     const missing=reviewerIds.filter(id=>!active.has(id));
@@ -1960,8 +1961,9 @@ async function submitExactExpertPlan(){
   const body={review_batch:PRODUCT_REVIEW_BATCH,reviewer_ids:reviewerIds,reason:(($('expert-assignment-reason')||{}).value||'').trim()};
   try{
     if(message)message.textContent='배정 전 서버 계약을 확인하는 중입니다…';
-    const result=await api('POST','/golden/assignments/expert-review-plan',body);
-    if(message)message.textContent='배정 완료: '+result.reviewer_count+'명 · 1인 '+result.documents_per_reviewer+'건 · 총 '+result.total_documents+'건'+(result.already_applied?' (기존 동일 계획 확인)':'');
+    const result=await api('POST','/golden/assignments/review-plan',body);
+    const allocation=result.min_documents_per_reviewer===result.max_documents_per_reviewer?'1인 '+result.max_documents_per_reviewer+'건':'1인 '+result.min_documents_per_reviewer+'~'+result.max_documents_per_reviewer+'건';
+    if(message)message.textContent='배정 완료: '+result.reviewer_count+'명 · '+allocation+' · 총 '+result.total_documents+'건'+(result.already_applied?' (기존 동일 계획 확인)':'');
     await loadExpertOperations();
   }catch(error){if(message)message.textContent='배정하지 않았습니다. '+errKoText(error);}
 }
@@ -2396,29 +2398,8 @@ function applySynthAvailability(active){
   }
   const box=$('sy-noop-note');
   if(box){
-    const blocked=(a==='noop');
-    box.style.display = blocked ? '' : 'none';
-    /* [2026-08-24] 문구를 다시 썼다. 셋을 고쳤다.
-       ① **결함이 아니라 구성이다.** 종전은 "본문을 쓸 LLM 이 없습니다"라 부족해서 못 하는 것처럼
-          읽혔다. 실제로는 등급 판정 LLM 을 쓰지 않기로 한 구성이고, 합성 문서를 새로 만들지
-          않기로 한 방침이다(2026-08-24).
-       ② **못 고치는 것을 안내하지 않는다.** `LLM_PROVIDER`·`.env` 를 지웠다 — 이 화면을 보는
-          사람은 서버 설정을 바꿀 권한이 없다. 검증문서 카드에서 같은 이유로 이미 뺐던 것이다.
-       ③ **조어를 뺐다.** "생성→검수 큐 경로가 도는지"는 표준어가 아니다.
-          무슨 일이 일어나고 무엇이 안 되는지만 적는다. */
-    box.innerHTML = blocked
-      /* [2026-08-24 3차 수정] 원인이 아니라 **결정**을 적는다. 종전 두 판은 둘 다 약했다 —
-         「LLM 이 없다」·「연결되지 않았습니다」는 미완성·환경 미비로 읽히고, 감리가 "그럼
-         붙이면 되지 않나" 로 되물으면 수세가 된다. 사실은 그 반대다: **이미 만들었고, 그것으로
-         배포 모델까지 학습했고, 더 만들 필요가 없어서 안 만든다.**
-         근거(실측 2026-08-24): 배포 모델 v-fe4b386b 의 학습셋
-         datasets/labeled_p1_retrain_v4_clean/train.jsonl 5,911행 중 합성 3,187행(53.9%).
-         요건은 「만들 수 있어야 한다」이지 「계속 만들어라」가 아니다.
-         버튼은 잠그지 않는다 — 요건 증빙 화면(§N)이라 감리가 눌러 볼 수 있어야 한다. */
-      ? '<b>학습 후보는 이미 확보돼 있고, 추가 생성은 하지 않는 구성입니다.</b><br/>'
-        + '현행 배포 모델이 그 데이터로 학습됐습니다. 생성·검수 큐는 그대로 동작하지만, '
-        + '여기서 만든 본문은 학습에 들어가지 않습니다.'
-      : '';
+    box.style.display = 'none';
+    box.textContent = '';
   }
 }
 function applyServerConfig(d){
@@ -3297,8 +3278,10 @@ async function loadSynthQueue(){
   const status=$('sy-status').value;
   try{
     const d=await api('GET',`/synth/queue?status=${encodeURIComponent(status)}&limit=50`);
-    SYNTH=d.items||[];
-    $('sy-info').textContent=`${status} ${d.total??SYNTH.length}건 (표시 ${SYNTH.length})`;
+    const items=Array.isArray(d.items)?d.items:[];
+    const omitted=items.filter(item=>String(item.llm_provider||'').toLowerCase()==='noop').length;
+    SYNTH=items.filter(item=>String(item.llm_provider||'').toLowerCase()!=='noop');
+    $('sy-info').textContent=`검토 대상 ${SYNTH.length}건${omitted?' · 테스트 데이터 '+omitted+'건 제외':''}`;
     renderSynthQueue();
   }catch(e){ $('sy-info').textContent=`검수 큐 조회 실패: ${errKoText(e)}`; }
 }

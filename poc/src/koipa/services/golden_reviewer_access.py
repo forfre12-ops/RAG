@@ -752,6 +752,90 @@ class AssignmentLedger:
                 os.fsync(handle.fileno())
         return rows, group_id, False, plan
 
+    def apply_balanced_review_plan(
+        self, *, review_batch: str, reviewer_ids: Iterable[str], doc_batches: Mapping[str, str | None],
+        actor_id: str, reason: str = "",
+    ) -> tuple[list[dict[str, Any]], str, bool, dict[str, tuple[str, ...]]]:
+        """현재 배치 전체를 실제 검수자 수에 맞춰 균등·독점 배정한다."""
+        batch = norm_id(review_batch)
+        reviewers = tuple(norm_id(reviewer_id) for reviewer_id in reviewer_ids)
+        actor = norm_id(actor_id)
+        if not batch or not actor:
+            raise ValueError("review_batch and actor_id are required")
+        if not reviewers or not all(reviewers) or len(set(reviewers)) != len(reviewers):
+            raise ValueError("review plan requires distinct reviewer IDs")
+
+        batch_docs = tuple(sorted(
+            doc_id for doc_id, doc_batch in doc_batches.items() if norm_id(doc_batch) == batch
+        ))
+        if not batch_docs:
+            raise ValueError("review batch has no candidates")
+        if len(batch_docs) < len(reviewers):
+            raise ValueError(
+                f"review batch has {len(batch_docs)} candidates but {len(reviewers)} reviewers were selected"
+            )
+
+        ordered = tuple(sorted(
+            batch_docs,
+            key=lambda doc_id: hashlib.sha256(f"{batch}\0{doc_id}".encode("utf-8")).hexdigest(),
+        ))
+        plan_lists: dict[str, list[str]] = {reviewer: [] for reviewer in reviewers}
+        for index, doc_id in enumerate(ordered):
+            plan_lists[reviewers[index % len(reviewers)]].append(doc_id)
+        plan = {reviewer: tuple(doc_ids) for reviewer, doc_ids in plan_lists.items()}
+        counts = [len(doc_ids) for doc_ids in plan.values()]
+        if max(counts) - min(counts) > 1:
+            raise RuntimeError("review plan is not balanced")
+
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with _exclusive_ledger_lock(self.lock_path):
+            events = self.read_events()
+            state = self.replay(events)
+            batch_doc_set = frozenset(batch_docs)
+            visible_by_reviewer = {}
+            for reviewer, slot in state.items():
+                if not (slot["doc_ids"] or slot["review_batches"]):
+                    continue
+                visible = self._resolve(slot, doc_batches) & batch_doc_set
+                if visible:
+                    visible_by_reviewer[reviewer] = visible
+            desired = {reviewer: frozenset(doc_ids) for reviewer, doc_ids in plan.items()}
+            exact_existing = (
+                set(visible_by_reviewer) == set(desired)
+                and all(visible_by_reviewer.get(reviewer, frozenset()) == docs
+                        for reviewer, docs in desired.items())
+            )
+            if exact_existing:
+                return [], self._existing_group_id(events, desired), True, plan
+
+            occupied = sorted({doc_id for doc_ids in visible_by_reviewer.values() for doc_id in doc_ids})
+            if occupied:
+                raise ValueError("review batch already has assignments: " + ", ".join(occupied[:10]))
+
+            group_id = str(uuid4())
+            now = dt.datetime.now(dt.timezone.utc).isoformat()
+            rows: list[dict[str, Any]] = []
+            for reviewer, doc_ids in plan.items():
+                for doc_id in doc_ids:
+                    rows.append({
+                        "schema_version": 1,
+                        "event_id": str(uuid4()),
+                        "event": EVENT_ASSIGN,
+                        "reviewer_id": reviewer,
+                        "doc_id": doc_id,
+                        "actor_id": actor,
+                        "at": now,
+                        "reason": (reason or "").strip(),
+                        "assignment_group_id": group_id,
+                        "review_batch_context": batch,
+                        "assignment_kind": "balanced_review_plan",
+                    })
+            with self.path.open("a", encoding="utf-8", newline="\n") as handle:
+                handle.writelines(dumps_line(row, sort_keys=True) + "\n" for row in rows)
+                handle.flush()
+                os.fsync(handle.fileno())
+        return rows, group_id, False, plan
+
     @staticmethod
     def _existing_group_id(
         events: Iterable[Mapping[str, Any]],
