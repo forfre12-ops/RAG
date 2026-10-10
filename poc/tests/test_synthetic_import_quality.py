@@ -129,12 +129,14 @@ def test_load_json_jsonl_and_cli_report_manifest_are_read_only(tmp_path: Path):
 
     report_path = tmp_path / "out" / "report.json"
     manifest_path = tmp_path / "out" / "manifest.json"
-    script = Path(__file__).resolve().parents[2] / "scripts" / "audit_synthetic_documents.py"
-    completed = subprocess.run(
-        [sys.executable, str(script), str(input_dir), "--report", str(report_path), "--manifest", str(manifest_path)],
-        check=True, capture_output=True, text=True,
-    )
-    assert completed.stdout == ""
+    root_script = Path(__file__).resolve().parents[2] / "scripts" / "audit_synthetic_documents.py"
+    image_script = Path(__file__).resolve().parents[1] / "scripts" / "audit_synthetic_documents.py"
+    for script in (root_script, image_script):
+        completed = subprocess.run(
+            [sys.executable, str(script), str(input_dir), "--report", str(report_path), "--manifest", str(manifest_path)],
+            check=True, capture_output=True, text=True,
+        )
+        assert completed.stdout == ""
     assert report_path.exists() and manifest_path.exists()
     assert {path: path.read_bytes() for path in (json_path, jsonl_path)} == before
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
