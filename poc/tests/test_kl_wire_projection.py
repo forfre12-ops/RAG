@@ -83,7 +83,9 @@ def test_rule_grade_stays_none_when_never_set():
 
 
 def test_some_diagnostic_fields_are_still_always_blanked():
-    """scores·model_grade·grade_candidates(_reason) 넷은 그대로 항상 비운다 — 10/2 에도 안 바뀐 넷."""
+    """model_grade·grade_candidates(_reason) 셋은 그대로 항상 비운다 — 신뢰도 수치가 아니라
+    내부 진단용 대안 후보 필드라 범위 밖(scores 는 2026-10-11 뒤집혀 더 이상 비우지 않는다,
+    test_scores_now_survive_projection_2026_10_11 참조)."""
     r = _result(
         label="S2", rule_grade="S2",
         scores={"S2": 0.8, "S3": 0.2},
@@ -92,10 +94,17 @@ def test_some_diagnostic_fields_are_still_always_blanked():
         grade_candidates_reason="접근범위 미확인",
     )
     projected = kl_wire_projection(r)
-    assert projected.scores == {}
     assert projected.model_grade is None
     assert projected.grade_candidates == []
     assert projected.grade_candidates_reason is None
+
+
+def test_scores_now_survive_projection_2026_10_11():
+    """[2026-10-11 뒤집힘] "API로 신뢰도를 보여줘야 한다"는 요청에 따라 scores(등급별 신뢰도
+    수치)는 더 이상 비우지 않는다 — 9/29~10/2엔 반대로 비웠었다."""
+    r = _result(label="S2", rule_grade="S2", scores={"S2": 0.8, "S3": 0.2})
+    projected = kl_wire_projection(r)
+    assert projected.scores == {"S2": 0.8, "S3": 0.2}
 
 
 def test_evidence_fields_now_survive_projection_2026_10_02():

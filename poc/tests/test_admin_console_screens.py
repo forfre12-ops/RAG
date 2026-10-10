@@ -87,6 +87,23 @@ def test_console_model_release_uses_evidence_scoped_metrics(console: str):
     ):
         assert marker in console
     assert "안전층 적용 전" not in console
+    assert "3 재학습 트리거" not in console
+    assert "4 모델 서빙·배포" not in console
+
+
+def test_console_hides_technical_settings_and_compacts_synth_coverage(console: str):
+    for marker in (
+        'class="connection-summary"',
+        'id="settings-health-state"',
+        'class="settings-stack" data-tech',
+        'class="coverage-panel"',
+        'class="coverage-summary"',
+        'class="coverage-details"',
+        '점검 대상',
+    ):
+        assert marker in console
+    assert "학습셋 분포·검토 후보" not in console
+    assert "d.caveat" not in console
 
 
 def test_console_warns_before_grade_deactivation(console: str):

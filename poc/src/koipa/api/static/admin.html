@@ -435,6 +435,28 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .settings-maintenance .settings-section-no{background:#b45309;}
 .settings-maintenance-body{display:flex;align-items:center;justify-content:space-between;gap:16px;}
 .settings-maintenance-body p{margin:0;color:var(--text-soft);font-size:12px;line-height:1.6;}
+.connection-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.connection-summary-item{padding:13px 14px;border:1px solid var(--ui-line-soft);border-radius:10px;background:#fbfcfe;}
+.connection-summary-item span{display:block;color:var(--ui-muted);font-size:10.5px;font-weight:750;}
+.connection-summary-item b{display:block;margin-top:6px;color:var(--ui-navy);font-size:13px;}
+.operations-advanced{margin-top:14px;border-top:1px solid var(--ui-line-soft);padding-top:14px;}
+.operations-advanced summary{cursor:pointer;color:var(--ui-muted);font-size:12px;font-weight:700;}
+.operations-advanced .settings-fields{margin-top:14px;}
+.coverage-panel{margin-top:12px;border:1px solid var(--ui-line-soft);border-radius:11px;background:#fbfcfe;overflow:hidden;}
+.coverage-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
+.coverage-metric{padding:13px 14px;border-right:1px solid var(--ui-line-soft);}
+.coverage-metric:last-child{border-right:0;}
+.coverage-metric span{display:block;color:var(--ui-muted);font-size:10.5px;font-weight:750;}
+.coverage-metric b{display:block;margin-top:6px;color:var(--ui-navy);font:800 20px var(--font-mono);letter-spacing:-.05em;}
+.coverage-metric.is-caution b{color:#b45309;}
+.coverage-details{border-top:1px solid var(--ui-line-soft);background:#fff;}
+.coverage-details summary{padding:11px 14px;cursor:pointer;color:var(--ui-navy);font-size:12px;font-weight:750;}
+.coverage-table{width:100%;border-collapse:collapse;font-size:12px;}
+.coverage-table th{padding:8px 12px;background:#f8fafc;color:var(--ui-muted);font-size:10.5px;text-align:left;}
+.coverage-table td{padding:9px 12px;border-top:1px solid var(--ui-line-soft);color:var(--text-soft);}
+.coverage-table td:last-child{text-align:right;}
+.coverage-table .btn{min-height:30px;padding:4px 9px;font-size:11px;}
+.coverage-clear{padding:12px 14px;color:var(--ui-muted);font-size:12px;}
 .settings-maintenance .btn.btn{flex:0 0 auto;border-color:#e7b45f;background:#fffaf0;color:#92400e;}
 .settings-maintenance .btn:hover{background:#fff4db;}
 
@@ -581,6 +603,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
   .top .mark{width:30px;height:30px;}.top .brand-mark{width:28px;height:28px;padding:3px;}
   .top .spacer{display:none;}.top .health-pill{margin-left:auto;font-size:11px;}.top .logout-link{padding:5px 8px;font-size:11.5px;}
   .top .cnav{order:3;width:100%;overflow-x:auto;padding-bottom:1px;}
+}
+@media(max-width:760px){
+  .connection-summary,.coverage-summary{grid-template-columns:1fr 1fr;}
+  .connection-summary-item:last-child,.coverage-metric:last-child{border-right:1px solid var(--ui-line-soft);}
+  .coverage-metric:nth-child(2){border-right:0;}
 }
 
 /* console-theme:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 */
@@ -805,17 +832,15 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
          항목이 아니므로 「연결·운영 도구」에서만 열어, 업무 화면을 같은 설정으로 반복하지 않는다. -->
     <section class="card col-span settings-card" data-pane="settings" data-product-view="settings" style="order:0" aria-labelledby="settings-title">
       <header class="settings-hero">
-        <div>
-          <p class="settings-kicker">환경 · 접근</p>
-          <h2 id="settings-title">연결 및 운영 도구</h2>
-          <p>일상 업무 화면에는 연결 상태만 표시합니다. 서버 주소, 기록 주체, 쓰기 허용과 시연 데이터 정리는 이곳에서만 관리합니다.</p>
-        </div>
-        <div class="settings-hero-note">
-          <b>안전한 기본값</b>
-          <span>상태 변경 전에는 쓰기 작업 허용을 확인하고, 연결 상태는 상단 표시에서 바로 확인합니다.</span>
-        </div>
+        <div><p class="settings-kicker">운영 상태</p><h2 id="settings-title">운영 연결</h2></div>
+        <button class="btn sec sm" type="button" onclick="checkHealth()">상태 새로고침</button>
       </header>
-      <div class="settings-stack">
+      <div class="connection-summary" style="padding:18px 22px 0;" aria-live="polite">
+        <div class="connection-summary-item"><span>서비스 상태</span><b id="settings-health-state">확인 필요</b></div>
+        <div class="connection-summary-item"><span>권한 기준</span><b>서버 인증</b></div>
+        <div class="connection-summary-item"><span>변경 기록</span><b>감사 기록 보존</b></div>
+      </div>
+      <div class="settings-stack" data-tech>
         <section class="settings-section" aria-labelledby="settings-connection-title">
           <header class="settings-section-head">
             <span class="settings-section-no" aria-hidden="true">01</span>
@@ -956,7 +981,7 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
     <!-- ===== N. 학습 후보 생성 · 검수 (FUN-003) ===== -->
     <section class="card col-span" data-pane="train" data-product-view="models" style="order:1" data-capability="synthesis-console">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">데이터</span> 학습 후보 생성 · 검토 → 학습셋 편입 <span class="reqtag" data-tech>FUN-003</span><span class="secmark" data-tech title="제출본 RFP 구현현황이 이 카드를 §N 으로 지목한다">§N</span></div>
+        <div class="ttl">학습 후보 생성 <span class="reqtag" data-tech>FUN-003</span><span class="secmark" data-tech title="제출본 RFP 구현현황이 이 카드를 §N 으로 지목한다">§N</span></div>
         <span class="ep" data-tech>POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
       </div>
       <div class="card-body">
@@ -988,18 +1013,18 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
                     vllm_qwen·vllm_exaone 은 서버가 422 로 거부하고, 실제로 되는
                     ollama·vllm·local_openai·lm_studio 는 화면에 없었다. 이제 healthz 의
                     llm_providers_supported 로 채운다(등급 셀렉트와 같은 방식). -->
-            <label class="fld">생성 제공자 (LLM)</label>
+            <label class="fld">생성 제공자</label>
             <select id="sy-provider"></select>
           </div>
           <div class="field">
             <!-- [2026-08-24] 「검수 큐」 → 「학습 후보 검토 큐」. 운영 탭의 검수 큐(분류 결과)와
                  글자가 같아 같은 목록으로 읽혔다. 여기 있는 것은 아직 문서가 아니라 학습용
                  합성 후보다. 서버 상태값(pending/approved/rejected)은 그대로 둔다. -->
-            <label class="fld">학습 후보 검토 큐 — 상태</label>
+            <label class="fld">검토 상태</label>
             <select id="sy-status" onchange="loadSynthQueue()">
-              <option value="pending">pending (검토 대기)</option>
-              <option value="approved">approved (승인됨)</option>
-              <option value="rejected">rejected (반려됨)</option>
+              <option value="pending">대기</option>
+              <option value="approved">승인</option>
+              <option value="rejected">반려</option>
             </select>
           </div>
           <div class="field">
@@ -1010,26 +1035,25 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
             </div>
           </div>
         </div>
-        <p class="hint" id="sy-provider-note" style="margin-top:2px"></p>
+        <p class="hint" id="sy-provider-note" data-tech style="margin-top:2px"></p>
         <!-- [2026-09-28] 생성 규칙(플레이북) — 지금 생성에 기본 적용되는 규칙을 관리자가
              확인할 수 있어야 한다. 기본 접힘(요약 한 줄)·펼치면 규칙·금지
              낱말이 보인다. 정본은 m1_synthesis/generation_playbook.py, 조회는 GET /synth/playbook. -->
-        <details id="sy-playbook" style="margin-top:8px;">
+        <details id="sy-playbook" data-tech style="margin-top:8px;">
           <summary class="hint" style="cursor:pointer;">생성 규칙(플레이북) — <span id="sy-playbook-version">불러오는 중…</span></summary>
           <div id="sy-playbook-body" class="hint" style="margin-top:6px;line-height:1.6;"></div>
         </details>
         <!-- [2026-08-24] warnbox(노랑) → sec-note(회색). 이 카드는 제출본이 §N 으로 지목한
              **요건 증빙 화면**이다(FUN-003-①⑦). 다섯 줄짜리 노란 경고가 카드를 덮고 있으면
              감리에서 "이 기능 고장났다"로 읽힌다. 알려야 할 사실은 그대로 두고 색과 분량만 줄인다. -->
-        <div id="sy-noop-note" class="sec-note" style="display:none;margin-top:10px;line-height:1.6;"></div>
+        <div id="sy-noop-note" class="sec-note" data-tech style="display:none;margin-top:10px;line-height:1.6;"></div>
         <div id="sy-info" class="hint"></div>
         <!-- [2026-09-06] 무엇을 만들지 화면이 알려준다.
              종전에는 사람이 터미널에서 scripts/synth_coverage_gaps.py 를 돌려 표를 읽고,
              조합을 외운 뒤 위 폼에 등급·도메인을 손으로 다시 넣어야 했다. 필요한 정보가
              이미 있는데 화면이 그것을 몰랐다. 칸을 누르면 폼이 채워진다. -->
         <div id="sy-coverage" style="margin-top:12px;"></div>
-        <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">검토 대기 0건 — 승인한 건만 학습 데이터가 됩니다.</div></div>
-        <p class="sec-note">생성은 뒤에서 처리됩니다 — 잠시 후 새로고침하세요. 승인 시 <b>확정 등급</b>을 바꾸면 그 등급으로 학습 데이터가 만들어집니다.</p>
+        <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">검토 대기 0건</div></div>
       </div>
     </section>
 
@@ -1443,7 +1467,7 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
 
   </div>
 
-  <details style="margin-top:16px">
+  <details data-tech style="margin-top:16px">
     <summary>최근 응답 원본 (raw JSON)</summary>
     <div id="raw-json" class="json">— 아직 호출 없음 —</div>
   </details>
@@ -1453,7 +1477,7 @@ input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border
 </div>
 
 <!-- LOG CONSOLE -->
-<div class="logbar">
+<div class="logbar" data-tech>
   <div class="logbar-head" role="button" tabindex="0" aria-controls="logbody" aria-expanded="false" onclick="toggleLog()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleLog();}">
     <b>기술 요청 로그</b>
     <span id="log-toggle" style="color:#71717a">펼치기 ▴</span>
@@ -2231,11 +2255,13 @@ window.updateProductProfile=function(data){
 /* ---- HEALTH ---- */
 async function checkHealth(){
   const pill=$('health'), txt=$('health-txt');
+  const settingsState=$('settings-health-state');
   try{
     const d=await api('GET','/healthz');
     pill.className='health-pill ok'; txt.textContent='정상 · '+(d.status||'ok');
+    if(settingsState) settingsState.textContent='정상';
     applyServerConfig(d);
-  }catch(e){ pill.className='health-pill bad'; txt.textContent='실패 '+(e.status||''); }
+  }catch(e){ pill.className='health-pill bad'; txt.textContent='실패 '+(e.status||''); if(settingsState) settingsState.textContent='연결 실패'; }
 }
 /* healthz 가 실어 보내는 서버 실제 설정을 화면에 반영한다.
  * [정합 2026-08-09] 검수 임계는 **서버 값이 진실**이다. 종전 콘솔은 0.70 슬라이더를 두고
@@ -3149,7 +3175,7 @@ function pickCoverageCell(grade, domain){
   if(g && Array.from(g.options).some(o=>o.value===grade)) g.value=grade;
   if(d && Array.from(d.options).some(o=>o.value===domain)) d.value=domain;
   else if(d) log(`도메인 「${domain}」 은 생성 목록에 없다 — 등급만 채웠다`,'warn');
-  log(`채울 자리 선택: ${grade} × ${domain}`,'ok');
+  log(`생성 대상 선택: ${grade} × ${domain}`,'ok');
   const c=$('sy-count'); if(c) c.focus();
 }
 
@@ -3162,51 +3188,32 @@ async function loadSynthCoverage(){
     // 404 = 이 서버에는 합성 생성 라우터가 없다(고객사 운영 프로파일은 합성 생성을 지재원에서만
     // 한다). 고장이 아니므로 "불러오지 못했습니다" 오류 문구를 쓰지 않는다.
     if(e && e.status===404){ box.innerHTML='<div class="hint">이 서버에서는 합성 생성 기능을 쓰지 않습니다.</div>'; return; }
-    box.innerHTML=`<div class="hint">채울 자리 격자를 불러오지 못했습니다: ${esc(errKo(e))}</div>`; return;
+    box.innerHTML=`<div class="hint">학습 데이터 분포를 조회하지 못했습니다: ${esc(errKo(e))}</div>`; return;
   }
   if(!d || !d.available){
-    box.innerHTML=`<div class="hint">채울 자리 격자 없음 — ${esc((d&&d.reason)||'학습셋을 읽지 못했습니다')}</div>`;
+    box.innerHTML=`<div class="hint">학습 데이터 분포 없음 — ${esc((d&&d.reason)||'학습셋을 읽지 못했습니다')}</div>`;
     return;
   }
-  const grades=['TS','S1','S2','S3'];
-  const thin={}, empty={};
-  (d.thin||[]).forEach(c=>{ thin[c.grade+'|'+c.domain]=c; });
-  (d.empty||[]).forEach(c=>{ empty[c.grade+'|'+c.domain]=c; });
-
-  // 빈 칸·얇은 칸만 색으로 구분한다. 충분한 칸은 눈에 띄지 않아야 후보가 보인다.
-  const cell=(g,dom)=>{
-    // 인라인 핸들러 안에서 함수를 부르지 않는다 — 정적 검사기가 그것을 핸들러로 읽는다.
-    const gq=esc(g), dq=esc(dom);
-    const key=g+'|'+dom, n=(d.grid||{})[key]||0;
-    const t=thin[key], e=empty[key];
-    const realGrid=d.real_grid||{};
-    const hasReal=Object.prototype.hasOwnProperty.call(realGrid,key) || Boolean(t||e);
-    const real=Object.prototype.hasOwnProperty.call(realGrid,key) ? Number(realGrid[key]||0) : (t||e||{}).real;
-    const bg = e ? 'var(--warn-bg,#fff4e5)' : (t ? 'var(--info-bg,#eef4ff)' : 'transparent');
-    const state=e?'빈 칸':(t?'얇은 칸':'충분한 칸');
-    const composition=hasReal
-      ? `전체 ${n}건 / 실문서 ${Number(real||0)}건 / 합성 ${Math.max(0,n-Number(real||0))}건`
-      : `전체 ${n}건 / 실문서·합성 구성 정보 없음`;
-    const tip = `${state} — ${composition}. 클릭은 생성 폼만 채우며 데이터를 바꾸지 않습니다.`;
-    return `<td style="text-align:right;padding:2px 8px;background:${bg};cursor:pointer" role="button" tabindex="0"
-              aria-label="${esc(g+' '+dom+' '+tip)}" title="${esc(tip)}" onclick="pickCoverageCell('${gq}','${dq}')"
-              onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pickCoverageCell('${gq}','${dq}');}">${n===0?'·':n}</td>`;
-  };
-  const rows=(d.domains||[]).map(dom=>
-    `<tr><td style="padding:2px 8px;white-space:nowrap">${esc(dom)}</td>${grades.map(g=>cell(g,dom)).join('')}</tr>`
-  ).join('');
-
-  box.innerHTML =
-    `<div class="hint" style="margin-bottom:4px"><b>학습셋 분포·검토 후보</b> — 빈/얇은 칸은 생성 지시가 아니라 사람이 검토할 후보입니다. 칸을 누르면 위 <b>생성 폼만</b> 채워집니다 ·
-       문서 ${d.documents}건 · 칸 ${d.cells_filled}/${d.cells_total} ·
-       실문서 유래 ${Math.round((d.real_share||0)*100)}% ·
-       <b>빈 칸 ${(d.empty||[]).length}</b> · <b>얇은 칸(&lt;${d.min_per_cell}) ${(d.thin||[]).length}</b></div>
-      <div class="sec-note" style="margin:0 0 6px;line-height:1.5"><span style="display:inline-block;padding:1px 6px;background:var(--warn-bg,#fff4e5)">빈 칸</span> 해당 등급×분야 학습 행 없음 · <span style="display:inline-block;padding:1px 6px;background:var(--info-bg,#eef4ff)">얇은 칸</span> ${d.min_per_cell}건 미만 · 각 칸의 숫자·도움말은 전체/실문서/합성 구성을 구분합니다.</div>
-     <div style="overflow-x:auto"><table style="border-collapse:collapse;font-family:var(--font-mono);font-size:12px">
-        <caption style="text-align:left;padding:2px 8px;font-family:var(--font-sans);font-size:11.5px;color:var(--text-dim)">등급 × 업무 분야별 학습 행 수. 키보드로도 칸을 선택할 수 있습니다.</caption>
-        <tr><th scope="col"></th>${grades.map(g=>`<th scope="col" style="padding:2px 8px">${g}</th>`).join('')}</tr>${rows}
-     </table></div>
-      <div class="sec-note" style="margin-top:8px;line-height:1.6">${esc(d.caveat||'')}<br/>이 표는 <b>학습셋</b>을 셉니다. 선택은 데이터를 만들거나 바꾸지 않습니다. 생성 요청 후에도 문서는 검토 큐로만 가며, <b>승인과 학습셋 편입</b>이 끝난 뒤에야 이 수가 늘어납니다.</div>`;
+  const domainLabel=domain=>({ai:'AI',business:'경영',defense:'국방',en:'영문 일반',finance:'재무',hr:'인사',legal:'법무',mixed:'혼합',security:'보안',tech:'기술',public:'공개'})[domain]||domain;
+  const targets=[
+    ...(d.empty||[]).map(cell=>({...cell,state:'미구성'})),
+    ...(d.thin||[]).map(cell=>({...cell,state:'표본 부족'})),
+  ].sort((a,b)=>Number(a.n||0)-Number(b.n||0));
+  const rows=targets.map(cell=>{
+    const grade=esc(cell.grade||'—'), domain=esc(cell.domain||'');
+    const gradeArg=esc(JSON.stringify(cell.grade||'')), domainArg=esc(JSON.stringify(cell.domain||''));
+    return `<tr><td>${grade}</td><td>${esc(domainLabel(cell.domain||''))}</td><td>${Number(cell.n||0)}건</td><td>${Number(cell.real||0)}건</td><td><button class="btn sec sm" type="button" onclick="pickCoverageCell(${gradeArg},${domainArg})">선택</button></td></tr>`;
+  }).join('');
+  const realShare=d.real_share!=null?`${Math.round(Number(d.real_share)*100)}%`:'기록 없음';
+  box.innerHTML=`<section class="coverage-panel" aria-label="학습 데이터 분포">
+    <div class="coverage-summary">
+      <div class="coverage-metric"><span>학습 문서</span><b>${Number(d.documents||0).toLocaleString()}건</b></div>
+      <div class="coverage-metric"><span>구성 완료</span><b>${Number(d.cells_filled||0)} / ${Number(d.cells_total||0)}</b></div>
+      <div class="coverage-metric"><span>실문서 비중</span><b>${realShare}</b></div>
+      <div class="coverage-metric ${targets.length?'is-caution':''}"><span>점검 대상</span><b>${targets.length}개</b></div>
+    </div>
+    ${targets.length?`<details class="coverage-details"><summary>점검 대상 ${targets.length}개</summary><table class="coverage-table"><thead><tr><th>등급</th><th>업무 분야</th><th>학습 문서</th><th>실문서</th><th></th></tr></thead><tbody>${rows}</tbody></table></details>`:'<div class="coverage-clear">점검 대상 없음</div>'}
+  </section>`;
 }
 
 /* ---- 데이터 생성 현황(부서·정보유형) — 이상민 요청 #1·#2·#4, 2026-10-02 ---- */

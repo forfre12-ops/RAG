@@ -268,9 +268,12 @@ def kl_wire_projection(
     [2026-10-02 뒤집힘] evaluation_factors·rule_evaluation_factors·evidence·decision_path는
     더 이상 비우지 않는다 — KL포털이 문서마다 매번 사람 검수를 하기로 하면서 "신뢰도는
     근거(evidence)와 같이 보여준다"로 결정이 바뀌었다(9/29엔 반대로 "KL 요청 범위 밖"이라
-    비웠었다). scores·model_grade·grade_candidates(_reason)는 여전히 비운다 — 이 넷은 오늘
-    다시 논의되지 않았다. confidence_tier(계산 필드)는 result 에서 그대로 승계된다(별도
-    처리 불필요). DB 저장·우리 콘솔(admin.html)·`GET /classify/jobs/{job_id}`를 관리자/시스템
+    비웠었다). confidence_tier(계산 필드)는 result 에서 그대로 승계된다(별도 처리 불필요).
+
+    [2026-10-11 뒤집힘] scores(등급별 신뢰도 수치)는 더 이상 비우지 않는다 — "API로 신뢰도를
+    보여줘야 한다"는 요청에 따라 그대로 승계한다. model_grade·grade_candidates(_reason) 셋은
+    여전히 비운다(신뢰도 수치 자체가 아니라 내부 진단용 대안 후보 필드라 범위 밖).
+    DB 저장·우리 콘솔(admin.html)·`GET /classify/jobs/{job_id}`를 관리자/시스템
     역할로 부르는 내부 대용량 테스트 화면은 이 함수를 거치지 않아 그대로 전체를 본다
     (api/async_classify.py 의 kl_backend 역할 분기, workers/tasks.py 의 콜백 발사 지점).
     """
@@ -281,7 +284,6 @@ def kl_wire_projection(
         fallback_reason=fallback_reason,
     )
     return result.model_copy(update={
-        "scores": {},
         "model_grade": None,
         "grade_candidates": [],
         "grade_candidates_reason": None,

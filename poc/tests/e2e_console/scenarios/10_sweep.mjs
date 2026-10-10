@@ -233,11 +233,11 @@ export const scenarios = [
         }
         const connectionSettings = page.qa('[data-product-view="settings"]').filter((s) => page.visible(s));
         if (view === 'settings') {
-          check.gte(connectionSettings.length, 1, '연결·운영 도구 메뉴에서만 연결·인증 상세를 연다');
+          check.gte(connectionSettings.length, 1, '연결·운영 도구 메뉴에서만 운영 연결 상태를 연다');
           const settings = connectionSettings[0];
           check.ok(settings.classList.contains('settings-card'), '설정 화면이 공용 설정 카드 표현을 사용한다');
-          check.ok(settings.textContent.includes('서버 연결과 기록 주체'), '설정 화면이 연결 설정의 목적을 설명한다');
-          check.ok(settings.textContent.includes('시연 데이터 정리'), '시연 정리 작업을 별도 구역으로 분리한다');
+          check.ok(settings.textContent.includes('운영 연결'), '설정 화면이 운영 연결 상태를 표시한다');
+          check.ok(settings.querySelector('.settings-stack')?.hasAttribute('data-tech'), '기술 연결 설정과 시연 정리는 기본 화면에서 숨긴다');
         } else {
           check.eq(connectionSettings.length, 0, `${view} 메뉴에 연결·인증 상세가 중복 노출되지 않는다`);
         }
