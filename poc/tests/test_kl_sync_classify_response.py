@@ -51,6 +51,8 @@ def test_kl_sync_classify_projects_rule_and_regulation_explanation(monkeypatch):
     assert out.rule_grade == "S1"
     assert out.regulation_reference == reference
     assert out.regulation_summary == "제41조가 적용됩니다."
+    assert out.explanation_status == "available"
+    assert out.fallback_reason is None
     assert calls == ["kl-sync-doc", ("kl-sync-doc", reference)]
 
 
@@ -74,3 +76,4 @@ def test_non_kl_sync_classify_does_not_invoke_regulation_enrichment(monkeypatch)
 
     assert out is result
     assert out.regulation_reference is None
+    assert out.explanation_status == "not_requested"

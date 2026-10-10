@@ -188,15 +188,20 @@ def _warn_regulation_prerequisites(settings_obj) -> None:
             "regulation_reference_enabled=true 인데 storage_encryption_enabled=false — 규정 원본(regulations-raw)이 평문으로 저장된다. "
             "onprem-local·full-train 프로파일은 암호화를 강제한다. 그 밖의 배포는 STORAGE_ENCRYPTION_ENABLED=true 와 키를 설정한다."
         )
-    if settings_obj.regulation_reference_enabled and settings_obj.regulation_llm_select_enabled:
+    llm_explanation_enabled = bool(
+        getattr(settings_obj, "regulation_llm_select_enabled", False)
+        or getattr(settings_obj, "regulation_llm_summary_enabled", False)
+    )
+    if settings_obj.regulation_reference_enabled and llm_explanation_enabled:
         from urllib.parse import urlsplit  # noqa: PLC0415
 
         from koipa.regulation.llm_select import endpoint_is_local, is_local_provider  # noqa: PLC0415
 
         if not is_local_provider(settings_obj.llm_provider):
             logger.warning(
-                "regulation_llm_select_enabled=true 인데 llm_provider=%s — 로컬 LLM 공급자(ollama·vllm·local_openai·lm_studio)가 "
-                "아니면 문서 본문을 보내지 않으므로 관련 규정이 표시되지 않는다(reason=llm_not_local). LLM_PROVIDER=ollama 로 바꾸거나 이 옵션을 끈다.",
+                "regulation_llm_select_enabled 또는 regulation_llm_summary_enabled=true 인데 llm_provider=%s — "
+                "로컬 LLM 공급자(ollama·vllm·local_openai·lm_studio)가 아니면 문서 본문을 보내지 않으므로 "
+                "규정 판정/설명을 만들지 않는다(reason=llm_not_local). LLM_PROVIDER=ollama 로 바꾸거나 이 옵션을 끈다.",
                 settings_obj.llm_provider,
             )
         elif str(settings_obj.llm_provider).strip().lower() in ("vllm", "local_openai"):
@@ -204,8 +209,9 @@ def _warn_regulation_prerequisites(settings_obj) -> None:
             base_url = getattr(settings_obj, "local_llm_base_url", None) or getattr(settings_obj, "vllm_base_url", None)
             if base_url and not endpoint_is_local(base_url):
                 logger.warning(
-                    "regulation_llm_select_enabled=true 인데 LOCAL_LLM_BASE_URL 의 호스트(%r)가 사내가 아니거나 이름이 풀리지 않는다 — "
-                    "문서 본문을 보내지 않으므로 관련 규정이 표시되지 않는다(reason=llm_not_local). 사내 서버 주소로 바꾸거나 이 옵션을 끈다.",
+                    "regulation_llm_select_enabled 또는 regulation_llm_summary_enabled=true 인데 LOCAL_LLM_BASE_URL 의 "
+                    "호스트(%r)가 사내가 아니거나 이름이 풀리지 않는다 — 문서 본문을 보내지 않으므로 규정 판정/설명을 만들지 "
+                    "않는다(reason=llm_not_local). 사내 서버 주소로 바꾸거나 이 옵션을 끈다.",
                     urlsplit(str(base_url)).hostname,
                 )
 

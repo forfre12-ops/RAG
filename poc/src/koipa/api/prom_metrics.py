@@ -120,6 +120,33 @@ EMBEDDING_CACHE_MISS_TOTAL = Counter(
     registry=registry,
 )
 
+# 규정 RAG는 등급을 바꾸지 않는 보조 근거다. 일반 HTTP 지연 지표만으로는 "근거가 없음"과
+# "조회 인프라가 죽음"을 구분할 수 없으므로 결과와 설명 생성 상태를 별도로 센다. 이 값은 API
+# 프로세스가 직접 실행한 조회만 나타낸다. Celery 색인 시간은 워커 레지스트리에 쌓아 API에서
+# 스크랩하면 거짓 all-clear가 되므로, 공유 저장소 기반 집계가 마련되기 전에는 여기 넣지 않는다.
+REGULATION_EVIDENCE_REQUESTS_TOTAL = Counter(
+    "koipa_regulation_evidence_requests_total",
+    "Regulation evidence lookups by result",
+    ["result"],  # available | empty | not_found | error
+    registry=registry,
+)
+REGULATION_EVIDENCE_DURATION = Histogram(
+    "koipa_regulation_evidence_duration_seconds",
+    "Regulation evidence lookup duration in seconds",
+    registry=registry,
+)
+REGULATION_SUMMARY_REQUESTS_TOTAL = Counter(
+    "koipa_regulation_summary_requests_total",
+    "Explicit regulation explanation requests by result",
+    ["result"],  # no_reference | disabled | available | unavailable
+    registry=registry,
+)
+REGULATION_SUMMARY_DURATION = Histogram(
+    "koipa_regulation_summary_duration_seconds",
+    "Explicit local LLM regulation explanation duration in seconds",
+    registry=registry,
+)
+
 # LLM 토큰·비용 관측성 — LLMUsageService.record()가 모든 호출에서 갱신.
 # 라벨 카디널리티: provider/model/purpose는 유한 집합.
 # tenant 제거: LLM 비용은 전역 집계(단일 고객사 엔진, tenant 태그 없음).

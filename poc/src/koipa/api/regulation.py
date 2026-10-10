@@ -18,6 +18,12 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Reques
 
 from koipa.api._jwt_auth import require_auth
 from koipa.api._rbac import require_role
+from koipa.api.prom_metrics import (
+    REGULATION_EVIDENCE_DURATION,
+    REGULATION_EVIDENCE_REQUESTS_TOTAL,
+    REGULATION_SUMMARY_DURATION,
+    REGULATION_SUMMARY_REQUESTS_TOTAL,
+)
 from koipa.api.rate_limit import limiter
 from koipa.config import settings
 from koipa.regulation import runtime_toggle
@@ -46,6 +52,7 @@ from koipa.services.regulation_evidence_service import (
     EvidenceResult,
     RegulationEvidenceService,
     get_regulation_evidence_service,
+    regulation_summary_for_kl_wire,
 )
 from koipa.services.regulation_service import (
     RegulationError,
@@ -77,8 +84,40 @@ def _items(items: list[EvidenceItem]) -> list[EvidenceItemModel]:
         sentences=list(i.sentences), is_grade_list=i.is_grade_list) for i in items]
 
 
-def _evidence_response(r: EvidenceResult) -> RegulationEvidenceResponse:
-    return RegulationEvidenceResponse(doc_id=r.doc_id, indexed=r.indexed, reason=r.reason, items=_items(r.items))
+def _evidence_response(
+    r: EvidenceResult,
+    *,
+    summary: str | None = None,
+    summary_status: str = "not_requested",
+) -> RegulationEvidenceResponse:
+    return RegulationEvidenceResponse(
+        doc_id=r.doc_id,
+        indexed=r.indexed,
+        reason=r.reason,
+        items=_items(r.items),
+        summary=summary,
+        summary_status=summary_status,
+    )
+
+
+def _explicit_summary(doc_id: str, items: list[EvidenceItemModel]) -> tuple[str | None, str]:
+    """관리자가 누른 경우에만 로컬 LLM 설명을 만든다.
+
+    기본 규정 조회는 원문 근거를 빠르고 결정적으로 돌려준다. 화면을 펼칠 때마다 문서를 LLM에
+    보내면 비용·지연이 숨겨지므로, 요약은 ``include_summary=true``라는 명시 요청에서만 호출한다.
+    이 설명도 대표 등급이나 포털 검수 결정을 바꾸지 않는다.
+    """
+    if not items:
+        REGULATION_SUMMARY_REQUESTS_TOTAL.labels(result="no_reference").inc()
+        return None, "no_reference"
+    if not settings.regulation_llm_summary_enabled:
+        REGULATION_SUMMARY_REQUESTS_TOTAL.labels(result="disabled").inc()
+        return None, "disabled"
+    with REGULATION_SUMMARY_DURATION.time():
+        summary = regulation_summary_for_kl_wire(doc_id, items)
+    status = "available" if summary else "unavailable"
+    REGULATION_SUMMARY_REQUESTS_TOTAL.labels(result=status).inc()
+    return summary, status
 
 
 # ── 검수 화면 노출 스위치 (콘솔 체크박스 — 재시작 불필요) ──────────────────────────
@@ -282,6 +321,10 @@ def regulation_evidence(
     request: Request,
     doc_id: uuid.UUID,
     max_items: Optional[int] = Query(default=None, ge=1, le=3),
+    include_summary: bool = Query(
+        default=False,
+        description="true 일 때에만 이미 찾은 조항을 바탕으로 로컬 LLM 설명을 생성한다. 기본 false.",
+    ),
     auth: dict = Depends(require_role(*_READ)),
     ev: RegulationEvidenceService = Depends(get_regulation_evidence_service),
 ) -> RegulationEvidenceResponse:
@@ -290,10 +333,21 @@ def regulation_evidence(
     문서가 없을 때만 404, 조회 인프라가 없을 때(임베더·DB)만 503 이다. 검수 화면은 이 실패로 멈추면 안 된다.
     """
     try:
-        return _evidence_response(ev.find_for_document(str(doc_id), max_items=max_items))
+        with REGULATION_EVIDENCE_DURATION.time():
+            result = ev.find_for_document(str(doc_id), max_items=max_items)
+        items = _items(result.items)
+        summary, summary_status = (
+            _explicit_summary(str(doc_id), items) if include_summary else (None, "not_requested")
+        )
+        REGULATION_EVIDENCE_REQUESTS_TOTAL.labels(
+            result="available" if items else "empty"
+        ).inc()
+        return _evidence_response(result, summary=summary, summary_status=summary_status)
     except LookupError as exc:
+        REGULATION_EVIDENCE_REQUESTS_TOTAL.labels(result="not_found").inc()
         raise HTTPException(status_code=404, detail="document not found") from exc
     except Exception as exc:  # noqa: BLE001
+        REGULATION_EVIDENCE_REQUESTS_TOTAL.labels(result="error").inc()
         raise HTTPException(status_code=503, detail=f"관련 규정을 조회할 수 없습니다: {type(exc).__name__}") from exc
 
 

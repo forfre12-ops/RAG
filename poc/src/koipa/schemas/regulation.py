@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -118,6 +120,16 @@ class RegulationEvidenceResponse(BaseModel):
                     "below_floor | no_sentence | not_applicable | public_document | llm_unavailable | llm_not_local. "
                     "오류가 아니라 정상 응답이다(뒤의 넷은 로컬 LLM 판정 옵션을 켰을 때만 나온다)")
     items: list[EvidenceItemModel]
+    summary: str | None = Field(
+        default=None,
+        description="관리자가 include_summary=true 로 명시 요청했을 때만 생성하는 로컬 LLM 설명. "
+                    "등급 판정 근거가 아니며, 기본 조회에서는 null 이다.",
+    )
+    summary_status: Literal["not_requested", "no_reference", "disabled", "available", "unavailable"] = Field(
+        default="not_requested",
+        description="설명 생성 상태. not_requested=기본 원문 조회, no_reference=요약할 조항 없음, "
+                    "disabled=서버 설정상 요약 미사용, available=설명 생성됨, unavailable=로컬 LLM 확인/호출 실패.",
+    )
 
 
 class PreviewRequest(BaseModel):

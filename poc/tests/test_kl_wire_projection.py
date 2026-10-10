@@ -241,6 +241,48 @@ def test_kl_projection_exposes_batch_budget_fallback_without_dropping_answer():
     assert projected.fallback_reason == "regulation_enrichment_budget_exceeded"
 
 
+def test_async_kl_job_marks_budget_fallback_without_dropping_answer(monkeypatch):
+    """IF-05 배치 시간 예산 초과도 HTTP 결과에서 label을 끊지 않고 명시한다."""
+    from starlette.requests import Request
+
+    from koipa.api import async_classify as api
+    from koipa.config import settings
+    from koipa.schemas.classify_async import ClassifyJobStatus
+
+    job_id = uuid4()
+    stored = ClassifyJobStatus(
+        job_id=job_id,
+        status="done",
+        results=[
+            _result(label="S1", rule_grade="S2"),
+            _result(label="S2", rule_grade="S1"),
+        ],
+    )
+
+    class _Jobs:
+        def get_status(self, received_job_id):
+            assert received_job_id == job_id
+            return stored
+
+    # deadline 생성(0초) 뒤 첫 결과를 읽을 때 1,000초로 뛰어 예산 초과를 재현한다.
+    ticks = iter((0.0, 1_000.0))
+    monkeypatch.setattr(api.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(settings, "regulation_llm_summary_enabled", True, raising=False)
+    monkeypatch.setattr(api, "AsyncClassifyService", lambda: _Jobs())
+    request = Request({"type": "http", "method": "GET", "path": f"/classify/jobs/{job_id}", "headers": []})
+    request.state.auth_role = "kl_backend"
+
+    response = api.classify_job_status(job_id, request)
+    assert response.results is not None
+    first, second = response.results
+    assert first.label == "S1"
+    assert first.rule_grade == "S2"
+    assert second.label == "S2"
+    assert second.rule_grade == "S1"
+    assert {result.explanation_status for result in response.results} == {"fallback"}
+    assert {result.fallback_reason for result in response.results} == {"regulation_enrichment_budget_exceeded"}
+
+
 def test_kl_explanation_metadata_prefers_explicit_fallback_reason():
     status, reason = kl_explanation_metadata(
         regulation_reference=None,

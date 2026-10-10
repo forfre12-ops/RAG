@@ -3,10 +3,17 @@
 Current release status: `CONDITIONALLY_READY` (strict release gate = **FAIL**).
 
 **Current hard blocker:**
-- `human_review` gold is **1/40**. Add 39 real reviewer-signed rows before strict release.
+- The recorded strict-release evidence baseline is `human_review` gold **1/40**. Add 39 real reviewer-signed release-evidence rows before strict release, then regenerate the gate on the target SHA.
 - P1 release-tier gate now passes: public/case/nkt F1 **0.938 >= 0.75**, FNR **0.043 <= 0.05**, high-risk->S3 **0**.
 - Strict `release-gate` still fails until `human_review` reaches the configured minimum and passes agreement checks.
 > Do not fake-green this with `ai_assist`, `llm_*`, blank, or placeholder reviewer IDs; the importer must reject them.
+
+> **Do not confuse this with KL Portal operation.** The 40-row value is a finite,
+> signed release-evidence sample for the strict GA gate.  The KL Portal sends
+> every accepted document to the Agent immediately; the Portal then has a human
+> confirm/correct each returned answer through `/confirm`.  It never holds an
+> online Agent answer until 40 reviews accumulate.  See
+> [`docs/KL_AGENT_RESPONSE_CONTRACT.md`](docs/KL_AGENT_RESPONSE_CONTRACT.md).
 
 ## 0. 릴리스 재현성 및 모델 일치 사전점검
 
@@ -24,9 +31,10 @@ make release-manifest      # 산출물·소스 버전을 reports/release_manifes
 2. 그 모델로 P1 평가를 다시 만듭니다. `reports/p1_release_legal_direct.json`과 `reports/p1_release_holdout_direct.json`의 `model_dir`는 `CLASSIFIER_MODEL_DIR`와 같아야 합니다. 평가 파일만 바꿔 수치를 맞추지 않습니다.
 3. `make operational-readiness`의 parity gate가 PASS인지 확인합니다. F1/FNR 보고서가 실제 배포 모델의 결과를 가리켜야 합니다.
 > Parity is an internal deploy action: set `CLASSIFIER_MODEL_DIR` to the evaluated model and regenerate readiness.
-> After parity passes, the remaining external blocker is `human_review=40/40`.
+> After parity passes, the remaining strict-GA evidence blocker is
+> `human_review=40/40`; it is not an online Portal response queue.
 
-## 1. Build Human Review Queue
+## 1. Build the strict-GA evidence review queue (separate from Portal review)
 
 ```bash
 make human-review-queue
@@ -58,7 +66,7 @@ make release-gate
 make release-manifest
 ```
 
-Pre-human state: `make operational-readiness` should report `CONDITIONALLY_READY` with only
+Pre-release-evidence state: `make operational-readiness` should report `CONDITIONALLY_READY` with only
 `human_review gold` blocked. `make release-gate` must remain blocked until the real
 reviewer-signed queue reaches `human_review=40/40`.
 

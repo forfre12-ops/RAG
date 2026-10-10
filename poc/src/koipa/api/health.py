@@ -259,6 +259,8 @@ def _build_identity() -> dict:
 
 
 def _operational_config() -> dict:
+    reference_enabled = bool(getattr(settings, "regulation_reference_enabled", False))
+    summary_enabled = bool(getattr(settings, "regulation_llm_summary_enabled", False))
     return {
         "classifier_model_dir": getattr(settings, "classifier_model_dir", ""),
         # [정합 2026-08-09] 검수 라우팅 임계 — 콘솔이 **서버의 실제 값**을 표시하기 위해 노출한다.
@@ -284,6 +286,19 @@ def _operational_config() -> dict:
         # 자신을 감춘다 — golden.py 가 없는 고객사 이미지에서 그 카드 버튼을 누르면 404 가
         # 나던 것을 막는다(로그인 자체는 koipa.api.console_login 이 항상 담당해 이 값과 무관).
         "golden_review_console_enabled": bool(getattr(settings, "enable_golden_review_console", False)),
+        # 규정 원문 조회와 LLM 설명은 모두 등급 결정과 분리된 참고 기능이다. 콘솔과 포털
+        # 운영자는 현재 서버가 "원문만"인지 "명시 요청 시 로컬 설명도 가능한지"를 알아야
+        # 장애와 의도된 미사용을 구분할 수 있다. 모델·허용목록·문서 내용은 노출하지 않는다.
+        "regulation_reference": {
+            "enabled": reference_enabled,
+            "summary_enabled": summary_enabled,
+            "mode": (
+                "disabled" if not reference_enabled else
+                "local_summary_on_request" if summary_enabled else
+                "reference_only"
+            ),
+            "summary_requires_explicit_request": True,
+        },
         # [2026-09-05] 보존기간 삭제 설정. 켜져 있으면 오래된 감사로그·LLM 사용량이
         # 지워진다 — 운영자가 "지금 얼마나 남기고 있나"를 화면에서 확인할 수 있어야 한다.
         # 오래된 파티션을 떼는 코드가 없어 표가 무한히 자라는 것을 막는 유일한 장치이기도 하다.

@@ -30,3 +30,18 @@ def test_check_extractors_contract() -> None:
         assert isinstance(v["available"], bool)
     # unavailable 목록은 available=False 인 probe와 정확히 일치해야 한다.
     assert set(out["unavailable"]) == {k for k, v in out["probes"].items() if not v["available"]}
+
+
+def test_operational_config_states_regulation_reference_mode(monkeypatch) -> None:
+    monkeypatch.setattr(health.settings, "regulation_reference_enabled", True)
+    monkeypatch.setattr(health.settings, "regulation_llm_summary_enabled", False)
+    status = health._operational_config()["regulation_reference"]
+    assert status == {
+        "enabled": True,
+        "summary_enabled": False,
+        "mode": "reference_only",
+        "summary_requires_explicit_request": True,
+    }
+
+    monkeypatch.setattr(health.settings, "regulation_llm_summary_enabled", True)
+    assert health._operational_config()["regulation_reference"]["mode"] == "local_summary_on_request"

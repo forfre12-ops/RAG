@@ -53,7 +53,9 @@ ENV_FILE=$CF docker compose --env-file $CF $BASE up -d
 - prod overlay(하드닝): **Dockerfile.api.prod**(non-root·gunicorn) · **불변**(./src·./scripts bind 없음,
   모델은 ro external volume) · **포트 최소노출**(api 만 127.0.0.1:8000, pg/redis/minio/mlflow 미노출 —
   리버스 프록시/내부망 전제) · HF 캐시는 non-root named volume(재다운로드 방지).
-- `WEB_CONCURRENCY=1`(기본) 권장 — 멀티워커는 모델 reload 팬아웃 미구현이라 재기동으로 갱신.
+- `WEB_CONCURRENCY=1`(기본) 권장. 여러 API/Celery 프로세스도 활성 모델을 기본 30초 간격으로
+  DB에서 확인해 스스로 새 모델을 다시 적재한다. 즉시 반영이 필요한 요청을 받은 프로세스만
+  `/admin/model/reload`로 갱신되고, 다른 프로세스는 다음 확인 주기까지 기존 모델을 쓸 수 있다.
 - alembic 단일 head `a7b8c9d0e1f2`. 확장(vector/pg_trgm)은 마이그레이션이 생성(pgvector 이미지).
 
 ## 3. 분류 모델 공급 (BLOCKER A3)
@@ -121,8 +123,9 @@ python scripts/run_acceptance.py --mode http --base-url http://<host>:8000 --api
   needs_second_review 대기 건을 서버측에서 FIFO 조회한다(reviewer 권한, 페이지네이션). admin 콘솔의
   "DB 검수 큐 불러오기"가 이 API 를 호출 — 브라우저 세션과 무관하게 실제 대기 목록을 본다(구 '세션-only'
   한계 해소). SQL 직접 확인(`documents.processing_status='needs_review'`)도 여전히 가능.
-- **모델 reload 멀티레플리카 팬아웃 미구현 (NFR-OPS-01)**: 프로모션 후 `/admin/model/reload` 는
-  로컬 프로세스만 갱신. 멀티워커/멀티레플리카면 재기동으로 갱신.
+- **모델 reload 즉시 팬아웃의 한계 (NFR-OPS-01)**: `/admin/model/reload`는 요청을 받은
+  프로세스만 즉시 갱신한다. 다른 API/Celery 프로세스는 공유 DB의 활성 모델을 기본 30초 간격으로
+  확인해 따라간다. 즉시 전 프로세스 반영을 요구하면 재기동 또는 별도 브로커 기반 팬아웃이 필요하다.
 - **`.doc`(구 워드)**: 이미지에 antiword 미포함 → 해당 입력은 검수 라우팅(무음 미탐 아님). 필요 시 추가.
   HWP 표 셀은 `[hwp-tables]`(unhwp, MIT)로 **전 배포 이미지에 포함**되어 회수된다(구 pyhwp/AGPL 경로 폐기).
 - **안전게이트 warn-only**: lite-cloud 는 agreement/metadata-floor 등이 OFF 여도 경고만(dev/staging

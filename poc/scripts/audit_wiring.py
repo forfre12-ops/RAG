@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import io
 import re
 import os
 import importlib
@@ -81,6 +80,17 @@ def _py_files(root: Path):
 # 세는 도구가 안 돌면 다음 사람이 다시 손으로 센다 — 이 도구가 생긴 이유가 그것이다.
 _TEXT_CACHE: dict[Path, str] = {}
 _TREE_CACHE: dict[Path, "ast.AST | None"] = {}
+
+
+def _force_utf8_stdio() -> None:
+    """Windows CP949 콘솔에서도 한국어 ``--help``를 실패 없이 출력한다."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            # pytest 등의 캡처 스트림은 reconfigure를 지원하지 않을 수 있다. 감사 자체와
+            # 무관하므로 그 경우 기존 스트림을 보존한다.
+            continue
 
 
 def _text(p: Path) -> str:
@@ -178,10 +188,10 @@ def text_mentions_in(root: Path, token: str) -> int:
 
 
 def main() -> int:
+    _force_utf8_stdio()
     # 인자를 받지 않지만 파서를 둔다 — 종전에는 `--help` 를 **조용히 무시하고** 전수
     # 감사를 그대로 돌려, 사용법을 물어본 사람이 몇 분을 기다렸다(2026-09-09).
     argparse.ArgumentParser(description=__doc__.splitlines()[0], epilog="인자 없음").parse_args()
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     defs = collect_defs(SRC)
     refs = ref_counts([SRC, SCRIPTS, TESTS])
 

@@ -70,11 +70,33 @@ classification evidence.
 
 The KL wire result exposes:
 
-- `explanation_status`: whether the regulation/RAG+LLM explanation was
-  available, not applicable, disabled, skipped for budget, or degraded.
+- `explanation_status`: one of the following explicit supplement states:
+  `available` (source citation and local-LLM summary), `reference_only`
+  (source citation only), `not_requested` (RAG reference feature disabled),
+  `unavailable` (reference enrichment enabled but no reference can be
+  returned), or `fallback` (enrichment skipped after a known fallback).
 - `fallback_reason`: a machine-readable reason whenever the expected
-  explanatory material is absent or degraded.  It explains the supplement
-  state only; it never changes the Agent grade.
+  explanatory material is absent or degraded.  Current reasons include
+  `regulation_summary_unavailable`,
+  `regulation_reference_unavailable`, and
+  `regulation_enrichment_budget_exceeded`.  It explains the supplement state
+  only; it never changes the Agent grade.
+
+For an on-premise KL deployment that requires the complete RAG + local-LLM
+explanation, configure all of the following after the target model's quality,
+latency, and closed-network checks have passed:
+
+```dotenv
+REGULATION_REFERENCE_ENABLED=1
+REGULATION_LLM_SUMMARY_ENABLED=1
+REGULATION_LLM_MODEL_ALLOWLIST='["<approved-local-model-id>"]'
+```
+
+`REGULATION_LLM_SELECT_ENABLED=1` is optional: it asks the same local LLM to
+filter which retrieved clauses apply before the summary.  It is not a grade
+authority.  Do not copy a template model name into the allowlist without that
+environment's approval; an unapproved model deliberately yields an explicit
+degraded explanation rather than sending document text to it.
 
 Portal rendering rule:
 
@@ -100,6 +122,14 @@ Agent label, confirmed label, reviewer identity, confirmation time, reason,
 policy/version context, and any correction lineage.  These operational review
 records are the source for quality measurement and future retraining
 candidates; they are not a blocking pre-answer queue.
+
+`review_receipt.candidate_data_status=eligible_for_candidate_rebuild` means
+the confirmed correction can enter the normal candidate/retraining pipeline
+after its text and holdout-leakage checks.  It does **not** automatically turn
+a customer Portal decision into a strict-GA `human_review` gold record.  That
+finite release-evidence sample separately requires the approved real-origin
+and signed-evaluation envelope, so live feedback cannot silently contaminate
+the evaluation set.
 
 ## Deployment verification procedure
 

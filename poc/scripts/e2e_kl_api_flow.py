@@ -44,6 +44,13 @@ for _s in (sys.stdout, sys.stderr):
         pass
 
 GRADES = {"TS", "S1", "S2", "S3"}
+EXPLANATION_STATUSES = {
+    "available",
+    "reference_only",
+    "not_requested",
+    "unavailable",
+    "fallback",
+}
 
 # 가상 표본 — 등급을 말하는 낱말은 넣지 않는다(본문만으로 판정되는지 보는 것이 아니라 흐름을 보는 도구다).
 SAMPLE_TEXT = (
@@ -69,6 +76,54 @@ class Run:
         return sum(1 for r in self.results if not r["ok"])
 
 
+def kl_agent_result_contract_problems(result: dict) -> list[str]:
+    """KL이 받은 최종 결과가 '항상 답 + 설명 상태' 계약을 지키는지 점검한다.
+
+    이 함수는 의도적으로 HTTP·DB에 의존하지 않는다. 실제 배포 E2E에서 poll 결과와
+    callback 수신 JSON 양쪽에 같은 검사를 적용할 수 있게, KL wire JSON 한 건만 받는다.
+    ``label``이 없는 것을 RAG/LLM 비가용으로 합리화하지 않는다.
+    """
+    problems: list[str] = []
+    label = result.get("label")
+    if label not in GRADES:
+        problems.append(f"label must be one of {sorted(GRADES)}, got {label!r}")
+
+    rule_grade = result.get("rule_grade")
+    if rule_grade is not None:
+        if rule_grade not in GRADES:
+            problems.append(f"rule_grade must be a grade or null, got {rule_grade!r}")
+        elif rule_grade == label:
+            problems.append("rule_grade must be null when it agrees with label")
+
+    # 매 문서 검수 화면에 보여 주기로 한 판단 근거가 사라지면, label만 남아도 계약이 불완전하다.
+    for field in ("status", "warnings", "confidence", "confidence_tier", "evidence", "decision_path"):
+        if field not in result:
+            problems.append(f"missing KL result field: {field}")
+
+    explanation_status = result.get("explanation_status")
+    if explanation_status not in EXPLANATION_STATUSES:
+        problems.append(
+            "explanation_status must be one of "
+            f"{sorted(EXPLANATION_STATUSES)}, got {explanation_status!r}"
+        )
+        return problems
+
+    reference = result.get("regulation_reference")
+    summary = result.get("regulation_summary")
+    fallback_reason = result.get("fallback_reason")
+    if explanation_status in {"available", "reference_only"} and not reference:
+        problems.append(f"{explanation_status} requires regulation_reference")
+    if explanation_status == "available" and not summary:
+        problems.append("available requires regulation_summary")
+    if summary and not reference:
+        problems.append("regulation_summary must not be sent without regulation_reference")
+    if explanation_status in {"unavailable", "fallback"} and not fallback_reason:
+        problems.append(f"{explanation_status} requires fallback_reason")
+    if explanation_status == "not_requested" and fallback_reason:
+        problems.append("not_requested must not claim a fallback_reason")
+    return problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--base-url", default=os.environ.get("BASE_URL", "http://127.0.0.1:8000"))
@@ -76,8 +131,8 @@ def main() -> int:
     ap.add_argument("--callback-url", default="", help="IF-03 에 함께 보낼 callback_url(선택)")
     ap.add_argument("--confirm", action="store_true", help="검수 확정까지 태워 IF-06 의 confirmed_* 를 본다")
     ap.add_argument("--confirm-token", default=os.environ.get("CONFIRM_TOKEN", ""),
-                    help="검수 확정(POST /confirm)에 쓸 JWT(admin·reviewer·kl_backend). 공유 API 키(system)는 확정 권한이 "
-                         "없어 403 이다 — 확정은 우리 콘솔에서 사람이 하고 KL 은 IF-06 으로 읽기만 한다")
+                    help="검수 확정(POST /confirm)에 쓸 사람 검수자 JWT(admin·reviewer·kl_backend). 공유 API 키는 "
+                         "환경에 따라 system 역할을 가질 수 있어도 개인 검수자 신원을 증명하지 못하므로 이 도구는 쓰지 않는다.")
     ap.add_argument("--poll-timeout", type=int, default=180, help="비동기 결과 대기 최대 초")
     ap.add_argument("--json", default="", help="결과를 JSON 파일로도 남긴다")
     args = ap.parse_args()
@@ -183,6 +238,12 @@ def main() -> int:
     run.check("모델 버전이 온다", bool(res.get("model_version")), f"model_version={res.get('model_version')}")
     run.check("신뢰도가 0~1", isinstance(res.get("confidence"), (int, float)) and 0 <= res["confidence"] <= 1,
               f"confidence={res.get('confidence')}")
+    contract_problems = kl_agent_result_contract_problems(res)
+    run.check(
+        "KL Agent 결과는 대표 답·룰 불일치·설명 폴백 상태를 함께 보냄",
+        not contract_problems,
+        "; ".join(contract_problems),
+    )
     r = requests.get(f"{base}/classify/jobs/{uuid.uuid4()}", headers=hdr, timeout=30)
     run.check("없는 job_id → 404", r.status_code == 404, f"status={r.status_code}")
 
@@ -220,11 +281,17 @@ def main() -> int:
               f"status={r.status_code} job={jg.get('status')}")
     run.check("결과는 TS + 검수 필요(미탐 방향으로 막는다)", rg.get("label") == "TS" and rg.get("status") == "needs_review",
               f"label={rg.get('label')} status={rg.get('status')}")
+    ghost_contract_problems = kl_agent_result_contract_problems(rg)
+    run.check(
+        "본문 불가도 Agent 답과 설명 상태를 유지",
+        not ghost_contract_problems,
+        "; ".join(ghost_contract_problems),
+    )
 
     # ── 검수 확정 → IF-06 confirmed_* (선택) ──────────────────
     if args.confirm and not args.confirm_token:
-        print("\n[확정] --confirm-token 이 없어 건너뜀 — 공유 API 키는 확정 권한이 없다(403). "
-              "확정은 콘솔에서 사람이 하고 KL 은 IF-06 으로 읽기만 한다.")
+        print("\n[확정] --confirm-token 이 없어 건너뜀 — 매건 포털 검수는 개인 검수자 JWT로 남겨야 한다. "
+              "공유 API 키로 확정 이력을 만들지 않는다.")
         rc = requests.post(f"{base}/confirm", headers=hdr, timeout=30, json={
             "doc_id": doc_id, "confirmed_label": label or "S2",
             "actor": {"user_id": "kl-e2e", "role": "kl_backend"}})

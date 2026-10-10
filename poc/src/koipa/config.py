@@ -974,8 +974,8 @@ class Settings(BaseSettings):
     regulation_llm_mode: str = "per_candidate"
     # [2026-10-02] 고른 조항이 이 문서에 왜 적용되는지 **로컬 LLM 이 한두 문장으로 쓴다**("당연히 설명이 나가야지" 요건).
     #   select_applicable(조항을 고르는 호출)과 달리 이 호출은 글을 짓는다 — 사실과 다른 말을 만들 위험이 더 크므로 별도 스위치로 끊는다.
-    #   꺼짐(기본)이면 regulation_summary 는 늘 null 이고 화면엔 조항 원문만 남는다. regulation_llm_select_enabled 가 꺼져 있으면 이 스위치도 무동작
-    #   (고를 조항 자체가 없다 — 조회 1위를 그대로 보이는 결정형 경로에는 요약을 달지 않는다).
+    #   꺼짐(기본)이면 regulation_summary 는 늘 null 이고 화면엔 조항 원문만 남는다. 선택 LLM을
+    #   꺼도 결정형 조회가 찾은 조항 원문에는 요약을 붙일 수 있다. 다만 규정 참고 자체가 없으면 무동작이다.
     regulation_llm_summary_enabled: bool = False
 
     # 임베딩 어댑터 선택:

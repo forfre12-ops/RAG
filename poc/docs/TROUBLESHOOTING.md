@@ -95,7 +95,7 @@ in-memory 폴백` (또는 동일 취지의 idempotency 메시지)으로 **fail-f
 
 | 게이트 메시지 | 원인 | 조치 |
 |---|---|---|
-| `[release-gate] BLOCKED (hard)` human_review | `human_review` 골든 < 40 | 실검수 서명 채움(`ai_assist`/`llm_*` 금지). 파일럿은 `release-gate-pilot` 감사 waiver. |
+| `[release-gate] BLOCKED (hard)` human_review | 엄격 GA용 `human_review` 골든 증빙 표본 < 40 | 실검수 서명 채움(`ai_assist`/`llm_*` 금지). 이는 온라인 KL 포털의 매문서 Agent 응답/사람 확인 흐름을 멈추라는 뜻이 아니다. 파일럿은 `release-gate-pilot` 감사 waiver. |
 | `[metamorphic-gate] BLOCKED: forward regression` | 스타일 패러프레이즈에 고등급이 하향분류(고등급 미탐) | 데이터천장 아님 = **안전 회귀**. 해당 등급(특히 S1 인사·재무: M&A 실사·자금조달·임원보상) 학습 보강 후 재판정. pilot도 waive 불가. |
 | `[metamorphic-gate] FAIL: not measurable` | 리포트 미생성/표본<min_n | `make metamorphic-gate`를 배포 모델로 실제 실행(리포트 미생성=green 아님). |
 | adversarial-gate FAIL | golden_100 고등급 미탐 baseline 초과 | 회귀 원인 모델/설정 확인 후 롤백 또는 재학습. |

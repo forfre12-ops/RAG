@@ -104,7 +104,7 @@ make release-gate                      # 상용(GA) 엄격 게이트 (모든 gat
 
 - 두 게이트 모두 prereq에 **`adversarial-gate`**(golden_100 고등급 미탐 회귀)와 **`metamorphic-gate`**(스타일 패러프레이즈에 고등급 하향분류 = forward 회귀, fail-closed)를 강제한다.
 - 메타모픽 forward 회귀는 데이터천장이 아니라 **안전 FAIL**이라 pilot에서도 waive 불가.
-- GA 하드블로커: `human_review` 골든이 최소치(40) 미만이면 strict `release-gate` 차단(파일럿은 감사 waiver로 진행).
+- GA 하드블로커: `human_review` **릴리스 증빙 골든 표본**이 최소치(40) 미만이면 strict `release-gate` 차단(파일럿은 감사 waiver로 진행). 이는 KL 포털의 매문서 검수와 다른 표본 게이트다. 포털은 Agent 답을 먼저 받고 모든 문서를 `/confirm`으로 사람 확인/교정한다.
 - 릴리스 산출물 해시: `make release-manifest`(게이트 통과 후 증빙 고정).
 
 ---
@@ -121,6 +121,12 @@ curl -s http://localhost:8000/api/v1/metrics-prom | head   # 앱 메트릭 노�
 
 - 발화 규칙: `http://<host>:9090/alerts` (airgap overlay가 `alert_rules.yml` 마운트).
 - 대시보드: `http://<host>:3000` (Grafana). 통지 라우팅: `alertmanager`(9093) — 사내 채널은 `observability/alertmanager.yml receivers`에 추가.
+- **규정 참고 조회**: `koipa_regulation_evidence_requests_total{result}`와
+  `koipa_regulation_evidence_duration_seconds`로 원문 근거 조회의 성공·빈 결과·오류와
+  지연을 확인한다. `koipa_regulation_summary_requests_total{result}`와
+  `koipa_regulation_summary_duration_seconds`는 관리자가 명시적으로 요청한 로컬 LLM
+  설명만 센다. 규정 **색인**은 Celery 프로세스에서 실행되므로, API `/metrics-prom`의 이
+  지표로 워커 색인 시간까지 측정했다고 해석하면 안 된다.
 - **킬게이트**: 고등급 미탐·검수피로·번복률 초과 시 발동 → 고등급 자동확정 억제(모니터·비파괴). `GET /api/v1/admin/dashboard`의 kill_gate 섹션에서 상태 확인.
 
 ---
@@ -232,6 +238,11 @@ $COMPOSE exec postgres psql -U koipa -d koipa \
   - **LLM 로 고르기** — 임베딩만으로 부족할 때 로컬 LLM(GPU 필요)으로 관련 조항을 고르게
     한다(기본형보다 해당 문서를 더 많이 찾아낸다). §4 표의 `REGULATION_LLM_SELECT_ENABLED`
     가 이 체크박스가 없을 때의 기본값이고, 체크박스는 그 값을 덮어쓴다.
+- **관련성 설명**: 문서 상세의 「관련성 설명 보기」는 이미 조회한 조항을 바탕으로
+  `include_summary=true`를 명시해 로컬 LLM 설명을 요청한다. 상세를 열기만 해서는 LLM을
+  호출하지 않는다. 설명이 꺼져 있거나 만들지 못해도 규정 원문은 남고, 등급·검수 결정은
+  바뀌지 않는다. `REGULATION_LLM_SUMMARY_ENABLED`와 모델 allowlist 변경은 배포 설정
+  검토 대상이며 콘솔에서 바꾸지 않는다.
 - **API로 켜고 끄기**(콘솔 없이 스크립트로 할 때):
   ```bash
   # 현재 상태 조회

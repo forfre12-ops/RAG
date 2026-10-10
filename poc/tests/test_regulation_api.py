@@ -264,6 +264,7 @@ def test_evidence_shape_and_no_score_anywhere(client):
     assert body["items"][0]["clause"]["article_no"] == "제41조"
     assert body["items"][0]["sentences"] == ["① 도면은 극비로 취급한다."]
     assert body["items"][0]["regulation"] == {"reg_id": "rid", "name": "문서보안 규정", "version_label": "v1"}
+    assert body["summary"] is None and body["summary_status"] == "not_requested"
     assert _no_score_keys(body)                                    # 점수·유사도·신뢰도 필드가 어디에도 없다
 
 
@@ -271,7 +272,44 @@ def test_empty_evidence_is_a_normal_answer_with_a_reason(client):
     c, _, ev = client
     ev.result = EvidenceResult(DID, None, "no_active_regulation", [])
     r = c.get(f"{API}/documents/{DID}/regulation-evidence", headers=hdr("reviewer"))
-    assert r.status_code == 200 and r.json() == {"doc_id": DID, "indexed": None, "reason": "no_active_regulation", "items": []}
+    assert r.status_code == 200 and r.json() == {
+        "doc_id": DID, "indexed": None, "reason": "no_active_regulation", "items": [],
+        "summary": None, "summary_status": "not_requested",
+    }
+
+
+def test_summary_is_explicit_and_does_not_change_evidence(client, monkeypatch: pytest.MonkeyPatch):
+    """기본 원문 조회가 LLM을 부르지 않고, 명시 요청만 설명을 추가한다."""
+    from koipa.api import regulation as regulation_api
+
+    c, _, _ = client
+    calls: list[tuple[str, int]] = []
+    monkeypatch.setattr(regulation_api.settings, "regulation_llm_summary_enabled", True)
+    monkeypatch.setattr(
+        regulation_api,
+        "regulation_summary_for_kl_wire",
+        lambda doc_id, items: calls.append((doc_id, len(items))) or "도면 취급 조항이 문서에 적용됩니다.",
+    )
+
+    base = c.get(f"{API}/documents/{DID}/regulation-evidence", headers=hdr("reviewer"))
+    assert base.status_code == 200 and base.json()["summary_status"] == "not_requested"
+    assert calls == []
+
+    explained = c.get(f"{API}/documents/{DID}/regulation-evidence?include_summary=true", headers=hdr("reviewer"))
+    assert explained.status_code == 200
+    assert explained.json()["summary"] == "도면 취급 조항이 문서에 적용됩니다."
+    assert explained.json()["summary_status"] == "available"
+    assert calls == [(DID, 1)]
+
+
+def test_explicit_summary_reports_disabled_without_calling_llm(client, monkeypatch: pytest.MonkeyPatch):
+    from koipa.api import regulation as regulation_api
+
+    c, _, _ = client
+    monkeypatch.setattr(regulation_api.settings, "regulation_llm_summary_enabled", False)
+    monkeypatch.setattr(regulation_api, "regulation_summary_for_kl_wire", lambda *_: pytest.fail("LLM must not run"))
+    r = c.get(f"{API}/documents/{DID}/regulation-evidence?include_summary=true", headers=hdr("reviewer"))
+    assert r.status_code == 200 and r.json()["summary_status"] == "disabled" and r.json()["summary"] is None
 
 
 def test_missing_document_is_404_and_infrastructure_failure_is_503(client):
@@ -331,10 +369,25 @@ def test_startup_warns_when_the_llm_option_is_on_without_a_local_llm_provider(ca
         caplog.clear()
         with caplog.at_level("WARNING", logger="koipa.api.app"):
             _warn_regulation_prerequisites(SimpleNamespace(regulation_reference_enabled=True, embedding_provider="hf",
-                                                           regulation_llm_select_enabled=True, **kw))
+                                                           regulation_llm_select_enabled=True,
+                                                           regulation_llm_summary_enabled=False, **kw))
         return caplog.text
 
     assert "llm_not_local" in run(llm_provider="noop")
     assert "llm_not_local" in run(llm_provider="anthropic")
     assert "llm_not_local" not in run(llm_provider="ollama")
     assert "llm_not_local" not in run(llm_provider="vllm")
+
+
+def test_startup_warns_when_summary_is_on_without_a_local_llm_provider(caplog):
+    from types import SimpleNamespace
+
+    from koipa.api.app import _warn_regulation_prerequisites
+
+    with caplog.at_level("WARNING", logger="koipa.api.app"):
+        _warn_regulation_prerequisites(SimpleNamespace(
+            regulation_reference_enabled=True, embedding_provider="hf",
+            regulation_llm_select_enabled=False, regulation_llm_summary_enabled=True,
+            llm_provider="noop",
+        ))
+    assert "llm_not_local" in caplog.text

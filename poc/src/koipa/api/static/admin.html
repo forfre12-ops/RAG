@@ -3817,23 +3817,55 @@ function regRefBlocks(items){
 }
 function regRefHtml(d){
   const body=regRefBlocks(d && d.items);
-  if(!body) return '';                              // 비면 블록을 그리지 않는다(설계 결정 ③)
-  return `<div class="reg-ref-h">관련 규정(참고)</div>${body}`
-    + '<div class="sec-note">이 내용은 참고용이며 등급 판정 근거가 아닙니다.</div>';
+  const reason=REG_EMPTY_KO[d&&d.reason]||'표시할 관련 문장이 없습니다';
+  if(!body) return `<div class="reg-ref-h">관련 규정(참고)</div><div class="sec-note">${esc(reason)}</div>`;
+  let summary='';
+  if(d&&d.summary){
+    summary=`<div class="reg-ref-h" style="margin-top:10px">관련성 설명 <span class="pill">AI 참고</span></div><div class="sec-note">${esc(d.summary)}</div>`;
+  }else if(d&&d.summary_status==='not_requested'){
+    summary='<div style="margin-top:8px"><button type="button" class="btn sec sm" data-reg-summary>관련성 설명 보기</button></div>';
+  }else if(d&&d.summary_status==='disabled'){
+    summary='<div class="sec-note" style="margin-top:8px">AI 설명은 이 서버에서 사용하지 않는 구성입니다.</div>';
+  }else if(d&&d.summary_status==='unavailable'){
+    summary='<div class="sec-note" style="margin-top:8px">AI 설명을 만들지 못했습니다. 위 규정 원문을 참고하십시오.</div>';
+  }
+  return `<div class="reg-ref-h">관련 규정(참고)</div>${body}${summary}`
+    + '<div class="sec-note">규정 원문과 AI 설명은 참고용이며 등급 판정 근거가 아닙니다.</div>';
+}
+async function requestRegSummary(button, docId){
+  if(!button || !UUID_RE.test(String(docId||''))) return;
+  const slot=button.closest('.reg-ref'); if(!slot) return;
+  button.disabled=true; button.textContent='설명 생성 중…';
+  try{
+    const d=await api('GET',`/documents/${encodeURIComponent(docId)}/regulation-evidence?include_summary=true`);
+    if(!d || typeof d!=='object' || !Array.isArray(d.items)) throw new Error('bad_response');
+    REGREF_CACHE[docId]={at:Date.now(), d};
+    if(slot.isConnected){
+      slot.innerHTML=regRefHtml(d);
+      const next=slot.querySelector('[data-reg-summary]');
+      if(next) next.addEventListener('click',()=>requestRegSummary(next,docId),{once:true});
+    }
+  }catch(e){
+    button.disabled=false; button.textContent='관련성 설명을 불러오지 못했습니다';
+  }
 }
 async function fillRegRef(box, docId){
   if(REG_ON!==true || !box || !UUID_RE.test(String(docId||''))) return;   // 붙여넣은 본문 등 저장되지 않은 문서는 대상이 아니다
   const slot=document.createElement('div');
   slot.className='reg-ref'; slot.style.display='none';
   box.appendChild(slot);
-  const paint=h=>{ slot.innerHTML=h; slot.style.display=h?'':'none'; };
+  const paint=d=>{
+    const h=regRefHtml(d); slot.innerHTML=h; slot.style.display=h?'':'none';
+    const summaryButton=slot.querySelector('[data-reg-summary]');
+    if(summaryButton) summaryButton.addEventListener('click',()=>requestRegSummary(summaryButton,docId),{once:true});
+  };
   const hit=REGREF_CACHE[docId];
-  if(hit && (hit.d.items.length || Date.now()-hit.at<REGREF_EMPTY_TTL_MS)){ paint(regRefHtml(hit.d)); return; }
+  if(hit && (hit.d.items.length || Date.now()-hit.at<REGREF_EMPTY_TTL_MS)){ paint(hit.d); return; }
   try{
     const d=await api('GET',`/documents/${encodeURIComponent(docId)}/regulation-evidence`);
     if(!d || typeof d!=='object' || !Array.isArray(d.items)) return;        // 형식이 다르면 그리지 않는다
     REGREF_CACHE[docId]={at:Date.now(), d};
-    if(slot.isConnected) paint(regRefHtml(d));
+    if(slot.isConnected) paint(d);
   }catch(e){
     // 503 = 조회 기반이 없다 → 흐린 한 줄. 그 밖의 실패(404·403 등)는 규정을 붙일 자리가 아니라는 뜻이라 아무것도 그리지 않는다.
     if(e && e.status===503 && slot.isConnected) paint('<div class="sec-note">규정 참고를 불러오지 못했습니다</div>');
