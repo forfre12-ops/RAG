@@ -2269,6 +2269,7 @@ async function checkHealth(){
  * 무관하게 계속 동작한다. */
 function applyProfileVisibility(d){
   const profile=String((d&&d.deploy_profile)||'');
+  const llmProvider=String((d&&d.llm_provider)||'').toLowerCase();
   const oc=(d&&d.operational_config)||{};
   // 화면 노출은 deploy_profile 이름이 아니라 서버가 실제로 마운트한 capability로 결정한다.
   // 구버전 healthz에는 이 키가 없을 수 있으므로, 그 경우에도 라우터가 없는 lite-*는 안전하게
@@ -2321,10 +2322,16 @@ function applyProfileVisibility(d){
           볼 자리는 [기술 상세]다. textContent 로는 그 구분을 못 주므로 innerHTML 로
           바꾸고 프로파일명만 [data-tech] 로 감싼다. */
     const techTag = ' <span class="techbar" data-tech>' + esc(profile) + '</span>';
+    // noop은 장애가 아니라 등급 판정 LLM을 쓰지 않기로 한 구성이다. 이때 생성 후보는
+    // 검수할 수 있지만 학습 행으로 승격되지 않는다. 프로필 배너에서 이 범위를 먼저 밝혀야
+    // 운영자가 「후보가 생겼는데 왜 재학습 데이터가 0건인가」를 뒤늦게 알지 않는다.
+    const noopTrainingScope = profile==='full-train' && llmProvider==='noop'
+      ? ' 현재는 등급 판정 LLM을 쓰지 않는 구성이며, 추가 후보는 검수하되 학습에 쓰이는 행은 0건입니다.'
+      : '';
     b.innerHTML = (isCust
       ? '<b>고객사 운영 환경</b> — 정책, 모델 및 감사 기능을 제공합니다.'
       : profile==='full-train'
-        ? '<b>지재원 검증·학습 환경</b> — 검증 문서, 학습, 릴리스 및 감사 기록을 관리합니다.'
+        ? '<b>지재원 검증·학습 환경</b> — 검증 문서, 학습, 릴리스 및 감사 기록을 관리합니다.' + noopTrainingScope
         : '<b>개발 환경</b> — 제공 기능은 서버 설정에 따라 다릅니다.') + techTag;
     b.className = 'profile-banner ' + (isCust ? 'cust' : (profile==='full-train' ? 'jjw' : 'dev'));
     b.style.display='';
@@ -2701,8 +2708,7 @@ async function loadMetrics(){
       <div><span>대상 모델</span><b>${esc(d.model_version||'기록 없음')}</b></div>
       <div><span>평가 데이터</span><b>${esc(d.eval_source||'기록 없음')}</b></div>
       <div><span>${esc(metricsTimestampText(d))}</span><b>${esc(d.measured_at||'기록 없음')}</b></div>
-      <div><span>평가 표본 수</span><b>${d.sample_count??'기록 없음'}건</b></div>
-      <div><span>전체 미탐률</span><b>${pct(d.fnr_overall)}</b></div>
+      <div><span>평가 표본 수</span><b>${d.sample_count != null ? `${d.sample_count}건` : '기록 없음'}</b></div>
     </div>`;
     const byg=d.fnr_by_grade||{};
     $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">등급별 미탐률 · ${esc(d.model_version||'모델 정보 없음')}</label>
@@ -3430,7 +3436,7 @@ async function saveGrades(){
     GRADE_ROWS=rows; GRADE_LOADED_CODES=codes;
     syncActiveGrades(codes);
     $('grade-result').innerHTML = d.requires_retraining
-      ? `<div class="warnbox"><b>재학습 필요</b> — version ${esc(d.version)} · 사유: ${esc(d.reason)}<br/>${d.serving_impact ? `<b>분류기 영향</b> — ${esc(d.serving_impact)}<br/>` : ''}등급 구조가 바뀌었습니다. 지금 떠 있는 서버는 <b>재기동·모델 리로드 전까지</b> 기존 모델로 추론합니다. 「모델」 탭에서 <b>3 재학습 트리거 → 4 모델 서빙·배포</b> 순서로 진행하세요.</div>`
+      ? `<div class="warnbox"><b>재학습 필요</b> — version ${esc(d.version)} · 사유: ${esc(d.reason)}<br/>${d.serving_impact ? `<b>분류기 영향</b> — ${esc(d.serving_impact)}<br/>` : ''}등급 구조가 바뀌었습니다. 현재 서버는 <b>재기동·모델 리로드 전까지</b> 기존 모델로 추론합니다. 「학습·평가·릴리스」에서 <b>학습 작업 → 릴리스 관리</b> 순서로 진행하세요.</div>`
       : `<div class="kv"><div><span>저장됨</span> <b>version ${esc(d.version)}</b></div><div><span>재학습</span> <b>불필요</b></div><div><span>사유</span> <b>${esc(d.reason)}</b></div></div>`;
     $('grade-info').textContent=`저장 완료 · 활성 ${rows.length}개`;
     log(`등급체계 저장: ${codes.join(', ')} · requires_retraining=${d.requires_retraining}`, d.requires_retraining?'info':'ok');
