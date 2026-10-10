@@ -181,3 +181,30 @@ def test_synth_review_handler_404_when_missing(monkeypatch):
             auth={"actor_role": "admin", "actor_user_id": "c"},
         )
     assert ei.value.status_code == 404
+
+
+def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_boundaries(console: str):
+    """관리자 콘솔 V2는 새 서버 계약을 만들지 않고 기존 후보 API를 작업대·지표에 연결한다.
+
+    제품 셸을 CSS 시안으로만 남기면 실제 배포본에서 구역이나 실패 상태가 빠질 수 있어,
+    운영자가 쓰는 일곱 메뉴·문서유형 지표·원본 문서 작업대의 앵커를 정적으로 잠근다.
+    """
+    for marker in (
+        'data-product-nav="overview"',
+        'data-product-nav="documents"',
+        'data-product-nav="experts"',
+        'data-product-nav="policy"',
+        'data-product-nav="models"',
+        'data-product-nav="audit"',
+        'data-product-nav="settings"',
+        'id="product-category-body"',
+        'id="document-workbench"',
+        'data-resize="left"',
+        'data-resize="right"',
+        "'/golden/candidates?limit=2000'",
+        "'/golden/candidates/'+encodeURIComponent(docId)",
+        'function productShowView(',
+        'function loadProductOverview(',
+        'function loadWorkbench(',
+    ):
+        assert marker in console
