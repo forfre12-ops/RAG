@@ -1436,14 +1436,125 @@ load(true);
 # 바꿀 필요가 없다.
 # 검수자(reviewer)로 연 후보 관리 화면에서 감추는 관리자 전용 조작 — 업로드 · 출처 기록 · 평가정답 승격.
 # 서버가 이미 403 으로 막는 조작이다(권한은 그대로). 늘 실패할 버튼을 보이지 않게 할 뿐이다.
+# 후보 관리의 원래 상세 영역은 목록 아래에 붙어 있어, 문서 하나를 열 때마다 목록과 본문을
+# 위아래로 오가야 했다. 검수자는 실질적으로 「문서함 / 원문 / 결정」을 동시에 보며 작업하므로,
+# 같은 DOM·같은 API를 세 칸으로 재배치한다. 새 API나 별도 데이터 복제는 만들지 않는다.
+_REVIEWER_DOCUMENT_WORKBENCH_CSS = r"""
+.reviewer-workspace{display:block!important;padding:18px 22px 26px!important;max-width:none!important}
+.reviewer-workspace>.side{display:none!important}
+.reviewer-workspace>.main{padding:0!important;max-width:none!important}
+.reviewer-workspace .hero,.reviewer-workspace .summary,.reviewer-workspace #ledgerAll{display:none!important}
+.reviewer-access-note{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.reviewer-workbench-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:3px 0 19px}
+.reviewer-workbench-head h1{margin:0;font-size:27px;letter-spacing:-1.3px;line-height:1.25}
+.reviewer-workbench-head p{margin:7px 0 0;color:var(--text-soft);font-size:14px}
+.reviewer-workbench-head .head-actions{display:flex;gap:8px;flex-wrap:wrap}
+.reviewer-workbench-flash{margin:0 0 12px!important}
+#reviewer-workbench{display:grid;grid-template-columns:minmax(270px,25%) minmax(0,1fr);height:calc(100vh - 184px);min-height:620px;border:1px solid var(--border);background:#fff;overflow:hidden}
+#reviewer-workbench .reviewer-inbox{min-width:0;min-height:0;border-right:1px solid var(--border);background:#fff;overflow:hidden}
+#reviewer-workbench #candidates{height:100%;min-height:0;display:flex;flex-direction:column;margin:0;border:0;background:#fff}
+#reviewer-workbench #candidates .sectionTop{display:block;margin:0;padding:21px 18px 17px;border-bottom:1px solid var(--border);background:#fff}
+#reviewer-workbench #candidates .secNum{display:none}
+#reviewer-workbench #candidates h2{display:block;margin:0;font-size:16px;letter-spacing:-.45px}
+#reviewer-workbench #candidates .sectionTop p{margin:7px 0 0;font-size:12px;line-height:1.55}
+#reviewer-workbench #candidates .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+#reviewer-workbench #candidates .filters input,#reviewer-workbench #candidates .filters select{box-sizing:border-box;min-width:0;width:100%;padding:9px 10px;background:#fff}
+#reviewer-workbench #candidates #query{grid-column:1/-1}
+#reviewer-workbench #candidates #review_batch,#reviewer-workbench #candidates #grade,#reviewer-workbench #candidates #origin,#reviewer-workbench #candidates #department,#reviewer-workbench #candidates #filter{display:none}
+#reviewer-workbench #candidates .list{flex:1;min-height:0;overflow-y:auto;border:0}
+#reviewer-workbench #candidates .rowhead{display:none}
+#reviewer-workbench #candidates .candidate{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'title status' 'meta meta';gap:5px 8px;padding:14px 16px;border-bottom:1px solid #edf0f2;background:#fff}
+#reviewer-workbench #candidates .candidate:hover,#reviewer-workbench #candidates .candidate.selected{background:#f2f6ff}
+#reviewer-workbench #candidates .candidate.selected{box-shadow:inset 3px 0 0 #2563a8}
+#reviewer-workbench #candidates .candidate>:nth-child(1){grid-area:meta;font-size:11px;color:var(--text-dim)}
+#reviewer-workbench #candidates .candidate>:nth-child(2){grid-area:title;min-width:0}
+#reviewer-workbench #candidates .candidate>:nth-child(3),#reviewer-workbench #candidates .candidate>:nth-child(5){display:none}
+#reviewer-workbench #candidates .candidate>:nth-child(4){grid-area:status;align-self:start}
+#reviewer-workbench #candidates .doctitle{font-size:14px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#reviewer-workbench #candidates .docsub{font-size:11px}
+#reviewer-workbench #detail{display:grid!important;grid-column:2;grid-template-columns:minmax(0,1fr) minmax(280px,31%);min-width:0;min-height:0;margin:0;border:0;background:#fff}
+#reviewer-workbench #detail .detailMain{min-width:0;min-height:0;overflow:auto;padding:31px;background:#edf2f7;border-right:1px solid var(--border)}
+#reviewer-workbench .reviewer-document-sheet{box-sizing:border-box;min-height:100%;max-width:760px;margin:0 auto;padding:52px 62px 66px;background:#fff;border:1px solid #d5dde6;box-shadow:0 5px 18px rgba(15,23,42,.08)}
+#reviewer-workbench .reviewer-document-sheet .eyebrow{margin-bottom:17px;color:#64748b}
+#reviewer-workbench .reviewer-document-sheet h3{font-size:29px;line-height:1.32;margin:0 0 13px;word-break:keep-all}
+#reviewer-workbench .reviewer-document-sheet .metas{margin:0 0 18px}
+#reviewer-workbench .reviewer-document-sheet .scope{margin:0 0 20px}
+#reviewer-workbench .reviewer-document-sheet .viewbar{margin:0 0 18px;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+#reviewer-workbench .reviewer-document-sheet .viewnote{margin-left:8px;font-size:11px}
+#reviewer-workbench .reviewer-document-sheet .docbody{max-width:none;font-size:16px;line-height:1.9;color:#1f2937}
+#reviewer-workbench .reviewer-document-sheet .docbody.md h1,#reviewer-workbench .reviewer-document-sheet .docbody.md h2{letter-spacing:-.55px}
+#reviewer-workbench #detail .sideDetail{min-width:0;min-height:0;overflow:auto;padding:0;background:#fafbfd}
+#reviewer-workbench .reviewer-inspector-head{padding:22px 20px 17px;border-bottom:1px solid var(--border);background:#fff}
+#reviewer-workbench .reviewer-inspector-head h3{margin:0;font-size:16px;letter-spacing:-.35px}
+#reviewer-workbench .reviewer-inspector-head p{margin:7px 0 0;font-size:12px;line-height:1.55;color:var(--text-soft)}
+#reviewer-workbench #detail .sideDetail>.action,#reviewer-workbench #detail .sideDetail>.history{margin:16px;padding:17px;background:#fff;border:1px solid var(--border)}
+#reviewer-workbench #detail .sideDetail>.history{margin-top:0}
+#reviewer-workbench #detail .sideDetail h4{margin:0 0 12px;color:#334155}
+#reviewer-workbench #detail .sideDetail .action label{margin-top:13px}
+#reviewer-workbench #detail .sideDetail .action select,#reviewer-workbench #detail .sideDetail .action textarea{box-sizing:border-box;font-size:13px}
+@media(max-width:1050px){.reviewer-workspace{padding:14px!important}.reviewer-workbench-head{padding-bottom:14px}#reviewer-workbench{height:auto;min-height:0;grid-template-columns:1fr}#reviewer-workbench .reviewer-inbox{max-height:390px;border-right:0;border-bottom:1px solid var(--border)}#reviewer-workbench #detail{grid-column:1;grid-template-columns:minmax(0,1fr) minmax(275px,34%);min-height:680px}.reviewer-workbench-head h1{font-size:24px}}
+@media(max-width:700px){.reviewer-workspace{padding:12px!important}.reviewer-workbench-head{display:block}.reviewer-workbench-head .head-actions{margin-top:12px}#reviewer-workbench #detail{grid-template-columns:1fr}#reviewer-workbench #detail .detailMain{padding:14px}#reviewer-workbench .reviewer-document-sheet{padding:30px 22px;min-height:0}#reviewer-workbench #detail .sideDetail{border-top:1px solid var(--border)}#reviewer-workbench .reviewer-document-sheet .viewnote{display:block;margin:8px 0 0}}
+"""
+_REVIEWER_DOCUMENT_WORKBENCH_SCRIPT = r"""<script>
+/* 후보 목록과 상세 DOM을 재사용해 문서함 / 원문 / 결정 패널을 한 화면에 둔다. */
+(function(){
+  const root=document.querySelector('.reviewer-workspace');
+  const main=root&&root.querySelector('.main');
+  const candidates=document.getElementById('candidates');
+  const detail=document.getElementById('detail');
+  if(!root||!main||!candidates||!detail||document.getElementById('reviewer-workbench'))return;
+
+  const header=document.createElement('header');
+  header.className='reviewer-workbench-head';
+  const title=document.createElement('div');
+  const h1=document.createElement('h1'); h1.textContent='문서 검토 및 확정';
+  const subtitle=document.createElement('p'); subtitle.textContent='문서함, 원문, 결정 정보를 한 화면에서 확인합니다.';
+  title.append(h1,subtitle);
+  const actions=document.createElement('div'); actions.className='head-actions';
+  const refresh=document.createElement('button'); refresh.type='button'; refresh.className='btn'; refresh.textContent='목록 새로고침';
+  refresh.addEventListener('click',function(){const original=document.getElementById('refresh');if(original)original.click();});
+  actions.append(refresh); header.append(title,actions);
+
+  const bench=document.createElement('section'); bench.id='reviewer-workbench'; bench.setAttribute('aria-label','문서 검토 작업영역');
+  const inbox=document.createElement('aside'); inbox.className='reviewer-inbox'; inbox.setAttribute('aria-label','문서함');
+  const top=candidates.querySelector('.sectionTop');
+  if(top){const h2=top.querySelector('h2');const p=top.querySelector('p');if(h2)h2.textContent='문서함';if(p)p.textContent='배정 문서를 선택해 원문과 결정을 확인합니다.';}
+  inbox.append(candidates);
+
+  const detailMain=detail.querySelector('.detailMain');
+  if(detailMain&&!detailMain.querySelector('.reviewer-document-sheet')){
+    const sheet=document.createElement('article'); sheet.className='reviewer-document-sheet';
+    while(detailMain.firstChild)sheet.append(detailMain.firstChild);
+    detailMain.append(sheet);
+  }
+  const side=detail.querySelector('.sideDetail');
+  if(side&&!side.querySelector('.reviewer-inspector-head')){
+    const inspector=document.createElement('header'); inspector.className='reviewer-inspector-head';
+    const inspectorTitle=document.createElement('h3'); inspectorTitle.textContent='문서 결정 정보';
+    const inspectorText=document.createElement('p'); inspectorText.textContent='선택 문서의 등록 정보와 결정 이력';
+    inspector.append(inspectorTitle,inspectorText); side.prepend(inspector);
+  }
+  const flash=document.getElementById('flash'); if(flash){flash.classList.add('reviewer-workbench-flash');header.after(flash);}
+  bench.append(inbox,detail);
+  main.prepend(bench); main.prepend(header);
+
+  const detailWasShown=detail.classList.contains('show');
+  const originalRenderRows=renderRows;
+  renderRows=function(data){
+    originalRenderRows(data);
+    if(!detailWasShown&&!detail.classList.contains('show')&&data.candidates&&data.candidates[0])show(data.candidates[0].doc_id);
+  };
+})();
+</script>"""
 _REVIEWER_VIEW_CSS = (
     "<style>"
     "#openUpload,#promote,#provBox{display:none!important}"
     + REVIEWER_WORKSPACE_CSS
+    + _REVIEWER_DOCUMENT_WORKBENCH_CSS
     + "</style>"
 )
 _REVIEWER_VIEW_NOTE = (
-    '<div class="note" style="margin:10px 34px">검수자 권한으로 열었습니다 — 등급 결정과 서명을 할 수 '
+    '<div class="reviewer-access-note">검수자 권한으로 열었습니다 — 등급 결정과 서명을 할 수 '
     "있습니다. 문서 업로드 · 출처 기록 · 평가정답 승격은 관리자가 합니다.</div>"
 )
 
@@ -1488,7 +1599,15 @@ def _as_reviewer_view(html: str) -> str:
     html = html.replace('<div class="frame">', reviewer_frame, 1)
     html = html.replace('<nav class="nav">', '<nav class="nav" aria-label="검수 작업 메뉴">', 1)
     html = html.replace("if(s.by_proposed_grade){let gb=document.createElement('div');gb.style.cssText='grid-column:1/-1;border-top:1px solid var(--line);padding:24px 29px 29px';let cap=document.createElement('div');cap.className='cap';cap.textContent='등급별 분포 현황';gb.append(cap);let gr=document.createElement('div');gr.style.cssText='display:grid;grid-template-columns:76px repeat(4,1fr);gap:10px 24px;margin-top:16px;align-items:center;max-width:760px';const GCOLOR={TS:'#c72c40',S1:'#c47a00',S2:'#2563a8',S3:'#1a8a5f'};const hcell=(t,strong)=>{let el=document.createElement('span');el.style.cssText='font-size:12px;color:#8a9299'+(strong?';font-weight:800;color:#5f666c':'');el.textContent=t;return el};gr.append(hcell(''),hcell('특급'),hcell('1급'),hcell('2급'),hcell('3급'));const maxVal=Math.max(1,...['TS','S1','S2','S3'].map(g=>(s.by_proposed_grade||{})[g]||0));const gradeRow=(label,counts)=>{gr.append(hcell(label,true));['TS','S1','S2','S3'].forEach(g=>{let v=(counts||{})[g]||0;let cell=document.createElement('div');let num=document.createElement('b');num.style.cssText='font:800 18px ui-monospace,monospace;letter-spacing:-1px;display:block';num.textContent=v;let bar=document.createElement('div');bar.style.cssText='height:5px;border-radius:2px;margin-top:5px;background:'+GCOLOR[g]+';opacity:.82;width:'+Math.max(v>0?3:0,Math.round(v/maxVal*100))+'%';cell.append(num,bar);gr.append(cell)})};gradeRow('전체',s.by_proposed_grade);gradeRow('미검수',s.by_proposed_grade_unfixed);gradeRow('검수 완료',s.by_final_grade);gb.append(gr);$('kpis').append(gb)}", "", 1)  # [2026-10-09] 등급별 분포 카드 — 관리자 전용, 검수자에게는 보여주지 않는다
+    # 워크벤치 안에서 상세를 열 때는 페이지 전체를 아래로 이동시키지 않는다. 본문 패널의
+    # 스크롤 위치만 바뀌므로 문서함을 잃지 않는다.
+    html = html.replace(
+        "$('detail').scrollIntoView({behavior:'smooth',block:'start'});",
+        "if(!document.getElementById('reviewer-workbench'))$('detail').scrollIntoView({behavior:'smooth',block:'start'});",
+        1,
+    )
     html = html.replace("</head>", _REVIEWER_VIEW_CSS + "</head>", 1)
+    html = html.replace("</body>", _REVIEWER_DOCUMENT_WORKBENCH_SCRIPT + "</body>", 1)
     return html.replace(reviewer_frame, _REVIEWER_VIEW_NOTE + reviewer_frame, 1)
 
 
@@ -1508,7 +1627,7 @@ _BLIND_VIEW_CSS = (
     "</style>"
 )
 _BLIND_VIEW_NOTE = (
-    '<div class="note" style="margin:10px 34px">독립 검수 모드입니다 — 제안 등급과 다른 검수자의 '
+    '<div class="reviewer-access-note">독립 검수 모드입니다 — 제안 등급과 다른 검수자의 '
     "결정은 표시되지 않습니다. 문서 ID 는 이 검수를 위해 붙인 별칭(RV-…)입니다. 본문을 읽고 등급을 직접 지정하십시오.</div>"
 )
 _BLIND_VIEW_PATCHES: tuple[tuple[str, str], ...] = (

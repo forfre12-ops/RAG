@@ -798,6 +798,10 @@ def test_reviewer_manage_html_uses_the_reviewer_workspace_without_admin_actions(
         "내 검수 진행",
         "내 결정 이력",
         "#openUpload,#promote,#provBox{display:none!important}",
+        'id=\'reviewer-workbench\'',
+        "문서 검토 및 확정",
+        "reviewer-document-sheet",
+        "reviewer-inspector-head",
     ):
         assert expected in html
     assert "CURRENT WORKSPACE" not in html
