@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import inspect
-import io
 import json
 import os
 import sys
@@ -35,7 +34,17 @@ if str(_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_ROOT / "src"))
 
 
+def _force_utf8_stdio() -> None:
+    """Windows CP949 콘솔에서도 한국어 측정 도구 도움말을 안전하게 출력한다."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            continue
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_stdio()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--regulation", required=True, help="규정 파일(txt/md)")
     ap.add_argument("--docs", required=True, help="문서 jsonl — {doc_id, text}")
@@ -55,7 +64,6 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--device", choices=("auto", "cpu"), default="auto")
     a = ap.parse_args(argv)
 
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
     os.environ.setdefault("EMBEDDING_PROVIDER", "hf")
     os.environ.setdefault("EMB_CACHE_ENABLED", "0")
     os.environ.setdefault("EMB_REDIS_ENABLED", "0")

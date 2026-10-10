@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import io
 import json
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,9 +19,17 @@ from koipa.services.regulation_evidence_service import EvidenceResult, get_regul
 from koipa.services.regulation_service import RegisterResult, RegulationError, get_regulation_service
 
 API = "/api/v1"
-RID = str(uuid.uuid4())
-CID = str(uuid.uuid4())
-DID = str(uuid.uuid4())
+# [2026-10-11] 고정 상수로 둔다 — 종전엔 uuid.uuid4() 로 모듈 로드 시점에 매번 새로
+# 뽑았는데, 이 값이 그대로 @pytest.mark.parametrize(...) 의 테스트 ID 문자열에 박힌다
+# (예: "get-/regulations/{RID}-kw1"). pytest-xdist 워커는 각자 별도 프로세스에서 이
+# 모듈을 다시 import 하므로 워커마다 다른 난수가 나와 "Different tests were collected
+# between gwN and gwM" 로 전체 수집이 깨진다(실측 2026-10-11 — -n auto 1차 실행이 9개
+# 에러로 전부 실패). 이 값들은 req path 와 가짜 서비스 응답을 같은 프로세스 안에서만
+# 맞춰 쓰는 자리표시자일 뿐 난수성이 필요하지 않다 — 고정 문자열로 바꿔도 테스트 의미는
+# 그대로다.
+RID = "a1a1a1a1-0000-4000-8000-000000000001"
+CID = "a1a1a1a1-0000-4000-8000-000000000002"
+DID = "a1a1a1a1-0000-4000-8000-000000000003"
 
 
 def hdr(role: str) -> dict:
