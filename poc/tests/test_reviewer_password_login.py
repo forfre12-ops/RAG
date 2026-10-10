@@ -85,6 +85,30 @@ def test_password_login_marks_cookie_secure_behind_https_proxy(client: TestClien
     assert "secure" in r.headers["set-cookie"].lower()
 
 
+def test_logout_expires_the_httponly_cookie(client: TestClient):
+    """HttpOnly 로그인은 서버가 같은 cookie scope로 만료시켜야 실제 로그아웃된다."""
+    rc.set_password("reviewer-01", "correct-horse-battery")
+    login = client.post(
+        f"{API}/golden/candidates/login",
+        headers={"X-Forwarded-Proto": "https"},
+        json={"username": "reviewer-01", "password": "correct-horse-battery"},
+    )
+    assert login.status_code == 200, login.text
+
+    logout = client.post(
+        f"{API}/golden/candidates/logout",
+        headers={"X-Forwarded-Proto": "https"},
+    )
+    assert logout.status_code == 204, logout.text
+    set_cookie = logout.headers["set-cookie"].lower()
+    assert "koipa_access_token=" in set_cookie
+    assert "max-age=0" in set_cookie
+    assert "httponly" in set_cookie
+    assert "secure" in set_cookie
+
+    assert client.get(f"{API}/golden/candidates/session").status_code == 401
+
+
 def test_wrong_password_rejected_401(client: TestClient):
     rc.set_password("reviewer-01", "correct-horse-battery")
     r = client.post(

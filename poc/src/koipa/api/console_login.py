@@ -233,6 +233,25 @@ def _request_uses_https(request: Request) -> bool:
     return request.url.scheme.lower() == "https" or forwarded == "https"
 
 
+@html_router.post("/golden/candidates/logout", status_code=204, summary="관리 콘솔 로그아웃")
+def proxy_gold_console_logout(request: Request) -> Response:
+    """브라우저 세션 쿠키를 만료시킨다.
+
+    비밀번호 로그인은 ``HttpOnly`` 쿠키를 발급하므로 화면 JavaScript가 직접 지울 수 없다.
+    로그인 때와 같은 path·SameSite·Secure 속성으로 만료 Set-Cookie를 내려 모든 로그인
+    방식(비밀번호, 프리필, 레거시 토큰)의 브라우저 세션을 일관되게 끝낸다.
+    """
+    response = Response(status_code=204)
+    response.delete_cookie(
+        "koipa_access_token",
+        path="/",
+        samesite="lax",
+        httponly=True,
+        secure=_request_uses_https(request),
+    )
+    return response
+
+
 @html_router.post("/golden/candidates/login", summary="검수자 아이디+비밀번호 로그인")
 @limiter.limit("10/minute")
 def proxy_gold_console_password_login(request: Request, body: ReviewerLoginRequest) -> Response:

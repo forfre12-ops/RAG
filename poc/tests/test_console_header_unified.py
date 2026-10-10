@@ -50,9 +50,9 @@ STATIC = _POC / "src" / "koipa" / "api" / "static"
 # [2026-08-24] 「검증문서 후보 관리」도 뺐다(3항목 → 2항목). 그 항목만
 # 포털 로그인을 거쳐야 열리고(다른 둘은 그냥 열린다) 특정 업무 화면이라 층위가 달랐다.
 # 진입은 관리자 콘솔 「검증문서 현황」 카드의 [후보 관리 화면 열기 ↗] 버튼이 맡는다.
-# [2026-09-29] "등급 시연" → "업로드·분류 테스트" 로 개명(console_nav.py 정본) — 실고객 문서
-# 업로드·분류는 이제 KL 포털이 API 로 하고, 이 화면은 우리가 직접 확인해 보는 내부 테스트용이다.
-LABELS = ["관리자 콘솔", "업로드·분류 테스트"]
+# 실문서는 검수 문서함의 「문서 업로드」로만 등록한다. 업로드·분류 테스트 화면은
+# 개발·운영 진단용 직접 주소로만 남기므로 공통 메뉴에는 관리자 콘솔 하나만 있다.
+LABELS = ["관리자 콘솔"]
 
 
 def _screens() -> dict[str, str]:
@@ -88,7 +88,7 @@ def test_every_screen_has_the_same_header_skeleton(name):
     # 표시하므로 왼쪽에 같은 이름을 또 적는 것은 중복이다(console_nav.header_html).
     # 메뉴에 **없는** 화면(검수·서명, 로그인)만 자기 이름을 밝힌다 — 아래 시험이 그것을 잡는다.
     # manage 는 메뉴에서 빠졌으므로(console_nav 3→2) 자기 이름을 밝히는 쪽이다.
-    in_menu = name in {"admin.html", "index.html"}
+    in_menu = name == "admin.html"
     if in_menu:
         assert '<span class="product">' not in head, f"{name}: 메뉴에 있는 화면인데 이름을 또 적는다"
     else:
@@ -106,6 +106,8 @@ def test_login_screen_has_no_logout_link_other_screens_do():
     for name in ("manage", "signoff"):
         head = _header_of(screens[name])
         assert "logout-link" in head, f"{name}: 로그아웃 버튼이 없다"
+        assert "/golden/candidates/logout" in head
+        assert "document.cookie" not in head
 
 
 def test_login_uses_the_single_console_theme_not_a_blue_subtheme():

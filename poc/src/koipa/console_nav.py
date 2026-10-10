@@ -32,12 +32,9 @@ CONSOLE_LINKS: tuple[tuple[str, str, str], ...] = (
     #       로그인이 필요한 업무 화면이라 층위가 달랐다. 진입은 admin.html 「검증문서 현황」 카드의
     #       [후보 관리 화면 열기 ↗] 버튼이 맡는다.
     ("admin", "관리자 콘솔", "/console/admin.html"),
-    # [D3 2026-08-18] 시연은 별도 화면이 아니라 분류 콘솔 안의 구역이 됐다.
-    # parse_demo.html 은 그 구역으로 보내는 스텁으로만 남는다(인쇄된 주소 보호).
-    # [2026-09-29] 이름을 "등급 시연"에서 "업로드·분류 테스트"로 바꿨다 — 실고객 문서 업로드·분류는
-    # 이제 KL 포털이 API 로 직접 하므로, 이 화면은 대외 시연용이 아니라 우리가 파이프라인을 직접
-    # 확인해 보는 내부 테스트 용도로 재정의했다(admin.html 의 3카드 제거와 짝).
-    ("demo", "업로드·분류 테스트", "/console/index.html#sec-parse"),
+    # ``/console/index.html#sec-parse`` 는 직접 주소를 아는 개발·운영 진단용으로만 남긴다.
+    # 문서를 평가 후보로 등록하는 경로는 골든셋 관리 화면의 「문서 업로드」 하나다. 이 링크를
+    # 공통 메뉴에 두면 검수자가 분류 테스트로 실제 문서를 보내는 동선이 생기므로 노출하지 않는다.
     # 뺀 항목: ("login", "로그인", "/api/v1/golden/candidates/login.html")
     #   화면은 살아 있고 주소로 직접 열린다. 223 콘솔은 토큰이 프리필돼 시연 동선에 필요 없다.
 )
@@ -235,17 +232,19 @@ def header_html(product: str, current: str = "", *, trailing: str = "",
         if (in_menu or not product)
         else f'<span class="divider"></span><span class="product">{_html.escape(product)}</span>'
     )
-    # [2026-10-02] 로그아웃 — 지금까지 다섯 화면 어디에도 없었다(쿠키를 지우는 유일한 통로가
-    # "로그인 실패 시 조용히 지움"뿐이었다). 쿠키만 지우고 로그인 화면으로 보낸다 — 서버에
-    # 상태를 안 두므로(토큰은 무상태) 지울 것은 이 쿠키 하나뿐이다.
+    # [2026-10-02] 로그아웃은 서버 응답의 Set-Cookie로 한다. 비밀번호 로그인 쿠키는 HttpOnly라
+    # JavaScript ``document.cookie``로는 지울 수 없다. 서버에는 상태가 없지만, 같은 path/domain
+    # 속성의 만료 쿠키를 내려 브라우저가 실제 세션 쿠키를 제거하게 한다.
     # [2026-10-07 KL 발견] 로그인 화면 자체에도 이 버튼이 그대로 떴다 — 눌러도 지울 쿠키가
     # 없고 같은 로그인 화면으로 다시 보내니 화면이 안 바뀌어 "안 눌러진다"로 보였다.
     # show_logout=False 로 로그인 화면에서만 뺀다.
     logout = (
         (
             '<a href="#" class="logout-link" '
-            "onclick=\"document.cookie='koipa_access_token=; path=/; Max-Age=0; SameSite=Lax';"
-            "location.href='/api/v1/golden/candidates/login.html';return false\">로그아웃</a>"
+            "onclick=\"fetch('/api/v1/golden/candidates/logout',{method:'POST',credentials:'same-origin'})"
+            ".then(function(r){if(!r.ok)throw new Error('logout');"
+            "location.href='/api/v1/golden/candidates/login.html'})"
+            ".catch(function(){alert('로그아웃 처리에 실패했습니다. 다시 시도하십시오.')});return false\">로그아웃</a>"
         )
         if show_logout
         else ""

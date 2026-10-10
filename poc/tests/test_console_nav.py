@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from koipa.console_nav import CONSOLE_LINKS, nav_bar_html
+from koipa.console_nav import CONSOLE_LINKS, REVIEW_SCREEN_EXCLUDE, nav_bar_html
 
 _STATIC = Path(__file__).resolve().parents[1] / "src" / "koipa" / "api" / "static"
 # [D3 2026-08-18] parse_demo.html 은 리다이렉트 스텁이 됐다 — 네비를 넣을 화면이 아니다.
@@ -40,10 +40,9 @@ def _labels(html: str) -> list[str]:
 
 
 def test_link_list_is_not_empty():
-    # [2026-08-24] 3 → 2. 「검증문서 후보 관리」를 메뉴에서 뺐다(console_nav 주석 참조).
-    # 하한을 2 로 둔다 — 남은 둘(관리자 콘솔·업로드·분류 테스트, 2026-09-29 개명)은 화면의 종류를
-    # 가르는 축이라 그보다 줄면 메뉴가 화면 사이 이동 수단으로서 뜻을 잃는다.
-    assert len(CONSOLE_LINKS) >= 2, CONSOLE_LINKS
+    # 검수 후보 등록은 관리 화면의 「문서 업로드」가 단일 진입점이다. 내부 분류 진단은
+    # 직접 주소로만 열므로, 공통 메뉴는 관리자 콘솔 하나만 남는다.
+    assert len(CONSOLE_LINKS) >= 1, CONSOLE_LINKS
     for key, label, href in CONSOLE_LINKS:
         assert key and label and href.startswith("/"), (key, label, href)
 
@@ -69,20 +68,20 @@ def test_static_page_hrefs_match(page):
 
 
 def test_dynamic_screens_carry_nav():
-    """golden.py 의 세 화면과 review/signoff 의 _nav_html 에 링크가 들어갔는지."""
+    """동적 화면이 공통 메뉴에서 허용한 링크만 렌더하는지."""
     from koipa.api.console_login import _render_console_login_html
     from koipa.api.golden import _render_specledger_gold_console_html
     from koipa.golden_review_html import _nav_html
 
     # [D1 2026-08-17] actual-intake 는 후보 관리의 업로드 모달로 흡수돼 화면이 사라졌다.
-    for name, html in (
-        ("manage", _render_specledger_gold_console_html()),
-        ("login", _render_console_login_html()),
-        ("review", _nav_html("검수", "full-train", "review")),
+    for name, html, exclude in (
+        ("manage", _render_specledger_gold_console_html(), ()),
+        ("login", _render_console_login_html(), REVIEW_SCREEN_EXCLUDE),
+        ("review", _nav_html("검수", "full-train", "review"), REVIEW_SCREEN_EXCLUDE),
     ):
         got = _hrefs(html)
-        assert got, f"{name}: 화면 간 링크가 없다"
-        assert set(got) <= {href for _, _, href in CONSOLE_LINKS}, (name, got)
+        want = set(_hrefs(nav_bar_html(exclude=exclude)))
+        assert set(got) == want, (name, got, want)
 
 
 def test_review_and_signoff_are_not_nav_targets():

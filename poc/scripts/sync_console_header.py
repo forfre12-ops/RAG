@@ -68,8 +68,10 @@ TRAILING = {
     "index.html": "",
 }
 
-PRODUCT = {"admin.html": "관리자 콘솔", "index.html": "등급 시연"}
-CURRENT = {"admin.html": "admin", "index.html": "demo"}
+# index.html 은 운영 검수 동선의 메뉴 대상이 아니다. 직접 주소를 아는 개발·운영 진단용
+# 화면임을 헤더에 밝혀, 실제 문서를 이곳에 올리는 착오를 줄인다.
+PRODUCT = {"admin.html": "관리자 콘솔", "index.html": "내부 분류 진단"}
+CURRENT = {"admin.html": "admin", "index.html": ""}
 
 # CSS 를 넣을 곳. admin 은 자체 인라인 <style>, index 는 외부 styles.css 를 쓴다.
 CSS_TARGET = {"admin.html": "admin.html", "index.html": "styles.css"}
