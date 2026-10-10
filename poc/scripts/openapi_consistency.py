@@ -297,8 +297,19 @@ def main() -> int:
 
     skip_prefixes: tuple[str, ...] = ()
     if not _training_enabled:
-        skip_prefixes = (f"{server_prefix}/train", "/api/v1/train", "/train")
-        print("  ℹ training 라우터 비활성 (enable_training=False) — /train/* YAML 경로 제외")
+        # training_router에는 /train 뿐 아니라 학습 산출물(ModelVersion)을 다루는
+        # /admin/model/* 운영 경로도 묶여 있다. 고객사 추론 이미지에서는 이 라우터를
+        # 아예 mount하지 않으므로, /train만 제외하면 YAML에만 남은 model 관리 3경로가
+        # 실제 계약 불일치처럼 오탐된다. ENABLE_TRAINING=1 프로파일에서는 제외하지
+        # 않아 세 경로의 구현·명세 정합성은 계속 검증한다.
+        skip_prefixes = (
+            f"{server_prefix}/train", "/api/v1/train", "/train",
+            f"{server_prefix}/admin/model", "/api/v1/admin/model", "/admin/model",
+        )
+        print(
+            "  ℹ training 라우터 비활성 (enable_training=False) — "
+            "/train/* 및 /admin/model/* YAML 경로 제외"
+        )
     # 규정 참고 표시 라우터도 기능 플래그(regulation_reference_enabled, 기본 꺼짐)일 때만 등록된다 — 꺼진 프로파일에서는 YAML 의 규정 경로 10개를
     # training 과 같은 방식으로 제외한다. REGULATION_REFERENCE_ENABLED=1 로 돌리면 10개가 모두 라우터와 일치한다(2026-09-26 확인).
     if not _regulation_enabled:
