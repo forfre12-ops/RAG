@@ -641,6 +641,13 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans
 input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:#fff;color:var(--text)}
 /* 운영 콘솔은 장식적 타원·색 띠 대신 직선형 정보 구조를 공통으로 쓴다. */
 body *,body *::before,body *::after{border-radius:0 !important}
+:root{
+  --red:#111;--red-soft:#f4f4f4;--red-border:rgba(0,0,0,.18);
+  --green:#111;--green-soft:#f4f4f4;
+  --amber:#525252;--amber-soft:#f4f4f4;
+}
+.dash-panel{background:#fff;box-shadow:none}
+.dash-panel::before,.grade-card::before{display:none !important}
 /* console-theme:end */
 </style>
 <script src="./errors_ko.js"></script>

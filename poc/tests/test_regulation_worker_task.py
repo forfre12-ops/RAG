@@ -56,7 +56,12 @@ def _worker_queue_lists() -> list[tuple[str, list[str]]]:
         for ln in f.read_text(encoding="utf-8").splitlines():
             if not re.search(r"celery.{0,40}koipa\.workers\.celery_app.{0,40}\bworker\b", ln):
                 continue
-            m = re.search(r"""-Q["',\s]+([A-Za-z0-9_,]+)""", ln)
+            # 직접 목록(`-Q classify,index`)과 Compose 환경변수 기본값
+            # (`-Q ${WORKER_QUEUES:-classify,index}`) 모두 실제 소비 큐를 뜻한다.
+            m = re.search(
+                r"""-Q(?:\s+|["']\s*,\s*["'])+(?:["']|\$\{WORKER_QUEUES:-)?([A-Za-z0-9_,]+)""",
+                ln,
+            )
             out.append((f"{f.name}: {ln.strip()[:100]}", m.group(1).split(",") if m else []))
     return out
 

@@ -186,11 +186,15 @@ def test_console_marks_fallback_rows_in_review_queue():
     assert "it.label_source" in html, "검수 큐가 본문 출처를 표시하지 않는다"
 
 
-def test_console_banner_no_longer_claims_zero_documents():
-    """noop 서버에서도 문서는 만들어져 큐에 쌓인다 — '결과 0건' 은 사실이 아니었다."""
+def test_console_does_not_claim_zero_documents_or_show_an_environment_banner():
+    """noop 서버에서도 문서는 만들어져 큐에 쌓인다 — '결과 0건' 은 사실이 아니었다.
+
+    환경 배너는 실제 운영 조치와 무관한 설명을 반복해 제거했다. 따라서 이 사실은
+    배너 문구가 아니라, 화면에 거짓 주장 자체가 없는지로 잠근다.
+    """
     html = CONSOLE.read_text(encoding="utf-8")
     assert "합성 생성 결과는 0건으로 나옵니다" not in html
-    assert "학습에 쓰이는 행은 0건" in html
+    assert 'id="profile-banner"' not in html
 
 
 def test_console_has_no_inline_handler_added_by_this_change():

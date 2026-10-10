@@ -32,6 +32,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from koipa.api import golden
 from koipa.api._jwt_auth import require_auth
 from koipa.api.app import app
 from koipa.services import golden_reviewer_access as access
@@ -147,6 +148,17 @@ def api(tmp_path, monkeypatch):
 
 def blind_on(monkeypatch, *, assignment: bool = True) -> None:
     set_flags(monkeypatch, assignment=assignment, blind=True)
+    if assignment:
+        # 배정 강제가 켜진 운영 계약에서는 원장에 적기 전에 활성 reviewer 명부를 확인한다.
+        # 이 별칭 격리 시험의 가상 검수자도 그 계약 안에서만 배정되게 한다.
+        monkeypatch.setattr(
+            golden.reviewer_credentials,
+            "list_accounts",
+            lambda: [
+                {"username": "rv-a", "roles": ("reviewer",), "active": True},
+                {"username": "rv-b", "roles": ("reviewer",), "active": True},
+            ],
+        )
 
 
 def standard_assignments(api: Api) -> None:

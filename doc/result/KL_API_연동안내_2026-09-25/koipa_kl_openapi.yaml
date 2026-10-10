@@ -33,6 +33,7 @@ servers:
       default: ai.example.koipa.local
 security:
 - ApiKeyAuth: []
+- BearerAuth: []
 tags:
 - name: classify
   description: 등급 분류 추론 (FUN-005)
@@ -321,6 +322,8 @@ paths:
                     type: boolean
                     default: false
                     description: 고등급 2인검토 게이트로 needs_second_review 로 보류됐는지.
+                  review_receipt:
+                    $ref: '#/components/schemas/ReviewReceipt'
       x-interface: IF-07
   /documents:
     post:
@@ -415,6 +418,11 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: AUTH_MODE=jwt 또는 both일 때만 허용되는 RS256 JWT. iss·aud·exp 검증을 통과해야 한다.
   schemas:
     DocumentUploadResponse:
       type: object
@@ -848,6 +856,44 @@ components:
           type: string
           nullable: true
           description: 확정 시각(ISO 8601 UTC)
+    ReviewReceipt:
+      type: object
+      description: 포털이 Agent 답을 받은 뒤 남긴 검수·확정의 추적 영수증. Agent 응답을 기다리게 하지 않으며, 영속된 Correction과 재학습 후보 상태를 함께 가리킨다.
+      required:
+      - doc_id
+      - reviewer_id
+      - final_label
+      - reviewed_at
+      - candidate_data_status
+      properties:
+        doc_id:
+          type: string
+        inference_id:
+          type: string
+          format: uuid
+          nullable: true
+        reviewer_id:
+          type: string
+        final_label:
+          $ref: '#/components/schemas/Grade'
+        reason:
+          type: string
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+        correction_id:
+          type: integer
+          nullable: true
+          description: 영속된 Correction 식별자. persisted=false이면 null.
+        candidate_data_status:
+          type: string
+          enum:
+          - eligible_for_candidate_rebuild
+          - held_for_finalization
+          - ineligible_reviewer
+          - not_persisted
+          description: 후보 재빌드 입구 상태이며, 자동 재학습·자동 활성화를 뜻하지 않는다.
     ClassifyAsyncResponse:
       type: object
       required:
