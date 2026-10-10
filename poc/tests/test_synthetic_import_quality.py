@@ -160,3 +160,28 @@ def test_blind_reviewer_file_can_be_joined_to_internal_metadata_without_writing_
     decision = report["decisions"][0]
     assert decision["grade"] == "S2" and decision["document_type"] == "계약 검토서"
     assert "S2" not in reviewer.read_text(encoding="utf-8")
+
+
+def test_proxy_gold_manifest_intended_label_is_accepted_by_import_audit(tmp_path: Path):
+    """Existing proxy-gold metadata uses intended_label, not true_grade."""
+    reviewer = tmp_path / "reviewer_documents.jsonl"
+    reviewer.write_text(
+        json.dumps({"review_id": "MS1-0001", "text": "검토 결과와 후속 조치를 기록한다."}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    internal = tmp_path / "internal_manifest.jsonl"
+    internal.write_text(
+        json.dumps(
+            {"doc_id": "MS1-0001", "intended_label": "S1", "doc_format": "품의서"},
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    records, errors = load_records([reviewer])
+    metadata, metadata_errors = load_metadata_index(internal)
+    report = audit_records(merge_metadata(records, metadata))
+
+    assert errors == metadata_errors == []
+    assert report["summary"]["keep"] == 1
+    assert report["decisions"][0]["grade"] == "S1"

@@ -111,7 +111,18 @@ def normalize_record(row: Mapping[str, Any], *, source_path: str, source_index: 
     document_id = _first_text(row, ("review_id", "synth_id", "document_id", "id", "doc_id", "uuid"))
     if not document_id:
         document_id = f"{Path(source_path).name}:{source_index + 1}"
-    grade = _first_text(row, ("target_grade", "true_grade", "grade", "expected_grade", "label")) or None
+    # Review-delivery manifests use ``intended_label`` so the reviewer JSONL
+    # can remain label-free.  Proxy-gold candidates use ``proposed_grade``.
+    # Both are server-side fields and must participate in the import audit;
+    # otherwise a valid blind review batch is falsely reported as having no
+    # grade at all and every document is excluded.
+    grade = _first_text(
+        row,
+        (
+            "target_grade", "true_grade", "grade", "expected_grade", "label",
+            "intended_label", "proposed_grade",
+        ),
+    ) or None
     if grade:
         grade = _fold(grade).upper()
     document_type = _first_text(
