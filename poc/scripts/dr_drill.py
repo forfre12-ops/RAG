@@ -78,7 +78,12 @@ def run_stage(name: str, dry_run: bool, cmd: list[str] | None = None) -> dict:
     }
 
 
-def stage_commands(staging_compose: str) -> dict[str, list[str] | None]:
+def stage_commands(
+    staging_compose: str,
+    *,
+    allow_write_smoke: bool = False,
+) -> dict[str, list[str] | None]:
+    staging_url = "http://staging:8000"
     return {
         "find_latest_backups": ["ls", "-la", "backups/"],
         "spin_up_staging": ["docker", "compose", "-p", "koipa-dr", "-f", staging_compose, "up", "-d"],
@@ -88,11 +93,14 @@ def stage_commands(staging_compose: str) -> dict[str, list[str] | None]:
         "restore_postgres": ["python", "scripts/dr_restore.py", "--target", "postgres", "--staging"],
         "restore_storage": ["python", "scripts/dr_restore.py", "--target", "storage", "--staging"],
         # p5_e2e_smoke.py 는 --mode {http,inproc} 만 허용(staging 은 argparse exit 2 로 항상 죽음) → http.
-        "smoke_classify": ["python", "scripts/p5_e2e_smoke.py", "--mode", "http"],
-        # /guide·async batch 실 스테이징 검증 러너 미구현 → 자동 검증 불가. print 스텁으로 PASS 위장하지
-        # 않고 MANUAL 로 기록(수동/스크립트 검증 필요). 러너 생기면 실 명령으로 교체.
+        "smoke_classify": ["python", "scripts/p5_e2e_smoke.py", "--mode", "http", "--url", staging_url],
+        # /guide는 실 스테이징 검증 러너가 없어 MANUAL로 남긴다. async batch는 비식별 2건을
+        # 실제로 등록하므로 기본값에서는 절대 실행하지 않고, 호출자가 명시적으로 허용한 경우에만 켠다.
         "smoke_guide": None,
-        "smoke_async_batch": None,
+        "smoke_async_batch": (
+            ["python", "scripts/p5_async_batch_smoke.py", "--url", staging_url, "--allow-write"]
+            if allow_write_smoke else None
+        ),
         "smoke_audit_chain": ["python", "-c",
             "from koipa.services.audit_chain import verify_chain; r=verify_chain(); print(r)"],
         "smoke_kpi_endpoint": ["curl", "-fsS", "http://staging:8000/api/v1/metrics"],
@@ -106,9 +114,14 @@ def main() -> int:
     parser.add_argument("--staging-compose", default="docker-compose.dr-staging.yml")
     parser.add_argument("--report-out", type=Path, default=Path("reports/dr/dr_drill_latest.json"))
     parser.add_argument("--rto-seconds", type=int, default=4 * 3600, help="RTO 목표(초). 초과 시 비-zero exit.")
+    parser.add_argument(
+        "--allow-write-smoke",
+        action="store_true",
+        help="비식별 async-batch DR 스모크의 쓰기를 명시적으로 허용합니다.",
+    )
     args = parser.parse_args()
 
-    cmds = stage_commands(args.staging_compose)
+    cmds = stage_commands(args.staging_compose, allow_write_smoke=args.allow_write_smoke)
     results = []
     overall_start = time.time()
 

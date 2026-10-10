@@ -87,6 +87,8 @@ textarea{resize:vertical;min-height:90px;font-size:12.5px;line-height:1.55;}
    화면에 **존재**해야 한다는 시험이 있다(test_admin_console_screens). 감추되 남긴다. */
 [data-tech]{display:none !important;}
 body.tech [data-tech]{display:revert !important;}
+/* 개발·시연용 설정과 합성 후보 조작은 기술 상세 주소에서도 운영 콘솔에 노출하지 않는다. */
+[data-legacy-config],[data-internal-synthesis]{display:none !important;}
 .grid > [data-product-legacy]{display:none !important;}
 .techbar{font-size:11px;color:var(--text-dim);padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:var(--bg-surface);}
 .sec-note details{margin-top:4px}
@@ -169,7 +171,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .warnbox{font-size:12px;color:var(--amber);background:var(--amber-soft);border:1px solid #fcd34d;border-radius:8px;padding:9px 12px;}
 
 /* DASHBOARD (관제 종합) */
-.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(206px,1fr));gap:12px;}
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
 /* 검수 근거 펼침 — 클릭한 행에서만 조회한다(lazy). */
 .q-why{margin-top:2px;}
 .why-box{margin-top:8px;border:1px solid var(--border-mid);border-radius:8px;padding:9px 11px;background:var(--bg-surface);}
@@ -196,11 +198,11 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .profile-banner.jjw{background:var(--bg-surface);border-color:var(--accent);}
 .profile-banner.cust{background:var(--bg-surface);border-color:#b8860b;}
 .profile-banner.dev{background:var(--bg-surface);border-color:var(--text-dim);}
-.dash-panel{border:1px solid var(--border-mid);border-left:3px solid var(--border-strong);padding:13px 14px;background:var(--bg-surface);display:flex;flex-direction:column;gap:9px;min-width:0;}
-/* 좌측 색선 하나로 칸 상태를 먼저 읽게 한다 — 배지를 다 읽지 않아도 정상/주의가 구분된다. */
-.dash-panel.st-ok{border-left-color:#16a34a;}
-.dash-panel.st-warn{border-left-color:#d97706;}
-.dash-panel.st-err{border-left-color:#dc2626;}
+.dash-panel{position:relative;overflow:hidden;border:1px solid var(--border-mid);border-radius:12px;padding:15px;background:linear-gradient(145deg,#fff 0%,var(--bg-surface) 100%);display:flex;flex-direction:column;gap:12px;min-width:0;box-shadow:0 8px 22px rgba(15,35,66,.035);}
+.dash-panel:before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--border-strong);}
+.dash-panel.st-ok:before{background:#16a34a;}
+.dash-panel.st-warn:before{background:#d97706;}
+.dash-panel.st-err:before{background:#dc2626;}
 .dash-panel .dp-h{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
 /* 제목이 「배포 준 / 비 상태」로 쪼개지고 배지가 세로로 무너지던 것 — 제목은 줄바꿈 금지,
    배지는 자리가 모자라면 통째로 다음 줄로 내린다. */
@@ -208,7 +210,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .dash-panel .dp-t{font-family:var(--font-sans);font-size:12.5px;font-weight:700;color:var(--text);text-transform:none;letter-spacing:-.01em;white-space:nowrap;}
 .dash-panel .dp-tags{margin-left:auto;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;}
 .dash-panel .dp-tags .pill{white-space:nowrap;font-family:var(--font-sans);letter-spacing:0;text-transform:none;font-size:11px;}
-.dash-panel .dp-big{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;}
+.dash-panel .dp-big{font-size:30px;font-weight:800;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums;}
 .dash-panel .dp-big .u{font-size:12px;font-weight:600;color:var(--text-dim);letter-spacing:0;margin-left:3px;}
 .dash-panel .dp-row{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--text-soft);}
 .dash-panel .dp-row b{color:var(--text);font-variant-numeric:tabular-nums;}
@@ -225,6 +227,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .dash-panel .dp-tab .gk{font-family:var(--font-mono);font-size:10.5px;font-weight:700;color:var(--text);background:var(--bg-strong);padding:1px 5px;}
 .dash-panel .dp-tab .n{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;min-width:20px;text-align:right;}
 .dash-panel .dp-tab small{color:var(--text-dim);font-size:10.5px;font-family:var(--font-mono);white-space:nowrap;}
+.dash-panel .dp-alert{padding:7px 9px;border-radius:7px;background:var(--amber-soft);color:#92400e;font-size:11.5px;font-weight:700;line-height:1.45;}
 .dash-panel .warnbox{font-size:11.5px;line-height:1.5;padding:8px 10px;}
 .dp-degraded{font-size:10.5px;color:var(--amber);font-family:var(--font-mono);}
 
@@ -233,7 +236,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
    나머지 상태/장식 색(빨강·초록·주황)은 전부 흑백·그레이로.
    (소스 순서상 마지막이라 위 규칙을 덮는다)
    ============================================================ */
-*{border-radius:0 !important;}
+*{border-radius:0;}
 :root{
   --red:#0a0a0a;   --red-soft:#f4f4f4;   --red-border:rgba(0,0,0,.16);
   --green:#525252; --green-soft:#f4f4f4;
