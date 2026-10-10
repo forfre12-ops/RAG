@@ -177,6 +177,7 @@ def _signoff_records(records: Sequence[dict], *, signable: bool = True) -> list[
             "llm": str(r.get("llm_grade", "")),
             "conf": round(float(r.get("llm_confidence") or 0.0), 3),
             "domain": str(r.get("domain", "") or r.get("source", "")),
+            "title": str(r.get("title", "") or r.get("document_title", "")),
             "text": str(r.get("text") or ""),
             # 서명 가능 여부는 **어느 파일에서 왔는가** 로 정한다.
             #
@@ -228,6 +229,7 @@ def render_signoff_html(
         .replace("__MINPG__", str(int(min_per_grade or 0)))
         .replace("__DOC_RENDER_JS__", DOC_RENDER_JS)
         .replace("__DATA__", _embed_json(data))
+        .replace("__SIGNOFF_WORKBENCH_SCRIPT__", _SIGNOFF_WORKBENCH_SCRIPT)
     )
 
 
@@ -264,6 +266,28 @@ def render_signoff_html_from_jsonl(
                                profile=profile, review_url=review_url,
                                min_per_grade=min_per_grade, pending=pending)
 
+
+# 카드 목록에서 문서를 하나씩 길게 펼치던 검수·서명 화면을 후보 관리와 같은
+# 「문서함 / 실제 원문 / 결정」 작업대에 맞춘다. 결정·사전점검·서명 API 및 브라우저
+# 임시 저장은 아래 런타임 재배치에서도 같은 id와 상태(DEC)를 계속 쓴다.
+_SIGNOFF_WORKBENCH_CSS = """
+.reviewer-workspace{display:block!important;max-width:none!important;padding:18px 22px 26px!important}
+.reviewer-workspace>.side{display:none!important}
+.reviewer-workspace>.main{max-width:none!important;padding:0!important}
+.signoff-workbench-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:3px 0 19px}
+.signoff-workbench-head h1{margin:0;font-size:27px;letter-spacing:-1.3px;line-height:1.25}
+.signoff-workbench-head p{margin:7px 0 0;color:var(--text-soft);font-size:14px}
+#signoff-workbench{display:grid;grid-template-columns:minmax(270px,25%) minmax(0,1fr);height:calc(100vh - 184px);min-height:620px;border:1px solid var(--border);background:#fff;overflow:hidden}
+.signoff-inbox{min-width:0;min-height:0;display:flex;flex-direction:column;border-right:1px solid var(--border);background:#fff}
+.signoff-inbox-head{padding:21px 18px 17px;border-bottom:1px solid var(--border)}
+.signoff-inbox-head h2{margin:0;font-size:16px;letter-spacing:-.45px}.signoff-inbox-head p{margin:7px 0 0;color:var(--text-soft);font-size:12px;line-height:1.55}
+.signoff-inbox .filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:14px 0 0}.signoff-inbox .filters .filter-label{display:none}
+.signoff-inbox .filter-btn{min-width:0;padding:8px 5px;font-size:11px}.signoff-inbox .filter-sep{display:none}.signoff-inbox .search-box{grid-column:1/-1;box-sizing:border-box;min-width:0;width:100%;padding:9px 10px}
+#grid.signoff-list{min-height:0;flex:1;overflow-y:auto}.signoff-list .scard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;width:100%;margin:0;padding:14px 16px;border:0;border-bottom:1px solid #edf0f2;border-radius:0;background:#fff;text-align:left;color:inherit;cursor:pointer;box-shadow:none}.signoff-list .scard:hover,.signoff-list .scard.selected{background:#f2f6ff}.signoff-list .scard.selected{box-shadow:inset 3px 0 0 #2563a8}.signoff-list .scard.decided{box-shadow:inset 3px 0 0 var(--c-s3)}.signoff-list .scard.rejected{box-shadow:inset 3px 0 0 var(--c-ts);opacity:1}.signoff-list .card-meta{display:contents}.signoff-list .grade-mark{grid-column:2;grid-row:1;align-self:start}.signoff-list .signoff-card-title{grid-column:1;grid-row:1;font-size:14px;font-weight:850;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.signoff-list .signoff-card-sub{grid-column:1/-1;grid-row:2;font:11px var(--font-mono);color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.signoff-list .pending-mark{color:#92400e;font-size:11px}
+.signoff-detail{display:grid;grid-template-columns:minmax(0,1fr) minmax(285px,31%);min-width:0;min-height:0}.signoff-document-canvas{min-width:0;min-height:0;overflow:auto;padding:31px;background:#edf2f7;border-right:1px solid var(--border)}.signoff-document-sheet{box-sizing:border-box;min-height:100%;max-width:760px;margin:0 auto;padding:52px 62px 66px;background:#fff;border:1px solid #d5dde6;box-shadow:0 5px 18px rgba(15,23,42,.08)}.signoff-document-sheet .doc-kicker{margin:0 0 17px;color:#64748b;font:700 12px var(--font-mono);letter-spacing:.06em}.signoff-document-sheet h2{margin:0 0 14px;font-size:29px;line-height:1.32;letter-spacing:-1px;word-break:keep-all}.signoff-document-sheet .doc-metas{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 18px}.signoff-document-sheet .doc-metas span{padding:5px 7px;border:1px solid var(--border);background:var(--bg-mid);font:11px var(--font-mono);color:var(--text-soft)}.signoff-document-sheet .doc-facts{margin:0 0 20px;padding:12px 14px;border-left:3px solid var(--text);background:var(--bg-surface);white-space:pre-line;color:var(--text-soft);font-size:13px;line-height:1.75}.signoff-document-sheet .viewbar{margin:0 0 18px;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}.signoff-document-sheet .docbody{max-width:none;font-size:16px;line-height:1.9;color:#1f2937}
+#decisionPanel{min-width:0;min-height:0;overflow:auto;background:#fafbfd}.decision-head{padding:22px 20px 17px;border-bottom:1px solid var(--border);background:#fff}.decision-head h3{margin:0;font-size:16px;letter-spacing:-.35px}.decision-head p{margin:7px 0 0;color:var(--text-soft);font-size:12px;line-height:1.55}.decision-head .who{padding:6px 0 0;font-size:12px;color:var(--text-soft)}.decision-card{margin:16px;padding:17px;border:1px solid var(--border);background:#fff}.decision-card h4{margin:0 0 12px;font-size:13px}.decision-card label{display:block;margin:11px 0;font-size:13px;line-height:1.45}.decision-card .gsel,.decision-card .usel{margin:6px 0 0;width:100%;padding:8px;border:1px solid var(--border-strong);background:#fff}.decision-card .note{box-sizing:border-box;min-height:76px;resize:vertical}.decision-card .readonly{color:var(--text-soft);font-size:13px;line-height:1.6}.decision-card .preflight,.decision-card .restored,.decision-card .result{margin:0 0 12px}.decision-card .submit-actions{margin-top:16px}.decision-card .submit-actions .btn{width:100%}.decision-card .publish-label{padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}.decision-card #deccount{display:block;margin:4px 0 8px;font:800 25px var(--font-mono)}.decision-card #decbreak{display:block;font-size:12px;line-height:1.65;color:var(--text-dim)}
+@media(max-width:1050px){.reviewer-workspace{padding:14px!important}#signoff-workbench{height:auto;min-height:0;grid-template-columns:1fr}.signoff-inbox{max-height:390px;border-right:0;border-bottom:1px solid var(--border)}.signoff-detail{grid-column:1;min-height:680px}.signoff-workbench-head h1{font-size:24px}}@media(max-width:700px){.reviewer-workspace{padding:12px!important}.signoff-workbench-head{display:block}.signoff-detail{grid-template-columns:1fr}.signoff-document-canvas{padding:14px}.signoff-document-sheet{min-height:0;padding:30px 22px}#decisionPanel{border-top:1px solid var(--border)}}
+"""
 
 # 토큰 재선언 — render_signoff_html(css=...) 로 커스텀 CSS 를 주입해도 서명 화면이
 # 토큰 미정의로 무너지지 않게 self-sufficient 하게 둔다(중복 선언은 무해).
@@ -333,7 +357,7 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + DOC_CSS + """
 .result{margin:14px 0;padding:12px 16px;border-radius:var(--radius);font-size:13px;display:none}
 .result.ok{background:#f0fdf4;border:1px solid var(--c-s3);border-left:3px solid var(--c-s3);color:#166534;display:block}
 .result.err{background:#fef2f2;border:1px solid var(--c-ts);border-left:3px solid var(--c-ts);color:#991b1b;display:block}
-""" + HEADER_CSS + NAV_CSS + SHELL_MEDIA_CSS + REVIEWER_WORKSPACE_CSS + """
+""" + HEADER_CSS + NAV_CSS + SHELL_MEDIA_CSS + REVIEWER_WORKSPACE_CSS + _SIGNOFF_WORKBENCH_CSS + """
 </style>"""
 
 _SIGNOFF_BODY = r"""
@@ -721,5 +745,142 @@ document.getElementById('submit').addEventListener('click',async function(){
 })();
 render();
 </script>
+__SIGNOFF_WORKBENCH_SCRIPT__
 </body></html>
 """
+
+
+_SIGNOFF_WORKBENCH_SCRIPT = r"""<script>
+/* 실제 검수는 한 문서를 읽고 판단하는 일이다. 카드 목록은 문서함으로만 남기고,
+   본문과 결정 폼은 각각 가운데 문서지와 오른쪽 결정 패널에 한 번만 그린다. */
+(function(){
+  const root=document.querySelector('.reviewer-workspace');
+  const main=root&&root.querySelector('.main');
+  if(!root||!main||document.getElementById('signoff-workbench'))return;
+
+  // 기존 비동기 세션 조회·사전점검·서명 이벤트는 이 요소 객체에 묶여 있다. 지우지 않고
+  // 새 패널로 옮겨서, 화면 구조만 바꾸고 인증·제출 계약은 그대로 둔다.
+  const keep={
+    who:document.getElementById('who'), preflight:document.getElementById('preflight'),
+    restored:document.getElementById('restored'), result:document.getElementById('result'),
+    publish:document.getElementById('publish'), submit:document.getElementById('submit')
+  };
+  const side=root.querySelector('.side'); if(side)side.remove();
+  main.innerHTML=''
+    +'<header class="signoff-workbench-head"><div><h1>문서 검토 및 확정</h1>'
+      +'<p>문서함, 원문, 결정 정보를 한 화면에서 확인합니다.</p></div></header>'
+    +'<section id="signoff-workbench" aria-label="문서 검토 작업영역">'
+      +'<aside class="signoff-inbox" aria-label="문서함">'
+        +'<header class="signoff-inbox-head"><h2>문서함</h2><p>배정 문서를 선택해 원문과 결정을 확인합니다.</p>'
+        +'<div class="filters"><span class="filter-label">등급</span>'
+          +'<button type="button" class="filter-btn active" data-f="grade" data-v="all">전체</button>'
+          +'<button type="button" class="filter-btn" data-f="grade" data-v="TS">TS</button>'
+          +'<button type="button" class="filter-btn" data-f="grade" data-v="S1">S1</button>'
+          +'<button type="button" class="filter-btn" data-f="grade" data-v="S2">S2</button>'
+          +'<button type="button" class="filter-btn" data-f="grade" data-v="S3">S3</button>'
+          +'<button type="button" class="filter-btn active" data-f="state" data-v="all">전체 상태</button>'
+          +'<button type="button" class="filter-btn" data-f="state" data-v="todo" id="fTodo">미결정</button>'
+          +'<button type="button" class="filter-btn" data-f="state" data-v="done">결정함</button>'
+          +'<input class="search-box" id="q" placeholder="문서 ID·본문 검색" aria-label="문서 ID 또는 본문 검색">'
+        +'</div></header><div id="grid" class="signoff-list"></div>'
+      +'</aside>'
+      +'<section class="signoff-detail">'
+        +'<div class="signoff-document-canvas"><article class="signoff-document-sheet">'
+          +'<p id="documentKicker" class="doc-kicker">점검/검토 기록</p><h2 id="documentTitle">문서 상세</h2>'
+          +'<div id="documentMetas" class="doc-metas"></div><div id="documentFacts" class="doc-facts"></div>'
+          +'<div class="viewbar"><button type="button" id="viewRendered" class="btn sm active" aria-pressed="true">읽기 좋게</button>'
+            +'<button type="button" id="viewRaw" class="btn sm" aria-pressed="false">원문 그대로</button>'
+            +'<span class="viewnote">검수 판단은 원문 기준입니다. 읽기 좋게 보기는 서식만 입힌 같은 내용입니다.</span></div>'
+          +'<div id="documentRendered" class="docbody md"></div><pre id="documentRaw" class="docbody" style="display:none"></pre>'
+        +'</article></div>'
+        +'<aside id="decisionPanel"><header class="decision-head"><h3>문서 결정 정보</h3><p>선택 문서의 검토 상태와 서명 결정을 기록합니다.</p><div id="whoSlot"></div></header>'
+          +'<section id="decisionForm" class="decision-card"></section>'
+          +'<section class="decision-card"><h4>검수 제출</h4><span id="deccount">–</span><span id="decbreak"></span>'
+            +'<div id="preflightSlot"></div><div id="restoredSlot"></div><div id="resultSlot"></div>'
+            +'<label class="publish-label" id="publishSlot">라이브 반영(publish)</label><div class="submit-actions" id="submitSlot"></div>'
+          +'</section>'
+        +'</aside>'
+      +'</section>'
+    +'</section>';
+  if(keep.who)document.getElementById('whoSlot').append(keep.who);
+  if(keep.preflight)document.getElementById('preflightSlot').append(keep.preflight);
+  if(keep.restored)document.getElementById('restoredSlot').append(keep.restored);
+  if(keep.result)document.getElementById('resultSlot').append(keep.result);
+  if(keep.publish)document.getElementById('publishSlot').prepend(keep.publish);
+  if(keep.submit)document.getElementById('submitSlot').append(keep.submit);
+
+  let selectedId=DATA.length?DATA[0].id:null;
+  let documentView='md';
+  const byId={}; DATA.forEach(function(r){byId[r.id]=r;});
+  function titleOf(r){return r.title||r.domain||('검수 문서 '+r.id);}
+  function filtered(){
+    const query=(q||'').toLowerCase();
+    return DATA.filter(function(r){
+      if(g!=='all'&&r.grade!==g)return false;
+      const decided=!!(DEC[r.id]&&DEC[r.id].decision);
+      if(st==='todo'&&(!r.signable||decided))return false;
+      if(st==='done'&&!decided)return false;
+      return !query||((r.id+' '+titleOf(r)+' '+r.text).toLowerCase().includes(query));
+    });
+  }
+  function inboxRow(r){
+    const d=DEC[r.id]||{};
+    const cls='scard'+(selectedId===r.id?' selected':'')+(r.signable?'':' pending')+(d.decision==='reject'?' rejected':(d.decision?' decided':''));
+    return '<button type="button" class="'+cls+'" data-id="'+esc(r.id)+'">'
+      +'<span class="signoff-card-title">'+esc(titleOf(r))+'</span><span class="grade-mark g-'+r.grade+'">'+r.grade+'</span>'
+      +'<span class="signoff-card-sub">'+esc(r.id)+(r.domain?' · '+esc(r.domain):'')+(r.signable?'':' · <span class="pending-mark">보기 전용</span>')+'</span></button>';
+  }
+  function renderDocument(r){
+    const title=document.getElementById('documentTitle');
+    const kicker=document.getElementById('documentKicker');
+    const metas=document.getElementById('documentMetas');
+    const facts=document.getElementById('documentFacts');
+    const rendered=document.getElementById('documentRendered');
+    const raw=document.getElementById('documentRaw');
+    metas.replaceChildren();
+    if(!r){title.textContent='선택할 문서가 없습니다.';kicker.textContent='문서함';facts.textContent='왼쪽 문서함에서 검토할 문서를 선택하십시오.';rendered.replaceChildren();raw.textContent='';return;}
+    kicker.textContent=r.signable?'점검/검토 기록':'참고/확인 기록';
+    title.textContent=titleOf(r);
+    [['업무분야',r.domain||'미지정'],['점검/검토 기록',r.id],['검수 상태',r.signable?'서명 대상':'보기 전용']].forEach(function(pair){const chip=document.createElement('span');chip.textContent=pair[0]+' · '+pair[1];metas.append(chip);});
+    facts.textContent='문서번호: '+r.id+'\n검토 등급: '+r.grade+'\n룰 판정: '+(r.rule||'확인 안 됨')+' · LLM 판정: '+(r.llm||'확인 안 됨')+' · 신뢰도: '+r.conf.toFixed(2);
+    rendered.innerHTML=mdOnce(r); raw.textContent=r.text;
+    rendered.style.display=documentView==='md'?'':'none';raw.style.display=documentView==='raw'?'':'none';
+  }
+  function renderDecision(r){
+    const box=document.getElementById('decisionForm');
+    if(!r){box.innerHTML='<h4>검수 결정</h4><p class="readonly">문서를 선택하면 결정 항목이 표시됩니다.</p>';return;}
+    if(!r.signable){box.innerHTML='<h4>검수 결정</h4><p class="readonly">이 문서는 룰과 LLM 합의가 미달한 보기 전용 후보입니다. 내용만 확인할 수 있으며, 확정은 후보 관리 화면에서 합니다.</p>';return;}
+    const d=DEC[r.id]||{};
+    box.innerHTML='<h4>검수 결정</h4>'
+      +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="approve"'+(d.decision==='approve'?' checked':'')+'> 승인 ('+esc(r.grade)+' 유지)</label>'
+      +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="change"'+(d.decision==='change'?' checked':'')+'> 등급 지정 또는 변경</label>'
+      +'<select class="gsel" data-id="'+esc(r.id)+'" aria-label="확정 등급">'+gopts(d.grade||r.grade)+'</select>'
+      +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="reject"'+(d.decision==='reject'?' checked':'')+'> 거부 (승격 제외)</label>'
+      +'<label>용도<select class="usel" data-id="'+esc(r.id)+'"><option value="locked_eval"'+((d.intended_use||'locked_eval')==='locked_eval'?' selected':'')+'>평가 정답</option><option value="review_only"'+(d.intended_use==='review_only'?' selected':'')+'>검토 기록만</option></select></label>'
+      +'<textarea class="note" data-id="'+esc(r.id)+'" placeholder="판단 사유 또는 메모 (선택)">'+esc(d.note||'')+'</textarea>';
+  }
+  function workbenchRender(){
+    const rows=filtered();
+    if(!selectedId||!rows.some(function(r){return r.id===selectedId;}))selectedId=rows.length?rows[0].id:null;
+    document.getElementById('grid').innerHTML=rows.length?rows.map(inboxRow).join(''):'<div class="no-results">조건에 맞는 문서가 없습니다.</div>';
+    decCount();renderDocument(selectedId?byId[selectedId]:null);renderDecision(selectedId?byId[selectedId]:null);
+  }
+  // decClear·복원·제출 후의 기존 render() 호출도 같은 작업대를 다시 그리도록 교체한다.
+  render=workbenchRender;
+  document.getElementById('grid').addEventListener('click',function(e){const row=e.target.closest&&e.target.closest('.scard[data-id]');if(!row)return;selectedId=row.dataset.id;render();});
+  document.getElementById('decisionForm').addEventListener('change',function(e){
+    const t=e.target,id=t.dataset.id||((t.name||'').indexOf('dec-')===0?t.name.slice(4):'');if(!id)return;
+    if(t.matches('input[type=radio]')){DEC[id]=DEC[id]||{};DEC[id].decision=t.value;if(t.value!=='change')delete DEC[id].grade;}
+    else if(t.matches('.gsel')){DEC[id]=DEC[id]||{};DEC[id].decision='change';DEC[id].grade=t.value;}
+    else if(t.matches('.usel')){DEC[id]=DEC[id]||{};DEC[id].intended_use=t.value;}
+    else return;
+    render();decSave();
+  });
+  document.getElementById('decisionForm').addEventListener('input',function(e){if(!e.target.matches('.note'))return;const id=e.target.dataset.id;DEC[id]=DEC[id]||{};DEC[id].note=e.target.value;decSave();});
+  document.getElementById('viewRendered').addEventListener('click',function(){documentView='md';document.getElementById('viewRendered').classList.add('active');document.getElementById('viewRaw').classList.remove('active');document.getElementById('viewRendered').setAttribute('aria-pressed','true');document.getElementById('viewRaw').setAttribute('aria-pressed','false');renderDocument(selectedId?byId[selectedId]:null);});
+  document.getElementById('viewRaw').addEventListener('click',function(){documentView='raw';document.getElementById('viewRaw').classList.add('active');document.getElementById('viewRendered').classList.remove('active');document.getElementById('viewRaw').setAttribute('aria-pressed','true');document.getElementById('viewRendered').setAttribute('aria-pressed','false');renderDocument(selectedId?byId[selectedId]:null);});
+  document.querySelectorAll('.filter-btn').forEach(function(button){button.addEventListener('click',function(){const group=this.dataset.f;document.querySelectorAll('.filter-btn[data-f="'+group+'"]').forEach(function(x){x.classList.remove('active');});this.classList.add('active');if(group==='grade')g=this.dataset.v;else st=this.dataset.v;render();});});
+  document.getElementById('q').addEventListener('input',function(){const value=this.value;clearTimeout(qTimer);qTimer=setTimeout(function(){q=value;render();},150);});
+  workbenchRender();
+})();
+</script>"""

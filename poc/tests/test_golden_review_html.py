@@ -79,6 +79,9 @@ def test_signoff_uses_the_shared_reviewer_workspace_shell():
         "REVIEW WORKSPACE",
         "배정 문서 검수",
         "검수자 계정",
+        "signoff-workbench",
+        "signoff-document-sheet",
+        "decisionPanel",
     ):
         assert expected in html
     assert "CURRENT WORKSPACE" not in html and "goldset/signoff" not in html

@@ -39,8 +39,17 @@ async function signoff(server, opts = {}) {
   return page;
 }
 
-/** 후보 카드의 결정 라디오를 사람이 누르듯 누른다. */
+/** 문서함에서 한 건을 열어 가운데 원문·오른쪽 결정 패널로 보낸다. */
+function selectDocument(page, docId) {
+  const row = card(page, docId);
+  if (!row) throw new Error(`문서함 항목이 없다: ${docId}`);
+  row.click();
+  return row;
+}
+
+/** 선택 문서의 결정 라디오를 사람이 누르듯 누른다. */
 function decide(page, docId, value) {
+  selectDocument(page, docId);
   const el = page.q(`input[name="dec-${docId}"][value=${value}]`);
   if (!el) throw new Error(`결정 라디오가 없다: ${docId} ${value}`);
   el.click();
@@ -49,6 +58,7 @@ function decide(page, docId, value) {
 
 /** 등급변경 드롭다운을 고른다 — 라디오를 누르지 않고 이것만 건드리는 경로. */
 function pickGrade(page, docId, grade) {
+  selectDocument(page, docId);
   const sel = page.q(`.gsel[data-id="${docId}"]`);
   if (!sel) throw new Error(`등급 드롭다운이 없다: ${docId}`);
   sel.value = grade;
@@ -73,9 +83,8 @@ export const scenarios = [
       for (const [key, docId] of Object.entries(IDS)) {
         check.ok(card(page, docId), `${key} 카드가 있다 (${docId})`);
       }
-      // 본문이 비면 검수자는 읽을 것이 없다 — 카드 껍데기만 그려진 것과 구분해야 한다.
-      const body = page.text(page.q(`.scard[data-id="${IDS.ts}"] .docbody`));
-      check.includes(body, '배합비', '문서 본문이 카드 안에 들어 있다');
+      // 본문이 비면 검수자는 읽을 것이 없다 — 문서지 가운데에 전문이 있어야 한다.
+      check.includes(page.text('documentRendered'), '배합비', '문서 원문이 가운데 문서지에 들어 있다');
       check.includes(page.text('deccount'), '0 / 5', '진행 숫자는 서명 대상 5건 기준이다');
       return page;
     },
