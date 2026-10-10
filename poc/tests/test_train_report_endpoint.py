@@ -59,6 +59,10 @@ def test_report_surfaces_stored_metrics(monkeypatch):
         "f1_macro": 0.865, "fnr_overall": 0.034, "fnr_by_grade": {"TS": 0.01, "S1": 0.05},
         "fnr_high": 0.02, "confusion_matrix": [[10, 1], [2, 9]],
         "classification_report": "...",
+        "learning_curve": [
+            {"epoch": 0.5, "step": 10, "loss": 0.82},
+            {"epoch": 1.0, "step": 20, "eval_loss": 0.61},
+        ],
     })
     svc = _svc(monkeypatch, by_label={"v-abc123": mv}, active=None)
     rep = svc.report("v-abc123")
@@ -68,6 +72,9 @@ def test_report_surfaces_stored_metrics(monkeypatch):
     assert rep.f1_macro == 0.865
     assert rep.fnr_by_grade == {"TS": 0.01, "S1": 0.05}
     assert rep.confusion_matrix == [[10, 1], [2, 9]]
+    assert rep.learning_curve_status == "recorded"
+    assert rep.learning_curve[0].train_loss == 0.82
+    assert rep.learning_curve[1].eval_loss == 0.61
     assert rep.compared_to_active is None  # 활성 모델 없음 — 비교 불가
 
 
@@ -103,11 +110,47 @@ def test_missing_metric_fields_do_not_crash(monkeypatch):
     assert rep.f1_macro is None
     assert rep.fnr_by_grade == {}
     assert rep.confusion_matrix == []
+    assert rep.learning_curve == [] and rep.learning_curve_status == "not_recorded"
+
+
+def test_pdf_renderer_uses_stored_values_and_is_a_valid_pdf(monkeypatch):
+    """PDF는 빈 과거 곡선을 추정하지 않고, 저장된 지표만 읽어야 한다."""
+    mv = _mv("v-pdf", metrics={
+        "accuracy": 0.91, "f1_macro": 0.88, "fnr_overall": 0.03,
+        "fnr_by_grade": {"TS": 0.01, "S1": 0.02},
+        "learning_curve": [{"epoch": 1, "step": 20, "loss": 0.8}, {"epoch": 1, "step": 20, "eval_loss": 0.6}],
+    })
+    rep = _svc(monkeypatch, by_label={"v-pdf": mv}).report("v-pdf")
+    from koipa.api._training_report_pdf import render_training_report_pdf
+
+    payload = render_training_report_pdf(rep)
+
+    assert payload.startswith(b"%PDF-")
+    assert len(payload) > 1000
+
+
+def test_trainer_loss_log_projection_keeps_only_finite_loss_values():
+    from koipa.modules.m4_training.trainer import _learning_curve_from_log_history
+
+    curve = _learning_curve_from_log_history([
+        {"epoch": 0.5, "step": 10, "loss": 0.9, "learning_rate": 0.00002},
+        {"epoch": 1.0, "step": 20, "eval_loss": 0.6, "eval_runtime": 3.2},
+        {"epoch": 1.5, "step": 30, "loss": float("nan")},
+        {"epoch": 2.0, "step": 40, "eval_accuracy": 0.9},
+    ])
+
+    assert curve == [
+        {"epoch": 0.5, "step": 10, "train_loss": 0.9, "eval_loss": None},
+        {"epoch": 1.0, "step": 20, "train_loss": None, "eval_loss": 0.6},
+    ]
 
 
 def test_csv_export_route_exists_and_is_registered():
     """format=csv 라우트가 실제로 등록돼 있는지(배선 확인, DB 불필요)."""
     from koipa.api.training import router
+    import inspect
 
     paths = {r.path for r in router.routes}
     assert "/train/models/{version_label}/report" in paths
+    endpoint = next(route.endpoint for route in router.routes if route.path == "/train/models/{version_label}/report")
+    assert "json|csv|pdf" in inspect.getsource(endpoint)

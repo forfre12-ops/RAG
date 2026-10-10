@@ -39,6 +39,7 @@ REASON_NOT_APPLICABLE = "not_applicable"       # 모든 후보에서 해당 항�
 REASON_PUBLIC_DOCUMENT = "public_document"     # 이미 공개된 외부 자료(판결문·법령·보도·공시 등)라 사내 규정을 붙이지 않았다 — 정상 응답
 REASON_LLM_UNAVAILABLE = "llm_unavailable"     # LLM 오류·시간 초과·해석 불가로 판정이 서지 않았다
 REASON_LLM_NOT_LOCAL = "llm_not_local"         # 로컬이 아닌 공급자이거나 LLM 서버 주소가 사내가 아니라 문서를 보내지 않았다
+REASON_LLM_MODEL_NOT_ALLOWED = "llm_model_not_allowed"  # 서버 허용 목록에 없는 로컬 모델이라 문서를 보내지 않았다
 
 # 문서 본문이 프롬프트에 들어가므로 온프렘 안에서 도는 공급자만 허용한다(허용목록 — 모르는 이름은 막는다).
 LOCAL_PROVIDERS = frozenset({"ollama", "vllm", "local_openai", "lm_studio"})

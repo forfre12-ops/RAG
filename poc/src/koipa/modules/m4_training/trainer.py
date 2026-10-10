@@ -349,8 +349,45 @@ class TrainReport:
     claim_scope: str = "legacy_training_report"
     deployable: bool = True
     training_execution_manifest: str | None = None
+    # HF TrainerState.log_history에서 보존한 실측 손실 이력. 과거 실행에는 이 필드가
+    # 없을 수 있으며, 그 경우 리포트는 곡선이 미기록임을 명시한다.
+    learning_curve: list[dict[str, float | int | None]] = field(default_factory=list)
     # 학습 조건 — 시드·결정성·등급별 손실 가중과 그 출처(db|default) 등. 같은 학습셋도 이것에 따라 결과가 갈린다.
     training_conditions: dict = field(default_factory=dict)
+
+
+def _learning_curve_from_log_history(log_history: object) -> list[dict[str, float | int | None]]:
+    """HF 로그에서 손실만 골라 JSON/DB에 안전하게 보존한다.
+
+    로그 전문에는 런타임·메모리 등 배포별 잡음이 많다. 성능 리포트에는 epoch,
+    step, train/eval loss만 남긴다. 숫자가 아니거나 무한대인 값은 저장하지 않는다.
+    """
+    if not isinstance(log_history, list):
+        return []
+
+    def number(value: object) -> float | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        out = float(value)
+        return out if math.isfinite(out) else None
+
+    out: list[dict[str, float | int | None]] = []
+    for row in log_history[-500:]:
+        if not isinstance(row, dict):
+            continue
+        train_loss = number(row.get("loss"))
+        eval_loss = number(row.get("eval_loss"))
+        if train_loss is None and eval_loss is None:
+            continue
+        epoch = number(row.get("epoch"))
+        step_raw = number(row.get("step"))
+        out.append({
+            "epoch": epoch,
+            "step": int(step_raw) if step_raw is not None and step_raw >= 0 else None,
+            "train_loss": train_loss,
+            "eval_loss": eval_loss,
+        })
+    return out
 
 
 def _load_jsonl(path: str) -> tuple[list[str], list[int]]:
@@ -1319,6 +1356,9 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         if spec.use_mlflow:
             mlflow.log_params(asdict(spec))
         trainer.train()
+        learning_curve = _learning_curve_from_log_history(
+            getattr(getattr(trainer, "state", None), "log_history", None)
+        )
 
         if spec.proxy_candidate_mode:
             if proxy_materialization is None or base_model_attestation is None:
@@ -1353,6 +1393,7 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
                 claim_scope="proxy_training_only_not_customer_accuracy",
                 deployable=False,
                 training_execution_manifest=str(execution_manifest),
+                learning_curve=learning_curve,
             )
 
         if ds_test is None:  # pragma: no cover - proxy branch returned above
@@ -1467,6 +1508,7 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
             fnr_high=float(fnr_high),
             confusion_matrix=cm.tolist(),
             classification_report=report,
+            learning_curve=learning_curve,
         )
         (out_dir / "report.json").write_text(
             json.dumps(asdict(result), indent=2, ensure_ascii=False), encoding="utf-8"

@@ -187,6 +187,28 @@ def test_a_provider_that_cannot_be_built_hides_the_evidence_instead_of_failing_t
     assert res.items == [] and res.reason == "llm_unavailable" and res.indexed is True
 
 
+def test_an_unapproved_local_model_is_never_called_for_regulation_evidence():
+    """로컬 endpoint라는 이유만으로 임의 모델에 문서 본문을 보내면 안 된다."""
+    llm = FakeLLM({"제0조": 1, "제1조": 1})
+    svc, groups = _service(llm, _settings(regulation_llm_model_allowlist=["approved-local-model"]))
+
+    res = svc._find("d1", groups, None)
+
+    assert res.items == []
+    assert res.reason == llm_select.REASON_LLM_MODEL_NOT_ALLOWED
+    assert llm.calls == 0 and llm.kind_calls == 0
+
+
+def test_an_allowlisted_local_model_keeps_the_existing_selection_path():
+    llm = FakeLLM({"제0조": 1, "제1조": 0})
+    svc, groups = _service(llm, _settings(regulation_llm_model_allowlist=["FAKE"]))
+
+    svc._find("d1", groups, None)
+
+    # 허용 목록은 보안 게이트일 뿐, 기존 선택·해석 로직을 우회하지 않는다.
+    assert llm.calls == 2
+
+
 def test_a_public_document_shows_nothing_and_says_why():
     """이미 공개된 판결문·법령·보도·공시에는 사내 규정을 붙이지 않는다 — 낱말만 겹친 항이 뜨는 것을 막는다."""
     llm = FakeLLM({"제40조": 1, "제41조": 2}, kind="public")
@@ -232,6 +254,15 @@ def test_settings_reject_out_of_range_values(field, bad):
 
     with pytest.raises(ValueError):
         Settings(**{field: bad})
+
+
+def test_regulation_llm_model_allowlist_is_trimmed_deduplicated_and_rejects_empty_entries():
+    from koipa.config import Settings
+
+    cfg = Settings(_env_file=None, regulation_llm_model_allowlist=[" Solar ", "solar", "Qwen"])
+    assert cfg.regulation_llm_model_allowlist == ["Solar", "Qwen"]
+    with pytest.raises(ValueError):
+        Settings(_env_file=None, regulation_llm_model_allowlist=[""])
 
 
 # ── 고르는 방식(regulation_llm_mode) ────────────────────────────────────────────

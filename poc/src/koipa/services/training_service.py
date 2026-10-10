@@ -13,6 +13,7 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import logging
+import math
 import uuid
 from typing import Any, Optional
 
@@ -28,6 +29,7 @@ from koipa.schemas.training import (
     TrainReportResponse,
     TrainResponse,
     TrainStatus,
+    TrainingCurvePoint,
 )
 from koipa.services.async_classify_service import _celery_dispatch_available
 from koipa.services.job_store import get_default_store
@@ -69,6 +71,53 @@ def _report_metrics(report: Any) -> dict:
             pass
     d = getattr(report, "__dict__", None)
     return dict(d) if isinstance(d, dict) else {}
+
+
+def _finite_number(value: Any) -> float | None:
+    """사용자/구버전 metric JSON에서 숫자만 안전하게 읽는다."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        out = float(value)
+        return out if math.isfinite(out) else None
+    return None
+
+
+def _stored_learning_curve(metrics: dict[str, Any]) -> list[TrainingCurvePoint]:
+    """저장된 손실 이력을 화면용 계약으로 정규화한다.
+
+    새 학습은 ``learning_curve``를 기록한다. 과거 모델 또는 실험 스크립트는
+    ``loss_history``/HF ``log_history``라는 이름을 쓸 수 있어 읽기 호환만 제공한다.
+    데이터가 없으면 빈 배열을 반환하며, 서비스가 가짜 곡선을 만들지 않는다.
+    """
+    source: Any = None
+    for key in ("learning_curve", "loss_history", "log_history"):
+        candidate = metrics.get(key)
+        if isinstance(candidate, list):
+            source = candidate
+            break
+    if source is None:
+        return []
+
+    points: list[TrainingCurvePoint] = []
+    for row in source[:500]:  # 손상된 DB 값이 리포트 응답을 비대하게 만들지 않게 상한
+        if not isinstance(row, dict):
+            continue
+        train_loss = _finite_number(row.get("train_loss", row.get("loss")))
+        eval_loss = _finite_number(row.get("eval_loss", row.get("validation_loss")))
+        if train_loss is None and eval_loss is None:
+            continue
+        epoch = _finite_number(row.get("epoch"))
+        step_number = _finite_number(row.get("step", row.get("global_step")))
+        points.append(
+            TrainingCurvePoint(
+                epoch=epoch,
+                step=int(step_number) if step_number is not None and step_number >= 0 else None,
+                train_loss=train_loss,
+                eval_loss=eval_loss,
+            )
+        )
+    return points
 
 
 def _maybe_anchor_report(settings: Any, *, candidate_model_dir: str | None) -> dict | None:
@@ -695,6 +744,7 @@ class TrainingService:
                 if mv is None:
                     return None
                 m = dict(mv.metrics or {})
+                learning_curve = _stored_learning_curve(m)
                 active = repo.get_active()
                 comparison = None
                 if active is not None and active.version_label != version_label:
@@ -730,6 +780,8 @@ class TrainingService:
                     fnr_high=m.get("fnr_high"),
                     confusion_matrix=m.get("confusion_matrix") or [],
                     classification_report=m.get("classification_report") or "",
+                    learning_curve=learning_curve,
+                    learning_curve_status="recorded" if learning_curve else "not_recorded",
                     compared_to_active=comparison,
                     raw_metrics=m,
                 )

@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import os
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -947,6 +947,13 @@ class Settings(BaseSettings):
     #   ⛔ 문서 본문이 프롬프트에 들어가므로 llm_provider 가 로컬(ollama·vllm·local_openai·lm_studio)일 때만 부른다 — 그 밖이면 안 보인다(fail-closed).
     #   비용: 검수자가 「왜 이 등급인가?」를 펼칠 때 후보 수만큼 LLM 을 동시에 부른다(같은 문서·규정 판·모델은 캐시). CPU 만 있는 서버는 느리다(qwen3:14b 는 호출당 수십 초).
     regulation_llm_select_enabled: bool = False
+    # 규정 RAG에 문서 본문 일부가 전달되므로, 로컬이라는 사실만으로는 충분하지 않다.
+    # 운영자가 검증한 모델 ID만 명시적으로 허용한다. 빈 목록은 "어떤 모델도 호출하지 않음"이다.
+    # list 형식 환경변수 예: REGULATION_LLM_MODEL_ALLOWLIST='["upstage/Solar-Open-100B"]'
+    # 다른 로컬 모델을 쓰려면 성능·보안 검증 후 이 목록에 추가해야 한다.
+    regulation_llm_model_allowlist: list[str] = Field(
+        default_factory=lambda: ["upstage/Solar-Open-100B"]
+    )
     regulation_llm_candidates: int = 5         # 조회 순위 상위 몇 개 조항을 LLM 에게 물을지(1~10)
     regulation_llm_doc_chars: int = 1500       # 프롬프트에 넣는 문서 앞부분 글자 수(300~6000)
     regulation_llm_timeout_s: float = 60.0     # 문서 하나의 판정 제한 시간(초) — 넘으면 안 보인다. 호출 하나의 한도이기도 하다(재시도 없음). 동봉 프록시(nginx)가 경로에 있으면 300초에서 잘린다
@@ -1130,6 +1137,26 @@ class Settings(BaseSettings):
         if not 1 <= v <= 10:
             raise ValueError(f"regulation_llm_candidates는 1~10 이어야 합니다 (got {v}).")
         return v
+
+    @field_validator("regulation_llm_model_allowlist")
+    @classmethod
+    def _normalise_regulation_llm_model_allowlist(cls, values: list[str]) -> list[str]:
+        """공백/중복 모델명을 정리한다.
+
+        빈 목록은 유효한 fail-closed 설정이다. 모델명을 비워 두는 것은 허용하지 않아
+        "빈 문자열이 모든 모델을 허용"하는 우회가 생기지 않게 한다.
+        """
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            model = str(value or "").strip()
+            if not model:
+                raise ValueError("regulation_llm_model_allowlist에는 빈 모델명을 넣을 수 없습니다.")
+            key = model.casefold()
+            if key not in seen:
+                cleaned.append(model)
+                seen.add(key)
+        return cleaned
 
     @field_validator("regulation_llm_doc_chars")
     @classmethod

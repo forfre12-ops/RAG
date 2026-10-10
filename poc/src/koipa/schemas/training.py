@@ -76,6 +76,19 @@ class ModelMetricsComparison(BaseModel):
     fnr_overall_delta: Optional[float] = None  # 음수=개선(미탐 감소)
 
 
+class TrainingCurvePoint(BaseModel):
+    """학습기가 실제로 남긴 한 시점의 손실 값.
+
+    점이 없다는 것은 성능이 좋다는 뜻이 아니라, 과거 실행이 곡선을 보존하지
+    않았다는 뜻이다. API와 PDF는 그 상태를 별도로 표시한다.
+    """
+
+    epoch: Optional[float] = None
+    step: Optional[int] = None
+    train_loss: Optional[float] = None
+    eval_loss: Optional[float] = None
+
+
 class TrainReportResponse(BaseModel):
     version_label: str
     base_model: Optional[str] = None
@@ -91,5 +104,7 @@ class TrainReportResponse(BaseModel):
     fnr_high: Optional[float] = None
     confusion_matrix: list[list[int]] = Field(default_factory=list)
     classification_report: str = ""
+    learning_curve: list[TrainingCurvePoint] = Field(default_factory=list)
+    learning_curve_status: str = "not_recorded"  # recorded | not_recorded
     compared_to_active: Optional[ModelMetricsComparison] = None
     raw_metrics: dict[str, Any] = Field(default_factory=dict)  # metrics dict 원본(화면이 모르는 새 필드도 안 잃음)

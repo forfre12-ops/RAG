@@ -50,16 +50,24 @@ def train_list(
 
 
 # [2026-10-09] KL 요청(요구사항 추적표 6절) — 파인튜닝 모델 성능 리포트.
-# ⚠ 에폭별 손실 추이·PDF 내보내기는 범위 밖(별도 작업 필요, 메모리 참조). 이 엔드포인트는
-# 이미 계산·저장된 지표(정확도·정밀도·재현율·F1·혼동행렬)를 꺼내고, 현재 활성 모델과
-# 비교해 개선폭을 더한다. CSV는 format=csv 로 받는다.
+# JSON은 자동화/콘솔, CSV는 수치 반출, PDF는 검수용 읽기 전용 형식이다. PDF 곡선은
+# 저장된 loss 로그가 있을 때만 그리며 과거 모델의 빈 이력은 미기록으로 표시한다.
 @router.get("/train/models/{version_label}/report", response_model=None)
-def train_report(version_label: str, format: str = Query(default="json", pattern=r"^(json|csv)$")):
+def train_report(version_label: str, format: str = Query(default="json", pattern=r"^(json|csv|pdf)$")):
     rep = TrainingService().report(version_label)
     if rep is None:
         raise HTTPException(status_code=404, detail="model version not found")
     if format == "json":
         return rep
+    if format == "pdf":
+        from koipa.api._training_report_pdf import render_training_report_pdf  # noqa: PLC0415
+
+        payload = render_training_report_pdf(rep)
+        return StreamingResponse(
+            io.BytesIO(payload),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="train_report_{version_label}.pdf"'},
+        )
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["metric", "value"])
@@ -74,6 +82,12 @@ def train_report(version_label: str, format: str = Query(default="json", pattern
         w.writerow(["fnr_overall_delta", c.fnr_overall_delta])
     for grade, fnr in rep.fnr_by_grade.items():
         w.writerow([f"fnr_{grade}", fnr])
+    w.writerow(["learning_curve_status", rep.learning_curve_status])
+    for point in rep.learning_curve:
+        w.writerow([
+            "learning_curve",
+            f"epoch={point.epoch},step={point.step},train_loss={point.train_loss},eval_loss={point.eval_loss}",
+        ])
     buf.seek(0)
     return StreamingResponse(
         buf, media_type="text/csv",

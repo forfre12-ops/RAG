@@ -267,6 +267,26 @@ class RegulationEvidenceService:
             self._llm_provider = provider
         return self._llm_provider
 
+    @staticmethod
+    def _is_allowed_llm_model(provider: Any, settings_obj: Any) -> bool:
+        """규정 RAG에 사용할 모델이 서버 허용 목록에 있는지 확인한다.
+
+        규정 선택/요약에는 문서 본문이 프롬프트로 들어간다. provider가 local 이고
+        endpoint가 사내망이어도, 운영자가 검증하지 않은 모델로 바뀌면 호출하지
+        않는다. 실운영 Settings에는 항상 이 필드가 존재한다. ``None``은 이
+        설정이 생기기 전의 단위시험용 가짜 Settings와의 호환만 위한 값이다.
+        """
+        allowlist = getattr(settings_obj, "regulation_llm_model_allowlist", None)
+        if allowlist is None:
+            return True
+        model = str(getattr(provider, "model", "") or "").strip().casefold()
+        allowed = {
+            str(value or "").strip().casefold()
+            for value in allowlist
+            if str(value or "").strip()
+        }
+        return bool(model and model in allowed)
+
     def _find_with_llm(self, doc_id: str, index: RegulationIndex, doc_vec: np.ndarray, doc_text: str, limit: int, s: Any,
                        *, use_cache: bool) -> EvidenceResult:
         """조회 순위 상위 후보 조항을 로컬 LLM 에게 물어 문서에 직접 적용되는 항만 보인다. 아니면 아무것도 안 보인다.
@@ -292,6 +312,12 @@ class RegulationEvidenceService:
             logger.error("규정 LLM 판정을 건너뛴다 — LLM 서버 주소(호스트 %r)가 사내가 아니거나 확인되지 않는다(문서 본문을 밖으로 보내지 않는다)",
                          urlsplit(str(base_url)).hostname)
             return EvidenceResult(doc_id, True, llm_select.REASON_LLM_NOT_LOCAL, [])
+        if not self._is_allowed_llm_model(provider, s):
+            logger.error(
+                "규정 LLM 판정을 건너뛴다 — 모델 %r 가 REGULATION_LLM_MODEL_ALLOWLIST에 없다",
+                getattr(provider, "model", None),
+            )
+            return EvidenceResult(doc_id, True, llm_select.REASON_LLM_MODEL_NOT_ALLOWED, [])
         if not doc_text.strip():                # 본문이 비면 LLM 이 빈 [문서 앞부분] 으로 아무 항이나 고를 수 있다 — 묻지 않는다
             return EvidenceResult(doc_id, True, llm_select.REASON_NOT_APPLICABLE, [])
         skip_public = bool(getattr(s, "regulation_llm_skip_public", True))
@@ -344,6 +370,12 @@ class RegulationEvidenceService:
         if base_url is not None and not llm_select.endpoint_is_local(base_url):
             logger.error("규정 요약 생성을 건너뛴다 — LLM 서버 주소(호스트 %r)가 사내가 아니거나 확인되지 않는다",
                          urlsplit(str(base_url)).hostname)
+            return None
+        if not self._is_allowed_llm_model(provider, s):
+            logger.error(
+                "규정 요약 생성을 건너뛴다 — 모델 %r 가 REGULATION_LLM_MODEL_ALLOWLIST에 없다",
+                getattr(provider, "model", None),
+            )
             return None
         doc_text = self._doc_text(doc_id)
         shim_items = [_SummaryItem(i.clause.article_no, i.clause.title, tuple(i.sentences)) for i in items]
