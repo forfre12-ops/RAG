@@ -162,6 +162,7 @@ allow = [
   "evaluate_public_s3_challenge.py",  # 공개 S3 도전셋 평가 — 운영자가 수동으로 돌림
   "gate_p1_candidate.py",             # 3축 게이트 — 운영자가 재학습 후보마다 수동으로 돌림
   "import_review_corrections.py",     # OPERATION.md 검수 결과 반입
+  "p5_async_batch_smoke.py",          # dr_drill.py 가 부른다(ops 안에서 체인)
   "p5_e2e_smoke.py",                  # dr_drill.py 가 부른다(ops 안에서 체인)
   "probe_ingest_capacity.py",         # 문서 처리량 재고 — 운영자가 수동으로 돌림
   "promote_golden_candidates.py",     # 골든 후보 정본 병합 게이트 — 운영자가 수동으로 돌림

@@ -49,6 +49,7 @@ COPY scripts/_cli_io.py \
      scripts/evaluate_public_s3_challenge.py \
      scripts/gate_p1_candidate.py \
      scripts/import_review_corrections.py \
+     scripts/p5_async_batch_smoke.py \
      scripts/p5_e2e_smoke.py \
      scripts/probe_ingest_capacity.py \
      scripts/promote_golden_candidates.py \
