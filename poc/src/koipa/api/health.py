@@ -18,7 +18,7 @@ import hashlib
 import time
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from koipa.config import settings
@@ -212,7 +212,9 @@ def _check_compute() -> dict:
 
         threads = torch.get_num_threads()
     except Exception:  # noqa: BLE001
-        pass
+        # torch 는 선택 의존성이다. 진단 실패가 /health 가용성을 바꾸면 안 되지만,
+        # 이후 비교 로직에는 "알 수 없음"을 명시적으로 남긴다.
+        threads = None
 
     effective = quota or host_cpus
     notes: list[str] = []
@@ -388,11 +390,17 @@ def healthz_deep():
 
 
 @router.get("/healthz")
-def healthz():
+def healthz(request: Request):
     """하위호환 단일 엔드포인트 — 기존 /healthz 동작 유지 + 데모 콘솔용 필드."""
     model_check = _check_model()
     overall = "ok" if model_check["ok"] else "degraded"
     operational_config = _operational_config()
+    # admin.html은 이 명시 capability가 true일 때만 /synth/*를 호출한다. 설정값만 보면
+    # 고객사 분리 이미지에서 synthesis 모듈 import가 실패해 라우터가 빠진 경우를 구분할 수 없다.
+    # app.py는 include_router 성공 뒤에만 이 state를 true로 올린다.
+    operational_config["synthesis_console_enabled"] = bool(
+        getattr(request.app.state, "synthesis_console_enabled", False)
+    )
     return {
         "status": overall,
         # [빌드 신원] 배포된 이미지가 어느 커밋에서 나왔는가. 이미지 빌드 시

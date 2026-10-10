@@ -27,8 +27,12 @@ from pathlib import Path
 try:
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
     sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
-except Exception:  # noqa: BLE001
-    pass
+except (AttributeError, OSError):
+    # 일부 테스트/리다이렉션 스트림은 인코딩 재설정을 지원하지 않는다. 이 경우에도
+    # 검사 자체는 수행하되, 진단용 상태를 명시적으로 남긴다.
+    _STDIO_UTF8_ENABLED = False
+else:
+    _STDIO_UTF8_ENABLED = True
 
 HERE = Path(__file__).resolve().parent
 POC_ROOT = HERE.parent
@@ -236,7 +240,7 @@ def diff(
 
     # profile-conditional 제외 (예: training 라우터). [2026-10-09 정정] router_norm 쪽은 그대로
     # 두면 비대칭이 생긴다 — golden처럼 같은 접두사 아래 **일부 경로는 플래그와 무관하게 항상
-    # 등록**(console_login.py의 로그인 3경로)되는 경우, yaml 쪽만 걷어내면 그 경로들이
+    # 등록**(console_login.py의 로그인·시연 프리필 4경로)되는 경우, yaml 쪽만 걷어내면 그 경로들이
     # "router에만 있음(스펙 누락)"으로 오탐한다(실제로는 yaml에도 있는데 비교 대상에서 먼저
     # 빠진 것). training·synth·regulation은 플래그가 꺼지면 해당 경로가 router에 전혀 없으므로
     # router_norm 쪽도 같이 거르는 것이 영향 없다(뺄 게 없음) — 그래서 대칭으로 바꿔도 기존
@@ -323,15 +327,16 @@ def main() -> int:
         print("  ℹ 합성문서 라우터 비활성 (enable_synthetic_generation=False) — /synth/* YAML 경로 제외")
     # [2026-10-09 #9 이미지 분리] golden.py(검수·서명 화면) 라우터도 같은 profile-conditional
     # 패턴 — enable_golden_review_console=False(onprem-local 기본)면 app.py 가 golden_api.router
-    # 를 통째로 include_router 하지 않는다. ⚠ 로그인/세션 3경로(login.html·login·session)는
+    # 를 통째로 include_router 하지 않는다. ⚠ 로그인/세션·시연 프리필 4경로
+    # (login.html·login·session·prefill-login)는
     # koipa.api.console_login 이 **플래그와 무관하게 항상** 등록하므로, 아래처럼 /golden 전체를
-    # training·synth 와 같은 방식으로 한 번에 제외하면 그 3경로도 이번 실행에서는 비교 대상에서
+    # training·synth 와 같은 방식으로 한 번에 제외하면 그 4경로도 이번 실행에서는 비교 대상에서
     # 빠진다(위 diff() 의 대칭 제외 수정으로 "스펙 누락" 오탐은 막았지만, 그 3경로가 실제로
     # router·yaml 양쪽에 다 있는지는 이 조합에서 확인되지 않는다는 뜻 — golden_review_console
     # 이 켜진 실행(지재원)에서는 전부 비교되니 거기서 잡힌다).
     if not _golden_enabled:
         skip_prefixes += (f"{server_prefix}/golden", "/api/v1/golden", "/golden")
-        print("  ℹ 골든 검수·서명 라우터 비활성 (enable_golden_review_console=False) — /golden/* YAML 경로 제외(로그인 3경로 포함, enable_golden_review_console=True 실행에서 별도로 비교됨)")
+        print("  ℹ 골든 검수·서명 라우터 비활성 (enable_golden_review_console=False) — /golden/* YAML 경로 제외(로그인·시연 프리필 4경로 포함, enable_golden_review_console=True 실행에서 별도로 비교됨)")
 
     result = diff(yaml_paths, router_paths, skip_yaml_prefixes=skip_prefixes)
 

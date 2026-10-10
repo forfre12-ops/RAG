@@ -863,6 +863,55 @@ paths:
                   real_share: { type: number, description: 실문서 유래 비중(0~1) }
                   caveat: { type: string, nullable: true }
 
+  /synth/providers/status:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [synthesis]
+      summary: 합성 제공자별 현재 가용성
+      description: >-
+        콘솔의 제공자 선택지에 쓰는 읽기 전용 상태다. 실제 생성 호출·비용 발생 없이
+        설정과 연결 가능 여부만 반환하며, 문서 본문·API 키는 반환하지 않는다.
+      responses:
+        '200':
+          description: 현재 활성 제공자와 제공자별 가용성
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [active, providers]
+                properties:
+                  active: { type: string, description: 현재 기본 제공자 }
+                  providers:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      additionalProperties: true
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /synth/playbook:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [synthesis]
+      summary: 합성 문서 생성 플레이북
+      description: >-
+        현재 생성기에 적용되는 품질 규칙과 금지 문구를 조회한다. 이는 운영자가
+        생성 기준을 확인하는 용도이며 생성 실행·학습셋 변경은 일으키지 않는다.
+      responses:
+        '200':
+          description: 플레이북 적용 여부·버전·규칙
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enabled, version, rules, avoid_phrases, text]
+                properties:
+                  enabled: { type: boolean }
+                  version: { type: string }
+                  rules: { type: array, items: { type: string } }
+                  avoid_phrases: { type: array, items: { type: string } }
+                  text: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /synth/{synth_id}/review:
     post:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
@@ -1880,6 +1929,33 @@ paths:
               schema: { type: object, additionalProperties: true }
         '401': { description: 아이디 또는 비밀번호 불일치 }
         '404': { description: 이 서버는 비밀번호 로그인이 설정돼 있지 않음 }
+
+  /golden/candidates/prefill-login:
+    post:
+      x-audience: internal    # 폐쇄망 시연 전용 — KL 연동·일반 운영에서 호출하지 않는다
+      tags: [golden]
+      summary: 폐쇄망 시연 계정의 HttpOnly 세션 쿠키 발급
+      description: >-
+        운영 기본값에서는 경로 자체가 404다. 명시적인 unsafe 시연 설정과 하드닝 배포 차단을
+        통과한 경우에만 세션 쿠키를 발급하며, 토큰 문자열·후보 문서·등급 정보는 응답에
+        포함하지 않는다. 일반 검수 인증 수단으로 사용하면 안 된다.
+      security: []
+      responses:
+        '200':
+          description: 시연 세션 쿠키 발급 완료
+          headers:
+            Set-Cookie:
+              description: HttpOnly `koipa_access_token` 세션 쿠키
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, mode]
+                properties:
+                  ok: { type: boolean, example: true }
+                  mode: { type: string, enum: [demo-prefill] }
+        '404': { description: 시연 프리필 로그인이 설정되지 않음 }
 
   /golden/candidates/session:
     get:
