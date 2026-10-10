@@ -196,7 +196,8 @@ GOLDEN_HTML_URL_SECRET=$(gen_secret)
 
 # 외부 전문가 블라인드 검수 — 기본 꺼짐인 채로 두면 제안 등급이 검수자에게 그대로 보여
 # 독립 판정이 깨진다(오류 없이 조용히 그렇게 됨). 안 쓰는 노드에서도 켜 둬서 해될 것이 없어
-# 기본으로 켠다. 검수자별 배정까지 나누려면 GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1 을 따로 켠다.
+# 전문가 검수는 배정 범위와 블라인드를 함께 켠다. 둘 중 하나만 끄면 독립 검수가 깨진다.
+GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1
 GOLDEN_REVIEW_BLIND_ENFORCED=1
 
 # 후보 관리 화면의 기본 검수 배치 — 번들 golden_review_batch/ 의 회차. 옛 회차가 후보 풀에 쌓여도

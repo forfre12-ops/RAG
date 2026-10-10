@@ -156,7 +156,7 @@ cp infra-config/.env.template .env
 | `KOIPA_AUDIT_CHAIN_SECRET` | `<64 hex>` | 감사체인 HMAC(NFR-SEC-01). **없으면 api startup 실패** |
 | `GOLDEN_HTML_URL_SECRET` | `<64 hex>` | 골든 검수·서명 화면 서명 URL 키. **없으면 그 화면이 무인증으로 열려 후보 문서 본문이 노출된다**(startup 은 통과하므로 조용히 열린 채 운영됨) |
 | `GOLDEN_REVIEW_BLIND_ENFORCED` | `1` | 외부 전문가 검수용. **기본값 False** — 이 줄이 없으면 검수자 화면에 제안 등급·근거가 그대로 보여 독립 판정이 깨진다(startup 은 통과, 조용히 그대로 운영됨). 전문가 검수 배치를 열 때 필수 |
-| `GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED` | `1` | 선택. 검수자별로 문서를 나눠 배정할 때만 켠다 — 안 켜면 전원이 배치 전체를 본다 |
+| `GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED` | `1` | 전문가 검수 배치에서는 필수. 끄면 전원이 배치 전체를 볼 수 있어 20명x50건 독립 검수가 깨진다 |
 | `GOLDEN_DEFAULT_REVIEW_BATCH` | `expert_review_1731_20260924` | 후보 관리 화면(관리자)이 처음 열릴 때 좁혀 보는 검수 배치. 후보 풀에는 예전 적재분이 지워지지 않고 쌓이므로(개발 서버 2026-09-25 실측 3,598건 = 이번 회차 1,731 + 같은 문서의 중복 적재 800 + 옛 후보 1,067 — 이 중 요청 대상은 결함 20건을 뺀 1,711건) 비워 두면 첫 화면이 전체를 보여 이번 회차가 묻힌다. 그 배치가 서버에 없으면 자동으로 전체를 보여 주므로 값이 낡아도 화면이 비지는 않는다 |
 | `CORS_ALLOW_ORIGINS` | `["https://<콘솔 오리진>"]` | 운영 모드는 와일드카드(`*`) 거부. **JSON 배열** 형식 |
 

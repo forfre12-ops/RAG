@@ -28,6 +28,8 @@ from koipa.services.job_store import get_default_store
 from koipa.schemas.golden import (
     GoldenAssignmentRequest,
     GoldenAssignmentResponse,
+    GoldenExpertReviewPlanRequest,
+    GoldenExpertReviewPlanResponse,
     GoldenAssignmentStatusResponse,
     GoldenBuildRequest,
     GoldenBuildResponse,
@@ -711,6 +713,59 @@ def golden_assignment_add(
     이미 배정된 대상은 원장에 다시 적지 않고 skipped 로 돌려준다(멱등).
     """
     return _apply_assignment(access.EVENT_ASSIGN, req, auth)
+
+
+@router.post(
+    "/golden/assignments/expert-review-plan",
+    response_model=GoldenExpertReviewPlanResponse,
+    status_code=201,
+    summary="전문가 20명에게 검수 배치 1,000건을 50건씩 원자 배정",
+)
+def golden_expert_review_plan(
+    req: GoldenExpertReviewPlanRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> GoldenExpertReviewPlanResponse:
+    """KL 전문가 검수 회차를 안전하게 개시한다.
+
+    개별/배치 배정 API는 기존 운영과의 호환을 위해 유지한다. 이 엔드포인트는 그보다
+    훨씬 좁다: 배치가 정확히 1,000건이고, 서로 다른 20명에게 정확히 50건씩 독점 배정될
+    때만 성공한다. 배정 강제와 블라인드가 꺼진 상태에서는 원장을 쓰지 않는다. 그렇지
+    않으면 ``20 x 50``이라는 운영 표기가 실제 접근제어와 달라진다.
+    """
+    if not bool(getattr(settings, "golden_reviewer_assignment_enforced", False)):
+        raise HTTPException(
+            status_code=409,
+            detail="expert review plan requires GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1",
+        )
+    if not bool(getattr(settings, "golden_review_blind_enforced", False)):
+        raise HTTPException(
+            status_code=409,
+            detail="expert review plan requires GOLDEN_REVIEW_BLIND_ENFORCED=1",
+        )
+    actor_id = _console_actor_id(auth)
+    svc = ProxyGoldCandidateService()
+    ledger = access.AssignmentLedger(svc.root)
+    try:
+        rows, group_id, already_applied, plan = ledger.apply_exact_expert_review_plan(
+            review_batch=req.review_batch,
+            reviewer_ids=req.reviewer_ids,
+            doc_batches=svc.review_batch_index(),
+            actor_id=actor_id,
+            reason=req.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return GoldenExpertReviewPlanResponse(
+        review_batch=access.norm_id(req.review_batch),
+        reviewer_count=len(plan),
+        documents_per_reviewer=50,
+        total_documents=1000,
+        actor_id=actor_id,
+        events_written=len(rows),
+        assignment_group_id=group_id,
+        already_applied=already_applied,
+        reviewer_document_counts={reviewer: len(doc_ids) for reviewer, doc_ids in plan.items()},
+    )
 
 
 @router.post(

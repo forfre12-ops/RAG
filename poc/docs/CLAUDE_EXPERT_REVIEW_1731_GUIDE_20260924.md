@@ -23,7 +23,7 @@
 
 ```
 GOLDEN_REVIEW_BLIND_ENFORCED=1          # 필수 — 이게 없으면 제안 등급·근거가 검수자에게 노출된다
-GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1   # 선택 — 검수자별로 문서를 배정해 나눠 볼 때만. 안 켜면 전원이 전체 1,711건을 본다
+GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1   # 전문가 검수에서는 필수 — 안 켜면 전원이 배치 전체를 본다
 ```
 
 값은 필드명 그대로 env 매핑(`env_prefix` 없음, `config.py:186,1124` 확인). 두 값 다 서버 기동 시점에 읽으므로

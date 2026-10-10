@@ -642,6 +642,136 @@ class AssignmentLedger:
                     os.fsync(handle.fileno())
         return written, skipped
 
+    def apply_exact_expert_review_plan(
+        self, *, review_batch: str, reviewer_ids: Iterable[str], doc_batches: Mapping[str, str | None],
+        actor_id: str, reason: str = "",
+    ) -> tuple[list[dict[str, Any]], str, bool, dict[str, tuple[str, ...]]]:
+        """원자적으로 1,000건을 20명에게 50건씩 배정한다.
+
+        이 메서드는 임의의 대량 배정기가 아니다. 전문가 검수 운영에서만 쓰는 좁은
+        안전장치다. 배치가 정확히 1,000건인지, 검수자가 정확히 20명인지, 기존 배정이
+        없거나 이번 계획과 완전히 동일한지를 모두 확인한 뒤에만 append-only 원장에
+        문서 단위 assign 이벤트 1,000개를 한 번에 쓴다. 부분 배정은 남기지 않는다.
+        """
+        batch = norm_id(review_batch)
+        reviewers = tuple(norm_id(reviewer_id) for reviewer_id in reviewer_ids)
+        actor = norm_id(actor_id)
+        if not batch or not actor:
+            raise ValueError("review_batch and actor_id are required")
+        if len(reviewers) != 20 or not all(reviewers) or len(set(reviewers)) != 20:
+            raise ValueError("expert review plan requires exactly 20 distinct reviewer IDs")
+
+        batch_docs = tuple(sorted(
+            doc_id for doc_id, doc_batch in doc_batches.items() if norm_id(doc_batch) == batch
+        ))
+        if len(batch_docs) != 1000:
+            raise ValueError(
+                f"expert review batch must contain exactly 1000 candidates (got {len(batch_docs)})")
+
+        # 원래 doc_id 순서는 등급 코드·적재 순서를 담을 수 있다. 배정은 batch+doc_id 해시로
+        # 결정해 재현 가능하면서도 그 순서를 20명에게 분산한다. 난수/클라이언트 정렬에
+        # 의존하지 않아 재실행·감사 때 같은 계획을 다시 계산할 수 있다.
+        ordered = tuple(sorted(
+            batch_docs,
+            key=lambda doc_id: hashlib.sha256(f"{batch}\0{doc_id}".encode("utf-8")).hexdigest(),
+        ))
+        plan = {
+            reviewer: ordered[index * 50:(index + 1) * 50]
+            for index, reviewer in enumerate(reviewers)
+        }
+        if any(len(doc_ids) != 50 for doc_ids in plan.values()):  # defensive: constants above must imply this
+            raise RuntimeError("expert review plan did not resolve to 50 candidates per reviewer")
+
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with _exclusive_ledger_lock(self.lock_path):
+            events = self.read_events()
+            state = self.replay(events)
+            visible_by_reviewer = {
+                reviewer: self._resolve(slot, doc_batches)
+                for reviewer, slot in state.items()
+                if slot["doc_ids"] or slot["review_batches"]
+            }
+            desired = {reviewer: frozenset(doc_ids) for reviewer, doc_ids in plan.items()}
+            batch_doc_set = frozenset(batch_docs)
+
+            # 같은 계획을 다시 누르면 원장에 1,000줄을 또 적지 않는다. 단순히 요청한
+            # 20명의 문서 수만 같아서는 부족하다 — 다른 검수자가 배치 문서를 함께 보고
+            # 있거나, 이 20명이 다른 문서를 보고 있으면 20x50 독점 배정이 아니다.
+            exact_existing = (
+                set(visible_by_reviewer) == set(desired)
+                and all(visible_by_reviewer.get(reviewer, frozenset()) == docs
+                        for reviewer, docs in desired.items())
+            )
+            if exact_existing:
+                return [], self._existing_group_id(events, desired), True, plan
+
+            colliding_docs = sorted({
+                doc_id
+                for docs in visible_by_reviewer.values()
+                for doc_id in docs
+                if doc_id in batch_doc_set
+            })
+            occupied_reviewers = sorted(
+                reviewer for reviewer in reviewers
+                if visible_by_reviewer.get(reviewer, frozenset())
+            )
+            if colliding_docs or occupied_reviewers:
+                pieces: list[str] = []
+                if colliding_docs:
+                    pieces.append(f"batch already assigned: {', '.join(colliding_docs[:10])}")
+                if occupied_reviewers:
+                    pieces.append(f"reviewers already have visible documents: {', '.join(occupied_reviewers[:10])}")
+                raise ValueError("; ".join(pieces))
+
+            group_id = str(uuid4())
+            now = dt.datetime.now(dt.timezone.utc).isoformat()
+            clean_reason = (reason or "").strip()
+            rows: list[dict[str, Any]] = []
+            for reviewer, doc_ids in plan.items():
+                for doc_id in doc_ids:
+                    rows.append({
+                        "schema_version": 1,
+                        "event_id": str(uuid4()),
+                        "event": EVENT_ASSIGN,
+                        "reviewer_id": reviewer,
+                        "doc_id": doc_id,
+                        "actor_id": actor,
+                        "at": now,
+                        "reason": clean_reason,
+                        "assignment_group_id": group_id,
+                        "review_batch_context": batch,
+                        "assignment_kind": "exact_expert_review_20x50",
+                    })
+            # 모든 검증은 잠금 안에서 이미 끝났다. 이제 한 번의 append/fsync만 수행한다.
+            # 중간 예외가 나면 OS 수준 쓰기 실패이므로 운영자는 원장을 복구해야 하며, 성공
+            # 응답을 내보내지 않는다. 애플리케이션 수준 partial plan 은 만들지 않는다.
+            with self.path.open("a", encoding="utf-8", newline="\n") as handle:
+                handle.writelines(dumps_line(row, sort_keys=True) + "\n" for row in rows)
+                handle.flush()
+                os.fsync(handle.fileno())
+        return rows, group_id, False, plan
+
+    @staticmethod
+    def _existing_group_id(
+        events: Iterable[Mapping[str, Any]],
+        desired: Mapping[str, AbstractSet[str]],
+    ) -> str:
+        """동일 계획 재호출의 응답용 표식.
+
+        과거 수동 배정으로 우연히 같은 모양이 된 경우에는 그룹 UUID가 없을 수 있다. 그
+        경우에도 idempotent 응답이라는 사실을 숨기지 않도록 ``existing-exact-plan``을 쓴다.
+        재호출은 원장을 절대 바꾸지 않는다.
+        """
+        groups = {
+            str(event.get("assignment_group_id"))
+            for event in events
+            if event.get("event") == EVENT_ASSIGN
+            and norm_id(event.get("reviewer_id")) in desired
+            and norm_id(event.get("doc_id")) in desired[norm_id(event.get("reviewer_id"))]
+            and str(event.get("assignment_group_id") or "").strip()
+        }
+        return next(iter(groups)) if len(groups) == 1 else "existing-exact-plan"
+
     # 현황 ---------------------------------------------------------------
     def status(
         self, doc_batches: Mapping[str, str | None], *,

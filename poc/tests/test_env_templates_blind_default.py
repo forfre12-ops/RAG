@@ -25,11 +25,13 @@ def _env_value(text: str, key: str) -> str | None:
 def test_the_deployment_template_turns_blind_review_on(template):
     text = (POC / template).read_text(encoding="utf-8")
     assert _env_value(text, "GOLDEN_REVIEW_BLIND_ENFORCED") == "1", f"{template} 에 GOLDEN_REVIEW_BLIND_ENFORCED=1 이 없다"
+    assert _env_value(text, "GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED") == "1", f"{template} 에 GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1 이 없다"
 
 
 def test_the_env_that_setup_sh_generates_turns_blind_review_on():
     text = (POC / "scripts" / "setup.sh").read_text(encoding="utf-8")
     assert "\nGOLDEN_REVIEW_BLIND_ENFORCED=1\n" in text
+    assert "\nGOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1\n" in text
 
 
 def test_blind_review_is_a_real_setting_and_defaults_off_in_code():
@@ -38,3 +40,13 @@ def test_blind_review_is_a_real_setting_and_defaults_off_in_code():
 
     assert "golden_review_blind_enforced" in Settings.model_fields
     assert Settings.model_fields["golden_review_blind_enforced"].default is False
+
+
+def test_full_train_profile_defaults_to_an_isolated_blind_reviewer_portal():
+    """개발 기본값은 호환을 위해 False지만, 검수 포털을 여는 full-train은 안전 기본값이어야 한다."""
+    from koipa.config import Settings, apply_profile_defaults
+
+    profile = Settings(deploy_profile="full-train")
+    apply_profile_defaults(profile)
+    assert profile.golden_reviewer_assignment_enforced is True
+    assert profile.golden_review_blind_enforced is True

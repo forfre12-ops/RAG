@@ -340,6 +340,45 @@ class GoldenAssignmentResponse(BaseModel):
     assignment_enforced: bool
 
 
+class GoldenExpertReviewPlanRequest(BaseModel):
+    """전문가 검수 1,000건을 20명에게 50건씩 한 번에 봉인한다.
+
+    배치 단위 배정은 편리하지만 한 사람에게 배치 전체를 열 수 있다. KL 전문가 검수처럼
+    정확히 20명 x 50건이 필요한 회차는 이 요청만 사용한다. 서버가 배치의 정확한 1,000건을
+    확인한 뒤, 중복 없이 명시 문서 배정 1,000줄을 원자적으로 원장에 추가한다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    review_batch: str = Field(min_length=1, max_length=128)
+    reviewer_ids: list[str] = Field(min_length=20, max_length=20)
+    reason: str = Field(default="", max_length=1000)
+
+    @model_validator(mode="after")
+    def _expert_review_contract(self) -> "GoldenExpertReviewPlanRequest":
+        batch = self.review_batch.strip()
+        reviewers = [str(value).strip() for value in self.reviewer_ids]
+        if not batch:
+            raise ValueError("review_batch 가 비어 있다(공백만은 불가)")
+        if any(not reviewer for reviewer in reviewers):
+            raise ValueError("reviewer_ids 에 빈 값이 있다")
+        if len(set(reviewers)) != 20:
+            raise ValueError("reviewer_ids 는 서로 다른 20명이어야 한다")
+        return self
+
+
+class GoldenExpertReviewPlanResponse(BaseModel):
+    review_batch: str
+    reviewer_count: int
+    documents_per_reviewer: int
+    total_documents: int
+    actor_id: str
+    events_written: int
+    assignment_group_id: str
+    already_applied: bool = False
+    reviewer_document_counts: dict[str, int]
+
+
 class GoldenAssignmentEnforcement(BaseModel):
     """두 격리 손잡이의 현재 값 — 관리자 화면의 「배정 강제」·「제안 등급 숨김」 표시가 읽는다(읽기 전용)."""
 
@@ -418,4 +457,3 @@ class ReviewerLoginRequest(BaseModel):
 
     username: str
     password: str
-

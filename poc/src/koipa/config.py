@@ -184,6 +184,11 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "enable_synthetic_generation": True,
         # [골든셋 검증 화면] 지재원은 검수·서명(locked_eval 생성) 주체다 — 반드시 켜져 있어야 한다.
         "enable_golden_review_console": True,
+        # 외부 전문가 검수는 한 사람이 전체 후보를 보는 순간 독립성이 무너진다. full-train 은
+        # 검수 포털을 기본 노출하는 프로파일이므로, 명시 설정이 없을 때도 배정 범위와
+        # 제안 등급 비노출을 함께 켠다. 개발/단위테스트의 코드 기본값(False)은 유지한다.
+        "golden_reviewer_assignment_enforced": True,
+        "golden_review_blind_enforced": True,
     },
 }
 
