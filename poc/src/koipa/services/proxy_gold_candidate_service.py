@@ -551,7 +551,7 @@ class ProxyGoldCandidateService:
         return rows
 
     def recent_decisions(
-        self, limit: int = 100, *,
+        self, limit: int = 100, *, offset: int = 0, action: str | None = None,
         visible_doc_ids: AbstractSet[str] | None = None,
         view: EventView | None = None,
     ) -> dict[str, Any]:
@@ -567,6 +567,14 @@ class ProxyGoldCandidateService:
           view             이벤트 목록(원장 순서, 위 필터 적용 뒤)을 요청자가 봐도 되는 이벤트로 바꾼다
                            (숨김 검수: 자기 이벤트만, 그것도 M 입력은 자기가 적은 값으로만).
                            **집계(total·by_action)와 limit 은 바꾼 뒤** 기준이다.
+
+        [2026-10-10] offset·action 추가 — 종전엔 "최근 500건"만 보이고 그 이전은 볼 방법이 없었다
+        (관리자 콘솔이 limit=300 고정 호출, 페이지 넘길 수단 자체가 없음). total 은 그대로
+        전체 건수(페이지와 무관) — 화면이 "N / 전체" 를 보여줄 수 있어야 한다.
+        action 필터는 **여기서(슬라이스 전에) 걸러야 한다** — 화면이 페이지 단위로 받아오는데
+        필터를 화면 쪽에서 걸면 "이번 페이지 안에서만" 걸러져 다른 페이지의 같은 action 이
+        안 보인다. by_action 집계는 action 필터를 적용하기 **전** 분포를 보여준다(필터 셀렉트가
+        그 분포를 보고 고르는 용도라 필터링 후 집계를 쓰면 자기 자신만 보여 무의미해진다).
         """
         events = self.ledger_rows()
         if visible_doc_ids is not None:
@@ -574,10 +582,15 @@ class ProxyGoldCandidateService:
         if view is not None:
             events = view(events)
         by_action = Counter(str(e.get("action") or "") for e in events)
+        if action:
+            events = [e for e in events if str(e.get("action") or "") == action]
+        newest_first = list(reversed(events))
+        off = max(0, int(offset))
+        lim = max(1, min(int(limit), 500))
         return {
             "total": len(events),
             "by_action": dict(sorted(by_action.items())),
-            "events": list(reversed(events))[: max(1, min(int(limit), 500))],
+            "events": newest_first[off: off + lim],
         }
 
     @staticmethod
