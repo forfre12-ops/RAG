@@ -1,0 +1,40 @@
+{
+  "pre_registered_target": {
+    "ngram_classifier": "글자 n-gram 분류기(가족단위 3-fold 교차검증, 30회 평균)의 실제 정확도가 무작위 라벨 섞기 300회 분포의 95번째 백분위(percentile_rank <= 0.95) 이내면 통과. 초과하면 '잔여 지름길 있음'으로 보고 원인을 더 추적한다.",
+    "title_words": "등급 정의와 무관한 낱말이 어떤 등급의 제목에서는 2회 이상 나오고 다른 모든 등급의 제목에는 0회면 '점검 대상'으로 표시한다(자동 합격/불합격 기준이 아니라 목록만 뽑아 사람이 등급 정의 관련 낱말인지 판단한다)."
+  },
+  "n_docs": 64,
+  "class_counts": {
+    "S2": 28,
+    "S1": 12,
+    "S3": 21,
+    "TS": 3
+  },
+  "n_families": 62,
+  "title_word_clustering_flagged": {
+    "S2": [
+      "검토(x7)",
+      "조정(x2)",
+      "상반기(x2)",
+      "공급사(x2)",
+      "주차(x2)"
+    ],
+    "S3": [
+      "재고(x2)",
+      "발주(x2)"
+    ]
+  },
+  "ngram_classifier_family_aware": {
+    "real_accuracy_mean": 0.5354166666666667,
+    "real_accuracy_std": 0.05005422406972485,
+    "permutation_mean": 0.35739583333333336,
+    "permutation_std": 0.06807903329444062,
+    "permutation_max": 0.53125,
+    "percentile_rank_of_real": 1.0,
+    "verdict_vs_pre_registered_target": "미달(잔여 지름길 의심)"
+  },
+  "n_splits": 3,
+  "n_repeats_real": 30,
+  "n_permutations": 300,
+  "caveat": "표본 43건(등급당 3~17건, 그중 대조쌍 2개는 가족으로 묶여 사실상 41개 독립 단위)으로 검정력이 낮다."
+}

@@ -82,7 +82,8 @@ export const scenarios = [
       // 모드에서는 그 클래스를 갱신하는 줄까지 가지 않고 새 내비게이션(productShowView)으로
       // 위임한 뒤 바로 return한다(admin.html:1437-1440). 실제 복원 결과는
       // [data-product-nav].active로 확인한다(productMapPaneToView: config→policy·model(없어진
-      // 이름)→review 쪽 기본값 review→experts).
+      // 이름)→review 쪽 기본값 review→experts). healthz가 검수 기능을 확인하기 전에도
+      // 저장한 화면을 overview로 덮어쓰지 않아야 한다.
       const p1 = await openPage(server, '/console/admin.html', { session: { koipa_admin_pane: 'config' } });
       await p1.settle();
       check.eq(p1.q('[data-product-nav].active')?.dataset.productNav, 'policy', '저장된 탭(설정)으로 복원된다');
@@ -107,9 +108,9 @@ export const scenarios = [
         session: { koipa_admin_pane: 'config' },
       });
       await page.settle();
-      const ok = await page.until(() => page.$('gold-jobs-card') && page.visible('gold-jobs-card'), 3000);
-      check.ok(ok, '검수 목록 카드가 실제로 보인다', `탭=${page.q('.tab.active')?.dataset.tab}`);
-      check.eq(page.q('.tab.active')?.dataset.tab, 'review', '검수 탭으로 전환됐다');
+      const ok = await page.until(() => page.visible('product-experts'), 3000);
+      check.ok(ok, '과거 검수 목록 북마크가 현재 검수자 배정 화면으로 열린다', `뷰=${page.q('[data-product-nav].active')?.dataset.productNav}`);
+      check.eq(page.q('[data-product-nav].active')?.dataset.productNav, 'experts', '검수자 배정 화면으로 전환됐다');
       return page;
     },
   },

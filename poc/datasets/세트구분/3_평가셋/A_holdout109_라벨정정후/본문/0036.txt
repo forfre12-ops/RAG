@@ -1,0 +1,3 @@
+Guidance algorithm validation note
+
+Missile guidance CFAR threshold, MIMO radar signal chain, target tracking logic, classified interface assumptions, and field validation risk.

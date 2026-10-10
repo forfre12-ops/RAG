@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from koipa.api.app import app
 from koipa.config import Settings
+from koipa.regulation import runtime_toggle
 from koipa.regulation.index import EvidenceItem
 from koipa.services.regulation_evidence_service import EvidenceResult, get_regulation_evidence_service
 from koipa.services.regulation_service import RegisterResult, RegulationError, get_regulation_service
@@ -103,8 +104,25 @@ class FakeEvidence:
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch: pytest.MonkeyPatch):
     svc, ev = FakeService(), FakeEvidence()
+    state = {"enabled": True, "llm_enabled": False}
+    monkeypatch.setattr(runtime_toggle, "is_enabled", lambda: state["enabled"])
+    monkeypatch.setattr(
+        runtime_toggle,
+        "set_enabled",
+        lambda value, **_kw: state.__setitem__("enabled", value),
+    )
+    monkeypatch.setattr(
+        runtime_toggle,
+        "is_llm_select_enabled",
+        lambda *, default=None: state["llm_enabled"],
+    )
+    monkeypatch.setattr(
+        runtime_toggle,
+        "set_llm_select_enabled",
+        lambda value, **_kw: state.__setitem__("llm_enabled", value),
+    )
     app.dependency_overrides[get_regulation_service] = lambda: svc
     app.dependency_overrides[get_regulation_evidence_service] = lambda: ev
     try:

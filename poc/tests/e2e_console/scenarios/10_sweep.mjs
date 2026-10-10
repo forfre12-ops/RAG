@@ -116,6 +116,15 @@ export const scenarios = [
       }
       await page.settle();
 
+      // 문서 작업대의 결정 폼은 선택 문서를 그릴 때 동적으로 생긴다. 정적 HTML에 없다는
+      // 이유로 미아 id로 오인하지 않도록 정식 Product Shell 경로로 한 번 연다.
+      const documents = page.q('[data-product-nav="documents"]');
+      if (documents && !documents.classList.contains('pf-hidden')) {
+        documents.click();
+        await page.settle();
+        await page.until(() => !!page.$('wb-decision-action'), 3000);
+      }
+
       /* 화면에서 뺐지만 코드가 **없을 때를 방어하며** 남겨 둔 것들.
        * 새로 생긴 미아 id 는 여기 없으니 그대로 실패한다 — 그것이 이 시험의 목적이다.
        *   sample-select : 2026-08-23 분류 카드에서 제거. populateSamples 가 `if(!sel) return`.
@@ -190,21 +199,33 @@ export const scenarios = [
   },
 
   {
-    id: 'sweep.tabs.every-tab-has-visible-cards',
-    title: '어느 탭을 열어도 빈 화면이 되지 않는다',
+    id: 'sweep.navigation.every-view-has-visible-content',
+    title: '어느 Product Shell 메뉴를 열어도 빈 화면이 되지 않는다',
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      for (const tab of page.qa('.tab')) {
-        tab.click();
-        const name = tab.dataset.tab;
-        const shown = page.qa(`[data-pane="${name}"]`).filter((s) => page.visible(s));
-        check.gte(shown.length, 1, `${name} 탭에 보이는 카드가 있다`);
-        check.ok(page.text('pane-note').length > 10, `${name} 탭에 설명이 있다`);
+      for (const nav of page.qa('[data-product-nav]').filter((n) => !n.classList.contains('pf-hidden'))) {
+        nav.click();
+        await page.settle();
+        const view = nav.dataset.productNav;
+        const productPanel = page.$(`product-${view}`);
+        if (productPanel) {
+          check.ok(page.visible(productPanel), `${view} 메뉴의 본문이 보인다`);
+          check.gte(productPanel.querySelectorAll('section,article,div').length, 1, `${view} 메뉴에 내용 골격이 있다`);
+        } else {
+          // policy/models/audit/settings는 새 껍데기의 메뉴이되, 검증된 기존 카드 묶음을
+          // 재사용한다. 존재하지 않는 product-* 빈 껍데기를 만들지 않는다.
+          const pane = ({ policy: 'config', models: 'train', audit: 'ops' })[view];
+          const selector = view === 'settings'
+            ? '.grid > [data-product-view="settings"]'
+            : `.grid > [data-pane="${pane}"]`;
+          const shown = page.qa(selector).filter((card) => page.visible(card));
+          check.gte(shown.length, 1, `${view} 메뉴의 기존 카드 본문이 보인다`);
+        }
         const always = page.qa('[data-pane="always"]').filter((s) => page.visible(s));
-        check.gte(always.length, 1, `${name} 탭에서도 연결·인증 카드는 남는다`);
+        check.gte(always.length, 1, `${view} 메뉴에서도 연결·인증 카드는 남는다`);
       }
-      check.eq(page.errors.length, 0, '탭을 다 눌러도 오류가 없다', page.errors.map((e) => e.message).join(' | '));
+      check.eq(page.errors.length, 0, '메뉴를 다 눌러도 오류가 없다', page.errors.map((e) => e.message).join(' | '));
       return page;
     },
   },

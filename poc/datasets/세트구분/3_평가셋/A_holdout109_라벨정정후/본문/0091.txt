@@ -1,0 +1,3 @@
+GMP process transfer checklist
+
+GMP batch-transfer know-how, DMF preparation note, impurity-control range, supplier qualification status, and process deviation handling rule.

@@ -383,6 +383,29 @@ class ClassifyRepo:
         ).first()
         return row is not None
 
+    def find_correction(
+        self,
+        classification_id: uuid.UUID,
+        corrected_level_id: int,
+        corrected_by: str,
+    ) -> Correction | None:
+        """동일 검수 결과의 영속 행을 반환한다.
+
+        confirm/relabel 재시도는 멱등으로 기존 행을 재사용한다. 포털에는 임의의 요청 UUID가
+        아니라 실제 ``Correction`` 식별자를 돌려줘야 문서·추론·검수자·사유·시각을 한
+        원장 행으로 추적할 수 있다.
+        """
+        return self.db.execute(
+            select(Correction)
+            .where(
+                Correction.classification_id == classification_id,
+                Correction.corrected_level_id == corrected_level_id,
+                Correction.corrected_by == corrected_by,
+            )
+            .order_by(Correction.correction_id.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
     def distinct_reviewers_for_level(
         self, classification_id: uuid.UUID, corrected_level_id: int
     ) -> set[str]:

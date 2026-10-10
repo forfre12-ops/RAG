@@ -4,6 +4,18 @@ from pydantic import BaseModel, Field, computed_field
 from .common import FactorRegistry, Grade
 from .regulation import EvidenceItemModel
 
+
+# KL 포털이 설명 보조(RAG/LLM)의 상태를 해석할 때 쓰는 좁은 상태 집합. 분류 결과(label)는
+# 어떤 상태에서도 빠지지 않는다. "reference_only"는 원문 인용은 있지만 LLM 요약은 없다는
+# 뜻이며, 인용 자체가 없을 때와 구별한다.
+KLExplanationStatus = Literal[
+    "available",
+    "reference_only",
+    "unavailable",
+    "not_requested",
+    "fallback",
+]
+
 # [2026-10-02] 신뢰도 화면 표시 3단계 — 게이트가 아니라 검수 우선순위 참고자료다(KL포털이
 # 문서마다 매번 사람 검수를 하기로 했으므로, 이 값이 자동확정 여부를 바꾸지 않는다). 경계는
 # 아직 사람 검수 결과로 실측하지 않은 균등분할(1/3·2/3)이다 — 검수 데이터가 쌓이면 구간별
@@ -199,12 +211,53 @@ class ClassifyOutcome(BaseModel):
     # 꺼져 있으면 항상 None. ⛔ 로컬 LLM 이 새로 쓴 글이다 — regulation_reference(원문)와
     # 항상 같이 보일 것, 이 문장만 단독으로 등급·법리 근거로 쓰지 않는다.
     regulation_summary: Optional[str] = None
+    # KL Agent는 RAG/LLM 장애·예산 초과에도 label(대표 답)을 반드시 돌려준다. 따라서
+    # regulation_reference/regulation_summary 가 비어 있는 이유를 null만으로 추측하게 하지
+    # 않고, KL wire 사본에는 아래 상태·사유를 함께 싣는다. 내부 전용 응답은 보조 호출을 하지
+    # 않았으므로 기본값 not_requested를 쓴다.
+    explanation_status: KLExplanationStatus = "not_requested"
+    fallback_reason: Optional[str] = None
+
+
+def kl_explanation_metadata(
+    regulation_reference: Optional[list[EvidenceItemModel]],
+    regulation_summary: Optional[str],
+    *,
+    fallback_reason: Optional[str] = None,
+) -> tuple[KLExplanationStatus, Optional[str]]:
+    """KL RAG/LLM 보조 설명의 상태를 한 곳에서 계산한다.
+
+    규정검색과 LLM 요약은 등급 판정의 권한이 아니라 보조 설명이다. 조회/요약 함수는
+    Agent 답을 막지 않기 위해 오류를 삼켜 ``None``을 돌리므로, 이 함수가 그 ``None``을
+    포털에 명시적인 상태로 바꾼다. 설정은 함수 호출 시점에만 읽어 테스트·런타임 토글도
+    그대로 따른다. ``fallback_reason``은 배치 전체 시간 예산처럼 호출자가 원인을 이미
+    알고 있을 때 우선한다.
+    """
+    if fallback_reason:
+        return "fallback", fallback_reason
+
+    # 실제 인용이 있으면, 토글이 직전에 꺼졌더라도 이미 확보한 근거를 숨기거나
+    # not_requested로 잘못 표시하지 않는다.
+    if regulation_reference:
+        if regulation_summary:
+            return "available", None
+        from koipa.config import settings  # noqa: PLC0415
+        if getattr(settings, "regulation_llm_summary_enabled", False):
+            return "reference_only", "regulation_summary_unavailable"
+        return "reference_only", None
+
+    from koipa.config import settings  # noqa: PLC0415
+    if not getattr(settings, "regulation_reference_enabled", False):
+        return "not_requested", None
+    return "unavailable", "regulation_reference_unavailable"
 
 
 def kl_wire_projection(
     result: "ClassifyOutcome",
     regulation_reference: Optional[list[EvidenceItemModel]] = None,
     regulation_summary: Optional[str] = None,
+    *,
+    fallback_reason: Optional[str] = None,
 ) -> "ClassifyOutcome":
     """KL(지재원 포털)이 실제로 받을 사본 — 같은 클래스, 진단용 필드 일부만 비운다.
 
@@ -222,6 +275,11 @@ def kl_wire_projection(
     (api/async_classify.py 의 kl_backend 역할 분기, workers/tasks.py 의 콜백 발사 지점).
     """
     rule_grade = result.rule_grade if result.rule_grade is not None and result.rule_grade != result.label else None
+    explanation_status, explanation_reason = kl_explanation_metadata(
+        regulation_reference,
+        regulation_summary,
+        fallback_reason=fallback_reason,
+    )
     return result.model_copy(update={
         "scores": {},
         "model_grade": None,
@@ -230,6 +288,8 @@ def kl_wire_projection(
         "rule_grade": rule_grade,
         "regulation_reference": regulation_reference,
         "regulation_summary": regulation_summary,
+        "explanation_status": explanation_status,
+        "fallback_reason": explanation_reason,
     })
 
 

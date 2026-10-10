@@ -327,8 +327,10 @@ class RegulationEvidenceService:
         floor = float(s.regulation_min_similarity)
         # 키: 규정 판 지문·공급자·모델·후보 수·글자 수·개수·공개 확인·방식·문턱 + 조회가 실제로 보는 본문 전체(≤6,000자)와 문서 벡터의 지문.
         # (프롬프트에 들어가는 앞 1,500자만 지문으로 삼으면 뒷부분만 바뀐 문서가 옛 결과를 받는다 — 낱말 채널은 6,000자를 본다.)
-        digest = hashlib.sha1(" ".join(doc_text.split()).encode("utf-8")).hexdigest()[:16]
-        vec_digest = hashlib.sha1(np.ascontiguousarray(doc_vec, dtype=np.float32).tobytes()).hexdigest()[:16]
+        # These digests only separate in-memory cache entries, but use SHA-256 so
+        # no weak digest is normalised into a release-facing code path.
+        digest = hashlib.sha256(" ".join(doc_text.split()).encode("utf-8")).hexdigest()[:16]
+        vec_digest = hashlib.sha256(np.ascontiguousarray(doc_vec, dtype=np.float32).tobytes()).hexdigest()[:16]
         key = (doc_id, self._signature, provider_name, str(getattr(provider, "model", "")), k, doc_chars, limit, skip_public, mode, floor, digest, vec_digest)
         if use_cache and ttl > 0:
             hit = self._llm_cache_get(key, ttl)

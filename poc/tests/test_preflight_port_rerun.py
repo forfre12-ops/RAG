@@ -42,7 +42,16 @@ def _run(docker_ports_output: str) -> str:
         f"{_port_block()}\n"
         'echo "RESULT fail=$fail"\n'
     )
-    return subprocess.run([BASH, "-c", script], capture_output=True, encoding="utf-8", check=True).stdout
+    # Windows의 bash.exe ``-c`` 경로는 shell-local ``$fail`` 같은 변수를
+    # 인수 전달 과정에서 비워 버린다. LF 바이트 stdin을 쓰면 대상 Rocky bash와
+    # 동일하게 검사 블록을 실행할 수 있다.
+    result = subprocess.run(
+        [BASH, "-s"],
+        input=script.encode("utf-8"),
+        capture_output=True,
+        check=True,
+    )
+    return result.stdout.decode("utf-8", errors="replace")
 
 
 def test_port_held_by_our_own_stack_is_a_rerun_not_a_block():

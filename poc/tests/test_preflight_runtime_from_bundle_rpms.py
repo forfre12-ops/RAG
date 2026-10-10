@@ -42,7 +42,21 @@ def _run(cwd: Path) -> subprocess.CompletedProcess:
         f"{_runtime_block()}\n"
         'echo "RESULT fail=$fail warn=$warn"\n'
     )
-    return subprocess.run([BASH, "-c", script], cwd=cwd, capture_output=True, encoding="utf-8")
+    # Windows의 bash.exe는 ``-c`` 인수 안의 shell-local ``$fail``/``$*``를
+    # WSL에 넘기기 전에 빈 문자열로 바꾼다. 명령을 LF 바이트 stdin으로 공급해야
+    # Rocky의 bash와 같은 스크립트를 실제로 검증할 수 있다.
+    result = subprocess.run(
+        [BASH, "-s"],
+        cwd=cwd,
+        input=script.encode("utf-8"),
+        capture_output=True,
+    )
+    return subprocess.CompletedProcess(
+        args=result.args,
+        returncode=result.returncode,
+        stdout=result.stdout.decode("utf-8", errors="replace"),
+        stderr=result.stderr.decode("utf-8", errors="replace"),
+    )
 
 
 def test_no_runtime_but_bundle_has_rpms_warns_instead_of_blocking(tmp_path: Path):

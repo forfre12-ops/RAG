@@ -22,13 +22,21 @@ from .confirm import (
     RelabelRequest,
     RelabelResponse,
 )
-from .training import (
-    TrainRequest,
-    TrainResponse,
-    TrainStatus,
-    TrainJobSummary,
-    TrainJobList,
-)
+# 고객사 전용 이미지는 training.py 와 학습 구현을 물리적으로 제외한다. 이 패키지는
+# common.Error 하나만 import 해도 __init__이 먼저 실행되므로, 학습 라우터가 미등록이어도
+# 여기서 ModuleNotFoundError가 나면 분류 API 전체가 부팅하지 못한다. 학습 스키마를 쓰는
+# 호출자는 full-train 이미지의 training 생태계뿐이므로, 고객사에서는 안전하게 내보내지 않는다.
+try:
+    from .training import (
+        TrainRequest,
+        TrainResponse,
+        TrainStatus,
+        TrainJobSummary,
+        TrainJobList,
+    )
+except ModuleNotFoundError as exc:
+    if exc.name != f"{__name__}.training":
+        raise
 # [2026-10-07 KL 분리 조사] 고객사 전용 이미지(Dockerfile.api.customer·Dockerfile.worker.customer)
 # 에는 schemas/synthesis.py 가 물리적으로 없다. 이 패키지의 __init__.py 는 `import koipa.schemas.*`
 # 아무거나 하나만 해도 무조건 실행되므로(파이썬 패키지 임포트 규칙), 여기서 못 잡으면 schemas
@@ -64,10 +72,11 @@ __all__ = [
     "ClassifyAsyncRequest", "ClassifyAsyncResponse",
     "ClassifyBatchRequest", "ClassifyBatchResponse", "ClassifyJobStatus",
     "ConfirmRequest", "ConfirmResponse", "RelabelRequest", "RelabelResponse",
-    "TrainRequest", "TrainResponse", "TrainStatus", "TrainJobSummary", "TrainJobList",
     "GradesGetResponse", "GradesPutRequest", "GradesPutResponse",
     "MetricsReport", "MetricsHistory", "ConfusionMatrix",
 ]
+if "TrainRequest" in globals():
+    __all__ += ["TrainRequest", "TrainResponse", "TrainStatus", "TrainJobSummary", "TrainJobList"]
 # synthesis 스키마는 고객사 전용 이미지에 없을 수 있어 실제로 임포트됐을 때만 __all__ 에 넣는다
 # (위 try/except 참고) — `from koipa.schemas import *` 가 없는 이름을 끌어오려다 깨지지 않게.
 if "SynthGenerateRequest" in globals():

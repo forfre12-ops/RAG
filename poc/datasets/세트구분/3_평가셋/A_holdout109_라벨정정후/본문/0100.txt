@@ -1,0 +1,3 @@
+Customer database export risk review
+
+VIP customer database, renewal probability, churn score, discounted pricing model, sales-contact history, and partner-specific margin assumptions.

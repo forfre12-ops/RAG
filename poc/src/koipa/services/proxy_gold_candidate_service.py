@@ -424,11 +424,29 @@ class ProxyGoldCandidateService:
         배치 표식이 없는 후보는 세지 않는다 — 목록에 "(없음)" 항목을 만들면 그것이
         배치인 줄 알고 고르게 된다. 표식이 하나도 없으면 빈 목록이고, 그때는 화면이
         "이 서버에는 배치 표식이 없습니다" 를 **이 응답을 근거로** 말한다.
+
+        ``review_batch_active`` 는 적재 검증을 끝내고 이번 전문가 검수에 열어 둔 전달본을
+        표시하는 메타데이터다. 이름순으로 가장 마지막 배치를 고르는 것은 날짜 없는 과거
+        전달본을 현재 대상으로 오인하게 하므로 금지한다. 오래된 적재분은 이 값이 없어도
+        목록에 남고, UI는 active 표식이 없는 경우 임의 배치를 선택하지 않는다.
         """
         counter = Counter(
             b for c in candidates if (b := str(c.get("review_batch") or "").strip())
         )
-        return [{"review_batch": b, "total": n} for b, n in sorted(counter.items())]
+        active_batches = {
+            str(c.get("review_batch") or "").strip()
+            for c in candidates
+            if c.get("review_batch_active") and str(c.get("review_batch") or "").strip()
+        }
+        # 기존 API 소비자는 ``review_batch``·``total`` 두 키만 비교한다. 현재 배치일 때만
+        # opt-in 힌트를 추가해 계약 호환성과 신규 UI 선택을 함께 지킨다.
+        result = []
+        for batch, total in sorted(counter.items()):
+            item: dict[str, Any] = {"review_batch": batch, "total": total}
+            if batch in active_batches:
+                item["active"] = True
+            result.append(item)
+        return result
 
     @staticmethod
     def _available_departments(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1327,6 +1345,9 @@ class ProxyGoldCandidateService:
             "requires_manual_audit": bool(meta.get("requires_manual_audit")),
             # 검수 배치 표식. 전달본 단위로 묶어 목록을 좁힌다.
             "review_batch": str(meta.get("review_batch") or "") or None,
+            # 현재 전문가 검수에 열어 둔 전달본인지. 목록/통계는 여전히 모든 배치를 읽되,
+            # 새 콘솔이 과거 전달본을 기본값으로 박지 않도록 선택 힌트만 준다.
+            "review_batch_active": bool(meta.get("review_batch_active")),
             "claim_scope": str(meta.get("claim_scope") or ""),
             "document_path": document_path,
             "content_revision": str(meta.get("content_revision") or "v1"),

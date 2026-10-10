@@ -85,7 +85,10 @@ def classify_job_status(job_id: UUID, request: Request):
                 # 예산 초과 — 남은 문서는 규정참고·요약 없이(둘 다 None) 그대로 내보낸다.
                 # label·confidence 등 핵심 판정은 멀쩡하다, 참고용 부가정보만 생략될 뿐이다.
                 over_budget = True
-                projected.append(kl_wire_projection(r))
+                projected.append(kl_wire_projection(
+                    r,
+                    fallback_reason="regulation_enrichment_budget_exceeded",
+                ))
                 continue
             reference = regulation_reference_for_kl_wire(r.doc_id)
             projected.append(kl_wire_projection(

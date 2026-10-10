@@ -49,7 +49,7 @@
     // 응답을 보고 세우는 플래그를 여기서도 보고 애초에 패널을 넣지 않는다 — healthz 응답이
     // 이 스크립트보다 늦게 오면(드문 경합) 이번 로드에서는 패널이 그대로 뜬다(다음 새로고침엔
     // 사라짐). 탭(data-golden="1")이 이미 숨어 있으므로 사용자가 이 카드를 볼 일도 없다.
-    if (window.__hideGoldenReview) return;
+    if (window.__hideGoldenReview || document.getElementById('gold-jobs-card')) return;
     // 골든 빌더 카드 바로 뒤에 붙인다(검수 흐름상 인접).
     var summary = document.getElementById('gold-summary');
     var anchor = summary && summary.closest ? summary.closest('section.card') : null;
@@ -184,9 +184,7 @@
     if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mount);
-  } else {
-    mount();
-  }
+  // healthz가 현재 이미지에 golden.py가 포함됐는지 확정한 다음에만 붙인다. 고객사 분리
+  // 이미지에서 초기 로드 순서가 먼저 오면, 숨길 카드와 404 호출이 잠깐 나타나는 경합이 있었다.
+  document.addEventListener('koipa:profile-ready', mount);
 })();

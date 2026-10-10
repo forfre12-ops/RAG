@@ -20,7 +20,7 @@ if str(_SCRIPTS) not in sys.path:
 
 from build_offline_bundle import load_review_request_exclusions, select_review_batch_files  # noqa: E402
 
-BATCH = "expert_review_mock1000_20261002"
+BATCH = "expert_review_product_1000_20261010"
 
 
 def _write(root: Path, doc_id: str, *, batch: str = BATCH) -> None:
@@ -54,6 +54,17 @@ def test_a_different_batch_tag_is_never_included(tmp_path):
 
     assert "FD-0001.metadata.json" not in names
     assert "GOLD-B1-S1-001.metadata.json" not in names
+
+
+def test_selection_provenance_is_included_only_for_the_selected_batch(tmp_path):
+    _make_batch(tmp_path)
+    (tmp_path / f"{BATCH}.selection.json").write_text('{"review_document_count":1000}\n', encoding="utf-8")
+    (tmp_path / "other.selection.json").write_text("{}\n", encoding="utf-8")
+
+    names = [path.name for path in select_review_batch_files(tmp_path, set(), BATCH)]
+
+    assert names[-1] == f"{BATCH}.selection.json"
+    assert "other.selection.json" not in names
 
 
 def test_metadata_without_a_matching_body_file_is_skipped(tmp_path):

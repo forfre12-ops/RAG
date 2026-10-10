@@ -53,7 +53,7 @@ CONSOLE_AUTOLOGIN="${CONSOLE_AUTOLOGIN:-1}"
 CONSOLE_TOKEN_DAYS="${CONSOLE_TOKEN_DAYS:-365}"
 
 # 설치 대상 판별. 지재원 학습 노드는 GPU 가 있고 학습 라우터가 필요하다(full-train).
-# 고객사 운영 노드는 CPU 전용이고 학습 경로가 아예 등록되지 않는다(onprem-local).
+# 고객사 운영 노드는 CPU 전용이며 분류·활성학습 신호 수집만 한다(onprem-local).
 # 자동 판별은 GPU 유무로 한다 — 틀리면 NODE 로 강제한다.
 if [ -z "${NODE:-}" ]; then
   if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
@@ -67,11 +67,14 @@ else
 fi
 case "$NODE" in
   jjw)      PROFILE=full-train;   NODE_LABEL="지재원 학습·골든 노드"
-            API_IMAGE_NAME=koipa-api;          WORKER_IMAGE_NAME=koipa-worker ;;
-  customer) PROFILE=onprem-local; NODE_LABEL="고객사 운영 노드"
-            # [2026-10-07 KL 요청] 고객사는 합성 문서 생성 코드가 물리적으로 빠진 이미지를 쓴다
-            # (Dockerfile.api.customer·worker.customer — 골든 검수·학습은 고객사도 그대로 쓰므로 남아 있다).
-            API_IMAGE_NAME=koipa-api-customer; WORKER_IMAGE_NAME=koipa-worker-customer ;;
+            API_IMAGE_NAME=koipa-api;          WORKER_IMAGE_NAME=koipa-worker
+            WORKER_QUEUES="classify,index,synthesis,learning,celery"
+            ENABLE_TRAINING=true; ENABLE_INCREMENTAL_RETRAIN=false ;;
+  customer) PROFILE=onprem-local; NODE_LABEL="고객사 분류·활성학습 노드"
+            # 고객사는 지재원 전용(전문가 검수·생성·학습·성능보고) 코드가 물리적으로 빠진 이미지를 쓴다.
+            API_IMAGE_NAME=koipa-api-customer; WORKER_IMAGE_NAME=koipa-worker-customer
+            WORKER_QUEUES="classify,index,learning,celery"
+            ENABLE_TRAINING=false; ENABLE_INCREMENTAL_RETRAIN=false ;;
   *) printf "NODE 는 jjw 또는 customer 여야 한다 (받은 값: %s)\n" "$NODE" >&2; exit 1 ;;
 esac
 
@@ -182,6 +185,9 @@ IMAGE_TAG=${IMAGE_TAG_DEFAULT}
 # [2026-10-07] NODE=${NODE} 에 맞춘 이미지 — docker-compose.airgap.yml 참고.
 API_IMAGE_NAME=${API_IMAGE_NAME}
 WORKER_IMAGE_NAME=${WORKER_IMAGE_NAME}
+WORKER_QUEUES=${WORKER_QUEUES}
+ENABLE_TRAINING=${ENABLE_TRAINING}
+ENABLE_INCREMENTAL_RETRAIN=${ENABLE_INCREMENTAL_RETRAIN}
 API_PORT=${API_PORT}
 
 POSTGRES_USER=koipa
@@ -202,7 +208,7 @@ GOLDEN_REVIEW_BLIND_ENFORCED=1
 
 # 후보 관리 화면의 기본 검수 배치 — 번들 golden_review_batch/ 의 회차. 옛 회차가 후보 풀에 쌓여도
 # 첫 화면이 이번 회차만 보여 준다(그 배치가 서버에 없으면 자동으로 전체).
-GOLDEN_DEFAULT_REVIEW_BATCH=expert_review_mock1000_20261002
+GOLDEN_DEFAULT_REVIEW_BATCH=expert_review_product_1000_20261010
 
 # 골든 검수 콘솔 로그인 — 결정 저장(POST .../decision)은 공유 API_KEY 를 거부하고 포털 JWT
 # 쿠키만 받는다("golden console requires a portal JWT login"). 이걸 안 채우면 AUTH_MODE
@@ -264,6 +270,17 @@ _env_unset() {
   chmod 600 "$_t"; mv "$_t" "$ENV_FILE"
 }
 _env_set() { _env_unset "$1"; printf '%s=%s\n' "$1" "$2" >> "$ENV_FILE"; }
+# 기존 .env를 보존하는 설치 재실행에서도 선택한 노드 토폴로지는 강제한다. 이미지 파일을
+# 바꿔도 예전 WORKER_QUEUES=synthesis 값이 남으면 고객사 워커가 지재원 전용 메시지를
+# 소비하려 시도한다. 학습 플래그를 명시해 프로파일 기본값·오래된 .env 의존도 없앤다.
+if [ "$DRY_RUN" != "1" ]; then
+  _env_set DEPLOY_PROFILE "$PROFILE"
+  _env_set API_IMAGE_NAME "$API_IMAGE_NAME"
+  _env_set WORKER_IMAGE_NAME "$WORKER_IMAGE_NAME"
+  _env_set WORKER_QUEUES "$WORKER_QUEUES"
+  _env_set ENABLE_TRAINING "$ENABLE_TRAINING"
+  _env_set ENABLE_INCREMENTAL_RETRAIN "$ENABLE_INCREMENTAL_RETRAIN"
+fi
 # 토큰 발급기가 파일 이름으로 쓰는 형태(영숫자 . _ - 만 남긴다)
 _tok_name() { printf '%s' "$1" | sed 's/[^A-Za-z0-9._-]/_/g'; }
 # 컨테이너 안에서 토큰을 발급한다. $1=계정 $2=역할. 결과 JSON 은 표준출력(토큰 자체는 없다).

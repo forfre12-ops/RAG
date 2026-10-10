@@ -13,11 +13,12 @@ import pytest
 
 pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from koipa.adapters.storage import LocalStorage
 from koipa.api.app import app
 from koipa.api.documents import _get_ingestion_service
-from koipa.config import settings
+from koipa.config import Settings, settings
 from koipa.services.document_ingestion_service import DocumentIngestionService
 
 
@@ -43,6 +44,11 @@ def _files(items: list[tuple[str, bytes]]):
 
 
 class TestDocumentsBatchUpload:
+    def test_total_file_bytes_limit_must_be_positive(self):
+        assert Settings(_env_file=None, documents_batch_max_total_mb=3).documents_batch_max_total_mb == 3
+        with pytest.raises(ValidationError, match="documents_batch_max_total_mb"):
+            Settings(_env_file=None, documents_batch_max_total_mb=0)
+
     def test_two_files_201_independent_results_same_order(self, client):
         items = [
             ("a.txt", "핵심 공정 레시피 ALD 증착 조건 대외비".encode("utf-8")),
@@ -114,6 +120,47 @@ class TestDocumentsBatchUpload:
             files=_files(items),
         )
         assert r.status_code == 413, r.text
+
+    def test_per_file_limit_is_reported_per_item_without_rejecting_batch(self, client, monkeypatch):
+        monkeypatch.setattr(settings, "max_upload_mb", 1)
+        items = [
+            ("too-large.txt", b"x" * (1024 * 1024 + 1)),
+            ("small.txt", b"small document"),
+        ]
+        r = client.post(
+            "/api/v1/documents/batch",
+            headers=_hdr(),
+            data={"actor": _actor()},
+            files=_files(items),
+        )
+        # 개별 파일 초과는 기존 계약대로 201의 항목별 warning이다.
+        assert r.status_code == 201, r.text
+        first, second = r.json()["results"]
+        assert first["filename"] == "too-large.txt"
+        assert first["persisted"] is False
+        assert any("file too large" in warning for warning in first["warnings"])
+        assert second["filename"] == "small.txt"
+
+    def test_total_file_bytes_limit_rejects_entire_batch_with_exact_413(self, client, monkeypatch):
+        monkeypatch.setattr(settings, "documents_batch_max_total_mb", 1)
+        items = [
+            ("first.txt", b"a" * (700 * 1024)),
+            ("second.txt", b"b" * (400 * 1024)),
+        ]
+        r = client.post(
+            "/api/v1/documents/batch",
+            headers=_hdr(),
+            data={"actor": _actor()},
+            files=_files(items),
+        )
+        assert r.status_code == 413, r.text
+        detail = r.json()["detail"]
+        assert detail == {
+            "code": "KOIPA_DOCUMENT_BATCH_TOTAL_TOO_LARGE",
+            "message": "total uploaded file bytes exceed documents_batch_max_total_mb",
+            "total_file_bytes": 1100 * 1024,
+            "max_total_file_bytes": 1024 * 1024,
+        }
 
     def test_enqueue_classification_submits_one_batch_job(self, client):
         items = [

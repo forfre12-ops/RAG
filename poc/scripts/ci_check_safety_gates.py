@@ -48,10 +48,17 @@ def _settings_for(profile: str) -> Settings:
 def main() -> int:
     failures: list[str] = []
 
-    # [hermetic] 강제집합 env 는 아래 (음성) 루프가 명시적으로 토글하는 대상이다. 호출자(pytest
-    # conftest 가 REQUIRE_REAL_EMBEDDER=false 주입, 또는 개발 셸이 이 값들을 켜/꺼 둠)가 미리
-    # 설정해 두면 (양성) 프로파일 '순수 기본값' 검증이 오염된다 — 시작 시 걷어내 프로파일 기본값만 본다.
-    for _, _env in _SAFETY_GATES:
+    # [hermetic] 이 스크립트의 양성 검증은 운영자의 현재 환경이 아니라 **프로파일의
+    # 기본값**을 확인한다. pytest conftest는 기존 라우트 시험을 위해 ENABLE_TRAINING=true를
+    # 전역 주입하는데, 그것을 물려받으면 onprem-local의 "학습 금지" 계약이 오히려 예외로
+    # 끝나 안전 게이트 CI가 실행되지 않는다. 안전 게이트뿐 아니라 모든 프로필 default
+    # 필드를 제거한 후, 아래 음성 루프에서만 의도적으로 하나씩 override한다.
+    profile_envs = {
+        field.upper()
+        for defaults in _PROFILE_DEFAULTS.values()
+        for field in defaults
+    }
+    for _env in profile_envs:
         os.environ.pop(_env, None)
 
     hardened = [

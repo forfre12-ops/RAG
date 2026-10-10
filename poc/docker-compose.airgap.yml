@@ -72,8 +72,8 @@ services:
   # 의존했으므로 minio 제거와 함께 제거.)
 
   api:
-    # [2026-10-07] 이미지 이름도 태그처럼 .env 로 뺐다 — setup.sh 가 NODE=customer 면
-    # API_IMAGE_NAME=koipa-api-customer 를 .env 에 적는다(고객사=분류+증분재학습 전용
+    # 이미지 이름도 태그처럼 .env 로 뺐다 — setup.sh 가 NODE=customer 면
+    # API_IMAGE_NAME=koipa-api-customer 를 .env 에 적는다(고객사=분류·활성학습 전용
     # 이미지, Dockerfile.api.customer). NODE=jjw·미지정은 기본값(koipa-api, 전체 이미지)
     # 그대로라 기존 설치 경로는 아무 영향 없다.
     image: ${API_IMAGE_NAME:-koipa-api}:${IMAGE_TAG:-1.0.0-rc1}        # docker load 로 복원된 태그
@@ -157,7 +157,9 @@ services:
     # koipa-worker-customer).
     image: ${WORKER_IMAGE_NAME:-koipa-worker}:${IMAGE_TAG:-1.0.0-rc1}
     restart: unless-stopped
-    command: celery -A koipa.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
+    # 고객사 노드는 synthesis 큐를 구독하지 않는다. setup.sh가 NODE별 WORKER_QUEUES를
+    # 고정해 고객사 이미지에 없는 지재원 태스크를 소비하지 못하게 한다.
+    command: celery -A koipa.workers.celery_app worker -l info -Q ${WORKER_QUEUES:-classify,index,synthesis,learning,celery}
     env_file: .env
     environment:
       DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)

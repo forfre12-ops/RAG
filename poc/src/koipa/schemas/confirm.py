@@ -18,6 +18,34 @@ class ConfirmRequest(BaseModel):
     note: Optional[str] = Field(default=None, max_length=1000)
 
 
+class ReviewReceipt(BaseModel):
+    """KL 포털 검수 결과의 추적 가능한 영수증.
+
+    분류 Agent는 이 영수증을 기다리지 않고 먼저 답을 반환한다. 이후 포털에서 남긴
+    confirm/relabel 결과는 ``Correction`` 한 행으로 보존되며, 이 객체는 그 행과
+    문서·추론·검수자·사유·시각을 함께 가리킨다. ``candidate_data_status`` 는
+    재학습 후보 *입구* 상태일 뿐 자동 학습/자동 활성화를 뜻하지 않는다. 본문 복원,
+    holdout 누수 차단, 모델 승격은 후속 게이트가 계속 담당한다.
+    """
+
+    doc_id: str
+    inference_id: Optional[UUID] = None
+    reviewer_id: str
+    final_label: Grade
+    reason: Optional[str] = None
+    reviewed_at: str
+    correction_id: Optional[int] = Field(
+        default=None,
+        description="영속된 Correction 식별자. persisted=False면 없음.",
+    )
+    candidate_data_status: str = Field(
+        description=(
+            "eligible_for_candidate_rebuild | held_for_finalization | "
+            "ineligible_reviewer | not_persisted. 후보 재빌드 뒤에도 본문/holdout 게이트가 적용된다."
+        )
+    )
+
+
 class ConfirmResponse(BaseModel):
     confirmation_id: UUID
     confirmed_at: str  # ISO-8601
@@ -35,6 +63,10 @@ class ConfirmResponse(BaseModel):
     second_review_required: bool = Field(
         default=False,
         description="고등급 2인검토 게이트로 needs_second_review 보류됐는지.",
+    )
+    review_receipt: Optional[ReviewReceipt] = Field(
+        default=None,
+        description="포털 검수 결과와 영속된 교정 후보의 추적 영수증(추가형 필드).",
     )
 
 
@@ -89,4 +121,8 @@ class RelabelResponse(BaseModel):
     second_review_required: bool = Field(
         default=False,
         description="고등급 2인검토 게이트로 needs_second_review 보류됐는지.",
+    )
+    review_receipt: Optional[ReviewReceipt] = Field(
+        default=None,
+        description="포털 검수 결과와 영속된 교정 후보의 추적 영수증(추가형 필드).",
     )

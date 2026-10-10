@@ -11,7 +11,7 @@
 # [재현성] base image 를 digest 로 고정 — 태그(3.11-slim)는 재빌드 시 다른 이미지를 가리킬 수 있어
 # 폐쇄망 반입본과 재빌드본의 동일성을 보증하지 못한다. 갱신 시:
 #   docker buildx imagetools inspect python:3.11-slim   # → Digest 를 아래에 반영
-FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS base
+FROM python:3.11-slim@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce AS base
 
 # [빌드 신원] 배포된 이미지가 어느 커밋에서 나왔는지를 런타임이 말할 수 있어야 한다.
 # 없으면 "서버가 그 SHA 를 실제로 실행 중인가" 를 확인할 방법이 없고, 릴리스 게이트의
@@ -44,7 +44,6 @@ COPY src ./src
 # BEGIN deploy_manifest:container_scripts — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
 # 이미지에는 정본(deploy_manifest.toml)의 container.scripts.allow 만 싣는다.
 COPY scripts/_cli_io.py \
-     scripts/audit_synthetic_documents.py \
      scripts/analyze_golden_run.py \
      scripts/check_domain_leakage_gate.py \
      scripts/docker_install_locked.sh \
@@ -79,7 +78,10 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 RUN pip install --upgrade pip && \
     TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh \
         psh otel jwt hwp hwp-tables pdf-tables xls llm && \
-    pip install -U "wheel>=0.46.2" "jaraco.context>=6.1.0"   # [보안] Trivy 유일 수정가능 2건(빌드툴 CVE) 상향
+    pip install -U "wheel>=0.46.2" "jaraco.context>=6.1.0" && \
+    apt-mark manual libpq5 libfreetype6 libexpat1 curl && \
+    apt-get purge -y --auto-remove build-essential libpq-dev && \
+    rm -rf /var/lib/apt/lists/*   # [보안] runtime에는 컴파일러·perl 계열을 남기지 않는다.
 
 # [HWP 파싱 복구] rhwp-python 이 번들한 FreeType(libfreetype-*.so.6)에 FT_Palette_Data_Get 심볼이
 # 없어 `import rhwp` 가 undefined symbol 로 실패 → .hwp/.hwpx 추출이 0글자로 깨진다. 심볼이 있는

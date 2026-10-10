@@ -13,10 +13,21 @@ import numpy as np
 import pytest
 
 from koipa.regulation import llm_select
+from koipa.regulation import runtime_toggle
 from koipa.regulation.index import ClauseRec, RegulationIndex, SentenceRec
 from koipa.services.regulation_evidence_service import RegulationEvidenceService
 
 VEC = np.asarray([1.0, 0.0, 0.0], dtype=np.float32)
+
+
+@pytest.fixture(autouse=True)
+def _local_runtime_toggle(monkeypatch: pytest.MonkeyPatch):
+    """서비스 단위 시험은 Redis의 운영 토글이 아니라 주입한 설정만 검증한다."""
+    monkeypatch.setattr(
+        runtime_toggle,
+        "is_llm_select_enabled",
+        lambda *, default=None: bool(default),
+    )
 
 
 def sent(seq, text, *, lead=False):

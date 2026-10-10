@@ -1041,6 +1041,9 @@ def select_review_batch_files(src: Path, excluded: set[str], batch: str) -> list
             continue
         files.append(meta_path)
         files.append(body_path)
+    selection_manifest = src / f"{batch}.selection.json"
+    if selection_manifest.is_file():
+        files.append(selection_manifest)
     return files
 
 
@@ -1419,9 +1422,8 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     # deploy_manifest.toml 의 [bundle.review_batch].batch 를 정본으로 읽는다 — 배치가 또
     # 바뀌면 거기 한 곳만 고치면 된다.
     #
-    # [2026-10-03 사용자 결정 — 같은 날 재확정] 배포본에 mock1000(guide40 구조, 1,001건)을
-    # 싣는다 — 검수자 계정 20개를 이미 발급했고(6800b315) 그 계정들이 배포 직후 이 배치를
-    # 검수한다. 1,711건 배치는 더 안 쓴다(보관함으로 이동). batch 값이 빈 문자열이면
+    # 배포본에는 20명 x 50건에 맞춘 정확히 1,000건의 현재 검수 배치만 싣는다. 선택
+    # provenance가 있으면 ``<batch>.selection.json``도 함께 싣는다. batch 값이 빈 문자열이면
     # "검수 후보 의도적 미동봉"(예: 운영 방식이 다시 바뀌어 지재원이 직접 생성하는 쪽으로
     # 갈 때)이고, 값이 있는데 0건이면 그게 진짜 결함이다 — 둘을 구분해서 알린다.
     review_src = _REPO_ROOT / "datasets" / "proxy_gold" / "single_document_candidates"

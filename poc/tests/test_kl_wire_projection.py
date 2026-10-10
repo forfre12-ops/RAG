@@ -24,7 +24,12 @@ from uuid import uuid4
 
 import pytest
 
-from koipa.schemas.classify import ClassifyJobResult, compute_confidence_tier, kl_wire_projection
+from koipa.schemas.classify import (
+    ClassifyJobResult,
+    compute_confidence_tier,
+    kl_explanation_metadata,
+    kl_wire_projection,
+)
 from koipa.schemas.regulation import EvidenceClauseRef, EvidenceItemModel, EvidenceRegulationRef
 from koipa.services.regulation_evidence_service import (
     regulation_reference_for_kl_wire,
@@ -157,6 +162,8 @@ def test_regulation_reference_is_carried_through_when_given():
     )
     projected = kl_wire_projection(_result(), regulation_reference=[item])
     assert projected.regulation_reference == [item]
+    assert projected.explanation_status == "reference_only"
+    assert projected.fallback_reason is None
 
 
 def test_regulation_reference_defaults_to_none():
@@ -169,6 +176,79 @@ def test_regulation_summary_is_carried_through_when_given():
     """[2026-10-02] rag_llm 의 요약(regulation_summary)도 있으면 그대로 실린다."""
     projected = kl_wire_projection(_result(), regulation_summary="제41조가 이 문서에 적용됩니다.")
     assert projected.regulation_summary == "제41조가 이 문서에 적용됩니다."
+
+
+def test_kl_projection_marks_a_complete_rag_llm_explanation_available():
+    """KL은 인용과 LLM 요약이 모두 있으면 둘을 분리하지 않고 완료 상태로 알린다."""
+    item = EvidenceItemModel(
+        regulation=EvidenceRegulationRef(reg_id="r1", name="영업비밀관리규정", version_label="v1"),
+        clause=EvidenceClauseRef(clause_id="c1", article_no="제41조", title="설계·공정 문서"),
+        sentences=["공정 조건표는 핵심 공정은 극비로 취급한다."],
+        is_grade_list=False,
+    )
+    projected = kl_wire_projection(
+        _result(),
+        regulation_reference=[item],
+        regulation_summary="제41조가 이 문서에 적용됩니다.",
+    )
+    assert projected.explanation_status == "available"
+    assert projected.fallback_reason is None
+
+
+def test_kl_projection_exposes_disabled_and_unavailable_explanation_states(monkeypatch):
+    """RAG가 비어도 label은 유지하고, 꺼짐과 조회 불가를 null만으로 숨기지 않는다."""
+    from koipa.config import settings
+
+    monkeypatch.setattr(settings, "regulation_reference_enabled", False, raising=False)
+    disabled = kl_wire_projection(_result())
+    assert disabled.label == "S2"
+    assert disabled.explanation_status == "not_requested"
+    assert disabled.fallback_reason is None
+
+    monkeypatch.setattr(settings, "regulation_reference_enabled", True, raising=False)
+    unavailable = kl_wire_projection(_result())
+    assert unavailable.label == "S2"
+    assert unavailable.explanation_status == "unavailable"
+    assert unavailable.fallback_reason == "regulation_reference_unavailable"
+
+
+def test_kl_projection_exposes_summary_fallback_without_dropping_reference(monkeypatch):
+    """요약 LLM 실패/시간초과가 None이어도 원문 인용과 대표 답은 남고 사유가 드러난다."""
+    from koipa.config import settings
+
+    item = EvidenceItemModel(
+        regulation=EvidenceRegulationRef(reg_id="r1", name="영업비밀관리규정", version_label="v1"),
+        clause=EvidenceClauseRef(clause_id="c1", article_no="제41조", title="설계·공정 문서"),
+        sentences=["공정 조건표는 핵심 공정은 극비로 취급한다."],
+        is_grade_list=False,
+    )
+    monkeypatch.setattr(settings, "regulation_llm_summary_enabled", True, raising=False)
+    projected = kl_wire_projection(_result(), regulation_reference=[item])
+    assert projected.label == "S2"
+    assert projected.regulation_reference == [item]
+    assert projected.explanation_status == "reference_only"
+    assert projected.fallback_reason == "regulation_summary_unavailable"
+
+
+def test_kl_projection_exposes_batch_budget_fallback_without_dropping_answer():
+    projected = kl_wire_projection(
+        _result(label="S1", rule_grade="S2"),
+        fallback_reason="regulation_enrichment_budget_exceeded",
+    )
+    assert projected.label == "S1"
+    assert projected.rule_grade == "S2"
+    assert projected.explanation_status == "fallback"
+    assert projected.fallback_reason == "regulation_enrichment_budget_exceeded"
+
+
+def test_kl_explanation_metadata_prefers_explicit_fallback_reason():
+    status, reason = kl_explanation_metadata(
+        regulation_reference=None,
+        regulation_summary=None,
+        fallback_reason="regulation_enrichment_budget_exceeded",
+    )
+    assert status == "fallback"
+    assert reason == "regulation_enrichment_budget_exceeded"
 
 
 def test_regulation_summary_defaults_to_none():

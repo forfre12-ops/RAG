@@ -667,7 +667,7 @@ def test_job_html_is_unchanged_by_default(h, cookie_jwt, path):
     """꺼진 기본 상태 — 로그인 없이도 서명 URL 토큰 검사만 거쳐 종전대로 열린다(없는 잡 → 404 안내 화면)."""
     app.dependency_overrides.pop(require_auth, None)
     r = h.client.get(API + path)
-    assert r.status_code == 404 and "이 검수 잡이 서버에 없습니다" in r.text
+    assert r.status_code == 404 and "이 검수 잡을 찾을 수 없습니다" in r.text
 
 
 # ══ 4. 우회 경로 전수 — golden.py 의 모든 라우트를 분류하고, 분류에 없으면 실패한다 ═══════════════

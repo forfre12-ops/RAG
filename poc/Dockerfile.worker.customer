@@ -12,7 +12,7 @@
 # 빌드:
 #   docker build -f Dockerfile.worker.customer -t koipa-worker-customer:1.0.0-rc1 .
 
-FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93
+FROM python:3.11-slim@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce
 
 ARG KOIPA_BUILD_SHA=unknown
 ARG KOIPA_BUILD_AT=unknown
@@ -30,18 +30,26 @@ COPY pyproject.toml uv.lock ./
 COPY src ./src
 # BEGIN deploy_manifest:customer_exclude — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
 # 고객사 전용 이미지에서 빼는 파일. 정본: deploy_manifest.toml 의 container.customer_exclude.
-RUN rm -f src/koipa/api/golden.py \
+RUN rm -f src/koipa/api/_training_report_pdf.py \
+           src/koipa/api/golden.py \
            src/koipa/api/synthesis.py \
+           src/koipa/api/training.py \
            src/koipa/dataset_leakage.py \
            src/koipa/modules/m1_synthesis/__init__.py \
            src/koipa/modules/m1_synthesis/generation_playbook.py \
            src/koipa/modules/m1_synthesis/generator.py \
            src/koipa/modules/m1_synthesis/witness_taxonomy.py \
+           src/koipa/modules/m4_training/__init__.py \
+           src/koipa/modules/m4_training/chunk_expand.py \
+           src/koipa/modules/m4_training/trainer.py \
+           src/koipa/proxy_training_finalization.py \
            src/koipa/schemas/synthesis.py \
+           src/koipa/schemas/training.py \
            src/koipa/services/synth_coverage.py \
            src/koipa/services/synth_provider_status.py \
            src/koipa/services/synth_quality.py \
-           src/koipa/services/synthesis_service.py
+           src/koipa/services/synthesis_service.py \
+           src/koipa/services/training_service.py
 # END deploy_manifest:customer_exclude
 # BEGIN deploy_manifest:container_scripts — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
 # 이미지에는 정본(deploy_manifest.toml)의 container.scripts.allow 만 싣는다.
@@ -58,7 +66,10 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 
 RUN pip install --upgrade pip && \
     TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh \
-        hwp hwp-tables pdf-tables xls llm
+        hwp hwp-tables pdf-tables xls llm && \
+    apt-mark manual libpq5 libfreetype6 libexpat1 && \
+    apt-get purge -y --auto-remove build-essential libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 

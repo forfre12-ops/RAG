@@ -14,6 +14,7 @@ schema = 1
 # poc/scripts 에서 번들 루트로 복사한다(줄바꿈은 LF 로 고정).
 scripts = [
   "preflight_host.sh",   # setup.sh 가 호스트 점검에 부른다
+  "preflight_target_host.sh", # 설치 전 실제 Rocky/폐쇄망 대상만 판정(WSL은 NOT_READY)
   "setup.sh",            # 원커맨드 설치기(INSTALL.md §0-2)
   "deploy.sh",           # install.sh 가 안내하는 통합 진입점 → deploy_airgap.sh
   "deploy_airgap.sh",    # setup.sh 가 부르는 전체 스택 기동
@@ -27,7 +28,12 @@ generated = ["install.sh", "verify.sh", "manifest.yaml", "manifest.json", "CHECK
 readme = { source = "docs/BUNDLE_README.md", dest = "README.md" }
 
 [bundle.docs]
-files = ["INSTALL.md", "OPERATION.md", "TROUBLESHOOTING.md"]
+files = [
+  "INSTALL.md",
+  "OPERATION.md",
+  "TROUBLESHOOTING.md",
+  "EXPERT_REVIEW_OPERATION_1000.md",
+]
 
 [bundle.infra]                      # infra-config/
 files = ["docker-compose.airgap.yml", "docker-compose.gpu.yml", ".env.template", "mtls/nginx.mtls.conf"]
@@ -49,13 +55,13 @@ files = [
 ]
 
 [bundle.review_batch]               # golden_review_batch/ — 선택은 빌더의 select_review_batch_files()
-patterns = ["*_review.md", "*.metadata.json"]
-# [2026-10-03 사용자 결정 — 같은 날 재확정] 배포본에 mock1000(guide40 구조, 1,001건)을
-# 싣는다. 검수자 계정 20개를 이미 발급했고(6800b315) 그 계정들이 검수할 대상이 이 배치다.
-# 1,711건 배치는 더 안 쓴다(보관함으로 이동, single_document_candidates 에 없음).
-# doc_id 접두사로 하드코딩했다가 조용히 0건을 실은 결함을 2026-10-03 에 고쳤다 — 배치를
-# 바꾸려면 반드시 이 값을 거쳐서만 고를 것(코드에 다시 하드코딩하지 말 것).
-batch = "expert_review_mock1000_20261002"
+patterns = ["*_review.md", "*.metadata.json", "*.selection.json"]
+# 20명 x 50건 전문가 검수에는 정확히 1,000건인 이 배치만 싣는다. 원본 1,001건 중
+# MS1-1001은 등급·본문·품질과 무관한 안정 doc_id 규칙으로 제외했으며, 동봉되는
+# selection manifest가 원본 매니페스트 해시와 제외 ID를 기록한다.
+# doc_id 접두사가 아니라 metadata의 review_batch로 고른다. 배치를 바꾸려면 반드시 이
+# 값을 거쳐서만 고를 것(코드에 다시 하드코딩하지 말 것).
+batch = "expert_review_product_1000_20261010"
 
 [bundle.locked_eval]                # golden_locked_eval/ — 지재원 서명 locked_eval 스냅샷(선택, 없으면 미동봉)
 # [2026-10-09] #9(이미지 분리) 때문에 생겼다 — 고객사 이미지에는 api/golden.py(검수·서명 화면)가
@@ -141,6 +147,7 @@ allow = [
   "backup_postgres.py",               # dr_restore.py 가 부른다(ops 안에서 체인)
   "batch_issue_reviewer_tokens.py",   # setup_console_test_login.py 를 여러 명분 한 번에 돌린다(이상민 요청#3)
   "calibrate_classifier.py",          # 운영자가 학습 후 수동으로 돌리는 온도 보정 도구
+  "check_expert_review_readiness.py", # 지재원 전문가 검수 공개 전, 적재 원장·계정·블라인드 상태를 read-only 점검
   "compare_proxy_models.py",          # 프록시 모델 비교 CLI(라이브러리 함수는 자기 스크립트 존재만 확인, api·worker 미호출)
   "db_engine.py",                     # dr_restore.py 가 부른다(ops 안에서 체인)
   "demo_e2e_8010.py",                 # OPERATION.md §8 시연 스크립트
@@ -173,9 +180,9 @@ paths = ["src/koipa/api/static/samples/", "src/koipa/four_path_shadow.py"]
 
 # ── 고객사 전용 이미지(Dockerfile.api.customer·Dockerfile.worker.customer) ──────
 [container.customer_exclude]
-# [2026-10-07 KL 요청] "고객사 PC(문서 분류)에는 지재원 전용(합성 문서 생성·학습) 코드가
-# 설정으로 꺼진 채로가 아니라 물리적으로 없어야 한다"는 지적에 대한 2차 방어선(1차=
-# enable_synthetic_generation 플래그, app.py). check_deploy_manifest.py --write 가 이 목록으로
+# 고객사 PC에는 분류·활성학습 신호 수집만 남긴다. 지재원 GPU의 전문가 검수·합성 문서 생성·
+# 모델 학습·성능 보고 코드는 설정으로 꺼진 채가 아니라 물리적으로 없어야 한다. 이는
+# app.py의 프로파일 가드에 이은 2차 방어선이며, check_deploy_manifest.py --write 가 이 목록으로
 # 두 Dockerfile의 `RUN rm -f` 블록을 생성한다 — 손으로 그 블록을 고치지 않는다.
 #
 # [2026-10-09 정정] 위 2026-08-24 결정("golden.py 는 여기 넣지 않는다 — 고객사도 서명에
@@ -191,26 +198,32 @@ paths = ["src/koipa/api/static/samples/", "src/koipa/four_path_shadow.py"]
 # 뷰 하나뿐이고, locked_eval.jsonl 은 검수 화면이 아니라 설치 패키지에 미리 구워 넣은 스냅샷
 # 파일로 공급한다(아래 [bundle.*] 참고).
 #
-# api/training.py·services/training_service.py는 여기 넣지 않는다 — 고객사 야간 증분
-# 재학습이 그대로 쓰는 공유 코드다. 지재원 전용 전체학습·URGENT 자동재학습
-# (enable_training 단독 게이트)은 workers/tasks.py 안에 고객사 공유 함수와 같은 파일로
-# 섞여 있어 파일 단위로 뺄 수 없다 — 기존 플래그 게이트가 유일한 분리선이다(2026-10-07 조사,
-# Explore 트레이스로 확인).
+# workers/tasks.py에는 활성학습 평가·분류 태스크와 학습 태스크가 함께 정의돼 있어 남긴다.
+# 그러나 고객사 프로파일은 학습 플래그를 fail-fast로 막고, 학습 모듈·API·서비스는 아래에서
+# 제거한다. 따라서 외부 큐에 남은 학습 메시지가 있어도 import·실행될 수 없다.
 #
 # 실제 import 그래프(런타임 reachability)로 구했다 — grep 으로 찾으면 간접 참조를 놓친다
 # (golden_build_service.py 가 scripts/analyze_golden_run.py 를 sys.path 로 끌어오는 식의
 # 숨은 경로가 실제로 있었다, 2026-10-03 ops 이미지 분리 때의 교훈을 재확인).
 paths = [
+  "src/koipa/api/_training_report_pdf.py",
   "src/koipa/api/golden.py",
   "src/koipa/api/synthesis.py",
+  "src/koipa/api/training.py",
   "src/koipa/dataset_leakage.py",
   "src/koipa/modules/m1_synthesis/__init__.py",
   "src/koipa/modules/m1_synthesis/generation_playbook.py",
   "src/koipa/modules/m1_synthesis/generator.py",
   "src/koipa/modules/m1_synthesis/witness_taxonomy.py",
+  "src/koipa/modules/m4_training/__init__.py",
+  "src/koipa/modules/m4_training/chunk_expand.py",
+  "src/koipa/modules/m4_training/trainer.py",
+  "src/koipa/proxy_training_finalization.py",
   "src/koipa/schemas/synthesis.py",
+  "src/koipa/schemas/training.py",
   "src/koipa/services/synth_coverage.py",
   "src/koipa/services/synth_provider_status.py",
   "src/koipa/services/synth_quality.py",
   "src/koipa/services/synthesis_service.py",
+  "src/koipa/services/training_service.py",
 ]

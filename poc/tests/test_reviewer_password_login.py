@@ -69,6 +69,20 @@ def test_correct_password_logs_in_and_sets_cookie(client: TestClient):
     assert r.status_code == 200, r.text
     assert r.json()["username"] == "reviewer-01"
     assert "koipa_access_token" in r.cookies
+    set_cookie = r.headers["set-cookie"].lower()
+    assert "httponly" in set_cookie
+    assert "samesite=lax" in set_cookie
+
+
+def test_password_login_marks_cookie_secure_behind_https_proxy(client: TestClient):
+    rc.set_password("reviewer-01", "correct-horse-battery")
+    r = client.post(
+        f"{API}/golden/candidates/login",
+        headers={"X-Forwarded-Proto": "https"},
+        json={"username": "reviewer-01", "password": "correct-horse-battery"},
+    )
+    assert r.status_code == 200, r.text
+    assert "secure" in r.headers["set-cookie"].lower()
 
 
 def test_wrong_password_rejected_401(client: TestClient):

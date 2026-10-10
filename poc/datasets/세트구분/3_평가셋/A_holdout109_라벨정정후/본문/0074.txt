@@ -1,0 +1,3 @@
+RLHF reward model weight handover
+
+Foundation-model RLHF reward model weights, preference data sampling rule, safety-tuning failure cases, and restricted release procedure.

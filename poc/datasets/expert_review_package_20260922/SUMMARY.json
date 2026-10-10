@@ -1,0 +1,41 @@
+{
+  "total": 1584,
+  "by_batch": {
+    "golden_sealed_untouched": 200,
+    "fs7_train_loss": 963,
+    "eval_dev_never_trained": 354,
+    "fs7_val_holdout": 67
+  },
+  "by_batch_grade": {
+    "golden_sealed_untouched": {
+      "TS": 50,
+      "S2": 50,
+      "S3": 50,
+      "S1": 50
+    },
+    "fs7_train_loss": {
+      "S3": 205,
+      "S1": 305,
+      "S2": 243,
+      "TS": 210
+    },
+    "eval_dev_never_trained": {
+      "TS": 87,
+      "S2": 84,
+      "S3": 84,
+      "S1": 99
+    },
+    "fs7_val_holdout": {
+      "S1": 23,
+      "S3": 14,
+      "TS": 14,
+      "S2": 16
+    }
+  },
+  "note": {
+    "fs7_train_loss": "모델 학습 손실에 직접 쓴 문서 — 검수 결과는 라벨 품질 검증용, 모델 성능(재현율·미탐율) 계산에 재사용 금지",
+    "fs7_val_holdout": "체크포인트 선택에만 영향 — 위와 같이 조심해서 다룰 것",
+    "eval_dev_never_trained": "모델 학습에 전혀 안 씀 — 검수 결과를 그대로 골든셋(평가 정답)으로 승격 가능",
+    "golden_sealed_untouched": "우리도 아직 안 연 문서 — 가장 깨끗한 골든셋 후보"
+  }
+}

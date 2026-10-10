@@ -27,7 +27,29 @@ info:
     ⓑ(KL 포털 통합)를 전제로 진행 중이며, 현재 콘솔은 그때까지의 과도기 화면이다.
     따라서 `golden`·`admin` 계열 경로는 그 화면이 쓰는 것으로 KL 연동 대상이 아니다.
 
-    인증: API Key (서버 간 통신) + 선택적 JWT (관리자 행위 추적)
+    ## 인증 배포 모드
+
+    기본 `AUTH_MODE=api_key` 는 `X-API-Key` 를 검증한다. `jwt` 는 RS256 Bearer JWT만,
+    `both` 는 둘 중 하나를 받는다. 이 명세의 전역 security 는 이 세 모드에서 가능한 두
+    자격증명을 **대안**으로 표시한다.
+
+    KL AI 엔진이 외부에 노출되지 않는 폐쇄망 VM에서만 `AUTH_MODE=none` 을 선택할 수 있다.
+    이 모드에서는 API Key/JWT 검증을 생략하므로 요청에 인증 헤더를 보내지 않는다. 단,
+    `API_KEY_ROLE` 은 계속 서버가 부여하는 역할 상한이다. 예를 들어 `system` 은 관리자
+    경로를 호출할 수 없고, 관리자 작업에는 `admin` 또는 해당 경로가 허용하는 역할이
+    필요하다. 인증을 끈다고 관리자 권한이 자동 부여되지는 않는다. 인터넷·공유망·불명확한
+    프록시 경로에서는 `none` 을 사용하면 안 된다.
+
+    전문가 검수 콘솔의 개인 로그인 쿠키는 위 서버간 AI API 인증 설정과 별개다. 검수자의
+    개인 책임 이력을 위해 콘솔 로그인/JWT 설정은 `AUTH_MODE=none` 선택 시에도 유지한다.
+
+    ## 배포 프로파일별 경로 가용성
+
+    `training` 및 모델 관리(`/train*`, `/admin/model/*`) 경로는 지재원 GPU의
+    `full-train` 프로파일에서만 등록된다. 고객사 `onprem-local` 프로파일에서는 해당 경로가
+    존재하지 않아 404이며, `AUTH_MODE=none` 또는 `API_KEY_ROLE=admin`으로 바꿔도 만들거나
+    호출할 수 없다. 인증·역할은 **등록된 경로의 권한**만 결정한다.
+
     모든 응답은 application/json. 파일 업로드는 multipart/form-data.
     날짜·시각은 ISO 8601 UTC. 모든 ID는 UUIDv4.
 
@@ -52,6 +74,7 @@ servers:
 
 security:
   - ApiKeyAuth: []
+  - BearerAuth: []
 
 tags:
   - name: classify
@@ -505,7 +528,9 @@ paths:
       tags: [training]
       summary: 모델 학습·재학습 트리거
       description: |
-        스케줄 또는 KL 관리자 수동 트리거. 진행 상태는 /train/jobs/{id}로 폴링.
+        지재원 GPU `full-train` 프로파일 전용의 스케줄 또는 관리자 수동 트리거. 진행 상태는
+        /train/jobs/{id}로 폴링한다. 고객사 `onprem-local`에서는 이 라우터 자체가 등록되지
+        않아 404이며, 인증 모드나 역할을 바꿔도 사용할 수 없다.
       requestBody:
         required: true
         content:
@@ -601,10 +626,12 @@ paths:
       tags: [training]
       summary: 모델 성능 리포트(정확도·정밀도·재현율·F1·혼동행렬, 활성 모델 대비 비교)
       description: |
-        파인튜닝 완료 모델의 저장된 지표(ModelVersion.metrics)를 꺼낸다. 활성(배포) 모델이
-        따로 있으면 그 모델 대비 정확도·F1·미탐율 증감을 함께 돌려준다(파인튜닝 전후 비교).
-        format=csv 이면 같은 내용을 CSV로 내려받는다. 에폭별 손실 추이·PDF 내보내기는
-        아직 없다(에폭 단위 이력을 저장하는 자리가 없음 — 별도 작업 필요).
+        지재원 GPU `full-train` 프로파일 전용. 파인튜닝 완료 모델의 저장된 지표(ModelVersion.metrics)를
+        꺼낸다. 활성(배포) 모델이 따로 있으면 그 모델 대비 정확도·F1·미탐율 증감을 함께 돌려준다
+        (파인튜닝 전후 비교). 고객사 `onprem-local`에는 이 라우터가 등록되지 않아 404다.
+        format=csv·pdf 이면 각각 같은 저장 지표를 내려받는다. 손실 곡선은 학습 시 저장된 경우에만
+        포함하며, 과거 모델처럼 이력이 없으면 `learning_curve=[]`, `learning_curve_status=not_recorded`로
+        명시한다. 서버가 빈 과거 이력으로 곡선을 추정하지 않는다.
       parameters:
         - in: path
           name: version_label
@@ -612,10 +639,10 @@ paths:
           schema: { type: string, example: v-24c7c02c }
         - in: query
           name: format
-          schema: { type: string, enum: [json, csv], default: json }
+          schema: { type: string, enum: [json, csv, pdf], default: json }
       responses:
         '200':
-          description: 모델 성능 리포트(JSON) 또는 CSV 파일
+          description: 모델 성능 리포트(JSON·CSV·PDF)
           content:
             application/json:
               schema:
@@ -637,6 +664,19 @@ paths:
                     type: array
                     items: { type: array, items: { type: integer } }
                   classification_report: { type: string }
+                  learning_curve_status:
+                    type: string
+                    enum: [recorded, not_recorded]
+                  learning_curve:
+                    type: array
+                    description: 저장된 학습 손실 이력. 없으면 빈 배열이며 추정값을 만들지 않는다.
+                    items:
+                      type: object
+                      properties:
+                        epoch: { type: number, nullable: true }
+                        step: { type: integer, nullable: true }
+                        train_loss: { type: number, nullable: true }
+                        eval_loss: { type: number, nullable: true }
                   compared_to_active:
                     type: object
                     nullable: true
@@ -652,6 +692,8 @@ paths:
                       fnr_overall_delta: { type: number, nullable: true, description: "음수=개선(미탐 감소)" }
                   raw_metrics: { type: object, additionalProperties: true }
             text/csv:
+              schema: { type: string, format: binary }
+            application/pdf:
               schema: { type: string, format: binary }
         '404':
           description: 해당 모델 버전 없음
@@ -948,9 +990,12 @@ paths:
         않음) results[] 에 파일 순서대로 결과가 쌓인다. enqueue_classification=true 면
         성공적으로 적재된 문서 전체를 **하나의** POST /classify/batch(IF-08) 작업으로 묶어
         큐에 건다 — 분류 쪽 처리량·시간제한은 그 경로가 이미 보장한다.
-        한 요청의 파일 수는 documents_batch_max_files(기본 50)로 제한된다 — 파일 파싱(HWP/PDF/
-        DOCX 추출)이 요청 안에서 동기로 끝나야 doc_id 를 줄 수 있어, 상한을 높이면 이 요청
-        자체가 오래 걸린다(/classify/batch 의 1000건 상한은 이미 추출된 텍스트 기준이라 다르다).
+        한 요청의 파일 수는 documents_batch_max_files(기본 50)로 제한된다. 또한 multipart 안의
+        **실파일 바이트 합계**는 documents_batch_max_total_mb(기본 20 MiB)를 넘을 수 없다.
+        개별 파일의 max_upload_mb와 별개인 요청 단위 상한이며, 둘 중 하나라도 넘으면 파싱·저장·
+        분류 큐 적재 전에 413으로 거절된다. 파일 파싱(HWP/PDF/DOCX 추출)이 요청 안에서 동기로
+        끝나야 doc_id 를 줄 수 있어, 상한을 높이면 이 요청 자체가 오래 걸린다(/classify/batch 의
+        1000건 상한은 이미 추출된 텍스트 기준이라 다르다).
       requestBody:
         required: true
         content:
@@ -996,7 +1041,19 @@ paths:
                   classification_status: { type: string, nullable: true }
                   classification_status_url: { type: string, nullable: true }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '413': { description: "파일 1개가 max_upload_mb 초과, 또는 files 개수가 documents_batch_max_files 초과." }
+        '413':
+          description: "파일 수 초과, 또는 실파일 바이트 합계가 documents_batch_max_total_mb 초과. 합계 초과만 구조화 detail을 돌려준다."
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [detail]
+                properties:
+                  detail:
+                    oneOf:
+                      - type: string
+                        description: files 개수 초과 등 기존 413 사유
+                      - $ref: '#/components/schemas/DocumentBatchTotalLimitError'
         '422': { description: "actor JSON 오류, files 가 비었음, 또는 client_request_ids 길이가 files 와 다름." }
         '500': { $ref: '#/components/responses/InternalError' }
 
@@ -1454,6 +1511,7 @@ paths:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: 활성 모델 핫리로드
+      description: 지재원 GPU `full-train` 프로파일 전용. 고객사 `onprem-local`에는 등록되지 않아 404다.
       responses:
         '200':
           description: 리로드 결과
@@ -1467,6 +1525,7 @@ paths:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: 특정 ModelVersion 수동 활성화
+      description: 지재원 GPU `full-train` 프로파일 전용. 고객사 `onprem-local`에는 등록되지 않아 404다.
       requestBody:
         required: true
         content:
@@ -2008,6 +2067,26 @@ paths:
               schema: { type: string }
         '401': { description: "포털 JWT 쿠키 필요 — login.html 경유" }
 
+  /golden/reviewers:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [golden]
+      summary: 배정 가능한 활성 검수자 계정 목록 (관리자 전용)
+      description: >-
+        전문가 검수 20x50 배정 계획에 넣을 수 있는 활성 reviewer 계정 ID와 역할만 반환한다.
+        비밀번호, 해시, 세션 정보는 반환하지 않는다. 배정 계획 호출 전에 관리자 화면이
+        계정 명부를 검증하는 용도이며 admin 또는 kl_backend 권한이 필요하다.
+      responses:
+        '200':
+          description: 활성 검수자 계정 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/GoldenReviewerRosterEntry' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /golden/assignments:
     get:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
@@ -2108,6 +2187,35 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { description: "대상이 없거나 둘 다 있음 · 존재하지 않는 doc_id/배치 · 본문에 허용되지 않는 필드" }
+
+  /golden/assignments/expert-review-plan:
+    post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [golden]
+      summary: 전문가 20명에게 검수 배치 1,000건을 50건씩 원자 배정
+      description: >-
+        전문가 검수 회차를 개시하는 전용 경로다. 검수 배치가 정확히 1,000건이고 서로 다른
+        20명에게 문서가 중복 없이 정확히 50건씩 배정될 때만 원장을 쓴다. 일반
+        /golden/assignments 배치 배정과 달리, 20x50이라는 운영 조건을 서버가 강제한다.
+        GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1 및 GOLDEN_REVIEW_BLIND_ENFORCED=1 이 모두
+        아니면 409 이며, 기존과 완전히 같은 계획을 재호출하면 원장을 바꾸지 않고
+        already_applied=true 로 응답한다. actor_id 는 요청 본문이 아니라 인증 컨텍스트에서
+        확정된다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoldenExpertReviewPlanRequest' }
+      responses:
+        '201':
+          description: 정확한 20x50 배정 계획이 원장에 기록됨(또는 동일 기존 계획 확인)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoldenExpertReviewPlanResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: "배정 강제 또는 블라인드 강제가 켜져 있지 않음" }
+        '422': { description: "배치가 정확히 1,000건이 아님 · 검수자가 서로 다른 20명이 아님 · 기존 배정과 충돌" }
 
   /golden/assignments/revoke:
     post:
@@ -2520,8 +2628,33 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: AUTH_MODE=jwt 또는 both일 때만 허용되는 RS256 JWT. iss·aud·exp 검증을 통과해야 한다.
 
   schemas:
+    DocumentBatchTotalLimitError:
+      type: object
+      required: [code, message, total_file_bytes, max_total_file_bytes]
+      description: POST /documents/batch의 실파일 바이트 합계 상한 초과 detail
+      properties:
+        code:
+          type: string
+          enum: [KOIPA_DOCUMENT_BATCH_TOTAL_TOO_LARGE]
+        message:
+          type: string
+          enum: [total uploaded file bytes exceed documents_batch_max_total_mb]
+        total_file_bytes:
+          type: integer
+          minimum: 0
+          description: 상한을 넘긴 시점까지 읽은 실파일 바이트 합계
+        max_total_file_bytes:
+          type: integer
+          minimum: 1
+          description: documents_batch_max_total_mb를 바이트로 환산한 요청 상한
+
     DocumentUploadResponse:
       type: object
       required: [doc_id, filename, source_format, file_hash, file_size_bytes, extraction_method,
@@ -2583,6 +2716,73 @@ components:
         order: { type: integer, description: "높을수록 높은 등급" }
         description: { type: string }
         color: { type: string, example: "#D32F2F" }
+
+    GoldenExpertReviewPlanRequest:
+      type: object
+      additionalProperties: false
+      required: [review_batch, reviewer_ids]
+      properties:
+        review_batch:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: 정확히 1,000건인 전문가 검수 배치 식별자. 공백만은 허용하지 않는다.
+        reviewer_ids:
+          type: array
+          minItems: 20
+          maxItems: 20
+          uniqueItems: true
+          description: 서로 다른 전문가 20명의 포털 sub/검수자 ID. 각자 정확히 50건을 받는다.
+          items:
+            type: string
+            minLength: 1
+        reason:
+          type: string
+          maxLength: 1000
+          default: ""
+          description: 배정 원장에 남길 개시 사유
+
+    GoldenExpertReviewPlanResponse:
+      type: object
+      required: [review_batch, reviewer_count, documents_per_reviewer, total_documents,
+                 actor_id, events_written, assignment_group_id, already_applied,
+                 reviewer_document_counts]
+      properties:
+        review_batch: { type: string }
+        reviewer_count: { type: integer, example: 20 }
+        documents_per_reviewer: { type: integer, example: 50 }
+        total_documents: { type: integer, example: 1000 }
+        actor_id:
+          type: string
+          description: 서버가 인증 컨텍스트에서 확정한 배정 관리자
+        events_written:
+          type: integer
+          description: 이번 호출이 새로 쓴 append-only 배정 원장 행 수. 동일 계획 재호출이면 0이다.
+        assignment_group_id:
+          type: string
+          description: 한 번의 정확한 20x50 배정 묶음을 식별하는 원장 그룹 ID
+        already_applied:
+          type: boolean
+          default: false
+          description: 동일한 정확 배정이 이미 존재하여 원장을 변경하지 않았으면 true
+        reviewer_document_counts:
+          type: object
+          description: 검수자 ID별 현재 정확 배정 문서 수. 성공한 계획은 모든 값이 50이다.
+          additionalProperties:
+            type: integer
+
+    GoldenReviewerRosterEntry:
+      type: object
+      required: [reviewer_id, roles]
+      description: 배정 UI에만 제공하는 비밀 없는 활성 검수자 계정 정보
+      properties:
+        reviewer_id:
+          type: string
+          description: 활성 reviewer 계정 ID
+        roles:
+          type: array
+          description: 계정에 부여된 역할 목록
+          items: { type: string }
 
     Actor:
       type: object

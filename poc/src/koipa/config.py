@@ -9,7 +9,7 @@
 - DEPLOY_PROFILE 한 줄로 4-tier 납품 모드 전환:
     lite-noapi    : GPU·외부 API 모두 없음 (noop LLM + hash embedding + inmemory + 학습 OFF)
     lite-cloud    : GPU 없음, 외부 LLM 사용 (anthropic/openai + KURE/hash + PG + 학습 OFF)
-    onprem-local  : GPU 보유, 폐쇄망 (local_openai/ollama + KURE/BGE + PG + 로컬FS저장 + 학습 OFF)
+    onprem-local  : 고객사 PC, 폐쇄망 (분류·활성학습만; 학습·검수·생성·성능보고 OFF)
     full-train    : 풀스펙 (자유 + KURE/BGE + PG + 로컬FS저장 + 학습 ON, KOIPA 풀스펙 대상)
 프로파일은 미설정 키에만 default를 채움 — 사용자가 .env로 명시한 값은 항상 우선.
 """
@@ -123,12 +123,9 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "deploy_gate_first_deploy_fnr_high_max": 0.10,
         # 데모 콘솔·파괴적 purge 비활성(고객사 운영 — 시연 표면/물리삭제 엔드포인트 미노출).
         "demo_console_enabled": False,
-        # [고객사 학습 결정 2026-07] 야간 증분 재학습 ON — 고객사 현장서 사람검수 교정을 기존
-        # 학습셋에 섞어 CPU 풀 파인튜닝을 야간 배치로 무인 실행(cpu-incremental-retrain-measured).
-        # enable_training(지재원 URGENT 자동재학습 경로)과 별개 축: 이 플래그는 nightly 스케줄만
-        # 발화시키고 URGENT 드리프트 자동재학습(30분틱)은 켜지 않는다(죽음의 나선 보수). 재학습본은
-        # 후보로만 등록되고 자동 서빙 안 됨 — 활성화는 여전히 사람서명 locked-eval/감사 force 필요.
-        "enable_incremental_retrain": True,
+        # 고객사 PC는 분류·활성학습 신호 수집만 수행한다. 모델 학습·재학습·성능보고는
+        # 지재원 full-train 노드만 수행한다.
+        "enable_incremental_retrain": False,
         # [고객사 관리자 콘솔] 거버넌스 콘솔(검수→재학습→활성화) 서빙 ON. demo_console_enabled와
         # 분리 — 파괴적 purge/데모 SPA는 계속 OFF(위), 관리 UI만 노출. 모든 쓰기는 RBAC 보호.
         "serve_admin_console": True,
@@ -208,12 +205,9 @@ class Settings(BaseSettings):
     # False면 /api/v1/training/* 라우터 등록 자체 skip (OpenAPI에서 사라짐).
     enable_training: bool = False
 
-    # [고객사 야간 증분 재학습] enable_training과 별개 축. onprem-local(고객사)에서 True 로,
-    # 야간 beat 스케줄(nightly_incremental_retrain_tick)이 교정-병합 학습셋으로 재학습을 발화
-    # 시킨다. enable_training 이 여는 URGENT 드리프트 자동재학습(active_learning 30분틱)은 여전히
-    # enable_training 노드(지재원)에서만 — 이 플래그는 통제된 야간 배치만 켜 죽음의 나선을 보수한다.
-    # 학습 라우터(/train) 등록·train_classifier_task 실행은 (enable_training OR 이 플래그)로 허용.
-    # 재학습본은 후보 등록만 — 자동 서빙 안 됨(활성화는 사람서명 locked-eval/감사 force 불변).
+    # 증분 재학습은 지재원 full-train 노드에서만 허용하는 레거시/운영 스위치다. 고객사
+    # onprem-local은 분류·활성학습 신호 수집 전용이므로 이 값을 True로 설정할 수 없다.
+    # 학습 라우터(/train) 등록은 enable_training으로만 결정한다.
     enable_incremental_retrain: bool = False
 
     # 데모 콘솔(/demo SPA + POST /admin/demo/purge 물리삭제) 노출 여부. 데모/파일럿(lite-*)만 True,
@@ -623,6 +617,10 @@ class Settings(BaseSettings):
     fnr_rule_s1_threshold: float = 2.2
     fnr_rule_s2_threshold: float = 1.6
 
+    # 운영 콘솔에서 FNR을 주의 색으로 표시할 경계. 배포·자동확정 정책이나 안전 게이트가
+    # 아니며, 화면이 독자적으로 5%를 정책처럼 해석하지 않도록 서버가 함께 내려 준다.
+    metrics_fnr_warning_threshold: float = 0.05
+
     # 청크 집계에서 most-severe-wins(max-pooling)를 적용할 고등급 코드.
     # 이 등급들은 청크 평균이 아니라 가장 강한 청크로 잡아 한 단락의 비밀 신호가 희석되어
     # 미탐되는 것을 막는다. 기본 TS·S1 — S2·S3는 표준(길이가중) 집계(S2→S3 희석은 고등급
@@ -1028,6 +1026,15 @@ class Settings(BaseSettings):
     # 줄어든 채로 재현한다. 보수적으로 작게 시작한다(필요하면 조정).
     documents_batch_max_files: int = 50
 
+    # POST /documents/batch 의 업로드 파일 **합계** 상한. 파일 하나의 상한
+    # (max_upload_mb)과 별개로, 작은 파일 50개를 한 요청에 넣어 메모리·동기 추출
+    # 작업을 과점유하는 것을 막는다. 이 값은 multipart 경계/폼 필드를 제외한
+    # 실제 파일 바이트의 합계이며, 초과하면 413과 상한·관측 합계를 반환한다.
+    #
+    # 기본 20MB는 전역 요청 본문 상한(기본 25MB)보다 작아 multipart 오버헤드까지
+    # 수용한다. 이 값을 올릴 때는 MAX_REQUEST_BODY_MB도 함께 더 크게 잡아야 한다.
+    documents_batch_max_total_mb: int = 20
+
     # [2026-10-06] KL 요청 — 등록 시스템과 같은 VM에서 돈다는 전제로, 파일을 업로드하지
     # 않고 "이 경로에 이미 있는 파일을 읽어라"로 등록. 비워두면(기본) 기능 자체가 꺼진다
     # (file_path 를 보내도 422) — 반드시 호출측 저장소가 실제로 이 컨테이너에 마운트된
@@ -1120,7 +1127,7 @@ class Settings(BaseSettings):
         return v
 
     # 2) 양수/음수 제약 — 풀·업로드·청크·시퀀스·타임리밋 등.
-    @field_validator("db_pool_size", "max_upload_mb", "max_request_body_mb", "chunk_size", "max_seq_len",
+    @field_validator("db_pool_size", "max_upload_mb", "max_request_body_mb", "documents_batch_max_total_mb", "chunk_size", "max_seq_len",
                      "regulation_max_sentences", "regulation_active_max")
     @classmethod
     def _check_ge_one(cls, v: int, info) -> int:  # noqa: ANN001
@@ -1363,6 +1370,14 @@ def apply_profile_defaults(s: Settings) -> dict[str, str]:
             continue
         setattr(s, field, default)
         sources[field] = "profile"
+    # KL 배포 토폴로지 계약: 고객사 PC에는 분류와 활성학습 신호 수집만 둔다.
+    # 모델 학습·성능 보고·전문가 검수·모의문서 생성은 full-train(지재원 GPU) 전용이다.
+    # 일반 프로파일의 "명시값 우선" 원칙보다 이 물리 이미지 경계가 우선한다.
+    if profile == "onprem-local" and (s.enable_training or s.enable_incremental_retrain):
+        raise ValueError(
+            "onprem-local is classification/active-learning only; "
+            "training and incremental retraining require DEPLOY_PROFILE=full-train"
+        )
     sources["_profile"] = profile
     sources["_status"] = "ok"
     return sources
@@ -1529,6 +1544,17 @@ def assert_production_credentials() -> None:
         raise RuntimeError(
             f"production 모드인데 필수 자격증명 누락: {', '.join(missing)}. "
             ".env / 환경변수 / secrets_manager(Vault·AWS SM)로 설정 필요."
+        )
+
+    # 인증을 생략하는 KL 연계 경로는 사람 권한을 대신할 수 없다. none 모드의 fallback
+    # 역할을 admin/reviewer로 두면 쿠키·API 키가 전혀 없는 요청도 고권한 API를 호출할 수
+    # 있다. 검수 콘솔은 JWT cookie가 있으면 그 신원을 우선 사용하므로, 여기서는 서버간
+    # 최소권한(system/kl_backend)만 허용한다.
+    if settings.auth_mode.lower() == "none" and settings.api_key_role.lower() not in {"system", "kl_backend"}:
+        raise RuntimeError(
+            "SECURITY: AUTH_MODE=none 은 사람 권한을 부여할 수 없습니다. "
+            "API_KEY_ROLE 은 system 또는 kl_backend만 허용됩니다. 전문가 검수·관리자 콘솔은 "
+            "AUTH_MODE=jwt/both 와 개인 JWT 로그인을 사용하세요."
         )
 
     # [공급망] 운영에서 모델을 허브에서 즉석으로 받아오면, 같은 이름이 다른 가중치를 가리켜도

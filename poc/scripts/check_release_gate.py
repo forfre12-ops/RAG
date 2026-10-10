@@ -28,6 +28,14 @@ import json
 import os
 from pathlib import Path
 
+try:
+    from _cli_io import force_utf8_stdio
+except ImportError:  # package import in tests/release checks
+    from scripts._cli_io import force_utf8_stdio
+
+
+force_utf8_stdio()
+
 # Gate statuses a PILOT (--allow-conditional) release is permitted to waive.
 # Everything else — notably FAIL, and any unrecognised status — is a hard blocker.
 _WAIVABLE = {"BLOCKED"}

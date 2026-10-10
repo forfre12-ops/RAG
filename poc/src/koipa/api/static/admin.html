@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>한국지식재산보호원 | 관리자 콘솔</title>
-<meta name="description" content="루프 A(분류 → 검수·확정)와 루프 B(검증문서 → 검수·서명 → 재학습 → 배포 → 메트릭)를 탭으로 나눈 관리자 콘솔. 기존 /api/v1 엔드포인트를 그대로 호출합니다." />
+<meta name="description" content="검증 문서 검토, 분류 정책, 학습·평가 상태와 감사 기록을 확인하는 운영 콘솔입니다. 기존 /api/v1 엔드포인트를 그대로 호출합니다." />
 <style>
 :root{
   --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
@@ -385,6 +385,7 @@ body{background:var(--ui-canvas);color:var(--ui-ink);}
 .console-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
 .console-meta .meta-chip{padding:5px 9px;border:1px solid var(--ui-line);border-radius:999px;background:#fff;font:700 11px var(--font-mono);color:var(--ui-muted);}
 .console-meta .meta-chip strong{color:var(--ui-navy);}
+.console-meta .meta-chip select{width:auto;max-width:250px;margin-left:5px;padding:2px 20px 2px 5px;border:0;background:transparent;color:var(--ui-navy);font:700 11px var(--font-mono);box-shadow:none;}
 
 /* V2 views own navigation; legacy tabs remain in the DOM to preserve existing controls. */
 .loopwrap,.tabbar,.pane-note{display:none;}
@@ -472,7 +473,36 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .document-sheet h2{margin:15px 0 8px;color:var(--ui-navy);font-size:25px;letter-spacing:-.04em;line-height:1.3;}
 .document-sheet .doc-meta{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 25px;}
 .document-sheet .doc-meta span{padding:4px 7px;border:1px solid var(--ui-line);border-radius:5px;color:var(--ui-muted);font:10px var(--font-mono);}
-.document-sheet .doc-copy{white-space:pre-wrap;color:#334155;font-size:13px;line-height:1.9;}
+.document-sheet .doc-copy{color:#334155;font-size:13px;line-height:1.9;}
+.document-sheet .doc-copy p{white-space:pre-wrap;margin:0 0 15px;}
+.document-sheet .doc-copy h3{margin:24px 0 9px;color:var(--ui-navy);font-size:15px;line-height:1.45;}
+.document-sheet .doc-table{width:100%;margin:18px 0 22px;border-collapse:collapse;font-size:12px;line-height:1.55;white-space:normal;}
+.document-sheet .doc-table th,.document-sheet .doc-table td{padding:8px 9px;border:1px solid var(--ui-line);vertical-align:top;text-align:left;}
+.document-sheet .doc-table th{background:#f5f7fb;color:var(--ui-navy);font-weight:800;}
+.wb-decision{display:grid;gap:10px;}
+.wb-decision-note,.wb-decision-message{margin:0;color:var(--ui-muted);font-size:11px;line-height:1.5;}
+.wb-decision-message{color:#1d4ed8;min-height:16px;}
+.wb-decision-field{display:grid;gap:5px;color:var(--ui-ink);font-size:11px;font-weight:750;}
+.wb-decision-field select,.wb-decision-field textarea{width:100%;font:400 12px var(--font-sans);}
+.wb-decision-field textarea{min-height:76px;resize:vertical;}
+.wb-decision-facts{padding:9px;border:1px solid var(--ui-line-soft);border-radius:8px;background:#fff;}
+.wb-decision-facts summary{cursor:pointer;color:var(--ui-navy);font-size:11px;font-weight:800;}
+.wb-decision-facts p{margin:8px 0;color:var(--ui-muted);font-size:10.5px;line-height:1.5;}
+
+/* 검수자 배정·진행 */
+.expert-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:18px;}
+.expert-panel{padding:20px;border:1px solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-panel);box-shadow:var(--ui-shadow);}
+.expert-panel h3{margin:0 0 8px;color:var(--ui-navy);font-size:15px;}
+.expert-note{margin:0 0 14px;color:var(--ui-muted);font-size:12px;line-height:1.65;}
+.expert-field{display:grid;gap:6px;margin:13px 0;color:var(--ui-ink);font-size:12px;font-weight:750;}
+.expert-field span{color:var(--ui-muted);font-size:10.5px;font-weight:500;}
+.expert-field textarea,.expert-field input,.expert-field select{width:100%;font:400 12px var(--font-sans);}
+.expert-field textarea{resize:vertical;}
+.expert-message{min-height:19px;margin:10px 0 0;color:#1d4ed8;font-size:12px;line-height:1.5;}
+.expert-assignment-list{display:grid;gap:7px;margin-top:12px;}
+.expert-assignment-row{display:grid;grid-template-columns:minmax(110px,1fr) auto;gap:10px;align-items:center;padding:10px 11px;border:1px solid var(--ui-line-soft);background:#fbfcfe;font-size:12px;}
+.expert-assignment-row small{display:block;margin-top:3px;color:var(--ui-muted);font-size:10.5px;}
+@media(max-width:900px){.expert-grid{grid-template-columns:1fr;}}
 .document-sheet .doc-empty{padding:44px 12px;text-align:center;color:var(--ui-muted);font-size:13px;}
 .inspector-tabs{display:flex;padding:10px 12px 0;gap:5px;border-bottom:1px solid var(--ui-line-soft);}
 .inspector-tabs button{appearance:none;border:0;border-bottom:2px solid transparent;background:transparent;padding:7px 5px 9px;color:var(--ui-muted);cursor:pointer;font:700 11px var(--font-sans);}
@@ -491,6 +521,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 @media(max-width:760px){
   .top{height:64px;}.wrap{padding:14px 12px 90px;}.lede-row{align-items:flex-start;flex-direction:column;margin-bottom:14px;}.console-meta{justify-content:flex-start}.metrics-grid{grid-template-columns:1fr 1fr;}.grade-rows{grid-template-columns:62px repeat(4,minmax(42px,1fr));gap:4px;}.grade-number{padding:7px 3px;font-size:12px;}.category-panel{overflow:auto}.category-table{min-width:620px}.workbench{display:block;height:auto;min-height:0;overflow:visible;}.workbench-handle{display:none}.workbench-drawer,.workbench-canvas,.workbench-inspector{display:block;max-height:none;border:0;border-bottom:1px solid var(--ui-line-soft);}.workbench-canvas{min-height:480px;padding:14px;}.document-sheet{padding:30px 24px;}.workbench-inspector{display:block;}.console-nav button{min-height:38px;padding:7px 9px;font-size:12px;}
 }
+@media(max-width:640px){
+  .top{height:auto;min-height:58px;padding:8px 12px;gap:7px;align-items:center;flex-wrap:wrap;}
+  .top .mark{width:30px;height:30px;}.top .brand-mark{width:28px;height:28px;padding:3px;}
+  .top .spacer{display:none;}.top .health-pill{margin-left:auto;font-size:11px;}.top .logout-link{padding:5px 8px;font-size:11.5px;}
+  .top .cnav{order:3;width:100%;overflow-x:auto;padding-bottom:1px;}
+}
 </style>
 <script src="./errors_ko.js"></script>
 <script src="./upload_progress.js"></script>
@@ -506,15 +542,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 <div class="wrap">
   <div class="console-layout">
     <aside class="console-sidebar" aria-label="관리자 콘솔 메뉴">
-      <div class="console-sidebar-kicker">KOIPA WORKSPACE</div>
+      <div class="console-sidebar-kicker">운영 작업공간</div>
       <nav class="console-nav" aria-label="관리자 작업 메뉴">
         <button type="button" class="active" data-product-nav="overview" onclick="showProductView('overview')"><span class="nav-icon">O</span>운영 개요</button>
-        <button type="button" data-product-nav="documents" onclick="showProductView('documents')"><span class="nav-icon">D</span>문서 · 판정</button>
-        <button type="button" data-product-nav="experts" onclick="showProductView('experts')"><span class="nav-icon">R</span>전문가 검수<span class="nav-count" id="reviewer-nav-count">—</span></button>
-        <button type="button" data-product-nav="policy" onclick="showProductView('policy')"><span class="nav-icon">P</span>정책 · 근거</button>
-        <button type="button" data-product-nav="models" onclick="showProductView('models')"><span class="nav-icon">M</span>모델 · 릴리스</button>
-        <button type="button" data-product-nav="audit" onclick="showProductView('audit')"><span class="nav-icon">A</span>감사 · 보고서</button>
-        <button type="button" data-product-nav="settings" onclick="showProductView('settings')"><span class="nav-icon">S</span>설정</button>
+        <button type="button" data-product-nav="documents" data-product-requires-golden="1" onclick="showProductView('documents')"><span class="nav-icon">D</span>검증 문서 검토·결정</button>
+        <button type="button" data-product-nav="experts" data-product-requires-golden="1" onclick="showProductView('experts')"><span class="nav-icon">R</span>검수자 배정·진행<span class="nav-count" id="reviewer-nav-count">—</span></button>
+        <button type="button" data-product-nav="policy" onclick="showProductView('policy')"><span class="nav-icon">P</span>분류 정책·참고 규정</button>
+        <button type="button" data-product-nav="models" onclick="showProductView('models')"><span class="nav-icon">M</span>학습·평가·릴리스</button>
+        <button type="button" data-product-nav="audit" onclick="showProductView('audit')"><span class="nav-icon">A</span>감사 기록</button>
+        <button type="button" data-product-nav="settings" onclick="showProductView('settings')"><span class="nav-icon">S</span>연결·운영 도구</button>
       </nav>
       <div class="console-sidebar-foot">문서·정책·모델 변경은 기존 권한과 감사 기록을 그대로 사용합니다.</div>
     </aside>
@@ -523,10 +559,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 
   <div class="lede-row">
     <div>
-      <h1 class="h1">AI 영업비밀 관리 콘솔</h1>
-      <p class="console-caption">문서 검수, 정책 근거, 모델 릴리스와 감사 기록을 하나의 운영 흐름으로 관리합니다.</p>
+      <h1 class="h1">영업비밀 분류·검수 운영 콘솔</h1>
+      <p class="console-caption">AI 보조 결과와 검수·정책·모델 운영 기록을 관리합니다. 최종 업무 결정은 승인 권한자의 절차에 따릅니다.</p>
     </div>
     <div class="console-meta" aria-label="운영 상태">
+      <label class="meta-chip" data-product-requires-golden="1" for="product-review-batch">검수 배치 <select id="product-review-batch" onchange="onProductReviewBatchChange()" aria-label="검수 배치"><option value="">불러오는 중</option></select></label>
       <span class="meta-chip">환경 <strong id="product-profile">확인 중</strong></span>
       <span class="meta-chip">마지막 갱신 <strong id="product-stamp">—</strong></span>
     </div>
@@ -538,30 +575,30 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
     <div class="console-view-head">
       <div>
         <h2 id="overview-heading" class="console-view-title">운영 개요</h2>
-        <p class="console-view-help">현재 검수 배치의 문서유형 분포와 검수 진행 상황을 확인합니다.</p>
+        <p id="overview-help" class="console-view-help">현재 검수 배치의 문서유형 분포와 검수 진행 상황을 확인합니다.</p>
       </div>
       <div class="console-view-actions">
         <button class="btn sec sm" type="button" onclick="loadProductOverview(true)">새로고침</button>
-        <button class="btn sm" type="button" onclick="showProductView('documents')">문서 작업대 열기</button>
+        <button class="btn sm" type="button" data-product-requires-golden="1" onclick="showProductView('documents')">문서 작업대 열기</button>
       </div>
     </div>
     <div class="overview-grid">
       <section class="overview-summary" aria-live="polite">
         <div class="overview-titleline">
-          <div><h2>검수 배치 현황</h2><p id="overview-scope">검수 배치를 불러오는 중입니다.</p></div>
-          <span class="category-status" id="overview-status">LOADING</span>
+          <div><h2 id="overview-summary-title">검수 배치 현황</h2><p id="overview-scope">검수 배치를 불러오는 중입니다.</p></div>
+          <span class="category-status" id="overview-status">조회 중</span>
         </div>
         <div id="overview-summary-body" class="overview-state" data-state="loading">문서 현황을 불러오는 중입니다.</div>
       </section>
       <aside class="overview-side">
         <h3>바로가기</h3>
-        <button class="quick-link" type="button" onclick="showProductView('documents')"><span>문서·판정 작업대</span><span>→</span></button>
-        <button class="quick-link" type="button" onclick="showProductView('experts')"><span>전문가 검수 운영</span><span>→</span></button>
-        <button class="quick-link" type="button" onclick="showProductView('models')"><span>모델·릴리스 현황</span><span>→</span></button>
+        <button class="quick-link" type="button" data-product-requires-golden="1" onclick="showProductView('documents')"><span>검증 문서 검토·결정 작업대</span><span>→</span></button>
+        <button class="quick-link" type="button" data-product-requires-golden="1" onclick="showProductView('experts')"><span>검수자 배정·진행</span><span>→</span></button>
+        <button class="quick-link" type="button" onclick="showProductView('models')"><span>학습·평가·릴리스 현황</span><span>→</span></button>
         <button class="quick-link" type="button" onclick="showProductView('audit')"><span>감사 기록 조회</span><span>→</span></button>
       </aside>
     </div>
-    <section class="category-panel" aria-labelledby="category-heading">
+    <section class="category-panel" data-product-requires-golden="1" aria-labelledby="category-heading">
       <div class="category-panel-head">
         <div><h2 id="category-heading">카테고리별 문서 지표</h2><p>문서유형을 누르면 해당 유형으로 문서 작업대를 엽니다.</p></div>
         <span class="category-status" id="category-batch-label">배치 확인 중</span>
@@ -571,10 +608,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
   </section>
 
   <!-- 기존 후보 API의 목록·상세만 사용한다. 신규 판정 API를 만들거나 등급을 추정하지 않는다. -->
-  <section id="product-documents" class="product-view" aria-labelledby="documents-heading">
+  <section id="product-documents" class="product-view" data-product-requires-golden="1" aria-labelledby="documents-heading">
     <div class="console-view-head">
-      <div><h2 id="documents-heading" class="console-view-title">문서 · 판정 작업대</h2><p class="console-view-help">좌우 패널 경계를 드래그해 문서함·본문·근거 영역의 폭을 조절할 수 있습니다.</p></div>
-      <div class="console-view-actions"><button class="btn sec sm" type="button" onclick="loadWorkbench(true)">목록 새로고침</button><a class="btn sm" href="/api/v1/golden/candidates/manage.html" target="_blank" rel="noopener">후보 관리 열기</a></div>
+      <div><h2 id="documents-heading" class="console-view-title">검증 문서 검토·결정 작업대</h2><p class="console-view-help">좌우 패널 경계를 드래그해 문서함·본문·결정 정보 영역의 폭을 조절할 수 있습니다.</p></div>
+      <div class="console-view-actions"><button class="btn sec sm" type="button" onclick="loadWorkbench(true)">목록 새로고침</button><button class="btn sm" type="button" onclick="focusWorkbenchDecision()">선택 문서 검토</button></div>
     </div>
     <div id="document-workbench" class="workbench" aria-live="polite">
       <aside class="workbench-drawer" id="wb-drawer">
@@ -584,14 +621,25 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
       <div class="workbench-handle" role="separator" aria-orientation="vertical" aria-label="문서함 너비 조절" data-resize="left"></div>
       <main class="workbench-canvas" id="wb-canvas"><article id="wb-document" class="document-sheet"><div class="doc-empty">왼쪽 문서함에서 문서를 선택하면 원문과 메타데이터를 표시합니다.</div></article></main>
       <div class="workbench-handle" role="separator" aria-orientation="vertical" aria-label="근거 패널 너비 조절" data-resize="right"></div>
-      <aside class="workbench-inspector" id="wb-inspector"><div class="workbench-pane-head"><h2>문서 인스펙터</h2><p>선택 문서의 등록 정보와 결정 이력</p></div><div class="inspector-tabs" role="tablist"><button type="button" class="active" data-inspector-tab="detail" onclick="showInspectorTab('detail')">상세</button><button type="button" data-inspector-tab="history" onclick="showInspectorTab('history')">이력</button></div><div id="wb-inspector-body" class="inspector-body"><div class="inspector-empty">문서를 선택하면 상세 정보가 표시됩니다.</div></div></aside>
+      <aside class="workbench-inspector" id="wb-inspector"><div class="workbench-pane-head"><h2>문서 결정 정보</h2><p>선택 문서의 등록 정보와 결정 이력</p></div><div class="inspector-tabs" role="tablist"><button type="button" class="active" data-inspector-tab="detail" onclick="showInspectorTab('detail')">상세</button><button type="button" data-inspector-tab="history" onclick="showInspectorTab('history')">이력</button></div><div id="wb-inspector-body" class="inspector-body"><div class="inspector-empty">문서를 선택하면 상세 정보가 표시됩니다.</div></div></aside>
+    </div>
+  </section>
+
+  <section id="product-experts" class="product-view" data-product-requires-golden="1" aria-labelledby="experts-heading">
+    <div class="console-view-head">
+      <div><h2 id="experts-heading" class="console-view-title">검수자 배정·진행</h2><p class="console-view-help">현재 검수 배치를 검수자 20명에게 50건씩 독립 배정하고 진행 상태를 확인합니다.</p></div>
+      <div class="console-view-actions"><button class="btn sec sm" type="button" onclick="loadExpertOperations()">배정 현황 새로고침</button><button class="btn sm" type="button" onclick="showProductView('documents')">검증 문서 작업대</button></div>
+    </div>
+    <div class="expert-grid">
+      <section class="expert-panel"><h3>배정 상태</h3><div id="expert-assignment-summary" class="overview-state" data-state="loading">배정 현황을 불러오는 중입니다.</div><div id="expert-assignment-list" class="expert-assignment-list"></div></section>
+      <section class="expert-panel"><h3>검수자 20명 × 50건 배정</h3><p class="expert-note">현재 검수 배치가 정확히 1,000건이고, 배정 강제와 블라인드 검수가 모두 켜진 경우에만 저장됩니다. 조건이 하나라도 다르면 서버가 원장을 쓰지 않고 사유를 돌려줍니다.</p><label class="expert-field" for="expert-reviewer-roster">배정 가능한 활성 검수자 <span>현재 이 서버에서 로그인 가능한 reviewer 계정만 표시합니다.</span><select id="expert-reviewer-roster" multiple size="7" aria-describedby="expert-roster-note"></select></label><button class="btn sec sm" type="button" onclick="appendSelectedExpertReviewers()">선택 계정 추가</button><p id="expert-roster-note" class="expert-note">계정 명부를 불러오는 중입니다.</p><label class="expert-field" for="expert-reviewer-ids">검수자 계정 ID 20개 <span>선택 계정을 추가하거나 한 줄에 하나씩 입력합니다. 저장 전 서버가 활성 계정을 다시 확인합니다.</span><textarea id="expert-reviewer-ids" rows="9" placeholder="reviewer-01&#10;reviewer-02&#10;…"></textarea></label><label class="expert-field" for="expert-assignment-reason">배정 메모 <span>선택</span><input id="expert-assignment-reason" maxlength="1000" placeholder="예: 2026-10 검수 1차" /></label><button class="btn black" id="expert-plan-submit" type="button" onclick="submitExactExpertPlan()">20명에게 균등 배정</button><p id="expert-plan-message" class="expert-message" role="status" aria-live="polite"></p></section>
     </div>
   </section>
 
   <!-- FLOW STEPPER — [2026-09-29] 루프 A(분류→검수·확정)를 뺐다. 그 두 단계는 이제 KL 포털이
        우리 API(IF-02·03·05·07)로 직접 수행한다 — 우리 콘솔에 실고객 문서 검수·확정 화면을 두지
        않는다. 남는 루프 B(골든셋→재학습→배포→메트릭)만 그린다. -->
-  <div class="loopwrap">
+  <div class="loopwrap" data-golden="1">
     <div class="flow loop" id="flow-b">
       <span class="loop-tag">모델 갱신 흐름</span>
       <span class="flow-step" data-step="g1"><b>G1</b> 검증문서 후보</span>
@@ -735,8 +783,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
     <!-- [2026-10-03 사용자 결정] G3 "검증문서 현황 — 구성·서명" 카드의 지표(서명 확정/목표 5 등)를
          뺐다 — 그 숫자로 관리자가 할 수 있는 다른 행동이 없다는 판단. 자동배포를 막는 안전장치
          (golden_tiers.eval_readiness·deploy_gate_min_locked_per_grade)는 코드에 그대로 남아
-         있다. 같은 수치는 [관제] 탭 대시보드의 '배포 준비 상태' 패널에도 있다(그 패널은 실제
-         배포 판단에 쓰여 남긴다) — GET /admin/locked-readiness.
+         있다. 같은 수치는 [관제] 탭 대시보드의 '평가 정답지 준비도' 패널에도 있다(그 패널은
+         재학습 모델 자동 활성화 평가 게이트에 쓰여 남긴다) — GET /admin/locked-readiness.
          ⚠ 링크 하나는 그대로 둔다 — [console_nav.py](CONSOLE_LINKS 주석)가 "후보 관리 화면
          진입은 이 카드의 버튼이 맡는다"고 명시한 **유일한 진입로**였다(상단 공용 메뉴에는
          의도적으로 안 둠 — 로그인이 필요한 업무 화면이라 층위가 다름). 지표 없이 링크만 남긴다. -->
@@ -967,12 +1015,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
     <!-- ===== 5. 메트릭 ===== -->
     <section class="card col-span" data-pane="train" style="order:4">
       <div class="card-head">
-        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 5단계">5</span> 모델 메트릭 · FNR 게이트 <span class="reqtag" data-tech>FUN-024</span></div>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 5단계">5</span> 모델 평가 지표 · 미탐률(FNR) <span class="reqtag" data-tech>FUN-024</span></div>
         <span class="ep" data-tech>GET /metrics/latest · /history · /confusion-matrix</span>
       </div>
       <div class="card-body">
         <div class="btn-row">
-          <button class="btn" onclick="loadMetrics()">최신 메트릭</button>
+          <button class="btn" onclick="loadMetrics()">최신 평가 지표</button>
           <button class="btn sec sm" onclick="loadHistory()">이력</button>
           <button class="btn sec sm" onclick="loadConfusionMatrix()">혼동행렬</button>
           <!-- 「등급체계 조회」를 뺐다 — 보여 주던 것은 지금 활성인 등급체계이지 이 성적을 낼 때 쓰인
@@ -981,7 +1029,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
         </div>
         <div id="metrics-cards" class="factors" style="grid-template-columns:repeat(3,1fr)"></div>
         <div id="metrics-extra"></div>
-        <p class="sec-note"><b>안전층 적용 전</b> 분류기 raw 수치입니다 — 실제 서빙 미탐은 더 낮습니다.<details style="margin-top:4px"><summary style="cursor:pointer">자세히</summary>평가셋이 학습셋과 겹치면 정확도가 과대평가될 수 있습니다.</details></p>
+        <p class="sec-note"><b>안전층 적용 전</b> 분류기 원시 수치입니다. 실제 서빙 성능과 동일하게 해석하지 마십시오. 서버가 제공한 표시 주의 기준 초과는 운영 확인 신호일 뿐, 배포·자동확정 정책을 뜻하지 않습니다.<details style="margin-top:4px"><summary style="cursor:pointer">자세히</summary>평가셋이 학습셋과 겹치면 정확도가 과대평가될 수 있습니다.</details></p>
       </div>
     </section>
 
@@ -1005,12 +1053,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
          화면에서 "누가 언제 무엇을 했는가"를 볼 수 없었다. -->
     <section class="card col-span" data-pane="ops" data-product-view="audit" style="order:4">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">조회</span> 감사 로그 — 누가 · 언제 · 무엇을</div>
+        <div class="ttl"><span class="step-no aux">조회</span> 감사 기록 — 누가 · 언제 · 무엇을</div>
         <span class="ep" data-tech>GET /admin/audit-log</span>
       </div>
       <div class="card-body">
         <div class="btn-row" style="align-items:center;flex-wrap:wrap;gap:8px">
-          <input id="au-action" type="text" placeholder="action 검색 (예: train, confirm, activate)" style="flex:1;min-width:180px" />
+          <input id="au-action" type="text" placeholder="동작 코드 검색 (예: train, confirm, activate)" style="flex:1;min-width:180px" />
+          <input id="au-actor" type="text" placeholder="행위자 ID" style="width:140px" />
+          <label class="hint" for="au-from">시작 <input id="au-from" type="datetime-local" /></label>
+          <label class="hint" for="au-to">종료 <input id="au-to" type="datetime-local" /></label>
           <select id="au-success" style="width:auto">
             <option value="">전체</option>
             <option value="true">성공만</option>
@@ -1022,10 +1073,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
         <div id="au-warn"></div>
         <div class="tbl-wrap" style="margin-top:8px;max-height:340px;overflow:auto">
           <table>
-            <thead><tr><th>시각</th><th>action</th><th>행위자</th><th>대상</th><th>결과</th></tr></thead>
+            <thead><tr><th>시각</th><th>동작 코드</th><th>행위자</th><th>대상</th><th>결과</th></tr></thead>
             <tbody id="au-body"><tr><td colspan="5" style="color:var(--text-dim)">「조회」를 누르면 감사 기록이 나옵니다</td></tr></tbody>
           </table>
         </div>
+        <div class="btn-row" style="justify-content:flex-end;margin-top:8px"><span id="au-page" class="hint"></span><button class="btn sec sm" id="au-prev" type="button" onclick="loadAuditLog(AUDIT_OFFSET-AUDIT_PAGE_SIZE)">이전</button><button class="btn sec sm" id="au-next" type="button" onclick="loadAuditLog(AUDIT_OFFSET+AUDIT_PAGE_SIZE)">다음</button></div>
       </div>
     </section>
 
@@ -1460,6 +1512,20 @@ function gotoHash(){
   if(!h) return;
   const el = document.getElementById(h);
   if(!el) return;                                   // 아직 안 그려졌으면 나중에 다시 부른다
+  // Product Shell V2에서 과거 G2 카드 자체는 이중 화면을 막기 위해 숨긴다. 하지만 기존
+  // 북마크가 빈 화면으로 끝나면 안 되므로, 그 주소는 현재의 검수자 배정 화면으로 연결한다.
+  const legacyProductView = ({'gold-jobs-card':'experts','gold-register-block':'experts'})[h];
+  if(legacyProductView && window.__KOIPA_PRODUCT_SHELL && window.showProductView){
+    window.showProductView(legacyProductView,true);
+    const current=document.getElementById('product-'+legacyProductView);
+    (current||el).scrollIntoView({block:'start'});
+    return;
+  }
+  const product=el.closest('.product-view');
+  if(product && product.id && window.showProductView){
+    const view=product.id.replace(/^product-/,'');
+    if(PRODUCT_VIEW_TO_PANE[view]) window.showProductView(view,true);
+  }
   const box = el.closest('[data-pane]');            // closest 는 자기 자신도 본다
   const pane = box && box.dataset ? box.dataset.pane : '';
   if(pane && pane!=='always') showPane(pane);
@@ -1551,9 +1617,15 @@ async function api(method, path, body){
  * -------------------------------------------------------------------------- */
 const PRODUCT_VIEW_TO_PANE={overview:'ops',documents:'ops',experts:'review',policy:'config',models:'train',audit:'ops',settings:'config'};
 let PRODUCT_VIEW='overview';
+let PRODUCT_REVIEW_BATCH='';
 let WORKBENCH_ROWS=[];
 let WORKBENCH_SELECTED=null;
 let WORKBENCH_INSPECTOR_TAB='detail';
+// 후보 문서·검수자 배정 API는 full-train 이미지에만 있다. healthz 확인 전에는 이 기능을
+// 열지 않아 고객사 이미지에서 404를 "오류"로 보여 주지 않는다.
+let PRODUCT_PROFILE_READY=false;
+let PRODUCT_GOLDEN_REVIEW_ENABLED=false;
+function productGoldenReviewAvailable(){ return PRODUCT_PROFILE_READY && PRODUCT_GOLDEN_REVIEW_ENABLED; }
 
 function productSetState(id, state, message){
   const el=$(id); if(!el) return null;
@@ -1574,7 +1646,9 @@ function productSetLegacyVisibility(view){
     if(!card.classList.contains('pf-hidden') && !card.classList.contains('reg-off')) card.style.display='';
   });
   if(view==='overview') show('.grid > [data-product-view="overview"]');
-  if(view==='experts') show('.grid > [data-pane="review"]');
+  // 검수자 배정은 위 V2 화면에서만 연다. 과거 카드 묶음은 DOM·API 호환용으로 남기되
+  // 새 콘솔 안에서 다시 노출하지 않아, 사용자가 서로 다른 두 화면을 오가게 하지 않는다.
+  if(view==='experts') show('.grid > [data-product-view="experts"]');
   if(view==='policy') show('.grid > [data-pane="config"]');
   if(view==='models') show('.grid > [data-pane="train"]');
   if(view==='audit') show('.grid > [data-product-view="audit"]');
@@ -1586,6 +1660,10 @@ function productSetLegacyVisibility(view){
 }
 function productShowView(view, fromLegacy){
   if(!PRODUCT_VIEW_TO_PANE[view]) view='overview';
+  // healthz가 오기 전에는 검수 기능의 포함 여부를 아직 모른다. 이때 저장한 검수 화면이나
+  // 북마크를 overview로 먼저 덮어쓰면, healthz가 full-train을 확인해도 원래 화면으로 복원할
+  // 방법이 없다. 실제로 분리 이미지임이 확인된 뒤에만 overview로 돌린다.
+  if((view==='documents'||view==='experts') && PRODUCT_PROFILE_READY && !PRODUCT_GOLDEN_REVIEW_ENABLED) view='overview';
   PRODUCT_VIEW=view;
   document.querySelectorAll('[data-product-nav]').forEach(button=>{
     const active=button.dataset.productNav===view;
@@ -1597,13 +1675,145 @@ function productShowView(view, fromLegacy){
   showPane(PRODUCT_VIEW_TO_PANE[view]);
   window.__KOIPA_PRODUCT_SWITCHING=false;
   productSetLegacyVisibility(view);
-  if(view==='overview') loadProductOverview();
-  if(view==='documents') loadWorkbench(false);
+  if(view==='overview' && productGoldenReviewAvailable()) loadProductOverview();
+  if(view==='documents' && productGoldenReviewAvailable()) loadWorkbench(false);
+  if(view==='experts' && productGoldenReviewAvailable()) loadExpertOperations();
   if(!fromLegacy){
     try{ history.replaceState(null,'','#view='+encodeURIComponent(view)); }catch(e){}
   }
 }
 window.showProductView=productShowView;
+
+/* 검수 대상은 화면에 박아 둔 과거 배치명이 아니라 후보 API가 실제로 돌려 준 배치에서 고른다.
+ * active 표식은 적재 검증이 끝난 전달본 하나에만 붙는다. 표식이 없을 때 임의의 옛 배치를
+ * 선택하지 않고 전체 원장을 보여 주므로, 존재하지 않는 배치 때문에 빈 화면이 되는 일을 막는다. */
+function syncProductReviewBatches(items){
+  const select=$('product-review-batch'); if(!select) return false;
+  const batches=Array.isArray(items)?items:[];
+  const before=PRODUCT_REVIEW_BATCH;
+  const valid=new Set(batches.map(item=>String(item.review_batch||'')));
+  if(before && !valid.has(before)) PRODUCT_REVIEW_BATCH='';
+  if(!PRODUCT_REVIEW_BATCH){
+    const active=batches.find(item=>item&&item.active);
+    if(active) PRODUCT_REVIEW_BATCH=String(active.review_batch||'');
+    else if(batches.length===1) PRODUCT_REVIEW_BATCH=String(batches[0].review_batch||'');
+  }
+  const keep=PRODUCT_REVIEW_BATCH;
+  select.replaceChildren();
+  const all=document.createElement('option'); all.value=''; all.textContent='전체 원장'; select.append(all);
+  batches.forEach(item=>{
+    const option=document.createElement('option'); option.value=item.review_batch;
+    option.textContent=item.review_batch+' · '+Number(item.total||0).toLocaleString()+'건'+(item.active?' · 현재 검수':'');
+    select.append(option);
+  });
+  select.disabled=!batches.length;
+  select.value=keep;
+  return before!==PRODUCT_REVIEW_BATCH;
+}
+function onProductReviewBatchChange(){
+  const select=$('product-review-batch'); PRODUCT_REVIEW_BATCH=select?select.value:'';
+  WORKBENCH_ROWS=[]; WORKBENCH_SELECTED=null;
+  loadProductOverview(true);
+  if(PRODUCT_VIEW==='documents') loadWorkbench(true);
+}
+function applyProductReviewBatch(query){
+  if(PRODUCT_REVIEW_BATCH) query.set('review_batch',PRODUCT_REVIEW_BATCH);
+  return query;
+}
+function focusWorkbenchDecision(){
+  productShowView('documents');
+  const inspector=$('wb-inspector'); if(inspector) inspector.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function expertSetState(state, text){
+  const host=$('expert-assignment-summary');if(!host)return;
+  host.className='overview-state';host.dataset.state=state;host.textContent=text;
+}
+function renderExpertAssignmentRows(reviewers){
+  const host=$('expert-assignment-list');if(!host)return;host.replaceChildren();
+  const rows=Array.isArray(reviewers)?reviewers:[];
+  if(!rows.length){host.append(Object.assign(document.createElement('div'),{className:'inspector-empty',textContent:'현재 선택한 배치에 유효한 검수자 배정이 없습니다.'}));return;}
+  rows.forEach(row=>{
+    const item=document.createElement('div');item.className='expert-assignment-row';
+    const who=document.createElement('div');who.textContent=row.reviewer_id||'검수자 미상';
+    const note=document.createElement('small');note.textContent='배정 문서 '+Number(row.visible_doc_count||0).toLocaleString()+'건';who.append(note);
+    const target=document.createElement('span');target.className='category-status';target.textContent=(row.review_batches||[]).join(', ')||'문서 단위 배정';item.append(who,target);host.append(item);
+  });
+}
+let EXPERT_REVIEWER_ROSTER=[];
+async function loadExpertReviewerRoster(){
+  const select=$('expert-reviewer-roster'), note=$('expert-roster-note');
+  if(select){select.replaceChildren();select.disabled=true;}
+  try{
+    const rows=await api('GET','/golden/reviewers');
+    EXPERT_REVIEWER_ROSTER=Array.isArray(rows)?rows:[];
+    if(select){
+      EXPERT_REVIEWER_ROSTER.forEach(row=>{
+        const option=document.createElement('option');option.value=row.reviewer_id;
+        option.textContent=row.reviewer_id+(Array.isArray(row.roles)&&row.roles.length?' · '+row.roles.join(', '):'');
+        select.append(option);
+      });
+      select.disabled=!EXPERT_REVIEWER_ROSTER.length;
+    }
+    if(note)note.textContent=EXPERT_REVIEWER_ROSTER.length
+      ? '활성 reviewer 계정 '+EXPERT_REVIEWER_ROSTER.length+'개를 불러왔습니다. 서버가 저장 직전에 다시 확인합니다.'
+      : '배정 가능한 활성 reviewer 계정이 없습니다. 계정 발급·역할·활성 상태를 확인하세요.';
+  }catch(error){
+    EXPERT_REVIEWER_ROSTER=[];
+    if(note)note.textContent='활성 검수자 명부를 불러오지 못했습니다. 배정은 저장 전에 서버가 차단합니다. '+errKoText(error);
+  }
+}
+function appendSelectedExpertReviewers(){
+  const select=$('expert-reviewer-roster'), target=$('expert-reviewer-ids');if(!select||!target)return;
+  const existing=expertReviewerIds(), seen=new Set(existing);
+  Array.from(select.selectedOptions).forEach(option=>{if(option.value&&!seen.has(option.value)){seen.add(option.value);existing.push(option.value);}});
+  target.value=existing.join('\n');
+}
+async function loadExpertOperations(){
+  const roster=loadExpertReviewerRoster();
+  if(!PRODUCT_REVIEW_BATCH){await roster;expertSetState('empty','현재 검수 배치를 먼저 선택하세요.');renderExpertAssignmentRows([]);return;}
+  expertSetState('loading','배정 현황을 불러오는 중입니다.');
+  try{
+    const encoded=encodeURIComponent(PRODUCT_REVIEW_BATCH);
+    const [data,probe]=await Promise.all([
+      api('GET','/golden/assignments?review_batch='+encoded),
+      api('GET','/golden/candidates?review_batch='+encoded+'&limit=1')
+    ]);
+    await roster;
+    const enforced=data&&data.enforcement||{};
+    const reviewers=Array.isArray(data&&data.reviewers)?data.reviewers:[];
+    const batchCount=Number(probe&&probe.total||0);
+    const flags='배정 강제 '+(enforced.assignment_enforced?'켜짐':'꺼짐')+' · 블라인드 검수 '+(enforced.blind_enforced?'켜짐':'꺼짐');
+    const blockers=[];
+    if(batchCount!==1000) blockers.push('문서 수 '+batchCount.toLocaleString()+'건(1,000건 필요)');
+    if(!enforced.assignment_enforced) blockers.push('배정 강제 설정 필요');
+    if(!enforced.blind_enforced) blockers.push('블라인드 검수 설정 필요');
+    const ready=blockers.length===0;
+    const submit=$('expert-plan-submit');if(submit){submit.disabled=!ready;submit.title=ready?'20명에게 50건씩 배정합니다.':blockers.join(' · ');}
+    expertSetState('empty',PRODUCT_REVIEW_BATCH+' · 검수자 '+reviewers.length+'명 · '+flags+' · 문서 '+batchCount.toLocaleString()+'건'+(ready?' · 배정 가능':' · 배정 대기: '+blockers.join(', ')));
+    renderExpertAssignmentRows(reviewers);
+  }catch(error){await roster;expertSetState('error','배정 현황을 불러오지 못했습니다. '+errKoText(error));renderExpertAssignmentRows([]);}
+}
+function expertReviewerIds(){
+  const raw=(($('expert-reviewer-ids')||{}).value||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
+  return raw;
+}
+async function submitExactExpertPlan(){
+  const message=$('expert-plan-message');const reviewerIds=expertReviewerIds();
+  if(!PRODUCT_REVIEW_BATCH){if(message)message.textContent='현재 검수 배치를 먼저 선택하세요.';return;}
+  if(reviewerIds.length!==20||new Set(reviewerIds).size!==20){if(message)message.textContent='서로 다른 검수자 계정 ID 20개를 한 줄에 하나씩 입력하세요.';return;}
+  if(EXPERT_REVIEWER_ROSTER.length){
+    const active=new Set(EXPERT_REVIEWER_ROSTER.map(row=>row.reviewer_id));
+    const missing=reviewerIds.filter(id=>!active.has(id));
+    if(missing.length){if(message)message.textContent='활성 reviewer 명부에 없는 ID가 있습니다: '+missing.join(', ')+' — 계정 명부를 새로고침하거나 입력을 고치세요.';return;}
+  }
+  const body={review_batch:PRODUCT_REVIEW_BATCH,reviewer_ids:reviewerIds,reason:(($('expert-assignment-reason')||{}).value||'').trim()};
+  try{
+    if(message)message.textContent='배정 전 서버 계약을 확인하는 중입니다…';
+    const result=await api('POST','/golden/assignments/expert-review-plan',body);
+    if(message)message.textContent='배정 완료: '+result.reviewer_count+'명 · 1인 '+result.documents_per_reviewer+'건 · 총 '+result.total_documents+'건'+(result.already_applied?' (기존 동일 계획 확인)':'');
+    await loadExpertOperations();
+  }catch(error){if(message)message.textContent='배정하지 않았습니다. '+errKoText(error);}
+}
 
 function productMetric(label,value,hint){
   const card=document.createElement('div'); card.className='metric-card';
@@ -1652,14 +1862,18 @@ async function loadProductOverview(force){
     productSetState('overview-summary-body','loading','검수 현황을 불러오는 중입니다.');
     productSetState('product-category-body','loading','문서유형 지표를 불러오는 중입니다.');
   }
-  if(status) status.textContent='LOADING';
+  if(status) status.textContent='조회 중';
   try{
     // API가 실제로 반환하는 문서 목록으로 유형별 수를 계산한다. limit을 넘기면 partial로 표시한다.
-    const data=await api('GET','/golden/candidates?limit=2000');
+    const query=applyProductReviewBatch(new URLSearchParams({limit:'2000'}));
+    const data=await api('GET','/golden/candidates?'+query.toString());
+    if(syncProductReviewBatches(data&&data.available_batches) && PRODUCT_REVIEW_BATCH){
+      return loadProductOverview(true);
+    }
     const summary=data&&data.summary;
     const items=Array.isArray(data&&data.candidates)?data.candidates:[];
     if(!summary){throw new Error('summary가 없는 응답');}
-    const scope=(summary.scope==='batch'?'선택 검수 배치':'현재 조회 범위');
+    const scope=PRODUCT_REVIEW_BATCH?'선택 검수 배치':'전체 원장';
     const overview=$('overview-scope'); if(overview) overview.textContent=scope+' · 목록 '+Number(data.total||0).toLocaleString()+'건';
     const body=document.createElement('div'); body.className='metrics-grid';
     body.append(
@@ -1676,16 +1890,16 @@ async function loadProductOverview(force){
     items.forEach(item=>{const type=String(item.doc_format||item.info_type||'미분류').trim()||'미분류';byType.set(type,(byType.get(type)||0)+1);});
     const types=[...byType.entries()].map(([type,count])=>({type,count})).sort((a,b)=>b.count-a.count||a.type.localeCompare(b.type,'ko'));
     productCategoryTable(types,items.length,Number(data.returned||items.length)<Number(data.total||items.length));
-    const label=$('category-batch-label');if(label)label.textContent='문서 '+Number(data.total||items.length).toLocaleString()+'건';
+    const label=$('category-batch-label');if(label)label.textContent=(PRODUCT_REVIEW_BATCH||'전체 원장')+' · 문서 '+Number(data.total||items.length).toLocaleString()+'건';
     const nav=$('reviewer-nav-count');if(nav)nav.textContent=Number(summary.unfixed||0).toLocaleString();
-    if(status)status.textContent='LIVE';
+    if(status)status.textContent='정상';
     productStamp();
     syncWorkbenchFormats((data.available_doc_formats||[]).map(x=>x.doc_format).filter(Boolean));
   }catch(e){
     productSetState('overview-summary-body','error','검수 현황을 불러오지 못했습니다. '+errKoText(e));
     productSetState('product-category-body','error','문서유형 지표를 불러오지 못했습니다. '+errKoText(e));
     const label=$('category-batch-label');if(label)label.textContent='조회 실패';
-    if(status)status.textContent='ERROR';
+    if(status)status.textContent='오류';
   }
 }
 function syncWorkbenchFormats(formats){
@@ -1712,14 +1926,14 @@ async function loadWorkbench(force){
   const list=$('wb-list'), count=$('wb-count');if(!list)return;
   if(WORKBENCH_ROWS.length && !force){return;}
   workbenchEmpty('문서 목록을 불러오는 중입니다.');if(count)count.textContent='문서 목록을 불러오는 중입니다.';
-  const q=new URLSearchParams();q.set('limit','200');
+  const q=applyProductReviewBatch(new URLSearchParams());q.set('limit','2000');
   const query=($('wb-query')||{}).value||'';const format=($('wb-format')||{}).value||'';
   if(query.trim())q.set('query',query.trim());if(format)q.set('doc_format',format);
   try{
     const data=await api('GET','/golden/candidates?'+q.toString());
     WORKBENCH_ROWS=Array.isArray(data&&data.candidates)?data.candidates:[];
     syncWorkbenchFormats((data&&data.available_doc_formats||[]).map(x=>x.doc_format).filter(Boolean));
-    if(count)count.textContent='총 '+Number(data&&data.total||0).toLocaleString()+'건 · 최대 200건 표시';
+    if(count)count.textContent=(PRODUCT_REVIEW_BATCH?PRODUCT_REVIEW_BATCH+' · ':'')+'총 '+Number(data&&data.total||0).toLocaleString()+'건';
     renderWorkbenchList(WORKBENCH_ROWS);
     if(WORKBENCH_ROWS.length && !WORKBENCH_SELECTED)selectWorkbenchDocument(WORKBENCH_ROWS[0].doc_id);
   }catch(e){workbenchEmpty('목록을 불러오지 못했습니다. '+errKoText(e));if(count)count.textContent='조회 실패';}
@@ -1731,6 +1945,61 @@ function addInspectorCard(title, content){
 function inspectorKv(values){
   const dl=document.createElement('dl');dl.className='inspector-kv';
   values.forEach(([label,value])=>{const dt=document.createElement('dt');dt.textContent=label;const dd=document.createElement('dd');dd.textContent=value||'—';dl.append(dt,dd);});return dl;
+}
+function workbenchActionLabel(action){
+  return ({approve:'제안 등급 승인',change:'등급 지정',defer:'보류',discard:'폐기',exclude:'검수 대상 제외',reopen:'재검토로 되돌림'})[action]||action;
+}
+function workbenchDecisionOptions(candidate){
+  const options=[];
+  // 제안 등급은 블라인드 검수 응답에서 서버가 제거한다. 그 경우 승인 경로도 화면에 만들지 않는다.
+  if(candidate.document_origin==='synthetic' && candidate.proposed_grade) options.push(['approve','제안 등급 그대로 승인']);
+  options.push(['change','등급 지정 또는 변경'],['defer','보류'],['discard','폐기'],['exclude','검수 대상 제외']);
+  if(['deferred','discarded','out_of_scope'].includes(candidate.status)) options.push(['reopen','재검토로 되돌림']);
+  return options;
+}
+function workbenchSelect(label, id, values, selected){
+  const wrap=document.createElement('label');wrap.className='wb-decision-field';wrap.htmlFor=id;wrap.textContent=label;
+  const select=document.createElement('select');select.id=id;
+  values.forEach(([value,text])=>{const option=document.createElement('option');option.value=value;option.textContent=text;if(value===selected)option.selected=true;select.append(option);});
+  wrap.append(select);return wrap;
+}
+function renderWorkbenchDecision(candidate){
+  const box=document.createElement('div');box.className='wb-decision';
+  const intro=document.createElement('p');intro.className='wb-decision-note';intro.textContent='결정은 기존 후보 원장에 추가 기록됩니다. 저장 후에도 이전 결정 이력은 유지됩니다.';box.append(intro);
+  const action=workbenchSelect('검수 결정','wb-decision-action',workbenchDecisionOptions(candidate),'change');box.append(action);
+  const grade=workbenchSelect('확정 등급','wb-decision-grade',[['TS','특급'],['S1','1급'],['S2','2급'],['S3','3급']],candidate.final_grade||candidate.proposed_grade||'S3');box.append(grade);
+  const management=candidate.management||{};
+  const facts=document.createElement('details');facts.className='wb-decision-facts';
+  const summary=document.createElement('summary');summary.textContent='관리 사실 보완 (선택)';facts.append(summary);
+  const note=document.createElement('p');note.textContent='문서에 실제로 확인되는 보안표시와 접근범위만 기록합니다. 확인되지 않은 사실을 추정해 등급 근거로 쓰지 않습니다.';facts.append(note);
+  facts.append(
+    workbenchSelect('보안표시','wb-security-marking',[['','확인 안 됨'],['none','표기 없음'],['confidential','대외비'],['secret','기밀 · 1급 비밀'],['top_secret','극비 · 특급기밀']],management.security_marking||''),
+    workbenchSelect('접근범위','wb-access-scope',[['','확인 안 됨'],['approved_only','승인된 자에 한해 공개'],['designated','지정된 접근자만'],['department','특정 부서 · 임직원 일부'],['all_employees','전 임직원 열람 가능']],management.access_scope||'')
+  );
+  box.append(facts);
+  const reasonLabel=document.createElement('label');reasonLabel.className='wb-decision-field';reasonLabel.htmlFor='wb-decision-reason';reasonLabel.textContent='판단 사유 / 메모';
+  const reason=document.createElement('textarea');reason.id='wb-decision-reason';reason.placeholder='등급 지정·보류·폐기·제외에는 사유가 필요합니다.';reasonLabel.append(reason);box.append(reasonLabel);
+  const message=document.createElement('p');message.id='wb-decision-message';message.className='wb-decision-message';box.append(message);
+  const submit=document.createElement('button');submit.type='button';submit.className='btn black';submit.textContent='결정 저장';submit.onclick=()=>saveWorkbenchDecision(candidate);box.append(submit);
+  const sync=()=>{grade.style.display=action.querySelector('select').value==='change'?'':'none';};
+  action.querySelector('select').onchange=sync;sync();
+  return box;
+}
+async function saveWorkbenchDecision(candidate){
+  const action=($('wb-decision-action')||{}).value||'';
+  const grade=($('wb-decision-grade')||{}).value||'';
+  const reason=(($('wb-decision-reason')||{}).value||'').trim();
+  const message=$('wb-decision-message');
+  if(['change','defer','discard','exclude'].includes(action) && !reason){if(message)message.textContent='이 결정에는 사유를 입력하세요.';return;}
+  const body={action,reason};if(action==='change')body.grade=grade;
+  const security=($('wb-security-marking')||{}).value||'';const scope=($('wb-access-scope')||{}).value||'';
+  if(security)body.security_marking=security;if(scope)body.access_scope=scope;
+  try{
+    if(message)message.textContent='저장 중입니다…';
+    await api('POST',`/golden/candidates/${encodeURIComponent(candidate.doc_id)}/decision`,body);
+    if(message)message.textContent='저장했습니다.';
+    WORKBENCH_ROWS=[];await loadProductOverview(true);await loadWorkbench(true);await selectWorkbenchDocument(candidate.doc_id);
+  }catch(error){if(message)message.textContent='저장하지 못했습니다. '+errKoText(error);}
 }
 function renderInspector(candidate){
   const host=$('wb-inspector-body');if(!host)return;host.replaceChildren();
@@ -1744,7 +2013,34 @@ function renderInspector(candidate){
   host.append(addInspectorCard('등록 정보',inspectorKv([
     ['문서 ID',candidate.doc_id],['문서유형',candidate.doc_format||candidate.info_type],['업무분야',candidate.department],['출처',candidate.document_origin],['상태',candidate.status],['분량',candidate.characters?Number(candidate.characters).toLocaleString()+'자':'—']
   ])));
-  host.append(addInspectorCard('판정 정보','이 화면은 문서 관리용 읽기 작업대입니다. 등급 확정·변경은 기존 후보 관리 화면의 권한 및 감사 흐름에서 수행합니다.'));
+  const judgment=inspectorKv([['잠정 등급',candidate.proposed_grade||'블라인드 검수 또는 미지정'],['확정 등급',candidate.final_grade||'미확정'],['최근 결정',candidate.latest_decision&&workbenchActionLabel(candidate.latest_decision.action)||'기록 없음']]);
+  const judgmentCard=addInspectorCard('검수 상태',judgment);
+  const caveat=document.createElement('p');caveat.textContent='이 화면의 검수 후보에는 모델 신뢰도·룰 등급을 노출하지 않습니다. 검수자의 판단이 숨은 제안값에 끌리지 않도록 하기 위한 분리입니다.';judgmentCard.append(caveat);host.append(judgmentCard);
+  host.append(addInspectorCard('검수 결정',renderWorkbenchDecision(candidate)));
+}
+function workbenchTitleKey(value){return String(value||'').replace(/^#+\s*/,'').replace(/\s+/g,' ').trim();}
+function workbenchTableCells(line){return String(line||'').trim().replace(/^\||\|$/g,'').split('|').map(cell=>cell.trim());}
+function isWorkbenchTableLine(line){const cells=workbenchTableCells(line);return String(line||'').includes('|')&&cells.length>=2&&cells.every(cell=>cell.length>0);}
+function isWorkbenchTableSeparator(line){return workbenchTableCells(line).every(cell=>/^:?-{3,}:?$/.test(cell));}
+function appendWorkbenchTable(host, lines){
+  const rows=lines.map(workbenchTableCells);const table=document.createElement('table');table.className='doc-table';
+  const header=rows[0]||[];const head=document.createElement('thead');const headRow=document.createElement('tr');header.forEach(cell=>{const th=document.createElement('th');th.textContent=cell;headRow.append(th);});head.append(headRow);table.append(head);
+  const body=document.createElement('tbody');const start=rows.length>1&&isWorkbenchTableSeparator(lines[1])?2:1;
+  rows.slice(start).forEach(row=>{const tr=document.createElement('tr');row.forEach(cell=>{const td=document.createElement('td');td.textContent=cell;tr.append(td);});body.append(tr);});table.append(body);host.append(table);
+}
+function renderWorkbenchBody(candidate){
+  const fragment=document.createDocumentFragment();let lines=String(candidate.text||'').replace(/\r\n?/g,'\n').split('\n');
+  const first=lines.findIndex(line=>line.trim());if(first>=0&&workbenchTitleKey(lines[first])===workbenchTitleKey(candidate.title))lines.splice(first,1);
+  for(let i=0;i<lines.length;){
+    const line=lines[i];if(!line.trim()){i+=1;continue;}
+    if(isWorkbenchTableLine(line)){
+      const tableLines=[];while(i<lines.length&&isWorkbenchTableLine(lines[i])){tableLines.push(lines[i]);i+=1;}appendWorkbenchTable(fragment,tableLines);continue;
+    }
+    if(/^#{1,6}\s+/.test(line)){const h=document.createElement('h3');h.textContent=line.replace(/^#{1,6}\s+/,'');fragment.append(h);i+=1;continue;}
+    const paragraph=[];while(i<lines.length&&lines[i].trim()&&!isWorkbenchTableLine(lines[i])&&!/^#{1,6}\s+/.test(lines[i])){paragraph.push(lines[i].trim());i+=1;}
+    const p=document.createElement('p');p.textContent=paragraph.join('\n');fragment.append(p);
+  }
+  return fragment;
 }
 function renderWorkbenchDocument(candidate){
   const article=$('wb-document');if(!article)return;article.replaceChildren();
@@ -1752,14 +2048,14 @@ function renderWorkbenchDocument(candidate){
   const eyebrow=document.createElement('div');eyebrow.className='doc-eyebrow';eyebrow.textContent=(candidate.doc_format||candidate.info_type||'DOCUMENT').toUpperCase();
   const h=document.createElement('h2');h.textContent=candidate.title||candidate.doc_id;
   const meta=document.createElement('div');meta.className='doc-meta';[[candidate.department||'분야 미분류'],[candidate.doc_format||candidate.info_type||'유형 미분류'],[candidate.doc_id]].flat().forEach(v=>{const s=document.createElement('span');s.textContent=v;meta.append(s);});
-  const copy=document.createElement('div');copy.className='doc-copy';copy.textContent=candidate.text||'원문이 없는 문서입니다.';
+  const copy=document.createElement('div');copy.className='doc-copy';copy.append(renderWorkbenchBody(candidate));
   article.append(eyebrow,h,meta,copy);
 }
 async function selectWorkbenchDocument(docId){
   WORKBENCH_SELECTED=docId;renderWorkbenchList(WORKBENCH_ROWS);
   const article=$('wb-document');if(article){article.replaceChildren(Object.assign(document.createElement('div'),{className:'doc-empty',textContent:'문서 원문을 불러오는 중입니다.'}));}
   renderInspector(null);
-  try{const candidate=await api('GET','/golden/candidates/'+encodeURIComponent(docId));renderWorkbenchDocument(candidate);renderInspector(candidate);}
+  try{const candidate=await api('GET',`/golden/candidates/${encodeURIComponent(docId)}`);renderWorkbenchDocument(candidate);renderInspector(candidate);}
   catch(e){if(article){article.replaceChildren(Object.assign(document.createElement('div'),{className:'doc-empty',textContent:'문서를 불러오지 못했습니다. '+errKoText(e)}));}renderInspector(null);}
 }
 function showInspectorTab(tab){
@@ -1855,6 +2151,8 @@ function applyProfileVisibility(d){
   const oc=(d&&d.operational_config)||{};
   const hideGolden = oc.golden_review_console_enabled===false;
   window.__hideGoldenReview = hideGolden;   // golden_jobs.js 가 헛 호출(404)을 안 하려고 읽는다
+  PRODUCT_PROFILE_READY=true;
+  PRODUCT_GOLDEN_REVIEW_ENABLED=!hideGolden;
   // ⚠ 인라인 style 로 숨기면 showPane() 이 탭 전환 때 [data-pane] 전체의 display 를 다시
   //   써서 숨김이 지워진다(실측: 탭을 한 번 누르면 숨긴 카드가 되살아났다).
   //   클래스 + !important 로 두어 두 로직이 서로 간섭하지 않게 한다.
@@ -1864,6 +2162,26 @@ function applyProfileVisibility(d){
   document.querySelectorAll('[data-golden="1"]').forEach(el=>{
     el.classList.toggle('pf-hidden', hideGolden);
   });
+  document.querySelectorAll('[data-product-requires-golden="1"]').forEach(el=>{
+    el.classList.toggle('pf-hidden', hideGolden);
+  });
+  if(hideGolden){
+    // 고객사 분리 이미지에는 후보·배정 원장이 물리적으로 없으므로, 빈 숫자나 404를
+    // 보이는 대신 해당 기능을 지재원 검수 환경의 범위로 정확히 분리한다.
+    if(PRODUCT_VIEW==='documents'||PRODUCT_VIEW==='experts') productShowView('overview',true);
+    productSetState('overview-summary-body','empty','이 설치본에서는 검증 문서 검토·검수자 배정 기능을 제공하지 않습니다. 문서 분류·정책·모델 운영 기능을 사용하십시오.');
+    productSetState('product-category-body','empty','검증 문서 검토 지표는 지재원 검수 환경에서 제공합니다.');
+    const status=$('overview-status');if(status)status.textContent='해당 없음';
+    const scope=$('overview-scope');if(scope)scope.textContent='고객사 운영 환경 · 후보 검수 기능 미설치';
+    const summaryTitle=$('overview-summary-title');if(summaryTitle)summaryTitle.textContent='운영 범위';
+    const help=$('overview-help');if(help)help.textContent='고객사 운영 환경의 정책 근거, 모델 릴리스 및 감사 기록을 확인합니다.';
+    const label=$('category-batch-label');if(label)label.textContent='검수 기능 미설치';
+  }else{
+    // healthz 응답 뒤에만 후보 API를 호출한다. 정적 화면의 선행 호출은 고객사에서 404를
+    // 남기고, full-train에서도 인증 전 화면을 불필요하게 흔들었다.
+    productShowView(PRODUCT_VIEW,true);
+  }
+  document.dispatchEvent(new Event('koipa:profile-ready'));
   const b=$('profile-banner');
   if(b && profile){
     const isCust = hideFactory;
@@ -1875,7 +2193,7 @@ function applyProfileVisibility(d){
           바꾸고 프로파일명만 [data-tech] 로 감싼다. */
     const techTag = ' <span class="techbar" data-tech>' + esc(profile) + '</span>';
     b.innerHTML = (isCust
-      ? '<b>고객사 운영 시스템</b> — 문서 분류·검수·모델 운영 화면입니다.'
+      ? '<b>고객사 운영 시스템</b> — 문서 분류·정책·모델 운영 화면입니다.'
         + ' 학습 후보 생성(합성)은 지재원에서 수행하므로 표시하지 않습니다.'
       : '<b>지재원 시스템</b> — 검증문서 구성·학습·배포까지 전 구간 화면입니다.'
         + (llmOff ? ' (이 서버는 LLM 을 쓰지 않는 구성입니다 — 생성 버튼을 눌러도 자리표시 본문이 만들어져 검수 큐에 쌓이고, 학습에 쓰이는 행은 0건입니다.)' : ''))
@@ -1956,10 +2274,14 @@ function applyServerConfig(d){
   catch(e){ console && console.warn && console.warn('domain list skipped', e); }
   // [2026-09-28] "우리가 실제로 가진 것만" — healthz 의 정적 허용목록으로 채운 뒤,
   // 실측 가용성(로컬 연결·상용 키 유무)으로 다시 좁힌다. 실패해도 앞서 채운 목록은 남는다.
-  try{ loadSynthProviderStatus(); }
-  catch(e){ console && console.warn && console.warn('provider status skipped', e); }
-  try{ loadSynthPlaybook(); }
-  catch(e){ console && console.warn && console.warn('playbook skipped', e); }
+  // 고객사 분리 이미지에는 합성 라우터가 없으므로 상태 조회도 호출하지 않는다.
+  // 숨겨진 UI가 요청 로그에 404를 남기면 실제 장애와 구분할 수 없기 때문이다.
+  if(!window.__hideFactory){
+    try{ loadSynthProviderStatus(); }
+    catch(e){ console && console.warn && console.warn('provider status skipped', e); }
+    try{ loadSynthPlaybook(); }
+    catch(e){ console && console.warn && console.warn('playbook skipped', e); }
+  }
 }
 
 /* [2026-09-29] 「1. CLASSIFY」·「2. QUEUE/CONFIRM/RELABEL」·「2-1. 확정 대기」 섹션(runClassify·
@@ -2128,14 +2450,43 @@ async function rollbackModel(){
  * "누가 언제 무엇을 했는가"를 화면에서 볼 수 없었다 — 영업비밀 분류 시스템에서 감리가 반드시
  * 묻는 항목이다. 응답의 actorless_ratio 를 함께 보여 준다: 공유 API 키 모드에서는 행위자
  * 신원이 남지 않으므로, 감사 추적이 실제로 성립하는지를 화면이 스스로 드러내야 한다. */
-async function loadAuditLog(){
+const AUDIT_PAGE_SIZE=50;
+let AUDIT_OFFSET=0;
+let AUDIT_QUERY_KEY='';
+function auditFilterTime(id){
+  const raw=(($(id)||{}).value||'').trim();
+  if(!raw)return '';
+  const date=new Date(raw);
+  return Number.isNaN(date.valueOf())?'':date.toISOString();
+}
+function renderAuditPager(total, returned){
+  const prev=$('au-prev'), next=$('au-next'), page=$('au-page');
+  if(prev)prev.disabled=AUDIT_OFFSET<=0;
+  if(next)next.disabled=AUDIT_OFFSET+returned>=total;
+  if(page){
+    const from=total?AUDIT_OFFSET+1:0, to=AUDIT_OFFSET+returned;
+    page.textContent=total?`${from}–${to} / ${total}건`:'0건';
+  }
+}
+async function loadAuditLog(offset){
+  if(Number.isInteger(offset)&&offset>=0)AUDIT_OFFSET=offset;
   const body=$('au-body'), warn=$('au-warn'), info=$('au-info');
   body.innerHTML='<tr><td colspan="5" style="color:var(--text-dim)">불러오는 중…</td></tr>';
   if(warn) warn.innerHTML='';
   try{
-    const q=new URLSearchParams({limit:'50'});
-    const a=$('au-action')?.value.trim(); if(a) q.set('action',a);
-    const sc=$('au-success')?.value; if(sc) q.set('success',sc);
+    const a=$('au-action')?.value.trim();
+    const sc=$('au-success')?.value;
+    const actor=$('au-actor')?.value.trim();
+    const occurredFrom=auditFilterTime('au-from');
+    const occurredTo=auditFilterTime('au-to');
+    const filterKey=[a||'',sc||'',actor||'',occurredFrom,occurredTo].join('\u0000');
+    if(filterKey!==AUDIT_QUERY_KEY){ AUDIT_QUERY_KEY=filterKey; AUDIT_OFFSET=0; }
+    const q=new URLSearchParams({limit:String(AUDIT_PAGE_SIZE),offset:String(AUDIT_OFFSET)});
+    if(a) q.set('action',a);
+    if(sc) q.set('success',sc);
+    if(actor) q.set('actor_id',actor);
+    if(occurredFrom)q.set('occurred_from',occurredFrom);
+    if(occurredTo)q.set('occurred_to',occurredTo);
     const d=await api('GET',`/admin/audit-log?${q.toString()}`);
     const items=d.items||[];
     if(!items.length){
@@ -2152,12 +2503,19 @@ async function loadAuditLog(){
              + `<td>${esc(it.action||'')}</td><td>${who}</td><td>${tgt}</td><td>${ok}</td></tr>`;
       }).join('');
     }
-    if(info) info.textContent=`전체 ${d.total??0}건 중 최근 ${items.length}건 · 서버 상태 확인·정적 자산·지표 수집만 제외됩니다.`;
+    if(info) info.textContent=`조건에 맞는 전체 ${d.total??0}건 중 ${items.length}건을 표시합니다 · 서버 상태 확인·정적 자산·지표 수집은 제외됩니다.`;
+    renderAuditPager(Number(d.total||0),items.length);
+    const actorlessRatio=Number(d.actorless_ratio);
+    if(Number.isFinite(actorlessRatio)&&actorlessRatio>0&&warn){
+      const actorlessPercent=(actorlessRatio*100).toFixed(1);
+      warn.innerHTML+=`<div class="warnbox" style="margin-top:8px">현재 조회 결과 ${items.length}건 중 행위자 신원이 기록되지 않은 비율은 ${actorlessPercent}%입니다. 이 비율은 현재 조회 결과 기준입니다.</div>`;
+    }
     (d.warnings||[]).forEach(w=>{ if(warn) warn.innerHTML+=`<div class="warnbox" style="margin-top:8px">${esc(w)}</div>`; });
     log(`감사 로그 ${items.length}건 조회 (전체 ${d.total??0})`,'ok');
   }catch(e){
     body.innerHTML=`<tr><td colspan="5">조회 실패: ${errKo(e)} ${esc(e.data?.detail||e.message||'')}`
       + (e.status===403?' — admin 역할 필요':'')+'</td></tr>';
+    renderAuditPager(0,0);
   }
 }
 
@@ -2187,19 +2545,29 @@ async function purgeDemoData(){
 // /admin/locked-readiness 엔드포인트는 그대로 둔다 — [관제] 탭 대시보드가 여전히 쓴다.
 
 /* ---- 5. METRICS ---- */
+function metricsTimestampText(d){
+  const source=d.metric_timestamp_source||'';
+  if(source==='live_evaluation')return '현재 운영 데이터로 계산';
+  if(source==='evaluation')return '평가 완료 시각';
+  if(source==='training_fallback')return '학습 완료 시각(별도 평가 시각 미기록)';
+  return '시각 미기록';
+}
 async function loadMetrics(){
   try{
     const d=await api('GET','/metrics/latest');
     LAST_MODEL_VERSION = d.model_version || LAST_MODEL_VERSION;
     const cards=$('metrics-cards');
     const pct = v => v!=null ? (v*100).toFixed(1)+'%' : '—';
+    const fnrWarning=Number(d.fnr_warning_threshold);
+    const hasFnrWarning=Number.isFinite(fnrWarning);
+    const fnrWarningLabel=hasFnrWarning?`표시 주의 기준 ${(fnrWarning*100).toFixed(1)}%`:'표시 주의 기준 미설정';
     cards.innerHTML=`
-      ${metricCard('정확도 Accuracy', pct(d.accuracy))}
-      ${metricCard('정밀도 Precision (macro)', pct(d.precision_macro))}
-      ${metricCard('재현율 Recall (macro)', pct(d.recall_macro))}
-      ${metricCard('F1 (macro)', pct(d.f1_macro))}
-      ${metricCard('FNR 전체', pct(d.fnr_overall), d.fnr_overall>0.05)}
-      ${metricCard('표본', d.sample_count??'—')}`;
+      ${metricCard('정확도', pct(d.accuracy))}
+      ${metricCard('정밀도(등급 평균)', pct(d.precision_macro))}
+      ${metricCard('재현율(등급 평균)', pct(d.recall_macro))}
+      ${metricCard('F1(등급 평균)', pct(d.f1_macro))}
+      ${metricCard('전체 미탐률(FNR) · '+fnrWarningLabel, pct(d.fnr_overall), hasFnrWarning&&d.fnr_overall>fnrWarning)}
+      ${metricCard('평가 표본', d.sample_count??'—')}`;
     /* [2026-08-21] 이 숫자가 **어느 평가셋**에서 나왔는지 화면이 스스로 말한다.
        종전에는 정확도만 크게 뜨고 근거 셋이 없어, 감리·시연 Q&A 에서 "그 숫자는 무슨
        셋이냐" 를 물으면 그 자리에서 답할 수 없었다. eval_source 는 DB 에 이미 저장돼
@@ -2210,7 +2578,7 @@ async function loadMetrics(){
       src.style.cssText='margin-top:10px;line-height:1.7';
       /* [2026-08-24] 파일 경로를 기본 화면에서 뺐다([기술 상세]로). 인용 주의 문구는
          **남긴다** — 제출 수치와 섞어 쓰면 감리에서 바로 문제가 되는 자리다. 다만 접어 둔다. */
-      src.innerHTML='<b>이 수치가 나온 평가셋</b>'
+      src.innerHTML='<b>평가 근거</b>'
         + (d.sample_count?(' — 표본 '+d.sample_count+'건'):'')
         + (d.fnr_high!=null?(' · 고등급 미탐 '+(d.fnr_high*100).toFixed(1)+'%'):'')
         + ' <span class="techbar" data-tech>'+esc(d.eval_source)+'</span>'
@@ -2220,8 +2588,8 @@ async function loadMetrics(){
       cards.parentNode.insertBefore(src, cards.nextSibling);
     }
     const byg=d.fnr_by_grade||{};
-    $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">등급별 FNR · 모델 ${d.model_version} (측정 ${d.measured_at||'-'})</label>
-      <div class="kv" style="margin-top:4px">${GRADES.map(g=>byg[g]!=null?`<div><span>${g}</span> <b style="color:${byg[g]>0.05?'var(--red)':'var(--green)'}">${(byg[g]*100).toFixed(1)}%</b></div>`:'').join('')||'<span style="color:var(--text-dim)">등급별 데이터 없음</span>'}</div></div>`;
+    $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">등급별 미탐률(FNR) · 모델 ${d.model_version} (${metricsTimestampText(d)} ${d.measured_at||'-'})</label>
+      <div class="kv" style="margin-top:4px">${GRADES.map(g=>byg[g]!=null?`<div><span>${g}</span> <b style="color:${hasFnrWarning&&byg[g]>fnrWarning?'var(--red)':'var(--green)'}">${(byg[g]*100).toFixed(1)}%</b></div>`:'').join('')||'<span style="color:var(--text-dim)">등급별 데이터 없음</span>'}</div></div>`;
     markFlow(5);
   }catch(e){ $('metrics-cards').innerHTML=''; $('metrics-extra').innerHTML=`<div class="warnbox">메트릭 조회 실패: ${errKo(e)} — 평가 실행 이력이 없거나 DB 미가용일 수 있습니다.</div>`; }
 }
@@ -2231,14 +2599,14 @@ async function loadHistory(){
     const d=await api('GET','/metrics/history');
     const items=d.items||[];
     $('metrics-extra').innerHTML=`<div class="tbl-wrap" style="margin-top:12px"><table>
-      <thead><tr><th>모델</th><th>측정</th><th>정확도</th><th>정밀도</th><th>재현율</th><th>F1</th><th>FNR</th><th>표본</th></tr></thead>
+      <thead><tr><th>모델</th><th>측정 시각</th><th>정확도</th><th>정밀도</th><th>재현율</th><th>F1</th><th>미탐률(FNR)</th><th>평가 표본</th></tr></thead>
       <tbody>${items.length?items.map(m=>`<tr>
-        <td class="mono">${m.model_version}</td><td>${m.measured_at||'-'}</td>
+        <td class="mono">${m.model_version}</td><td title="${metricsTimestampText(m)}">${m.measured_at||'-'}<small class="hint">${metricsTimestampText(m)}</small></td>
         <td>${m.accuracy!=null?(m.accuracy*100).toFixed(1)+'%':'-'}</td>
         <td>${m.precision_macro!=null?(m.precision_macro*100).toFixed(1)+'%':'-'}</td>
         <td>${m.recall_macro!=null?(m.recall_macro*100).toFixed(1)+'%':'-'}</td>
         <td>${m.f1_macro!=null?(m.f1_macro*100).toFixed(1)+'%':'-'}</td>
-        <td style="color:${m.fnr_overall>0.05?'var(--red)':'inherit'}">${m.fnr_overall!=null?(m.fnr_overall*100).toFixed(1)+'%':'-'}</td>
+        <td style="color:${Number.isFinite(Number(m.fnr_warning_threshold))&&m.fnr_overall>Number(m.fnr_warning_threshold)?'var(--red)':'inherit'}">${m.fnr_overall!=null?(m.fnr_overall*100).toFixed(1)+'%':'-'}</td>
         <td>${m.sample_count??'-'}</td></tr>`).join(''):'<tr><td colspan="8" style="color:var(--text-dim)">이력 없음</td></tr>'}</tbody></table></div>`;
   }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">이력 조회 실패: ${errKo(e)}</div>`; }
 }
@@ -2259,7 +2627,10 @@ async function loadConfusionMatrix(){
  * 그 버튼을 없앴다(설정 탭이 같은 것을 편집한다). 등급체계 조회·편집은 loadGradeEditor() 한 곳. */
 
 /* ---- 6. 운영 관제 대시보드 ---- */
-function dpDegraded(d, name){ return (d.degraded||[]).includes(name) ? '<span class="dp-degraded">degraded</span>' : ''; }
+function dpDegraded(d, name){ return (d.degraded||[]).includes(name) ? '<span class="dp-degraded" title="이 신호를 조회하지 못했습니다">조회 불가</span>' : ''; }
+function dashSectionLabel(name){
+  return ({escalation_held:'이중검토 보류',locked_readiness:'평가 정답지 준비도',active_learning:'재학습 대기',kill_gate:'안전 경보',drift:'입력 변화 감시'})[name]||'알 수 없는 항목';
+}
 function alStatusPill(s){
   if(s==='URGENT_RETRAIN') return '<span class="pill err">긴급 재학습</span>';
   if(s==='RETRAIN_RECOMMENDED') return '<span class="pill warn">재학습 권고</span>';
@@ -2304,7 +2675,7 @@ function dashTime(t){
 }
 function renderDashboard(d){
   const meta=$('dash-meta');
-  meta.textContent = `생성 ${dashTime(d.generated_at)}` + ((d.degraded&&d.degraded.length)?` · 조회 실패: ${d.degraded.join(', ')}`:'');
+  meta.textContent = `생성 ${dashTime(d.generated_at)}` + ((d.degraded&&d.degraded.length)?` · 조회 불가: ${d.degraded.map(dashSectionLabel).join(', ')}`:'');
   meta.title = d.generated_at ? `서버 원본 시각 ${d.generated_at}` : '';
   const eh=d.escalation_held||{}, lr=d.locked_readiness||{}, al=d.active_learning||{}, kg=d.kill_gate||{}, dr=d.drift||{};
   const byg=eh.by_grade||{};
@@ -2330,11 +2701,11 @@ function renderDashboard(d){
   const allSynth=gradesWith.filter(g=>(pg[g]||0)>0 && (rpg[g]||0)===0);
   const gradeRows=gradesWith.map(g=>
     `<div><span class="gk">${g}</span><span class="n">${pg[g]}</span><small>실 ${rpg[g]??0} · 합 ${spg[g]??0}</small></div>`).join('');
-  const p2=dpPanel(lr.ready&&!allSynth.length?'ok':'warn', '배포 준비 상태',
-    (lr.ready?'<span class="pill ok">준비됨</span>':'<span class="pill warn">미충족</span>')
+  const p2=dpPanel(lr.ready&&!allSynth.length?'ok':'warn', '평가 정답지 준비도',
+    (lr.ready?'<span class="pill ok">기준 충족</span>':'<span class="pill warn">미충족</span>')
     + (allSynth.length?'<span class="pill warn">실문서 0</span>':'') + dpDegraded(d,'locked_readiness'),
     // 이 패널이 무엇을 세는지 한 줄로 밝힌다 — 업로드·분류 건수와 무관한 값이다(사용자 질문).
-    `<div class="dp-note">사람이 서명해 <b>평가 정답</b>으로 잠근 검증문서 수입니다. 이 수가 등급별 기준을 채워야 재학습 모델을 <b>자동 활성</b>할 수 있습니다. 업로드·분류 건수와는 무관합니다.</div>`
+    `<div class="dp-note">사람이 서명해 <b>평가 정답지</b>로 잠근 검증 문서 수입니다. 이 평가 게이트는 등급별 기준 충족 시 재학습 모델의 <b>자동 활성화</b> 판단에만 쓰이며, 전체 배포 가능 여부를 확정하지 않습니다.</div>`
     + (gradeRows?`<div class="dp-tab">${gradeRows}</div>`:'<div class="dp-note">등급별 데이터 없음</div>')
     + (lr.min_per_grade!=null?`<div class="dp-note">등급별 최소 ${lr.min_per_grade}건 필요${(lr.missing&&lr.missing.length)?` · 부족 ${lr.missing.join(' · ')}`:''}</div>`:'')
     + (noSign.length?`<div class="dp-note"><b>${noSign.join(', ')}</b> 는 서명이 0건입니다 — 검수·서명을 아직 하지 않았습니다.</div>`:'')
@@ -2356,10 +2727,11 @@ function renderDashboard(d){
     + (al.reason?`<div class="dp-note">${esc(dashReason(al.reason))}</div>`:''));
   // 4) kill-gate
   const kgReasons=(kg.reasons||[]);
-  const p4=dpPanel(kg.tripped?'err':'ok', '안전 정지',
+  const p4=dpPanel(kg.tripped?'err':'ok', '안전 경보',
     (kg.tripped?'<span class="pill err">발동</span>':'<span class="pill ok">정상</span>')+dpDegraded(d,'kill_gate'),
-    dpBig(kg.tripped?'정지':'정상', '', kg.tripped?'var(--red)':'var(--green)')
-    + `<div class="dp-note">${kgReasons.length?kgReasons.map(esc).join(' · '):'발동 사유 없음'}</div>`);
+    dpBig(kg.tripped?'경보':'정상', '', kg.tripped?'var(--red)':'var(--green)')
+    + `<div class="dp-note">${kgReasons.length?kgReasons.map(esc).join(' · '):'경보 발동 사유 없음'}</div>`
+    + '<div class="dp-note">이 신호는 서비스나 재학습을 자동 정지하지 않습니다. 고등급 자동확정 억제는 별도 설정을 켠 경우에만 적용됩니다.</div>');
   /* [2026-08-24] 5) 「입력 분포 변화」 카드를 화면에서 뺐다. 셋이 겹쳤다:
        · 요건 밖 — 제출본 전문에 "드리프트"·"분포" 0회.
        · 값이 변하지 않는다 — run_drift_check 는 "운영 표본 부재 시 빈 보고서"를 낸다
@@ -3606,8 +3978,7 @@ function syncSynthDomains(list){
   }catch(e){}
 })();
 initPane();          // 기존 카드 초기화 — V2 작업공간이 그 위에 같은 기능을 배치한다.
-initProductShell();  // 좌측 메뉴·운영 개요·문서 작업대 초기 표시
-loadGoldenBuilds();  // 등록 가능한 문서 묶음 목록(자유 입력 칸을 대체)
+initProductShell();  // 좌측 메뉴·운영 개요 초기 표시(후보 API는 healthz 확인 뒤에만 호출)
 onTrainPresetChange();   // 학습 규모 preset 설명 채우기(기본=정식 학습)
 syncWriteGate();
 syncActiveGrades();
@@ -3618,6 +3989,7 @@ syncSynthDomains();
 checkHealth().then(()=>{
   if(window.__hideFactory){ const b=$('sy-coverage'); if(b) b.innerHTML='<div class="hint">이 서버에서는 합성 생성 기능을 쓰지 않습니다.</div>'; }
   else loadSynthCoverage();
+  if(!window.__hideGoldenReview) loadGoldenBuilds();
 });
 /* [2026-09-29] 검수 큐·확정 대기 초기 조회(loadReviewQueue·loadStagingQueue)를 뺐다 — 그 카드들을
    콘솔에서 뺐다(실고객 문서 검수·확정은 이제 KL 포털의 몫). */

@@ -21,7 +21,8 @@ import re
 from pathlib import Path
 
 import pytest
-from pydantic import BaseModel
+from fastapi.routing import APIRoute
+from pydantic import TypeAdapter
 
 _ROOT = Path(__file__).resolve().parents[1]
 _STATIC = _ROOT / "src" / "koipa" / "api" / "static"
@@ -62,16 +63,13 @@ def routes() -> dict[tuple[str, str], object]:
     from koipa.api.app import app
 
     table: dict[tuple[str, str], object] = {}
-    for included in app.routes:
-        if type(included).__name__ != "_IncludedRouter":
+    for route in app.routes:
+        if not isinstance(route, APIRoute):
             continue
-        ctx = getattr(included, "include_context", None)
-        prefix = getattr(ctx, "prefix", "") or ""
-        for r in getattr(included, "original_router").routes:
-            path = _norm(prefix + getattr(r, "path", ""))
-            for m in getattr(r, "methods", None) or []:
-                table[(m, path)] = getattr(r, "response_model", None)
-    assert len(table) > 40, f"라우트를 제대로 못 읽었다({len(table)}건)"
+        path = _norm(route.path)
+        for method in route.methods or []:
+            table[(method, path)] = route.response_model
+    assert len(table) > 30, f"라우트를 제대로 못 읽었다({len(table)}건)"
     return table
 
 
@@ -297,18 +295,26 @@ def _fixture_items(fixtures, routes):
         yield key, body, model
 
 
+def _response_adapter(model: object) -> TypeAdapter | None:
+    """FastAPI의 단일 모델뿐 아니라 ``list[Model]`` 응답도 검증 대상으로 만든다."""
+    if model is None:
+        return None
+    return TypeAdapter(model)
+
+
 def test_fixtures_validate_against_response_models(fixtures, routes):
     """필드명이 실제 응답 모델과 어긋나면 여기서 깨진다(evidence 의 type/excerpt 같은 것)."""
     problems: list[str] = []
     checked = 0
     for key, body, model in _fixture_items(fixtures, routes):
-        if not (isinstance(model, type) and issubclass(model, BaseModel)):
+        adapter = _response_adapter(model)
+        if adapter is None:
             continue
         checked += 1
         try:
-            model.model_validate(body)
+            adapter.validate_python(body)
         except Exception as exc:  # noqa: BLE001 — 어느 본보기가 왜 틀렸는지 모아서 보고한다
-            problems.append(f"{key} ({model.__name__}): {str(exc)[:400]}")
+            problems.append(f"{key} ({model!s}): {str(exc)[:400]}")
     assert checked >= 15, f"검증한 본보기가 너무 적다({checked}건) — 모델 연결이 끊겼는지 확인"
     assert not problems, "본보기가 실제 응답 모델과 맞지 않는다:\n  " + "\n  ".join(problems)
 
@@ -320,7 +326,7 @@ def test_fixtures_without_response_model_are_listed(fixtures, routes):
     """
     unbound = sorted(
         key for key, _body, model in _fixture_items(fixtures, routes)
-        if not (isinstance(model, type) and issubclass(model, BaseModel))
+        if _response_adapter(model) is None
     )
     # 자동 검증이 안 되는 것은 지금 이만큼이다. 늘어나면 이 시험이 알려 준다.
     # (2026-08-23: 후보 관리 화면 시나리오를 붙이며 /golden/candidates 계열 5개가 늘었다.

@@ -1044,6 +1044,10 @@ def auto_rollback_tick() -> dict:
     기본은 판정만 하고 롤백은 안 함(동작 보존) — beat가 주기 호출.
     """
     from koipa.config import settings  # noqa: PLC0415
+    # 고객사 이미지는 training_service를 물리적으로 싣지 않는다. 활성학습 신호는
+    # 유지하지만 모델 수명주기·롤백은 지재원 full-train 노드의 책임이다.
+    if not settings.enable_training:
+        return {"skipped": "training_disabled"}
     from koipa.services.training_service import (  # noqa: PLC0415
         evaluate_rollback_need,
         rollback_active_model,

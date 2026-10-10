@@ -1,0 +1,52 @@
+{
+  "total": 1731,
+  "by_round": {
+    "R7": 384,
+    "R4": 151,
+    "R2": 228,
+    "R5": 273,
+    "R9": 147,
+    "R8": 114,
+    "R1": 233,
+    "R6": 86,
+    "R3": 115
+  },
+  "by_grade": {
+    "S1": 552,
+    "S3": 373,
+    "TS": 381,
+    "S2": 425
+  },
+  "by_training_use": {
+    "fs_train_loss": 1110,
+    "never_trained": 354,
+    "fs_val_holdout": 67,
+    "never_trained_sealed": 200
+  },
+  "by_training_use_grade": {
+    "never_trained": {
+      "S2": 84,
+      "S3": 84,
+      "S1": 99,
+      "TS": 87
+    },
+    "never_trained_sealed": {
+      "S1": 50,
+      "TS": 50,
+      "S3": 50,
+      "S2": 50
+    },
+    "fs_val_holdout": {
+      "TS": 14,
+      "S1": 23,
+      "S3": 14,
+      "S2": 16
+    },
+    "fs_train_loss": {
+      "S1": 380,
+      "S3": 225,
+      "TS": 230,
+      "S2": 275
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "total": 584,
+  "by_split": {
+    "train_r7": 384,
+    "test_r8_style_shift": 114,
+    "test_r6_independent": 86
+  },
+  "by_round_writer": {
+    "R7|opus": 189,
+    "R7|sonnet": 195,
+    "R8|opus": 59,
+    "R6|opus": 38,
+    "R6|fable": 40,
+    "R8|fable": 55,
+    "R6|haiku": 8
+  },
+  "by_split_grade": {
+    "train_r7": {
+      "S3": 75,
+      "S1": 142,
+      "S2": 93,
+      "TS": 74
+    },
+    "test_r6_independent": {
+      "S2": 20,
+      "S3": 22,
+      "TS": 22,
+      "S1": 22
+    },
+    "test_r8_style_shift": {
+      "TS": 30,
+      "S2": 26,
+      "S3": 30,
+      "S1": 28
+    }
+  },
+  "family_disjoint_r6_r7": true
+}

@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 import koipa.config as config_mod
 from koipa.config import (
     _PROFILE_DEFAULTS,
@@ -96,11 +98,20 @@ def test_source_prior_in_enforced_safety_gates() -> None:
 
 
 def _hermetic_gate_env(monkeypatch) -> None:
-    """conftest(REQUIRE_REAL_EMBEDDER=false) 등 호출자 env override 가 프로파일 기본값 해석을
-    오염시키지 않게 강제집합 env 를 걷어낸다 — '순수 프로파일 기본값'만 평가."""
-    from koipa.config import _SAFETY_GATES
+    """호출자 env override가 프로파일 기본값 해석을 오염시키지 않게 걷어낸다.
 
-    for _, env in _SAFETY_GATES:
+    안전 게이트 외에도 conftest가 기존 라우트 검증용으로 ENABLE_TRAINING=true를 전역
+    주입한다. 이를 남기면 onprem-local 순수 기본값 검증이 '학습은 full-train 전용' 가드에서
+    끝난다. 여기서는 프로필이 정하는 모든 필드의 환경값을 제거한다.
+    """
+    from koipa.config import _PROFILE_DEFAULTS
+
+    profile_envs = {
+        field.upper()
+        for defaults in _PROFILE_DEFAULTS.values()
+        for field in defaults
+    }
+    for env in profile_envs:
         monkeypatch.delenv(env, raising=False)
 
 
@@ -321,6 +332,7 @@ def _cors_wildcard_fields() -> tuple[str, ...]:
         "poc_mode",
         "api_key",
         "auth_mode",
+        "api_key_role",
         "minio_secret_key",
         "audit_chain_secret",
         "cors_allow_origins",
@@ -380,6 +392,7 @@ def test_cors_wildcard_allowed_when_auth_mode_none() -> None:
     config_mod.settings.poc_mode = "full"
     config_mod.settings.api_key = ""  # auth_mode=none 이면 키 자체도 요구하지 않는다
     config_mod.settings.auth_mode = "none"
+    config_mod.settings.api_key_role = "kl_backend"
     config_mod.settings.minio_secret_key = "y"
     config_mod.settings.audit_chain_secret = "z"
     config_mod.settings.cors_allow_origins = ["*"]
@@ -402,6 +415,43 @@ def test_cors_wildcard_allowed_when_auth_mode_none() -> None:
         ):
             # CORS 사유로 raise 하면 안 됨(다른 운영 체크는 위에서 모두 통과하도록 구성).
             config_mod.assert_production_credentials()
+    finally:
+        for k, v in snap.items():
+            setattr(config_mod.settings, k, v)
+        config_mod._SECRETS_FILLED = False
+
+
+@pytest.mark.parametrize("role", ("admin", "reviewer"))
+def test_none_auth_mode_rejects_privileged_fallback_role(role: str) -> None:
+    """AI 연계 무인증은 사람 검수·관리 권한으로 확대되면 안 된다."""
+    config_mod._SECRETS_FILLED = True
+    snap = {k: getattr(config_mod.settings, k) for k in _cors_wildcard_fields()}
+    config_mod.settings.poc_mode = "full"
+    config_mod.settings.api_key = ""
+    config_mod.settings.auth_mode = "none"
+    config_mod.settings.api_key_role = role
+    config_mod.settings.minio_secret_key = "y"
+    config_mod.settings.audit_chain_secret = "z"
+    config_mod.settings.cors_allow_origins = ["*"]
+    config_mod.settings.api_key_trust_actor_role_header = False
+    config_mod.settings.classifier_model_dir = ""
+    config_mod.settings.require_safety_gates = False
+    config_mod.settings.agreement_gate_enabled = False
+    config_mod.settings.metadata_floor_enabled = False
+    config_mod.settings.storage_encryption_enabled = False
+    try:
+        with patch.dict(
+            os.environ,
+            {
+                "TESTING": "",
+                "PYTEST_CURRENT_TEST": "",
+                "RATE_LIMIT_DISABLED": "",
+                "AUDIT_DISABLED": "",
+                "KOIPA_AUDIT_CHAIN_SECRET": "z",
+            },
+        ):
+            with pytest.raises(RuntimeError, match="AUTH_MODE=none"):
+                config_mod.assert_production_credentials()
     finally:
         for k, v in snap.items():
             setattr(config_mod.settings, k, v)

@@ -21,7 +21,7 @@ UV ?= $(PY) -m uv
         gold-set retrieval-gold check-data check-gold check-leakage check-patent-proxy check-release-evidence check-parser-support openapi-consistency check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-gate-recalculate release-manifest \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers eval-trusted-ci \
-        test-lite test-slow test-fullstack test-kl-integration test-model-download test-full
+        test-lite test-slow test-fullstack test-kl-integration test-model-download test-full test-parallel
 
 help:
 	@echo "Targets:"
@@ -434,6 +434,9 @@ p1:
 
 test-lite: ## 빠른 테스트 suite (2분 이내 목표, CI 기본 — slow/fullstack/model_download 제외)
 	$(PY) -m pytest -q -m "not fullstack and not model_download and not slow"
+
+test-parallel: ## test-lite 와 같은 범위를 pytest-xdist 로 병렬 실행 (로컬 코어 자동 — -n auto)
+	$(PY) -m pytest -q -n auto -m "not fullstack and not model_download and not slow"
 
 test-lite-cov: ## test-lite + coverage 측정·리포트 (CI용 — 소프트, 하드 게이트 없음)
 	$(PY) -m pytest -q -m "not fullstack and not model_download and not slow" \

@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
 
 import pytest
 
@@ -51,13 +52,17 @@ def test_profile_applies_defaults(profile: str, monkeypatch: pytest.MonkeyPatch)
         ("full-train", False),
     ],
 )
-def test_demo_console_gated_by_profile(profile: str, expected: bool) -> None:
+def test_demo_console_gated_by_profile(
+    profile: str, expected: bool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """데모 콘솔·파괴적 POST /admin/demo/purge 노출은 하드닝 프로파일서 꺼져야 한다(SEC-2/3).
 
     demo_console_enabled 가 Settings 에 미선언이던 탓에 admin.py 의 getattr(...,True) 게이트와
     app.py /demo 마운트가 죽은 no-op(항상 True)였다 — 이제 데모/파일럿(lite-*)만 True, 고객사
     운영/모델공장(onprem-local·full-train)은 프로파일 default False 로 실제 비활성(마운트·purge 404).
     """
+    monkeypatch.delenv("ENABLE_TRAINING", raising=False)
+    monkeypatch.delenv("ENABLE_INCREMENTAL_RETRAIN", raising=False)
     s = Settings(deploy_profile=profile, _env_file=None)
     apply_profile_defaults(s)
     assert s.demo_console_enabled is expected, f"{profile}: demo_console_enabled"
@@ -68,26 +73,29 @@ def test_demo_console_gated_by_profile(profile: str, expected: bool) -> None:
     [
         ("lite-noapi", False, False),     # 순수 추론 — 학습·콘솔 없음
         ("lite-cloud", False, False),     # 데모(콘솔은 demo_console_enabled 축으로 켜짐)
-        ("onprem-local", True, True),     # 고객사 — 야간 증분 재학습 + 하드닝 관리 콘솔
+        ("onprem-local", False, True),    # 고객사 — 분류·활성학습 신호 수집 + 하드닝 관리 콘솔
         ("full-train", False, True),      # 지재원 — enable_training 경로 학습 + 관리 콘솔
     ],
 )
 def test_incremental_retrain_and_admin_console_gated_by_profile(
-    profile: str, incr_expected: bool, admin_expected: bool
+    profile: str, incr_expected: bool, admin_expected: bool, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """[고객사 학습 2026-07] enable_incremental_retrain·serve_admin_console 프로파일 default.
+    """고객사 학습 차단·관리 콘솔 프로파일 default.
 
-    고객사(onprem-local)만 야간 증분 재학습 ON, 지재원은 enable_training 경로라 증분 플래그 OFF.
+    고객사(onprem-local)는 학습·재학습을 열지 않고 분류·활성학습 신호 수집만 한다.
+    지재원은 enable_training 경로로 모델 학습·성능보고를 담당한다.
     관리 콘솔(serve_admin_console)은 두 프로덕션 노드(onprem-local·full-train) 모두 ON —
     demo_console_enabled(파괴적 purge)와 분리된 축이라 콘솔만 노출하고 purge 는 계속 OFF.
     """
+    monkeypatch.delenv("ENABLE_TRAINING", raising=False)
+    monkeypatch.delenv("ENABLE_INCREMENTAL_RETRAIN", raising=False)
     s = Settings(deploy_profile=profile, _env_file=None)
     apply_profile_defaults(s)
     assert s.enable_incremental_retrain is incr_expected, f"{profile}: enable_incremental_retrain"
     assert s.serve_admin_console is admin_expected, f"{profile}: serve_admin_console"
-    # 안전 불변식: 야간 증분 재학습을 켠 노드도 파괴적 purge(demo_console_enabled)는 열지 않는다.
-    if incr_expected:
-        assert s.demo_console_enabled is False, f"{profile}: 증분 재학습 노드에 purge 노출 금지"
+    # 안전 불변식: 하드닝 관리 콘솔에도 파괴적 purge는 열지 않는다.
+    if admin_expected:
+        assert s.demo_console_enabled is False, f"{profile}: 하드닝 콘솔에 purge 노출 금지"
 
 
 def test_explicit_env_wins_over_profile(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -123,7 +131,7 @@ def test_empty_profile_is_noop() -> None:
     [
         ("lite-noapi", False, False, False),    # 순수 추론 — 학습 노드 아님
         ("lite-cloud", False, False, False),
-        ("onprem-local", False, True, True),    # 고객사 야간 증분 재학습 노드 → 라우터 등록
+        ("onprem-local", False, False, False),  # 고객사 — 학습 라우터 미노출
         ("full-train", True, False, True),      # 지재원 학습 노드 → 라우터 등록
         ("full-train", True, True, True),       # 둘 다 켜도 등록(OR)
         ("onprem-local", False, False, False),  # 두 플래그 모두 off → 미등록(음성 대조)
@@ -133,10 +141,10 @@ def test_training_router_visibility(
     profile: str, en_train: bool, en_incr: bool, training_expected: bool,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """프로파일별 /api/v1/train* 라우터 등록 — 계약: enable_training OR enable_incremental_retrain.
+    """프로파일별 /api/v1/train* 라우터 등록 — full-train 전용 계약.
 
-    지재원(full-train)은 enable_training, 고객사(onprem-local)는 enable_incremental_retrain(야간
-    증분 재학습, 2026-07)으로 학습 라우터가 등록된다. 순수 추론 노드(lite-*)는 미등록.
+    지재원(full-train)에서만 enable_training으로 학습 라우터가 등록된다. 고객사(onprem-local)와
+    순수 추론 노드에서는 OpenAPI에도 노출되지 않는다.
     app.py가 두 플래그를 import-time에 평가하므로 settings 모듈 reload + app 모듈 reload 순서로
     강제 재로딩. teardown 필수 — reload는 monkeypatch가 풀어주지 않으므로 env 정리 후 원상복구.
     """
@@ -182,7 +190,7 @@ def test_training_router_visibility(
     [
         ("lite-noapi", False, False, False),    # 순수 추론 — 합성 노드 아님
         ("lite-cloud", False, False, False),
-        ("onprem-local", False, True, False),   # 고객사 증분 재학습 노드여도 합성은 열지 않는다
+        ("onprem-local", False, False, False),  # 고객사 — 합성 미노출
         ("full-train", True, False, True),      # 지재원 모델공장 → 등록
     ],
 )
@@ -272,6 +280,8 @@ def test_golden_router_visibility(
     """
     monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
     monkeypatch.setenv("DEPLOY_PROFILE", profile)
+    monkeypatch.setenv("ENABLE_TRAINING", "false")
+    monkeypatch.setenv("ENABLE_INCREMENTAL_RETRAIN", "false")
     monkeypatch.delenv("ENABLE_GOLDEN_REVIEW_CONSOLE", raising=False)
 
     import koipa.config as cfg_mod
@@ -306,6 +316,8 @@ def test_admin_console_mounts_without_enabling_purge(monkeypatch: pytest.MonkeyP
     """
     monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
     monkeypatch.setenv("DEPLOY_PROFILE", "onprem-local")
+    monkeypatch.setenv("ENABLE_TRAINING", "false")
+    monkeypatch.setenv("ENABLE_INCREMENTAL_RETRAIN", "false")
     # 두 축을 os.environ 에 명시(explicit)해 .env/프로파일 간섭 제거 — 하드닝 콘솔 조합을 강제.
     monkeypatch.setenv("SERVE_ADMIN_CONSOLE", "true")
     monkeypatch.setenv("DEMO_CONSOLE_ENABLED", "false")
@@ -326,6 +338,61 @@ def test_admin_console_mounts_without_enabling_purge(monkeypatch: pytest.MonkeyP
         monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
         cfg_mod.settings = _orig_settings
         importlib.reload(app_mod)
+
+
+def test_customer_profile_rejects_any_training_override() -> None:
+    """고객사 이미지에 없는 학습 코드를 .env로 되살리려는 시도는 부팅 전에 막는다."""
+    for kwargs in (
+        {"enable_training": True},
+        {"enable_incremental_retrain": True},
+    ):
+        s = Settings(deploy_profile="onprem-local", _env_file=None, **kwargs)
+        with pytest.raises(ValueError, match="classification/active-learning only"):
+            apply_profile_defaults(s)
+
+
+def test_customer_profile_hides_model_lifecycle_routes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """고객사 OpenAPI에는 학습·성능·모델 활성화 경로가 없어야 한다."""
+    monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
+    monkeypatch.setenv("DEPLOY_PROFILE", "onprem-local")
+    monkeypatch.setenv("ENABLE_TRAINING", "false")
+    monkeypatch.setenv("ENABLE_INCREMENTAL_RETRAIN", "false")
+
+    import koipa.config as cfg_mod
+    _orig_settings = cfg_mod.settings
+    importlib.reload(cfg_mod)
+    import koipa.api.app as app_mod
+    importlib.reload(app_mod)
+    try:
+        paths = set(app_mod.app.openapi().get("paths", {}))
+        assert not {p for p in paths if p.startswith("/api/v1/train")}
+        assert {
+            "/api/v1/admin/model/reload",
+            "/api/v1/admin/model/activate",
+            "/api/v1/admin/model/rollback",
+        }.isdisjoint(paths)
+    finally:
+        monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+        cfg_mod.settings = _orig_settings
+        importlib.reload(app_mod)
+
+
+def test_customer_image_removes_jjw_only_modules() -> None:
+    """Dockerfile 정본이 고객사 이미지에서 지재원 전용 파일을 모두 삭제해야 한다."""
+    root = Path(__file__).resolve().parents[1]
+    required = {
+        "src/koipa/api/golden.py",
+        "src/koipa/api/synthesis.py",
+        "src/koipa/api/training.py",
+        "src/koipa/api/_training_report_pdf.py",
+        "src/koipa/modules/m4_training/trainer.py",
+        "src/koipa/services/synthesis_service.py",
+        "src/koipa/services/training_service.py",
+    }
+    for dockerfile in ("Dockerfile.api.customer", "Dockerfile.worker.customer"):
+        text = (root / dockerfile).read_text(encoding="utf-8")
+        missing = {path for path in required if path not in text}
+        assert not missing, f"{dockerfile}: customer image exclusion missing {sorted(missing)}"
 
 
 # ── 프로파일 환경변수 이름 (2026-09-06) ────────────────────────────────────

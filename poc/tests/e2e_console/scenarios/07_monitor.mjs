@@ -37,7 +37,7 @@ export const scenarios = [
       check.ok(server.lastCall('GET', '/admin/dashboard'), 'GET /admin/dashboard 를 불렀다');
       const grid = page.text('dash-grid');
       check.includes(grid, '이중검토 보류', '이중검토 패널이 있다');
-      check.includes(grid, '배포 준비 상태', '배포 준비 패널이 있다');
+      check.includes(grid, '평가 정답지 준비도', '평가 정답지 준비 패널이 있다');
       check.includes(page.text('dash-meta'), '생성', '언제 만든 수치인지 적는다');
       // ⚠ 문구·구분기호는 화면 손질로 자주 바뀐다(2026-08-23 에도 바뀌었다). 뜻이 유지되는지만 본다.
       check.data.matches(grid, /실\s*0\s*[·/]\s*합\s*3/, '등급별로 실문서/합성을 갈라 보여준다');
@@ -71,8 +71,8 @@ export const scenarios = [
       };
       page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
-      check.includes(page.text('dash-meta'), '조회 실패', '무엇을 못 읽었는지 상단에 적는다');
-      check.includes(page.text('dash-meta'), 'escalation_held', '실패한 항목 이름이 보인다');
+      check.includes(page.text('dash-meta'), '조회 불가', '무엇을 못 읽었는지 상단에 적는다');
+      check.includes(page.text('dash-meta'), '이중검토 보류', '실패한 항목을 운영 용어로 보여준다');
       return page;
     },
   },

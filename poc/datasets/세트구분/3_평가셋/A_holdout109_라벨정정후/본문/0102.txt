@@ -1,0 +1,3 @@
+HBM etch recipe parameter review
+
+HBM stack W/TiN/SiO2 etch recipe: SF6 CHF3 C4F8 Ar gas ratio, RF power, selectivity result, and yield impact. Disclosure would let a competitor reproduce the process window.

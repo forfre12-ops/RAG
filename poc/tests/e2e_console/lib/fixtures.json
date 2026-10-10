@@ -575,6 +575,9 @@
   "GET /metrics/latest": {
     "model_version": "v-fe4b386b",
     "measured_at": "2026-08-22T10:00:00Z",
+    "evaluated_at": "2026-08-22T10:00:00Z",
+    "trained_at": "2026-08-22T08:30:00Z",
+    "metric_timestamp_source": "evaluation",
     "accuracy": 0.917,
     "precision_macro": 0.921,
     "recall_macro": 0.914,
@@ -588,13 +591,17 @@
     },
     "sample_count": 42,
     "eval_source": "hardened42",
-    "fnr_high": 0.031
+    "fnr_high": 0.031,
+    "fnr_warning_threshold": 0.05
   },
   "GET /metrics/history": {
     "items": [
       {
         "model_version": "v-fe4b386b",
         "measured_at": "2026-08-22T10:00:00Z",
+        "evaluated_at": "2026-08-22T10:00:00Z",
+        "trained_at": "2026-08-22T08:30:00Z",
+        "metric_timestamp_source": "evaluation",
         "accuracy": 0.917,
         "precision_macro": 0.921,
         "recall_macro": 0.914,
@@ -603,11 +610,15 @@
         "fnr_high": 0.031,
         "sample_count": 42,
         "eval_source": "hardened42",
-        "fnr_by_grade": {}
+        "fnr_by_grade": {},
+        "fnr_warning_threshold": 0.05
       },
       {
         "model_version": "v-d2b4d2e1",
         "measured_at": "2026-08-15T10:00:00Z",
+        "evaluated_at": null,
+        "trained_at": "2026-08-15T10:00:00Z",
+        "metric_timestamp_source": "training_fallback",
         "accuracy": 0.933,
         "precision_macro": 0.935,
         "recall_macro": 0.931,
@@ -616,7 +627,8 @@
         "fnr_high": 0.052,
         "sample_count": 42,
         "eval_source": "hardened42",
-        "fnr_by_grade": {}
+        "fnr_by_grade": {},
+        "fnr_warning_threshold": 0.05
       }
     ]
   },
@@ -798,6 +810,50 @@
     "status_url": "/api/v1/golden/jobs/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
     "review_url": "/api/v1/golden/jobs/dddddddd-dddd-4ddd-8ddd-dddddddddddd/review.html",
     "signoff_url": "/api/v1/golden/jobs/dddddddd-dddd-4ddd-8ddd-dddddddddddd/signoff.html"
+  },
+  "GET /golden/assignments": {
+    "total_candidates": 3,
+    "assigned_candidate_count": 0,
+    "unassigned_candidate_count": 3,
+    "reviewers": [],
+    "assignments": [],
+    "ledger_events_total": 0,
+    "by_event": {},
+    "enforced": { "assignment": false, "blind": false },
+    "enforcement": { "assignment_enforced": false, "blind_enforced": false }
+  },
+  "GET /golden/reviewers": [
+    {"reviewer_id": "reviewer-01", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-02", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-03", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-04", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-05", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-06", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-07", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-08", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-09", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-10", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-11", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-12", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-13", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-14", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-15", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-16", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-17", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-18", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-19", "roles": ["reviewer"]},
+    {"reviewer_id": "reviewer-20", "roles": ["reviewer"]}
+  ],
+  "POST /golden/assignments/expert-review-plan": {
+    "review_batch": "2026-08-A",
+    "reviewer_count": 20,
+    "documents_per_reviewer": 50,
+    "total_documents": 1000,
+    "actor_id": "e2e-admin-test",
+    "events_written": 1000,
+    "assignment_group_id": "eeeeeeee-0000-4000-8000-000000000099",
+    "already_applied": false,
+    "reviewer_document_counts": { "reviewer-01": 50, "reviewer-02": 50 }
   },
   "GET /golden/builds": {
     "total": 2,

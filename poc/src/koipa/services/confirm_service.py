@@ -24,6 +24,7 @@ from koipa.schemas.confirm import (
     ConfirmResponse,
     RelabelRequest,
     RelabelResponse,
+    ReviewReceipt,
 )
 
 logger = logging.getLogger(__name__)
@@ -263,6 +264,7 @@ class ConfirmResult:
     persisted: bool
     warnings: list[str]
     second_review_required: bool = False
+    review_receipt: ReviewReceipt | None = None
 
 
 @dataclass
@@ -273,6 +275,50 @@ class RelabelResult:
     persisted: bool
     warnings: list[str]
     second_review_required: bool = False
+    review_receipt: ReviewReceipt | None = None
+
+
+def _review_receipt(
+    *,
+    doc_id: str,
+    inference_id: uuid.UUID | None,
+    reviewer_id: str,
+    final_label,
+    reason: str | None,
+    reviewed_at: str,
+    correction=None,
+    classification_status: str | None = None,
+    persisted: bool,
+) -> ReviewReceipt:
+    """포털 검수 → Correction → 재학습 후보의 연결 상태를 응답에 명시한다.
+
+    이 함수는 Agent 응답 경로를 건드리지 않는다. Agent가 이미 답한 뒤의 포털 검수
+    요청에서만 호출되며, correction 행이 실제로 남았는지와 그 행이 후보 재빌드 입구를
+    통과할 수 있는지를 호출자에게 돌려준다.
+    """
+    if not persisted:
+        candidate_status = "not_persisted"
+    elif classification_status not in ("confirmed", "corrected"):
+        candidate_status = "held_for_finalization"
+    else:
+        from koipa.golden_tiers import is_human_reviewer  # noqa: PLC0415
+
+        candidate_status = (
+            "eligible_for_candidate_rebuild"
+            if is_human_reviewer(reviewer_id)
+            else "ineligible_reviewer"
+        )
+    record_time = getattr(correction, "corrected_at", None)
+    return ReviewReceipt(
+        doc_id=doc_id,
+        inference_id=inference_id,
+        reviewer_id=reviewer_id,
+        final_label=final_label,
+        reason=(getattr(correction, "reason", None) if correction is not None else reason),
+        reviewed_at=record_time.isoformat() if record_time is not None else reviewed_at,
+        correction_id=(int(correction.correction_id) if correction is not None else None),
+        candidate_data_status=candidate_status,
+    )
 
 
 def _apply_dual_review_gate(
@@ -368,8 +414,15 @@ class ConfirmService:
                         "confirm: classification not found (audit only) — inference_id=%s doc_id=%s",
                         req.inference_id, req.doc_id,
                     )
-                    warns.append("classification not found in DB — confirmation recorded in audit only")
-                    return ConfirmResult(new_id, confirmed_at, persisted=False, warnings=warns)
+                    warns.append("classification not found in DB — confirmation was not persisted")
+                    return ConfirmResult(
+                        new_id, confirmed_at, persisted=False, warnings=warns,
+                        review_receipt=_review_receipt(
+                            doc_id=req.doc_id, inference_id=req.inference_id,
+                            reviewer_id=req.actor.user_id, final_label=req.confirmed_label,
+                            reason=req.note, reviewed_at=confirmed_at, persisted=False,
+                        ),
+                    )
 
                 # 게이트가 원래 status(needs_second_review 보류 여부)를 볼 수 있도록 덮어쓰기 전에 포착.
                 prior_status = cls.status
@@ -390,13 +443,17 @@ class ConfirmService:
                     if target_level_id != cls.predicted_level_id
                     else None
                 )
+                correction = None
                 if repo.correction_exists(cls.classification_id, target_level_id, req.actor.user_id):
                     warns.append(
                         "idempotent: confirmation already recorded for this classification/label/actor"
                     )
+                    correction = repo.find_correction(
+                        cls.classification_id, target_level_id, req.actor.user_id
+                    )
                 else:
                     # direction은 add_correction이 등급 order로 자동 산출(confirm/under/over).
-                    repo.add_correction(
+                    correction = repo.add_correction(
                         classification_id=cls.classification_id,
                         original_level_id=cls.predicted_level_id,
                         corrected_level_id=target_level_id,
@@ -418,11 +475,24 @@ class ConfirmService:
                 return ConfirmResult(
                     new_id, confirmed_at, persisted=True, warnings=warns,
                     second_review_required=second_required,
+                    review_receipt=_review_receipt(
+                        doc_id=str(cls.doc_id), inference_id=cls.classification_id,
+                        reviewer_id=req.actor.user_id, final_label=req.confirmed_label,
+                        reason=reason, reviewed_at=confirmed_at, correction=correction,
+                        classification_status=status, persisted=True,
+                    ),
                 )
         except SQLAlchemyError as exc:
             logger.warning("confirm persistence failed: %s", exc)
             warns.append(f"persistence skipped: {type(exc).__name__}")
-            return ConfirmResult(new_id, confirmed_at, persisted=False, warnings=warns)
+            return ConfirmResult(
+                new_id, confirmed_at, persisted=False, warnings=warns,
+                review_receipt=_review_receipt(
+                    doc_id=req.doc_id, inference_id=req.inference_id,
+                    reviewer_id=req.actor.user_id, final_label=req.confirmed_label,
+                    reason=req.note, reviewed_at=confirmed_at, persisted=False,
+                ),
+            )
 
     @staticmethod
     def _find_classification(repo: ClassifyRepo, req: ConfirmRequest):
@@ -439,6 +509,7 @@ class RelabelService:
         )
         warns: list[str] = []
         new_id = uuid.uuid4()
+        reviewed_at = dt.datetime.now(dt.timezone.utc).isoformat()
         try:
             with session_scope() as db:
                 repo = ClassifyRepo(db)
@@ -448,8 +519,15 @@ class RelabelService:
                         "relabel: classification not found (audit only) — inference_id=%s doc_id=%s",
                         req.inference_id, req.doc_id,
                     )
-                    warns.append("classification not found in DB — relabel queued in audit only")
-                    return RelabelResult(new_id, 0, RETRAIN_THRESHOLD_DEFAULT, persisted=False, warnings=warns)
+                    warns.append("classification not found in DB — relabel was not persisted")
+                    return RelabelResult(
+                        new_id, 0, RETRAIN_THRESHOLD_DEFAULT, persisted=False, warnings=warns,
+                        review_receipt=_review_receipt(
+                            doc_id=req.doc_id, inference_id=req.inference_id,
+                            reviewer_id=req.actor.user_id, final_label=req.corrected_label,
+                            reason=req.reason, reviewed_at=reviewed_at, persisted=False,
+                        ),
+                    )
 
                 orig_id = repo.level_id_by_code(req.original_label)
                 corr_id = repo.level_id_by_code(req.corrected_label)
@@ -458,12 +536,16 @@ class RelabelService:
                     return RelabelResult(new_id, 0, RETRAIN_THRESHOLD_DEFAULT, persisted=False, warnings=warns)
 
                 # 멱등 기록 — 동일 (분류·교정등급·검수자) 중복 방지(행 잠금과 함께).
+                correction = None
                 if repo.correction_exists(cls.classification_id, corr_id, req.actor.user_id):
                     warns.append(
                         "idempotent: relabel already recorded for this classification/label/actor"
                     )
+                    correction = repo.find_correction(
+                        cls.classification_id, corr_id, req.actor.user_id
+                    )
                 else:
-                    repo.add_correction(
+                    correction = repo.add_correction(
                         classification_id=cls.classification_id,
                         original_level_id=orig_id,
                         corrected_level_id=corr_id,
@@ -492,11 +574,24 @@ class RelabelService:
                     persisted=True,
                     warnings=warns,
                     second_review_required=second_required,
+                    review_receipt=_review_receipt(
+                        doc_id=str(cls.doc_id), inference_id=cls.classification_id,
+                        reviewer_id=req.actor.user_id, final_label=req.corrected_label,
+                        reason=req.reason, reviewed_at=reviewed_at, correction=correction,
+                        classification_status=status, persisted=True,
+                    ),
                 )
         except SQLAlchemyError as exc:
             logger.warning("relabel persistence failed: %s", exc)
             warns.append(f"persistence skipped: {type(exc).__name__}")
-            return RelabelResult(new_id, 0, RETRAIN_THRESHOLD_DEFAULT, persisted=False, warnings=warns)
+            return RelabelResult(
+                new_id, 0, RETRAIN_THRESHOLD_DEFAULT, persisted=False, warnings=warns,
+                review_receipt=_review_receipt(
+                    doc_id=req.doc_id, inference_id=req.inference_id,
+                    reviewer_id=req.actor.user_id, final_label=req.corrected_label,
+                    reason=req.reason, reviewed_at=reviewed_at, persisted=False,
+                ),
+            )
 
     @staticmethod
     def _find_classification(repo: ClassifyRepo, req: RelabelRequest):
@@ -510,6 +605,7 @@ def to_confirm_response(result: ConfirmResult) -> ConfirmResponse:
         persisted=result.persisted,
         warnings=result.warnings,
         second_review_required=result.second_review_required,
+        review_receipt=result.review_receipt,
     )
 
 
@@ -521,6 +617,7 @@ def to_relabel_response(result: RelabelResult) -> RelabelResponse:
         persisted=result.persisted,
         warnings=result.warnings,
         second_review_required=result.second_review_required,
+        review_receipt=result.review_receipt,
     )
 
 

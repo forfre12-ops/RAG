@@ -199,12 +199,49 @@ def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_bound
         'data-product-nav="settings"',
         'id="product-category-body"',
         'id="document-workbench"',
+        'id="product-experts"',
+        'id="expert-reviewer-ids"',
+        'id="expert-reviewer-roster"',
+        'id="expert-plan-submit"',
+        'data-product-requires-golden="1"',
+        'id="overview-help"',
         'data-resize="left"',
         'data-resize="right"',
-        "'/golden/candidates?limit=2000'",
-        "'/golden/candidates/'+encodeURIComponent(docId)",
+        "applyProductReviewBatch(new URLSearchParams({limit:'2000'}))",
+        "/golden/candidates/${encodeURIComponent(docId)}",
         'function productShowView(',
         'function loadProductOverview(',
         'function loadWorkbench(',
+        'function saveWorkbenchDecision(',
+        'function renderWorkbenchBody(',
+        'function submitExactExpertPlan(',
+        'function loadExpertReviewerRoster(',
+        'function appendSelectedExpertReviewers(',
+        'function productGoldenReviewAvailable()',
+        "document.dispatchEvent(new Event('koipa:profile-ready'))",
+        "'/golden/assignments/expert-review-plan'",
+        "'/golden/reviewers'",
+        "'/golden/candidates?review_batch='+encoded+'&limit=1'",
     ):
         assert marker in console
+    for wording in (
+        "검증 문서 검토·결정",
+        "검수자 배정·진행",
+        "분류 정책·참고 규정",
+        "학습·평가·릴리스",
+        "감사 기록",
+        "연결·운영 도구",
+        "평가 정답지 준비도",
+        "안전 경보",
+    ):
+        assert wording in console
+    assert "전문가 검수 운영" not in console
+    assert "배포 준비 상태" not in console
+    assert "안전 정지" not in console
+
+
+def test_console_mobile_header_wraps_the_navigation(console: str):
+    """320px 폭에서도 상단 링크가 본문을 가로질러 잘리지 않게 두 줄 헤더로 전환한다."""
+    assert "@media(max-width:640px)" in console
+    assert ".top{height:auto;min-height:58px" in console
+    assert ".top .cnav{order:3;width:100%;overflow-x:auto" in console

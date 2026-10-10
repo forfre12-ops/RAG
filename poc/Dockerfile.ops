@@ -9,7 +9,7 @@
 #   docker compose --profile tools run --rm ops python3 scripts/dr_drill.py --help
 #
 # [재현성] Dockerfile.api.prod 와 같은 base digest — 반입본과 재빌드본의 동일성을 보증한다.
-FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS base
+FROM python:3.11-slim@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce AS base
 
 ARG KOIPA_BUILD_SHA=unknown
 ARG KOIPA_BUILD_AT=unknown
@@ -34,6 +34,7 @@ COPY scripts/_cli_io.py \
      scripts/backup_postgres.py \
      scripts/batch_issue_reviewer_tokens.py \
      scripts/calibrate_classifier.py \
+     scripts/check_expert_review_readiness.py \
      scripts/compare_proxy_models.py \
      scripts/db_engine.py \
      scripts/demo_e2e_8010.py \
@@ -69,7 +70,10 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 RUN pip install --upgrade pip && \
     TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh \
         psh otel jwt hwp hwp-tables pdf-tables xls llm && \
-    pip install -U "wheel>=0.46.2" "jaraco.context>=6.1.0"
+    pip install -U "wheel>=0.46.2" "jaraco.context>=6.1.0" && \
+    apt-mark manual libpq5 libfreetype6 libexpat1 curl && \
+    apt-get purge -y --auto-remove build-essential libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 

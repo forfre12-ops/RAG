@@ -328,6 +328,9 @@ async def upload_documents_batch(
     (이미 운영 검증된 경로를 그대로 재사용 — 09-30 Celery 디스패치·시간제한 보강 적용분).
     documents_batch_max_files(기본 50) 를 넘는 요청은 413 — 파싱(HWP/PDF/DOCX 추출)이 요청
     안에서 동기로 끝나야 doc_id 를 돌려줄 수 있어, 상한을 높이면 이 요청 자체가 오래 걸린다.
+    파일 합계도 documents_batch_max_total_mb(기본 20MB)를 넘으면, 어느 파일도 적재하지
+    않고 413을 반환한다. 파일 하나의 max_upload_mb 판정은 기존처럼 결과별 warning으로
+    독립 보고한다. 처리 시간은 추출기·파일 형식·현장 장비에 따라 달라 사전 추정하지 않는다.
     """
     try:
         actor_obj = Actor.model_validate(json.loads(actor))
@@ -352,9 +355,34 @@ async def upload_documents_batch(
         )
 
     max_bytes = settings.max_upload_mb * 1024 * 1024
+    max_total_bytes = max(
+        1,
+        int(getattr(settings, "documents_batch_max_total_mb", 20) or 20),
+    ) * 1024 * 1024
+
+    # 전체 합계를 먼저 확인해야 뒤쪽 파일 때문에 상한을 넘겼을 때 앞쪽 문서만
+    # 부분 적재되는 일이 없다. BodySizeLimitMiddleware가 요청 본문을 별도로 제한하므로
+    # 이 버퍼의 최댓값도 배포 전역 상한 안에 머문다.
+    file_bodies: list[bytes] = []
+    total_file_bytes = 0
+    for file in files:
+        body = await file.read()
+        file_bodies.append(body)
+        total_file_bytes += len(body)
+        if total_file_bytes > max_total_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "code": "KOIPA_DOCUMENT_BATCH_TOTAL_TOO_LARGE",
+                    "message": "total uploaded file bytes exceed documents_batch_max_total_mb",
+                    "total_file_bytes": total_file_bytes,
+                    "max_total_file_bytes": max_total_bytes,
+                },
+            )
+
     results: list[DocumentUploadResponse] = []
     classify_targets: list[str] = []
-    for i, file in enumerate(files):
+    for i, (file, body) in enumerate(zip(files, file_bodies, strict=True)):
         crid = client_request_ids[i] if client_request_ids is not None else None
         filename = file.filename or "unknown"
         declared_size = getattr(file, "size", None)
@@ -365,7 +393,6 @@ async def upload_documents_batch(
                 file_size_bytes=declared_size,
             ))
             continue
-        body = await file.read()
         if len(body) > max_bytes:
             results.append(_batch_item_error(
                 filename, crid,

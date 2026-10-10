@@ -18,6 +18,9 @@ from koipa.api._rbac import require_role
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+# 모델 활성화·롤백은 학습 산출물을 다루므로 지재원 full-train에서만 마운트한다.
+# 고객사 이미지는 training_service를 물리적으로 제거한다.
+training_router = APIRouter(prefix="/admin", tags=["admin"])
 
 _ADMIN_ONLY = [Depends(require_role("admin"))]
 
@@ -29,7 +32,7 @@ class ReloadModelResponse(BaseModel):
     model_loaded: bool
 
 
-@router.post(
+@training_router.post(
     "/model/reload",
     response_model=ReloadModelResponse,
     dependencies=_ADMIN_ONLY,
@@ -99,7 +102,7 @@ class ActivateModelResponse(BaseModel):
     model_loaded: bool | None = None
 
 
-@router.post(
+@training_router.post(
     "/model/activate",
     response_model=ActivateModelResponse,
     summary="특정 ModelVersion 활성화 (deploy gate 적용·force 우회 감사)",
@@ -171,7 +174,7 @@ class RollbackModelResponse(BaseModel):
     model_loaded: bool | None = None
 
 
-@router.post(
+@training_router.post(
     "/model/rollback",
     response_model=RollbackModelResponse,
     dependencies=_ADMIN_ONLY,
@@ -257,6 +260,8 @@ def audit_log(
     action: str | None = Query(default=None, description="action 부분일치(대소문자 무시)"),
     success: bool | None = Query(default=None, description="성공/실패만 보기"),
     actor_id: str | None = Query(default=None),
+    occurred_from: _dt.datetime | None = Query(default=None, description="이 시각 이후(UTC ISO-8601)"),
+    occurred_to: _dt.datetime | None = Query(default=None, description="이 시각 이전(UTC ISO-8601)"),
 ) -> AuditLogResponse:
     from sqlalchemy import func as _func, select  # noqa: PLC0415
 
@@ -273,6 +278,10 @@ def audit_log(
                 conds.append(AuditLog.success.is_(success))
             if actor_id:
                 conds.append(AuditLog.actor_id == actor_id)
+            if occurred_from:
+                conds.append(AuditLog.occurred_at >= occurred_from)
+            if occurred_to:
+                conds.append(AuditLog.occurred_at <= occurred_to)
             total = int(
                 db.execute(select(_func.count()).select_from(AuditLog).where(*conds)).scalar() or 0
             )

@@ -23,7 +23,6 @@ from koipa.api import explain as explain_api
 from koipa.api import health as health_api
 from koipa.api import confirm as confirm_api
 from koipa.api import promotion as promotion_api
-from koipa.api import training as training_api
 from koipa.api import console_login as console_login_api
 from koipa.api import documents as documents_api
 from koipa.api import schema_admin as schema_admin_api
@@ -436,13 +435,11 @@ app.include_router(async_classify_api.router, prefix="/api/v1")
 app.include_router(confirm_api.router, prefix="/api/v1")
 # 검수 액션(승급)은 재학습 무관 — enable_training과 무관하게 항상 등록(폐쇄망 운영 경로).
 app.include_router(promotion_api.router, prefix="/api/v1")
-# 학습 라우터는 학습 노드에서만 등록: enable_training(지재원 full-train) 또는
-# enable_incremental_retrain(고객사 onprem-local 야간 증분 재학습). 순수 추론 노드(lite-*)에서는
-# OpenAPI에도 노출되지 않는다. 등록되더라도 모든 엔드포인트는 admin/kl_backend/system RBAC 보호.
-# [2026-10-07 KL 요청 조사] training.py·services/training_service.py는 고객사 야간 증분
-# 재학습이 그대로 쓰는 공유 코드라 고객사 전용 이미지에서도 빼지 않는다 — Dockerfile.api.customer
-# 에서 지운 것은 synthesis 관련 모듈뿐이다(아래 참고).
-if settings.enable_training or settings.enable_incremental_retrain:
+# 학습 라우터·성능 보고는 지재원 full-train 노드에서만 등록한다. 고객사 이미지는
+# training.py 자체를 물리적으로 싣지 않으므로 import도 이 가드 안에서만 한다.
+if settings.enable_training:
+    from koipa.api import training as training_api  # noqa: PLC0415
+
     app.include_router(
         training_api.router, prefix="/api/v1",
         dependencies=[Depends(require_role("admin", "kl_backend", "system"))],
@@ -522,6 +519,8 @@ app.include_router(
 app.include_router(metrics_api.router, prefix="/api/v1")
 app.include_router(prom_metrics_api.router, prefix="/api/v1")
 app.include_router(admin_api.router, prefix="/api/v1")
+if settings.enable_training:
+    app.include_router(admin_api.training_router, prefix="/api/v1")
 app.include_router(keyword_admin_api.router, prefix="/api/v1")
 
 # [2026-09-25] 규정 참고 표시 — 회원사 규정에서 검수 중인 문서와 관련된 **원문 문장**을 참고로 보여 준다.
