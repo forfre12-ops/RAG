@@ -74,10 +74,10 @@ def _expected_ids() -> list[str]:
     return [f"RF-{number:04d}" for number in range(1, EXPECTED_SOURCE_COUNT + 1)]
 
 
-def load_validated_source(report: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def load_validated_source(report: Path, *, audit_path: Path | None = None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Return auditable source rows only after every RF quality gate passes."""
     plan_path = report / "plan.json"
-    audit_path = report / "audit_results.json"
+    audit_path = audit_path or report / "audit_results.json"
     documents = report / "documents"
     plan = _read_json_list(plan_path)
     audit = _read_json_list(audit_path)
@@ -123,6 +123,10 @@ def load_validated_source(report: Path) -> tuple[list[dict[str, Any]], dict[str,
             raise ValueError(f"{doc_id}: missing document body") from exc
         if not text.strip():
             raise ValueError(f"{doc_id}: blank document body")
+        source_file_sha256 = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        audited_sha256 = str(result.get("source_file_sha256") or "").strip().lower()
+        if audited_sha256 and audited_sha256 != source_file_sha256:
+            raise ValueError(f"{doc_id}: audit digest differs from current document body")
         rows.append({
             "doc_id": doc_id,
             "true_grade": grade,
@@ -133,7 +137,7 @@ def load_validated_source(report: Path) -> tuple[list[dict[str, Any]], dict[str,
             "length_min": item.get("length_min"),
             "length_max": item.get("length_max"),
             "body_len": result.get("body_len"),
-            "source_file_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "source_file_sha256": source_file_sha256,
             "text": text,
         })
     missing_formats = [name for name in REQUIRED_FORMATS if not any(row["doc_format"] == name for row in rows[:EXPECTED_REVIEW_COUNT])]
@@ -142,6 +146,7 @@ def load_validated_source(report: Path) -> tuple[list[dict[str, Any]], dict[str,
     provenance = {
         "source_report": str(report.resolve()),
         "plan_sha256": _sha256(plan_path),
+        "audit_results_path": str(audit_path.resolve()),
         "audit_results_sha256": _sha256(audit_path),
         "source_document_count": len(rows),
         "quality_gate": {
@@ -239,11 +244,13 @@ def write_candidates(selected: list[dict[str, Any]], selection: dict[str, Any], 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, default=REPORT)
+    parser.add_argument("--audit", type=Path, help="refreshed per-document audit JSON; enforces source file digests when present")
     parser.add_argument("--canonical-source", type=Path, default=CANONICAL_SOURCE)
     parser.add_argument("--root", type=Path, default=CANDIDATE_ROOT)
     parser.add_argument("--apply", action="store_true", help="stage source and write RF console candidates")
     args = parser.parse_args(argv)
-    rows, provenance = load_validated_source(args.report.resolve())
+    audit_path = args.audit.resolve() if args.audit else None
+    rows, provenance = load_validated_source(args.report.resolve(), audit_path=audit_path)
     selected, selection = select_rows(rows)
     print(json.dumps({"review_batch": BATCH, **provenance, "review_document_count": len(selected), **selection}, ensure_ascii=False, indent=2))
     if not args.apply:

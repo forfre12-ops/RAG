@@ -29,7 +29,7 @@ export const scenarios = [
     async run({ server, check }) {
       const page = await openPage(server, '/console/index.html', { bundleModules: true });
       await page.settle();
-      server.faults.push({ path: '/documents/analyze', delayMs: 600 });
+      server.faults.push({ path: '/documents/analyze', delayMs: 100 });
 
       page.attachFile('doc-file', { name: '시연 문서.pdf' });
       check.eq(isOpen(page), true, '요청이 나가는 즉시 팝업이 뜬다');
@@ -50,7 +50,7 @@ export const scenarios = [
     async run({ server, check }) {
       const page = await openPage(server, '/api/v1/golden/candidates/manage.html');
       await page.settle();
-      server.faults.push({ path: '/golden/candidates/upload', delayMs: 600 });
+      server.faults.push({ path: '/golden/candidates/upload', delayMs: 100 });
 
       page.click('openUpload');
       page.attachFile('file', { name: '운영절차서.pdf' });
@@ -75,7 +75,7 @@ export const scenarios = [
       await page.settle();
       check.eq(isOpen(page), false, '최초 로딩이 끝난 뒤에는 팝업이 없다');
 
-      server.faults.push({ path: /^\/golden\/candidates(\?|$)/, delayMs: 600 });
+      server.faults.push({ path: /^\/golden\/candidates(\?|$)/, delayMs: 100 });
       page.click('refresh');
       check.eq(isOpen(page), true, '새로고침을 누르면 즉시 팝업이 뜬다');
       check.includes(page.text('ap-title'), '목록', '무엇을 하고 있는지 업로드와 다른 문구로 말한다');
@@ -100,7 +100,7 @@ export const scenarios = [
       page.click(page.q('#rows .candidate'));
       await page.settle();
 
-      server.faults.push({ path: /^\/golden\/candidates(\?|$)/, delayMs: 600 });
+      server.faults.push({ path: /^\/golden\/candidates(\?|$)/, delayMs: 100 });
       page.set('action', 'change');
       page.set('finalGrade', 'S1');
       page.set('reason', '재확인 완료');

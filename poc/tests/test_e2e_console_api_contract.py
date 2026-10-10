@@ -59,16 +59,32 @@ def _norm(path: str) -> str:
 
 @pytest.fixture(scope="module")
 def routes() -> dict[tuple[str, str], object]:
-    """(METHOD, 정규화 경로) → response_model(없으면 None). FastAPI 앱에서 직접 읽는다."""
+    """(METHOD, 정규화 경로) → response_model(없으면 None).
+
+    FastAPI/Starlette 최신 조합은 ``include_router`` 결과를 path 없는
+    ``_IncludedRouter``로 ``app.routes``에 보관한다. ``app.routes``의 APIRoute만
+    순회하면 라우트가 0개로 보여 계약 검증 전체가 무력화된다. 포함 컨텍스트의 공개
+    router/routes와 prefix를 함께 읽어, 실제 응답 모델 연결은 유지한다.
+    """
     from koipa.api.app import app
 
     table: dict[tuple[str, str], object] = {}
     for route in app.routes:
-        if not isinstance(route, APIRoute):
-            continue
-        path = _norm(route.path)
-        for method in route.methods or []:
-            table[(method, path)] = route.response_model
+        if isinstance(route, APIRoute):
+            candidates = [("", route)]
+        else:
+            included = getattr(route, "original_router", None)
+            context = getattr(route, "include_context", None)
+            prefix = str(getattr(context, "prefix", "") or "")
+            candidates = [
+                (prefix, child)
+                for child in getattr(included, "routes", ())
+                if isinstance(child, APIRoute)
+            ]
+        for prefix, child in candidates:
+            path = _norm(prefix + child.path)
+            for method in child.methods or []:
+                table[(method, path)] = child.response_model
     assert len(table) > 30, f"라우트를 제대로 못 읽었다({len(table)}건)"
     return table
 

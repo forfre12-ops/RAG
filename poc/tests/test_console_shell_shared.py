@@ -37,6 +37,20 @@ def test_shell_holds_the_layout_rules(rule):
     assert rule in SHELL_CSS, f"{rule} 이 공용 껍데기에 없다"
 
 
+def test_shell_uses_the_same_geometry_as_the_admin_console():
+    """골든 두 화면이 별도 폭·여백·강조색으로 다시 갈라지는 회귀를 막는다."""
+    for fragment in (
+        "var(--shell-sidebar-width)",
+        "var(--shell-content-max)",
+        "var(--shell-page-gutter)",
+        "var(--shell-gap)",
+        "var(--shell-panel-shadow)",
+        ".frame .hero h1",
+        ".frame .side .nav a.active,.frame .side .sidenav a.active",
+    ):
+        assert fragment in SHELL_CSS
+
+
 @pytest.mark.parametrize("marker", ['class="frame"', 'class="side"', 'class="main"',
                                      'class="hero"', 'class="section"'])
 def test_both_screens_use_the_same_skeleton(signoff, manage, marker):

@@ -64,6 +64,16 @@ def test_healthz_advertises_supported_providers(health_payload: dict) -> None:
     )
 
 
+def test_healthz_advertises_actual_synthesis_console_capability(health_payload: dict) -> None:
+    """콘솔은 profile 문자열이 아니라 실제로 마운트된 /synth router capability를 따라야 한다."""
+    operational = health_payload.get("operational_config")
+    assert isinstance(operational, dict)
+    assert isinstance(operational.get("synthesis_console_enabled"), bool), (
+        "healthz 가 synthesis_console_enabled를 주지 않는다 — 라우터가 없는 설치본에서도 "
+        "admin.html이 /synth 요청을 보내 404를 요청 로그에 남길 수 있다."
+    )
+
+
 def test_every_advertised_provider_is_accepted_by_synth_api(health_payload: dict) -> None:
     """② 광고한 값은 전부 POST /synth/generate 가 받는다 — 이것이 깨졌던 계약이다."""
     pattern = re.compile(LLM_PROVIDER_PATTERN)

@@ -451,7 +451,8 @@ fi
 # 고객사·전문가는 "토큰"이 무엇인지 모른다. 로그인 화면이 토큰을 붙여넣으라고 하면 설치가 끝난 것이
 # 아니다(2026-08-24 사용자 지시 — 사람이 토큰을 입력하는 안은 답이 아니다). 그래서 설치가
 #   (1) 서명키와 토큰을 만들고  (2) 그 토큰을 .env 에 적어 로그인 화면에 미리 채워 둔다.
-# 미리 채워진 로그인 화면은 버튼 없이 스스로 로그인한다(211·223 시험서버가 쓰던 방식) — 주소만 열면 된다.
+# 프리필은 접속 토큰을 브라우저에 노출하지 않는다. 로그인 화면에서 **시연 계정으로 계속**을
+# 명시적으로 눌러 HttpOnly 쿠키를 발급받는다. (과거처럼 주소를 여는 것만으로 로그인하지 않는다.)
 #   · 지재원 노드 : 전문가용 reviewer 전용 토큰을 채운다(제안 등급이 가려진 채로 검수한다)
 #   · 고객사 노드 : 관리자 토큰(admin,reviewer)을 채운다
 # 대가: 그 주소에 닿는 누구나 그 토큰의 권한으로 들어간다 → 폐쇄망 안에서만 쓴다. 하드닝 프로파일은
@@ -468,7 +469,7 @@ if [ "$DRY_RUN" = "1" ]; then
     inf "(dry-run) 검수자 토큰(계정 ${REVIEWER_ID}, reviewer 전용) 발급 → ${_rev_file##*/}"
   fi
   if [ "$CONSOLE_AUTOLOGIN" = "1" ]; then
-    inf "(dry-run) 로그인 화면에 토큰을 미리 채워 자동 로그인을 켠다 — .env 에 CONSOLE_LOGIN_PREFILL_* 기록 후 스택 재기동"
+    inf "(dry-run) 로그인 화면에 시연 계정 빠른 로그인 버튼을 설정한다 — .env 에 CONSOLE_LOGIN_PREFILL_* 기록 후 스택 재기동"
   else
     inf "(dry-run) 자동 로그인 끔 — 로그인 화면에 토큰을 붙여넣어야 한다"
   fi
@@ -495,25 +496,25 @@ else
       inf "검수자 토큰 발급 실패 — bash setup.sh 를 다시 돌리면 이어서 한다(멱등)"
     fi
   fi
-  # 자동 로그인 — 토큰을 .env 에 적고 스택을 다시 올려야 로그인 화면이 그 값을 읽는다.
+  # 시연 계정 빠른 로그인 — 토큰은 서버 설정에만 두고, 화면은 명시적 버튼으로 HttpOnly 쿠키를 받는다.
   if [ "$CONSOLE_AUTOLOGIN" = "1" ]; then
     if [ -s "$_prefill_file" ]; then
       _env_set CONSOLE_LOGIN_PREFILL_TOKEN "$(cat "$_prefill_file")"
       _env_set CONSOLE_LOGIN_PREFILL_ALLOW_UNSAFE 1
-      inf "자동 로그인을 적용하려고 스택을 다시 올린다(1~2분)"
+      inf "시연 계정 빠른 로그인을 적용하려고 스택을 다시 올린다(1~2분)"
       if _run_deploy; then
         _autologin_on=1
-        ok "자동 로그인 켜짐 — 콘솔 주소를 열면 토큰 입력 없이 들어간다"
+        ok "시연 계정 빠른 로그인 설정됨 — 콘솔 로그인 화면에서 시연 계정으로 계속을 눌러 들어간다"
       else
         inf "재기동이 경고를 남겼다 — 위 출력 확인. bash setup.sh 를 다시 돌리면 이어서 적용된다"
       fi
     else
-      inf "자동 로그인 토큰이 없어 켜지 못했다 — 위 토큰 발급 결과를 확인한다"
+      inf "시연 계정 빠른 로그인 토큰이 없어 설정하지 못했다 — 위 토큰 발급 결과를 확인한다"
     fi
   elif grep -q '^CONSOLE_LOGIN_PREFILL_TOKEN=' "$ENV_FILE"; then
     _env_unset CONSOLE_LOGIN_PREFILL_TOKEN
     _env_unset CONSOLE_LOGIN_PREFILL_ALLOW_UNSAFE
-    inf "자동 로그인을 끈다(CONSOLE_AUTOLOGIN=0) — 스택을 다시 올린다"
+    inf "시연 계정 빠른 로그인을 끈다(CONSOLE_AUTOLOGIN=0) — 스택을 다시 올린다"
     _run_deploy || inf "재기동이 경고를 남겼다 — 위 출력 확인"
   else
     inf "자동 로그인 끔(CONSOLE_AUTOLOGIN=0) — 로그인 화면에 토큰을 붙여넣어야 한다"

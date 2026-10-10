@@ -93,7 +93,11 @@ export const scenarios = [
       const p2 = await openPage(server, '/console/admin.html', { session: { koipa_admin_pane: 'model' } });
       await p2.settle();
       check.eq(p2.q('[data-product-nav].active')?.dataset.productNav, 'experts', '없어진 탭 이름이면 검수 탭으로 떨어진다');
-      check.ok(p2.qa('[data-pane]').some((s) => p2.visible(s)), '어느 탭이든 보이는 카드가 있다');
+      // Product Shell V2에서는 옛 data-pane 카드가 아니라 product-view 하나만 보인다.
+      // 검수자 화면은 카드가 없어도 배정 상태 패널 자체가 작업 화면이다.
+      const activeView = p2.q('.product-view.is-visible');
+      check.eq(activeView?.id, 'product-experts', '활성 내비게이션과 같은 검수자 작업 화면이 보인다');
+      check.ok(p2.visible(activeView), '복원 뒤 빈 화면이 아니라 작업 화면이 보인다');
       return p2;
     },
   },

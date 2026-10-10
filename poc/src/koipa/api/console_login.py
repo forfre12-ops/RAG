@@ -15,7 +15,6 @@ URL 경로는 바꾸지 않았다(`/golden/candidates/login.html` 등 그대로)
 """
 from __future__ import annotations
 
-import html as _html
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -65,20 +64,24 @@ def _is_console_admin(auth: dict) -> bool:
 
 
 def _login_prefill_block() -> str:
-    """토큰 입력란 — settings.console_login_prefill_token 이 있으면 미리 채우고 경고를 띄운다.
+    """토큰 로그인 영역. 프리필 토큰은 HTML/DOM에 절대 넣지 않는다.
 
-    편의를 위해 무인증 페이지에 관리자 토큰을 싣는 것은 사실상 인증 해제다. 조용히 하지 않고
-    화면에 그대로 적어, 외부 노출 서버에서 켜져 있으면 바로 눈에 띄게 한다.
+    과거에는 무인증 로그인 페이지의 textarea에 JWT를 넣고, 페이지가 열리자마자
+    ``document.cookie``로 옮겼다. 시연 편의와 별개로 토큰이 페이지 소스ㆍ브라우저 DOM에
+    남고, 주소를 여는 것만으로 세션이 생기는 위험한 경로였다. unsafe 프리필은 여전히
+    폐쇄망 시연 전용이지만, 서버가 HttpOnly 쿠키를 발급하고 사용자가 명시적으로 눌러야 한다.
     """
     token = str(getattr(settings, "console_login_prefill_token", "") or "").strip()
     if not token:
         return '<textarea id="t" placeholder="eyJhbGciOiJSUzI1NiIs..." autofocus></textarea>'
     return (
         '<div class="note" style="border-left-color:#c47a00;background:#fff8e8">'
-        "<b>주의:</b> 이 서버는 접속 토큰이 미리 채워져 있습니다(시연 설정). "
-        "이 주소를 여는 누구나 그 토큰의 권한으로(관리자 토큰이면 관리자로) 들어올 수 있으므로 외부 공개 환경에서는 "
-        "<code>CONSOLE_LOGIN_PREFILL_TOKEN</code> 을 비워야 합니다.</div>"
-        f'<textarea id="t" autofocus>{_html.escape(token)}</textarea>'
+        "<b>폐쇄망 시연 설정:</b> 이 서버에는 시연용 접속 수단이 설정돼 있습니다. "
+        "외부 공개 환경에서는 사용할 수 없으며, 시연 계정으로 들어가면 모든 작업이 그 계정의 이력으로 남습니다. "
+        "접속 토큰 자체는 이 페이지나 브라우저에 표시하지 않습니다.</div>"
+        '<button type="button" id="goPrefill">시연 계정으로 계속</button>'
+        '<div class="divider">또는 발급받은 접속 토큰으로</div>'
+        '<textarea id="t" placeholder="eyJhbGciOiJSUzI1NiIs..."></textarea>'
     )
 
 
@@ -98,9 +101,10 @@ def _render_console_login_html() -> str:
         + CONSOLE_THEME_CSS +
         # 로그인만 가운데 인증 패널이라는 역할은 유지하되, 색·글꼴·테두리·포커스는
         # 관리자·골든셋 화면과 같은 CONSOLE_THEME_CSS를 쓴다.
-        ".wrap{max-width:680px;margin:56px auto;padding:36px 40px;background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--radius-lg)}"
+        "body{background:var(--bg-surface)}"
+        ".wrap{max-width:720px;margin:32px auto 72px;padding:28px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shell-panel-shadow)}"
         ".eyebrow{font:800 11px var(--font-mono);letter-spacing:1px;color:var(--text-dim)}"
-        "h1{font-size:40px;line-height:1.1;letter-spacing:-2px;margin:14px 0 10px}"
+        "h1{font-size:clamp(28px,3vw,36px);line-height:1.18;letter-spacing:-.045em;margin:12px 0 10px}"
         "h1 em{font-style:normal;color:var(--text)}p{line-height:1.7;color:var(--text-soft)}"
         "textarea{width:100%;height:150px;padding:13px;font:13px var(--font-mono);"
         "word-break:break-all}"
@@ -111,7 +115,7 @@ def _render_console_login_html() -> str:
         "padding:15px;font-weight:800;font-size:15px;cursor:pointer}button:hover{opacity:.86}"
         ".msg{margin-top:16px;padding:14px;border-radius:8px;background:#fff1f2;color:#b42318;display:none}"
         ".note{border-left:3px solid var(--text);padding:16px 20px;border-radius:var(--radius-sm);background:var(--bg-surface);margin:24px 0}"
-        ".divider{display:flex;align-items:center;gap:14px;margin:40px 0 24px;color:var(--text-dim);font-size:13px}"
+        ".divider{display:flex;align-items:center;gap:14px;margin:28px 0 20px;color:var(--text-dim);font-size:13px}"
         "@media(max-width:760px){.wrap{margin:22px 14px;padding:32px 24px}h1{font-size:32px}}"
         ".divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border-strong)}"
         + HEADER_CSS + NAV_CSS +
@@ -127,7 +131,6 @@ def _render_console_login_html() -> str:
         '<input id="u" type="text" placeholder="아이디" autocomplete="username" autofocus>'
         '<input id="p" type="password" placeholder="비밀번호" autocomplete="current-password">'
         '<button id="goPw">로그인</button><div class="msg" id="mPw"></div>'
-        '<div class="divider">또는 발급받은 접속 토큰으로</div>'
         + _login_prefill_block()
         + '<button id="go">토큰으로 로그인</button><div class="msg" id="m"></div></main><script>'
         "var $=function(x){return document.getElementById(x)};"
@@ -166,15 +169,20 @@ def _render_console_login_html() -> str:
         "location.href=dest();return true}"
         "$('go').onclick=function(){login($('t').value.trim(),false)};"
         "$('t').addEventListener('keydown',function(e){if(e.key==='Enter'&&e.ctrlKey)$('go').click()});"
+        "async function loginWithPrefill(){var b=$('goPrefill');if(!b)return false;b.disabled=true;"
+        "var r=await fetch('/api/v1/golden/candidates/prefill-login',{method:'POST',credentials:'same-origin'});"
+        "if(!r.ok){$('m').style.display='block';$('m').textContent='시연 계정 로그인에 실패했습니다('+r.status+'). 관리자에게 설정을 확인하십시오.';b.disabled=false;return false}"
+        "var s=await fetch('/api/v1/golden/candidates/session',{credentials:'same-origin'});"
+        "if(!s.ok){$('m').style.display='block';$('m').textContent='시연 계정 권한을 확인하지 못했습니다.';b.disabled=false;return false}location.href=dest();return true}"
+        "var prefill=$('goPrefill');if(prefill)prefill.onclick=loginWithPrefill;"
         # 이미 쿠키가 살아 있으면 로그인 화면을 거치지 않는다 — 이 화면이 공용 메뉴의
         # 「검증문서 후보 관리」 목적지라, 붙여넣을 것이 없는 사람에게는 한 단계 군더더기다.
         # 쿠키가 없거나 만료면 그대로 아래 폼으로 남는다.
         "(async function(){try{var r=await fetch('/api/v1/golden/candidates/session',"
         "{credentials:'same-origin'});if(r.ok){location.href=dest();return}}catch(e){}"
-        # 토큰이 미리 채워져 있으면 **버튼을 누르지 않아도** 들어간다.
-        # 요구사항(2026-08-20): 시연 중에 로그인이 막히면 안 된다. 주소만 열면 끝이어야
-        # 한다. 실패하면 조용히 화면에 남아 손으로 붙여넣을 수 있게 둔다(quiet=true).
-        "var v=$('t').value.trim();if(v)login(v,true)})();"
+        # 프리필 토큰이 있어도 자동 로그인하지 않는다. 이 페이지를 단순히 열었을 때
+        # 관리자 세션이 생기면 안 되며, 시연 계정 버튼을 명시적으로 누르게 한다.
+        "})();"
         "</script></body></html>"
     )
 
@@ -183,6 +191,30 @@ def _render_console_login_html() -> str:
 def proxy_gold_console_login_html() -> HTMLResponse:
     """콘솔 진입 화면 — 무인증. 데이터는 없고 토큰을 쿠키로 심기만 한다."""
     return HTMLResponse(content=_render_console_login_html())
+
+
+@html_router.post("/golden/candidates/prefill-login", summary="폐쇄망 시연 계정 로그인")
+def proxy_gold_console_prefill_login(request: Request) -> Response:
+    """명시적으로 요청한 폐쇄망 시연에만 프리필 JWT를 HttpOnly 쿠키로 발급한다.
+
+    프리필이 비어 있으면 이 경로 자체를 제공하지 않는다. 토큰 문자열은 응답 본문ㆍHTMLㆍ
+    JavaScript 어디에도 실리지 않는다. 이 경로는 안전한 인증 수단이 아니므로 기존 설정의
+    하드닝 배포 차단(``CONSOLE_LOGIN_PREFILL_ALLOW_UNSAFE``)도 그대로 적용된다.
+    """
+    token = str(getattr(settings, "console_login_prefill_token", "") or "").strip()
+    if not token:
+        raise HTTPException(status_code=404, detail="demo prefill login is not configured")
+    response = JSONResponse({"ok": True, "mode": "demo-prefill"})
+    response.set_cookie(
+        "koipa_access_token",
+        token,
+        max_age=12 * 3600,
+        path="/",
+        samesite="lax",
+        httponly=True,
+        secure=_request_uses_https(request),
+    )
+    return response
 
 
 # 세션 쿠키 수명 — 서버가 직접 서명하는 토큰(아이디+비밀번호 로그인)의 만료.

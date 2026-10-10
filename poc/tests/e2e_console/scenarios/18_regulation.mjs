@@ -282,7 +282,11 @@ export const scenarios = [
         SUMMARY(REG1, '문서보안 규정', 'v3.1', 'active'), SUMMARY(REG2, '개인정보 처리 지침', 'v1.0', 'indexing', { clause_count: 0, sentence_count: 0 })]);
       server.overrides['GET /regulations/{reg_id}'] = DETAIL(REG2, '개인정보 처리 지침', 'v1.0', 'indexing', { embedded_count: 2, embed_target_count: 6, clause_count: 0, sentence_count: 0 });
       page.click('reg-upload');
-      await page.settle();
+      // indexing 상태에서는 화면이 의도적으로 조용한 폴링을 계속한다. `settle()`은
+      // in-flight 요청이 0이 되기를 기다리므로 여기서는 최대 4초를 다 소진한다.
+      // 필요한 것은 초기 업로드 결과가 그려졌는지이므로 그 UI 상태만 기다린다.
+      const indexingShown = await page.until(() => page.text('reg-body').includes('분석 중'), 1000);
+      check.ok(indexingShown, '업로드 뒤 분석 중 상태가 목록에 그려진다');
 
       const up = server.lastCall('POST', '/regulations');
       check.eq(up?.path, '/regulations', 'POST /regulations 가 나갔다');

@@ -47,6 +47,8 @@ def test_grid_counts_cells_and_real_origin():
     assert out["documents"] == 4
     assert out["grid"]["TS|반도체"] == 2
     assert out["grid"]["S1|반도체"] == 1
+    assert out["real_grid"]["TS|반도체"] == 0
+    assert out["real_grid"]["S1|반도체"] == 1
     assert out["grades"] == {"TS": 2, "S1": 1, "S2": 0, "S3": 1}
     # 실문서 유래 비중 — 빈 칸이라도 실문서가 있으면 합성이 급하지 않다는 판단의 근거다.
     assert out["real_share"] == 0.5

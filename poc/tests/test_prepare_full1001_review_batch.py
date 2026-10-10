@@ -49,3 +49,14 @@ def test_rf_source_refuses_any_failed_quality_gate(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="length_ok"):
         batch.load_validated_source(tmp_path)
+
+
+def test_rf_source_refuses_a_custom_audit_with_a_stale_document_digest(tmp_path: Path) -> None:
+    _write_report(tmp_path)
+    audit_path = tmp_path / "audit_results.current.json"
+    audit = json.loads((tmp_path / "audit_results.json").read_text(encoding="utf-8"))
+    audit[0]["source_file_sha256"] = "0" * 64
+    audit_path.write_text(json.dumps(audit, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="audit digest differs"):
+        batch.load_validated_source(tmp_path, audit_path=audit_path)

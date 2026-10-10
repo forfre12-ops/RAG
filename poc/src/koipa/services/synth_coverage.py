@@ -113,6 +113,9 @@ def analyse(
         "thin": thin,
         "min_per_cell": min_per_cell,
         "grid": {f"{g}|{d}": grid[(g, d)] for g in GRADES for d in domains},
+        # full cell도 실문서/합성 구성을 구분해야 한다. thin·empty 목록만으로는 충분한
+        # 칸의 real 수를 알 수 없어 화면이 전체 수를 합성 수처럼 오해할 수 있었다.
+        "real_grid": {f"{g}|{d}": real[(g, d)] for g in GRADES for d in domains},
         "real_share": round(sum(real.values()) / total, 3) if total else 0.0,
     }
 

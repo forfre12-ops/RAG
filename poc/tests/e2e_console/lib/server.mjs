@@ -333,6 +333,11 @@ data: ${JSON.stringify(ev.data)}
     anyCall(method, pathPart, pred = () => true) {
       return state.calls.find((c) => c.method === method && c.path.startsWith(pathPart) && pred(c)) || null;
     },
-    close: () => new Promise((r) => server.close(r)),
+    close: () => new Promise((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+      // 타임아웃된 시나리오가 남긴 keep-alive/진행 중 요청이 listen socket 종료를
+      // 무기한 붙잡지 않게 한다. 이 서버는 이 실행기만 쓰는 localhost mock 이다.
+      server.closeAllConnections?.();
+    }),
   };
 }

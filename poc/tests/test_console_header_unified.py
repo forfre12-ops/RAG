@@ -124,6 +124,17 @@ def test_login_uses_the_single_console_theme_not_a_blue_subtheme():
         assert old_token not in html
 
 
+def test_login_uses_the_same_panel_scale_as_the_console_shell():
+    html = _render_console_login_html()
+    for fragment in (
+        "background:var(--bg-surface)",
+        "max-width:720px",
+        "box-shadow:var(--shell-panel-shadow)",
+        "font-size:clamp(28px,3vw,36px)",
+    ):
+        assert fragment in html
+
+
 @pytest.mark.parametrize("name", ("manage", "login", "admin.html", "index.html"))
 def test_every_console_surface_carries_the_shared_visual_theme(name):
     """상단만이 아니라 본문 토큰·컨트롤도 한 정본에서 나와야 한다."""
@@ -275,14 +286,14 @@ def test_deploy_badge_mounts_into_the_unified_header():
     assert "header.top" in js
 
 
-def test_admin_console_opens_the_tab_for_a_hash_anchor():
-    """검수 목록 카드는 기본 탭에 없다 — 주소에 해시를 달고 오면 해시 처리가 탭을 열어야 한다.
+def test_admin_console_opens_the_product_view_for_a_hash_anchor():
+    """검수 목록 카드의 옛 북마크는 현재 검수자 Product View로 이어져야 한다.
 
     [2026-08-24] 종전에는 앵커 이름을 CONSOLE_LINKS["signoff"] 에서 뽑아 썼다. 그 메뉴 항목이
     없어졌으므로(4항목 → 3항목: 그 항목만 다른 화면이 아니라 이 화면의 내부 앵커를 가리켰다)
     이름을 직접 적는다. **잠그는 것은 그대로다** — 이 기계장치는 메뉴가 없어져도 필요하다:
-    이 카드는 기본 탭(ops)이 아닌 「검증문서」 탭(review)에 있어서, 인쇄물·북마크·화면 안
-    링크가 이 주소를 달고 오면 대상이 display:none 인 채로 도착한다(2026-08-20 실측).
+    새 콘솔에서는 이 카드가 검수자 화면과 중복 노출되지 않는다. 그래도 인쇄물·북마크·화면 안
+    링크가 이 주소를 달고 오면 현재의 검수자 Product View로 전환돼야 한다(2026-08-20 실측).
     """
     admin = (STATIC / "admin.html").read_text(encoding="utf-8")
     jobs = (STATIC / "golden_jobs.js").read_text(encoding="utf-8")
@@ -292,7 +303,9 @@ def test_admin_console_opens_the_tab_for_a_hash_anchor():
 
     anchor = "gold-jobs-card"
     assert f'id="{anchor}"' in jobs, f"#{anchor} 를 만드는 곳이 없다"
-    assert 'data-pane="review"' in jobs, f"#{anchor} 가 기본 탭에 있으면 이 시험의 전제가 깨진다"
+    assert 'data-pane="review"' in jobs, f"#{anchor} 가 이전 북마크 호환 정보를 잃었다"
+    assert 'data-product-view="experts"' in jobs, f"#{anchor} 가 Product Shell 소유 화면을 명시하지 않는다"
+    assert 'data-product-legacy="true"' in jobs, f"#{anchor} 가 새 검수 화면과 중복 노출될 수 있다"
 
 
 def test_signoff_screen_is_not_a_fixed_link_target():

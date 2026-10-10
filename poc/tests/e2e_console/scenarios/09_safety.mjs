@@ -123,7 +123,11 @@ export const scenarios = [
     needsMock: true,
     async run({ server, check }) {
       const { FIXTURES } = await import('../lib/server.mjs');
-      server.overrides['GET /healthz'] = { ...FIXTURES['GET /healthz'], deploy_profile: 'onprem-local' };
+      server.overrides['GET /healthz'] = {
+        ...FIXTURES['GET /healthz'],
+        deploy_profile: 'onprem-local',
+        operational_config: { ...FIXTURES['GET /healthz'].operational_config, synthesis_console_enabled: false },
+      };
 
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
@@ -131,7 +135,7 @@ export const scenarios = [
       // [2026-08-24] 2 → 1. 검증문서 카드가 게이트에서 빠졌다 — 그 카드에서 지재원 전용이던
       // AI 후보 생성이 화면에서 제거됐고, 남은 검수 시작·서명 열기는 고객사에도 필요하다
       // (onprem-local 은 활성화에 사람 서명 평가셋을 요구한다). 남은 대상은 합성 생성 카드다.
-      const factory = page.qa('[data-profile="full-train"]');
+      const factory = page.qa('[data-capability="synthesis-console"]');
       check.gte(factory.length, 1, '모델 공장 전용 카드가 존재는 한다');
       for (const el of factory) check.ok(!page.visible(el), `숨겨졌다: ${el.querySelector('.ttl')?.textContent?.trim() || el.id}`);
       check.ok(page.visible('profile-banner'), '어떤 서버인지 배너가 뜬다');
@@ -154,7 +158,11 @@ export const scenarios = [
     needsMock: true,
     async run({ server, check }) {
       const { FIXTURES } = await import('../lib/server.mjs');
-      server.overrides['GET /healthz'] = { ...FIXTURES['GET /healthz'], llm_provider: 'noop' };
+      server.overrides['GET /healthz'] = {
+        ...FIXTURES['GET /healthz'],
+        llm_provider: 'noop',
+        operational_config: { ...FIXTURES['GET /healthz'].operational_config, synthesis_console_enabled: true },
+      };
 
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
@@ -172,7 +180,7 @@ export const scenarios = [
       check.matches(page.text('profile-banner'), /학습에 쓰이는 행은 0건/,
                     '0 이 되는 것이 결과가 아니라 학습 행이라고 말한다');
       // 프로파일 숨김과 탭 숨김을 섞지 않으려고, 각 카드를 자기 탭에서 확인한다.
-      for (const el of page.qa('[data-profile="full-train"]')) {
+      for (const el of page.qa('[data-capability="synthesis-console"]')) {
         await goToPane(page, el.dataset.pane);
         check.ok(page.visible(el), `${el.dataset.pane} 탭에서 모델 공장 전용 카드가 보인다`);
         check.ok(!el.classList.contains('pf-hidden'), '프로파일 숨김 클래스가 붙지 않았다');

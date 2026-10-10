@@ -27,8 +27,8 @@ SHELL_CSS = """
 /* [2026-08-21] 본문 글꼴을 다섯 화면 한 벌로. 종전에는 이 두 곳만 Arial 계열이라
    같은 한글 문서를 보는데 화면마다 글자 모양이 달랐다(관리자 콘솔·등급 시연은
    Pretendard 계열). 시스템 폰트를 앞세우고 한글 폴백을 뒤에 둔다. */
-body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;line-height:1.45}
-.top{height:84px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 34px;gap:18px}
+body{margin:0;background:var(--bg-surface);color:var(--text);font-family:var(--font-sans);line-height:1.6}
+.top{height:var(--shell-header-height);border-bottom:1px solid var(--border-mid);display:flex;align-items:center;padding:0 34px;gap:18px;background:var(--bg)}
 .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}
 .brand{font-size:17px;font-weight:900;letter-spacing:1px}
 .divider{height:23px;border-left:1px solid #cfcfcb}
@@ -37,19 +37,19 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system
 .revision{margin-left:14px;padding:7px 11px;border:1px solid var(--line);border-radius:6px;font:700 12px ui-monospace,monospace;color:#555}
 .dot{display:inline-block;width:10px;height:10px;background:#bf6c00;border-radius:50%;margin-right:8px;box-shadow:0 0 0 4px #fff4df}
 .workspace{font-size:11px;font-weight:800;color:#949494;letter-spacing:.5px}
-.frame{display:grid;grid-template-columns:326px minmax(0,1fr);min-height:calc(100vh - 84px)}
-.side{border-right:1px solid var(--line);padding:42px 28px;display:flex;flex-direction:column}
-.main{padding:68px min(6.5vw,110px) 90px;max-width:1500px}
-.cap{font:800 12px ui-monospace,monospace;letter-spacing:.7px;color:#969da3}
-.eyebrow{font:800 12px ui-monospace,monospace;letter-spacing:.8px;color:#8a9298}
-.hero{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:35px;padding-bottom:56px;border-bottom:1px solid var(--line)}
-  .gate{border:1px solid var(--line);border-left:5px solid var(--text);align-self:center;padding:25px 24px;min-height:218px}
+.frame{display:grid;grid-template-columns:var(--shell-sidebar-width) minmax(0,1fr);gap:var(--shell-gap);align-items:start;max-width:var(--shell-content-max);min-height:calc(100vh - var(--shell-header-height));margin:0 auto;padding:24px var(--shell-page-gutter) 112px;box-sizing:border-box}
+.side{position:sticky;top:calc(var(--shell-header-height) + 22px);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--bg);box-shadow:var(--shell-panel-shadow);padding:15px 12px;min-height:438px;display:flex;flex-direction:column;box-sizing:border-box}
+.main{min-width:0;padding:4px 0 0;max-width:none}
+.cap{font:800 10px var(--font-mono);letter-spacing:.09em;color:var(--text-dim)}
+.eyebrow{font:800 11px var(--font-mono);letter-spacing:.08em;color:var(--text-dim)}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:var(--shell-gap);padding:4px 0 28px;border-bottom:1px solid var(--border)}
+  .gate{border:1px solid var(--border);border-left:3px solid var(--text);border-radius:var(--radius-lg);background:var(--bg);align-self:start;padding:20px;min-height:0;box-shadow:0 2px 8px rgba(9,9,11,.025)}
 .gate .glabel{font:12px ui-monospace,monospace;color:#8a949a}
 .gate .status{display:inline-block;border-radius:20px;background:var(--green);color:#087341;padding:5px 10px;font-size:11px;font-weight:800}
 .actions{display:flex;gap:9px;margin-top:20px}
-.section{margin-top:76px}
-.sectionTop{display:flex;align-items:end;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line);padding-bottom:23px}
-.secNum{display:inline-block;border:1px solid #dadad7;padding:5px 8px;border-radius:4px;color:#92999f;font:12px ui-monospace,monospace;margin-right:13px;vertical-align:8px}
+.section{margin-top:32px}
+.sectionTop{display:flex;align-items:end;justify-content:space-between;gap:20px;border-bottom:1px solid var(--border);padding-bottom:16px}
+.secNum{display:inline-block;border:1px solid var(--border-strong);padding:4px 7px;border-radius:var(--radius-sm);color:var(--text-dim);font:11px var(--font-mono);margin-right:10px;vertical-align:5px}
 .list{width:100%}
 .rowhead{padding:13px 12px;background:#f7f7f5;color:#899199;font:11px ui-monospace,monospace}
 .btn{border:1px solid #d8d8d5;background:#fff;padding:11px 14px;font-weight:800;font-size:13px;cursor:pointer}
@@ -64,14 +64,34 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system
 .btn.primary{background:#111;color:#fff;border-color:#111}
 .btn:focus-visible{outline:2px solid #0070f3;outline-offset:2px}
 .viewbar .btn.sm{padding:6px 11px;font-size:12px}
-.summary{margin-top:40px;border-top:3px solid #111;background:#fafaf8;display:grid;grid-template-columns:1.18fr repeat(4,1fr)}
-.summaryIntro,.metric{padding:29px;border-right:1px solid var(--line);min-height:154px}
+.summary{margin-top:24px;border:1px solid var(--border);border-top:3px solid var(--text);border-radius:var(--radius-lg);background:var(--bg);display:grid;grid-template-columns:1.18fr repeat(4,1fr);overflow:hidden;box-shadow:0 2px 8px rgba(9,9,11,.025)}
+.summaryIntro,.metric{padding:20px;border-right:1px solid var(--border);min-height:132px}
 .metric:last-child{border-right:0}
 .metric .mcap{font-size:12px;color:#8a9299}
 .flash{min-height:20px;color:#087341;font-size:13px;margin:14px 0}
 .flash.error{color:#bf2337}
 .empty{padding:45px 14px;color:#8a9299}
 .pill{display:inline-block;border-radius:18px;padding:5px 9px;font-size:11px;font-weight:800}
+
+/* 후보 관리·서명 화면의 개별 CSS보다 우선하는 공용 작업공간 규격.
+   각 화면의 업무 정보는 달라도, 좌측 작업공간·제목·카드 밀도는 관리자 콘솔과 같아야 한다. */
+.frame .side .workname{margin:10px 8px 4px;font-size:16px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+.frame .side .workdesc{margin:0 8px;font-size:12px;line-height:1.55;color:var(--text-dim)}
+.frame .side .branch{margin:8px 8px 0;font:700 11px var(--font-mono);color:var(--text-dim)}
+.frame .side .nav,.frame .side .sidenav{margin:18px 0 0;padding:0;border:0;display:flex;flex-direction:column;gap:3px}
+.frame .side .nav a,.frame .side .sidenav a{display:flex;align-items:center;gap:10px;margin:0;padding:8px 10px;border:1px solid transparent;border-left:1px solid transparent;border-radius:var(--radius);color:var(--text-dim);font-size:13px;text-decoration:none}
+.frame .side .nav a span,.frame .side .sidenav a span{font:700 10px var(--font-mono);color:inherit;padding:0}
+.frame .side .nav a.active,.frame .side .sidenav a.active{background:var(--bg-inverse);border-color:var(--bg-inverse);color:#fff;font-weight:800;padding-left:10px}
+.frame .side .ledger{margin:18px 5px 2px;padding:14px 4px 1px;border-top:1px solid var(--border);font-size:11px;color:var(--text-dim)}
+.frame .side .ledger b{color:var(--text)}
+.frame .hero h1{font-size:clamp(28px,3vw,36px);line-height:1.18;letter-spacing:-.045em;margin:12px 0 10px;font-weight:850;color:var(--text)}
+.frame .hero h1 em{color:var(--text)}
+.frame .hero p{max-width:720px;margin:0;color:var(--text-soft);font-size:14px;line-height:1.65}
+.frame .hero .gate strong{font-size:28px;letter-spacing:-.04em;margin:8px 0;color:var(--text)}
+.frame .section h2{font-size:24px;letter-spacing:-.035em;color:var(--text)}
+.frame .sectionTop p{margin:6px 0 0;color:var(--text-soft);font-size:13px}
+.frame .metric b{font-size:26px;letter-spacing:-.04em;color:var(--text)}
+.frame .summaryIntro h2{font-size:18px;color:var(--text)}
 """
 
 
@@ -82,6 +102,6 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system
 # 그래서 SHELL_CSS 와 분리해 두고, 각 화면이 자기 스타일 끝에 이어 붙인다.
 # 화면 고유 반응형(manage 의 .detail·.candidate 등)은 각자 파일에 남긴다.
 SHELL_MEDIA_CSS = """
-@media(max-width:1050px){.frame{grid-template-columns:1fr}.side{display:none}.main{padding:45px 30px}.hero{grid-template-columns:1fr}.summary{grid-template-columns:repeat(3,1fr)}.summaryIntro{grid-column:1/-1}}
-@media(max-width:700px){.top{padding:0 16px}.topmid,.workspace{display:none}.main{padding:35px 18px}.hero h1{letter-spacing:-2.5px}.summary{grid-template-columns:repeat(2,1fr)}.rowhead{display:none}.section h2{font-size:31px}.sectionTop{align-items:start;flex-direction:column}.sectionTop p{margin-left:0}.filters{width:100%}.filters input{width:100%}}
+@media(max-width:1050px){.frame{grid-template-columns:1fr;padding:18px var(--shell-page-gutter) 96px}.side{display:none}.main{padding:0}.hero{grid-template-columns:1fr}.summary{grid-template-columns:repeat(3,1fr)}.summaryIntro{grid-column:1/-1}}
+@media(max-width:700px){.top{padding:0 16px}.topmid,.workspace{display:none}.frame{padding:14px 12px 84px}.main{padding:0}.hero h1{letter-spacing:-2.5px}.summary{grid-template-columns:repeat(2,1fr)}.rowhead{display:none}.section h2{font-size:31px}.sectionTop{align-items:start;flex-direction:column}.sectionTop p{margin-left:0}.filters{width:100%}.filters input{width:100%}}
 """

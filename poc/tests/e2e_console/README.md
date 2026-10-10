@@ -6,10 +6,27 @@
 cd poc/tests/e2e_console
 npm install            # 한 번만 (jsdom)
 node run.mjs           # 전부 실행
+node run.mjs --json    # stdout JSON, stderr 진행 상태
 ```
 
 pytest 에서도 같은 것이 돈다(`poc/tests/test_e2e_console_scenarios.py`). node 나 jsdom 이
 없으면 그 파일은 통째로 skip 한다 — 파이썬 CI 에 node 를 강제하지 않는다.
+
+## 실행 시간과 멈춤 방지
+
+mock 전체 실행은 시나리오 하나당 기본 **15초**, 전체 **120초**의 상한을 둔다. 어느 화면
+타이머·요청이 끝나지 않으면 그 시나리오는 `CRASH`로 결과에 남고, jsdom 창과 localhost mock
+연결을 닫는다. 조용히 멈춘 채 성공으로 보이지 않게 하기 위한 안전망이다.
+
+```
+node run.mjs --scenario-timeout-ms 20000
+node run.mjs --suite-timeout-ms 90000
+```
+
+시나리오의 시작·종료는 stderr로 즉시 표시한다. `--json`의 stdout은 결과 JSON만 유지하며,
+`suite.elapsed_ms`·`suite.timed_out`에도 실행 한도를 기록한다. mock 모드에서는 화면의 폴링
+타이머만 10배 빠르게 돌려 대기 비용을 줄인다. 실제 서버(`--base`)에는 이 축소와 전체 실행
+상한을 적용하지 않는다.
 
 ---
 
@@ -156,6 +173,18 @@ KOIPA_E2E_COOKIE="koipa_access_token=$(cat token.txt)" node run.mjs --base http:
 ⚠ **대가 하나** — 쿠키를 주면 항상 인증된 상태라 401 경로를 못 태운다.
 `demo.auth.401-goes-to-login-not-a-prompt` 하나가 그래서 실패한다. 그 시나리오를 보려면
 쿠키 없이 한 번 더 돌린다. 두 번 돌리는 것이 지금의 정답이다.
+
+### 로컬 실제 서버 스모크
+
+로컬에서도 정적 mock이 아니라 FastAPI의 정적 마운트·lifespan·HTTP 프록시 경로를 함께
+확인하려면 아래를 실행한다. 개발용 `TESTING=1`·`DEPLOY_PROFILE=dev`·`POC_MODE=dryrun`으로
+임시 loopback Uvicorn을 기동하고, 읽기 전용 Product Shell 전환만 검사한 뒤 종료한다.
+문서·검수·학습 데이터를 쓰지 않으며 211 배포 증명은 아니다.
+
+```
+cd poc
+.venv/Scripts/python.exe scripts/check_console_http_acceptance.py
+```
 
 건너뛰는 것 셋:
 

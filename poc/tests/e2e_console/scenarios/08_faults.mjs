@@ -168,10 +168,10 @@ export const scenarios = [
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      server.faults.push({ path: '/admin/dashboard', delayMs: 700 });
+      server.faults.push({ path: '/admin/dashboard', delayMs: 120 });
 
       page.set('auto-interval', '3');       // 즉시 1회 tick 시작(느린 응답)
-      await page.wait(120);                  // tick 진행 중
+      await page.wait(30);                   // tick 진행 중
       page.set('auto-interval', '0');        // 진행 중에 끈다
       check.includes(page.text('auto-status'), '정지', '끈 직후에는 정지로 표시된다');
 
@@ -191,6 +191,8 @@ export const scenarios = [
       await page.settle();
       // 정상으로 뜬 뒤 healthz 를 죽이고 다시 눌러 본다
       server.faults.push({ path: '/healthz', status: 503, body: { detail: 'model not loaded' } });
+      // Product Shell V2에서는 서버 상태 확인이 「연결·운영 도구」 화면에 있다.
+      await goToPane(page, 'settings');
       page.click(page.q('button[onclick="checkHealth()"]'));
       await page.settle();
 

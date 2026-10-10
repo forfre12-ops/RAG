@@ -70,6 +70,25 @@ def test_console_shows_precision_and_recall(console: str):
     assert "정밀도" in console and "재현율" in console
 
 
+def test_console_model_release_uses_evidence_scoped_metrics(console: str):
+    """모델 화면은 내부 단계번호가 아니라 릴리스 업무와 평가 근거를 먼저 보여 준다."""
+    for marker in (
+        'class="card release-card"',
+        '학습 작업',
+        '릴리스 관리',
+        '모델 평가',
+        'F1 점수',
+        '고등급 미탐률',
+        '평가 데이터',
+        '평가 표본 수',
+        'metric_timestamp_source',
+        'fnr_high',
+        'id="metrics-context"',
+    ):
+        assert marker in console
+    assert "안전층 적용 전" not in console
+
+
 def test_console_warns_before_grade_deactivation(console: str):
     """PUT /schema/grades 는 목록 치환이라 행 삭제 = 비활성이다. 무경고 저장은 사고 경로.
 
@@ -245,3 +264,12 @@ def test_console_mobile_header_wraps_the_navigation(console: str):
     assert "@media(max-width:640px)" in console
     assert ".top{height:auto;min-height:58px" in console
     assert ".top .cnav{order:3;width:100%;overflow-x:auto" in console
+
+
+def test_console_uses_synth_capability_and_keeps_debug_log_collapsed(console: str):
+    """없는 /synth router를 profile 추정으로 두드리지 않고, 기술 로그도 기본 화면을 가리지 않는다."""
+    assert 'data-capability="synthesis-console"' in console
+    assert "synthesis_console_enabled" in console
+    assert "function synthConsoleAvailable()" in console
+    assert '<div class="logbar-body collapsed" id="logbody"' in console
+    assert 'aria-expanded="false"' in console

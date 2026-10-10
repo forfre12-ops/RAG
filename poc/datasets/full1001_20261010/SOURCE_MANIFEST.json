@@ -2,7 +2,8 @@
   "schema_version": "full1001-source-v1",
   "source_report": "F:\\antigravity\\rag\\poc\\reports\\full1001_20261010",
   "plan_sha256": "a1cf5b5fe9568e07fce5359674f832e0fa771d711ebebe05097e2371a93c226a",
-  "audit_results_sha256": "106397ebaadb71342a42e93fd33d5732dd2a55083ec7d4ae11cdcf0d94ea2b86",
+  "audit_results_path": "F:\\antigravity\\rag\\poc\\reports\\full1001_20261010\\audit_results.current.json",
+  "audit_results_sha256": "d3ae42485be561597ff3fad364c698fe6097d8ba91e3923c41f8271022ba96b8",
   "source_document_count": 1001,
   "quality_gate": {
     "length_ok": true,
@@ -12,6 +13,6 @@
     "self_decl": 0,
     "pii": 0
   },
-  "canonical_manifest_sha256": "76b88f0ca1c8d1481d3aa723a67538e031b275b59d249198613bccef8582a704",
+  "canonical_manifest_sha256": "79ed98049280d1f26b739b69dddcee973b215e1b3dc709fdc8734ca27df25422",
   "documents": 1001
 }

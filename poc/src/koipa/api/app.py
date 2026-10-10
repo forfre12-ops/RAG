@@ -434,6 +434,7 @@ async def unhandled_error(request: Request, exc: Exception):
 
 
 app.include_router(health_api.router, prefix="/api/v1")
+app.state.synthesis_console_enabled = False
 app.include_router(classify_api.router, prefix="/api/v1")
 app.include_router(classify_stream_api.router, prefix="/api/v1")
 app.include_router(explain_api.router, prefix="/api/v1")
@@ -473,6 +474,7 @@ if settings.enable_synthetic_generation:
         )
     else:
         app.include_router(synthesis_api.router, prefix="/api/v1")
+        app.state.synthesis_console_enabled = True
 else:
     logger.info("synthesis router disabled (deploy_profile=%s)", settings.deploy_profile)
 # 골든 검수·서명 HTML 뷰 — 브라우저 window.open/직접 URL 로 열리게 별도 라우터로 분리.

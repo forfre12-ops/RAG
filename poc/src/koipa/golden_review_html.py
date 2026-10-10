@@ -304,7 +304,7 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + DOC_CSS + """
 .main .rubric{margin-top:22px}
 .main .filters{margin-top:18px}
 
-.who{font-size:13px;font-weight:700;color:#fff;padding:5px 0;display:inline-block}
+.who{font-size:13px;font-weight:700;color:var(--text);padding:5px 0;display:inline-block}
 .scard.pending{opacity:.72;background:var(--bg-surface)}
 .pendnote{margin-top:10px;padding:8px 11px;font-size:13px;line-height:1.55;color:#78350f;background:#fffbeb;border:1px solid #fcd34d;border-left:3px solid #f59e0b;border-radius:2px}
 .pg-lack{color:#b45309;font-weight:700}

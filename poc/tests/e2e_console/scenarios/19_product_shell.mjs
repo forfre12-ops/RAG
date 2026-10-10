@@ -390,6 +390,8 @@ export const scenarios = [
       const page = await productTab(server, 'overview');
       check.eq(page.qa('#gold-jobs-card').length, 1, '첫 로드에서 카드가 하나다');
 
+      // Product Shell V2에서는 서버 상태 확인이 「연결·운영 도구」 화면에 있다.
+      await goToPane(page, 'settings');
       page.click(page.q('button[onclick="checkHealth()"]'));
       await page.settle();
       check.eq(page.qa('#gold-jobs-card').length, 1, '다시 확인해도 카드가 여전히 하나다');

@@ -209,22 +209,41 @@ export const scenarios = [
         await page.settle();
         const view = nav.dataset.productNav;
         const productPanel = page.$(`product-${view}`);
+        const navigationStatus = page.$('product-view-status');
+        const viewLabel = {
+          overview: '운영 개요', documents: '검증 문서 검토·결정', experts: '검수자 배정·진행',
+          policy: '분류 정책·참고 규정', models: '학습·평가·릴리스', audit: '감사 기록', settings: '연결·운영 도구',
+        }[view];
+        check.includes(
+          navigationStatus?.textContent || '',
+          viewLabel,
+          `${view} 메뉴 전환이 보조기술 상태 영역에 안내된다`,
+          navigationStatus?.textContent || '',
+        );
         if (productPanel) {
           check.ok(page.visible(productPanel), `${view} 메뉴의 본문이 보인다`);
           check.gte(productPanel.querySelectorAll('section,article,div').length, 1, `${view} 메뉴에 내용 골격이 있다`);
         } else {
-          // policy/models/audit/settings는 새 껍데기의 메뉴이되, 검증된 기존 카드 묶음을
-          // 재사용한다. 존재하지 않는 product-* 빈 껍데기를 만들지 않는다.
-          const pane = ({ policy: 'config', models: 'train', audit: 'ops' })[view];
-          const selector = view === 'settings'
-            ? '.grid > [data-product-view="settings"]'
-            : `.grid > [data-pane="${pane}"]`;
+          // policy/models/audit/settings는 검증된 기존 카드 묶음을 쓰되, 이제는 모든 카드가
+          // 명시적인 Product View 소유권을 가진다. 구 data-pane으로 화면을 고르면 두 메뉴
+          // 체계가 다시 섞이는 회귀가 된다.
+          const selector = `.grid > [data-product-view="${view}"]:not([data-product-legacy])`;
           const shown = page.qa(selector).filter((card) => page.visible(card));
-          check.gte(shown.length, 1, `${view} 메뉴의 기존 카드 본문이 보인다`);
+          check.gte(shown.length, 1, `${view} 메뉴의 소유 카드 본문이 보인다`);
         }
-        const always = page.qa('[data-pane="always"]').filter((s) => page.visible(s));
-        check.gte(always.length, 1, `${view} 메뉴에서도 연결·인증 카드는 남는다`);
+        const connectionSettings = page.qa('[data-product-view="settings"]').filter((s) => page.visible(s));
+        if (view === 'settings') {
+          check.gte(connectionSettings.length, 1, '연결·운영 도구 메뉴에서만 연결·인증 상세를 연다');
+          const settings = connectionSettings[0];
+          check.ok(settings.classList.contains('settings-card'), '설정 화면이 공용 설정 카드 표현을 사용한다');
+          check.ok(settings.textContent.includes('서버 연결과 기록 주체'), '설정 화면이 연결 설정의 목적을 설명한다');
+          check.ok(settings.textContent.includes('시연 데이터 정리'), '시연 정리 작업을 별도 구역으로 분리한다');
+        } else {
+          check.eq(connectionSettings.length, 0, `${view} 메뉴에 연결·인증 상세가 중복 노출되지 않는다`);
+        }
       }
+      const unownedLegacyCards = page.qa('.grid > [data-pane]').filter((card) => !card.dataset.productView);
+      check.eq(unownedLegacyCards.length, 0, '모든 기존 카드는 Product View 소유권을 명시한다', unownedLegacyCards.map((card) => card.id || card.textContent.trim().slice(0, 24)).join(' | '));
       check.eq(page.errors.length, 0, '메뉴를 다 눌러도 오류가 없다', page.errors.map((e) => e.message).join(' | '));
       return page;
     },

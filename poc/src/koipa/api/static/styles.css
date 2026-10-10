@@ -1062,6 +1062,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
   --amber:#d97706;--amber-soft:#fffbeb;--amber-border:#fde68a;
   --c-ts:#dc2626;--c-s1:#d97706;--c-s2:#0070f3;--c-s3:#16a34a;
   --radius-sm:6px;--radius:8px;--radius-lg:12px;
+  /* 화면별 임의 폭·여백을 금지하는 공용 콘솔 골격. */
+  --shell-header-height:84px;--shell-sidebar-width:238px;
+  --shell-page-gutter:28px;--shell-content-max:1560px;
+  --shell-gap:22px;--shell-panel-shadow:0 8px 24px rgba(9,9,11,.06);
   --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
   --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
   /* 이전 검수 렌더러가 쓰는 이름도 같은 값으로만 유지한다. */

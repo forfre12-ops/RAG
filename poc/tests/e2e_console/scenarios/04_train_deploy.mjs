@@ -108,12 +108,12 @@ export const scenarios = [
 
   {
     id: 'deploy.danger-controls-are-folded',
-    title: 'force · 롤백 · 핫리로드는 「복구 · 고급」 안에 접혀 있고, 기본 화면에는 활성화만 있다',
+    title: '강제 활성화 · 롤백 · 다시 불러오기는 「복구 및 고급 작업」 안에 접혀 있고, 기본 화면에는 활성화만 있다',
     why: 'force 체크박스가 활성화 버튼 바로 옆에 있어 평소 조작 중에 잘못 눌릴 수 있었다',
     async run({ server, check }) {
       const page = await trainTab(server);
       const adv = page.$('deploy-adv');
-      check.ok(adv, '「복구 · 고급」 접기 영역이 있다');
+      check.ok(adv, '「복구 및 고급 작업」 접기 영역이 있다');
       check.eq(adv?.open, false, '기본은 접혀 있다');
       for (const [name, sel] of [
         ['force 체크박스', '#act-force'],
@@ -228,9 +228,10 @@ export const scenarios = [
       const cards = page.html('metrics-cards');
       check.data.includes(cards, '91.7%', '정확도가 보인다');
       check.includes(cards, 'F1', 'F1 카드가 있다');
-      check.data.includes(page.bodyText(), 'hardened42', '이 수치가 어느 셋에서 나왔는지 밝힌다');
-      check.includes(page.bodyText(), '섞어 인용하지', '다른 셋과 섞지 말라는 경고가 있다');
-      check.includes(page.html('metrics-extra'), '등급별 미탐률(FNR)', '등급별 미탐률이 보인다');
+      check.data.includes(page.bodyText(), 'hardened42', '평가 데이터 출처가 보인다');
+      check.includes(page.html('metrics-context'), '평가 표본 수', '평가 표본 수가 근거와 함께 보인다');
+      check.includes(cards, '고등급 미탐률', '릴리스 검증 지표가 전면에 보인다');
+      check.includes(page.html('metrics-extra'), '등급별 미탐률', '등급별 미탐률이 보인다');
 
       page.click(page.q('button[onclick="loadHistory()"]'));
       await page.settle();
@@ -269,8 +270,8 @@ export const scenarios = [
       server.faults.push({ path: '/metrics/latest', status: 404, body: { detail: '활성 모델의 평가 이력이 없습니다' } });
       page.click(page.q('button[onclick="loadMetrics()"]'));
       await page.settle();
-      check.includes(page.text('metrics-extra'), '메트릭 조회 실패', '실패했다고 말한다');
-      check.includes(page.text('metrics-extra'), '평가 실행 이력', '왜 그런지 짚어 준다');
+      check.includes(page.text('metrics-extra'), '평가 결과를 조회하지 못했습니다', '실패했다고 말한다');
+      check.includes(page.text('metrics-extra'), '평가 이력', '왜 그런지 짚어 준다');
       check.eq(page.html('metrics-cards'), '', '옛 수치가 남아 오해를 만들지 않는다');
       return page;
     },

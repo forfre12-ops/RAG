@@ -15,10 +15,9 @@
   'use strict';
 
   var PANEL_HTML = [
-    // data-pane/order — 런타임에 삽입되는 카드라 admin.html 탭 전환 규칙을 직접 달아 준다
-    // (없으면 어느 탭에서나 뜬다). order:1 = 「검증문서」 탭 맨 위(검수 목록으로 오는 유일한 길).
-    // order:0 은 상시노출 「연결·인증」 카드가 쓴다.
-    '<section class="card col-span" id="gold-jobs-card" data-pane="review" style="order:1">',
+    // data-product-view가 현재 Product Shell의 소유 화면을 명시한다. data-pane은 오래된
+    // 북마크/인라인 동작 호환용이다. 이 카드는 새 검수자 화면과 중복되지 않도록 표시하지 않는다.
+    '<section class="card col-span" id="gold-jobs-card" data-pane="review" data-product-view="experts" data-product-legacy="true" style="order:1">',
     '  <div class="card-head">',
     // [2026-08-24] 배지를 "3"에서 aux "조회"로. 흐름도(루프 B)의 3단계는 "재학습"이고
     // admin.html 730줄대 재학습 카드가 이미 그 번호를 쓴다. 이 카드는 런타임에 별도
@@ -62,9 +61,12 @@
       var grid = document.querySelector('.wrap') || document.body;
       grid.appendChild(panel);
     }
-    // 이 스크립트는 인라인 초기화(initPane) 이후에 로드된다. 방금 삽입한 카드에는
-    // 탭 표시 규칙이 아직 적용되지 않았으므로 현재 탭 기준으로 한 번 다시 적용한다.
-    if (typeof window.showPane === 'function') {
+    // 이 스크립트는 인라인 초기화 이후에 로드된다. Product Shell이 있으면 현재 제품
+    // 화면을 다시 적용해 새 카드가 엉뚱한 메뉴에 잠깐이라도 나타나지 않게 한다.
+    if (window.__KOIPA_PRODUCT_SHELL && typeof window.showProductView === 'function') {
+      var active = document.querySelector('[data-product-nav].active');
+      window.showProductView((active && active.dataset.productNav) || 'overview', true);
+    } else if (typeof window.showPane === 'function') {
       var cur = 'review';
       try { cur = sessionStorage.getItem('koipa_admin_pane') || 'review'; } catch (e) {}
       window.showPane(cur);

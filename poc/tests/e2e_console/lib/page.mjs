@@ -30,6 +30,26 @@ const isNoise = (msg) => JSDOM_NOISE.some((r) => r.test(String(msg)));
  * 흘려보내 "그 버튼이 죽었다"로 기록되게 한다. */
 let ERROR_SINK = null;
 let TRAP_INSTALLED = false;
+const OPEN_PAGES = new Set();
+let DEFAULT_TIMER_SCALE = 1;
+
+/**
+ * 실행기 안전망: 시나리오가 타임아웃되어 page 를 반환하지 못해도 jsdom 타이머와
+ * 열린 창을 남기지 않는다. 시나리오는 순차 실행하므로 이때 열린 창은 모두 해당
+ * 시나리오가 만든 것이다.
+ */
+export function closeOpenPages() {
+  for (const page of [...OPEN_PAGES]) page.close();
+}
+
+/** mock DOM에서만 UI 타이머를 빠르게 돌린다. 실서버 모드는 항상 1배다. */
+export function setDefaultTimerScale(scale) {
+  const value = Number(scale);
+  if (!Number.isFinite(value) || value <= 0 || value > 1) {
+    throw new Error(`timer scale은 0 초과 1 이하여야 합니다: ${scale}`);
+  }
+  DEFAULT_TIMER_SCALE = value;
+}
 
 /* 실서버 모드에서 쓸 API 키 등, 모든 화면에 공통으로 심어 둘 브라우저 저장소 값.
  * 콘솔은 localStorage 의 koipa_api_key 를 읽어 쓴다(주소에 ?key= 로 한 번 넣으면 저장되는
@@ -104,6 +124,7 @@ export async function openPage(server, urlPath, opts = {}) {
   } = opts;
 
   const pageUrl = `${server.url}${urlPath}${query}${hash}`;
+  const timerScale = DEFAULT_TIMER_SCALE;
   let html = await (await fetch(`${server.url}${urlPath}`)).text();
 
   if (bundleModules) {
@@ -144,6 +165,15 @@ export async function openPage(server, urlPath, opts = {}) {
     pretendToBeVisual: true,
     virtualConsole: vc,
     beforeParse(win) {
+      if (timerScale !== 1) {
+        const nativeTimeout = win.setTimeout.bind(win);
+        const nativeInterval = win.setInterval.bind(win);
+        const scaledMs = (ms) => Math.max(1, Math.round((Number(ms) || 0) * timerScale));
+        // 앱 코드가 쓰는 window 타이머만 축소한다. Node의 fetch/서버 지연은 그대로여서
+        // 업로드·네트워크 진행 상태 시험은 여전히 실제 비동기 요청을 기다린다.
+        win.setTimeout = (fn, ms, ...args) => nativeTimeout(fn, scaledMs(ms), ...args);
+        win.setInterval = (fn, ms, ...args) => nativeInterval(fn, scaledMs(ms), ...args);
+      }
       try {
         for (const [k, v] of Object.entries({ ...DEFAULT_STORAGE, ...storage })) win.localStorage.setItem(k, v);
         for (const [k, v] of Object.entries(session)) win.sessionStorage.setItem(k, v);
@@ -231,19 +261,25 @@ export async function openPage(server, urlPath, opts = {}) {
     q(sel) { return win.document.querySelector(sel); },
     qa(sel) { return Array.from(win.document.querySelectorAll(sel)); },
 
-    /** 요청이 다 끝날 때까지 기다린다(연쇄 호출 포함). */
+    /** 요청이 다 끝날 때까지 기다린다(연쇄 호출 포함).
+     *
+     * mock 서버의 응답은 즉시 돌아오므로 매 호출마다 48ms(12ms × 4)를 쉬는 것은
+     * 166개 시나리오에서 수십 초의 고정 비용만 만든다. 4ms 간격으로 세 번의
+     * event-loop turn을 비우면 `fetch → then → 다음 fetch` 연쇄는 여전히 잡고,
+     * 실제 지연은 아래 maxMs까지 그대로 기다린다.
+     */
     async settle(maxMs = 4000) {
       const t0 = Date.now();
       let quiet = 0;
       while (Date.now() - t0 < maxMs) {
-        await new Promise((r) => setTimeout(r, 12));
+        await new Promise((r) => setTimeout(r, 4));
         quiet = inflight === 0 ? quiet + 1 : 0;
-        if (quiet >= 4) return true;
+        if (quiet >= 3) return true;
       }
       return false;
     },
 
-    async wait(ms) { await new Promise((r) => setTimeout(r, ms)); },
+    async wait(ms) { await new Promise((r) => setTimeout(r, Math.max(1, Math.round(ms * timerScale)))); },
 
     /** 조건이 참이 될 때까지. 안 되면 false — 시나리오가 사유와 함께 실패시킨다. */
     async until(fn, maxMs = 4000) {
@@ -330,10 +366,12 @@ export async function openPage(server, urlPath, opts = {}) {
 
     close() {
       if (ERROR_SINK === errors) ERROR_SINK = null;
+      OPEN_PAGES.delete(page);
       try { win.close(); } catch { /* 이미 닫힘 */ }
     },
   };
 
+  OPEN_PAGES.add(page);
   return page;
 }
 

@@ -187,6 +187,8 @@ class SynthCoverageResponse(BaseModel):
     min_per_cell: int = 0
     # "TS|반도체" -> 건수. 키에 도메인 이름이 들어가므로 한글 키가 그대로 나온다.
     grid: dict[str, int] = Field(default_factory=dict)
+    # 모든 칸의 실문서 유래 건수. thin/empty 목록만으로는 충분한 칸의 구성을 알 수 없다.
+    real_grid: dict[str, int] = Field(default_factory=dict)
     empty: list[SynthCoverageCell] = Field(default_factory=list)
     thin: list[SynthCoverageCell] = Field(default_factory=list)
     # 실문서 유래 비중(0~1). 나머지가 합성이다.

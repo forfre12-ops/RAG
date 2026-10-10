@@ -1,12 +1,12 @@
-"""setup.sh 7단계 — 설치가 끝나면 콘솔 주소만 열어도 로그인되는 상태가 되는지.
+"""setup.sh 7단계 — 설치가 끝나면 시연 계정 빠른 로그인을 쓸 수 있는지.
 
 배경(2026-09-25). 패키지로 설치하면 로그인 화면이 "토큰을 붙여넣으십시오" 를 요구해 고객사·전문가가
 막힌다는 지적이 나왔다. 2026-08-24 결정은 "사람이 토큰을 입력하는 안은 답이 아니다" 였고,
-211·223 시험서버는 로그인 화면에 토큰을 미리 채워 두어 주소만 열면 스스로 로그인하는 방식으로
-그 결정을 지키고 있었다 — 그런데 패키지 설치(setup.sh)는 그 설정을 하지 않았다.
+211·223 시험서버는 로그인 화면에서 명시적으로 ``시연 계정으로 계속``을 눌러 빠른 로그인을
+시작하는 방식을 썼다 — 그런데 패키지 설치(setup.sh)는 그 설정을 하지 않았다.
 
 이 시험이 지키는 것(가짜 compose 로 setup.sh 의 해당 구간만 떼어 돌린다 — 실제 도커 없이 논리만 본다):
-  · 지재원 노드는 reviewer 전용 토큰, 고객사 노드는 관리자 토큰이 로그인 화면에 미리 채워진다
+  · 지재원 노드는 reviewer 전용 토큰, 고객사 노드는 관리자 토큰으로 빠른 로그인을 준비한다
   · 하드닝 프로파일이 기동을 거부하지 않도록 ALLOW_UNSAFE 가 함께 적힌다
   · 토큰이 호스트 파일로 꺼내진다(컨테이너를 다시 만들면 안의 토큰 파일이 사라지므로) — 권한 600
   · 다시 돌려도 .env 에 프리필 줄이 하나만 남는다(멱등) · 나머지 줄은 그대로다
@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import stat
 import subprocess
@@ -27,6 +28,21 @@ SETUP = Path(__file__).resolve().parents[1] / "scripts" / "setup.sh"
 BASH = shutil.which("bash")
 
 pytestmark = pytest.mark.skipif(BASH is None, reason="bash 가 없다")
+
+
+def _bash_path(path: Path) -> str:
+    """Return a path that the selected bash can read on Windows.
+
+    ``shutil.which('bash')`` resolves to WSL's ``C:\\Windows\\System32\\bash.exe``
+    on this workstation.  It cannot open a native ``C:/...`` argument; it needs
+    its mounted ``/mnt/c/...`` equivalent.  Git Bash accepts the native form, so
+    keep that form for every other bash implementation.
+    """
+    raw = path.resolve().as_posix()
+    bash = Path(BASH or "").resolve().as_posix().lower()
+    if os.name == "nt" and bash.endswith("/windows/system32/bash.exe") and len(raw) >= 3 and raw[1:3] == ":/":
+        return f"/mnt/{raw[0].lower()}{raw[2:]}"
+    return raw
 
 
 def _section(text: str, start: str, end: str) -> str:
@@ -67,13 +83,19 @@ def _run(tmp: Path, *, node: str, autologin: str = "1", dry: str = "0", env_text
     fake.chmod(0o755)
     (tmp / "deploy_airgap.sh").write_text('echo "DEPLOY GPU=${GPU_OVERLAY:-none}" >> "$FAKE_LOG"\n', encoding="utf-8", newline="\n")
     (tmp / "infra-config").mkdir(exist_ok=True)
+    shell_env = {"FAKE_LOG": _bash_path(tmp / "calls.log"), **(extra_env or {})}
     body = "\n".join([
         "set -euo pipefail",
-        f'BUNDLE="{tmp.as_posix()}"; cd "$BUNDLE"',
+        f'BUNDLE="{_bash_path(tmp)}"; cd "$BUNDLE"',
+        *[f"export {key}={shlex.quote(str(value))}" for key, value in shell_env.items()],
         'ENV_FILE=.env; API_PORT=8000',
         f'DRY_RUN={dry}; NODE={node}; REVIEWER_ID="{reviewer}"',
+        # The extracted helper also maintains node-topology keys before step 7.
+        # Supply the same prerequisite variables that setup.sh establishes above it.
+        'PROFILE=test-profile; API_IMAGE_NAME=test-api; WORKER_IMAGE_NAME=test-worker',
+        'WORKER_QUEUES=classify,index; ENABLE_TRAINING=false; ENABLE_INCREMENTAL_RETRAIN=false',
         f'CONSOLE_AUTOLOGIN={autologin}; CONSOLE_TOKEN_DAYS=365',
-        f'CRT_COMPOSE="{fake.as_posix()}"',
+        f'CRT_COMPOSE="{_bash_path(fake)}"',
         "b(){ echo \">> $*\"; }; ok(){ echo \"[ok] $*\"; }; inf(){ echo \"$*\"; }",
         HELPERS,
         *[STEP7] * runs,
@@ -81,8 +103,7 @@ def _run(tmp: Path, *, node: str, autologin: str = "1", dry: str = "0", env_text
     ])
     script = tmp / "driver.sh"
     script.write_text(body, encoding="utf-8", newline="\n")
-    env = {**os.environ, "FAKE_LOG": (tmp / "calls.log").as_posix(), **(extra_env or {})}
-    return subprocess.run([BASH, script.as_posix()], capture_output=True, text=True, encoding="utf-8", env=env, timeout=60)
+    return subprocess.run([BASH, _bash_path(script)], capture_output=True, text=True, encoding="utf-8", env=os.environ, timeout=60)
 
 
 def _env_lines(tmp: Path) -> list[str]:
@@ -105,6 +126,7 @@ def test_jjw_node_prefills_the_reviewer_only_token_and_turns_autologin_on(tmp_pa
     lines = _env_lines(tmp_path)
     assert "CONSOLE_LOGIN_PREFILL_TOKEN=hdr.expert-01.sig" in lines        # 전문가는 reviewer 전용 토큰으로 들어간다
     assert "CONSOLE_LOGIN_PREFILL_ALLOW_UNSAFE=1" in lines                   # 하드닝 프로파일의 기동 거부를 명시적으로 연다
+    assert "DEPLOY_PROFILE=test-profile" in lines                            # 노드 토폴로지도 함께 고정한다
     assert "API_KEY=xyz" in lines and "FOO=bar" in lines                     # 나머지 줄은 그대로
     assert "RESULT autologin=1 expiry=2027-09-25 who=expert-01" in r.stdout
     calls = _calls(tmp_path)
@@ -144,7 +166,9 @@ def test_autologin_off_removes_an_existing_prefill_and_restarts_the_stack(tmp_pa
     r = _run(tmp_path, node="customer", autologin="0", env_text=old)
 
     assert r.returncode == 0, r.stdout + r.stderr
-    assert _env_lines(tmp_path) == ["API_KEY=xyz", "FOO=bar"]
+    lines = _env_lines(tmp_path)
+    assert "API_KEY=xyz" in lines and "FOO=bar" in lines
+    assert not any(x.startswith("CONSOLE_LOGIN_PREFILL") for x in lines)
     assert _calls(tmp_path).count("DEPLOY") == 1                            # 지운 값이 반영되려면 다시 올려야 한다
     assert "RESULT autologin=0" in r.stdout
 
@@ -153,7 +177,9 @@ def test_autologin_off_with_nothing_to_remove_does_not_restart(tmp_path):
     r = _run(tmp_path, node="customer", autologin="0")
 
     assert r.returncode == 0, r.stdout + r.stderr
-    assert _env_lines(tmp_path) == ["API_KEY=xyz", "FOO=bar"]
+    lines = _env_lines(tmp_path)
+    assert "API_KEY=xyz" in lines and "FOO=bar" in lines
+    assert not any(x.startswith("CONSOLE_LOGIN_PREFILL") for x in lines)
     assert "DEPLOY" not in _calls(tmp_path)
 
 
