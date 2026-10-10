@@ -2,7 +2,9 @@
 
 대상: KOIPA 영업비밀관리시스템 폐쇄망 운영자 · 번들 `koipa-airgap-bundle`
 짝 문서: 설치는 [`INSTALL.md`](INSTALL.md), 장애 대응은 [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md),
-정본 운영 절차·책임경계는 `운영_런북`(HTML) 참조.
+KL 포털 Agent 응답·검수 계약과 실연동 검증은
+[`KL_AGENT_RESPONSE_CONTRACT.md`](KL_AGENT_RESPONSE_CONTRACT.md), 정본 운영 절차·책임경계는
+`운영_런북`(HTML) 참조.
 
 > 이 문서는 설치가 끝난 시스템의 **Day-2 운영**(기동·정지·모델 교체·검수·릴리스·관측·백업)을 다룬다.
 > 모든 명령은 번들 루트에서, compose 별칭은 설치와 동일하게 잡는다:
