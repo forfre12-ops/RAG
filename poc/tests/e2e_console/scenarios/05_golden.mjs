@@ -39,19 +39,20 @@ export const scenarios = [
 
   {
     id: 'golden.legacy-registration-is-not-exposed-twice',
-    title: '구형 묶음 등록 카드 대신 하나의 20명×50건 배정 화면만 노출한다',
-    why: '구형 등록 흐름과 새 검수자 배정 흐름을 함께 보이면 어느 원장이 정본인지 혼동한다',
+    title: '검수 계정별 진행 화면에는 배정 입력 폼을 노출하지 않는다',
+    why: '계정별 진행을 보는 화면에 배정 설정을 섞으면 요구하지 않은 운영 절차와 권한이 생긴다',
     async run({ server, check }) {
       const page = await expertsView(server);
 
-      check.ok(page.visible('product-experts'), '정식 검수자 배정 화면이 보인다');
+      check.ok(page.visible('product-experts'), '검수 계정별 진행 화면이 보인다');
       for (const id of ['gold-register-block', 'gold-reg', 'gold-build-path', 'gold-jobs-card']) {
         check.ok(!page.visible(id), `${id} 구형 제어는 새 콘솔에 중복 노출되지 않는다`);
       }
-      check.ok(!!page.$('expert-reviewer-ids'), '검수자 20명 입력 제어가 있다');
-      check.ok(!!page.$('expert-plan-submit'), '균등 배정 실행 제어가 있다');
-      check.includes(page.text('product-experts'), '20명', '정확 배정 조건을 화면에 밝힌다');
-      check.includes(page.text('product-experts'), '50건', '1인당 배정량을 화면에 밝힌다');
+      for (const id of ['expert-reviewer-ids', 'expert-reviewer-roster', 'expert-plan-submit', 'expert-assignment-reason']) {
+        check.ok(!page.$(id), `${id} 배정 입력 제어는 진행 화면에 없다`);
+      }
+      check.includes(page.text('product-experts'), '검수 계정별 진행 상태', '계정별 진행 상태를 설명한다');
+      check.includes(page.text('product-experts'), '검수 계정', '진행 현황 요약을 보여준다');
       assertNoScriptErrors(check, page);
       return page;
     },

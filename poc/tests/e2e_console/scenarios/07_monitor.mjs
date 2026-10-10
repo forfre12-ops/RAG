@@ -25,6 +25,13 @@ async function auditTab(server, opts = {}) {
   return page;
 }
 
+async function synthesisTab(server, opts = {}) {
+  const page = await openPage(server, '/console/admin.html', opts);
+  await page.settle();
+  await goToPane(page, 'synthesis');
+  return page;
+}
+
 export const scenarios = [
   {
     id: 'monitor.dashboard.renders-panels',
@@ -36,18 +43,9 @@ export const scenarios = [
 
       check.ok(server.lastCall('GET', '/admin/dashboard'), 'GET /admin/dashboard 를 불렀다');
       const grid = page.text('dash-grid');
-      check.includes(grid, '이중검토 보류', '이중검토 패널이 있다');
-      check.includes(grid, '평가 정답지 준비도', '평가 정답지 준비 패널이 있다');
+      check.includes(grid, '재학습 대기', '재학습 반영 대기 패널이 있다');
+      check.ok(!/이중검토 보류|평가 정답지 준비도|안전 경보/.test(grid), '요구사항 밖 운영 패널을 그리지 않는다');
       check.includes(page.text('dash-meta'), '생성', '언제 만든 수치인지 적는다');
-      // ⚠ 문구·구분기호는 화면 손질로 자주 바뀐다(2026-08-23 에도 바뀌었다). 뜻이 유지되는지만 본다.
-      check.data.matches(grid, /실\s*0\s*[·/]\s*합\s*3/, '등급별로 실문서/합성을 갈라 보여준다');
-      // [2026-09-05] check → check.data 로 옮겼다. 이 배지는 **서명>0 인데 실문서가 0인
-      // 등급이 있을 때만** 뜬다(admin.html 의 allSynth). 서명이 0/0 인 서버에서는 안 뜨는 것이
-      // 맞고(2026-08-24 에 사용자 지적으로 일부러 갈라 놓은 동작이다), 대신 "서명된 검증문서가
-      // 아직 없습니다"가 뜬다. 그런데 일반 check 로 두어 **빈 실서버에서 거짓 실패**가 났다.
-      // 데이터 모양에 기대는 확인이므로 실서버 모드에서는 건너뛴다(바로 위 32행과 같은 부류).
-      check.data.matches(grid, /실문서\s*0/, '서명분이 전부 합성인 등급이 있으면 그 사실을 알린다');
-      check.data.matches(grid, /부족[:\s].*TS.*S1.*S2.*S3/, '무엇이 부족한지 적는다');
       assertNoScriptErrors(check, page);
       return page;
     },
@@ -67,12 +65,12 @@ export const scenarios = [
         active_learning: {},
         kill_gate: {},
         drift: {},
-        degraded: ['escalation_held', 'drift'],
+        degraded: ['active_learning', 'drift'],
       };
       page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
       check.includes(page.text('dash-meta'), '조회 불가', '무엇을 못 읽었는지 상단에 적는다');
-      check.includes(page.text('dash-meta'), '이중검토 보류', '실패한 항목을 운영 용어로 보여준다');
+      check.includes(page.text('dash-meta'), '재학습 대기', '실패한 항목을 운영 용어로 보여준다');
       return page;
     },
   },
@@ -229,9 +227,7 @@ export const scenarios = [
     writes: true,
     title: '합성 검수 큐를 읽어 승인/반려하면 목록에서 빠진다',
     async run({ server, check }) {
-      const page = await openPage(server, '/console/admin.html');
-      await page.settle();
-      await goToPane(page, 'train');
+      const page = await synthesisTab(server);
       page.click(page.q('button[onclick="loadSynthQueue()"]'));
       await page.settle();
 
@@ -277,9 +273,7 @@ export const scenarios = [
           created_at: '2026-08-24T02:00:00Z',
         }],
       };
-      const page = await openPage(server, '/console/admin.html');
-      await page.settle();
-      await goToPane(page, 'train');
+      const page = await synthesisTab(server);
       page.set('sy-status', 'approved');
       page.click(page.q('button[onclick="loadSynthQueue()"]'));
       await page.settle();
@@ -300,9 +294,7 @@ export const scenarios = [
     writes: true,
     title: '합성 생성 요청은 예상 건수·비용을 화면에 돌려준다',
     async run({ server, check }) {
-      const page = await openPage(server, '/console/admin.html');
-      await page.settle();
-      await goToPane(page, 'train');
+      const page = await synthesisTab(server);
       page.set('sy-grade', 'TS');
       page.set('sy-count', '20');
       page.click('sy-gen');

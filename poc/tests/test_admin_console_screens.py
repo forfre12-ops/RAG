@@ -236,9 +236,6 @@ def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_bound
         'id="product-category-body"',
         'id="document-workbench"',
         'id="product-experts"',
-        'id="expert-reviewer-ids"',
-        'id="expert-reviewer-roster"',
-        'id="expert-plan-submit"',
         'progress_summary',
         'expert-progress-metrics',
         'data-product-requires-golden="1"',
@@ -252,14 +249,9 @@ def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_bound
         'function loadWorkbench(',
         'function saveWorkbenchDecision(',
         'function renderWorkbenchBody(',
-        'function submitBalancedReviewPlan(',
-        'function loadExpertReviewerRoster(',
-        'function appendSelectedExpertReviewers(',
+        'function loadExpertOperations(',
         'function productGoldenReviewAvailable()',
         "document.dispatchEvent(new Event('koipa:profile-ready'))",
-        "'/golden/assignments/expert-review-plan'",
-        "'/golden/reviewers'",
-        "'/golden/candidates?review_batch='+encoded+'&limit=1'",
     ):
         assert marker in console
     for wording in (
@@ -272,12 +264,21 @@ def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_bound
         "모델 학습 및 릴리스",
         "감사 기록",
         "운영 설정",
-        "평가 정답지 준비도",
-        "안전 경보",
     ):
         assert wording in console
+    for removed_wording in ("이중검토 보류", "평가 정답지 준비도", "안전 경보"):
+        assert removed_wording not in console
     assert "전문가 검수 운영" not in console
     assert "배포 준비 상태" not in console
+    for removed_control in (
+        'id="expert-reviewer-ids"',
+        'id="expert-reviewer-roster"',
+        'id="expert-plan-submit"',
+        'function submitBalancedReviewPlan(',
+        'function loadExpertReviewerRoster(',
+        "'/golden/assignments/expert-review-plan'",
+    ):
+        assert removed_control not in console
     assert "안전 정지" not in console
 
 
@@ -334,3 +335,12 @@ def test_console_uses_synth_capability_and_keeps_debug_log_collapsed(console: st
     assert "function synthConsoleAvailable()" in console
     assert '<div class="logbar-body collapsed" id="logbody"' in console
     assert 'aria-expanded="false"' in console
+
+
+def test_console_keeps_mock_document_generation_as_a_dedicated_menu(console: str):
+    """모의 문서 생성·검토는 모델 릴리스 화면에 묻히지 않는 필수 운영 기능이다."""
+    assert 'data-product-nav="synthesis"' in console
+    assert "모의 문서 생성·검토" in console
+    assert 'data-product-view="synthesis"' in console
+    assert "'synthesis'" in console
+    assert "if(view==='synthesis' && synthConsoleAvailable())" in console

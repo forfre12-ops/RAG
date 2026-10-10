@@ -197,10 +197,6 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .pf-hidden{display:none !important;}
 /* 규정 기능이 꺼진 서버·볼 권한이 없는 사용자에게는 카드를 숨긴다 — 같은 이유로 !important. */
 .reg-off{display:none !important;}
-.profile-banner{margin:10px 0 4px;padding:9px 13px;border-radius:8px;font-size:12.5px;font-weight:600;border-left:4px solid;}
-.profile-banner.jjw{background:var(--bg-surface);border-color:var(--accent);}
-.profile-banner.cust{background:var(--bg-surface);border-color:#b8860b;}
-.profile-banner.dev{background:var(--bg-surface);border-color:var(--text-dim);}
 .dash-panel{position:relative;overflow:hidden;border:1px solid var(--border-mid);border-radius:12px;padding:15px;background:linear-gradient(145deg,#fff 0%,var(--bg-surface) 100%);display:flex;flex-direction:column;gap:12px;min-width:0;box-shadow:0 8px 22px rgba(15,35,66,.035);}
 .dash-panel:before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--border-strong);}
 .dash-panel.st-ok:before{background:#16a34a;}
@@ -576,22 +572,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .wb-decision-facts p{margin:8px 0;color:var(--ui-muted);font-size:10.5px;line-height:1.5;}
 
 /* 검수 계정별 진행 현황 */
-.expert-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:18px;}
+.expert-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;}
 .expert-panel{padding:20px;border:1px solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-panel);box-shadow:var(--ui-shadow);}
 .expert-panel h3{margin:0 0 8px;color:var(--ui-navy);font-size:15px;}
 .expert-note{margin:0 0 14px;color:var(--ui-muted);font-size:12px;line-height:1.65;}
-.expert-field{display:grid;gap:6px;margin:13px 0;color:var(--ui-ink);font-size:12px;font-weight:750;}
-.expert-field span{color:var(--ui-muted);font-size:10.5px;font-weight:500;}
-.expert-field textarea,.expert-field input,.expert-field select{width:100%;font:400 12px var(--font-sans);}
-.expert-field textarea{resize:vertical;}
-.expert-message{min-height:19px;margin:10px 0 0;color:#1d4ed8;font-size:12px;line-height:1.5;}
 .expert-assignment-list{display:grid;gap:7px;margin-top:12px;}
 .expert-assignment-row{display:grid;gap:10px;padding:14px;border:1px solid var(--ui-line-soft);border-radius:9px;background:#fbfcfe;font-size:12px;}
 .expert-progress-head{display:flex;align-items:start;justify-content:space-between;gap:12px;}.expert-progress-head strong{color:var(--ui-navy);font-size:13px;}.expert-progress-head small{display:block;margin-top:3px;color:var(--ui-muted);font-size:10.5px;}.expert-progress-rate{color:var(--ui-navy);font:800 15px var(--font-mono);white-space:nowrap;}
 .expert-progress-bar{height:7px;overflow:hidden;border-radius:99px;background:#e8edf5;}.expert-progress-bar i{display:block;height:100%;border-radius:inherit;background:var(--ui-blue);}
 .expert-progress-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;}.expert-progress-metrics span{padding:7px 8px;border-radius:6px;background:#fff;color:var(--ui-muted);font-size:10px;line-height:1.35;}.expert-progress-metrics b{display:block;margin-top:2px;color:var(--ui-ink);font:800 13px var(--font-mono);}.expert-progress-meta{display:flex;flex-wrap:wrap;gap:5px 12px;color:var(--ui-muted);font-size:10.5px;}
 @media(max-width:560px){.expert-progress-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}}
-@media(max-width:900px){.expert-grid{grid-template-columns:1fr;}}
 .document-sheet .doc-empty{padding:44px 12px;text-align:center;color:var(--ui-muted);font-size:13px;}
 .inspector-tabs{display:flex;padding:10px 12px 0;gap:5px;border-bottom:1px solid var(--ui-line-soft);}
 .inspector-tabs button{appearance:none;border:0;border-bottom:2px solid transparent;background:transparent;padding:7px 5px 9px;color:var(--ui-muted);cursor:pointer;font:700 11px var(--font-sans);}
@@ -649,17 +639,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans
 .btn.sec,.btn.ghost{background:#fff;color:var(--text);border-color:var(--border-strong)}
 .btn:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--c-s2);outline-offset:2px}
 input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:#fff;color:var(--text)}
-
-/* 운영 화면은 장식적 모서리·색 띠 없이 직선형 정보 구조만 사용한다. */
-body *,body *::before,body *::after{border-radius:0 !important;}
-.grade-cards{grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;}
-.grade-card{padding:13px 14px;}
-.grade-card::before,.dash-panel::before{display:none;}
-.grade-card-head{align-items:center;}
-.grade-card-code,.grade-card-name{white-space:nowrap;}
-.grade-card-total{margin:12px 0;}
-.grade-card-total b{font-size:28px;}
-.profile-banner{border-left:1px solid var(--border-mid);}
+/* 운영 콘솔은 장식적 타원·색 띠 대신 직선형 정보 구조를 공통으로 쓴다. */
+body *,body *::before,body *::after{border-radius:0 !important}
 /* console-theme:end */
 </style>
 <script src="./errors_ko.js"></script>
@@ -768,7 +749,6 @@ body *,body *::before,body *::after{border-radius:0 !important;}
     </div>
     <div class="expert-grid">
       <section class="expert-panel"><h3>검수 계정별 진행 상태</h3><p class="expert-note">처리율은 이 계정이 자기 배정 문서에 남긴 결정 기준입니다. 보류는 결정 기록이 있으나 후속 판단이 필요한 건입니다.</p><div id="expert-assignment-summary" class="overview-state" data-state="loading">진행 현황을 불러오는 중입니다.</div><div id="expert-assignment-list" class="expert-assignment-list"></div></section>
-      <section class="expert-panel"><h3>20명 × 50건 배정</h3><p class="expert-note">배정 강제와 블라인드 검수가 켜진 경우에만 저장됩니다. 정확히 1,000건을 서로 다른 20명에게 50건씩 배정합니다.</p><label class="expert-field" for="expert-reviewer-roster">배정 가능한 활성 검수자 <span>현재 이 서버에서 로그인 가능한 reviewer 계정만 표시합니다.</span><select id="expert-reviewer-roster" multiple size="7" aria-describedby="expert-roster-note"></select></label><button class="btn sec sm" type="button" onclick="appendSelectedExpertReviewers()">선택 계정 추가</button><p id="expert-roster-note" class="expert-note">계정 명부를 불러오는 중입니다.</p><label class="expert-field" for="expert-reviewer-ids">선택한 검수자 계정 <span>선택 계정을 추가하거나 한 줄에 하나씩 입력합니다. 저장 전 서버가 활성 계정을 다시 확인합니다.</span><textarea id="expert-reviewer-ids" rows="9" placeholder="reviewer-01&#10;reviewer-02&#10;…"></textarea></label><label class="expert-field" for="expert-assignment-reason">배정 메모 <span>선택</span><input id="expert-assignment-reason" maxlength="1000" placeholder="예: 2026-10 검수 1차" /></label><button class="btn black" id="expert-plan-submit" type="button" onclick="submitBalancedReviewPlan()">20명에게 50건씩 배정</button><p id="expert-plan-message" class="expert-message" role="status" aria-live="polite"></p></section>
     </div>
   </section>
 
@@ -794,10 +774,6 @@ body *,body *::before,body *::after{border-radius:0 !important;}
   <!-- 탭 — 카드 12장을 상시 노출하는 대신 루프별로 나눈다.
        DOM 에서 제거하지 않고 display 만 전환하므로, 요건 이행 증빙(해당 기능이
        화면에 존재한다는 사실)은 그대로 유지된다. 삭제·비활성이 아니라 이동이다. -->
-  <!-- 어느 시스템에 접속했는지 항상 밝힌다 — 지재원과 고객사가 같은 화면을 쓰므로,
-       배너가 없으면 운영자가 어느 서버에서 무엇을 누르는지 구분할 근거가 화면에 없다. -->
-  <div id="profile-banner" class="profile-banner" style="display:none"></div>
-
   <div class="tabbar" role="tablist">
     <!-- [2026-08-20] 탭을 **사람 축**으로 다시 갈랐다. 종전 축은 기능(운영·모델·설정·관제)
          이라 "내가 뭘 눌러야 하나" 에 답하지 못했고, model 탭 하나에 카드 6개·조작 36개가
@@ -938,9 +914,8 @@ body *,body *::before,body *::after{border-radius:0 !important;}
 
     <!-- [2026-10-03 사용자 결정] G3 "검증문서 현황 — 구성·서명" 카드의 지표(서명 확정/목표 5 등)를
          뺐다 — 그 숫자로 관리자가 할 수 있는 다른 행동이 없다는 판단. 자동배포를 막는 안전장치
-         (golden_tiers.eval_readiness·deploy_gate_min_locked_per_grade)는 코드에 그대로 남아
-         있다. 같은 수치는 [관제] 탭 대시보드의 '평가 정답지 준비도' 패널에도 있다(그 패널은
-         재학습 모델 자동 활성화 평가 게이트에 쓰여 남긴다) — GET /admin/locked-readiness.
+         (golden_tiers.eval_readiness·deploy_gate_min_locked_per_grade)는 코드에 그대로 남지만,
+         관리자 화면에서는 표시하지 않는다.
          ⚠ 링크 하나는 그대로 둔다 — [console_nav.py](CONSOLE_LINKS 주석)가 "후보 관리 화면
          진입은 이 카드의 버튼이 맡는다"고 명시한 **유일한 진입로**였다(상단 공용 메뉴에는
          의도적으로 안 둠 — 로그인이 필요한 업무 화면이라 층위가 다름). 지표 없이 링크만 남긴다. -->
@@ -1922,88 +1897,18 @@ function renderExpertAssignmentRows(reviewers){
     item.append(head,bar,metrics,meta);host.append(item);
   });
 }
-let EXPERT_REVIEWER_ROSTER=[];
-async function loadExpertReviewerRoster(){
-  const select=$('expert-reviewer-roster'), note=$('expert-roster-note');
-  if(select){select.replaceChildren();select.disabled=true;}
-  try{
-    const rows=await api('GET','/golden/reviewers');
-    EXPERT_REVIEWER_ROSTER=Array.isArray(rows)?rows:[];
-    if(select){
-      EXPERT_REVIEWER_ROSTER.forEach(row=>{
-        const option=document.createElement('option');option.value=row.reviewer_id;
-        option.textContent=row.reviewer_id+(Array.isArray(row.roles)&&row.roles.length?' · '+row.roles.join(', '):'');
-        select.append(option);
-      });
-      select.disabled=!EXPERT_REVIEWER_ROSTER.length;
-    }
-    if(note)note.textContent=EXPERT_REVIEWER_ROSTER.length
-      ? '활성 reviewer 계정 '+EXPERT_REVIEWER_ROSTER.length+'개를 불러왔습니다. 서버가 저장 직전에 다시 확인합니다.'
-      : '배정 가능한 활성 reviewer 계정이 없습니다. 계정 발급·역할·활성 상태를 확인하세요.';
-  }catch(error){
-    EXPERT_REVIEWER_ROSTER=[];
-    if(note)note.textContent='활성 검수자 명부를 불러오지 못했습니다. 배정은 저장 전에 서버가 차단합니다. '+errKoText(error);
-  }
-}
-function appendSelectedExpertReviewers(){
-  const select=$('expert-reviewer-roster'), target=$('expert-reviewer-ids');if(!select||!target)return;
-  const existing=expertReviewerIds(), seen=new Set(existing);
-  Array.from(select.selectedOptions).forEach(option=>{if(option.value&&!seen.has(option.value)){seen.add(option.value);existing.push(option.value);}});
-  target.value=existing.join('\n');
-}
 async function loadExpertOperations(){
-  const roster=loadExpertReviewerRoster();
-  if(!PRODUCT_REVIEW_BATCH){await roster;expertSetState('empty','현재 검수 배치를 먼저 선택하세요.');renderExpertAssignmentRows([]);return;}
+  if(!PRODUCT_REVIEW_BATCH){expertSetState('empty','현재 검수 배치를 먼저 선택하세요.');renderExpertAssignmentRows([]);return;}
   expertSetState('loading','검수 계정별 진행 현황을 불러오는 중입니다.');
   try{
     const encoded=encodeURIComponent(PRODUCT_REVIEW_BATCH);
-    const [data,probe]=await Promise.all([
-      api('GET','/golden/assignments?review_batch='+encoded),
-      api('GET','/golden/candidates?review_batch='+encoded+'&limit=1')
-    ]);
-    await roster;
-    const enforced=data&&data.enforcement||{};
+    const data=await api('GET','/golden/assignments?review_batch='+encoded);
     const reviewers=Array.isArray(data&&data.reviewers)?data.reviewers:[];
     const progress=data&&data.progress_summary||{};
-    const batchCount=Number(probe&&probe.total||0);
-    const flags='배정 강제 '+(enforced.assignment_enforced?'켜짐':'꺼짐')+' · 블라인드 검수 '+(enforced.blind_enforced?'켜짐':'꺼짐');
-    const blockers=[];
-    // 이 배정 흐름의 계약은 20명 × 50건이다. 문서가 하나라도 있으면 된다는 식으로
-    // 열어 두면 3건 배치를 20명에게 나누는 허위 "균등 배정"이 된다.
-    if(batchCount!==1000) blockers.push('1,000건 필요 (현재 '+batchCount.toLocaleString()+'건)');
-    if(!enforced.assignment_enforced) blockers.push('배정 강제 설정 필요');
-    if(!enforced.blind_enforced) blockers.push('블라인드 검수 설정 필요');
-    const ready=blockers.length===0;
-    const submit=$('expert-plan-submit');if(submit){submit.disabled=!ready;submit.title=ready?'선택한 검수자에게 균등 배정합니다.':blockers.join(' · ');}
     const progressNote='배정 '+Number(progress.assigned_doc_count||0).toLocaleString()+'건 · 결정 '+Number(progress.reviewed_doc_count||0).toLocaleString()+'건 ('+Number(progress.progress_percent||0).toFixed(1)+'%) · 미처리 '+Number(progress.remaining_doc_count||0).toLocaleString()+'건 · 보류 '+Number(progress.deferred_doc_count||0).toLocaleString()+'건';
-    expertSetState('empty',PRODUCT_REVIEW_BATCH+' · 검수 계정 '+reviewers.length+'명 · '+progressNote+' · '+flags+(ready?'':' · 배정 대기: '+blockers.join(', ')));
+    expertSetState('empty',PRODUCT_REVIEW_BATCH+' · 검수 계정 '+reviewers.length+'명 · '+progressNote);
     renderExpertAssignmentRows(reviewers);
-  }catch(error){await roster;expertSetState('error','배정 현황을 불러오지 못했습니다. '+errKoText(error));renderExpertAssignmentRows([]);}
-}
-function expertReviewerIds(){
-  const raw=(($('expert-reviewer-ids')||{}).value||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
-  return raw;
-}
-async function submitBalancedReviewPlan(){
-  const message=$('expert-plan-message');const reviewerIds=expertReviewerIds();
-  if(!PRODUCT_REVIEW_BATCH){if(message)message.textContent='현재 검수 배치를 먼저 선택하세요.';return;}
-  if(reviewerIds.length!==20){if(message)message.textContent='검수자는 정확히 20개 계정을 한 줄에 하나씩 입력하세요.';return;}
-  if(new Set(reviewerIds).size!==reviewerIds.length){if(message)message.textContent='검수자 20개 계정은 서로 달라야 합니다.';return;}
-  if(EXPERT_REVIEWER_ROSTER.length){
-    const active=new Set(EXPERT_REVIEWER_ROSTER.map(row=>row.reviewer_id));
-    const missing=reviewerIds.filter(id=>!active.has(id));
-    if(missing.length){if(message)message.textContent='활성 reviewer 명부에 없는 ID가 있습니다: '+missing.join(', ')+' — 계정 명부를 새로고침하거나 입력을 고치세요.';return;}
-  }
-  const body={review_batch:PRODUCT_REVIEW_BATCH,reviewer_ids:reviewerIds,reason:(($('expert-assignment-reason')||{}).value||'').trim()};
-  try{
-    if(message)message.textContent='배정 전 서버 계약을 확인하는 중입니다…';
-    // 이 화면은 20명 × 50건만 허용하므로, 가변 인원·가변 문서 수용 일반 배정 API가
-    // 아니라 서버가 같은 계약을 보장하는 전용 API를 호출한다.
-    const result=await api('POST','/golden/assignments/expert-review-plan',body);
-    const allocation='1인 '+result.documents_per_reviewer+'건';
-    if(message)message.textContent='배정 완료: '+result.reviewer_count+'명 · '+allocation+' · 총 '+result.total_documents+'건'+(result.already_applied?' (기존 동일 계획 확인)':'');
-    await loadExpertOperations();
-  }catch(error){if(message)message.textContent='배정하지 않았습니다. '+errKoText(error);}
+  }catch(error){expertSetState('error','진행 현황을 불러오지 못했습니다. '+errKoText(error));renderExpertAssignmentRows([]);}
 }
 
 function productMetric(label,value,hint,statusFilter){
@@ -2351,8 +2256,7 @@ async function checkHealth(){
  * 필요한 경로**다 — onprem-local 은 deploy_gate_manual_require_locked_eval=True 라, 야간
  * 증분 재학습본을 현장에서 켜려면 사람이 서명한 평가셋이 있어야 한다. 카드를 숨겨 두면
  * 고객사는 그 평가셋을 만들 화면이 없어 매번 force 우회를 쓰게 된다.
- * 골든 현황·잡 목록도 숨기지 않는다(같은 이유).
- * 그리고 조용히 감추지 않는다 — 어느 시스템에 접속했는지 배너로 항상 밝힌다. */
+ * 골든 현황·잡 목록도 숨기지 않는다(같은 이유). */
 /* [2026-10-09 #9 이미지 분리] 「검증문서 후보 관리」·「데이터 생성 현황」·「검증문서 검수 준비」
  * 세 카드(data-golden="1")는 api/golden.py 가 있어야 동작한다 — 고객사 이미지에서 그 파일이
  * 빠지면 버튼을 눌렀을 때 404 만 난다. 이 값은 **프로파일이 아니라 healthz 의
@@ -2363,7 +2267,6 @@ async function checkHealth(){
  * 무관하게 계속 동작한다. */
 function applyProfileVisibility(d){
   const profile=String((d&&d.deploy_profile)||'');
-  const llmProvider=String((d&&d.llm_provider)||'').toLowerCase();
   const oc=(d&&d.operational_config)||{};
   // 화면 노출은 deploy_profile 이름이 아니라 서버가 실제로 마운트한 capability로 결정한다.
   // 구버전 healthz에는 이 키가 없을 수 있으므로, 그 경우에도 라우터가 없는 lite-*는 안전하게
@@ -2406,30 +2309,6 @@ function applyProfileVisibility(d){
     productShowView(PRODUCT_VIEW,true);
   }
   document.dispatchEvent(new Event('koipa:profile-ready'));
-  const b=$('profile-banner');
-  if(b && profile){
-    const isCust = profile==='onprem-local';
-    /* [2026-08-24] 두 가지를 뺐다.
-       ① 「모델 공장」 — 우리가 만든 비유다. 제출본·사용매뉴얼에 0회이고, 배지에서도 같은
-          이유로 걷어냈다(deploy_badge.js). 화면 문구에만 남아 있었다.
-       ② 프로파일명(full-train·onprem-local) — 사용자가 쓰는 말이 아니다. 기술 담당자가
-          볼 자리는 [기술 상세]다. textContent 로는 그 구분을 못 주므로 innerHTML 로
-          바꾸고 프로파일명만 [data-tech] 로 감싼다. */
-    const techTag = ' <span class="techbar" data-tech>' + esc(profile) + '</span>';
-    // noop은 장애가 아니라 등급 판정 LLM을 쓰지 않기로 한 구성이다. 이때 생성 후보는
-    // 검수할 수 있지만 학습 행으로 승격되지 않는다. 프로필 배너에서 이 범위를 먼저 밝혀야
-    // 운영자가 「후보가 생겼는데 왜 재학습 데이터가 0건인가」를 뒤늦게 알지 않는다.
-    const noopTrainingScope = profile==='full-train' && llmProvider==='noop'
-      ? ' 현재는 등급 판정 LLM을 쓰지 않는 구성이며, 추가 후보는 검수하되 학습에 쓰이는 행은 0건입니다.'
-      : '';
-    b.innerHTML = (isCust
-      ? '<b>고객사 운영 환경</b> — 정책, 모델 및 감사 기능을 제공합니다.'
-      : profile==='full-train'
-        ? '<b>지재원 검증·학습 환경</b> — 검증 문서, 학습, 릴리스 및 감사 기록을 관리합니다.' + noopTrainingScope
-        : '<b>개발 환경</b> — 제공 기능은 서버 설정에 따라 다릅니다.') + techTag;
-    b.className = 'profile-banner ' + (isCust ? 'cust' : (profile==='full-train' ? 'jjw' : 'dev'));
-    b.style.display='';
-  }
 }
 /* [2026-08-23] 등급 판정 LLM 이 없는 서버에서 「생성 요청」을 누르면 무슨 일이 벌어지는가.
  *
@@ -2826,7 +2705,7 @@ async function loadConfusionMatrix(){
 /* ---- 6. 운영 관제 대시보드 ---- */
 function dpDegraded(d, name){ return (d.degraded||[]).includes(name) ? '<span class="dp-degraded" title="이 신호를 조회하지 못했습니다">조회 불가</span>' : ''; }
 function dashSectionLabel(name){
-  return ({escalation_held:'이중검토 보류',locked_readiness:'평가 정답지 준비도',active_learning:'재학습 대기',kill_gate:'안전 경보',drift:'입력 변화 감시'})[name]||'알 수 없는 항목';
+  return ({active_learning:'재학습 대기'})[name]||'';
 }
 function alStatusPill(s){
   if(s==='URGENT_RETRAIN') return '<span class="pill err">긴급 재학습</span>';
@@ -2872,45 +2751,13 @@ function dashTime(t){
 }
 function renderDashboard(d){
   const meta=$('dash-meta');
-  meta.textContent = `생성 ${dashTime(d.generated_at)}` + ((d.degraded&&d.degraded.length)?` · 조회 불가: ${d.degraded.map(dashSectionLabel).join(', ')}`:'');
+  const degraded=(d.degraded||[]).map(dashSectionLabel).filter(Boolean);
+  meta.textContent = `생성 ${dashTime(d.generated_at)}` + (degraded.length?` · 조회 불가: ${degraded.join(', ')}`:'');
   meta.title = d.generated_at ? `서버 원본 시각 ${d.generated_at}` : '';
-  const eh=d.escalation_held||{}, lr=d.locked_readiness||{}, al=d.active_learning||{}, kg=d.kill_gate||{}, dr=d.drift||{};
-  const byg=eh.by_grade||{};
-  // 1) 이중검토 보류
-  const p1=dpPanel(eh.total>0?'warn':'ok', '이중검토 보류',
-    ((eh.total>0)?'<span class="pill warn">보류</span>':'<span class="pill ok">없음</span>')+dpDegraded(d,'escalation_held'),
-    dpBig(eh.total??0, '건', (eh.total>0)?'var(--red)':'var(--green)')
-    + `<div class="dp-note">${(eh.total>0)?'사람이 한 번 더 봐야 할 건입니다':'추가 검토 대기 없음'}</div>`
-    + dpStat(GRADES.map(g=>[g, byg[g]??0])));
-  // 2) 배포 readiness (locked_gold_eval)
-  // per_grade 만 보여주면 합성 서명분이 실문서와 섞여 "준비됨"으로 읽힌다. 실측 2026-08-09:
-  // TS 5건이 전부 합성인데 ready=true 였다. 합성 본문으로 잰 정확도는 실세계 성능이 아니므로
-  // (자체 실측 합성학습→실문서 F1 0.26) 등급별로 실문서/합성을 갈라 보이고, 실문서가 0인
-  // 등급이 있으면 그 사실을 배지 옆에 적는다. 게이트 판정 자체는 서버 계약 그대로 둔다.
-  const pg=lr.per_grade||{}, rpg=lr.real_per_grade||{}, spg=lr.synthetic_per_grade||{};
-  /* [2026-08-24] 종전에는 '실문서 0' 한 덩어리로 묶어, **서명이 아예 0건인 등급까지**
-     "서명분이 전부 합성입니다"라고 적었다(TS·S1·S2 가 0/0 인데 그 문장이 떴다).
-     없는 서명을 합성이라고 말하는 것은 사실과 다르다. 두 경우를 갈라 적는다:
-       · 서명 0건        → 아직 서명한 것이 없다(구성을 말할 대상 자체가 없다)
-       · 서명>0·실문서 0 → 서명은 있는데 본문이 전부 합성이다(수치 인용 시 한정 필요) */
-  const gradesWith=GRADES.filter(g=>pg[g]!=null);
-  const noSign=gradesWith.filter(g=>(pg[g]||0)===0);
-  const allSynth=gradesWith.filter(g=>(pg[g]||0)>0 && (rpg[g]||0)===0);
-  const gradeRows=gradesWith.map(g=>
-    `<div><span class="gk">${g}</span><span class="n">${pg[g]}</span><small>실 ${rpg[g]??0} · 합 ${spg[g]??0}</small></div>`).join('');
-  const p2=dpPanel(lr.ready&&!allSynth.length?'ok':'warn', '평가 정답지 준비도',
-    (lr.ready?'<span class="pill ok">기준 충족</span>':'<span class="pill warn">미충족</span>')
-    + (allSynth.length?'<span class="pill warn">실문서 0</span>':'') + dpDegraded(d,'locked_readiness'),
-    // 이 패널이 무엇을 세는지 한 줄로 밝힌다 — 업로드·분류 건수와 무관한 값이다(사용자 질문).
-    `<div class="dp-note">사람이 서명해 <b>평가 정답지</b>로 잠근 검증 문서 수입니다. 이 평가 게이트는 등급별 기준 충족 시 재학습 모델의 <b>자동 활성화</b> 판단에만 쓰이며, 전체 배포 가능 여부를 확정하지 않습니다.</div>`
-    + (gradeRows?`<div class="dp-tab">${gradeRows}</div>`:'<div class="dp-note">등급별 데이터 없음</div>')
-    + (lr.min_per_grade!=null?`<div class="dp-note">등급별 최소 ${lr.min_per_grade}건 필요${(lr.missing&&lr.missing.length)?` · 부족 ${lr.missing.join(' · ')}`:''}</div>`:'')
-    + (noSign.length?`<div class="dp-note"><b>${noSign.join(', ')}</b> 는 서명이 0건입니다 — 검수·서명을 아직 하지 않았습니다.</div>`:'')
-    + (allSynth.length?`<div class="warnbox"><b>${allSynth.join(', ')}</b> 는 서명분이 전부 합성입니다. 합성 본문으로 잰 정확도는 실세계 성능이 아니므로, 수치를 인용할 때 구성을 함께 밝히십시오.</div>`:'')
-    + (lr.reason?`<div class="dp-note">${esc(dashReason(lr.reason))}</div>`:''));
-  // 3) 재학습 backlog (active-learning)
+  const al=d.active_learning||{};
+  // 요구사항의 능동 학습 흐름에서 실제로 조치할 수 있는 교정 대기만 보여 준다.
   const alState = al.retrain_status==='URGENT_RETRAIN' ? 'err' : (al.retrain_status==='RETRAIN_RECOMMENDED' ? 'warn' : 'ok');
-  const p3=dpPanel(alState, '재학습 대기',
+  const panel=dpPanel(alState, '재학습 대기',
     alStatusPill(al.retrain_status)+dpDegraded(d,'active_learning'),
     dpBig(al.unconsumed_total??0, '건', (al.unconsumed_total>0)?'var(--red)':'var(--green)')
     + `<div class="dp-note">${(al.unconsumed_total>0)?'재학습에 반영되지 않은 교정입니다':'밀린 교정 없음'}</div>`
@@ -2922,22 +2769,7 @@ function renderDashboard(d){
               ['과대', al.pending_overclass??0, ''],
               ['측면', al.pending_lateral??0, '']])
     + (al.reason?`<div class="dp-note">${esc(dashReason(al.reason))}</div>`:''));
-  // 4) kill-gate
-  const kgReasons=(kg.reasons||[]);
-  const p4=dpPanel(kg.tripped?'err':'ok', '안전 경보',
-    (kg.tripped?'<span class="pill err">발동</span>':'<span class="pill ok">정상</span>')+dpDegraded(d,'kill_gate'),
-    dpBig(kg.tripped?'경보':'정상', '', kg.tripped?'var(--red)':'var(--green)')
-    + `<div class="dp-note">${kgReasons.length?kgReasons.map(esc).join(' · '):'경보 발동 사유 없음'}</div>`
-    + '<div class="dp-note">이 신호는 서비스나 재학습을 자동 정지하지 않습니다. 고등급 자동확정 억제는 별도 설정을 켠 경우에만 적용됩니다.</div>');
-  /* [2026-08-24] 5) 「입력 분포 변화」 카드를 화면에서 뺐다. 셋이 겹쳤다:
-       · 요건 밖 — 제출본 전문에 "드리프트"·"분포" 0회.
-       · 값이 변하지 않는다 — run_drift_check 는 "운영 표본 부재 시 빈 보고서"를 낸다
-         (drift_monitor.py:509). 이 서버는 시험 서버라 그 표본이 쌓이지 않는다.
-       · 그래서 화면이 스스로 「0.0은 실측이 아닙니다」라고 변명하고 있었다.
-     영원히 빈 칸에 변명이 달린 카드는 정보가 아니라 소음이다.
-     ⚠ API 응답(/admin/dashboard 의 drift)과 Prometheus 게이지는 그대로 둔다 —
-       운영 노드에서는 값이 쌓이고, 그때 이 블록만 되살리면 된다. */
-$('dash-grid').innerHTML = p1+p2+p3+p4;
+$('dash-grid').innerHTML = panel;
 }
 async function loadDashboard(){
   // [2026-10-03] 클릭과 결과 사이에 아무 표시가 없어 "늦게 나오는 것 같다"는 지적이 있었다 —

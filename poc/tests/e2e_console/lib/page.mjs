@@ -386,7 +386,7 @@ export async function openPage(server, urlPath, opts = {}) {
 const PANE_TO_VIEW = {
   review: 'experts', train: 'models', config: 'policy', ops: 'overview',
   overview: 'overview', documents: 'documents', experts: 'experts',
-  policy: 'policy', models: 'models', audit: 'audit', settings: 'settings',
+  synthesis: 'synthesis', policy: 'policy', models: 'models', audit: 'audit', settings: 'settings',
 };
 export async function goToPane(page, pane) {
   const view = PANE_TO_VIEW[pane] || 'overview';

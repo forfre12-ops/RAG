@@ -20,7 +20,7 @@ const WRITES = [
     press: (p) => p.q('button[onclick="activateModel()"]'),
   },
   { name: '모델 롤백', pane: 'train', endpoint: 'POST /admin/model/rollback', press: (p) => p.q('button[onclick="rollbackModel()"]') },
-  { name: '합성 생성', pane: 'train', endpoint: 'POST /synth/generate', press: (p) => p.$('sy-gen') },
+  { name: '합성 생성', pane: 'synthesis', endpoint: 'POST /synth/generate', press: (p) => p.$('sy-gen') },
   {
     name: '등급체계 저장', pane: 'config', endpoint: 'PUT /schema/grades',
     async setup(page) {
@@ -138,12 +138,10 @@ export const scenarios = [
       const factory = page.qa('[data-capability="synthesis-console"]');
       check.gte(factory.length, 1, '모델 공장 전용 카드가 존재는 한다');
       for (const el of factory) check.ok(!page.visible(el), `숨겨졌다: ${el.querySelector('.ttl')?.textContent?.trim() || el.id}`);
-      check.ok(page.visible('profile-banner'), '어떤 서버인지 배너가 뜬다');
-      check.includes(page.text('profile-banner'), '고객사', '고객사 시스템이라고 말한다');
+      check.ok(!page.q('#profile-banner'), '공통 환경 안내 배너가 없다');
 
-      // 탭을 눌러도 숨김이 되살아나면 안 된다(인라인 style 로 숨기던 시절의 회귀)
-      await goToPane(page, 'train');
-      await goToPane(page, 'review');
+      // Product Shell 메뉴와 카드 모두 capability를 따라 숨는다.
+      check.ok(page.q('[data-product-nav="synthesis"]')?.classList.contains('pf-hidden'), '합성 메뉴도 숨겨졌다');
       for (const el of factory) check.ok(!page.visible(el), `탭 전환 후에도 숨겨져 있다: ${el.id || 'card'}`);
       return page;
     },
@@ -151,38 +149,24 @@ export const scenarios = [
 
   {
     id: 'safety.profile.factory-shows-all',
-    title: '지재원 프로파일에서는 전 구간 카드가 보이고 배너가 그렇게 말한다',
-    // [2026-10-10] needsMock 없이 라이브 서버를 타면 그 서버의 실제 llm_provider(예: anthropic,
-    // 9/25 메모리에 기록된 의도적 전환) 가 그대로 반영돼 "LLM 안 쓴다" 단언이 거짓이 된다.
-    // customer-hides-factory-cards 와 같은 패턴으로 고정 fixture 를 강제한다.
+    title: '지재원 프로파일에서는 전 구간 카드가 보인다',
     needsMock: true,
     async run({ server, check }) {
       const { FIXTURES } = await import('../lib/server.mjs');
       server.overrides['GET /healthz'] = {
         ...FIXTURES['GET /healthz'],
-        llm_provider: 'noop',
         operational_config: { ...FIXTURES['GET /healthz'].operational_config, synthesis_console_enabled: true },
       };
 
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      // [2026-08-24] 「모델 공장」은 우리가 만든 비유라 화면에서 뺐다(제출본·매뉴얼 0회).
-      // 지키려던 것은 그 표현이 아니라 **어느 시스템에 접속했는지 배너가 밝히는가** 다.
-      check.includes(page.text('profile-banner'), '지재원', '어느 시스템인지 말한다');
-      // [2026-08-24] 문구에서 설정값 이름(noop)을 뺐다 — 화면 문구에 서버 설정 이름을 쓰지
-      // 않는다는 기존 판단과 같은 축이다. 시험은 이름이 아니라 **뜻**을 본다.
-      // [2026-09-10] 종전 문구 "합성 생성 결과는 0건으로 나옵니다" 는 **사실이 아니었다.**
-      // LLM 이 없어도 자리표시 본문이 만들어져 검수 큐에 쌓인다(생성기 _fallback_body).
-      // 0 이 되는 것은 그 문서가 만드는 **학습 행**이다. 화면이 "결과가 0건"이라고 말하면
-      // 검수 큐에 쌓인 자리표시 문서를 사람이 이상하게 여기지 않는다.
-      check.matches(page.text('profile-banner'), /LLM/,
-                    'LLM 을 쓰지 않는 구성임을 밝힌다');
-      check.matches(page.text('profile-banner'), /학습에 쓰이는 행은 0건/,
-                    '0 이 되는 것이 결과가 아니라 학습 행이라고 말한다');
-      // 프로파일 숨김과 탭 숨김을 섞지 않으려고, 각 카드를 자기 탭에서 확인한다.
-      for (const el of page.qa('[data-capability="synthesis-console"]')) {
-        await goToPane(page, el.dataset.pane);
-        check.ok(page.visible(el), `${el.dataset.pane} 탭에서 모델 공장 전용 카드가 보인다`);
+      check.ok(!page.q('#profile-banner'), '지재원 화면에도 공통 환경 안내 배너가 없다');
+      // 프로파일 숨김과 다른 Product Shell 화면의 비가시 상태를 섞지 않는다.
+      const factoryCards = page.qa('[data-capability="synthesis-console"][data-product-view="synthesis"]');
+      check.gte(factoryCards.length, 1, '합성 기능 카드는 존재한다');
+      await goToPane(page, 'synthesis');
+      for (const el of factoryCards) {
+        check.ok(page.visible(el), '모의 문서 생성·검토 화면에서 합성 기능 카드가 보인다');
         check.ok(!el.classList.contains('pf-hidden'), '프로파일 숨김 클래스가 붙지 않았다');
       }
       return page;

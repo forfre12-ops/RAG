@@ -29,6 +29,7 @@ PAGES = ["index.html", "admin.html", "parse_demo.html"]
 _HANDLER_CALL = re.compile(r"(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(")
 _INLINE = r'<script(?![^>]*type="module")(?![^>]* src=)[^>]*>(.*?)</script>'
 _EXTERNAL = r'<script(?![^>]*type="module")[^>]* src="([^"]+)"'
+_INLINE_KEYWORDS = {"if", "for", "while", "switch", "catch"}
 
 
 def _no_comments(html: str) -> str:
@@ -54,7 +55,8 @@ def _handler_names(html: str) -> set[str]:
     names: set[str] = set()
     for h in re.findall(r'\son[a-z]+="([^"]*)"', html):
         names.update(_HANDLER_CALL.findall(h))
-    return names
+    # onkeydown="if (...) handler()"처럼 인라인 제어문을 쓰는 경우, `if`는 함수 참조가 아니다.
+    return names - _INLINE_KEYWORDS
 
 
 def _missing(names: set[str], js: str) -> list[str]:

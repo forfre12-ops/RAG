@@ -80,6 +80,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans
 .btn.sec,.btn.ghost{background:#fff;color:var(--text);border-color:var(--border-strong)}
 .btn:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--c-s2);outline-offset:2px}
 input,select,textarea{font-family:var(--font-sans);border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:#fff;color:var(--text)}
+/* 운영 콘솔은 장식적 타원·색 띠 대신 직선형 정보 구조를 공통으로 쓴다. */
+body *,body *::before,body *::after{border-radius:0 !important}
 /* console-theme:end */
 """
 

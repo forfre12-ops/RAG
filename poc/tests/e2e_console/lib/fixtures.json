@@ -817,6 +817,18 @@
     "unassigned_candidate_count": 3,
     "reviewers": [],
     "assignments": [],
+    "progress_summary": {
+      "reviewer_count": 0,
+      "assigned_doc_count": 0,
+      "reviewed_doc_count": 0,
+      "fixed_doc_count": 0,
+      "deferred_doc_count": 0,
+      "excluded_doc_count": 0,
+      "in_progress_doc_count": 0,
+      "not_started_doc_count": 0,
+      "remaining_doc_count": 0,
+      "progress_percent": 0.0
+    },
     "ledger_events_total": 0,
     "by_event": {},
     "enforced": { "assignment": false, "blind": false },

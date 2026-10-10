@@ -1,9 +1,9 @@
-/* 19. Product Shell V2 — 운영 개요·문서 작업대·검수자 배정.
+/* 19. Product Shell V2 — 운영 개요·문서 작업대·검수 계정별 진행.
  *
  * 2026-10-10 작업분. admin.html 의 이 영역(productGoldenReviewAvailable 부터
  * initProductShell 까지, 함수 43개)은 옛 탭바를 대신하는 새 내비게이션인데,
  * 직접 이름이 등장하는 시나리오가 기존 파일 전체에 2개(productShowView 경로만)뿐이었다 —
- * 실제 동작(운영 개요 집계·문서 작업대 열람/결정·검수자 20명×50건 배정)은 한 번도 화면으로
+ * 실제 동작(운영 개요 집계·문서 작업대 열람/결정·검수 계정별 진행)은 한 번도 화면으로
  * 눌러본 적이 없었다. 이 파일이 그 격차를 채운다.
  *
  * ⚠ 검수 배치 선택(product-review-batch)의 기본값은 **서버가 표시한 active 배치**다
@@ -37,8 +37,6 @@ function healthWith(server, patch) {
 function candidatesWith(server, body) {
   server.overrides['GET /golden/candidates'] = body;
 }
-
-const READY_REVIEWERS = Array.from({ length: 20 }, (_, i) => `reviewer-${String(i + 1).padStart(2, '0')}`);
 
 export const scenarios = [
   {
@@ -291,26 +289,62 @@ export const scenarios = [
   },
 
   {
-    id: 'product.experts-shows-blockers-when-batch-is-not-ready',
-    needsData: true,   // 기본 본보기(배치 3건·강제 꺼짐)에 기댄 단언 — 실서버는 조건이 이미 맞을 수 있다
-    title: '현재 배치가 1,000건이 아니거나 배정·블라인드 강제가 꺼져 있으면 배정 버튼이 막히고 이유가 보인다',
-    why: '조건이 안 맞는데 배정을 눌러 봐야 서버가 막는다 — 화면이 미리 이유를 말해야 한다',
+    id: 'product.experts-is-progress-only-not-assignment-setup',
+    title: '검수 계정별 진행 화면은 배정 설정을 요구하거나 실행하지 않는다',
+    why: '진행 현황은 이미 배정된 업무의 상태를 읽는 화면이며, 수동 배정 절차가 섞이면 역할과 흐름이 흐려진다',
     async run({ server, check }) {
       const page = await productTab(server, 'experts');
       await page.until(() => page.text('expert-assignment-summary').length > 0);
 
-      check.eq(page.$('expert-plan-submit')?.disabled, true, '조건이 안 맞으면 배정 버튼이 막힌다');
-      check.includes(page.text('expert-assignment-summary'), '1,000건 필요', '문서 수 조건 미달이 적힌다');
-      check.includes(page.text('expert-assignment-summary'), '배정 강제 설정 필요', '배정 강제 꺼짐이 적힌다');
+      for (const id of ['expert-reviewer-ids', 'expert-reviewer-roster', 'expert-plan-submit', 'expert-assignment-reason']) {
+        check.ok(!page.$(id), `${id} 배정 설정 제어가 없다`);
+      }
+      check.ok(server.lastCall('GET', '/golden/assignments'), '진행 현황 API만 불러온다');
+      check.eq(server.countCalls('POST', '/golden/assignments/expert-review-plan'), 0, '진행 화면은 배정 요청을 보내지 않는다');
       assertNoScriptErrors(check, page);
       return page;
     },
   },
 
   {
-    id: 'product.experts-plan-rejects-fewer-than-20-unique-reviewers',
-    title: '조건이 다 맞아도 검수자 20명이 서로 다르지 않으면 서버를 부르지 않고 그 자리에서 막는다',
-    why: '중복 id 로 배정하면 같은 사람에게 두 몫이 몰리고 한 명은 아예 못 받는다',
+    id: 'product.experts-renders-detailed-per-account-progress',
+    title: '검수 계정별 진행은 계정별 배정·결정·보류·미처리·최근 활동을 보여준다',
+    why: '전체 숫자만 보면 어느 계정에 후속 조치가 필요한지 알 수 없다',
+    needsMock: true,
+    async run({ server, check }) {
+      server.overrides['GET /golden/assignments'] = {
+        total_candidates: 1000, assigned_candidate_count: 50, unassigned_candidate_count: 950,
+        reviewers: [{
+          reviewer_id: 'reviewer-01', visible_doc_count: 50, reviewed_doc_count: 18,
+          fixed_doc_count: 12, deferred_doc_count: 3, excluded_doc_count: 1,
+          in_progress_doc_count: 2, not_started_doc_count: 32, remaining_doc_count: 34,
+          progress_percent: 36, last_action: 'defer', last_decided_at: '2026-10-11T09:30:00Z',
+        }], assignments: [], ledger_events_total: 18, by_event: {},
+        enforced: { assignment: true, blind: true },
+        enforcement: { assignment_enforced: true, blind_enforced: true },
+        progress_summary: {
+          reviewer_count: 1, assigned_doc_count: 50, reviewed_doc_count: 18,
+          fixed_doc_count: 12, deferred_doc_count: 3, excluded_doc_count: 1,
+          in_progress_doc_count: 2, not_started_doc_count: 32, remaining_doc_count: 34, progress_percent: 36,
+        },
+      };
+      const page = await productTab(server, 'experts');
+      await page.until(() => page.text('expert-assignment-list').includes('reviewer-01'));
+
+      const row = page.text('expert-assignment-list');
+      for (const label of ['배정 50건', '판정 완료', '보류', '제외·폐기', '재검토', '미시작', '미처리', '최근 활동']) {
+        check.includes(row, label, `${label} 지표가 계정 행에 있다`);
+      }
+      check.includes(row, '36.0%', '계정 처리율을 보여준다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'product.experts-shows-an-empty-state-without-inventing-assignment-controls',
+    title: '배정된 검수 계정이 없으면 빈 상태를 보여주고 배정 입력 폼을 만들지 않는다',
+    why: '상태가 비었을 때 임시 배정 폼으로 바꾸면 운영자는 현재 현황과 새 작업을 구분할 수 없다',
     needsMock: true,
     async run({ server, check }) {
       server.overrides['GET /golden/assignments'] = {
@@ -318,64 +352,17 @@ export const scenarios = [
         reviewers: [], assignments: [], ledger_events_total: 0, by_event: {},
         enforced: { assignment: true, blind: true },
         enforcement: { assignment_enforced: true, blind_enforced: true },
-      };
-      server.overrides['GET /golden/candidates'] = {
-        total: 1000, summary: { total: 1000, fixed: 0, unfixed: 1000, deferred: 0, discarded: 0 },
-        candidates: [], available_batches: [{ review_batch: '2026-08-A', total: 1000, active: true }],
-        available_doc_formats: [],
-      };
-      const page = await productTab(server, 'experts');
-      await page.until(() => page.$('expert-plan-submit')?.disabled === false);
-
-      const nineteen = READY_REVIEWERS.slice(0, 19).join('\n');
-      page.set('expert-reviewer-ids', nineteen);
-      page.click('expert-plan-submit');
-      await page.settle();
-      check.includes(page.text('expert-plan-message'), '20개', '20명이 아니면 안내한다');
-      check.eq(server.countCalls('POST', '/golden/assignments/expert-review-plan'), 0, '요청이 나가지 않는다');
-
-      const withDup = [...READY_REVIEWERS.slice(0, 19), READY_REVIEWERS[0]].join('\n');
-      page.set('expert-reviewer-ids', withDup);
-      page.click('expert-plan-submit');
-      await page.settle();
-      check.eq(server.countCalls('POST', '/golden/assignments/expert-review-plan'), 0, '20줄이어도 중복이면 역시 안 나간다');
-      assertNoScriptErrors(check, page);
-      return page;
-    },
-  },
-
-  {
-    id: 'product.experts-plan-submits-and-reports-the-split',
-    title: '조건이 맞고 서로 다른 20명을 넣으면 배정을 보내고 1인당 분량을 화면에 보여준다',
-    why: '보낸 뒤 숫자가 안 보이면 20명×50건이 실제로 맞게 나갔는지 화면만으로 믿을 수 없다',
-    writes: true,
-    needsMock: true,
-    async run({ server, check }) {
-      server.overrides['GET /golden/assignments'] = {
-        total_candidates: 1000, assigned_candidate_count: 0, unassigned_candidate_count: 1000,
-        reviewers: [], assignments: [], ledger_events_total: 0, by_event: {},
-        enforced: { assignment: true, blind: true },
-        enforcement: { assignment_enforced: true, blind_enforced: true },
-      };
-      server.overrides['GET /golden/candidates'] = {
-        total: 1000, summary: { total: 1000, fixed: 0, unfixed: 1000, deferred: 0, discarded: 0 },
-        candidates: [], available_batches: [{ review_batch: '2026-08-A', total: 1000, active: true }],
-        available_doc_formats: [],
+        progress_summary: {
+          reviewer_count: 0, assigned_doc_count: 0, reviewed_doc_count: 0,
+          fixed_doc_count: 0, deferred_doc_count: 0, excluded_doc_count: 0,
+          in_progress_doc_count: 0, not_started_doc_count: 0, remaining_doc_count: 0, progress_percent: 0,
+        },
       };
       const page = await productTab(server, 'experts');
-      await page.until(() => page.$('expert-plan-submit')?.disabled === false);
+      await page.until(() => page.text('expert-assignment-list').includes('진행 중인 검수 계정이 없습니다.'));
 
-      page.set('expert-reviewer-ids', READY_REVIEWERS.join('\n'));
-      page.set('expert-assignment-reason', '2026-10 검수 배정 1차');
-      page.click('expert-plan-submit');
-      await page.settle();
-
-      const call = server.lastCall('POST', '/golden/assignments/expert-review-plan');
-      check.ok(call, '조건이 맞으면 배정 요청을 보낸다');
-      check.eq(call?.body?.review_batch, '2026-08-A', '현재 선택된 배치로 보낸다');
-      check.eq(call?.body?.reviewer_ids?.length, 20, '검수자 20명을 그대로 싣는다');
-      check.includes(page.text('expert-plan-message'), '20명', '배정 완료 메시지에 인원이 보인다');
-      check.includes(page.text('expert-plan-message'), '50건', '1인당 건수가 보인다');
+      check.includes(page.text('expert-assignment-list'), '진행 중인 검수 계정이 없습니다.', '빈 진행 현황을 설명한다');
+      check.eq(server.countCalls('POST', '/golden/assignments/expert-review-plan'), 0, '빈 상태에서도 배정 요청을 보내지 않는다');
       assertNoScriptErrors(check, page);
       return page;
     },
