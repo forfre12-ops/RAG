@@ -17,7 +17,7 @@
 사용:
   python scripts/audit_review_batch_presentation.py \
       --root datasets/proxy_gold/single_document_candidates \
-      --batch expert_review_product_1000_20261010 \
+      --batch expert_review_product_1000_20261010_rf \
       --report reports/expert_review_product_1000_presentation_audit.json
 """
 from __future__ import annotations

@@ -20,7 +20,7 @@ if str(_SCRIPTS) not in sys.path:
 
 from build_offline_bundle import load_review_request_exclusions, select_review_batch_files  # noqa: E402
 
-BATCH = "expert_review_product_1000_20261010"
+BATCH = "expert_review_product_1000_20261010_rf"
 
 
 def _write(root: Path, doc_id: str, *, batch: str = BATCH) -> None:

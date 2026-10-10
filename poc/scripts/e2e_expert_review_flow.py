@@ -8,7 +8,7 @@
 
     1. 배정 강제 검수자에게 자기 50건만 보이고, 관리자는 지정 배치 1,000건을 본다
     2. 검수자(reviewer 전용 토큰) 응답에서 제안 등급·근거·정답 단서가 안 보인다(블라인드 기본 켜짐)
-       · 문서 번호는 별칭(RV-…)이고 실 doc_id(MD-/MK-/MS1-…)가 응답 어디에도 없다
+       · 문서 번호는 별칭(RV-…)이고 실 doc_id(MD-/MK-/MS1-/RF-…)가 응답 어디에도 없다
     3. 「제안 등급 그대로 확정」(approve)은 403이다. 쓰기 검증은 UAT에서만 opt-in한다
     4. 공유 API 키(system)로는 검수 결정을 못 쓴다(포털 JWT 만)
     5. 관리자 토큰으로는 제안 등급·실 doc_id 가 보이고 배정 API 가 열려 있다
@@ -20,7 +20,7 @@
     # 현재 전문가 검수 운영(1,000건을 20명에게 50건씩 문서 단위로 배정)에서는
     # reviewer 는 자기 50건만, admin 은 지정 배치의 1,000건을 본다.
     # 다른 시험 배치를 쓸 때만 아래 기대값을 명시적으로 바꾼다.
-    ... --review-batch expert_review_product_1000_20261010 \
+    ... --review-batch expert_review_product_1000_20261010_rf \
         --expect-reviewer-total 50 --expect-batch-total 1000
 
 ■ 기본값은 읽기 전용이다. ``--write-probe`` 는 검수자 결정 1건을 원장에 **남기므로**,
@@ -46,9 +46,9 @@ for _s in (sys.stdout, sys.stderr):
 # 검수자가 보면 독립 판정이 깨지는 필드(golden_reviewer_access.BLIND_HIDDEN_*).
 ANSWER_KEYS = {"proposed_grade", "proposed_grade_basis", "by_proposed_grade", "by_final_grade", "document_path",
                "management_before", "grade_rationale", "intended_label"}
-# 배치가 바뀌면 doc_id 접두사도 바뀐다(MD-, MK-, MS1- 등). 특정 옛 접두사만
+# 배치가 바뀌면 doc_id 접두사도 바뀐다(MD-, MK-, MS1-, RF- 등). 특정 옛 접두사만
 # 찾으면 새 배치의 실 ID 누출을 놓친다. 별칭은 RV- 이므로 이 패턴에는 걸리지 않는다.
-REAL_ID = re.compile(r"\b(?:MD|MK|MS1)-\d{4}\b")
+REAL_ID = re.compile(r"\b(?:MD|MK|MS1|RF)-\d{4}\b")
 
 
 def walk_keys(obj) -> set[str]:
@@ -69,7 +69,7 @@ def main() -> int:
     ap.add_argument("--reviewer-token", required=True)
     ap.add_argument("--admin-token", default="")
     ap.add_argument("--api-key", default="")
-    ap.add_argument("--review-batch", default="expert_review_product_1000_20261010",
+    ap.add_argument("--review-batch", default="expert_review_product_1000_20261010_rf",
                     help="관리자가 검증할 활성 전문가 검수 배치")
     ap.add_argument("--expect-reviewer-total", type=int, default=50,
                     help="배정 강제 상태에서 이 검수자에게 보여야 할 문서 수")

@@ -48,10 +48,10 @@ class _Requests:
         if url.endswith("/candidates/summary"):
             return _Response(200, {"total": 50})
         if url.endswith("/candidates") and headers.get("Authorization") == "Bearer admin":
-            assert params == {"limit": 5, "review_batch": "expert_review_product_1000_20261010"}
+            assert params == {"limit": 5, "review_batch": "expert_review_product_1000_20261010_rf"}
             return _Response(200, {
                 "total": 1000,
-                "candidates": [{"doc_id": "MS1-0001", "proposed_grade": "S1"}],
+                "candidates": [{"doc_id": "RF-0001", "proposed_grade": "S1"}],
             })
         if url.endswith("/assignments"):
             return _Response(200 if headers.get("Authorization") == "Bearer admin" else 403)
@@ -80,8 +80,9 @@ def test_read_only_defaults_verify_assigned_50_and_admin_batch_1000(monkeypatch)
     assert not any(call[2].get("json", {}).get("action") == "change" for call in writes)
 
 
-def test_real_id_pattern_covers_current_ms1_prefix():
+def test_real_id_pattern_covers_current_rf_prefix():
     module = _load()
     assert module.REAL_ID.search("MS1-0001")
+    assert module.REAL_ID.search("RF-0001")
     assert module.REAL_ID.search("MD-0001")
     assert not module.REAL_ID.search("RV-123")

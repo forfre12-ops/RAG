@@ -57,11 +57,11 @@ files = [
 [bundle.review_batch]               # golden_review_batch/ — 선택은 빌더의 select_review_batch_files()
 patterns = ["*_review.md", "*.metadata.json", "*.selection.json"]
 # 20명 x 50건 전문가 검수에는 정확히 1,000건인 이 배치만 싣는다. 원본 1,001건 중
-# MS1-1001은 등급·본문·품질과 무관한 안정 doc_id 규칙으로 제외했으며, 동봉되는
-# selection manifest가 원본 매니페스트 해시와 제외 ID를 기록한다.
+# RF-1001은 등급·본문·품질과 무관한 안정 doc_id 규칙으로 제외했으며, 동봉되는
+# selection manifest가 RF 원본 매니페스트 해시·전수 품질 게이트와 제외 ID를 기록한다.
 # doc_id 접두사가 아니라 metadata의 review_batch로 고른다. 배치를 바꾸려면 반드시 이
 # 값을 거쳐서만 고를 것(코드에 다시 하드코딩하지 말 것).
-batch = "expert_review_product_1000_20261010"
+batch = "expert_review_product_1000_20261010_rf"
 
 [bundle.locked_eval]                # golden_locked_eval/ — 지재원 서명 locked_eval 스냅샷(선택, 없으면 미동봉)
 # [2026-10-09] #9(이미지 분리) 때문에 생겼다 — 고객사 이미지에는 api/golden.py(검수·서명 화면)가

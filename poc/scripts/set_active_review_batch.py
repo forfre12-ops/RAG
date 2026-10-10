@@ -8,7 +8,7 @@
 
 사용 예:
   python scripts/set_active_review_batch.py --batch mock1000_scaleup_20261007 --expected-count 1001
-  python scripts/set_active_review_batch.py --batch expert_review_product_1000_20261010 --expected-count 1000
+  python scripts/set_active_review_batch.py --batch expert_review_product_1000_20261010_rf --expected-count 1000
 """
 from __future__ import annotations
 

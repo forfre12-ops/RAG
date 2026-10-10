@@ -208,7 +208,7 @@ GOLDEN_REVIEW_BLIND_ENFORCED=1
 
 # 후보 관리 화면의 기본 검수 배치 — 번들 golden_review_batch/ 의 회차. 옛 회차가 후보 풀에 쌓여도
 # 첫 화면이 이번 회차만 보여 준다(그 배치가 서버에 없으면 자동으로 전체).
-GOLDEN_DEFAULT_REVIEW_BATCH=expert_review_product_1000_20261010
+GOLDEN_DEFAULT_REVIEW_BATCH=expert_review_product_1000_20261010_rf
 
 # 골든 검수 콘솔 로그인 — 결정 저장(POST .../decision)은 공유 API_KEY 를 거부하고 포털 JWT
 # 쿠키만 받는다("golden console requires a portal JWT login"). 이걸 안 채우면 AUTH_MODE

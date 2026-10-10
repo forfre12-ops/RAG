@@ -144,6 +144,25 @@ def test_signoff_carries_the_shared_visual_theme():
     assert CONSOLE_THEME_CSS.strip() in html
 
 
+def test_admin_v2_uses_console_tokens_instead_of_a_navy_subtheme():
+    """관리자 작업공간만 남색 제품으로 분리되는 회귀를 막는다."""
+    admin = (STATIC / "admin.html").read_text(encoding="utf-8")
+    for fragment in (
+        "--ui-canvas:var(--bg-surface)",
+        "--ui-line-soft:var(--border-mid)",
+        "--ui-navy:var(--text)",
+        "--ui-blue:var(--text)",
+        "--ui-radius:var(--radius-lg)",
+        "background:var(--ui-navy);border-color:var(--ui-navy)",
+    ):
+        assert fragment in admin
+    for old_token in (
+        "--ui-navy:#132a52", "--ui-blue:#2563eb", "--ui-canvas:#f3f5f8",
+        "--ui-line-soft:var(--border-soft)",
+    ):
+        assert old_token not in admin
+
+
 @pytest.mark.parametrize("name", list(_screens()))
 def test_old_header_skeletons_are_gone(name):
     """옛 골격이 남아 있으면 화면마다 상단이 두 개가 된다.

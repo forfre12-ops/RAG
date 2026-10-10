@@ -1,6 +1,6 @@
 # 전문가 검수 운영 절차 — 1,000건 배치
 
-대상 배치: `expert_review_product_1000_20261010`  
+대상 배치: `expert_review_product_1000_20261010_rf`
 범위: 모의문서 1,000건을 활성 검수자 20명에게 각 50건씩 한 번만 배정하는 지재원 검수 운영
 
 이 문서는 현재 회차의 운영 기준이다. `CLAUDE_EXPERT_REVIEW_1731_GUIDE_20260924.md`는 2026-09의 1,711건 회차를 설명하는 보관 자료이므로 현재 설치·배정에 사용하지 않는다.
@@ -14,7 +14,7 @@
    ```bash
    GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1
    GOLDEN_REVIEW_BLIND_ENFORCED=1
-   GOLDEN_DEFAULT_REVIEW_BATCH=expert_review_product_1000_20261010
+   GOLDEN_DEFAULT_REVIEW_BATCH=expert_review_product_1000_20261010_rf
    ```
 
 4. 설치 후 아래 읽기 전용 점검을 실행한다. 결과는 `READY`, 1,000 문서, 20 활성 검수자, assignment/blind `True`여야 한다.
@@ -31,7 +31,7 @@
 
 1. 인증된 관리자 계정으로 `.../api/v1/golden/candidates/manage.html`에 로그인한다.
 2. **검수 배정**에서 활성 검수자 20명을 중복 없이 선택하고, 현재 배치
-   `expert_review_product_1000_20261010`에 대해 **전문가 검수 계획 실행**을 누른다.
+   `expert_review_product_1000_20261010_rf`에 대해 **전문가 검수 계획 실행**을 누른다.
 3. 화면/`GET /api/v1/golden/assignments`에서 다음을 확인한다.
 
    - 문서 1,000건이 모두 배정됨
@@ -49,7 +49,7 @@
 python scripts/e2e_expert_review_flow.py \
   --base-url http://127.0.0.1:8000 \
   --reviewer-token "$REVIEWER_JWT" --admin-token "$ADMIN_JWT" \
-  --review-batch expert_review_product_1000_20261010 \
+  --review-batch expert_review_product_1000_20261010_rf \
   --expect-reviewer-total 50 --expect-batch-total 1000
 ```
 

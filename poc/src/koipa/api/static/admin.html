@@ -351,31 +351,32 @@ details.adv[open]{padding-bottom:12px;}
    운영 콘솔 안에서 탐색할 수 있게 하는 정보 구조와 표현 계층이다.
    =========================================================================== */
 :root{
-  --ui-canvas:#f3f5f8;
-  --ui-panel:#ffffff;
-  --ui-ink:#172033;
-  --ui-muted:#667085;
-  --ui-line:#d9dee8;
-  --ui-line-soft:#e9edf3;
-  --ui-navy:#132a52;
-  --ui-blue:#2563eb;
-  --ui-blue-soft:#eff6ff;
-  --ui-shadow:0 10px 30px rgba(20,32,51,.08);
-  --ui-radius:14px;
+  /* 공용 콘솔 토큰의 별칭. 관리자만 남색 제품처럼 보이면 안 된다. */
+  --ui-canvas:var(--bg-surface);
+  --ui-panel:var(--bg);
+  --ui-ink:var(--text);
+  --ui-muted:var(--text-dim);
+  --ui-line:var(--border);
+  --ui-line-soft:var(--border-mid);
+  --ui-navy:var(--text);
+  --ui-blue:var(--text);
+  --ui-blue-soft:var(--bg-mid);
+  --ui-shadow:0 8px 24px rgba(9,9,11,.06);
+  --ui-radius:var(--radius-lg);
 }
 body{background:var(--ui-canvas);color:var(--ui-ink);}
-.top{background:rgba(255,255,255,.96);box-shadow:0 1px 0 rgba(15,23,42,.06);backdrop-filter:blur(12px);}
+.top{background:rgba(255,255,255,.96);box-shadow:0 1px 0 rgba(9,9,11,.06);backdrop-filter:blur(12px);}
 .top .brand{color:var(--ui-navy);}
 .wrap{max-width:1560px;padding:24px 28px 112px;}
 .console-layout{display:grid;grid-template-columns:238px minmax(0,1fr);gap:22px;align-items:start;}
 .console-sidebar{position:sticky;top:106px;border:1px solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-panel);box-shadow:var(--ui-shadow);padding:15px 12px;}
 .console-sidebar-kicker{font-size:10px;font-family:var(--font-mono);font-weight:800;letter-spacing:.09em;color:var(--ui-muted);padding:4px 9px 12px;text-transform:uppercase;}
 .console-nav{display:flex;flex-direction:column;gap:3px;}
-.console-nav button{appearance:none;display:flex;align-items:center;gap:10px;width:100%;min-height:42px;border:1px solid transparent;border-radius:9px;background:transparent;color:#526077;cursor:pointer;padding:8px 10px;font:700 13px var(--font-sans);letter-spacing:-.01em;text-align:left;transition:background .15s,color .15s,border-color .15s;}
-.console-nav button:hover{background:#f5f7fb;color:var(--ui-navy);}
-.console-nav button.active{background:var(--ui-navy);border-color:var(--ui-navy);color:#fff;box-shadow:0 4px 12px rgba(19,42,82,.18);}
+.console-nav button{appearance:none;display:flex;align-items:center;gap:10px;width:100%;min-height:42px;border:1px solid transparent;border-radius:var(--radius);background:transparent;color:var(--ui-muted);cursor:pointer;padding:8px 10px;font:700 13px var(--font-sans);letter-spacing:-.01em;text-align:left;transition:background .15s,color .15s,border-color .15s;}
+.console-nav button:hover{background:var(--bg-mid);color:var(--ui-navy);}
+.console-nav button.active{background:var(--ui-navy);border-color:var(--ui-navy);color:#fff;box-shadow:0 4px 12px rgba(9,9,11,.14);}
 .console-nav .nav-icon{display:grid;place-items:center;width:20px;height:20px;border:1px solid currentColor;border-radius:6px;font:800 10px var(--font-mono);opacity:.86;}
-.console-nav .nav-count{margin-left:auto;min-width:22px;padding:1px 6px;border-radius:999px;background:#e9eef7;color:#526077;font:700 10px var(--font-mono);text-align:center;}
+.console-nav .nav-count{margin-left:auto;min-width:22px;padding:1px 6px;border-radius:999px;background:var(--bg-mid);color:var(--ui-muted);font:700 10px var(--font-mono);text-align:center;}
 .console-nav button.active .nav-count{background:rgba(255,255,255,.18);color:#fff;}
 .console-sidebar-foot{margin:15px 5px 2px;padding:14px 4px 1px;border-top:1px solid var(--ui-line-soft);font-size:11px;color:var(--ui-muted);line-height:1.55;}
 .console-body{min-width:0;}
@@ -383,7 +384,7 @@ body{background:var(--ui-canvas);color:var(--ui-ink);}
 .h1{font-size:clamp(26px,3vw,34px);color:var(--ui-navy);margin:0;}
 .console-caption{margin:5px 0 0;color:var(--ui-muted);font-size:13px;}
 .console-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
-.console-meta .meta-chip{padding:5px 9px;border:1px solid var(--ui-line);border-radius:999px;background:#fff;font:700 11px var(--font-mono);color:var(--ui-muted);}
+.console-meta .meta-chip{padding:5px 9px;border:1px solid var(--ui-line);border-radius:999px;background:var(--bg);font:700 11px var(--font-mono);color:var(--ui-muted);}
 .console-meta .meta-chip strong{color:var(--ui-navy);}
 .console-meta .meta-chip select{width:auto;max-width:250px;margin-left:5px;padding:2px 20px 2px 5px;border:0;background:transparent;color:var(--ui-navy);font:700 11px var(--font-mono);box-shadow:none;}
 
@@ -391,17 +392,17 @@ body{background:var(--ui-canvas);color:var(--ui-ink);}
 .loopwrap,.tabbar,.pane-note{display:none;}
 .flow[data-pane="ops"]{display:none;}
 .grid{gap:18px;}
-.card{border-color:var(--ui-line);border-radius:var(--ui-radius)!important;box-shadow:0 2px 8px rgba(15,23,42,.025);overflow:clip;}
-.card-head{padding:14px 18px;border-bottom-color:var(--ui-line-soft);background:linear-gradient(180deg,#fff,#fbfcfe);}
+.card{border-color:var(--ui-line);border-radius:var(--ui-radius)!important;box-shadow:0 2px 8px rgba(9,9,11,.025);overflow:clip;}
+.card-head{padding:14px 18px;border-bottom-color:var(--ui-line-soft);background:linear-gradient(180deg,var(--bg),var(--bg-surface));}
 .card-body{padding:18px;}
 .btn{border-radius:8px!important;background:var(--ui-navy);border-color:var(--ui-navy);}
 .btn.sec,.btn.ghost{border-radius:8px!important;border-color:var(--ui-line);background:#fff;color:var(--ui-navy);}
 .btn:hover{opacity:1;filter:brightness(.98);}
 .tbl-wrap{border-color:var(--ui-line);border-radius:10px!important;}
-th{background:#f8fafc;border-bottom-color:var(--ui-line);color:#5e6b81;}
-td{border-bottom-color:var(--ui-line-soft);color:#455268;}
+th{background:var(--bg-surface);border-bottom-color:var(--ui-line);color:var(--text-soft);}
+td{border-bottom-color:var(--ui-line-soft);color:var(--text-soft);}
 input[type=text],input[type=password],input[type=number],select,textarea{border-color:var(--ui-line);border-radius:8px!important;}
-input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0 0 0 3px rgba(37,99,235,.12);}
+input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0 0 0 3px rgba(9,9,11,.12);}
 
 .product-view{display:none;}
 .product-view.is-visible{display:block;}

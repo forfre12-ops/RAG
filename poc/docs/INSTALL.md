@@ -171,7 +171,7 @@ cp infra-config/.env.template .env
 | `GOLDEN_HTML_URL_SECRET` | `<64 hex>` | 골든 검수·서명 화면 서명 URL 키. **없으면 그 화면이 무인증으로 열려 후보 문서 본문이 노출된다**(startup 은 통과하므로 조용히 열린 채 운영됨) |
 | `GOLDEN_REVIEW_BLIND_ENFORCED` | `1` | 외부 전문가 검수용. **기본값 False** — 이 줄이 없으면 검수자 화면에 제안 등급·근거가 그대로 보여 독립 판정이 깨진다(startup 은 통과, 조용히 그대로 운영됨). 전문가 검수 배치를 열 때 필수 |
 | `GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED` | `1` | 전문가 검수 배치에서는 필수. 끄면 전원이 배치 전체를 볼 수 있어 20명x50건 독립 검수가 깨진다 |
-| `GOLDEN_DEFAULT_REVIEW_BATCH` | `expert_review_product_1000_20261010` | 후보 관리 화면(관리자)이 처음 열릴 때 좁혀 보는 현재 전문가 검수 배치. 이번 배치는 20명×50건에 맞춘 정확히 1,000건이며, 원본 1,001건 중 안정 `doc_id` 기준 마지막 1건은 검수 대상에서 제외했다. 과거 후보가 같은 풀에 있더라도 이 값이 있으면 이번 회차만 먼저 보인다 |
+| `GOLDEN_DEFAULT_REVIEW_BATCH` | `expert_review_product_1000_20261010_rf` | 후보 관리 화면(관리자)이 처음 열릴 때 좁혀 보는 현재 전문가 검수 배치. RF 1,001건의 전수 품질 게이트 통과본에서 안정 `doc_id` 기준 1,000건을 선별했다. 과거 후보가 같은 풀에 있더라도 이 값이 있으면 이번 회차만 먼저 보인다 |
 | `CORS_ALLOW_ORIGINS` | `["https://<콘솔 오리진>"]` | 운영 모드는 와일드카드(`*`) 거부. **JSON 배열** 형식 |
 
 > 64 hex 생성: `python3 -c "import secrets;print(secrets.token_hex(32))"`
@@ -365,7 +365,7 @@ docker compose --env-file .env -f infra-config/docker-compose.airgap.yml \
 ### 10.3 전문가 검수 배치 적재 — `setup.sh` 6-1단계가 자동으로 한다(지재원 노드)
 
 `setup.sh` 가 번들 루트의 `golden_review_batch/`(전문가 검수용 모의문서 **1,000건** — 20명×50건,
-`MS1-####_review.md`+`MS1-####.metadata.json` 쌍과 선택 근거 `*.selection.json`)를 검수 콘솔이 읽는 `golden_data` 볼륨
+`RF-####_review.md`+`RF-####.metadata.json` 쌍과 선택 근거 `*.selection.json`)를 검수 콘솔이 읽는 `golden_data` 볼륨
 (`/app/datasets/proxy_gold/single_document_candidates/`)에 복사한다. 이 적재가 안 되면 콘솔은 뜨지만
 **검수할 문서가 0건**이다. 임시 컨테이너(api 이미지·비-root uid 1000)로 복사하므로 볼륨 경로를 알 필요가
 없고 파일 소유자도 맞는다(종전 수동 `cp` 는 볼륨 경로를 모르면 못 했고, 소유자가 uid 1000 이 아니면 서명 제출이
@@ -418,7 +418,7 @@ docker compose --env-file .env -f infra-config/docker-compose.airgap.yml \
 > 배치 범위가 함께 확인된 뒤에만 별도 승인으로 승격한다.
 
 `evidence/eval_independence_exclusions.jsonl`은 과거 1,711건 회차의 학습·검증 사용 이력을 보존한 자료다.
-현재 `expert_review_product_1000_20261010`의 독립성이나 승격 허용을 증명하지 않는다. 따라서 현재 회차를
+현재 `expert_review_product_1000_20261010_rf`의 독립성이나 승격 허용을 증명하지 않는다. 따라서 현재 회차를
 평가정답 또는 재학습 입력에 쓰려면, 해당 배치의 학습 사용 이력·문서 해시·독립성 판정을 새 증빙으로 만들고
 승격 범위를 그 증빙과 대조해야 한다. 이 작업은 설치 단계가 아니라 검수 완료 후의 별도 릴리스 게이트다.
 
