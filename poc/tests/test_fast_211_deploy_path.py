@@ -56,6 +56,7 @@ def test_prebuilt_switcher_never_builds_on_the_target_host() -> None:
     assert "KOIPA_BUILD_SHA" in script
     assert ".previous" in script
     assert "python3 -" in script
+    assert "training-storage-init" in script
 
 
 def test_release_builder_is_exact_sha_and_component_scoped() -> None:
