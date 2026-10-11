@@ -26,8 +26,8 @@ export const scenarios = [
       // ② loadGoldenBuilds — 서버 목록으로 셀렉트가 채워졌다(자유 입력 아님)
       check.gte(page.$('gold-build-path')?.options.length, 3, 'loadGoldenBuilds: 묶음 목록이 채워졌다');
 
-      // ③ onTrainPresetChange — preset 설명
-      check.ok(page.$('tr-preset'), 'onTrainPresetChange: 학습 preset 셀렉트가 있다');
+      // ③ onTrainPresetChange — fixed operating-profile description
+      check.ok(page.$('tr-preset')?.readOnly, 'onTrainPresetChange: 정식 학습 프로필이 읽기 전용으로 보인다');
 
       // ④ syncActiveGrades — 등급 셀렉트 3곳
       for (const id of ['sy-grade', 'kw-f-grade', 'kw-n-grade']) {
@@ -39,12 +39,15 @@ export const scenarios = [
       check.includes(page.text('health-txt'), '정상', 'checkHealth: 헬스 표시가 정상으로 바뀌었다');
       check.eq(page.$('health')?.className, 'health-pill ok', 'checkHealth: 헬스 pill 이 ok');
 
-      // ⑥ applyServerConfig — **끝까지 돌았다**(2026-08-23 회귀 지점: 앞 함수 하나가 던지면
-      // 뒤 초기화가 통째로 멈춘다). 종전에는 검수 임계 표시로 이걸 확인했는데, 2026-08-24 에
-      // 그 칸을 화면에서 뺐다. 마지막 호출인 applySynthAvailability 의 결과로 바꾼다 —
-      // 잠그는 대상은 숫자가 아니라 "뒤 코드가 살아 있다" 는 사실이다.
-      check.includes(page.text('sy-provider-note'), '서버 설정',
-        'applyServerConfig: 마지막 초기화(applySynthAvailability)까지 실행됐다');
+      // ⑥ provider wiring — **끝까지 돌았다**(2026-08-23 회귀 지점: 앞 함수 하나가 던지면
+      // 뒤 초기화가 통째로 멈춘다). 제공자 상태를 확인하기 전에는 생성 요청을 열지 않는다는
+      // 안내가 남아야 한다.
+      const providerNote = page.text('sy-provider-note');
+      check.ok(
+        providerNote.includes('선택한 제공자로') || providerNote.includes('합성 문서는'),
+        '제공자 상태 초기화까지 실행됐다',
+        providerNote,
+      );
 
       check.includes(page.bodyText(), '거버넌스 콘솔 준비 완료', '초기화 완료 로그가 남았다');
       return page;

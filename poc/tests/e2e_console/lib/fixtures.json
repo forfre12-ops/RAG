@@ -719,8 +719,8 @@
   },
   "PUT /schema/grades": {
     "version": "v2",
-    "requires_retraining": true,
-    "reason": "등급 코드가 바뀌었습니다 — 기존 분류기 라벨 공간과 어긋나므로 재학습이 필요합니다"
+    "requires_retraining": false,
+    "reason": "등급 코드는 TS/S1/S2/S3으로 고정되어 표시 정보만 저장했습니다"
   },
   "GET /admin/dashboard": {
     "generated_at": "2026-08-23T02:30:00Z",
@@ -1086,6 +1086,17 @@
         "created_at": "2026-08-23T01:41:00Z"
       }
     ]
+  },
+  "GET /synth/training-candidate": {
+    "ready": false,
+    "dataset_version": "synth-e2e-empty",
+    "approved_total": 0,
+    "included": 0,
+    "excluded_noise": 0,
+    "excluded_empty": 0,
+    "excluded_gate_error": 0,
+    "grade_corrected": 0,
+    "blockers": ["승인된 모의 문서가 없습니다"]
   },
   "POST /synth/{synth_id}/review": {
     "synth_id": "12121212-1212-4121-8121-121212121212",

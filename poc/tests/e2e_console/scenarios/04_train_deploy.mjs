@@ -23,9 +23,8 @@ export const scenarios = [
       const page = await modelTab(server);
       check.ok(page.visible('tr-preset'), '모델 학습 화면에 학습 카드가 보인다');
       check.includes(page.bodyText(), '데이터 분할', '학습·검증·평가 분할을 안내한다');
-
-      page.set('tr-preset', 'demo');
-      check.includes(page.text('tr-preset-note'), '시연용', 'preset 설명이 바뀐다');
+      check.ok(page.$('tr-preset')?.readOnly, '시연용 preset 선택은 열려 있지 않다');
+      check.includes(page.text('tr-preset-note'), '검증된 기본 설정', '정식 학습 설정을 밝힌다');
 
       page.click(page.q('button[onclick="submitTrain()"]'));
       await page.settle();
@@ -33,7 +32,9 @@ export const scenarios = [
       check.ok(page.dialogs.some((d) => d.kind === 'confirm' && d.message.includes('재학습을 제출')), '되묻는다');
       const call = server.lastCall('POST', '/train');
       check.ok(call, 'POST /train 이 나갔다');
-      check.eq(call?.body?.hyperparams?.epochs, 1, '시연 preset 의 하이퍼파라미터가 실렸다');
+      check.eq(call?.body?.training_type, 'full', '정식 전체 학습만 전송한다');
+      check.eq(call?.body?.base_model, 'kakaobank/kf-deberta-base', '고정 베이스 모델을 전송한다');
+      check.ok(!Object.hasOwn(call?.body || {}, 'hyperparams'), '임의 하이퍼파라미터는 전송하지 않는다');
       check.ok(call?.body?.actor?.user_id, '행위자가 실렸다');
       check.ok(server.lastCall('GET', '/train/jobs'), '제출 후 작업 목록을 다시 읽는다');
       check.includes(page.html('jobs-body'), 'aaaaaaaa', '작업 목록에 잡이 그려졌다');

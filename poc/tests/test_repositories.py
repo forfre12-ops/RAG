@@ -25,6 +25,7 @@ from koipa.repositories import (
     SynthRepo,
     TrainingRepo,
 )
+from koipa.services.audit_chain import parse_chained_hash
 
 
 def _pg_ok() -> bool:
@@ -356,7 +357,12 @@ class TestAuditRepo:
         )
         db.flush()
         assert a.payload_hash is not None
-        assert len(a.payload_hash) == 64  # SHA-256 hex
+        # Direct repository writes join the append-only audit chain.  The
+        # column stores the compact ``previous-link:current-link`` format,
+        # not a standalone SHA-256 digest.
+        prev, current = parse_chained_hash(a.payload_hash)
+        assert len(prev) == 16
+        assert len(current) == 32
 
     def test_record_with_explicit_hash(self, db):
         repo = AuditRepo(db)

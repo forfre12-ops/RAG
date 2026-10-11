@@ -304,7 +304,8 @@ export const scenarios = [
       check.includes(raw, '2026-09-01', '시행일 값이 실렸다');
       check.excludes(raw, 'name="actor"', '행위자를 본문에 싣지 않는다(감사 신원은 인증이 정한다)');
       check.eq(page.$('reg-name').value + page.$('reg-ver').value + page.$('reg-date').value, '', '보낸 뒤 입력칸이 비워졌다');
-      check.includes(page.text('reg-notice'), '규정을 올렸습니다', '올렸다고 알린다');
+      const uploadNotified = await page.until(() => page.text('reg-notice').includes('규정을 올렸습니다'), 1000);
+      check.ok(uploadNotified, '올렸다고 알린다');
       check.eq(page.qa('#reg-body tr').length, 2, '목록에 새 규정이 생겼다');
       check.includes(page.text('reg-body'), '분석 중', '새 규정의 상태가 분석 중이다');
       check.includes(page.text('reg-detail-note'), '규정을 분석하는 중…', '선택한 규정 자리에 분석 진행이 보인다');

@@ -104,8 +104,12 @@ run "임시 Redis 기동" bash -c '
     docker run -d --rm --name koipa-testredis -p 16379:6379 redis:7.2-alpine >/dev/null
     sleep 2
 '
+# A handful of integration tests deliberately resolve repository artifacts
+# (for example ``poc/src/...``) from the checkout root.  Keep the gate's
+# tools rooted in poc/, but run the repository-wide suite from its canonical
+# root so those tests exercise the same layout as CI and deployment bundles.
 run "전체 pytest(fullstack 포함, DB·Redis 연결)" bash -c \
-    "TESTING=1 DATABASE_URL='$TEST_DB_URL' REDIS_URL='redis://localhost:16379/0' '$PY' -m pytest -q -m 'not gpu and not model_download'"
+    "cd .. && TESTING=1 DATABASE_URL='$TEST_DB_URL' REDIS_URL='redis://localhost:16379/0' 'poc/$PY' -m pytest -q -c poc/pyproject.toml -m 'not gpu and not model_download' poc/tests"
 
 run "데이터 누출 게이트" "$PY" scripts/check_data_quality.py \
     --train-hash-manifest datasets/gold_real/train_subset.hashes.txt \
@@ -132,7 +136,8 @@ else
     echo "" ; echo "==[ gold_real 3층 분리 검사 ]== 건너뜀 — datasets/gold_real/classification_gold.jsonl 없음"
 fi
 
-run "콘솔 e2e 시나리오" "$PY" -m pytest -q tests/test_e2e_console_scenarios.py tests/test_e2e_console_api_contract.py
+run "콘솔 e2e 시나리오" bash -c \
+    "cd .. && TESTING=1 'poc/$PY' -m pytest -q -c poc/pyproject.toml poc/tests/test_e2e_console_scenarios.py poc/tests/test_e2e_console_api_contract.py"
 
 _sha=$(git rev-parse HEAD 2>/dev/null || echo unknown)
 _now=$(date -u +%Y-%m-%dT%H:%M:%SZ)

@@ -14,27 +14,11 @@ async function configTab(server, opts = {}) {
   return page;
 }
 
-// 서버(schema_admin_service.assess_grade_change)가 실제로 내는 409 문구와 같은 모양.
-const BLOCKED = "서빙 모델(v-fe4b386b)의 등급 ['S1', 'S2', 'S3', 'TS'] 과 새 활성 등급 ['S1', 'S2', 'TS'] 이 달라, "
-  + '다음 모델 로드(재기동·리로드)부터 분류기가 로드를 거부하고 규칙엔진으로 판정합니다. '
-  + '그래도 저장하려면 force=true 와 force_reason 을 함께 보내십시오.';
-
-async function removeS3AndSaveBlocked(server, opts) {
-  const page = await configTab(server, opts);
-  page.click(page.q('button[onclick="loadGradeEditor()"]'));
-  await page.settle();
-  server.faults.push({ path: '/schema/grades', method: 'PUT', status: 409, once: true, body: { detail: BLOCKED } });
-  page.click(page.q('#grade-body button[onclick="removeGradeRow(3)"]'));
-  page.click('grade-save');
-  await page.settle();
-  return page;
-}
-
 export const scenarios = [
   {
-    id: 'config.grades.load-edit-save',
+    id: 'config.grades.fixed-four-levels-and-metadata-save',
     writes: true,
-    title: '등급체계를 불러와 행을 추가하고 저장하면 재학습 필요 안내가 뜬다',
+    title: '등급은 네 개로 고정되고 표시 정보만 저장한다',
     async run({ server, check }) {
       const page = await configTab(server);
       page.click(page.q('button[onclick="loadGradeEditor()"]'));
@@ -42,122 +26,24 @@ export const scenarios = [
 
       check.includes(page.text('grade-info'), '활성 4개', '현재 등급 수가 보인다');
       check.eq(page.qa('#grade-body tr').length, 4, '4행이 편집표에 그려졌다');
-      check.eq(page.$('ge-code-0')?.value, 'TS', '코드가 입력란에 들어갔다');
+      check.eq(page.qa('#grade-body .mono').map((el) => el.textContent).join(','), 'TS,S1,S2,S3', '고정 등급 코드가 보인다');
       check.eq(page.$('ge-name-0')?.value, '특급기밀', '명칭이 입력란에 들어갔다');
+      check.eq(page.qa('#grade-body button').length, 0, '등급 추가·삭제 버튼이 없다');
 
-      page.click(page.q('button[onclick="addGradeRow()"]'));
-      check.eq(page.qa('#grade-body tr').length, 5, '행이 하나 늘었다');
-      page.set('ge-code-4', 'S4');
-      page.set('ge-name-4', '4급 참고');
-
+      page.set('ge-name-0', '특급 기밀');
       page.click('grade-save');
       await page.settle();
 
-      const msgs = page.dialogs.map((d) => d.message).join(' ');
-      check.includes(msgs, '추가될 등급: S4', '무엇이 추가되는지 되묻는다');
+      const confirm = page.dialogs.find((d) => d.kind === 'confirm');
+      check.includes(confirm?.message || '', '4등급 라벨 공간은 변경되지 않습니다', '고정 정책을 확인한다');
       const call = server.lastCall('PUT', '/schema/grades');
       check.ok(call, 'PUT /schema/grades 가 나갔다');
-      check.eq((call?.body?.grades || []).length, 5, '5개 등급이 실려 나갔다');
-      check.eq(call?.body?.grades?.[4]?.code, 'S4', '새 등급 코드가 실렸다');
-      check.includes(page.html('grade-result'), '재학습 필요', '재학습이 필요하다고 알린다');
+      check.eq((call?.body?.grades || []).length, 4, '4개 등급만 실려 나갔다');
+      check.eq((call?.body?.grades || []).map((g) => g.code).join(','), 'TS,S1,S2,S3', '서버에도 고정 코드만 전송한다');
+      check.ok(!Object.hasOwn(call?.body || {}, 'force'), 'force 우회값은 전송하지 않는다');
       check.includes(page.html('grade-result'), 'version v2', '새 버전이 보인다');
       check.includes(page.text('grade-info'), '저장 완료', '저장됐다고 말한다');
-      // 저장한 등급이 다른 카드의 선택지에도 반영돼야 한다
-      check.includes(page.html('sy-grade'), 'S4', '합성 생성의 등급 목록에도 반영된다');
-      assertNoScriptErrors(check, page);
-      return page;
-    },
-  },
-
-  {
-    id: 'config.grades.validation',
-    title: '코드 중복·빈 값·0개 저장은 서버에 가기 전에 막는다',
-    async run({ server, check }) {
-      const page = await configTab(server);
-      page.click(page.q('button[onclick="loadGradeEditor()"]'));
-      await page.settle();
-
-      page.set('ge-code-1', 'TS');            // 0번과 중복
-      page.click('grade-save');
-      await page.settle();
-      check.ok(page.dialogs.some((d) => d.message.includes('중복')), '중복이라고 알린다');
-      check.eq(server.countCalls('PUT', '/schema/grades'), 0, '중복이면 보내지 않는다');
-
-      page.set('ge-code-1', '');              // 필수 누락
-      page.click('grade-save');
-      await page.settle();
-      check.ok(page.dialogs.some((d) => d.message.includes('필수')), '필수 항목이라고 알린다');
-      check.eq(server.countCalls('PUT', '/schema/grades'), 0, '빈 값이면 보내지 않는다');
-      return page;
-    },
-  },
-
-  {
-    id: 'config.grades.remove-warns-soft-delete',
-    writes: true,
-    title: '행을 지우면 하드 삭제가 아니라 비활성이라고 미리 알린다',
-    async run({ server, check }) {
-      const page = await configTab(server);
-      page.click(page.q('button[onclick="loadGradeEditor()"]'));
-      await page.settle();
-      page.click(page.q('#grade-body button[onclick="removeGradeRow(3)"]'));
-      check.includes(page.text('grade-info'), '비활성', '비활성(소프트 삭제)이라고 알린다');
-      page.click('grade-save');
-      await page.settle();
-      // [2026-08-24] 「소프트 삭제」는 우리가 만든 말이라 화면에서 뺐다(제출본·매뉴얼 0회).
-      // 시험은 문구 고정이 아니라 **뜻**을 본다 — 무엇이 어떻게 되는지.
-      check.matches(page.dialogs.map((d) => d.message).join(' '), /비활성될 등급: S3/, '무엇이 사라지는지 되묻는다');
-      check.eq((server.lastCall('PUT', '/schema/grades')?.body?.grades || []).length, 3, '3개만 저장된다');
-      return page;
-    },
-  },
-
-  // [2026-09-11] 서버는 서빙 분류기를 멈추게 하는 등급 변경을 저장 전에 409 로 거부한다.
-  // 콘솔은 영향을 보여 주고 사유를 받아 force 로 다시 보내야 한다 — 이 경로가 없으면 서빙
-  // 모델이 있는 서버에서 등급 추가·삭제(FUN-005-①)가 화면에서 불가능해진다.
-  {
-    id: 'config.grades.blocked-then-forced-with-reason',
-    writes: true,
-    title: '분류기를 멈추게 하는 변경이 거부되면 영향을 보여 주고, 사유를 받아 강제 저장한다',
-    async run({ server, check }) {
-      const page = await removeS3AndSaveBlocked(server, { promptAnswer: 'S3 폐지 결정 — 재학습 예정' });
-      const asked = page.dialogs.find((d) => d.kind === 'prompt');
-      check.ok(asked, '사유를 물어본다');
-      check.includes(asked?.message || '', '규칙엔진', '무엇이 멈추는지 보여 준다');
-      check.ok(!(asked?.message || '').includes('force=true'), 'API 사용법 문구는 화면에 내보이지 않는다');
-      check.eq(server.countCalls('PUT', '/schema/grades'), 2, '거부 뒤 한 번 더 보냈다');
-      const call = server.lastCall('PUT', '/schema/grades');
-      check.eq(call?.body?.force, true, '두 번째 요청은 강제 저장이다');
-      check.includes(call?.body?.force_reason || '', 'S3 폐지 결정', '사유가 그대로 실렸다');
-      check.includes(page.html('grade-result'), '재학습 필요', '저장 결과가 보인다');
-      assertNoScriptErrors(check, page);
-      return page;
-    },
-  },
-
-  {
-    id: 'config.grades.blocked-cancel-saves-nothing',
-    writes: true,
-    title: '거부된 변경에서 사유 입력을 취소하면 다시 보내지 않고, 저장하지 않았다고 말한다',
-    async run({ server, check }) {
-      const page = await removeS3AndSaveBlocked(server, { promptAnswer: null });
-      check.eq(server.countCalls('PUT', '/schema/grades'), 1, '다시 보내지 않았다');
-      check.includes(page.html('grade-result'), '저장하지 않았습니다', '저장하지 않았다고 말한다');
-      check.includes(page.html('grade-result'), '규칙엔진', '왜 저장하지 않았는지 남긴다');
-      check.ok(!page.text('grade-info').includes('저장 완료'), '저장 완료라고 말하지 않는다');
-      assertNoScriptErrors(check, page);
-      return page;
-    },
-  },
-
-  {
-    id: 'config.grades.blocked-empty-reason-saves-nothing',
-    writes: true,
-    title: '거부된 변경에서 사유를 비우면 다시 보내지 않는다',
-    async run({ server, check }) {
-      const page = await removeS3AndSaveBlocked(server, { promptAnswer: '   ' });
-      check.ok(page.dialogs.some((d) => d.kind === 'alert' && d.message.includes('사유는 필수')), '사유가 필수라고 알린다');
-      check.eq(server.countCalls('PUT', '/schema/grades'), 1, '다시 보내지 않았다');
+      check.includes(page.html('sy-grade'), 'S3', '합성 생성의 고정 등급도 유지된다');
       assertNoScriptErrors(check, page);
       return page;
     },
