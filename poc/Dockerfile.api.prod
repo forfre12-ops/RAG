@@ -13,13 +13,6 @@
 #   docker buildx imagetools inspect python:3.11-slim   # → Digest 를 아래에 반영
 FROM python:3.11-slim@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce AS base
 
-# [빌드 신원] 배포된 이미지가 어느 커밋에서 나왔는지를 런타임이 말할 수 있어야 한다.
-# 없으면 "서버가 그 SHA 를 실제로 실행 중인가" 를 확인할 방법이 없고, 릴리스 게이트의
-# --expect-git-sha 검증도 공중에 뜬다(실측 2026-08-15: healthz 에 sha 0건).
-ARG KOIPA_BUILD_SHA=unknown
-ARG KOIPA_BUILD_AT=unknown
-ENV KOIPA_BUILD_SHA=${KOIPA_BUILD_SHA} \
-    KOIPA_BUILD_AT=${KOIPA_BUILD_AT}
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -34,30 +27,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# editable 설치는 패키지 소스(src/)가 있어야 한다(pyproject egg_base=src). pyproject 만 복사한 뒤
-# pip install -e 하면 'src does not exist' 로 빌드 실패 → 소스를 먼저 복사한다. alembic/alembic.ini
-# 도 복사해야 이 이미지로 `alembic upgrade head`(마이그레이션)를 돌릴 수 있다.
-# [재현성] uv.lock 을 함께 복사한다 — 의존성 버전은 pyproject 범위가 아니라 lock 이 정한다
-# (scripts/docker_install_locked.sh 주석 참조).
+# [고속 빌드] 의존성 설치를 소스·빌드 신원과 분리한다. 화면 하나의 수정도 무거운
+# lock 설치를 다시 실행하던 구조를 없애고, editable 설치는 소스 COPY 뒤에서 마무리한다.
 COPY pyproject.toml uv.lock ./
-COPY src ./src
-# BEGIN deploy_manifest:container_scripts — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
-# 이미지에는 정본(deploy_manifest.toml)의 container.scripts.allow 만 싣는다.
-COPY scripts/_cli_io.py \
-     scripts/analyze_golden_run.py \
-     scripts/check_domain_leakage_gate.py \
-     scripts/docker_install_locked.sh \
-     scripts/register_deployed_model.py \
-     scripts/setup_console_test_login.py \
-     ./scripts/
-# END deploy_manifest:container_scripts
-COPY alembic ./alembic
-COPY alembic.ini ./
-# [2026-09-24 발견] evidence/ 를 여태 안 실었다 — console_signoff._EXCLUSIONS 가 런타임에
-# Path(__file__).resolve().parents[2]/"evidence"/"eval_independence_exclusions.jsonl" 를 찾는데
-# 이 이미지 어디에도 evidence/ 가 없어 승격(promote) 단계의 평가정답 오염 차단이 배포본에서는
-# 2026-09-09 도입 이후 계속 빈 목록으로 동작했다(개발 환경에서만 파일이 보여 안 드러났다).
-COPY evidence ./evidence
+COPY scripts/docker_install_locked.sh ./scripts/docker_install_locked.sh
 # torch 변형: 기본 CPU 전용(테스트·CPU 고객사) — CUDA 라이브러리(nvidia-cu*·triton, ~7GB)를 빼
 # 이미지를 ~10GB → ~3GB 로 줄인다. CPU 서버에선 CUDA torch 가 순수 낭비(추론은 CPU 로 동작).
 # 지재원 GPU 서버는 빌드 시 override:
@@ -76,12 +49,40 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 # 달라졌다(로컬↔KL 결과 차이의 원인을 특정할 수 없게 만든다). gunicorn 도 lock 에 들어 있어
 # 별도 설치가 필요 없다.
 RUN pip install --upgrade pip && \
-    TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh \
+    TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh --no-project-install \
         psh otel jwt hwp hwp-tables pdf-tables xls llm && \
     pip install -U "wheel>=0.46.2" "jaraco.context>=6.1.0" && \
     apt-mark manual libpq5 libfreetype6 libexpat1 curl && \
     apt-get purge -y --auto-remove build-essential libpq-dev && \
     rm -rf /var/lib/apt/lists/*   # [보안] runtime에는 컴파일러·perl 계열을 남기지 않는다.
+
+# editable 설치에는 src/가 필요하므로 의존성 레이어 뒤에서만 복사한다.
+COPY src ./src
+# BEGIN deploy_manifest:container_scripts — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
+# 이미지에는 정본(deploy_manifest.toml)의 container.scripts.allow 만 싣는다.
+COPY scripts/_cli_io.py \
+     scripts/analyze_golden_run.py \
+     scripts/check_domain_leakage_gate.py \
+     scripts/docker_install_locked.sh \
+     scripts/register_deployed_model.py \
+     scripts/setup_console_test_login.py \
+     ./scripts/
+# END deploy_manifest:container_scripts
+COPY alembic ./alembic
+COPY alembic.ini ./
+# [2026-09-24 발견] evidence/ 를 여태 안 실었다 — console_signoff._EXCLUSIONS 가 런타임에
+# Path(__file__).resolve().parents[2]/"evidence"/"eval_independence_exclusions.jsonl" 를 찾는데
+# 이 이미지 어디에도 evidence/ 가 없어 승격(promote) 단계의 평가정답 오염 차단이 배포본에서는
+# 2026-09-09 도입 이후 계속 빈 목록으로 동작했다(개발 환경에서만 파일이 보여 안 드러났다).
+COPY evidence ./evidence
+
+# 신원 값은 매 빌드마다 바뀌므로 의존성 레이어 뒤에 둔다. healthz의 실행 SHA 계약은
+# 유지하면서도 변경된 SHA가 lock 설치 캐시를 깨지 않게 한다.
+ARG KOIPA_BUILD_SHA=unknown
+ARG KOIPA_BUILD_AT=unknown
+ENV KOIPA_BUILD_SHA=${KOIPA_BUILD_SHA} \
+    KOIPA_BUILD_AT=${KOIPA_BUILD_AT}
+RUN python -m pip install -e . --no-deps
 
 # [HWP 파싱 복구] rhwp-python 이 번들한 FreeType(libfreetype-*.so.6)에 FT_Palette_Data_Get 심볼이
 # 없어 `import rhwp` 가 undefined symbol 로 실패 → .hwp/.hwpx 추출이 0글자로 깨진다. 심볼이 있는

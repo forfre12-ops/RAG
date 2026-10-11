@@ -89,6 +89,36 @@ jobs:
         # --locked: 락을 재생성하지 않고 pyproject 와 일치하는지만 검사(불일치 시 exit 1).
         run: uv lock --locked
 
+  console-e2e:
+    # 브라우저 DOM으로 실제 버튼·초기화·권한 경계를 확인한다. 로컬의 빠른 경로는
+    # 변경 범위만 보지만, 이 잡은 PR/main 배치마다 전체 콘솔 회귀를 끝까지 실행한다.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./poc/tests/e2e_console
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: poc/tests/e2e_console/package-lock.json
+
+      - name: Install locked browser harness dependencies
+        run: npm ci
+
+      - name: Run full console browser regression
+        run: node run.mjs --json > console-e2e-results.json
+
+      - name: Upload console E2E result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: console-e2e-${{ github.sha }}
+          path: poc/tests/e2e_console/console-e2e-results.json
+          retention-days: 30
+
   dependency-cve:
     # [공급망] 락파일 기준 의존성 CVE 검사. 지금까지 CI 에는 SAST(bandit·semgrep)만 있고
     # "우리가 쓰는 패키지에 알려진 취약점이 있는가" 를 보는 단계가 없었다 — 락을 고정해도
