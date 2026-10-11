@@ -773,11 +773,11 @@ class SyntheticDocGenerator:
         provider = str(getattr(self.llm, "name", "") or "").lower()
         if provider not in {"local_openai", "vllm", "ollama", "lm_studio"}:
             return resolved
-        configured = getattr(_settings(), "local_llm_synth_min_output_tokens", 4500)
+        configured = getattr(_settings(), "local_llm_synth_min_output_tokens", 5200)
         try:
             return max(resolved, max(512, int(configured)))
         except (TypeError, ValueError):
-            return max(resolved, 4500)
+            return max(resolved, 5200)
 
     @staticmethod
     def _record_usage(resp: object) -> None:

@@ -123,14 +123,14 @@ def test_local_provider_gets_configured_minimum_output_budget(monkeypatch):
     monkeypatch.setattr(
         generator_module,
         "_settings",
-        lambda: SimpleNamespace(local_llm_synth_min_output_tokens=4500),
+        lambda: SimpleNamespace(local_llm_synth_min_output_tokens=5200),
     )
     llm = LocalRecordingProvider()
     SyntheticDocGenerator(llm=llm, structured_output=False).generate_one(
         SynthRequest(target_grade="S2", domain="tech", max_output_tokens=3500)
     )
 
-    assert llm.calls[0]["max_tokens"] == 4500
+    assert llm.calls[0]["max_tokens"] == 5200
 
 
 def test_non_local_provider_keeps_requested_output_budget():
