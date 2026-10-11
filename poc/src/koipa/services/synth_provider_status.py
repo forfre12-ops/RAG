@@ -50,8 +50,13 @@ _cache: dict[str, tuple[float, bool]] = {}
 
 
 def _local_base_url(name: str) -> str:
-    if name in _LOCAL_DEFAULT_BASE_URL:
-        return _LOCAL_DEFAULT_BASE_URL[name]
+    # build_provider()와 반드시 같은 주소를 봐야 한다. 컨테이너에서 localhost는
+    # 컨테이너 자신이므로, OLLAMA_BASE_URL/LM_STUDIO_BASE_URL을 설정한 배포에서
+    # 상태 화면만 "연결 안 됨"으로 보이면 실제 생성 가능한 제공자를 고를 수 없다.
+    if name == "ollama":
+        return getattr(settings, "ollama_base_url", "") or _LOCAL_DEFAULT_BASE_URL[name]
+    if name == "lm_studio":
+        return getattr(settings, "lm_studio_base_url", "") or _LOCAL_DEFAULT_BASE_URL[name]
     # vllm · local_openai — settings.local_llm_base_url 공용.
     return getattr(settings, "local_llm_base_url", "") or "http://localhost:8001/v1"
 

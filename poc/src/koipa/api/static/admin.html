@@ -1044,6 +1044,7 @@ body *,body *::before,body *::after{border-radius:0 !important}
           </div>
         </div>
         <p class="hint" id="sy-provider-note" data-tech style="margin-top:2px"></p>
+        <p class="hint" data-tech style="margin-top:2px">지재원: Claude API 또는 로컬 오픈 LLM으로 내부 합성 문서를 생성합니다. 고객사 폐쇄망 문서는 로컬 오픈 LLM만 사용합니다.</p>
         <div class="btn-row" style="margin-top:10px;align-items:center;">
           <button class="btn sec sm" type="button" onclick="openSynthPlaybookDialog()">생성 규칙 관리</button>
           <span class="hint" id="sy-playbook-version">생성 규칙을 불러오는 중…</span>
@@ -3965,14 +3966,14 @@ function syncActiveGrades(codes){
  * 생성 버튼을 열지 않는다. 설정값을 받는 것과 지금 생성할 수 있는 것은 다르다. */
 const LLM_PROVIDER_KR = {
   noop: '결정론 · 외부 API 없이',
-  anthropic: 'Claude',
-  openai: 'GPT',
+  anthropic: 'Claude API · 상용',
+  openai: 'GPT API · 상용',
   google: 'Gemini',
   gemini: 'Gemini',
-  ollama: '온프렘 · Ollama',
-  vllm: '온프렘 · vLLM',
-  local_openai: '온프렘 · OpenAI 호환',
-  lm_studio: '온프렘 · LM Studio',
+  ollama: '로컬 오픈 LLM · Ollama',
+  vllm: '로컬 오픈 LLM · vLLM',
+  local_openai: '로컬 오픈 LLM · OpenAI 호환',
+  lm_studio: '로컬 오픈 LLM · LM Studio',
 };
 function syncLlmProviders(list, active){
   const sel=$('sy-provider'); if(!sel) return;
