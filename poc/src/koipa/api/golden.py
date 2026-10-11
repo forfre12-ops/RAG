@@ -1491,6 +1491,7 @@ _REVIEWER_DOCUMENT_WORKBENCH_CSS = r"""
 #reviewer-workbench #detail .sideDetail>.action,#reviewer-workbench #detail .sideDetail>.history{margin:16px;padding:17px;background:#fff;border:1px solid var(--border)}
 #reviewer-workbench #detail .sideDetail>.history{margin-top:0}
 #reviewer-workbench #detail .sideDetail h4{margin:0 0 12px;color:#334155}
+#reviewer-workbench #detail .sideDetail .reviewer-decision-title{margin:0 0 15px;color:#0f172a;font-size:15px;font-weight:800;letter-spacing:-.25px}
 #reviewer-workbench #detail .sideDetail .action label{margin-top:13px}
 #reviewer-workbench #detail .sideDetail .action select,#reviewer-workbench #detail .sideDetail .action textarea{box-sizing:border-box;font-size:13px}
 @media(max-width:1050px){.reviewer-workspace{padding:14px!important}.reviewer-workbench-head{padding-bottom:14px}#reviewer-workbench{height:auto;min-height:0;grid-template-columns:1fr}#reviewer-workbench .reviewer-inbox{max-height:390px;border-right:0;border-bottom:1px solid var(--border)}#reviewer-workbench #detail{grid-column:1;grid-template-columns:minmax(0,1fr) minmax(275px,34%);min-height:680px}.reviewer-workbench-head h1{font-size:24px}}
@@ -1572,6 +1573,19 @@ _REVIEWER_DOCUMENT_WORKBENCH_SCRIPT = r"""<script>
     const inspectorTitle=document.createElement('h3'); inspectorTitle.textContent='문서 결정 정보';
     const inspectorText=document.createElement('p'); inspectorText.textContent='선택 문서의 등록 정보와 결정 이력';
     inspector.append(inspectorTitle,inspectorText); side.prepend(inspector);
+  }
+  /* 기존 화면의 "등급 결정"은 aside 직속 제목이라 카드 밖에 떠 있었다.
+     검수자가 입력하는 결정 폼의 제목으로 옮겨, 제목·폼·저장 버튼을 한 카드로 유지한다. */
+  const legacyDecisionTitle=side&&Array.from(side.children).find(function(node){
+    return node.tagName==='H4'&&node.textContent.trim()==='등급 결정';
+  });
+  const decisionForm=side&&Array.from(side.children).find(function(node){
+    return node.classList&&node.classList.contains('action');
+  });
+  if(legacyDecisionTitle&&decisionForm&&!decisionForm.querySelector('.reviewer-decision-title')){
+    const decisionTitle=document.createElement('h3'); decisionTitle.className='reviewer-decision-title';
+    decisionTitle.textContent='검수 결정';
+    decisionForm.prepend(decisionTitle); legacyDecisionTitle.remove();
   }
   const flash=document.getElementById('flash'); if(flash){flash.classList.add('reviewer-workbench-flash');header.after(flash);}
   bench.append(inbox,detail);

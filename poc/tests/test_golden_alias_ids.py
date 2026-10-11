@@ -823,6 +823,9 @@ out.documentKicker = d.querySelector('.document-kicker')?.textContent;
 out.documentTags = [...d.querySelectorAll('#metas span')].map(e => e.textContent);
 out.documentFacts = d.getElementById('documentFacts')?.textContent;
 out.hasEvidenceCard = !!d.getElementById('scope') || !!d.querySelector('.viewbar');
+out.decisionTitle = d.querySelector('.reviewer-decision-title')?.textContent;
+out.hasFloatingDecisionTitle = [...d.querySelector('.sideDetail').children]
+  .some(e => e.tagName === 'H4' && e.textContent.trim() === '등급 결정');
 out.selectedRow = [...d.querySelectorAll('#rows .candidate.selected .docid')].map(e => e.textContent);
 d.getElementById('action').value = 'change';
 d.getElementById('action').dispatchEvent(new w.Event('change'));
@@ -881,6 +884,7 @@ def test_manage_html_lists_opens_and_saves_by_alias_in_a_real_dom(api, monkeypat
     assert out["documentKicker"] == "점검/검토 기록"
     assert alias in out["documentTags"]
     assert out["documentFacts"] and not out["hasEvidenceCard"]
+    assert out["decisionTitle"] == "검수 결정" and not out["hasFloatingDecisionTitle"]
     assert out["posts"] == [{"url": f"/api/v1/golden/candidates/{alias}/decision",
                              "body": {"action": "change", "reason": "본문을 읽고 판단했습니다", "grade": "S2"}}]
     assert "저장했습니다" in out["saveMsg"] or "저장 완료" in out["saveMsg"], out["saveMsg"]
