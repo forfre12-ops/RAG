@@ -60,6 +60,26 @@ export const scenarios = [
   },
 
   {
+    id: 'product.legacy-product-views-remain-navigable',
+    title: '레거시 카드로 구성된 화면도 새 제품 메뉴에서 열 수 있다',
+    why: '제품 메뉴만 추가하고 대응 패널이 없는 화면을 그대로 두면 모델·정책·감사 메뉴가 클릭 즉시 예외로 끝난다',
+    async run({ server, check }) {
+      const page = await productTab(server, 'overview');
+      for (const view of ['synthesis', 'policy', 'models', 'audit', 'settings']) {
+        const nav = page.q(`[data-product-nav="${view}"]`);
+        check.ok(nav, `${view} 메뉴가 있다`);
+        page.click(nav);
+        await page.settle();
+        const cards = page.qa(`.grid > [data-product-view="${view}"]`);
+        check.gte(cards.length, 1, `${view}에는 대응 카드가 있다`);
+        check.ok(cards.some((card) => page.visible(card)), `${view}의 대응 카드가 보인다`);
+      }
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     id: 'product.overview-renders-metrics-grades-and-category-table',
     title: '운영 개요가 집계 카드·등급별 분포·문서유형 표를 실제 응답으로 그린다',
     why: '운영 개요는 수치를 손으로 세지 않고 /golden/candidates 응답 하나로 전부 만든다',
@@ -284,6 +304,67 @@ export const scenarios = [
       } else {
         check.includes(page.text('wb-inspector-body'), '없습니다', '이력이 없으면 없다고 말한다');
       }
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'product.workbench-tablet-inspector-drawer-keeps-focus-and-panel-state',
+    title: '태블릿에서 결정 정보는 드로어로 열리고 ESC·Tab·키보드 리사이즈가 동작한다',
+    why: '중간 폭에서 Inspector를 숨기면 근거와 최종 결정을 확인할 수 없고, 마우스 전용 리사이즈는 접근성을 깨뜨린다',
+    async run({ server, check }) {
+      const page = await productTab(server, 'documents', {
+        beforeBoot(win) {
+          Object.defineProperty(win, 'innerWidth', { configurable: true, value: 900 });
+          win.matchMedia = (query) => ({
+            matches: String(query).includes('min-width: 761px'),
+            media: query,
+            addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {},
+          });
+        },
+      });
+      await page.until(() => !!page.$('wb-inspector-body'));
+
+      const trigger = page.$('wb-inspector-open');
+      // jsdom does not evaluate this page's width media query consistently;
+      // force the two tablet-only controls visible while exercising their
+      // keyboard behavior. CSS breakpoint existence is locked by pytest.
+      trigger.style.display = 'inline-flex';
+      page.$('wb-inspector').style.display = 'block';
+      page.$('wb-inspector-close').style.display = 'inline-flex';
+      trigger.focus();
+      page.win.toggleWorkbenchInspector(true);
+      await page.wait(250);
+      check.ok(page.$('document-workbench')?.classList.contains('inspector-open'), '태블릿에서 정보 패널이 드로어로 열린다');
+      check.eq(trigger.getAttribute('aria-expanded'), 'true', '열림 상태를 보조기술에도 알린다');
+      check.gte(page.win.inspectorFocusableElements().length, 1, '드로어 안에 포커스 가능한 조작 요소가 있다');
+      check.eq(page.$('product-documents').hasAttribute('inert'), false, '열린 문서 화면은 inert 상태가 아니다');
+
+      const focusables = page.qa('#wb-inspector button, #wb-inspector select, #wb-inspector textarea').filter((el) => !el.disabled);
+      const first = focusables[0];
+      // jsdom does not make CSS-hidden controls focusable.  Spy on the
+      // boundary call itself; actual breakpoint visibility is separately
+      // locked in the CSS/source test.
+      let trappedFocuses = 0;
+      const originalFirstFocus = first.focus.bind(first);
+      first.focus = (...args) => { trappedFocuses += 1; return originalFirstFocus(...args); };
+      trigger.focus();
+      page.doc.dispatchEvent(new page.win.KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+      check.gte(trappedFocuses, 1, '드로어 밖으로 나가려는 Tab을 첫 조작 요소로 되돌린다');
+
+      const leftHandle = page.q('[data-resize="left"]');
+      leftHandle.dispatchEvent(new page.win.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      check.ok(page.$('document-workbench').style.getPropertyValue('--wb-left').endsWith('px'), '화살표 키로 문서함 폭을 조절한다');
+      check.ok(page.win.localStorage.getItem('koipa_admin_workbench_layout_v1'), '패널 폭을 이 브라우저에만 저장한다');
+
+      let restoredFocuses = 0;
+      const originalTriggerFocus = trigger.focus.bind(trigger);
+      trigger.focus = (...args) => { restoredFocuses += 1; return originalTriggerFocus(...args); };
+      page.doc.dispatchEvent(new page.win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      check.ok(!page.$('document-workbench')?.classList.contains('inspector-open'), 'ESC로 드로어를 닫는다');
+      check.eq(trigger.getAttribute('aria-expanded'), 'false', '닫힘 상태를 보조기술에도 알린다');
+      check.gte(restoredFocuses, 1, '닫은 뒤 열기 버튼으로 포커스를 되돌린다');
       assertNoScriptErrors(check, page);
       return page;
     },
