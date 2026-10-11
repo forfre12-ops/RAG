@@ -19,8 +19,23 @@ def test_prefill_token_is_not_rendered_or_autologin_script(monkeypatch):
 
     assert token not in page
     assert "id=\"goPrefill\"" in page
-    assert "var v=$('t').value.trim();if(v)login(v,true)" not in page
     assert "prefill-login" in page
+    assert '<textarea id="t"' not in page
+    assert "토큰으로 로그인" not in page
+    assert "document.cookie='koipa_access_token=" not in page
+
+
+def test_login_page_uses_password_only_without_demo_prefill(monkeypatch):
+    """운영자에게 JWT를 붙여넣게 하는 UI는 제공하지 않는다."""
+    from koipa.api import console_login
+
+    monkeypatch.setattr(settings, "console_login_prefill_token", "", raising=False)
+    page = console_login._render_console_login_html()
+
+    assert 'id="u"' in page and 'id="p"' in page and 'id="goPw"' in page
+    assert 'id="goPrefill"' not in page
+    assert '<textarea id="t"' not in page
+    assert "토큰으로 로그인" not in page
 
 
 def test_prefill_endpoint_sets_httponly_cookie_only_when_configured(monkeypatch):

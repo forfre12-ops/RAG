@@ -3765,6 +3765,20 @@ async function loadSynthPlaybook(){
 
 /* ---- 생성 문서 주제 목록 동기화 ---- */
 let SYNTH_DOMAIN_CATALOG=[];
+/* 레거시 서버는 코드 목록만 내려준다. 선택값은 코드 그대로 API에 보내되, 운영자가 보는
+ * 모든 문구는 한글로 고정한다. 산업·업무·공개 범위를 같은 축으로 섞지 않는 최신 catalog가
+ * 오면 그 서버 제공 라벨을 우선한다. */
+const SYNTH_DOMAIN_DISPLAY_NAMES=Object.freeze({
+  ai:'인공지능', bio:'바이오·신약', business:'사업전략', defense:'방위산업',
+  finance:'재무', hr:'인사', legal:'법무', ma:'인수합병', mixed:'복합 내부 문서',
+  public:'공개 자료', security:'보안', tech:'기술개발',
+  '경영정보':'경영관리', '기타':'기타 내부 문서', '바이오_농업':'바이오·농업',
+  '반도체':'반도체', '배터리':'배터리', '소프트웨어':'소프트웨어', '화학_제약':'화학·제형',
+  semiconductor:'반도체', battery:'배터리', pharma:'화학·제형',
+});
+function synthDomainDisplayName(code){
+  return SYNTH_DOMAIN_DISPLAY_NAMES[String(code||'')]||'기타 내부 문서';
+}
 function syncSynthDomains(catalog, list){
   const sel=$('sy-domain'); if(!sel) return;
   if(Array.isArray(catalog)){
@@ -3777,7 +3791,7 @@ function syncSynthDomains(catalog, list){
   }
   if(!SYNTH_DOMAIN_CATALOG.length && Array.isArray(list)){
     SYNTH_DOMAIN_CATALOG=list.map(String).filter(Boolean).filter(code=>code!=='mixed')
-      .map(code=>({code,label:code,group:'legacy',group_label:'서버 제공 분류',grade_codes:[]}));
+      .map(code=>({code,label:synthDomainDisplayName(code),group:'legacy',group_label:'기존 서버 분류',grade_codes:[]}));
   }
   const grade=($('sy-grade')||{}).value||'';
   const rows=SYNTH_DOMAIN_CATALOG.filter(item=>!item.grade_codes.length || item.grade_codes.includes(grade));
@@ -3797,7 +3811,7 @@ function syncSynthDomains(catalog, list){
 
 function synthDomainLabel(code){
   const item=SYNTH_DOMAIN_CATALOG.find(x=>x.code===code);
-  return (item&&item.label)||code;
+  return (item&&item.label)||synthDomainDisplayName(code);
 }
 
 $('sy-grade') && $('sy-grade').addEventListener('change',()=>syncSynthDomains());

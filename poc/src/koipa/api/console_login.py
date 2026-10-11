@@ -1,4 +1,4 @@
-"""관리 콘솔 로그인 — 아이디+비밀번호/토큰 → `koipa_access_token` 쿠키.
+"""관리 콘솔 로그인 — 아이디+비밀번호 → `koipa_access_token` 쿠키.
 
 [2026-10-09 #9 이미지 분리] 원래 golden.py 안에 있었다(토큰 입력으로 골든셋 검수 화면에
 들어가는 용도로 만들어졌기 때문). 그런데 이 로그인 화면·쿠키 발급이 **고객사 관리자
@@ -63,8 +63,8 @@ def _is_console_admin(auth: dict) -> bool:
     return not roles.isdisjoint(_CONSOLE_ADMIN_ROLES)
 
 
-def _login_prefill_block() -> str:
-    """토큰 로그인 영역. 프리필 토큰은 HTML/DOM에 절대 넣지 않는다.
+def _demo_prefill_block() -> str:
+    """명시적으로 설정한 폐쇄망 시연 계정 진입 버튼만 만든다.
 
     과거에는 무인증 로그인 페이지의 textarea에 JWT를 넣고, 페이지가 열리자마자
     ``document.cookie``로 옮겼다. 시연 편의와 별개로 토큰이 페이지 소스ㆍ브라우저 DOM에
@@ -73,27 +73,18 @@ def _login_prefill_block() -> str:
     """
     token = str(getattr(settings, "console_login_prefill_token", "") or "").strip()
     if not token:
-        return '<textarea id="t" placeholder="eyJhbGciOiJSUzI1NiIs..." autofocus></textarea>'
+        return ""
     return (
         '<div class="note" style="border-left-color:#c47a00;background:#fff8e8">'
         "<b>폐쇄망 시연 설정:</b> 이 서버에는 시연용 접속 수단이 설정돼 있습니다. "
         "외부 공개 환경에서는 사용할 수 없으며, 시연 계정으로 들어가면 모든 작업이 그 계정의 이력으로 남습니다. "
         "접속 토큰 자체는 이 페이지나 브라우저에 표시하지 않습니다.</div>"
-        '<button type="button" id="goPrefill">시연 계정으로 계속</button>'
-        '<div class="divider">또는 발급받은 접속 토큰으로</div>'
-        '<textarea id="t" placeholder="eyJhbGciOiJSUzI1NiIs..."></textarea>'
+        '<button type="button" id="goPrefill">시연 계정으로 계속</button><div class="msg" id="mPrefill"></div>'
     )
 
 
 def _render_console_login_html() -> str:
-    """토큰을 붙여넣어 세션 쿠키를 심는 진입 화면(무인증·데이터 없음).
-
-    manage.html 은 포털 JWT 를 요구하므로, 쿠키 없이 열면 브라우저에 401 JSON 한 줄만
-    보인다("화면이 안 뜬다"). 개발자도구로 document.cookie 를 직접 넣으라고 안내하는 것은
-    현장에서 쓸 수 없다. 이 페이지는 **토큰을 URL 에 싣지 않고**(액세스로그·히스토리 잔존
-    방지) 입력값을 same-site 쿠키로만 저장한 뒤 관리 화면으로 이동시킨다.
-    검증은 그대로 서버가 한다 — 이 화면은 어떤 데이터도 노출하지 않는다.
-    """
+    """아이디·비밀번호로 서버가 HttpOnly 세션을 발급하는 진입 화면."""
     return (
         '<!doctype html><html lang="ko"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -106,11 +97,9 @@ def _render_console_login_html() -> str:
         ".eyebrow{font:800 11px var(--font-mono);letter-spacing:1px;color:var(--text-dim)}"
         "h1{font-size:clamp(28px,3vw,36px);line-height:1.18;letter-spacing:-.045em;margin:12px 0 10px}"
         "h1 em{font-style:normal;color:var(--text)}p{line-height:1.7;color:var(--text-soft)}"
-        "textarea{width:100%;height:150px;padding:13px;font:13px var(--font-mono);"
-        "word-break:break-all}"
         "input[type=text],input[type=password]{width:100%;padding:13px;"
         "font:15px inherit;margin-top:10px}"
-        "textarea:focus,input:focus{border-color:var(--text)}"
+        "input:focus{border-color:var(--text)}"
         "button{margin-top:18px;width:100%;border:1px solid var(--bg-inverse);border-radius:var(--radius-sm);background:var(--bg-inverse);color:#fff;"
         "padding:15px;font-weight:800;font-size:15px;cursor:pointer}button:hover{opacity:.86}"
         ".msg{margin-top:16px;padding:14px;border-radius:8px;background:#fff1f2;color:#b42318;display:none}"
@@ -131,23 +120,19 @@ def _render_console_login_html() -> str:
         '<input id="u" type="text" placeholder="아이디" autocomplete="username" autofocus>'
         '<input id="p" type="password" placeholder="비밀번호" autocomplete="current-password">'
         '<button id="goPw">로그인</button><div class="msg" id="mPw"></div>'
-        + _login_prefill_block()
-        + '<button id="go">토큰으로 로그인</button><div class="msg" id="m"></div></main><script>'
+        + _demo_prefill_block()
+        + '</main><script>'
         "var $=function(x){return document.getElementById(x)};"
         "async function loginWithPassword(u,p){"
         "var r=await fetch('/api/v1/golden/candidates/login',{method:'POST',credentials:'same-origin',"
         "headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});"
         "if(!r.ok){$('mPw').style.display='block';"
         "$('mPw').textContent=(r.status===404)"
-        "?'이 서버는 아이디+비밀번호 로그인이 켜져 있지 않습니다. 아래 토큰으로 로그인하십시오.'"
+        "?'이 서버에서는 아이디+비밀번호 로그인이 설정되지 않았습니다. 관리자에게 계정 발급을 요청하십시오.'"
         ":'로그인 실패. 아이디 또는 비밀번호를 확인하십시오.';return false}"
         "return afterLogin()}"
         "$('goPw').onclick=function(){loginWithPassword($('u').value.trim(),$('p').value)};"
         "$('p').addEventListener('keydown',function(e){if(e.key==='Enter')$('goPw').click()});"
-        # [2026-08-20] 쿠키를 **토큰 만료까지** 살린다.
-        # 종전에는 Max-Age 가 없어 세션 쿠키였다 — 브라우저를 닫으면 로그인이 풀려서
-        # 검수자가 매번 다시 붙여넣어야 했다. 토큰 payload 의 exp 를 읽어 그 시각까지
-        # 준다(읽지 못하면 12시간). 토큰보다 오래 살리지 않는 것이 요점이다.
         # [2026-08-24] 로그인 뒤 돌아갈 곳. 기본은 검수 화면이지만 `?next=` 가 붙어 오면
         # 그리로 되돌린다 — 시연 화면에서 401 을 만나 여기로 튕겨 온 사람이 검수 화면에
         # 떨어지면 시연 대본이 끊긴다. 열린 리다이렉트를 막으려고 **같은 오리진의
@@ -156,25 +141,11 @@ def _render_console_login_html() -> str:
         "if(n&&n.charAt(0)==='/'&&n.charAt(1)!=='/'&&n.indexOf(String.fromCharCode(92))===-1)return n}catch(e){}"
         "return session&&session.actor_role==='reviewer'?'/api/v1/golden/candidates/manage.html'+(location.hash||''):'/console/admin.html'+(location.hash||'')}"
         "async function afterLogin(){var r=await fetch('/api/v1/golden/candidates/session',{credentials:'same-origin'});var s=r.ok?await r.json():{};location.href=dest(s);return true}"
-        "function maxAge(v){try{var p=v.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');"
-        "p+='='.repeat((4-p.length%4)%4);var e=JSON.parse(atob(p)).exp;"
-        "var s=Math.floor(e-Date.now()/1000);return s>60?s:0}catch(err){return 43200}}"
-        "async function login(v,quiet){"
-        "if(v.split('.').length!==3){if(!quiet){$('m').style.display='block';"
-        "$('m').textContent='토큰 형식이 아닙니다. 점(.)으로 구분된 3부분이어야 합니다.'}return false}"
-        "document.cookie='koipa_access_token='+v+'; path=/; SameSite=Lax; Max-Age='+maxAge(v);"
-        "var r=await fetch('/api/v1/golden/candidates/session',{credentials:'same-origin'});"
-        "if(!r.ok){document.cookie='koipa_access_token=; path=/; Max-Age=0';"
-        "if(!quiet){$('m').style.display='block';"
-        "$('m').textContent='로그인 실패('+r.status+'). 토큰이 만료됐거나 권한이 없습니다.'}return false}"
-        "location.href=dest(await r.json());return true}"
-        "$('go').onclick=function(){login($('t').value.trim(),false)};"
-        "$('t').addEventListener('keydown',function(e){if(e.key==='Enter'&&e.ctrlKey)$('go').click()});"
-        "async function loginWithPrefill(){var b=$('goPrefill');if(!b)return false;b.disabled=true;"
+        "async function loginWithPrefill(){var b=$('goPrefill'),m=$('mPrefill');if(!b)return false;b.disabled=true;"
         "var r=await fetch('/api/v1/golden/candidates/prefill-login',{method:'POST',credentials:'same-origin'});"
-        "if(!r.ok){$('m').style.display='block';$('m').textContent='시연 계정 로그인에 실패했습니다('+r.status+'). 관리자에게 설정을 확인하십시오.';b.disabled=false;return false}"
+        "if(!r.ok){m.style.display='block';m.textContent='시연 계정 로그인에 실패했습니다('+r.status+'). 관리자에게 설정을 확인하십시오.';b.disabled=false;return false}"
         "var s=await fetch('/api/v1/golden/candidates/session',{credentials:'same-origin'});"
-        "if(!s.ok){$('m').style.display='block';$('m').textContent='시연 계정 권한을 확인하지 못했습니다.';b.disabled=false;return false}location.href=dest(await s.json());return true}"
+        "if(!s.ok){m.style.display='block';m.textContent='시연 계정 권한을 확인하지 못했습니다.';b.disabled=false;return false}location.href=dest(await s.json());return true}"
         "var prefill=$('goPrefill');if(prefill)prefill.onclick=loginWithPrefill;"
         # 이미 쿠키가 살아 있으면 로그인 화면을 거치지 않는다 — 이 화면이 공용 메뉴의
         # 「검증문서 후보 관리」 목적지라, 붙여넣을 것이 없는 사람에게는 한 단계 군더더기다.
@@ -190,7 +161,7 @@ def _render_console_login_html() -> str:
 
 @html_router.get("/golden/candidates/login.html", response_class=HTMLResponse)
 def proxy_gold_console_login_html() -> HTMLResponse:
-    """콘솔 진입 화면 — 무인증. 데이터는 없고 토큰을 쿠키로 심기만 한다."""
+    """콘솔 진입 화면 — 무인증. 성공 시 서버가 HttpOnly 세션을 발급한다."""
     return HTMLResponse(content=_render_console_login_html())
 
 
@@ -296,8 +267,7 @@ def proxy_gold_console_password_login(request: Request, body: ReviewerLoginReque
     resp.set_cookie(
         "koipa_access_token", token, max_age=_PASSWORD_LOGIN_TTL_SECONDS,
         # 비밀번호 로그인은 서버가 직접 Set-Cookie 하므로 브라우저 JavaScript가 토큰을
-        # 읽을 이유가 없다. HttpOnly로 고정해 XSS가 검수자 세션 JWT를 탈취하지 못하게
-        # 한다. (토큰 붙여넣기 레거시 경로는 document.cookie를 써야 하므로 별도이다.)
+        # 읽을 이유가 없다. HttpOnly로 고정해 XSS가 검수자 세션 JWT를 탈취하지 못하게 한다.
         # HTTPS 콘솔 프록시 경로에서는 Secure도 설정한다. loopback HTTP 설치 리허설은
         # 쿠키를 받지 못하게 되는 것을 피하기 위해 실제/전달된 스킴을 따른다.
         path="/", samesite="lax", httponly=True, secure=_request_uses_https(request),

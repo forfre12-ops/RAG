@@ -179,6 +179,18 @@ def test_console_does_not_hardcode_domain_options() -> None:
     assert "mixed 하나만" not in html
 
 
+def test_console_translates_legacy_server_domain_codes_for_display() -> None:
+    """구형 healthz가 코드만 내려도 운영 화면에는 한글 주제명을 보인다."""
+    html = ADMIN_HTML.read_text(encoding="utf-8")
+
+    assert "SYNTH_DOMAIN_DISPLAY_NAMES" in html
+    assert "ai:'인공지능'" in html
+    assert "tech:'기술개발'" in html
+    assert "'화학_제약':'화학·제형'" in html
+    assert "label:synthDomainDisplayName(code)" in html
+    assert "(item&&item.label)||synthDomainDisplayName(code)" in html
+
+
 def test_bio_is_pharma_not_agriculture() -> None:
     """별칭은 **같은 산업**의 두 이름에만 쓴다 — bio 는 접지 않는다.
 
