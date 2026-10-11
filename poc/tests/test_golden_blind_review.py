@@ -774,9 +774,13 @@ def _render() -> str:
 
 def test_blind_patch_anchors_are_all_alive():
     """치환 앵커가 하나라도 사라지면(화면 JS 가 고쳐지면) 그 조정이 조용히 안 걸린다 — 여기서 잡는다."""
-    html = _render()
-    for old, _new in golden_api._BLIND_VIEW_PATCHES:
-        assert html.count(old) == 1, f"앵커가 화면에 정확히 한 번 있어야 한다: {old[:70]}"
+    # 숨김 화면은 원본 관리자 화면이 아니라 일반 검수자 화면 위에 적용된다. 일반
+    # 검수자 단계에서 이미 제안 등급을 걷어 낸 항목은 여기서 재치환할 필요가 없다.
+    html = golden_api._as_reviewer_view(_render())
+    active_patches = [(old, new) for old, new in golden_api._BLIND_VIEW_PATCHES if old in html]
+    assert active_patches, "독립 검수 화면에 적용할 치환이 사라졌다"
+    for old, _new in active_patches:
+        assert html.count(old) == 1, f"앵커가 검수자 화면에 정확히 한 번 있어야 한다: {old[:70]}"
 
 
 def test_blind_screen_never_mentions_the_proposal(h, monkeypatch):
@@ -799,11 +803,12 @@ def test_blind_screen_never_mentions_the_proposal(h, monkeypatch):
 
 def test_screens_are_unchanged_unless_blind_is_on(h, monkeypatch):
     plain_reviewer = golden_api._as_reviewer_view(_render())
-    # 기본(둘 다 꺼짐)과 배정만 켠 상태: 검수자 화면은 종전 그대로(제안 등급이 화면에 있다)
+    # 기본(둘 다 꺼짐)과 배정만 켠 상태에도 동일한 검수자 작업 화면을 준다.
+    # 제안 등급은 독립 검수 손잡이와 무관하게 일반 검수자 UI에서 제거한다.
     for flags in (dict(), dict(assignment=True)):
         set_flags(monkeypatch, **flags)
         assert h.get(EXPERT_A, "/golden/candidates/manage.html").text == plain_reviewer, flags
-    assert "proposed_grade" in plain_reviewer, "이 비교가 공허하지 않다는 증거: 종전 화면은 제안 등급을 쓴다"
+    assert "proposed_grade" not in plain_reviewer, "검수자 화면은 제안 등급을 읽지 않아야 한다"
     # 관리자 화면은 어떤 손잡이 조합에서도 그대로
     for flags in (dict(), dict(blind=True), dict(assignment=True, blind=True)):
         set_flags(monkeypatch, **flags)

@@ -172,7 +172,7 @@ export const scenarios = [
       // [2026-09-29 정정] reg-llm-toggle·reg-runtime-toggle(런타임 스위치 체크박스 2개, 208d202f)이
       // 빠져 있었다 — 이 시험이 그 커밋 이후로 갱신된 적이 없었다(오늘 콘솔 분리 작업과는 무관).
       const ids = page.qa('#reg-card input').map((e) => e.id).sort();
-      check.eq(ids.join(','), 'reg-date,reg-file,reg-llm-toggle,reg-name,reg-runtime-toggle,reg-scope-note,reg-scope-ok,reg-ver', '입력칸은 규정명·판·시행일·파일·활성화 확인·런타임 스위치 2개뿐이다');
+      check.eq(ids.join(','), 'reg-date,reg-file,reg-llm-toggle,reg-name,reg-runtime-toggle,reg-scope-note,reg-scope-ok,reg-ver', '입력칸은 규정명·문서 버전·시행일·파일·활성화 확인·런타임 스위치 2개뿐이다');
       check.eq(page.dialogs.filter((d) => d.kind === 'prompt').length, 0, '프롬프트 창이 뜨지 않는다');
 
       const vis = visibleText(page);
@@ -206,7 +206,7 @@ export const scenarios = [
       check.ok(/limit=500/.test(cl?.path || ''), '한 번에 500건까지 요청한다');
 
       check.ok(page.visible('reg-detail'), '선택한 규정 자리가 열렸다');
-      check.includes(page.text('reg-detail-head'), '개인정보 처리 지침 v1.0', '규정명·판이 보인다');
+      check.includes(page.text('reg-detail-head'), '개인정보 처리 지침 v1.0', '규정명·문서 버전이 보인다');
       check.includes(page.text('reg-detail-head'), '사용 전', '상태가 한국어다');
       check.includes(page.text('reg-detail-head'), '표시 대상 1개', '표시 대상 조항 수가 보인다');
       const main = page.qa('#reg-clauses tr:not([id])');
@@ -254,7 +254,7 @@ export const scenarios = [
     id: 'regulation.upload.sends-every-field-and-follows-progress',
     writes: true,
     needsMock: true,
-    title: '규정 올리기가 파일·규정명·판·시행일을 실어 보내고, 분석 진행을 조용히 따라가다 끝나면 멈춘다',
+    title: '규정 올리기가 파일·규정명·문서 버전·시행일을 실어 보내고, 분석 진행을 조용히 따라가다 끝나면 멈춘다',
     why: '올리는 데 몇 분 걸리는 규정이 목록에서 안 바뀌면 관리자는 올라간 건지 모른다. 진행을 갱신하는 타이머가 끝난 뒤에도 돌면 서버를 계속 두드린다',
     async run({ server, check }) {
       server.overrides['GET /regulations'] = LIST([SUMMARY(REG1, '문서보안 규정', 'v3.1', 'active')]);
@@ -275,7 +275,7 @@ export const scenarios = [
       page.set('reg-name', '개인정보 처리 지침');
       page.click('reg-upload');
       await page.settle();
-      check.includes(page.text('reg-notice'), '판 표기를 입력하십시오', '판이 없으면 이유를 알린다');
+      check.includes(page.text('reg-notice'), '문서 버전을 입력하십시오', '문서 버전이 없으면 이유를 알린다');
       check.eq(calls(server, 'POST', '/regulations').length, 0, '빠진 것이 있는 동안 서버 요청은 나가지 않았다');
 
       // 올리기 — 분석 중으로 온다

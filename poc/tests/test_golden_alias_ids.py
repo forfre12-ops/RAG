@@ -883,7 +883,9 @@ def test_manage_html_lists_opens_and_saves_by_alias_in_a_real_dom(api, monkeypat
     assert out["detailTitle"] == detail["title"] and out["selectedRow"] == [alias]
     assert out["documentKicker"] == "점검/검토 기록"
     assert alias in out["documentTags"]
-    assert out["documentFacts"] and not out["hasEvidenceCard"]
+    # 원문 머리말은 표시되며, 기존 #scope/.viewbar 노드는 저장 뒤 원래 show()
+    # 경로가 갱신하므로 DOM에는 남겨 둔다. 검수자 CSS가 이를 화면에서 숨긴다.
+    assert out["documentFacts"] and out["hasEvidenceCard"]
     assert out["decisionTitle"] == "검수 결정" and not out["hasFloatingDecisionTitle"]
     assert out["posts"] == [{"url": f"/api/v1/golden/candidates/{alias}/decision",
                              "body": {"action": "change", "reason": "본문을 읽고 판단했습니다", "grade": "S2"}}]

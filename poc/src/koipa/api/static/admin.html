@@ -1408,7 +1408,7 @@ body *,body *::before,body *::after{border-radius:0 !important}
         <div id="reg-notice" role="status" aria-live="polite"></div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>규정명</th><th>판</th><th>상태</th><th>조항</th><th>시행일</th><th></th></tr></thead>
+            <thead><tr><th>규정명</th><th>문서 버전</th><th>상태</th><th>조항</th><th>시행일</th><th></th></tr></thead>
             <tbody id="reg-body"><tr><td colspan="6" style="color:var(--text-dim)">「규정 목록 불러오기」를 누르면 올려 둔 규정이 나옵니다</td></tr></tbody>
           </table>
         </div>
@@ -1417,14 +1417,14 @@ body *,body *::before,body *::after{border-radius:0 !important}
           <label class="fld">규정 올리기</label>
           <div class="row3">
             <div class="field"><input id="reg-name" type="text" placeholder="규정명 — 예: 문서보안 규정" maxlength="200" /></div>
-            <div class="field"><input id="reg-ver" type="text" placeholder="판 — 예: v3.1" maxlength="50" /></div>
+            <div class="field"><input id="reg-ver" type="text" placeholder="문서 버전 — 예: v3.1" maxlength="50" /></div>
             <div class="field"><input id="reg-date" type="text" placeholder="시행일(선택) — 예: 2026-09-01" maxlength="10" /></div>
           </div>
           <div class="btn-row" style="margin-top:8px;align-items:center;">
             <input id="reg-file" type="file" accept=".txt,.md,.docx,.pdf,.hwp,.hwpx" onchange="regFilePicked()" />
             <button class="btn" id="reg-upload" onclick="uploadRegulation()">규정 올리기</button>
           </div>
-          <p class="sec-note">txt · md · docx · pdf · hwp · hwpx 파일을 올릴 수 있습니다. 같은 규정명으로 새 판을 올리면 판이 하나 더 쌓이고, 사용 중인 판은 활성화할 때 바뀝니다.</p>
+          <p class="sec-note">txt · md · docx · pdf · hwp · hwpx 파일을 올릴 수 있습니다. 같은 규정명으로 새 문서 버전을 올리면 버전 이력이 추가되고, 사용 중인 버전은 활성화할 때 바뀝니다.</p>
         </div>
 
         <div id="reg-detail" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
@@ -3491,7 +3491,7 @@ async function toggleKeyword(i){
  *  ① 이 기능은 서버에서 꺼져 있을 수 있다(기본 꺼짐 — 라우트 자체가 없다). 화면을 열 때 GET /regulations 를 한 번
  *     물어 200 이면 카드를 보이고, 404·403 이면 카드를 숨기고 검수 화면에도 아무것도 붙이지 않는다. 이 물음은
  *     api() 를 거치지 않는다 — 꺼진 서버에서는 정상인 404 가 요청 로그에 오류로 남으면 안 된다.
- *  ② 등급을 바꾸지 않는다. 블록에는 규정명·판·조항 번호와 규정 원문 문장만 있다. 유사도·신뢰도 같은 수치는
+ *  ② 등급을 바꾸지 않는다. 블록에는 규정명·문서 버전·조항 번호와 규정 원문 문장만 있다. 유사도·신뢰도 같은 수치는
  *     서버가 주지도 않고 화면도 그리지 않는다(2026-08-24 지시). 고정 문구로 참고용임을 밝힌다.
  *  ③ 결과가 비면 블록 자체를 그리지 않는다. 「관련 규정 없음」이라고 적으면 규정에 그런 내용이 없다는 뜻으로
  *     읽힌다 — 실제로는 조회가 못 찾은 것일 뿐이다. 조회 기반이 없을 때(503)만 흐린 한 줄을 남긴다.
@@ -3740,7 +3740,7 @@ async function uploadRegulation(){
   const name=($('reg-name').value||'').trim(), ver=($('reg-ver').value||'').trim(), date=($('reg-date').value||'').trim();
   if(!f){ regNotice('warn','올릴 규정 파일을 고르십시오'); return; }
   if(!name){ regNotice('warn','규정명을 입력하십시오'); return; }
-  if(!ver){ regNotice('warn','판 표기를 입력하십시오 — 예: v3.1'); return; }
+  if(!ver){ regNotice('warn','문서 버전을 입력하십시오 — 예: v3.1'); return; }
   const btn=$('reg-upload'); if(btn) btn.disabled=true;
   regNotice('', '');
   const c=cfg(), fd=new FormData();
