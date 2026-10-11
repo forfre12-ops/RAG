@@ -71,6 +71,25 @@ services:
   # 불요. 학습·MLflow 는 지재원(Koipa) full-train 환경에서만. (mlflow 가 minio 아티팩트 저장에
   # 의존했으므로 minio 제거와 함께 제거.)
 
+  # named volume은 Docker가 root 소유로 만들 수 있다. API/worker는 uid 1000(koipa)로
+  # 실행되므로, 학습 후보 모델과 교정 delta를 쓰기 전에 권한을 한 번 정규화한다.
+  # 이 단계가 없으면 학습은 입력 검증을 통과한 뒤 산출물 저장에서 실패하고, 다음 재시도도
+  # 같은 이유로 반복 실패한다. 입력 학습셋은 읽기만 하므로 그 소유권은 건드리지 않는다.
+  training-storage-init:
+    image: ${WORKER_IMAGE_NAME:-koipa-worker}:${IMAGE_TAG:-1.0.0-rc1}
+    user: "0:0"
+    restart: "no"
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p /app/artifacts_out/classifier /app/datasets/demo_retrain
+        chown -R 1000:1000 /app/artifacts_out /app/datasets/demo_retrain
+        chmod -R u+rwX,g+rwX,o-rwx /app/artifacts_out /app/datasets/demo_retrain
+    volumes:
+      - golden_data:/app/datasets
+      - artifacts_out:/app/artifacts_out
+
   api:
     # 이미지 이름도 태그처럼 .env 로 뺐다 — setup.sh 가 NODE=customer 면
     # API_IMAGE_NAME=koipa-api-customer 를 .env 에 적는다(고객사=분류·활성학습 전용
@@ -133,6 +152,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_started }
+      training-storage-init: { condition: service_completed_successfully }
     ports:
       # [2026-08-02] 하드코딩 8000 이면 이미 8000 을 쓰는 호스트에서 기동이 실패하고, 운영자가
       # 번들 안 YAML 을 손으로 고쳐야 했다 → .env 로 뺀다(기본값은 종전과 동일).
@@ -206,8 +226,9 @@ services:
       - golden_data:/app/datasets       # api 와 공유 — 골든 후보·검수 원장(위 api 주석 참조)
       - artifacts_out:/app/artifacts_out # 재학습 산출물 — api 가 같은 경로로 읽는다
     depends_on:
-      - redis
-      - postgres
+      redis: { condition: service_started }
+      postgres: { condition: service_started }
+      training-storage-init: { condition: service_completed_successfully }
     healthcheck:
       # celery worker 응답성 — 브로커 연결 + 워커 프로세스 생존. 응답 없으면 non-zero.
       # 과거엔 worker/beat 헬스체크가 전 compose에서 부재라 죽은 워커를 오케스트레이터가 몰랐다.
