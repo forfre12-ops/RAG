@@ -75,7 +75,7 @@ export const scenarios = [
     id: 'config.keywords.create',
     writes: true,
     title: '키워드를 추가하면 서버로 나가고 목록을 다시 읽으며 반영 여부를 알린다',
-    why: '저장과 반영 상태가 다를 수 있으므로, 결과를 짧고 명확하게 남긴다',
+    why: '핫리로드가 안 되면 저장은 됐어도 서빙에는 아직 안 먹는다 — 그 차이를 화면이 말해야 한다',
     async run({ server, check }) {
       const page = await configTab(server);
       page.set('kw-n-grade', 'S2');
@@ -89,8 +89,9 @@ export const scenarios = [
       check.eq(call?.body?.grade, 'S2', '등급이 실렸다');
       check.eq(call?.body?.weight, 1.2, '가중치가 숫자로 실렸다');
       check.ok(call?.body?.actor?.user_id, '행위자가 실렸다');
-      // kw-info 는 목록 재조회가 덮어쓰므로 작업 로그의 간결한 상태를 확인한다.
-      check.includes(page.logLines().join(' '), '반영 완료', '반영 상태가 작업 로그에 남는다');
+      // ⚠ kw-info 에 찍힌 반영 안내는 곧바로 loadKeywords() 가 건수로 덮어쓴다.
+      //   현재 남는 곳은 작업 로그다 — 그 사실을 그대로 잠근다.
+      check.includes(page.logLines().join(' '), '핫리로드', '서빙 반영 여부가 작업 로그에 남는다');
       check.eq(page.$('kw-n-keyword')?.value, '', '입력란이 비워졌다');
       check.gte(server.countCalls('GET', '/admin/keywords'), 1, '목록을 다시 읽었다');
       return page;
