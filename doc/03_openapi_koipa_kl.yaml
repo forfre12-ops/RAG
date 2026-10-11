@@ -722,9 +722,13 @@ paths:
                   enum: [ai, battery, bio, business, defense, finance, hr, legal, ma, mixed, pharma, public, security, semiconductor, tech, 경영정보, 기타, 바이오_농업, 반도체, 배터리, 소프트웨어, 화학_제약]
                   default: mixed
                   description: >-
-                    생성기가 프롬프트를 가진 도메인(m1_synthesis.generator.DOMAIN_DOC_TYPES).
-                    2026-09-05 이전에는 앞의 6개만 받았는데, 그 6개는 학습셋에서 이미
-                    채워진 칸이고 정작 얇은 칸(ai·semiconductor·defense)은 거부됐다.
+                    생성 주제 코드. 현재 콘솔의 정본은 healthz.synth_domain_catalog이며
+                    산업 분야(ai·bio·반도체·배터리 등), 업무 유형(tech·business·finance
+                    등), 공개 범위(public)를 optgroup으로 구분해 보여 준다. mixed는 기존
+                    호출의 fallback(default) 호환용이며 새 콘솔에서는 선택지로 노출하지
+                    않는다. semiconductor→반도체, battery→배터리, pharma→화학_제약은
+                    과거 요청 호환 별칭이다. 이 API는 별칭과 mixed를 계속 받는다. public은
+                    공개 범위이므로 S3(대외 공개자료) 요청에서만 허용한다.
                 count: { type: integer, minimum: 1, maximum: 500 }
                 llm_provider:
                   type: string

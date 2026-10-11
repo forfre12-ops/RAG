@@ -293,10 +293,13 @@ class TestSynthRepo:
             llm_provider="anthropic",
             llm_model="claude-sonnet-4-6",
             generated_content="합성 본문 ...",
+            domain_code="tech",
             doc_type="기술도면",
             quality_score=0.88,
         )
         assert sd.review_status == "pending_review"
+        assert sd.domain_code == "tech"
+        assert sd.doc_type == "기술도면"
 
         # list_pending_review 는 limit=50 · created_at 오름차순이다. 공유 DB 에 pending 이
         # 50건 넘게 쌓이면 **방금 만든 샘플이 가장 뒤라 상위 50건 밖으로 밀려난다**

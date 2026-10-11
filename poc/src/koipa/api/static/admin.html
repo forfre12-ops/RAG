@@ -173,8 +173,6 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 
 .warnbox{font-size:12px;color:var(--amber);background:var(--amber-soft);border:1px solid #fcd34d;border-radius:8px;padding:9px 12px;}
 
-/* DASHBOARD (관제 종합) */
-.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
 /* 검수 근거 펼침 — 클릭한 행에서만 조회한다(lazy). */
 .q-why{margin-top:2px;}
 .why-box{margin-top:8px;border:1px solid var(--border-mid);border-radius:8px;padding:9px 11px;background:var(--bg-surface);}
@@ -198,10 +196,6 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 /* 규정 기능이 꺼진 서버·볼 권한이 없는 사용자에게는 카드를 숨긴다 — 같은 이유로 !important. */
 .reg-off{display:none !important;}
 .dash-panel{position:relative;overflow:hidden;border:1px solid var(--border-mid);border-radius:12px;padding:15px;background:linear-gradient(145deg,#fff 0%,var(--bg-surface) 100%);display:flex;flex-direction:column;gap:12px;min-width:0;box-shadow:0 8px 22px rgba(15,35,66,.035);}
-.dash-panel:before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--border-strong);}
-.dash-panel.st-ok:before{background:#16a34a;}
-.dash-panel.st-warn:before{background:#d97706;}
-.dash-panel.st-err:before{background:#dc2626;}
 .dash-panel .dp-h{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
 /* 제목이 「배포 준 / 비 상태」로 쪼개지고 배지가 세로로 무너지던 것 — 제목은 줄바꿈 금지,
    배지는 자리가 모자라면 통째로 다음 줄로 내린다. */
@@ -792,7 +786,7 @@ body *,body *::before,body *::after{border-radius:0 !important}
     <!-- [2026-08-23] 묶음 이름(일상 운영 / 모델 관리)을 뺐다. 회색 글씨가 **비활성 탭처럼**
          보여서 오히려 헷갈렸다. 설정을 톱니로 뺀 뒤 왼쪽에 「운영」 하나만 남아, 구분선만으로
          "이건 성격이 다르다"가 전달된다. 무엇이 무엇인지는 탭 아래 한 줄 설명이 말한다. -->
-    <button class="tab active" data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">문서 검토 · 분류 · 관제 · 감사</span></button>
+    <button class="tab active" data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">문서 검토 · 분류 · 감사</span></button>
     <span class="tab-divider" aria-hidden="true"></span>
     <!-- 「검증문서」 = 모델 평가 기준문서. 운영 탭의 「검수」(FUN-024·needs_review)와 대상이 다르다. -->
     <button class="tab"        data-tab="review"  role="tab" onclick="showPane('review')" data-golden="1">검증문서<span class="tab-sub">후보 구성 · 검수 · 서명</span></button>
@@ -808,30 +802,6 @@ body *,body *::before,body *::after{border-radius:0 !important}
     </button>
   </div>
   <p class="pane-note" id="pane-note"></p>
-
-  <!-- 실시간 관제 컨트롤 (읽기 전용 자동 폴링)
-       data-pane="ops" — 이 컨트롤이 갱신하는 것은 운영 탭의 관제 대시보드 하나뿐이다(autoTick).
-       [2026-09-29] 예전에는 검수 큐도 같이 갱신했으나 그 카드를 콘솔에서 뺐다. 탭 밖에 두면
-       다른 탭에서 안 보이는 카드를 켜 두고 폴링하게 된다. -->
-  <div class="flow" data-pane="ops" style="justify-content:flex-start;gap:12px;">
-    <span style="display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13px;">
-      <span id="auto-dot" style="width:9px;height:9px;border-radius:50%;background:var(--text-faint);display:inline-block;"></span>
-      실시간 관제
-    </span>
-    <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-soft);margin:0;">
-      자동 갱신
-      <select id="auto-interval" onchange="onAutoChange()" style="width:auto;padding:5px 9px;font-size:12.5px;">
-        <option value="0">끄기</option>
-        <option value="3">3초</option>
-        <option value="5">5초</option>
-        <option value="10">10초</option>
-        <option value="30">30초</option>
-      </select>
-    </label>
-    <span id="auto-status" style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);" role="status" aria-live="polite">정지</span>
-    <span id="auto-stamp" style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim);margin-left:auto;"></span>
-    <span class="hint" style="margin:0;flex-basis:100%;">관제 대시보드를 주기적으로 <b>읽기 전용</b>으로 조회합니다.</span>
-  </div>
 
   <div class="grid">
 
@@ -998,10 +968,9 @@ body *,body *::before,body *::after{border-radius:0 !important}
             <select id="sy-grade"></select>
           </div>
           <div class="field">
-            <!-- [2026-09-05] 제공자 목록과 같은 이유로 서버가 채운다. 손으로 적은 13개는
-                 생성기가 아는 것보다 적어 배터리·화학_제약·소프트웨어·경영정보·기타를
-                 고를 수 없었다. healthz 의 synth_domains_supported 를 쓴다. -->
-            <label class="fld">도메인</label>
+            <!-- 서버의 카탈로그가 산업·업무·공개 범위를 optgroup으로 분리한다. mixed는
+                 이전 API의 fallback일 뿐 새 생성의 기본값/선택지가 아니다. -->
+            <label class="fld">문서 주제 <span class="muted">(산업·업무·공개 범위)</span></label>
             <select id="sy-domain"></select>
           </div>
           <div class="field">
@@ -1168,22 +1137,6 @@ body *,body *::before,body *::after{border-radius:0 !important}
         <div id="metrics-context"></div>
         <div id="metrics-extra"></div>
         <p class="release-metrics-note">평가 결과는 모델 버전, 평가 데이터 출처, 표본 수와 평가 시각을 함께 확인합니다. 이 수치는 배포 승인 결과 또는 실제 운영 성능을 의미하지 않습니다.</p>
-      </div>
-    </section>
-
-    <!-- ===== 6. 운영 관제 대시보드 ===== -->
-    <section class="card col-span" data-pane="ops" data-product-view="overview" style="order:3">
-      <div class="card-head">
-        <div class="ttl"><span class="step-no aux">조회</span> 운영 관제 대시보드</div>
-        <span class="ep" data-tech>GET /admin/dashboard</span>
-      </div>
-      <div class="card-body">
-        <div class="btn-row" style="align-items:center">
-          <button class="btn" onclick="loadDashboard()">관제 종합 새로고침</button>
-          <span id="dash-meta" class="hint"></span>
-        </div>
-        <div id="dash-grid" class="dash-grid"><div class="q-empty">「관제 종합 새로고침」으로 조회합니다.</div></div>
-        
       </div>
     </section>
 
@@ -1393,10 +1346,10 @@ body *,body *::before,body *::after{border-radius:0 !important}
       </div>
     </section>
 
-    <!-- ===== R. 사내 규정(참고 표시) (FUN-004) — 서버에서 이 기능을 켠 경우에만 보인다(reg-off) ===== -->
+    <!-- ===== R. 사내 규정 참고 RAG (FUN-004) — full-train에 설치, 다른 프로파일은 옵션 ===== -->
     <section class="card col-span reg-off" id="reg-card" data-pane="config" data-product-view="policy" style="order:3">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">설정</span> 사내 규정(참고 표시) <span class="reqtag" data-tech>FUN-004</span></div>
+        <div class="ttl"><span class="step-no aux">설정</span> 사내 규정 참고 RAG <span class="reqtag" data-tech>FUN-004</span></div>
         <span class="ep" data-tech>GET · POST /regulations · POST /regulations/{reg_id}/activate · GET /documents/{doc_id}/regulation-evidence</span>
       </div>
       <div class="card-body">
@@ -1405,9 +1358,9 @@ body *,body *::before,body *::after{border-radius:0 !important}
         <div class="btn-row">
           <button class="btn sec sm" onclick="loadRegulations()">규정 목록 불러오기</button>
           <span id="reg-info" class="hint" style="margin:0;"></span>
-          <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin-left:auto;cursor:pointer;">
+          <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin-left:auto;cursor:pointer;" title="켜면 검수 화면에 문서와 관련된 사내 규정 원문을 참고로 표시합니다. 등급은 바꾸지 않습니다.">
             <input type="checkbox" id="reg-runtime-toggle" onchange="toggleRegRuntime(this.checked)" />
-            검수 화면에 노출
+            규정 참고 RAG 사용
           </label>
           <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;cursor:pointer;" title="후보 조항을 사내 LLM 서버가 다시 골라 정밀도를 높입니다. 사내 LLM 서버가 없으면 켜도 표시가 늘지 않습니다.">
             <input type="checkbox" id="reg-llm-toggle" onchange="toggleRegLlm(this.checked)" />
@@ -1504,8 +1457,6 @@ const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let lastFlow = 0;
 let LAST_MODEL_VERSION = null;   // 최신 메트릭에서 세팅 — 혼동행렬 조회에 사용
 let LAST_GOLDEN_JOB_ID = null;
-// 실시간 관제(auto-refresh) 상태 — 아래 "실시간 관제" 섹션 참조.
-let AUTO_TIMER=null, AUTO_SILENT=false, AUTO_INFLIGHT=false, AUTO_TICK_OK=true;
 
 const $ = id => document.getElementById(id);
 const cfg = () => ({
@@ -1709,7 +1660,6 @@ window.addEventListener('focus', ()=>{
 });
 function ts(){ const d=new Date(); return d.toTimeString().slice(0,8); }
 function log(msg, kind='info'){
-  if(AUTO_SILENT) return;   // 실시간 관제 폴링 tick 은 로그를 남기지 않는다(스팸 방지).
   const b=$('logbody'); const line=document.createElement('div');
   line.className='logline '+kind;
   line.innerHTML=`<span class="t">${ts()}</span><span class="m"></span>`;
@@ -1723,7 +1673,7 @@ function toggleLog(){
   const toggle=$('log-toggle'); if(toggle) toggle.textContent=expanded?'접기 ▾':'펼치기 ▴';
   const head=document.querySelector('.logbar-head'); if(head) head.setAttribute('aria-expanded',String(expanded));
 }
-function showRaw(obj){ if(AUTO_SILENT) return; $('raw-json').textContent = typeof obj==='string'?obj:JSON.stringify(obj,null,2); }
+function showRaw(obj){ $('raw-json').textContent = typeof obj==='string'?obj:JSON.stringify(obj,null,2); }
 function gradeTag(g){ return `<span class="tag g-${g}">${g}</span>`; }
 
 // [2026-08-24] 이 콘솔도 키·토큰을 화면에서 받지 않는다. 401 이면 로그인 화면으로
@@ -1753,10 +1703,10 @@ async function api(method, path, body){
     res=await fetch(url,{method, headers, body: body?JSON.stringify(body):undefined, credentials:'same-origin'});
     if(res.status===401) bounceToLogin();
     text=await res.text();
-  }catch(e){ AUTO_TICK_OK=false; log(`네트워크 오류: ${e.message}`,'err'); throw e; }
+  }catch(e){ log(`네트워크 오류: ${e.message}`,'err'); throw e; }
   let data; try{ data=text?JSON.parse(text):null; }catch{ data=text; }
   showRaw(data ?? text);
-  if(!res.ok){ AUTO_TICK_OK=false; log(`← ${res.status} ${path} :: ${typeof data==='object'?(data.detail||data.message||JSON.stringify(data)):text}`,'err'); const err=new Error(res.status); err.data=data; err.status=res.status; throw err; }
+  if(!res.ok){ log(`← ${res.status} ${path} :: ${typeof data==='object'?(data.detail||data.message||JSON.stringify(data)):text}`,'err'); const err=new Error(res.status); err.data=data; err.status=res.status; throw err; }
   log(`← ${res.status} ${path}`, 'ok');
   return data;
 }
@@ -2364,7 +2314,7 @@ function applyServerConfig(d){
   // 같은 이유로 따로 감싼다 — 목록 채우기가 죽어도 나머지 초기화는 살아야 한다.
   try{ syncLlmProviders(d&&d.llm_providers_supported, d&&d.llm_provider); }
   catch(e){ console && console.warn && console.warn('provider list skipped', e); }
-  try{ syncSynthDomains(d&&d.synth_domains_supported); }
+  try{ syncSynthDomains(d&&d.synth_domain_catalog, d&&d.synth_domains_supported); }
   catch(e){ console && console.warn && console.warn('domain list skipped', e); }
   // [2026-09-28] "우리가 실제로 가진 것만" — healthz 의 정적 허용목록으로 채운 뒤,
   // 실측 가용성(로컬 연결·상용 키 유무)으로 다시 좁힌다. 실패해도 앞서 채운 목록은 남는다.
@@ -2709,92 +2659,6 @@ async function loadConfusionMatrix(){
 /* [2026-08-24] loadSchema() 를 지웠다 — 메트릭 카드의 「등급체계 조회」 버튼이 유일한 호출처였고,
  * 그 버튼을 없앴다(설정 탭이 같은 것을 편집한다). 등급체계 조회·편집은 loadGradeEditor() 한 곳. */
 
-/* ---- 6. 운영 관제 대시보드 ---- */
-function dpDegraded(d, name){ return (d.degraded||[]).includes(name) ? '<span class="dp-degraded" title="이 신호를 조회하지 못했습니다">조회 불가</span>' : ''; }
-function dashSectionLabel(name){
-  return ({active_learning:'재학습 대기'})[name]||'';
-}
-function alStatusPill(s){
-  if(s==='URGENT_RETRAIN') return '<span class="pill err">긴급 재학습</span>';
-  if(s==='RETRAIN_RECOMMENDED') return '<span class="pill warn">재학습 권고</span>';
-  return '<span class="pill ok">정상</span>';
-}
-/* [2026-08-23] 서버 사유 코드를 화면 말로 옮긴다. 관리자에게 no_locked_records 는 뜻이 없다.
-   모르는 값은 **원문 그대로** 둔다 — 감추면 원인을 못 찾는다. */
-function dashReason(raw){
-  const t=String(raw||'');
-  if(!t) return '';
-  const MAP={
-    'no_locked_records':'서명된 검증문서가 아직 없습니다',
-    'locked_eval_not_ready':'평가 정답지가 아직 기준을 채우지 못했습니다',
-  };
-  if(MAP[t]) return MAP[t];
-  if(/under urgent\/recommended thresholds/i.test(t))
-    return '재학습 기준에 못 미칩니다 — 지금 조치할 것은 없습니다';
-  return t;
-}
-/* [2026-08-23] 칸이 좁아지면 제목이 「배포 준 / 비 상태」로 쪼개지고 배지가 글자 단위로
-   무너졌다. 머리글(제목+배지)·큰 수치·하위 수치를 헬퍼로 모아 다섯 칸을 같은 골격으로 찍고,
-   칸 상태는 좌측 색선으로 먼저 읽히게 한다. 표시만 바꾼다 — 판정은 서버 값 그대로. */
-function dpPanel(state, title, tags, body){
-  return `<div class="dash-panel st-${state}">`
-    + `<div class="dp-h"><span class="dp-t">${title}</span><span class="dp-tags">${tags}</span></div>`
-    + body + `</div>`;
-}
-function dpBig(v, unit, color){
-  return `<div class="dp-big"${color?` style="color:${color}"`:''}>${v}${unit?`<span class="u">${unit}</span>`:''}</div>`;
-}
-function dpStat(items){
-  return `<div class="dp-stat">${items.map(([k,v,c])=>
-    `<div><span>${esc(k)}</span><b${c?` style="color:${c}"`:''}>${v}</b></div>`).join('')}</div>`;
-}
-function dashTime(t){
-  const raw=String(t||'');
-  if(!raw) return '-';
-  const dt=new Date(raw);
-  if(isNaN(dt.getTime())) return raw;
-  const z=n=>String(n).padStart(2,'0');
-  return `${dt.getFullYear()}-${z(dt.getMonth()+1)}-${z(dt.getDate())} ${z(dt.getHours())}:${z(dt.getMinutes())}:${z(dt.getSeconds())}`;
-}
-function renderDashboard(d){
-  const meta=$('dash-meta');
-  const degraded=(d.degraded||[]).map(dashSectionLabel).filter(Boolean);
-  meta.textContent = `생성 ${dashTime(d.generated_at)}` + (degraded.length?` · 조회 불가: ${degraded.join(', ')}`:'');
-  meta.title = d.generated_at ? `서버 원본 시각 ${d.generated_at}` : '';
-  const al=d.active_learning||{};
-  // 요구사항의 능동 학습 흐름에서 실제로 조치할 수 있는 교정 대기만 보여 준다.
-  const alState = al.retrain_status==='URGENT_RETRAIN' ? 'err' : (al.retrain_status==='RETRAIN_RECOMMENDED' ? 'warn' : 'ok');
-  const panel=dpPanel(alState, '재학습 대기',
-    alStatusPill(al.retrain_status)+dpDegraded(d,'active_learning'),
-    dpBig(al.unconsumed_total??0, '건', (al.unconsumed_total>0)?'var(--red)':'var(--green)')
-    + `<div class="dp-note">${(al.unconsumed_total>0)?'재학습에 반영되지 않은 교정입니다':'밀린 교정 없음'}</div>`
-    /* [2026-08-24] '확정' 칸을 넣었다(3건인데 과소·과대·측면이 전부 0 이었다).
-       unconsumed_total 은 direction 이 confirm(등급 그대로 확정)인 교정까지 세는데 세부 칸에는
-       그 방향이 없어서, 화면이 합계와 내역이 안 맞는 표를 보여 주고 있었다. */
-    + dpStat([['확정', al.pending_confirm??0, ''],
-              ['과소', al.pending_underclass??0, al.pending_underclass>0?'var(--red)':''],
-              ['과대', al.pending_overclass??0, ''],
-              ['측면', al.pending_lateral??0, '']])
-    + (al.reason?`<div class="dp-note">${esc(dashReason(al.reason))}</div>`:''));
-$('dash-grid').innerHTML = panel;
-}
-async function loadDashboard(){
-  // [2026-10-03] 클릭과 결과 사이에 아무 표시가 없어 "늦게 나오는 것 같다"는 지적이 있었다 —
-  // 서버 자체는 빨라도(실측 수십 ms, 첫 호출만 수백 ms) 화면이 클릭을 확인해 주지 않으면
-  // 사람은 그 틈을 "느리다"로 느낀다. 버튼을 잠깐 잠그고 조회 중임을 바로 보인다.
-  const btn=document.querySelector('button[onclick="loadDashboard()"]');
-  if(btn){ btn.disabled=true; btn.dataset.label=btn.textContent; btn.textContent='불러오는 중…'; }
-  $('dash-grid').innerHTML='<div class="q-empty">불러오는 중…</div>';
-  try{
-    const d=await api('GET','/admin/dashboard');
-    renderDashboard(d);
-  }catch(e){
-    $('dash-grid').innerHTML=`<div class="warnbox">관제 대시보드 조회 실패: ${errKo(e)}</div>`;
-  }finally{
-    if(btn){ btn.disabled=false; btn.textContent=btn.dataset.label; }
-  }
-}
-
 /* ---- 7. GOLDEN BUILD ----
  * 종전에는 [생성]→[상태 조회]→[리뷰 열기] 3버튼을 사람이 순서대로 눌러야 했고, job_id 를
  * prompt() 로 되묻는 경로까지 있었다. 여기서는 생성 후 완료까지 자동 폴링하고, 끝나면
@@ -2944,60 +2808,19 @@ function openGoldenSignoff(){ SIGNOFF_TAB_OPENED=true; return openGoldenHtml('si
 
 
 
-/* ---- 실시간 관제 (auto-refresh · 읽기 전용 폴링) ----
- * 이 콘솔은 원래 수동 새로고침만 있었다(웹소켓/폴링 0). 여기서 읽기 전용 조회
- * (관제 대시보드 + 검수 큐)만 주기 폴링해 "켜두면 저절로 도는" 실시간 관제를 준다.
- * 확정/재라벨/재학습/활성화 같은 쓰기는 절대 폴링하지 않는다(Safe Mode 와 무관).
- * 메트릭/혼동행렬은 재학습 때만 바뀌고 수동으로 띄운 행렬을 덮어쓸 수 있어 제외한다. */
-function setAutoStatus(state){
-  const dot=$('auto-dot'), txt=$('auto-status'), stamp=$('auto-stamp');
-  if(!dot||!txt) return;
-  if(state==='live'){ dot.style.background='var(--green)'; txt.textContent='실시간 갱신 중'; txt.style.color='var(--green)'; if(stamp) stamp.textContent='마지막 갱신 '+ts(); }
-  else if(state==='error'){ dot.style.background='var(--red)'; txt.textContent='갱신 오류 · 재시도 중'; txt.style.color='var(--red)'; }
-  else { dot.style.background='var(--text-faint)'; txt.textContent='정지'; txt.style.color='var(--text-dim)'; }
-}
-// [2026-09-29] 검수 큐 카드를 뺐으므로 여기서 갱신할 것은 관제 대시보드뿐이다(queueBusy 도 같이 뺐다).
-async function autoTick(){
-  if(document.hidden) return;      // 백그라운드 탭이면 스킵(타이머는 유지)
-  if(AUTO_INFLIGHT) return;        // 이전 tick 진행 중이면 중첩 방지
-  AUTO_INFLIGHT=true; AUTO_SILENT=true; AUTO_TICK_OK=true;
-  try{
-    await loadDashboard();
-  }catch(e){ AUTO_TICK_OK=false; }
-  AUTO_SILENT=false; AUTO_INFLIGHT=false;
-  /* [2026-08-23] 그냥 setAutoStatus(live) 였다. 응답이 느린 tick 이 도는 동안 사용자가
-     자동 갱신을 끄면, 그 tick 이 **나중에 끝나면서 '정지'를 '실시간 갱신 중'으로 되돌렸다.**
-     폴링은 멈췄는데 표시만 켜져 있어 화면이 사실과 다른 말을 했다(e2e 시나리오
-     fault.autorefresh.stop-during-inflight). 타이머가 아직 살아 있을 때만 갱신한다. */
-  if(!AUTO_TIMER) return;
-  setAutoStatus(AUTO_TICK_OK ? 'live' : 'error');
-}
-function stopAuto(){ if(AUTO_TIMER){ clearInterval(AUTO_TIMER); AUTO_TIMER=null; } }
-function onAutoChange(){
-  const secs=+($('auto-interval').value||0);
-  stopAuto();
-  if(secs>0){
-    setAutoStatus('live');
-    log(`실시간 관제 ON — ${secs}s 주기 (관제 대시보드 읽기 전용 조회)`, 'ok');
-    autoTick();                                // 즉시 1회
-    AUTO_TIMER=setInterval(autoTick, secs*1000);
-  } else {
-    setAutoStatus('paused');
-    log('실시간 관제 OFF (수동 새로고침만)', 'info');
-  }
-}
-
 /* ---- N. 학습 후보 생성 · 검수 (FUN-003-①⑤⑦) ---- */
 let SYNTH = [];   // /synth/queue 응답 items
 
 async function synthGenerate(){
   if(!synthConsoleAvailable()){ const info=$('sy-info'); if(info) info.textContent=synthConsoleUnavailableMessage(); return; }
   if(!guardWrite('합성 생성')) return;
+  const domain=$('sy-domain').value;
+  if(!domain){ $('sy-info').textContent='문서 주제를 선택하세요.'; return; }
   const btn=$('sy-gen'); btn.disabled=true; btn.textContent='요청 중…';
   try{
     const body={
       target_grade: $('sy-grade').value,
-      domain: $('sy-domain').value,
+      domain,
       count: Math.max(1, Math.min(500, parseInt($('sy-count').value||'5',10)||5)),
       llm_provider: $('sy-provider').value,
       actor: actor(),
@@ -3059,6 +2882,7 @@ async function pollSynthJob(jobId, expected){
 function pickCoverageCell(grade, domain){
   const g=$('sy-grade'), d=$('sy-domain');
   if(g && Array.from(g.options).some(o=>o.value===grade)) g.value=grade;
+  syncSynthDomains();
   if(d && Array.from(d.options).some(o=>o.value===domain)) d.value=domain;
   else if(d) log(`도메인 「${domain}」 은 생성 목록에 없다 — 등급만 채웠다`,'warn');
   log(`생성 대상 선택: ${grade} × ${domain}`,'ok');
@@ -3080,7 +2904,6 @@ async function loadSynthCoverage(){
     box.innerHTML=`<div class="hint">학습 데이터 분포 없음 — ${esc((d&&d.reason)||'학습셋을 읽지 못했습니다')}</div>`;
     return;
   }
-  const domainLabel=domain=>({ai:'AI',business:'경영',defense:'국방',en:'영문 일반',finance:'재무',hr:'인사',legal:'법무',mixed:'혼합',security:'보안',tech:'기술',public:'공개'})[domain]||domain;
   const targets=[
     ...(d.empty||[]).map(cell=>({...cell,state:'미구성'})),
     ...(d.thin||[]).map(cell=>({...cell,state:'표본 부족'})),
@@ -3088,7 +2911,7 @@ async function loadSynthCoverage(){
   const rows=targets.map(cell=>{
     const grade=esc(cell.grade||'—'), domain=esc(cell.domain||'');
     const gradeArg=esc(JSON.stringify(cell.grade||'')), domainArg=esc(JSON.stringify(cell.domain||''));
-    return `<tr><td>${grade}</td><td>${esc(domainLabel(cell.domain||''))}</td><td>${Number(cell.n||0)}건</td><td>${Number(cell.real||0)}건</td><td><button class="btn sec sm" type="button" onclick="pickCoverageCell(${gradeArg},${domainArg})">선택</button></td></tr>`;
+    return `<tr><td>${grade}</td><td>${esc(synthDomainLabel(cell.domain||''))}</td><td>${Number(cell.n||0)}건</td><td>${Number(cell.real||0)}건</td><td><button class="btn sec sm" type="button" onclick="pickCoverageCell(${gradeArg},${domainArg})">선택</button></td></tr>`;
   }).join('');
   const realShare=d.real_share!=null?`${Math.round(Number(d.real_share)*100)}%`:'기록 없음';
   box.innerHTML=`<section class="coverage-panel" aria-label="학습 데이터 분포">
@@ -3198,7 +3021,7 @@ function renderSynthQueue(){
   box.innerHTML=SYNTH.map((it,i)=>`
     <div class="q-item">
       <div class="q-top">
-        <div><span class="q-id">${esc(it.synth_id)}</span>${it.domain?` · <span class="q-title">${esc(it.domain)}</span>`:''}</div>
+        <div><span class="q-id">${esc(it.synth_id)}</span>${it.domain?` · <span class="q-title">${esc(synthDomainLabel(it.domain))}</span>`:''}${it.document_type?` <span class="muted">— ${esc(it.document_type)}</span>`:''}</div>
         <div>${gradeTag(it.corrected_grade||it.target_grade)}${it.corrected_grade?`<span class="pill" title="검수자가 승인하면서 등급을 고쳤습니다. 학습 데이터는 이 등급으로 만들어집니다.">교정됨 · 생성 시 ${esc(it.target_grade)}</span>`:''}
           <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${esc(it.llm_provider)}/${esc(it.llm_model||'-')}</span>
           ${it.quality_score!=null?`<span class="pill ${it.quality_score>=0.7?'ok':'warn'}">품질 ${Number(it.quality_score).toFixed(2)}</span>`:''}
@@ -3914,6 +3737,7 @@ function syncActiveGrades(codes){
       + ACTIVE_GRADES.map(g=>`<option value="${esc(g)}">${esc(g)}${GRADE_KR[g]?' — '+esc(GRADE_KR[g]):''}</option>`).join('');
     if(prev && Array.from(sel.options).some(o=>o.value===prev)) sel.value=prev;
   });
+  if(typeof syncSynthDomains==='function') syncSynthDomains();
 }
 
 /* ---- 생성 제공자 목록 동기화 — 서버가 받는 값만 화면에 둔다 ----
@@ -4000,28 +3824,44 @@ async function loadSynthPlaybook(){
     + '<div>반복 금지 낱말(' + (d.avoid_phrases || []).length + '개): ' + avoid + '</div>';
 }
 
-/* ---- 생성 도메인 목록 동기화 — 제공자와 같은 이유로 서버가 준다 ----
- * [2026-09-05] 화면에 13개가 손으로 적혀 있었고 생성기가 아는 것보다 적었다. 배터리·
- * 화학_제약·소프트웨어·경영정보·기타는 서버가 받는데 고를 수가 없었다. healthz 가
- * 정본으로 접은 목록을 주므로 semiconductor/반도체 처럼 같은 것이 두 줄로 뜨지 않는다. */
-const SYNTH_DOMAIN_KR = {
-  mixed: '혼합', tech: '기술', business: '영업', hr: '인사', finance: '재무',
-  legal: '법무', public: '대외 공개자료', security: '보안·암호키', ma: '인수합병',
-  defense: '방위산업', ai: '인공지능', bio: '바이오·제약',
-};
-function syncSynthDomains(list){
+/* ---- 생성 문서 주제 목록 동기화 ---- */
+let SYNTH_DOMAIN_CATALOG=[];
+function syncSynthDomains(catalog, list){
   const sel=$('sy-domain'); if(!sel) return;
-  let names=(Array.isArray(list)?list:[]).map(String).filter(Boolean);
-  // 목록을 못 받으면 mixed 하나만 둔다 — 빈 셀렉트로 두면 폼이 빈 값을 보내 422 가 된다.
-  if(!names.length) names=['mixed'];
+  if(Array.isArray(catalog)){
+    SYNTH_DOMAIN_CATALOG=catalog.filter(item=>item && item.code && item.label && item.group_label)
+      .map(item=>({
+        code:String(item.code), label:String(item.label), group:String(item.group),
+        group_label:String(item.group_label),
+        grade_codes:Array.isArray(item.grade_codes)?item.grade_codes.map(String):[],
+      }));
+  }
+  if(!SYNTH_DOMAIN_CATALOG.length && Array.isArray(list)){
+    SYNTH_DOMAIN_CATALOG=list.map(String).filter(Boolean).filter(code=>code!=='mixed')
+      .map(code=>({code,label:code,group:'legacy',group_label:'서버 제공 분류',grade_codes:[]}));
+  }
+  const grade=($('sy-grade')||{}).value||'';
+  const rows=SYNTH_DOMAIN_CATALOG.filter(item=>!item.grade_codes.length || item.grade_codes.includes(grade));
   const prev=sel.value;
-  sel.innerHTML=names.map(n=>{
-    const kr=SYNTH_DOMAIN_KR[n];
-    return `<option value="${esc(n)}">${esc(n)}${kr?' ('+esc(kr)+')':''}</option>`;
-  }).join('');
-  if(prev && names.indexOf(prev)>=0) sel.value=prev;
-  else if(names.indexOf('mixed')>=0) sel.value='mixed';
+  const groups=[];
+  rows.forEach(item=>{
+    let group=groups.find(x=>x.key===item.group);
+    if(!group){ group={key:item.group,label:item.group_label,items:[]}; groups.push(group); }
+    group.items.push(item);
+  });
+  sel.innerHTML='<option value="" disabled>문서 주제를 선택하세요</option>'+
+    groups.map(group=>`<optgroup label="${esc(group.label)}">${group.items.map(item=>
+      `<option value="${esc(item.code)}">${esc(item.label)}</option>`).join('')}</optgroup>`).join('');
+  if(prev && rows.some(item=>item.code===prev)) sel.value=prev;
+  else sel.value='';
 }
+
+function synthDomainLabel(code){
+  const item=SYNTH_DOMAIN_CATALOG.find(x=>x.code===code);
+  return (item&&item.label)||code;
+}
+
+$('sy-grade') && $('sy-grade').addEventListener('change',()=>syncSynthDomains());
 
 /* [2026-08-24] 「API 키 자동 채움」 블록을 없앴다. 주소에 ?key= 를 붙여 여는 경로였는데,
  * 원칙상 **웹 화면에서 키·토큰을 받지 않는다**. 인증은 같은 오리진 쿠키가
@@ -4061,7 +3901,6 @@ checkHealth().then(()=>{
 /* [2026-09-25] 사내 규정(참고 표시) — 이 서버에 기능이 있고 이 사용자가 볼 수 있으면 설정 탭에 카드를 보이고,
    검수 화면의 「왜 이 등급인가?」에 관련 규정을 붙인다. 꺼진 서버에서는 아무 화면도 바뀌지 않는다. */
 initRegulationCard();
-setAutoStatus('paused');
 log('거버넌스 콘솔 준비 완료.','info');
 </script>
 

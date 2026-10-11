@@ -449,6 +449,9 @@ class SampleDocument(Base):
     # 한 칸에 뭉개지면 교정이 있었다는 사실 자체가 사라진다. 학습행 라벨은 이 값을 우선한다
     # (synthesis_service.build_training_rows).
     corrected_level_id: Mapped[int | None] = mapped_column("cfmtn_grd_sn", ForeignKey("tad_cm_clsf_grd_mng.grd_sn", ondelete="RESTRICT"))
+    # 생성 주제(산업/업무/공개 범위). doc_type과 별도로 보존해야 나중에 생성 분포와
+    # 실제 문서 유형을 각각 감사할 수 있다.
+    domain_code: Mapped[str | None] = mapped_column("dmn_cd", String(50))
     doc_type: Mapped[str | None] = mapped_column("doc_knd_nm", String(50))
     outline_prompt_version: Mapped[str | None] = mapped_column("otln_prmpt_ver_nm", ForeignKey("tad_pm_prmpt_ver_mng.prmpt_ver_nm"))
     body_prompt_version: Mapped[str | None] = mapped_column("mtxt_prmpt_ver_nm", ForeignKey("tad_pm_prmpt_ver_mng.prmpt_ver_nm"))

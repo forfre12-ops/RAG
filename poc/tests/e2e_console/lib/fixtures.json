@@ -32,6 +32,7 @@
       "review_confidence_threshold": 0.5,
       "review_confidence_threshold_public": null,
       "demo_console_enabled": true,
+      "synthesis_console_enabled": true,
       "rag": {
         "collection": "docs",
         "embedding_model": "nlpai-lab/KURE-v1",
@@ -40,6 +41,16 @@
         "chunk_overlap": 120
       }
     },
+    "synth_domains_supported": ["tech"],
+    "synth_domain_catalog": [
+      {
+        "code": "tech",
+        "label": "기술 개발",
+        "group": "work",
+        "group_label": "업무 유형",
+        "grade_codes": []
+      }
+    ],
     "readiness": {
       "locked_eval_ready": false,
       "reason": "locked_gold_eval 0건"

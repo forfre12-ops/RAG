@@ -82,3 +82,20 @@ def test_queue_pending_maps_to_pending_review(monkeypatch) -> None:
     resp = SynthesisService().queue(status="pending")
     assert _FakeRepo.last_status == "pending_review"  # API 'pending' → DB 'pending_review'
     assert resp.total == 1
+
+
+def test_queue_keeps_domain_and_document_type_separate(monkeypatch) -> None:
+    _patch(monkeypatch)
+    sample = _fake_sample("pending_review")
+    sample.domain_code = "finance"
+    sample.doc_type = "결산 초안"
+
+    class _DomainRepo(_FakeRepo):
+        def list_by_status(self, status, *, limit=50, offset=0):
+            _FakeRepo.last_status = status
+            return [sample]
+
+    monkeypatch.setattr(ss, "SynthRepo", _DomainRepo)
+    item = SynthesisService().queue(status="pending").items[0]
+    assert item.domain == "finance"
+    assert item.document_type == "결산 초안"

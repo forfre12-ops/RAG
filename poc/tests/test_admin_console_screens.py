@@ -106,6 +106,19 @@ def test_console_hides_technical_settings_and_compacts_synth_coverage(console: s
     assert "d.caveat" not in console
 
 
+def test_console_exposes_regulation_rag_switches_when_the_feature_is_installed(console: str):
+    """정책 화면에서 규정 RAG 표시와 로컬 LLM 정밀선택을 각각 제어할 수 있어야 한다."""
+    for marker in (
+        "사내 규정 참고 RAG",
+        "규정 참고 RAG 사용",
+        'id="reg-runtime-toggle"',
+        'id="reg-llm-toggle"',
+        "'/regulations/runtime-toggle'",
+        "'/regulations/llm-select-toggle'",
+    ):
+        assert marker in console
+
+
 def test_console_warns_before_grade_deactivation(console: str):
     """PUT /schema/grades 는 목록 치환이라 행 삭제 = 비활성이다. 무경고 저장은 사고 경로.
 

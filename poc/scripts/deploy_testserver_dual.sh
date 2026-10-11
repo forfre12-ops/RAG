@@ -103,6 +103,9 @@ gen_env() {
     if [ "$profile" = "full-train" ]; then
       echo "WORKER_MEM_LIMIT=${WORKER_MEM_LIMIT:-16G}"
       echo "WORKER_MEM_RESERVATION=${WORKER_MEM_RESERVATION:-2G}"
+      # 지재원 검수 콘솔에는 사내 규정 원문 참고(RAG)를 설치한다. 화면 표시 여부는
+      # 관리자 콘솔의 "규정 참고 RAG 사용" 스위치에서 재시작 없이 바꾼다.
+      echo "REGULATION_REFERENCE_ENABLED=1"
     fi
     if [ "$llm" = "anthropic" ]; then
       echo "LLM_PROVIDER=anthropic"

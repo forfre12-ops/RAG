@@ -59,6 +59,7 @@ def _doc(grade: str, *, label_source=None, parse_error=None, domain="finance"):
         llm_model="Qwen/Qwen3-14B",
         body="가상 사내 문서 본문",
         domain=domain,
+        document_type="결산 초안",
         label_source=label_source,
         parse_error=parse_error,
     )
@@ -80,8 +81,8 @@ def test_persist_writes_to_review_queue_with_level_mapping(monkeypatch) -> None:
     # 등급 code → target_level_id 매핑이 적용된다.
     assert _FakeSynthRepo.created[0]["target_level_id"] == _LEVELS["TS"]
     assert _FakeSynthRepo.created[1]["target_level_id"] == _LEVELS["S3"]
-    # 도메인은 doc_type 으로 보존(큐가 doc_type 을 domain 으로 표면화).
-    assert _FakeSynthRepo.created[0]["doc_type"] == "finance"
+    assert _FakeSynthRepo.created[0]["domain_code"] == "finance"
+    assert _FakeSynthRepo.created[0]["doc_type"] == "결산 초안"
 
 
 def test_persist_preserves_label_source_and_parse_error(monkeypatch) -> None:

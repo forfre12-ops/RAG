@@ -1,11 +1,14 @@
-"""규정 참고 표시는 **기본 꺼짐·무동작**이다(설계서 P4) — 켜지 않으면 라우트가 없다.
+"""규정 참고 표시는 일반 기본값에서는 꺼짐이다.
+
+지재원 ``full-train`` 프로파일에는 설치하고, 관리자 콘솔의 런타임 스위치로 검수 화면
+표시를 켜고 끈다. 그 밖의 배포는 명시적으로 켜지 않으면 라우트가 없다.
 
 왜 새 프로세스로 재나. 라우터 등록은 앱을 불러오는 순간(import time)에 한 번 정해진다. 같은 프로세스에서 설정 모듈을 다시
 불러 확인하는 방식(test_deploy_profile.py)은 다른 시험에 부작용을 남길 수 있어, 여기서는 **환경변수만 다르게 준 새 프로세스**가
 앱을 불러 라우트 표를 찍게 한다. 저장소의 `.env` 를 읽지 않도록 빈 작업 폴더에서 돌린다.
 
 이 시험이 지키는 것: (1) 아무것도 안 주면 규정 API 가 없다 (2) 명시적으로 끄면 없다 (3) 켜면 계약(ICD)에 적힌 경로가 전부 생긴다
-(4) 어떤 배포 프로파일도 기본값으로 이 기능을 켜지 않는다.
+(4) 지재원 full-train만 기본 설치하고, 다른 프로파일은 묵시적으로 켜지지 않는다.
 """
 
 from __future__ import annotations
@@ -64,13 +67,18 @@ def test_every_contract_path_appears_when_the_flag_is_on(tmp_path):
     assert _regulation_paths(tmp_path, REGULATION_REFERENCE_ENABLED="true") == EXPECTED_WHEN_ON
 
 
-def test_no_deploy_profile_turns_the_feature_on_by_default():
-    """프로파일 기본값 표(_PROFILE_DEFAULTS)가 이 플래그를 켜면 — 켠 적 없는 배포본에 화면이 생긴다."""
+def test_full_train_installs_every_regulation_contract_path(tmp_path):
+    """211용 full-train은 관리자가 바로 규정을 등록·표시 설정할 수 있어야 한다."""
+    assert _regulation_paths(tmp_path, DEPLOY_PROFILE="full-train") == EXPECTED_WHEN_ON
+
+
+def test_only_full_train_installs_the_feature_by_default():
+    """지재원 full-train에는 설치하되, 고객사·lite 프로파일에는 화면을 만들지 않는다."""
     from koipa.config import _PROFILE_DEFAULTS, Settings
 
     assert Settings.model_fields["regulation_reference_enabled"].default is False
     turned_on = [p for p, d in _PROFILE_DEFAULTS.items() if d.get("regulation_reference_enabled")]
-    assert not turned_on, f"기본으로 규정 참고 표시를 켜는 프로파일: {turned_on}"
+    assert turned_on == ["full-train"]
 
 
 def test_no_deploy_profile_turns_the_llm_option_on_by_default():

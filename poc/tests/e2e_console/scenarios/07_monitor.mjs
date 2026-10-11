@@ -1,23 +1,10 @@
-/* 7. 운영 — 관제 대시보드 · 감사 로그 · 실시간 관제 · 합성 검수 큐.
- *
- * "현재 상태를 한 화면에서 본다"가 목적인 자리다. 조회 실패를 성공처럼 그리면 관제가
- * 통째로 거짓이 되므로, 부분 실패(degraded)가 그대로 표시되는지까지 본다.
- */
+/* 7. 운영 — 감사 로그와 모의 문서 검토 흐름. */
 
 import { openPage, goToPane } from '../lib/page.mjs';
 import { assertNoScriptErrors } from '../lib/expect.mjs';
 
-async function opsTab(server, opts = {}) {
-  const page = await openPage(server, '/console/admin.html', opts);
-  await page.settle();
-  await goToPane(page, 'ops');
-  return page;
-}
-
 // [2026-10-10] 감사 로그 카드(admin.html:1006)는 옛 "운영" 탭 하나에 같이 있었지만, Product
-// Shell V2에서 "운영 개요"(overview)와 "감사·보고서"(audit)로 갈라졌다 — data-pane="ops" 는
-// 그대로지만 data-product-view="audit" 다. opsTab()의 일반 pane→view 매핑(ops→overview)으로는
-// 안 보인다 — 이 카드를 쓰는 시나리오는 전용 내비게이션으로 바로 간다.
+// Shell V2에서 감사·보고서(audit)는 전용 내비게이션으로 바로 연다.
 async function auditTab(server, opts = {}) {
   const page = await openPage(server, '/console/admin.html', opts);
   await page.settle();
@@ -33,64 +20,6 @@ async function synthesisTab(server, opts = {}) {
 }
 
 export const scenarios = [
-  {
-    id: 'monitor.dashboard.renders-panels',
-    title: '관제 종합을 누르면 패널들이 실제 수치로 그려진다',
-    async run({ server, check }) {
-      const page = await opsTab(server);
-      page.click(page.q('button[onclick="loadDashboard()"]'));
-      await page.settle();
-
-      check.ok(server.lastCall('GET', '/admin/dashboard'), 'GET /admin/dashboard 를 불렀다');
-      const grid = page.text('dash-grid');
-      check.includes(grid, '재학습 대기', '재학습 반영 대기 패널이 있다');
-      check.ok(!/이중검토 보류|평가 정답지 준비도|안전 경보/.test(grid), '요구사항 밖 운영 패널을 그리지 않는다');
-      check.includes(page.text('dash-meta'), '생성', '언제 만든 수치인지 적는다');
-      assertNoScriptErrors(check, page);
-      return page;
-    },
-  },
-
-  {
-    id: 'monitor.dashboard.degraded-visible',
-    title: '일부 조회가 실패하면 그 항목이 실패했다고 표시한다',
-    why: '실패한 항목을 0 으로 그리면 "문제 없음"으로 읽힌다',
-    needsMock: true,
-    async run({ server, check }) {
-      const page = await opsTab(server);
-      server.overrides['GET /admin/dashboard'] = {
-        generated_at: '2026-08-23T02:30:00Z',
-        escalation_held: {},
-        locked_readiness: {},
-        active_learning: {},
-        kill_gate: {},
-        drift: {},
-        degraded: ['active_learning', 'drift'],
-      };
-      page.click(page.q('button[onclick="loadDashboard()"]'));
-      await page.settle();
-      check.includes(page.text('dash-meta'), '조회 불가', '무엇을 못 읽었는지 상단에 적는다');
-      check.includes(page.text('dash-meta'), '재학습 대기', '실패한 항목을 운영 용어로 보여준다');
-      return page;
-    },
-  },
-
-  {
-    id: 'monitor.dashboard.failure-visible',
-    title: '대시보드 자체가 실패하면 빈 화면이 아니라 사유가 뜬다',
-    needsMock: true,
-    async run({ server, check }) {
-      const page = await opsTab(server);
-      server.faults.push({ path: '/admin/dashboard', status: 403, body: { detail: '권한 없음' } });
-      page.click(page.q('button[onclick="loadDashboard()"]'));
-      await page.settle();
-      check.includes(page.text('dash-grid'), '조회 실패', '실패했다고 말한다');
-      check.matches(page.text('dash-grid'), /admin 역할.*필요/, '403 일 때 무엇이 필요한지 짚어 준다');
-      check.includes(page.text('dash-grid'), '403', '어떤 실패인지도 남긴다');
-      return page;
-    },
-  },
-
   {
     id: 'monitor.audit.list-and-filter',
     title: '감사 로그를 조건으로 조회하면 행이 그려지고 신원 없음도 구분된다',
@@ -137,7 +66,7 @@ export const scenarios = [
   {
     id: 'monitor.audit.actor-time-and-page-filter',
     title: '감사 로그를 행위자·기간으로 좁히고 다음 쪽으로 이동한다',
-    why: '운영 사고를 특정 담당자·시간대에서 추적할 수 있어야 최신 50건만 보는 관제가 되지 않는다',
+    why: '운영 사고를 특정 담당자·시간대에서 추적할 수 있어야 최신 50건만 보는 조회가 되지 않는다',
     needsMock: true,
     async run({ server, check }) {
       server.overrides['GET /admin/audit-log'] = {
@@ -184,40 +113,6 @@ export const scenarios = [
       await page.settle();
       check.includes(page.text('au-body'), '조회 실패', '실패는 "없음"과 다르게 말한다');
       check.includes(page.text('au-body'), 'DB 오류', '서버 사유가 보인다');
-      return page;
-    },
-  },
-
-  {
-    id: 'monitor.autorefresh.starts-and-stops',
-    title: '실시간 관제를 켜면 주기적으로 다시 읽고, 끄면 멈춘다',
-    async run({ server, check }) {
-      const page = await opsTab(server);
-      const sel = page.$('auto-interval');
-      check.ok(sel, '주기 선택이 있다');
-      check.includes(page.text('auto-status'), '정지', '처음에는 꺼져 있다');
-
-      // 가장 짧은 주기를 골라 실제로 도는지 본다
-      const shortest = Array.from(sel.options).map((o) => Number(o.value)).filter((v) => v > 0).sort((a, b) => a - b)[0];
-      const before = server.calls.length;
-      page.set('auto-interval', String(shortest));
-      await page.settle();
-      check.matches(page.text('auto-status'), /갱신|실시간|live/i, '켜졌다고 표시된다');
-      check.gte(server.calls.length, before + 1, '켜자마자 한 번 읽는다');
-
-      const afterFirst = server.calls.length;
-      const ticked = await page.until(() => server.calls.length > afterFirst, Math.max(3000, shortest * 1000 + 1500));
-      check.ok(ticked, `주기(${shortest}초)마다 다시 읽는다`);
-
-      page.set('auto-interval', '0');
-      await page.settle();
-      const stopped = server.calls.length;
-      await page.wait(Math.min(2000, shortest * 1000 + 500));
-      check.eq(server.calls.length, stopped, '끄면 더 이상 읽지 않는다');
-      // 끄는 순간 진행 중이던 tick 이 끝나면서 상태를 'live' 로 되돌려 쓰던 자리 —
-      // 폴링은 멈췄는데 표시만 "실시간 갱신 중"으로 남으면 화면이 거짓말을 한다.
-      check.includes(page.text('auto-status'), '정지', '꺼졌다고 표시된다');
-      assertNoScriptErrors(check, page);
       return page;
     },
   },
@@ -296,6 +191,7 @@ export const scenarios = [
     async run({ server, check }) {
       const page = await synthesisTab(server);
       page.set('sy-grade', 'TS');
+      page.set('sy-domain', 'tech');
       page.set('sy-count', '20');
       page.click('sy-gen');
       await page.settle();

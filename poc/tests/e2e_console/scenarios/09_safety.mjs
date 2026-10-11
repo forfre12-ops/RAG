@@ -108,10 +108,10 @@ export const scenarios = [
       await page.settle();
       page.check('cfg-write-enable', false);
 
-      await goToPane(page, 'ops');
-      page.click(page.q('button[onclick="loadDashboard()"]'));
+      await goToPane(page, 'audit');
+      page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
-      check.ok(server.lastCall('GET', '/admin/dashboard'), '관제 조회는 된다');
+      check.ok(server.lastCall('GET', '/admin/audit-log'), '감사 로그 조회는 된다');
       return page;
     },
   },

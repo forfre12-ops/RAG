@@ -96,8 +96,11 @@ def test_ids_are_unique(signoff, eid):
     2026-08-18: 껍데기를 갈면서 새 자리에 넣고 옛 자리를 안 지워 네 쌍이 겹쳤다.
     deccount 는 그 탓에 gate 의 큰 글씨(20px/900)로 등급별 내역이 쏟아지고 있었다.
     """
+    # 작업대 스크립트는 기존 본문을 지운 뒤 같은 ID의 런타임 요소를 한 번만 만든다.
+    # 문자열 전체를 세면 그 JS 템플릿까지 마크업으로 오인해 정상 구조를 중복으로 판정한다.
+    markup = re.sub(r"<script\b[^>]*>.*?</script>", "", signoff, flags=re.IGNORECASE | re.DOTALL)
     marker = 'id="%s"' % eid
-    assert signoff.count(marker) == 1, "%s 가 %d회 나온다" % (marker, signoff.count(marker))
+    assert markup.count(marker) == 1, "%s 가 정적 마크업에 %d회 나온다" % (marker, markup.count(marker))
 
 
 @pytest.mark.parametrize("bp", ["max-width:1050px", "max-width:700px"])

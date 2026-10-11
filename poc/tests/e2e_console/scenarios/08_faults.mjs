@@ -8,8 +8,6 @@
 import { openPage, goToPane } from '../lib/page.mjs';
 
 const CLICKS = [
-  ['관제 종합', 'button[onclick="loadDashboard()"]', 'ops'],
-  // [2026-10-10] 감사 로그 카드는 V2에서 'audit' view로 갈라졌다 — 'ops'(→overview)로는 안 보인다.
   ['감사 로그', 'button[onclick="loadAuditLog()"]', 'audit'],
   // [2026-10-03] '검증문서 현황'(loadGoldenStatus/gs-body) 항목을 뺐다 — 그 카드를 없앴다.
   ['작업 목록', 'button[onclick="loadJobs()"]', 'train'],
@@ -46,7 +44,6 @@ export const scenarios = [
 
       // 로그창 밖(각 카드 자리)에도 남는가 — 접힌 로그만으로는 사용자가 못 본다
       const inCard = {
-        '관제 종합': page.text('dash-grid'),
         '감사 로그': page.text('au-body'),
         '작업 목록': page.text('jobs-body'),
         '최신 메트릭': page.text('metrics-extra'),
@@ -70,11 +67,6 @@ export const scenarios = [
       page.set('cfg-role', 'reviewer');   // 관리자 콘솔의 역할 목록은 admin·reviewer·kl_backend·system
       server.faults.push({ path: '/admin/', status: 403, body: { detail: 'admin role required' } });
 
-      await goToPane(page, 'ops');
-      page.click(page.q('button[onclick="loadDashboard()"]'));
-      await page.settle();
-      check.matches(page.text('dash-grid'), /admin 역할.*필요/, '무슨 역할이 필요한지 말한다');
-
       await goToPane(page, 'audit');
       page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
@@ -91,12 +83,12 @@ export const scenarios = [
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      server.faults.push({ path: '/admin/dashboard', status: 500, body: { detail: 'psycopg.OperationalError: connection refused' } });
-      await goToPane(page, 'ops');
-      page.click(page.q('button[onclick="loadDashboard()"]'));
+      server.faults.push({ path: '/admin/audit-log', status: 500, body: { detail: 'psycopg.OperationalError: connection refused' } });
+      await goToPane(page, 'audit');
+      page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
-      check.includes(page.text('dash-grid'), 'connection refused', '서버가 준 원문이 보인다');
-      check.includes(page.text('dash-grid'), '500', '상태코드가 보인다');
+      check.includes(page.text('au-body'), 'connection refused', '서버가 준 원문이 보인다');
+      check.includes(page.text('au-body'), '500', '상태코드가 보인다');
       return page;
     },
   },
@@ -104,26 +96,24 @@ export const scenarios = [
   {
     id: 'fault.network.disconnect',
     title: '연결이 끊기면 네트워크 오류라고 말하고 화면이 죽지 않는다',
-    // [2026-09-29] 종전 벡터(cl-body/btn-classify)를 콘솔에서 뺐다 — 같은 성격의 검증을
-    // 여전히 있는 관제 대시보드 조회로 옮겼다(cl-* 흐름 자체는 index.html 쪽에서 다룬다).
     needsMock: true,
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      server.faults.push({ path: '/admin/dashboard', abort: true });
+      server.faults.push({ path: '/admin/audit-log', abort: true });
 
-      await goToPane(page, 'ops');
-      page.click(page.q('button[onclick="loadDashboard()"]'));
+      await goToPane(page, 'audit');
+      page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
 
       check.includes(page.logLines('err').join(' '), '네트워크 오류', '네트워크 오류라고 말한다');
-      check.matches(page.text('dash-grid'), /실패|오류/, '카드 자리에도 실패가 남는다', page.text('dash-grid'));
+      check.matches(page.text('au-body'), /실패|오류/, '카드 자리에도 실패가 남는다', page.text('au-body'));
 
       // 끊긴 뒤에도 다음 조작이 된다
       server.faults.length = 0;
-      page.click(page.q('button[onclick="loadDashboard()"]'));
+      page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
-      check.ok(!/실패|오류/.test(page.text('dash-grid')), '연결이 돌아오면 다시 동작한다', page.text('dash-grid'));
+      check.ok(!/조회 실패|네트워크 오류/.test(page.text('au-body')), '연결이 돌아오면 다시 동작한다', page.text('au-body'));
       return page;
     },
   },
@@ -132,24 +122,23 @@ export const scenarios = [
     id: 'fault.html-instead-of-json',
     title: 'JSON 자리에 HTML 오류 페이지가 와도 화면이 무너지지 않는다',
     why: '역프록시가 502 를 HTML 로 돌려주는 흔한 상황이다 — JSON.parse 가 던지면 그 뒤가 다 멈춘다',
-    // [2026-09-29] 종전 벡터(검수 큐)를 콘솔에서 뺐다 — 같은 성격의 검증을 관제 대시보드로 옮겼다.
     needsMock: true,
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      server.faults.push({ path: '/admin/dashboard', status: 502, raw: '<html><head><title>502 Bad Gateway</title></head><body><h1>502</h1></body></html>' });
+      server.faults.push({ path: '/admin/audit-log', status: 502, raw: '<html><head><title>502 Bad Gateway</title></head><body><h1>502</h1></body></html>' });
 
-      await goToPane(page, 'ops');
-      page.click(page.q('button[onclick="loadDashboard()"]'));
+      await goToPane(page, 'audit');
+      page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
 
       check.eq(page.errors.length, 0, '스크립트가 죽지 않았다', page.errors.map((e) => e.message).join(' | '));
       check.includes(page.logLines('err').join(' '), '502', '502 라고 로그에 남는다');
       // 화면이 계속 쓸 수 있는 상태여야 한다
       server.faults.length = 0;
-      page.click(page.q('button[onclick="loadDashboard()"]'));
+      page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
-      check.ok(!/실패|오류|502/.test(page.text('dash-grid')), '그 다음 조회는 정상으로 그려진다', page.text('dash-grid'));
+      check.ok(!/조회 실패|오류|502/.test(page.text('au-body')), '그 다음 조회는 정상으로 그려진다', page.text('au-body'));
       return page;
     },
   },
@@ -159,27 +148,6 @@ export const scenarios = [
      (재학습 제출·모델 리로드 등)에서는 못 찾았다(disabled/busy-text 로직이 없음) — 이 카드만의
      구현이었다. index.html 의 btn-classify(SSE 경로)로 옮겨 다시 만드는 게 정확하겠으나
      아직 안 했다 — 알려진 커버리지 공백. */
-
-  {
-    id: 'fault.autorefresh.stop-during-inflight',
-    title: '느린 tick 도중에 자동 갱신을 끄면 표시도 「정지」로 남는다',
-    why: '폴링은 멈췄는데 표시만 "실시간 갱신 중"이면 화면이 거짓을 말한다',
-    needsMock: true,
-    async run({ server, check }) {
-      const page = await openPage(server, '/console/admin.html');
-      await page.settle();
-      server.faults.push({ path: '/admin/dashboard', delayMs: 120 });
-
-      page.set('auto-interval', '3');       // 즉시 1회 tick 시작(느린 응답)
-      await page.wait(30);                   // tick 진행 중
-      page.set('auto-interval', '0');        // 진행 중에 끈다
-      check.includes(page.text('auto-status'), '정지', '끈 직후에는 정지로 표시된다');
-
-      await page.settle(4000);               // 진행 중이던 tick 이 끝난 뒤
-      check.includes(page.text('auto-status'), '정지', '늦게 끝난 tick 이 표시를 되돌리지 않는다');
-      return page;
-    },
-  },
 
   {
     id: 'fault.healthz.down-keeps-console-usable',
@@ -200,10 +168,10 @@ export const scenarios = [
       check.eq(page.$('health')?.className, 'health-pill bad', '빨간 상태로 바뀐다');
 
       // 헬스가 죽어도 다른 조회는 된다
-      await goToPane(page, 'ops');
-      page.click(page.q('button[onclick="loadDashboard()"]'));
+      await goToPane(page, 'audit');
+      page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
-      check.ok(!/실패|오류/.test(page.text('dash-grid')), '관제 대시보드는 정상으로 그려진다', page.text('dash-grid'));
+      check.ok(!/조회 실패|오류/.test(page.text('au-body')), '감사 로그는 정상으로 그려진다', page.text('au-body'));
       check.eq(page.errors.length, 0, '스크립트 오류가 나지 않는다', page.errors.map((e) => e.message).join(' | '));
       return page;
     },

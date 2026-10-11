@@ -142,6 +142,19 @@ def test_healthz_advertises_supported_domains(health_payload: dict) -> None:
     assert not missing, f"프롬프트가 없는 도메인을 광고한다: {missing}"
 
 
+def test_healthz_exposes_a_grouped_current_taxonomy(health_payload: dict) -> None:
+    """새 생성 폼은 산업/업무/공개 범위를 같은 축처럼 섞지 않는다."""
+    catalog = health_payload.get("synth_domain_catalog")
+    assert isinstance(catalog, list) and catalog
+    assert [item["code"] for item in catalog] == health_payload["synth_domains_supported"]
+    assert "mixed" not in health_payload["synth_domains_supported"]
+    by_code = {item["code"]: item for item in catalog}
+    assert by_code["ai"]["group"] == "industry"
+    assert by_code["tech"]["group"] == "work"
+    assert by_code["public"]["group"] == "visibility"
+    assert by_code["public"]["grade_codes"] == ["S3"]
+
+
 def test_every_advertised_domain_is_accepted_by_synth_api(health_payload: dict) -> None:
     """② 광고한 도메인은 전부 POST /synth/generate 가 받는다."""
     from koipa.schemas.synthesis import SYNTH_DOMAIN_PATTERN  # noqa: PLC0415
@@ -161,6 +174,9 @@ def test_console_does_not_hardcode_domain_options() -> None:
         "로 채운다(syncSynthDomains). 손으로 적으면 생성기가 아는 것보다 적어진다 — "
         "실제로 배터리·화학_제약·소프트웨어·경영정보·기타를 고를 수 없었다."
     )
+    assert "synth_domain_catalog" in html
+    assert "optgroup" in html
+    assert "mixed 하나만" not in html
 
 
 def test_bio_is_pharma_not_agriculture() -> None:

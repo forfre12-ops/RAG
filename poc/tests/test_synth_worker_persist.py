@@ -127,11 +127,12 @@ def test_persist_to_review_queue_preserves_markers():
     from koipa.db import session_scope
     from koipa.db.models import SampleDocument
 
-    token = f"p0persist-{uuid.uuid4().hex[:8]}"  # 이 실행분만 격리 조회할 고유 doc_type
+    token = f"p0persist-{uuid.uuid4().hex[:8]}"  # 이 실행분만 격리 조회할 고유 domain_code
     gen = SyntheticDocGenerator(llm=_FakeProvider(""))  # 빈 응답 → 전부 noop_fallback
     docs = gen.generate(SynthRequest(target_grade="S1", domain="mixed", count=3))
     for d in docs:
-        d.domain = token                     # 적재 시 doc_type 으로 저장 → 격리 조회 키
+        d.domain = token                     # 적재 시 domain_code 로 저장 → 격리 조회 키
+        d.document_type = "검증용 문서 유형"
     docs[0].label_source = "llm_nonjson"     # 한 건은 다른 마커로 → 보존 구분 검증
 
     persisted = _persist_synth_samples(docs, job_id=None)
@@ -140,13 +141,14 @@ def test_persist_to_review_queue_preserves_markers():
     with session_scope() as db:
         rows = list(
             db.execute(
-                select(SampleDocument).where(SampleDocument.doc_type == token)
+                select(SampleDocument).where(SampleDocument.domain_code == token)
             ).scalars()
         )
     assert len(rows) == 3
     assert all(r.review_status == "pending_review" for r in rows)          # 검수 대기로 적재
     assert all(r.target_level_id is not None for r in rows)                 # 등급→레벨 매핑 성공
     assert all(r.llm_model for r in rows)                                   # 모델명 보존
+    assert all(r.doc_type == "검증용 문서 유형" for r in rows)              # 주제와 문서유형 분리
     sources = sorted(r.label_source for r in rows)
     assert sources == ["llm_nonjson", "noop_fallback", "noop_fallback"]     # 마커 보존
     assert all(r.parse_error == "non-json response" for r in rows)          # parse_error 보존

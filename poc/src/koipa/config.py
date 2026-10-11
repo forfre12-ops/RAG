@@ -158,6 +158,11 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "require_safety_gates": True,
         # [obs] 실 임베더 필수(onprem-local과 동일) — hash 무음 폴백 거부.
         "require_real_embedder": True,
+        # 사내 규정 RAG는 지재원 검수 화면의 참고 기능으로 설치한다. 실제 표시 여부는
+        # 관리자 콘솔의 런타임 스위치가 결정하며, 등급 판정·자동 확정에는 관여하지 않는다.
+        # 로컬 LLM으로 후보를 다시 고르는 기능은 비용·본문 취급이 달라 아래 기본값과
+        # 별개로 계속 명시적 opt-in 이다.
+        "regulation_reference_enabled": True,
         # [obs] 실 분류기 필수(onprem-local과 동일) — 모델 dir 로드 실패 시 rule-fallback 무음 열화 거부.
         "require_real_classifier": True,
         # 수동 GA 활성의 사람서명 locked-eval 요구는 끈다(지재원 한정).

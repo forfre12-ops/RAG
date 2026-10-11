@@ -13,14 +13,14 @@ from __future__ import annotations
 
 import pytest
 
-from koipa.modules.m1_synthesis.generator import DOMAIN_DOC_TYPES
+from koipa.modules.m1_synthesis.generator import DOMAIN_DOC_TYPES, canonical_domain
 from koipa.schemas.common import Actor, Grade
 from koipa.schemas.synthesis import SynthGenerateRequest
 
 
 def _req(domain: str) -> SynthGenerateRequest:
     return SynthGenerateRequest(
-        target_grade=Grade.TS,
+        target_grade=Grade.S3 if canonical_domain(domain) == "public" else Grade.TS,
         domain=domain,
         count=1,
         actor=Actor(user_id="u", role="admin"),
@@ -37,6 +37,16 @@ def test_unknown_domain_is_rejected():
     """어휘 밖 값은 막는다 — 프롬프트가 없으면 mixed 로 조용히 대체돼 의도와 달라진다."""
     with pytest.raises(Exception):
         _req("존재하지-않는-도메인")
+
+
+def test_public_visibility_is_s3_only():
+    with pytest.raises(Exception):
+        SynthGenerateRequest(
+            target_grade=Grade.S2,
+            domain="public",
+            count=1,
+            actor=Actor(user_id="u", role="admin"),
+        )
 
 
 def test_thin_cell_domains_are_reachable():

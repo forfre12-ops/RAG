@@ -44,12 +44,20 @@ def _synth_domains_supported() -> list[str]:
     없었기 때문).
     """
     try:
-        from koipa.modules.m1_synthesis.generator import canonical_domain  # noqa: PLC0415
-        from koipa.schemas.synthesis import _SYNTH_DOMAINS  # noqa: PLC0415
+        from koipa.modules.m1_synthesis.generator import synth_domain_catalog  # noqa: PLC0415
     except ModuleNotFoundError:
         return []
 
-    return sorted({canonical_domain(d) for d in _SYNTH_DOMAINS})
+    return [str(item["code"]) for item in synth_domain_catalog()]
+
+
+def _synth_domain_catalog() -> list[dict[str, object]]:
+    """사람이 보는 분류 축까지 포함한 합성 도메인 카탈로그."""
+    try:
+        from koipa.modules.m1_synthesis.generator import synth_domain_catalog  # noqa: PLC0415
+    except ModuleNotFoundError:
+        return []
+    return synth_domain_catalog()
 
 
 router = APIRouter(tags=["health"])
@@ -434,6 +442,7 @@ def healthz(request: Request):
         # 고를 수 없었다. **정본으로 접은 뒤** 내보낸다 — semiconductor 와 반도체 를
         # 나란히 띄우면 같은 것이 두 줄로 보인다(고르는 사람에겐 다른 것으로 읽힌다).
         "synth_domains_supported": _synth_domains_supported(),
+        "synth_domain_catalog": _synth_domain_catalog(),
         "classifier_model_dir": operational_config["classifier_model_dir"],
         "operational_config": operational_config,
         "readiness": _readiness_snapshot(),

@@ -259,7 +259,10 @@ class SynthesisService:
                     SyntheticDocItem(
                         synth_id=s.sample_id,
                         target_grade=self._level_id_to_code(db, s.target_level_id),
-                        domain=s.doc_type,
+                        domain=getattr(s, "domain_code", None) or s.doc_type,
+                        document_type=(
+                            s.doc_type if getattr(s, "domain_code", None) else None
+                        ),
                         llm_provider=s.llm_provider,
                         llm_model=s.llm_model,
                         quality_score=float(s.quality_score) if s.quality_score is not None else None,

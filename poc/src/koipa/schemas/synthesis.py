@@ -5,9 +5,13 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from koipa.modules.m1_synthesis.generator import DOMAIN_ALIASES, DOMAIN_DOC_TYPES
+from koipa.modules.m1_synthesis.generator import (
+    DOMAIN_ALIASES,
+    DOMAIN_DOC_TYPES,
+    canonical_domain,
+)
 
 from .common import Actor, Grade
 
@@ -43,6 +47,13 @@ class SynthGenerateRequest(BaseModel):
     llm_provider: str = Field(default="anthropic", pattern=LLM_PROVIDER_PATTERN)
     actor: Actor
 
+    @model_validator(mode="after")
+    def _public_material_requires_s3(self) -> "SynthGenerateRequest":
+        """공개 범위를 내부 등급 생성에 섞지 않는다."""
+        if canonical_domain(self.domain) == "public" and self.target_grade != Grade.S3:
+            raise ValueError("public 도메인은 S3(대외 공개자료) 등급에서만 생성할 수 있습니다")
+        return self
+
 
 class SynthGenerateResponse(BaseModel):
     synth_job_id: UUID
@@ -60,6 +71,8 @@ class SyntheticDocItem(BaseModel):
     synth_id: UUID
     target_grade: Grade
     domain: Optional[str] = None
+    # domain은 생성 주제(산업/업무/공개 범위), document_type은 실제 산출 문서 유형이다.
+    document_type: Optional[str] = None
     llm_provider: str
     llm_model: str
     quality_score: Optional[float] = None
