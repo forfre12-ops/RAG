@@ -68,19 +68,18 @@ def test_merged_demo_section_kept_every_sample():
         assert (STATIC / "demo_docs" / name).exists(), name
 
 
-def test_merged_demo_section_exists_and_is_linked():
-    """[2026-08-24] 앵커는 그대로 잠그되, 링크는 **다른 화면에서 오는 것**으로 옮겼다.
+def test_merged_demo_section_remains_an_internal_diagnostic():
+    """내부 진단 화면의 앵커는 남기되 운영 관리자 콘솔 메뉴에는 노출하지 않는다.
 
-    종전에는 index.html 안에 `href="#sec-parse"` 가 있어야 통과했는데, 그 링크는 상단 바의
-    구역 이동 메뉴 4개 중 하나였고 그 메뉴를 뺐다(scripts/sync_console_header.py).
-    앵커가 살아 있어야 한다는 취지는 남는다 — 사용설명서·배포 가이드가 이 주소를 쓴다. 그래서
-    ① index.html 에 앵커가 있고 ② 관리자 콘솔이 그 앵커로 오는 링크를 가진다는 두 조건을 잠근다.
+    정식 작업 동선은 관리자 콘솔 하나로 통일했다. ``#sec-parse`` 는 문서·설치 점검에서
+    직접 열 수 있도록 index.html 에만 보존한다. 운영 메뉴에 다시 연결하면 관리자·로그인·
+    골든셋 검수 화면이 서로 다른 제품처럼 보이는 회귀가 된다.
     """
     page = (STATIC / "index.html").read_text(encoding="utf-8")
     assert 'id="sec-parse"' in page, "흡수한 구역이 없다"
     assert 'href="./parse_demo.html"' not in page, "같은 페이지 안에서 옛 화면으로 나간다"
     admin = (STATIC / "admin.html").read_text(encoding="utf-8")
-    assert "#sec-parse" in admin, "관리자 콘솔에서 이 구역으로 가는 링크가 없다"
+    assert "#sec-parse" not in admin, "내부 진단 링크가 운영 관리자 콘솔에 다시 노출됐다"
 
 
 def test_merged_demo_wiring_lives_in_the_module():

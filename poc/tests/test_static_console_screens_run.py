@@ -29,7 +29,7 @@ PAGES = ["index.html", "admin.html", "parse_demo.html"]
 _HANDLER_CALL = re.compile(r"(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(")
 _INLINE = r'<script(?![^>]*type="module")(?![^>]* src=)[^>]*>(.*?)</script>'
 _EXTERNAL = r'<script(?![^>]*type="module")[^>]* src="([^"]+)"'
-_INLINE_KEYWORDS = {"if", "for", "while", "switch", "catch"}
+_INLINE_KEYWORDS = {"if", "for", "while", "switch", "catch", "function", "fetch"}
 
 
 def _no_comments(html: str) -> str:
@@ -55,7 +55,8 @@ def _handler_names(html: str) -> set[str]:
     names: set[str] = set()
     for h in re.findall(r'\son[a-z]+="([^"]*)"', html):
         names.update(_HANDLER_CALL.findall(h))
-    # onkeydown="if (...) handler()"처럼 인라인 제어문을 쓰는 경우, `if`는 함수 참조가 아니다.
+    # onkeydown="if (...) handler()"의 제어문이나 fetch(...).finally(function(){...})의
+    # 내장 API·익명 콜백은 페이지 전역 함수 참조가 아니다.
     return names - _INLINE_KEYWORDS
 
 

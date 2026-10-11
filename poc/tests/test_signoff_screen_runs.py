@@ -26,9 +26,10 @@ _HARNESS = r"""
 const fs = require('fs');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const dataJson = html.match(/<script id="data" type="application\/json">([\s\S]*?)<\/script>/)[1];
-const i = html.lastIndexOf('<script>') + '<script>'.length;
-const j = html.lastIndexOf('</script>');
-const code = html.slice(i, j);
+// 서명 화면은 기본 동작 스크립트 뒤에 문서 작업대 스크립트를 추가한다. 브라우저처럼
+// application/json 데이터 블록을 제외한 모든 인라인 스크립트를 문서 순서대로 실행한다.
+const code = [...html.matchAll(/<script(?![^>]*\btype=["']application\/json["'])[^>]*>([\s\S]*?)<\/script>/gi)]
+  .map((m) => m[1]).join('\n;\n');
 
 // 최소 DOM 스텁 — textContent 대입이 innerHTML 에도 반영되게 해서 화면 반영을 관찰한다.
 function el(id) {

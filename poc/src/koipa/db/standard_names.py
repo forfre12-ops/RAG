@@ -249,6 +249,7 @@ COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("sample_id", "syn_doc_id", "합성문서아이디"),
         ("target_level_id", "goal_grd_sn", "목표등급일련번호"),
         ("corrected_level_id", "cfmtn_grd_sn", "확정등급일련번호"),
+        ("domain_code", "dmn_cd", "생성주제코드"),
         ("doc_type", "doc_knd_nm", "문서종류명"),
         ("outline_prompt_version", "otln_prmpt_ver_nm", "개요프롬프트버전명"),
         ("body_prompt_version", "mtxt_prmpt_ver_nm", "본문프롬프트버전명"),
@@ -299,6 +300,15 @@ POST_BASE_RENAMES: dict[str, tuple[tuple[str, str, str, str], ...]] = {
          "용어집에서 '키(KEY)' 는 형식단어여부=N 이라 용어 끝자리로 쓸 수 없다. "
          "끝이 KEY 인 표준용어는 0/13,704 이고 '키' 로 끝나는 표준도메인도 없다. "
          "값은 활성일 때 1·아니면 NULL 인 정수라 형식단어 SN(일련번호)이 맞다."),
+    ),
+}
+
+# 기준 명명판 뒤에 기존 표로 추가한 칼럼. 기준판 사본에는 없으므로 이름 변경과 구분한다.
+# 새 ORM 칼럼은 이 목록과 만든 migration을 같이 적어 ERD·표준명 대응표가 DB와 어긋나지 않게 한다.
+# 옛 표 이름: ((파이썬 속성명, 표준 칼럼명, 만든 migration, 논리명), ...)
+POST_BASE_COLUMN_ADDITIONS: dict[str, tuple[tuple[str, str, str, str], ...]] = {
+    "tb_sample_documents": (
+        ("domain_code", "dmn_cd", "f2a4c6e8b0d1", "생성주제코드"),
     ),
 }
 
@@ -385,6 +395,9 @@ def logical_names() -> dict[str, tuple[str, dict[str, str]]]:
         TABLES[old][0]: (TABLES[old][1], {new: ko for _, new, ko in cols})
         for old, cols in COLUMNS.items()
     }
+    for old, cols in POST_BASE_COLUMN_ADDITIONS.items():
+        table = TABLES[old][0]
+        out[table][1].update({new: ko for _attr, new, _rev, ko in cols})
     for table, (ko, _rev) in POST_BASE_TABLES.items():
         out[table] = (ko, {col: ck for col, ck in POST_BASE_COLUMNS[table]})
     return out

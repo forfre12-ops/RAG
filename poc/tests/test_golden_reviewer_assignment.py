@@ -706,6 +706,7 @@ ROUTE_TABLE: dict[tuple[str, str], str] = {
     ("GET", "/golden/candidates/session"): NO_DATA,
     ("GET", "/golden/candidates/login.html"): NO_DATA,
     ("POST", "/golden/candidates/login"): NO_DATA,  # 아이디+비밀번호 로그인 — 후보 데이터 없음
+    ("POST", "/golden/candidates/logout"): NO_DATA,  # 쿠키 만료만 수행 — 후보 데이터 없음
     # 폐쇄망 시연에서만 HttpOnly 세션 쿠키를 심는다. 후보 데이터는 반환하지 않고,
     # 설정이 없으면 404라서 reviewer 범위·배정 정책을 적용할 대상도 없다.
     ("POST", "/golden/candidates/prefill-login"): NO_DATA,

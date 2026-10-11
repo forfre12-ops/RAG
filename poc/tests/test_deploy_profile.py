@@ -242,6 +242,9 @@ _ALWAYS_ON_LOGIN_PATHS = {
     "/api/v1/golden/candidates/login",
     "/api/v1/golden/candidates/session",
     "/api/v1/golden/candidates/prefill-login",
+    # 모든 로그인 방식의 쿠키를 지우는 세션 종료 경로다. 검수 데이터를 열거나 바꾸지 않으므로
+    # 검수 화면이 빠진 고객사/경량 프로파일에서도 남아야 한다.
+    "/api/v1/golden/candidates/logout",
 }
 
 

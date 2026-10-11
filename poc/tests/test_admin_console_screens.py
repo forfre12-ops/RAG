@@ -91,6 +91,12 @@ def test_console_model_release_uses_evidence_scoped_metrics(console: str):
     assert "4 모델 서빙·배포" not in console
 
 
+def test_console_model_release_does_not_use_a_top_accent_band(console: str):
+    """모델 학습·릴리스 카드는 굵고 둥근 상단 띠로 구분하지 않는다."""
+    assert ".release-card{border-top:1px solid var(--border-mid);}" in console
+    assert ".release-card{border-top:3px solid var(--ui-navy);}" not in console
+
+
 def test_console_hides_technical_settings_and_compacts_synth_coverage(console: str):
     for marker in (
         'class="connection-summary"',

@@ -149,11 +149,9 @@ export const scenarios = [
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
       const links = page.qa('.cnav-link');
-      // [2026-08-24] 4 → 3. 「검증문서 검수 목록」이 빠졌다(console_nav.py) — 그 항목만
-      // 다른 화면이 아니라 관리자 콘솔 자신의 내부 앵커를 가리켰다. 이 시험이 잠그는 것은
-      // 개수가 아니라 "링크가 전부 실재하는 주소를 가리킨다"는 아래 반복문이다.
-      // [2026-08-24] 3 → 2. 「검증문서 후보 관리」를 메뉴에서 뺐다(console_nav 주석 참조).
-      check.gte(links.length, 2, `공용 메뉴 링크 수 (${links.length})`);
+      // 운영 동선은 관리자 콘솔 한 화면으로 통일했다. 현재 화면 표시는 link가 아닌 span이라
+      // cnav-link는 하나만 남을 수 있다. 개수가 아니라 남은 링크의 실주소만 검증한다.
+      check.gte(links.length, 1, `공용 메뉴 링크 수 (${links.length})`);
 
       for (const a of links) {
         const href = a.getAttribute('href');

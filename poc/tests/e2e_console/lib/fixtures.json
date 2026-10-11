@@ -816,6 +816,7 @@
     "actorless_ratio": 0.0,
     "warnings": []
   },
+  "POST /golden/candidates/logout": null,
   "POST /golden/build": {
     "golden_job_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
     "status_url": "/api/v1/golden/jobs/dddddddd-dddd-4ddd-8ddd-dddddddddddd",

@@ -16,6 +16,7 @@ from koipa.db import Base
 from koipa.db import models  # noqa: F401 — 표 등록
 from koipa.db.standard_names import (
     COLUMNS,
+    POST_BASE_COLUMN_ADDITIONS,
     POST_BASE_COLUMNS,
     POST_BASE_RENAMES,
     POST_BASE_TABLES,
@@ -73,7 +74,8 @@ def test_orm_columns_match_standard_columns():
         if new_table in _MIGRATION_ONLY_TABLES:
             continue
         orm = {c.name for c in Base.metadata.tables[new_table].columns}
-        std = {new for _, new, _ in cols}
+        additions = POST_BASE_COLUMN_ADDITIONS.get(old, ())
+        std = {new for _, new, _ in cols} | {new for _attr, new, _rev, _ko in additions}
         assert orm == std, f"{new_table}: ORM 에만 {orm - std} · 대응표에만 {std - orm}"
     for table, cols in POST_BASE_COLUMNS.items():          # 마이그레이션 사본 뒤에 새로 만든 표
         orm = {c.name for c in Base.metadata.tables[table].columns}
@@ -100,9 +102,14 @@ def test_migration_copy_matches_standard_names():
         for table, rows in POST_BASE_RENAMES.items()
         for made_by_base, now, _rev, _why in rows
     }
+    additions = {
+        (old, new)
+        for old, rows in POST_BASE_COLUMN_ADDITIONS.items()
+        for _attr, new, _rev, _ko in rows
+    }
     changed = {
         old: tuple((a, later.get((old, b), b)) for a, b, _ in cols
-                   if a != later.get((old, b), b))
+                   if (old, b) not in additions and a != later.get((old, b), b))
         for old, cols in COLUMNS.items()
     }
     surviving = {}
@@ -124,6 +131,11 @@ def test_dropped_tables_and_columns_are_gone_from_orm_and_standard_names():
     dropped_tables, dropped_cols = _dropped()
     std_tables = {new for new, _ in TABLES.values()}
     std_cols = {(TABLES[old][0], new) for old, cols in COLUMNS.items() for _, new, _ in cols}
+    std_cols |= {
+        (TABLES[old][0], new)
+        for old, rows in POST_BASE_COLUMN_ADDITIONS.items()
+        for _attr, new, _rev, _ko in rows
+    }
     orm_cols = {(name, c.name) for name, table in Base.metadata.tables.items() for c in table.columns}
     for table in dropped_tables:
         assert table not in std_tables, f"{table}: 대응표에 남아 있다"
@@ -147,6 +159,21 @@ def test_post_base_renames_have_a_migration_and_a_reason():
             assert len(why) > 20, f"{table}.{now_name}: 사유가 너무 짧다"
             std = {new for _, new, _ in COLUMNS[table]}
             assert now_name in std, f"{table}: 정본이 {now_name} 을 쓰지 않는다"
+
+
+def test_post_base_column_additions_have_a_migration_and_a_logical_name():
+    """기준 명명판 뒤에 기존 표로 들어간 칼럼은 migration·표준명·ORM이 함께 있어야 한다."""
+    versions = Path(__file__).resolve().parents[1] / "alembic" / "versions"
+    for old, rows in POST_BASE_COLUMN_ADDITIONS.items():
+        table = TABLES[old][0]
+        orm = {c.name for c in Base.metadata.tables[table].columns}
+        for attr, column, rev, logical_name in rows:
+            files = list(versions.glob(f"{rev}_*.py"))
+            assert len(files) == 1, f"{table}.{column}: migration {rev} 이 없거나 둘 이상이다"
+            src = files[0].read_text(encoding="utf-8")
+            assert table in src and column in src, f"{table}.{column}: migration {rev} 에 추가가 없다"
+            assert attr and logical_name, f"{table}.{column}: 속성명 또는 논리명이 없다"
+            assert column in orm, f"{table}.{column}: ORM 에 없다"
 
 
 def test_post_base_tables_are_separate_from_the_migration_copy():
@@ -178,6 +205,10 @@ def test_names_are_valid_lowercase_identifiers_and_unique_per_table():
         assert len(news) == len(set(news)), f"{old}: 표준 칼럼명 중복"
         for _, new, ko in cols:
             assert _NAME.match(new), f"{old}.{new}"
+            assert ko, f"{old}.{new} 논리명 없음"
+    for old, rows in POST_BASE_COLUMN_ADDITIONS.items():
+        for attr, new, _rev, ko in rows:
+            assert attr and _NAME.match(new), f"{old}.{new}"
             assert ko, f"{old}.{new} 논리명 없음"
     for table in POST_BASE_TABLES:
         assert _NAME.match(table) and table.startswith("tad_") and table.endswith("_mng"), table
