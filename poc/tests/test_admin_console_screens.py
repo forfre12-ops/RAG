@@ -130,8 +130,8 @@ def test_console_shows_operating_state_but_keeps_connection_controls_out_of_sett
     assert "d.caveat" not in console
 
 
-def test_console_keeps_training_coverage_out_of_synthesis_review(console: str):
-    """분포 공백은 데이터 담당자용 분석이며 합성 검토 큐의 상태가 아니다."""
+def test_console_explains_current_training_data_in_the_synthesis_view(console: str):
+    """학습 데이터 합계는 생성 화면에서 설명하되, 검토 대기나 생성 지시로 보이지 않는다."""
     synth_start = console.index('data-product-view="synthesis"')
     model_start = console.index('id="model-training"')
     active_learning_start = console.index('<!-- ===== Active Learning =====')
@@ -139,10 +139,12 @@ def test_console_keeps_training_coverage_out_of_synthesis_review(console: str):
     synthesis_card = console[synth_start:model_start]
     model_training_card = console[model_start:active_learning_start]
 
-    assert 'id="sy-coverage"' not in synthesis_card
-    assert 'id="training-coverage"' in model_training_card
-    assert '데이터 담당자용' in model_training_card
-    assert "productShowView('synthesis');" in console
+    assert 'id="sy-coverage"' in synthesis_card
+    assert '현재 학습 데이터' in console
+    assert '학습·검증·평가 파일을 모두 합산한 값' in console
+    assert '검토 대기 건수나 이번 생성 요청 수가 아닙니다.' in console
+    assert 'id="training-coverage"' not in model_training_card
+    assert 'pickCoverageCell(' not in console
 
 
 def test_console_exposes_regulation_rag_switches_when_the_feature_is_installed(console: str):
