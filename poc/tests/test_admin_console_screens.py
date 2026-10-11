@@ -70,11 +70,11 @@ def test_console_shows_precision_and_recall(console: str):
     assert "정밀도" in console and "재현율" in console
 
 
-def test_console_model_learning_and_evaluation_uses_evidence_scoped_metrics(console: str):
+def test_console_model_learning_and_release_uses_evidence_scoped_metrics(console: str):
     """FUN-004·024 모델 화면은 학습, 평가, Active Learning 상태를 보여 준다."""
     for marker in (
-        'class="card model-card"',
-        '분류 모델 학습',
+        'class="card release-card model-card"',
+        '모델 학습 및 릴리스 관리',
         '데이터 분할',
         '모델 학습에 사용',
         '학습 중 점검에 사용',
@@ -82,7 +82,7 @@ def test_console_model_learning_and_evaluation_uses_evidence_scoped_metrics(cons
         '학습 반영 대기',
         'id="active-learning-status"',
         'function loadActiveLearning()',
-        '성능 평가 및 재학습 이력',
+        '모델 학습 · 성능 평가 · 재학습 이력',
         'F1 점수',
         '고등급 미탐률',
         '평가 데이터',
@@ -92,16 +92,13 @@ def test_console_model_learning_and_evaluation_uses_evidence_scoped_metrics(cons
         'id="metrics-context"',
     ):
         assert marker in console
-    for removed in (
-        '릴리스 관리',
-        '모델 활성화',
-        '강제 활성화',
-        '직전 모델로 롤백',
-        "'/admin/model/activate'",
-        "'/admin/model/rollback'",
-        "'/admin/model/reload'",
+    for marker in (
+        'id="deploy-adv"',
+        'function activateModel()',
+        'function rollbackModel()',
+        'function reloadModel()',
     ):
-        assert removed not in console
+        assert marker in console
 
 
 def test_console_model_cards_do_not_use_a_top_accent_band(console: str):
