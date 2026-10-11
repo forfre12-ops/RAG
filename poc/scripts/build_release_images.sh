@@ -12,6 +12,7 @@ set -euo pipefail
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$ROOT"
+GIT_BIN="${KOIPA_GIT_BIN:-git}"
 
 usage() {
   cat <<'EOF'
@@ -56,12 +57,12 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-git diff --quiet && git diff --cached --quiet || {
+"$GIT_BIN" diff --quiet && "$GIT_BIN" diff --cached --quiet || {
   echo "refusing a dirty checkout: commit the exact source before producing a release image" >&2
   exit 2
 }
 
-head_sha="$(git rev-parse HEAD)"
+head_sha="$("$GIT_BIN" rev-parse HEAD)"
 if [ -n "$expected_sha" ] && [ "$expected_sha" != "$head_sha" ]; then
   echo "--sha must equal committed HEAD ($head_sha), got $expected_sha" >&2
   exit 2
