@@ -802,6 +802,9 @@ def test_reviewer_manage_html_uses_the_reviewer_workspace_without_admin_actions(
         "문서 검토 및 확정",
         "reviewer-document-sheet",
         "reviewer-inspector-head",
+        "점검/검토 기록",
+        "documentFacts",
+        "originalShow=show",
     ):
         assert expected in html
     assert "CURRENT WORKSPACE" not in html

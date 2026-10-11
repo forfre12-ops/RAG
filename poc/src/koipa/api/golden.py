@@ -1474,14 +1474,15 @@ _REVIEWER_DOCUMENT_WORKBENCH_CSS = r"""
 #reviewer-workbench #candidates .docsub{font-size:11px}
 #reviewer-workbench #detail{display:grid!important;grid-column:2;grid-template-columns:minmax(0,1fr) minmax(280px,31%);min-width:0;min-height:0;margin:0;border:0;background:#fff}
 #reviewer-workbench #detail .detailMain{min-width:0;min-height:0;overflow:auto;padding:31px;background:#edf2f7;border-right:1px solid var(--border)}
-#reviewer-workbench .reviewer-document-sheet{box-sizing:border-box;min-height:100%;max-width:760px;margin:0 auto;padding:52px 62px 66px;background:#fff;border:1px solid #d5dde6;box-shadow:0 5px 18px rgba(15,23,42,.08)}
-#reviewer-workbench .reviewer-document-sheet .eyebrow{margin-bottom:17px;color:#64748b}
-#reviewer-workbench .reviewer-document-sheet h3{font-size:29px;line-height:1.32;margin:0 0 13px;word-break:keep-all}
-#reviewer-workbench .reviewer-document-sheet .metas{margin:0 0 18px}
-#reviewer-workbench .reviewer-document-sheet .scope{margin:0 0 20px}
-#reviewer-workbench .reviewer-document-sheet .viewbar{margin:0 0 18px;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-#reviewer-workbench .reviewer-document-sheet .viewnote{margin-left:8px;font-size:11px}
-#reviewer-workbench .reviewer-document-sheet .docbody{max-width:none;font-size:16px;line-height:1.9;color:#1f2937}
+#reviewer-workbench .reviewer-document-sheet{box-sizing:border-box;min-height:100%;max-width:760px;margin:0 auto;padding:56px 62px 72px;background:#fff;border:1px solid #d5dde6;box-shadow:0 5px 18px rgba(15,23,42,.08)}
+#reviewer-workbench .reviewer-document-sheet .eyebrow{margin:0 0 18px;color:#64748b}
+#reviewer-workbench .reviewer-document-sheet .document-kicker{font:600 12px/1.4 ui-monospace,monospace;letter-spacing:.08em;color:#64748b}
+#reviewer-workbench .reviewer-document-sheet h3{font-size:30px;line-height:1.32;margin:0 0 17px;word-break:keep-all}
+#reviewer-workbench .reviewer-document-sheet .metas{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+#reviewer-workbench .reviewer-document-sheet .metas span{margin:0;padding:6px 10px;border:1px solid #e1e6eb;border-radius:0;background:#fff;color:#526170;font-size:12px}
+#reviewer-workbench .reviewer-document-sheet .document-facts{white-space:pre-line;margin:33px 0 27px;color:#26384d;font-size:15px;line-height:1.9}
+#reviewer-workbench .reviewer-document-sheet .scope,#reviewer-workbench .reviewer-document-sheet .viewbar{display:none!important}
+#reviewer-workbench .reviewer-document-sheet .docbody{max-width:none;max-height:none!important;overflow:visible!important;padding:0!important;border:0!important;font-size:16px;line-height:1.9;color:#1f2937}
 #reviewer-workbench .reviewer-document-sheet .docbody.md h1,#reviewer-workbench .reviewer-document-sheet .docbody.md h2{letter-spacing:-.55px}
 #reviewer-workbench #detail .sideDetail{min-width:0;min-height:0;overflow:auto;padding:0;background:#fafbfd}
 #reviewer-workbench .reviewer-inspector-head{padding:22px 20px 17px;border-bottom:1px solid var(--border);background:#fff}
@@ -1527,6 +1528,44 @@ _REVIEWER_DOCUMENT_WORKBENCH_SCRIPT = r"""<script>
     while(detailMain.firstChild)sheet.append(detailMain.firstChild);
     detailMain.append(sheet);
   }
+  /* 원문은 "증거 카드"가 아니라 실제 문서처럼 읽힌다. 원문 데이터는 바꾸지 않고
+     제목과 첫 기본정보 블록만 문서 머리말로 올린다. */
+  const originalShow=show;
+  show=async function(id,reload){
+    await originalShow(id,reload);
+    const candidate=selected;
+    if(!candidate)return;
+    const titleNode=document.getElementById('detailTitle');
+    const tags=document.getElementById('metas');
+    const facts=document.getElementById('documentFacts')||document.createElement('div');
+    facts.id='documentFacts'; facts.className='document-facts';
+    if(!facts.parentNode){
+      const rendered=document.getElementById('documentRendered');
+      if(rendered&&rendered.parentNode)rendered.parentNode.insertBefore(facts,rendered);
+    }
+    if(titleNode)titleNode.textContent=candidate.title||candidate.doc_id;
+    if(tags){
+      tags.replaceChildren();
+      [candidate.department||candidate.info_type||'미분류',candidate.doc_format||'검수/검토 기록',candidate.doc_id]
+        .forEach(function(value){const tag=document.createElement('span');tag.textContent=value;tags.append(tag);});
+    }
+    const source=String(candidate.text||'').replace(/\r\n/g,'\n').trim();
+    const title=String(candidate.title||'').trim();
+    let visible=source;
+    if(title&&visible.startsWith(title))visible=visible.slice(title.length).replace(/^\s+/,'');
+    const blocks=visible.split(/\n\s*\n/);
+    const first=String(blocks[0]||'').trim();
+    const hasFacts=/^(문서번호|수신|참조|작성부서|작성일)\s*[:：]/.test(first);
+    facts.textContent=hasFacts?first:('문서 ID: '+candidate.doc_id);
+    if(hasFacts)blocks.shift();
+    const body=blocks.join('\n\n').trim()||visible||source;
+    const rendered=document.getElementById('documentRendered');
+    if(rendered)rendered.innerHTML=mdToHtml(body);
+    const eyebrow=detail.querySelector('.reviewer-document-sheet .eyebrow');
+    if(eyebrow){eyebrow.className='eyebrow document-kicker';eyebrow.textContent='점검/검토 기록';}
+    const scope=document.getElementById('scope'); if(scope)scope.remove();
+    const viewbar=detail.querySelector('.viewbar'); if(viewbar)viewbar.remove();
+  };
   const side=detail.querySelector('.sideDetail');
   if(side&&!side.querySelector('.reviewer-inspector-head')){
     const inspector=document.createElement('header'); inspector.className='reviewer-inspector-head';

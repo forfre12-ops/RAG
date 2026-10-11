@@ -141,7 +141,7 @@ def _render_console_login_html() -> str:
         "$('mPw').textContent=(r.status===404)"
         "?'이 서버는 아이디+비밀번호 로그인이 켜져 있지 않습니다. 아래 토큰으로 로그인하십시오.'"
         ":'로그인 실패. 아이디 또는 비밀번호를 확인하십시오.';return false}"
-        "location.href=dest();return true}"
+        "return afterLogin()}"
         "$('goPw').onclick=function(){loginWithPassword($('u').value.trim(),$('p').value)};"
         "$('p').addEventListener('keydown',function(e){if(e.key==='Enter')$('goPw').click()});"
         # [2026-08-20] 쿠키를 **토큰 만료까지** 살린다.
@@ -152,9 +152,10 @@ def _render_console_login_html() -> str:
         # 그리로 되돌린다 — 시연 화면에서 401 을 만나 여기로 튕겨 온 사람이 검수 화면에
         # 떨어지면 시연 대본이 끊긴다. 열린 리다이렉트를 막으려고 **같은 오리진의
         # 절대경로 한 종류만** 받는다(`/` 로 시작하고 `//` 도 역슬래시도 아닌 것).
-        "function dest(){try{var n=new URLSearchParams(location.search).get('next');"
+        "function dest(session){try{var n=new URLSearchParams(location.search).get('next');"
         "if(n&&n.charAt(0)==='/'&&n.charAt(1)!=='/'&&n.indexOf(String.fromCharCode(92))===-1)return n}catch(e){}"
-        "return '/console/admin.html'+(location.hash||'')}"
+        "return session&&session.actor_role==='reviewer'?'/api/v1/golden/candidates/manage.html'+(location.hash||''):'/console/admin.html'+(location.hash||'')}"
+        "async function afterLogin(){var r=await fetch('/api/v1/golden/candidates/session',{credentials:'same-origin'});var s=r.ok?await r.json():{};location.href=dest(s);return true}"
         "function maxAge(v){try{var p=v.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');"
         "p+='='.repeat((4-p.length%4)%4);var e=JSON.parse(atob(p)).exp;"
         "var s=Math.floor(e-Date.now()/1000);return s>60?s:0}catch(err){return 43200}}"
@@ -166,20 +167,20 @@ def _render_console_login_html() -> str:
         "if(!r.ok){document.cookie='koipa_access_token=; path=/; Max-Age=0';"
         "if(!quiet){$('m').style.display='block';"
         "$('m').textContent='로그인 실패('+r.status+'). 토큰이 만료됐거나 권한이 없습니다.'}return false}"
-        "location.href=dest();return true}"
+        "location.href=dest(await r.json());return true}"
         "$('go').onclick=function(){login($('t').value.trim(),false)};"
         "$('t').addEventListener('keydown',function(e){if(e.key==='Enter'&&e.ctrlKey)$('go').click()});"
         "async function loginWithPrefill(){var b=$('goPrefill');if(!b)return false;b.disabled=true;"
         "var r=await fetch('/api/v1/golden/candidates/prefill-login',{method:'POST',credentials:'same-origin'});"
         "if(!r.ok){$('m').style.display='block';$('m').textContent='시연 계정 로그인에 실패했습니다('+r.status+'). 관리자에게 설정을 확인하십시오.';b.disabled=false;return false}"
         "var s=await fetch('/api/v1/golden/candidates/session',{credentials:'same-origin'});"
-        "if(!s.ok){$('m').style.display='block';$('m').textContent='시연 계정 권한을 확인하지 못했습니다.';b.disabled=false;return false}location.href=dest();return true}"
+        "if(!s.ok){$('m').style.display='block';$('m').textContent='시연 계정 권한을 확인하지 못했습니다.';b.disabled=false;return false}location.href=dest(await s.json());return true}"
         "var prefill=$('goPrefill');if(prefill)prefill.onclick=loginWithPrefill;"
         # 이미 쿠키가 살아 있으면 로그인 화면을 거치지 않는다 — 이 화면이 공용 메뉴의
         # 「검증문서 후보 관리」 목적지라, 붙여넣을 것이 없는 사람에게는 한 단계 군더더기다.
         # 쿠키가 없거나 만료면 그대로 아래 폼으로 남는다.
         "(async function(){try{var r=await fetch('/api/v1/golden/candidates/session',"
-        "{credentials:'same-origin'});if(r.ok){location.href=dest();return}}catch(e){}"
+        "{credentials:'same-origin'});if(r.ok){location.href=dest(await r.json());return}}catch(e){}"
         # 프리필 토큰이 있어도 자동 로그인하지 않는다. 이 페이지를 단순히 열었을 때
         # 관리자 세션이 생기면 안 되며, 시연 계정 버튼을 명시적으로 누르게 한다.
         "})();"
@@ -196,9 +197,16 @@ def proxy_gold_console_login_html() -> HTMLResponse:
 @html_router.get("/golden/candidates/manage.html", include_in_schema=False)
 def redirect_legacy_gold_console(
     auth: dict = Depends(require_role("admin", "kl_backend", "reviewer")),
-) -> RedirectResponse:
-    """구형 검수 콘솔 주소를 현재 관리자 콘솔로 단일화한다."""
+) -> Response:
+    """관리자는 운영 콘솔, 검수자는 권한이 분리된 검수 문서함으로 보낸다."""
     _console_actor_id(auth)
+    if not _is_console_admin(auth):
+        # console_login 은 golden.py 보다 먼저 등록돼 이 고정 URL을 먼저 잡는다.
+        # 검수자까지 관리자 정적 화면으로 보내면 화면 API는 막혀도 관리자 작업공간을
+        # 보게 된다. 실행 시점 import로 순환 의존 없이 원래의 제한된 검수 화면을 돌려준다.
+        from koipa.api.golden import proxy_gold_candidate_manager_html
+
+        return proxy_gold_candidate_manager_html(auth)
     return RedirectResponse(
         url="/console/admin.html",
         status_code=307,

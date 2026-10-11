@@ -45,7 +45,7 @@ def test_prefill_endpoint_is_absent_without_unsafe_configuration(monkeypatch):
 
 
 def test_legacy_manage_address_redirects_to_the_admin_console() -> None:
-    """구형 검수 콘솔 북마크는 현재 관리자 콘솔로만 연다."""
+    """관리자 북마크만 운영 콘솔로 보낸다."""
     claims = JWTClaims(sub="kl-admin-test", roles=("admin",), exp=9999999999)
     app.dependency_overrides[require_auth] = lambda: {
         "mode": "jwt", "claims": claims, "actor_role": "admin", "actor_roles": ["admin"],
@@ -60,3 +60,21 @@ def test_legacy_manage_address_redirects_to_the_admin_console() -> None:
     assert response.status_code == 307
     assert response.headers["location"] == "/console/admin.html"
     assert response.headers["cache-control"] == "no-store"
+
+
+def test_reviewer_manage_address_returns_the_reviewer_workspace() -> None:
+    """검수자는 같은 주소를 열어도 관리자 정적 화면으로 보내지 않는다."""
+    claims = JWTClaims(sub="reviewer-test", roles=("reviewer",), exp=9999999999)
+    app.dependency_overrides[require_auth] = lambda: {
+        "mode": "jwt", "claims": claims, "actor_role": "reviewer", "actor_roles": ["reviewer"],
+    }
+    try:
+        response = TestClient(app).get(
+            "/api/v1/golden/candidates/manage.html", follow_redirects=False,
+        )
+    finally:
+        app.dependency_overrides.pop(require_auth, None)
+
+    assert response.status_code == 200
+    assert "reviewer-workspace" in response.text
+    assert 'href="/console/admin.html"' not in response.text

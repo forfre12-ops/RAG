@@ -819,6 +819,10 @@ out.rowTitles = [...d.querySelectorAll('#rows .doctitle')].map(e => e.textConten
 [...d.querySelectorAll('#rows .candidate')].find(b => b.querySelector('.docid').textContent === fx.alias).click();
 await tick(300);
 out.detailTitle = d.getElementById('detailTitle').textContent;
+out.documentKicker = d.querySelector('.document-kicker')?.textContent;
+out.documentTags = [...d.querySelectorAll('#metas span')].map(e => e.textContent);
+out.documentFacts = d.getElementById('documentFacts')?.textContent;
+out.hasEvidenceCard = !!d.getElementById('scope') || !!d.querySelector('.viewbar');
 out.selectedRow = [...d.querySelectorAll('#rows .candidate.selected .docid')].map(e => e.textContent);
 d.getElementById('action').value = 'change';
 d.getElementById('action').dispatchEvent(new w.Event('change'));
@@ -873,14 +877,20 @@ def test_manage_html_lists_opens_and_saves_by_alias_in_a_real_dom(api, monkeypat
     assert out["errors"] == [], out["errors"]
     assert out["badUrls"] == [], "화면이 실 doc_id 로 요청을 보냈다"
     assert set(out["rowIds"]) == {c["doc_id"] for c in listed["candidates"]} and all(i.startswith("RV-") for i in out["rowIds"])
-    assert out["detailTitle"].startswith(alias + " · ") and out["selectedRow"] == [alias]
+    assert out["detailTitle"] == detail["title"] and out["selectedRow"] == [alias]
+    assert out["documentKicker"] == "점검/검토 기록"
+    assert alias in out["documentTags"]
+    assert out["documentFacts"] and not out["hasEvidenceCard"]
     assert out["posts"] == [{"url": f"/api/v1/golden/candidates/{alias}/decision",
                              "body": {"action": "change", "reason": "본문을 읽고 판단했습니다", "grade": "S2"}}]
     assert "저장했습니다" in out["saveMsg"] or "저장 완료" in out["saveMsg"], out["saveMsg"]
     assert out["ledgerIds"] and all(i.startswith("RV-") for i in out["ledgerIds"])
     doc_urls = [u for u in out["urls"] if "/candidates/" in u and not u.endswith(("/session", "/manage.html"))
                 and "/decisions" not in u]
-    assert doc_urls and all(alias in u for u in doc_urls), doc_urls
+    visible_aliases = {c["doc_id"] for c in listed["candidates"]}
+    assert doc_urls and any(alias in u for u in doc_urls) and all(
+        any(proxy_id in u for proxy_id in visible_aliases) for u in doc_urls
+    ), doc_urls
 
 
 # ══ 10. 이 시험이 정말 계층을 잠그는가 — 계층을 끄면 탐침이 새는 것을 잡아야 한다 ═══════════════════════════════════
