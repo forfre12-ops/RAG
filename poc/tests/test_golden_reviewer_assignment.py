@@ -806,8 +806,12 @@ def test_reviewer_manage_html_uses_the_reviewer_workspace_without_admin_actions(
         "점검/검토 기록",
         "documentFacts",
         "originalShow=show",
+        "#reviewer-workbench #candidates .doctitle{font-size:14px;font-weight:400;",
     ):
         assert expected in html
+    # 관리자 후보 관리 화면의 제목 굵기는 그대로 둔다. 검수 문서함 범위에서만 일반 굵기를
+    # 덮어써야 하며, 공용 .doctitle 규칙을 바꾸면 관리자 화면까지 함께 바뀐다.
+    assert ".doctitle{font-size:17px;font-weight:850;" in html
     assert "CURRENT WORKSPACE" not in html
     assert "goldset/console-review" not in html
     assert 'href="/console/admin.html"' not in html

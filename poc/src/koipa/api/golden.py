@@ -1470,7 +1470,7 @@ _REVIEWER_DOCUMENT_WORKBENCH_CSS = r"""
 #reviewer-workbench #candidates .candidate>:nth-child(2){grid-area:title;min-width:0}
 #reviewer-workbench #candidates .candidate>:nth-child(3),#reviewer-workbench #candidates .candidate>:nth-child(5){display:none}
 #reviewer-workbench #candidates .candidate>:nth-child(4){grid-area:status;align-self:start}
-#reviewer-workbench #candidates .doctitle{font-size:14px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#reviewer-workbench #candidates .doctitle{font-size:14px;font-weight:400;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #reviewer-workbench #candidates .docsub{font-size:11px}
 #reviewer-workbench #detail{display:grid!important;grid-column:2;grid-template-columns:minmax(0,1fr) minmax(280px,31%);min-width:0;min-height:0;margin:0;border:0;background:#fff}
 #reviewer-workbench #detail .detailMain{min-width:0;min-height:0;overflow:auto;padding:31px;background:#edf2f7;border-right:1px solid var(--border)}
