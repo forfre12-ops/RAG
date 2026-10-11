@@ -107,21 +107,19 @@ def test_console_model_cards_do_not_use_a_top_accent_band(console: str):
     assert ".model-card{border-top:3px solid var(--ui-navy);}" not in console
 
 
-def test_console_keeps_rag_settings_visible_but_hides_technical_connection_controls(console: str):
+def test_console_shows_operating_state_but_keeps_connection_controls_out_of_settings(console: str):
     for marker in (
         'class="connection-summary"',
         'id="settings-health-state"',
         'class="settings-stack"',
-        'class="settings-section" data-tech aria-labelledby="settings-connection-title"',
+        'class="settings-section" aria-labelledby="settings-connection-title"',
         'class="settings-section settings-maintenance" data-tech',
-        '검수 운영 설정',
+        '현재 연결',
+        '시연 데이터 정리',
         'data-pane="settings" data-product-view="settings"',
         'productSetLegacyVisibility(PRODUCT_VIEW)',
-        'class="coverage-panel"',
-        'class="coverage-summary"',
-        'class="coverage-details"',
         'id="training-coverage"',
-        '점검 대상',
+        '데이터 담당자용',
     ):
         assert marker in console
     assert "학습셋 분포·검토 후보" not in console

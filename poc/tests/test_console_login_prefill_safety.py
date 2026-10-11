@@ -59,8 +59,8 @@ def test_prefill_endpoint_is_absent_without_unsafe_configuration(monkeypatch):
     assert response.status_code == 404
 
 
-def test_legacy_manage_address_redirects_to_the_admin_console() -> None:
-    """관리자 북마크만 운영 콘솔로 보낸다."""
+def test_legacy_manage_address_returns_the_administrator_workspace() -> None:
+    """관리자 북마크는 기존 검수 관리 화면을 그대로 연다."""
     claims = JWTClaims(sub="kl-admin-test", roles=("admin",), exp=9999999999)
     app.dependency_overrides[require_auth] = lambda: {
         "mode": "jwt", "claims": claims, "actor_role": "admin", "actor_roles": ["admin"],
@@ -72,9 +72,8 @@ def test_legacy_manage_address_redirects_to_the_admin_console() -> None:
     finally:
         app.dependency_overrides.pop(require_auth, None)
 
-    assert response.status_code == 307
-    assert response.headers["location"] == "/console/admin.html"
-    assert response.headers["cache-control"] == "no-store"
+    assert response.status_code == 200
+    assert "reviewer-workspace" not in response.text
 
 
 def test_reviewer_manage_address_returns_the_reviewer_workspace() -> None:
