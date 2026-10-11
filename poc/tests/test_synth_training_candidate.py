@@ -116,6 +116,7 @@ def test_training_submit_records_only_snapshot_identity(monkeypatch) -> None:
         "created_at": "2026-10-11T00:00:00+00:00",
     }
     monkeypatch.setattr(SynthesisService, "freeze_training_candidate", lambda *_args: frozen)
+    monkeypatch.setattr(training_module, "ensure_training_dataset_ready", lambda *_args: {"train": 1, "val": 1, "test": 1})
     monkeypatch.setattr(training_module, "_celery_dispatch_available", lambda: False)
     service = TrainingService()
     service.jobs = MagicMock()

@@ -100,8 +100,9 @@ def test_policy_shadow_rejects_a_packet_bound_to_other_document(tmp_path, monkey
 
 
 def test_classify_service_records_both_shadows_without_changing_verdict(monkeypatch):
+    import koipa.four_path_shadow as four_path_shadow
+
     from koipa.api.prom_metrics import registry
-    from koipa.four_path_shadow import configured_factor_shadow, configured_policy_shadow
     from koipa.modules.m5_inference.pipeline import InferenceResult
     from koipa.schemas import common as common_schemas
     from koipa.schemas.classify import ClassifyRequest
@@ -110,22 +111,20 @@ def test_classify_service_records_both_shadows_without_changing_verdict(monkeypa
     monkeypatch.setattr(common_schemas.GradeRegistry, "get_codes", lambda *args, **kwargs: ["TS", "S1", "S2", "S3"])
     monkeypatch.setattr(service_module, "_resolve_serving_model_dir", lambda *args, **kwargs: None)
     monkeypatch.setattr(
-        __import__("koipa.four_path_shadow", fromlist=["configured_factor_shadow"]),
+        four_path_shadow,
         "configured_factor_shadow",
         lambda text, metadata, label: {
             "state": "ok", "factor_grade": "S1", "direction": "factor_higher", "min_confidence": 0.97,
         },
     )
     monkeypatch.setattr(
-        __import__("koipa.four_path_shadow", fromlist=["configured_policy_shadow"]),
+        four_path_shadow,
         "configured_policy_shadow",
         lambda text, metadata, doc_id: {
             "state": "ok", "proposal": {"mode": "shadow_only", "policy_version": "v1"},
             "would_require_review": True, "missing_evidence": ["access_scope"],
         },
     )
-    # Imports above are deliberately referenced so a rename breaks this service-level wiring test.
-    assert configured_factor_shadow and configured_policy_shadow
 
     service = service_module.ClassifyService()
     monkeypatch.setattr(service, "_agreement_gate", lambda *args, **kwargs: None)

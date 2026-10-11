@@ -210,7 +210,7 @@ export const scenarios = [
         const navigationStatus = page.$('product-view-status');
         const viewLabel = {
           overview: '운영 개요', documents: '문서 검토 및 확정', experts: '검수 계정별 진행',
-          synthesis: '모의 문서 생성·검토', policy: '분류 정책 및 근거', models: '모델 학습 및 평가',
+          synthesis: '모의 문서 생성·검토', policy: '분류 정책 및 근거', models: '모델 학습 및 릴리스',
           audit: '감사 기록', settings: '운영 설정',
         }[view];
         check.includes(

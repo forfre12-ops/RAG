@@ -140,9 +140,9 @@ class SchemaAdminService:
             return GradesGetResponse(version=self._version_tag(), grades=list(_DEFAULT_GRADES))
 
     def put(self, req: GradesPutRequest) -> GradesPutResponse:
-        """등급체계 변경. 새 코드 추가 / 순서 변경 시 requires_retraining=True."""
+        """고정된 네 등급의 표시 메타데이터만 수정한다."""
         logger.debug(
-        "schema metadata put enter: grades_count=%d actor=%s",
+            "schema metadata put enter: grades_count=%d actor=%s",
             len(req.grades), req.actor.user_id,
         )
         reasons: list[str] = []
