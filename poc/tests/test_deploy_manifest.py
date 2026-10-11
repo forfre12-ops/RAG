@@ -126,6 +126,15 @@ def test_image_tar_plan_merges_services_sharing_an_image():
     assert image_tar_plan(comps) == {"api": "koipa-api:1", "worker": "koipa-worker:1"}
 
 
+def test_image_tar_plan_prefers_declared_worker_over_initializer():
+    """초기화 서비스가 compose에서 먼저 선언돼도 worker.tar 계약은 유지한다."""
+    comps = {
+        "training-storage-init": ComponentEntry("koipa-worker:1", "1"),
+        "worker": ComponentEntry("koipa-worker:1", "1"),
+    }
+    assert image_tar_plan(comps) == {"worker": "koipa-worker:1"}
+
+
 def test_copy_infra_ships_only_declared_files(tmp_path, manifest):
     """빌더가 실제로 복사·생성한 파일은 전부 정본이 허용한 것이다(선언 외 파일 0)."""
     _copy_infra(tmp_path, version="t")
