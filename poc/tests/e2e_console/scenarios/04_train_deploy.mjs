@@ -94,7 +94,9 @@ export const scenarios = [
       const cm = server.lastCall('GET', '/metrics/confusion-matrix/');
       check.ok(cm, '혼동행렬을 요청했다');
       check.data.includes(cm?.path || '', 'v-fe4b386b', '최신 메트릭에서 얻은 모델 버전으로 요청한다');
-      check.includes(page.html('metrics-extra'), '혼동행렬', '혼동행렬이 그려졌다');
+      // [2026-10-11] 화면 라벨이 "혼동행렬"(전문용어)에서 "실제 등급 · 모델 예측 비교"(쉬운 말)로
+      // 바뀌었다 — 변수명·주석의 "혼동행렬"은 남아 있지만 사용자가 보는 글자는 아니다.
+      check.includes(page.html('metrics-extra'), '실제 등급', '혼동행렬이 쉬운 말로 그려졌다');
       assertNoScriptErrors(check, page);
       return page;
     },

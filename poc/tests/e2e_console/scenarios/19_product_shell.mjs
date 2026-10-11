@@ -332,7 +332,10 @@ export const scenarios = [
       await page.until(() => page.text('expert-assignment-list').includes('reviewer-01'));
 
       const row = page.text('expert-assignment-list');
-      for (const label of ['배정 50건', '판정 완료', '보류', '제외·폐기', '재검토', '미시작', '미처리', '최근 활동']) {
+      // [2026-10-11] 계정 행 지표가 4분류("판정 완료"·"제외·폐기"·"미시작" 포함)에서 지금의
+      // 5분류(판정·미처리·보류·제외·재검토, admin.html:1823)로 바뀌었다 — "미시작"은 이제
+      // 별도 칸이 아니라 "미처리"(remaining_doc_count)에 합쳐진다.
+      for (const label of ['배정 50건', '판정', '보류', '제외', '재검토', '미처리', '최근 활동']) {
         check.includes(row, label, `${label} 지표가 계정 행에 있다`);
       }
       check.includes(row, '36.0%', '계정 처리율을 보여준다');

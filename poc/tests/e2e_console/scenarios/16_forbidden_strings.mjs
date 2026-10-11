@@ -44,20 +44,37 @@ export const FORBIDDEN = [
  * ⚠ 화면에서 감춘 것(pf-hidden·display:none)도 뺀다 — 프로파일·탭으로 숨긴 카드는 지금
  *   화면에 없는 글자다.
  */
+const EXCLUDE_TAGS = new Set(['SCRIPT', 'STYLE', 'DETAILS']);
+
 export function visibleText(page) {
+  // [2026-10-11] 종전 구현(복제 트리에서 script·style·details·[data-tech]를 먼저 지우고,
+  // 그 "지운 뒤" querySelectorAll 결과를 원본 querySelectorAll 결과와 같은 인덱스로 짝지어
+  // display:none 요소를 지웠다)은 그 선행 제거 때문에 복제 쪽 개수·순서가 원본과 어긋났다 —
+  // 문서 어디에든 [data-tech] 가 하나라도 있으면(실제로 수십 곳 있다) 그 뒤로는 인덱스가
+  // 전부 밀려 엉뚱한 노드를 지우거나 지워야 할 노드를 놓쳤다. 실측: 숨겨진 섹션(#model-training,
+  // display:none) 안의 <b>train.jsonl</b> 같은 inline 자손은 **자기 자신의 display 는 'none'이
+  // 아니라서** 종전 로직이 못 걸렀다 — 조상이 숨겨졌는지는 보지 않았기 때문이다.
+  // 지금은 복제·인덱스 짝짓기 없이, 각 텍스트 노드의 조상 체인을 직접 걸어 올라가며 제외
+  // 태그·[data-tech]·display:none·visibility:hidden 을 한 번에 판정한다.
   const doc = page.win.document;
-  const clone = doc.body.cloneNode(true);
-  clone.querySelectorAll('script, style, details, [data-tech]').forEach((el) => el.remove());
-  // 숨겨진 요소 제거 — 원본에서 계산해 같은 위치의 복제 노드를 지운다.
-  const originals = Array.from(doc.body.querySelectorAll('*'));
-  const clones = Array.from(clone.querySelectorAll('*'));
-  originals.forEach((el, i) => {
-    const c = clones[i];
-    if (!c || !c.parentNode) return;
-    const st = page.win.getComputedStyle(el);
-    if (st && (st.display === 'none' || st.visibility === 'hidden')) c.remove();
-  });
-  return (clone.textContent || '').replace(/\s+/g, ' ');
+  const win = page.win;
+  const isExcluded = (el) => {
+    for (let node = el; node; node = node.parentElement) {
+      if (EXCLUDE_TAGS.has(node.tagName)) return true;
+      if (node.hasAttribute && node.hasAttribute('data-tech')) return true;
+      const st = win.getComputedStyle(node);
+      if (st && (st.display === 'none' || st.visibility === 'hidden')) return true;
+    }
+    return false;
+  };
+  const walker = doc.createTreeWalker(doc.body, win.NodeFilter.SHOW_TEXT);
+  const parts = [];
+  let n = walker.nextNode();
+  while (n) {
+    if (!isExcluded(n.parentElement)) parts.push(n.nodeValue);
+    n = walker.nextNode();
+  }
+  return parts.join(' ').replace(/\s+/g, ' ');
 }
 
 function scan(page, check, where) {

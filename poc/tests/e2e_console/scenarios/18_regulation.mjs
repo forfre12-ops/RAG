@@ -64,9 +64,12 @@ const visText = (page, id) => {
 const NUMBERISH = /\d+(\.\d+)?\s*%|유사도|신뢰도|점수|confidence|score|similarity/i;
 
 async function openConfig(server, opts = {}) {
+  // [2026-10-11] 규정 카드는 더 이상 config(「분류 정책」) 탭이 아니라 settings(「운영 설정」)
+  // 탭에 있다 — data-product-view="settings" (admin.html:1341). 예전 'config' 는 그 자리에
+  // 없는 카드를 누르려 해 CRASH("화면에 안 보이는 것을 눌렀다")로 이어졌다.
   const page = await openPage(server, '/console/admin.html', opts);
   await page.settle();
-  await goToPane(page, 'config');
+  await goToPane(page, 'settings');
   return page;
 }
 async function choose(page, id) {
@@ -92,7 +95,7 @@ export const scenarios = [
       const card = page.$('reg-card');
       check.ok(card, '카드 마크업은 항상 있다(숨김 여부만 서버 응답이 정한다)');
       const on = !card.classList.contains('reg-off');
-      await goToPane(page, 'config');
+      await goToPane(page, 'settings');
       check.eq(page.visible('reg-card'), on, on ? '기능이 있는 서버 — 설정 탭에서 카드가 보인다' : '기능이 없는 서버 — 카드가 보이지 않는다');
       await goToPane(page, 'ops');
       check.ok(!page.visible('reg-card'), '운영 탭에서는 카드가 보이지 않는다(설정 탭 카드다)');
@@ -142,7 +145,7 @@ export const scenarios = [
       const page = await openConfig(server);
 
       check.ok(page.visible('reg-card'), '설정 탭에 카드가 보인다');
-      check.includes(page.text('pane-note'), '사내 규정', '기능이 있는 서버에서는 탭 안내문이 카드를 말한다');
+      check.includes(page.text('pane-note'), '규정 참고 RAG', '기능이 있는 서버에서는 탭 안내문이 카드를 말한다');
       const rows = page.qa('#reg-body tr');
       check.eq(rows.length, 3, '규정 3건이 그려졌다');
       const body = page.text('reg-body');
@@ -611,7 +614,7 @@ export const scenarios = [
       server.faults.push({ path: '/regulations', method: 'GET', status: 404, body: { detail: 'Not Found' } });
       const off = await openPage(server, '/console/admin.html');
       await off.settle();
-      for (const tab of ['review', 'train', 'config', 'ops', 'config']) {
+      for (const tab of ['review', 'train', 'settings', 'ops', 'settings']) {
         await goToPane(off, tab);
         check.ok(!off.visible('reg-card'), `기능이 없는 서버 — ${tab} 탭에서도 카드가 숨겨져 있다`);
       }
@@ -621,11 +624,11 @@ export const scenarios = [
       const on = await openPage(server, '/console/admin.html');
       await on.settle();
       const seen = {};
-      for (const tab of ['review', 'train', 'config', 'ops', 'config']) {
+      for (const tab of ['review', 'train', 'settings', 'ops', 'settings']) {
         await goToPane(on, tab);
         seen[tab] = on.visible('reg-card');
       }
-      check.eq(JSON.stringify(seen), JSON.stringify({ review: false, train: false, config: true, ops: false }), '기능이 있는 서버 — 설정 탭에서만 보인다');
+      check.eq(JSON.stringify(seen), JSON.stringify({ review: false, train: false, settings: true, ops: false }), '기능이 있는 서버 — 설정 탭에서만 보인다');
       assertNoScriptErrors(check, on);
       return on;
     },

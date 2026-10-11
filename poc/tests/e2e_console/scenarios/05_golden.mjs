@@ -51,7 +51,7 @@ export const scenarios = [
       for (const id of ['expert-reviewer-ids', 'expert-reviewer-roster', 'expert-plan-submit', 'expert-assignment-reason']) {
         check.ok(!page.$(id), `${id} 배정 입력 제어는 진행 화면에 없다`);
       }
-      check.includes(page.text('product-experts'), '검수 계정별 진행 상태', '계정별 진행 상태를 설명한다');
+      check.includes(page.text('product-experts'), '검수 계정별 진행 현황', '계정별 진행 상태를 설명한다');
       check.includes(page.text('product-experts'), '검수 계정', '진행 현황 요약을 보여준다');
       assertNoScriptErrors(check, page);
       return page;
