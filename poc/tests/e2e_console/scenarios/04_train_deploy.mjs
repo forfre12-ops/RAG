@@ -94,7 +94,7 @@ export const scenarios = [
       const cm = server.lastCall('GET', '/metrics/confusion-matrix/');
       check.ok(cm, '혼동행렬을 요청했다');
       check.data.includes(cm?.path || '', 'v-fe4b386b', '최신 메트릭에서 얻은 모델 버전으로 요청한다');
-      check.includes(page.html('metrics-extra'), '혼동행렬', '혼동행렬이 그려졌다');
+      check.includes(page.html('metrics-extra'), '실제 등급 · 모델 예측 비교', '실제 등급과 모델 예측의 비교표가 그려졌다');
       assertNoScriptErrors(check, page);
       return page;
     },

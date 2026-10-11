@@ -59,6 +59,26 @@ export const scenarios = [
   },
 
   {
+    id: 'product.legacy-product-views-remain-navigable',
+    title: '레거시 카드로 구성된 화면도 새 제품 메뉴에서 열 수 있다',
+    why: '제품 메뉴만 추가하고 대응 패널이 없는 화면을 그대로 두면 모델·정책·감사 메뉴가 클릭 즉시 예외로 끝난다',
+    async run({ server, check }) {
+      const page = await productTab(server, 'overview');
+      for (const view of ['synthesis', 'policy', 'models', 'audit', 'settings']) {
+        const nav = page.q(`[data-product-nav="${view}"]`);
+        check.ok(nav, `${view} 메뉴가 있다`);
+        page.click(nav);
+        await page.settle();
+        const cards = page.qa(`.grid > [data-product-view="${view}"]`);
+        check.gte(cards.length, 1, `${view}에는 대응 카드가 있다`);
+        check.ok(cards.some((card) => page.visible(card)), `${view}의 대응 카드가 보인다`);
+      }
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     id: 'product.overview-renders-metrics-grades-and-category-table',
     title: '운영 개요가 집계 카드·등급별 분포·문서유형 표를 실제 응답으로 그린다',
     why: '운영 개요는 수치를 손으로 세지 않고 /golden/candidates 응답 하나로 전부 만든다',

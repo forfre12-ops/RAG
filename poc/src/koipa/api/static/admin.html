@@ -457,7 +457,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 :root{--motion-fast:140ms;--motion-panel:180ms;--motion-ease:cubic-bezier(.2,.7,.2,1);}
 .product-view{display:none;}
 .product-view.is-visible{display:block;}
-.product-view.is-entering{animation:product-view-enter var(--motion-fast) var(--motion-ease) both;}
+.product-view.is-entering,.grid>.card.is-entering{animation:product-view-enter var(--motion-fast) var(--motion-ease) both;}
 @keyframes product-view-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .console-view-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:0 0 16px;}
 .console-view-title{margin:0;color:var(--ui-navy);font-size:20px;letter-spacing:-.035em;}
@@ -1764,6 +1764,26 @@ function focusProductHeading(panel){
   heading.setAttribute('tabindex','-1');
   try{heading.focus({preventScroll:true});}catch(e){heading.focus();}
 }
+function productLegacyCards(view){
+  return [...document.querySelectorAll(`.grid>[data-product-view="${view}"]`)];
+}
+function activateLegacyProductCards(view, fromLegacy){
+  const cards=productLegacyCards(view);if(!cards.length)return;
+  cards.forEach(card=>{
+    card.classList.remove('is-entering');
+    if(!productMotionReduced()){
+      card.classList.add('is-entering');
+      window.setTimeout(()=>card.classList.remove('is-entering'),180);
+    }
+  });
+  if(!fromLegacy){
+    const schedule=window.requestAnimationFrame||((callback)=>window.setTimeout(callback,0));
+    schedule(()=>{
+      const heading=cards[0].querySelector('.ttl,h2');if(!heading)return;
+      heading.setAttribute('tabindex','-1');try{heading.focus({preventScroll:true});}catch(e){heading.focus();}
+    });
+  }
+}
 function activateProductPanel(next, fromLegacy){
   const active=document.querySelector('.product-view.is-visible');
   const transitionId=++PRODUCT_TRANSITION_ID;
@@ -1817,7 +1837,12 @@ function productShowView(view, fromLegacy){
     button.classList.toggle('active',active);
     button.setAttribute('aria-current',active?'page':'false');
   });
-  activateProductPanel($('product-'+view),fromLegacy);
+  const productPanel=$('product-'+view);
+  if(productPanel) activateProductPanel(productPanel,fromLegacy);
+  else {
+    const active=document.querySelector('.product-view.is-visible');
+    if(active){active.classList.remove('is-visible','is-entering','is-leaving');setProductPanelHidden(active,true);}
+  }
   // 숨겨진 구 탭의 active 상태와 저장 키만 맞춘다. 표시 제어를 showPane에 넘기면
   // Product View와 legacy pane 두 체계가 같은 카드를 번갈아 보이게 하므로 호출하지 않는다.
   const legacyPane=PRODUCT_VIEW_TO_LEGACY_PANE[view];
@@ -1829,6 +1854,7 @@ function productShowView(view, fromLegacy){
   if(viewStatus && !fromLegacy) viewStatus.textContent=`${productViewLabel} 화면을 열었습니다.`;
   try{ sessionStorage.setItem('koipa_admin_pane',legacyPane); }catch(e){}
   productSetLegacyVisibility(view);
+  if(!productPanel)activateLegacyProductCards(view,fromLegacy);
   if(view==='overview' && productGoldenReviewAvailable()) loadProductOverview();
   if(view==='documents' && productGoldenReviewAvailable()) loadWorkbench(false);
   if(view==='experts' && productGoldenReviewAvailable()) loadExpertOperations();
