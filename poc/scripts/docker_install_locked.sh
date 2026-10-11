@@ -2,6 +2,7 @@
 # uv.lock 기준 고정 설치 — Docker 이미지 3종(api·api.prod·worker) 공용.
 #
 #   ./scripts/docker_install_locked.sh psh otel jwt hwp hwp-tables pdf-tables xls
+#   ./scripts/docker_install_locked.sh --no-project-install psh otel jwt hwp hwp-tables pdf-tables xls
 #
 # 왜 필요한가. 종전에는 `pip install -e ".[extras]"` 로 pyproject 의 **범위**를 빌드 시점에
 # 해석했다. 그러면 같은 커밋을 언제 빌드하느냐에 따라 torch·transformers 버전이 달라지고,
@@ -20,8 +21,17 @@
 # 닫히고, 공급망 검증은 반출 경로가 계속 담당한다.
 set -euo pipefail
 
+# Docker 의존성 레이어에서는 lock 기준 의존성만 먼저 설치한다. 소스를 COPY 한 뒤
+# 별도 레이어에서 editable 설치를 하므로, 화면/코드 변경이 수 GB 의 설치 캐시를 깨지 않는다.
+# 기본값은 기존과 동일하게 프로젝트까지 설치한다.
+install_project=1
+if [ "${1:-}" = "--no-project-install" ]; then
+    install_project=0
+    shift
+fi
+
 if [ "$#" -eq 0 ]; then
-    echo "usage: $0 <extra> [<extra> ...]" >&2
+    echo "usage: $0 [--no-project-install] <extra> [<extra> ...]" >&2
     exit 2
 fi
 
@@ -60,7 +70,9 @@ python -m pip install --index-url "${TORCH_INDEX}" "torch==${TORCH_VERSION}"
 python -m pip install -r "${APP_REQ}"
 # --no-deps: 의존성은 위에서 lock 기준으로 이미 깔았다. 빼면 pip 이 pyproject 범위를 다시
 # 해석해 고정이 풀린다(이 스크립트의 존재 이유가 사라진다).
-python -m pip install -e . --no-deps
+if [ "${install_project}" -eq 1 ]; then
+    python -m pip install -e . --no-deps
+fi
 
 # 설치 후 대조 — lock 이 말한 버전이 실제로 깔렸는지 본다. 조용히 어긋나면 재현성 주장이 거짓이 된다.
 python - "${APP_REQ}" <<'PY'

@@ -35,6 +35,7 @@ const opt = (n, d = null) => {
 
 const AS_JSON = flag('--json');
 const ONLY = opt('--only');
+const ONLY_TERMS = ONLY ? ONLY.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean) : [];
 const LIVE_BASE = opt('--base');
 const ALLOW_WRITES = flag('--allow-writes');
 const parseTimeout = (name, fallback, minimum) => {
@@ -78,9 +79,10 @@ async function loadScenarios() {
 }
 
 function selected(list) {
-  if (!ONLY) return list;
-  const k = ONLY.toLowerCase();
-  return list.filter((s) => s.id.toLowerCase().includes(k) || s.title.toLowerCase().includes(k) || s.file.includes(k));
+  if (!ONLY_TERMS.length) return list;
+  return list.filter((s) => ONLY_TERMS.some((k) => (
+    s.id.toLowerCase().includes(k) || s.title.toLowerCase().includes(k) || s.file.includes(k)
+  )));
 }
 
 const all = await loadScenarios();
