@@ -37,6 +37,7 @@ F1 0.26(실데이터 학습 0.736). 많이 만들어도 실문서 성능이 그�
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import logging
 import random
@@ -965,7 +966,7 @@ class SyntheticDocGenerator:
         """
         schema_used = bool(schema) and self.structured_output
         extra = {"json_schema": schema} if schema_used else {}
-        resp = self.llm.generate(
+        resp = self._generate_for_synthesis(
             user,
             system=system,
             temperature=0.7,
@@ -991,7 +992,7 @@ class SyntheticDocGenerator:
                 system
                 + "\n\n[중요] 반드시 유효한 JSON 객체 1개만 출력하세요. 코드블록·설명·주석 모두 금지."
             )
-            resp = self.llm.generate(
+            resp = self._generate_for_synthesis(
                 user,
                 system=retry_system,
                 temperature=0.3,
@@ -1010,6 +1011,27 @@ class SyntheticDocGenerator:
                 )
             )
         return parsed, resp
+
+    def _generate_for_synthesis(self, prompt: str, **kwargs: object) -> object:
+        """합성에만 필요한 로컬 Ollama/Qwen3 호출 옵션을 안전하게 붙인다.
+
+        Ollama의 OpenAI 호환 API는 Qwen3의 ``/no_think`` 지시를 무시한다. 모델이
+        본문보다 내부 추론 토큰을 먼저 소진하면 JSON 본문이 빈 문자열로 끝날 수 있으므로,
+        Ollama 어댑터가 지원할 때만 ``no_reasoning``을 명시한다. 다른 제공자와 시험용
+        provider의 호출 계약은 바꾸지 않는다.
+        """
+        if str(getattr(self.llm, "name", "") or "").lower() == "ollama":
+            generate = getattr(self.llm, "generate", None)
+            try:
+                supports_no_reasoning = (
+                    generate is not None
+                    and "no_reasoning" in inspect.signature(generate).parameters
+                )
+            except (TypeError, ValueError):
+                supports_no_reasoning = False
+            if supports_no_reasoning:
+                kwargs["no_reasoning"] = True
+        return self.llm.generate(prompt, **kwargs)
 
     # ── 단발 생성(종전 경로) ─────────────────────────────────────────────────
     def _generate_single(

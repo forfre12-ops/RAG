@@ -104,6 +104,31 @@ class LocalRecordingProvider(RecordingProvider):
     model = "qwen3"
 
 
+class OllamaRecordingProvider(RecordingProvider):
+    name = "ollama"
+    model = "qwen3:14b"
+
+    def generate(
+        self,
+        prompt,
+        *,
+        system=None,
+        max_tokens=1024,
+        temperature=0.7,
+        json_schema=None,
+        no_reasoning=False,
+    ):
+        result = super().generate(
+            prompt,
+            system=system,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            json_schema=json_schema,
+        )
+        self.calls[-1]["no_reasoning"] = no_reasoning
+        return result
+
+
 # ── ① 구조화 출력 ────────────────────────────────────────────────────────────
 
 
@@ -131,6 +156,16 @@ def test_local_provider_gets_configured_minimum_output_budget(monkeypatch):
     )
 
     assert llm.calls[0]["max_tokens"] == 5200
+
+
+def test_ollama_synthesis_disables_qwen_reasoning_when_supported():
+    """Ollama/Qwen3가 본문 전에 추론 토큰을 소진해 빈 JSON이 되는 회귀를 막는다."""
+    llm = OllamaRecordingProvider()
+    SyntheticDocGenerator(llm=llm, structured_output=False).generate_one(
+        SynthRequest(target_grade="S2", domain="tech")
+    )
+
+    assert llm.calls[0]["no_reasoning"] is True
 
 
 def test_non_local_provider_keeps_requested_output_budget():

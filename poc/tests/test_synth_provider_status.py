@@ -65,6 +65,15 @@ def test_local_provider_available_when_reachable(monkeypatch):
         assert rows[name]["available"] is True
 
 
+def test_local_provider_probe_uses_the_configured_ollama_and_lm_studio_urls(monkeypatch):
+    """생성기와 상태 조회가 다른 주소를 보면 콘솔에서 실제 제공자를 숨기게 된다."""
+    monkeypatch.setattr(sps.settings, "ollama_base_url", "http://ollama.internal:11434/v1", raising=False)
+    monkeypatch.setattr(sps.settings, "lm_studio_base_url", "http://studio.internal:1234/v1", raising=False)
+
+    assert sps._local_base_url("ollama") == "http://ollama.internal:11434/v1"
+    assert sps._local_base_url("lm_studio") == "http://studio.internal:1234/v1"
+
+
 def test_authenticated_local_provider_requires_real_key(monkeypatch):
     """401이 예상되는 자리표시자 키로는 생성 요청을 접수하면 안 된다."""
     monkeypatch.setattr(sps, "_probe_http", lambda base_url: True)
