@@ -176,6 +176,24 @@ class SynthProviderStatus(BaseModel):
     kind: str  # "deterministic" | "commercial" | "local"
     available: bool
     reason: str = ""
+    # kind=="commercial" 에만 의미 있음 — 키가 .env 인지 콘솔(redis)인지, 마스킹된 표시.
+    credential_source: str = ""  # "" | "env" | "console" | "none"
+    credential_masked: str = ""
+
+
+class SynthProviderCredentialRequest(BaseModel):
+    """콘솔에서 상용 LLM 공급자 API 키를 설정할 때의 요청 본문."""
+
+    api_key: str
+
+
+class SynthProviderCredentialStatus(BaseModel):
+    """키 설정·삭제 응답 — 평문을 절대 담지 않는다(마스킹만)."""
+
+    provider: str
+    configured: bool
+    source: str  # "console" | "env" | "none"
+    masked: str
 
 
 class SynthProvidersStatusResponse(BaseModel):

@@ -566,9 +566,20 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .workbench-drawer,.workbench-inspector{min-width:0;background:#fff;overflow:auto;}
 .workbench-drawer{border-right:1px solid var(--ui-line-soft);}
 .workbench-inspector{border-left:1px solid var(--ui-line-soft);background:#fbfcfe;}
-.workbench-handle{position:relative;background:#f6f8fb;cursor:col-resize;touch-action:none;}
+/* [2026-10-11] 평소엔 스크롤바를 숨기고, 마우스를 올렸을 때만 색을 보여준다.
+   ⚠ 너비(width)를 0↔8px로 바꾸면 그 칸 안 내용 폭이 같이 바뀌어 호버할 때마다 화면이
+   흔들린다(실측·사용자 지적) — 너비는 항상 8px로 고정하고 "투명↔색" 만 바꾼다. */
+.workbench-drawer,.workbench-inspector,.workbench-canvas{scrollbar-width:thin;scrollbar-color:transparent transparent;}
+.workbench-drawer:hover,.workbench-inspector:hover,.workbench-canvas:hover{scrollbar-color:#c7d0dd transparent;}
+.workbench-drawer::-webkit-scrollbar,.workbench-inspector::-webkit-scrollbar,.workbench-canvas::-webkit-scrollbar{width:8px;}
+.workbench-drawer::-webkit-scrollbar-thumb,.workbench-inspector::-webkit-scrollbar-thumb,.workbench-canvas::-webkit-scrollbar-thumb{background:transparent;border-radius:4px;}
+.workbench-drawer:hover::-webkit-scrollbar-thumb,.workbench-inspector:hover::-webkit-scrollbar-thumb,.workbench-canvas:hover::-webkit-scrollbar-thumb{background:#c7d0dd;}
+.workbench-drawer::-webkit-scrollbar-track,.workbench-inspector::-webkit-scrollbar-track,.workbench-canvas::-webkit-scrollbar-track{background:transparent;}
+.workbench-handle{position:relative;background:transparent;cursor:col-resize;touch-action:none;}
+.workbench-handle:hover,.workbench-handle:focus-visible{background:#f6f8fb;}
 .workbench-handle:focus-visible{z-index:3;outline:2px solid var(--ui-blue);outline-offset:-2px;}
-.workbench-handle::after{content:"";position:absolute;left:2px;right:2px;top:50%;height:38px;transform:translateY(-50%);border-left:2px dotted #a6b2c3;border-right:2px dotted #a6b2c3;}
+.workbench-handle::after{content:"";position:absolute;left:2px;right:2px;top:50%;height:38px;transform:translateY(-50%);border-left:2px dotted transparent;border-right:2px dotted transparent;transition:border-color .12s;}
+.workbench-handle:hover::after,.workbench-handle:focus-visible::after{border-left-color:#a6b2c3;border-right-color:#a6b2c3;}
 .workbench-pane-head{position:sticky;top:0;z-index:2;padding:14px 15px;border-bottom:1px solid var(--ui-line-soft);background:rgba(255,255,255,.96);backdrop-filter:blur(8px);}
 .workbench-inspector .workbench-pane-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
 .workbench-inspector-close,.workbench-inspector-open,.workbench-inspector-backdrop{display:none;}
@@ -619,7 +630,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .distribution-board{margin-top:16px;padding-top:18px;border-top:1px solid var(--ui-line-soft);}
 .distribution-main{min-width:0;}.distribution-kpi{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin:1px 0 12px;}.distribution-kpi strong{color:var(--ui-navy);font:800 31px var(--font-mono);letter-spacing:-.06em;font-variant-numeric:tabular-nums;}.distribution-kpi span{color:var(--ui-muted);font-size:11px;}.distribution-grade-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;}.distribution-grade-head h3{margin:0;color:var(--ui-navy);font-size:13px;}.distribution-scopes{display:flex;gap:4px;flex-wrap:wrap;}.distribution-scopes button{border:1px solid var(--ui-line);border-radius:99px;background:#fff;color:var(--ui-muted);padding:4px 8px;font:700 10px var(--font-sans);cursor:pointer;}.distribution-scopes button[aria-pressed="true"]{border-color:var(--ui-navy);background:var(--ui-navy);color:#fff;}
 .distribution-grade-stack{display:flex;height:18px;overflow:hidden;border:1px solid #dbe3ec;border-radius:4px;background:#edf1f5;}.distribution-grade-stack i{min-width:0;height:100%;}.distribution-grade-stack .grade-ts{background:#a81f39;}.distribution-grade-stack .grade-s1{background:#b26b06;}.distribution-grade-stack .grade-s2{background:#2e6293;}.distribution-grade-stack .grade-s3{background:#397b55;}.distribution-grade-legend{display:flex;gap:6px 13px;flex-wrap:wrap;margin-top:7px;}.distribution-grade-legend span{display:inline-flex;align-items:baseline;gap:4px;color:var(--ui-muted);font-size:10px;}.distribution-grade-legend i{width:7px;height:7px;border-radius:2px;display:inline-block;}.distribution-grade-legend b{color:var(--ui-ink);font:800 11px var(--font-mono);font-variant-numeric:tabular-nums;}.distribution-grade-legend .grade-ts i{background:#a81f39;}.distribution-grade-legend .grade-s1 i{background:#b26b06;}.distribution-grade-legend .grade-s2 i{background:#2e6293;}.distribution-grade-legend .grade-s3 i{background:#397b55;}.distribution-scope-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;padding:10px;border:1px solid var(--ui-line-soft);border-radius:7px;background:#f8fafc;}.distribution-scope-summary>div{min-width:0;padding:1px 4px;}.distribution-scope-summary small{display:block;color:var(--ui-muted);font-size:10px;line-height:1.35;}.distribution-scope-summary b{display:block;margin-top:3px;color:var(--ui-navy);font:800 16px var(--font-mono);font-variant-numeric:tabular-nums;}.distribution-scope-summary .distribution-scope-missing b{color:#9a6700;}.distribution-scope-note{grid-column:1/-1;margin:1px 4px 0;color:var(--ui-muted);font-size:10.5px;line-height:1.45;}.distribution-scope-note b{display:inline;margin:0;color:var(--ui-navy);font:800 10.5px var(--font-mono);}
-.distribution-taxonomy{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:18px;padding-top:15px;border-top:1px solid var(--ui-line-soft);}.distribution-taxonomy-panel h4{margin:0 0 8px;color:var(--ui-muted);font-size:11px;}.distribution-taxonomy-list{display:grid;gap:6px;max-height:276px;overflow:auto;padding-right:5px;}.distribution-taxonomy-row{display:grid;grid-template-columns:minmax(72px,1fr) minmax(40px,2.1fr) 33px;gap:7px;align-items:center;color:var(--ui-muted);font-size:10.5px;}.distribution-taxonomy-row>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.distribution-taxonomy-bar{height:7px;overflow:hidden;border-radius:99px;background:#eef1f4;}.distribution-taxonomy-bar i{display:block;height:100%;border-radius:inherit;background:#aab3bc;}.distribution-taxonomy-row b{color:var(--ui-ink);font:800 10px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;}.distribution-taxonomy-empty{color:var(--ui-muted);font-size:11px;padding:16px 0;}
+.distribution-taxonomy{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:18px;padding-top:15px;border-top:1px solid var(--ui-line-soft);}.distribution-taxonomy-panel h4{margin:0 0 8px;color:var(--ui-muted);font-size:11px;}.distribution-taxonomy-list{display:grid;gap:6px;max-height:276px;overflow:auto;padding-right:5px;scrollbar-width:thin;scrollbar-color:transparent transparent;}.distribution-taxonomy-list:hover{scrollbar-color:#c7d0dd transparent;}.distribution-taxonomy-list::-webkit-scrollbar{width:8px;}.distribution-taxonomy-list::-webkit-scrollbar-thumb{background:transparent;border-radius:4px;}.distribution-taxonomy-list:hover::-webkit-scrollbar-thumb{background:#c7d0dd;}.distribution-taxonomy-list::-webkit-scrollbar-track{background:transparent;}
+.synth-preview{font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;max-height:110px;overflow:auto;white-space:pre-wrap;scrollbar-width:thin;scrollbar-color:transparent transparent;cursor:pointer;transition:max-height .15s ease;}
+.synth-preview.expanded{max-height:600px;}
+.synth-preview:hover{scrollbar-color:#c7d0dd transparent;}
+.synth-preview::-webkit-scrollbar{width:8px;}
+.synth-preview::-webkit-scrollbar-thumb{background:transparent;border-radius:4px;}
+.synth-preview:hover::-webkit-scrollbar-thumb{background:#c7d0dd;}
+.synth-preview::-webkit-scrollbar-track{background:transparent;}.distribution-taxonomy-row{display:grid;grid-template-columns:minmax(72px,1fr) minmax(40px,2.1fr) 33px;gap:7px;align-items:center;color:var(--ui-muted);font-size:10.5px;}.distribution-taxonomy-row>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.distribution-taxonomy-bar{height:7px;overflow:hidden;border-radius:99px;background:#eef1f4;}.distribution-taxonomy-bar i{display:block;height:100%;border-radius:inherit;background:#aab3bc;}.distribution-taxonomy-row b{color:var(--ui-ink);font:800 10px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;}.distribution-taxonomy-empty{color:var(--ui-muted);font-size:11px;padding:16px 0;}
 @media(max-width:820px){.expert-progress-table-head{display:none;}.expert-progress-table-row{grid-template-columns:minmax(0,1fr) auto;gap:10px 16px;padding:14px;}.expert-progress-cell-rate,.expert-progress-cell-stats,.expert-progress-last{grid-column:1/-1;}.expert-progress-cell-rate{max-width:360px;}.expert-progress-last{margin-top:0;}.expert-progress-stats{gap:6px 10px;}}
 @media(max-width:760px){.distribution-taxonomy{grid-template-columns:1fr;gap:16px;}.distribution-taxonomy-list{max-height:230px;}.distribution-kpi strong{font-size:27px;}.distribution-scope-summary{grid-template-columns:1fr 1fr;}.distribution-scope-note{grid-column:1/-1;}}
 .document-sheet .doc-empty{padding:44px 12px;text-align:center;color:var(--ui-muted);font-size:13px;}
@@ -1045,6 +1063,15 @@ body *,body *::before,body *::after{border-radius:0 !important}
         </div>
         <p class="hint" id="sy-provider-note" data-tech style="margin-top:2px"></p>
         <p class="hint" data-tech style="margin-top:2px">지재원: Claude API 또는 로컬 오픈 LLM으로 내부 합성 문서를 생성합니다. 고객사 폐쇄망 문서는 로컬 오픈 LLM만 사용합니다.</p>
+        <!-- [2026-10-11] 상용 LLM(anthropic·openai) 연동 키를 콘솔에서 재시작 없이 설정.
+             사용자 명시적 지시로 신설 — 전까지는 "콘솔에 키 입력칸을 만들지 않는다"가 확정
+             정책이었다. 저장된 값은 화면에 다시 평문으로 보여주지 않는다(마스킹만).
+             테두리·라벨로 묶어 "생성 제공자" 드롭다운의 부연 문구처럼 안 보이게 한다 —
+             그렇지 않으면 독립된 설정 블록이 안내 문구 한 줄처럼 묻힌다. -->
+        <div style="margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:7px;background:var(--bg-surface);">
+          <label class="fld" style="margin-bottom:7px;">상용 LLM 키 관리</label>
+          <div id="sy-cred-panel" style="display:flex;flex-direction:column;gap:7px;"></div>
+        </div>
         <div class="btn-row" style="margin-top:10px;align-items:center;">
           <button class="btn sec sm" type="button" onclick="openSynthPlaybookDialog()">생성 규칙 관리</button>
           <span class="hint" id="sy-playbook-version">생성 규칙을 불러오는 중…</span>
@@ -3257,7 +3284,7 @@ function renderSynthQueue(){
           ${it.label_source?`<span class="pill warn" title="LLM 이 정상 응답을 주지 못해 대체 본문으로 만들어진 문서입니다. 승인해도 학습 데이터에는 들어가지 않습니다.">대체본 · 학습 제외</span>`:''}
           <span class="pill">${esc(it.review_status)}</span></div>
       </div>
-      ${it.preview?`<div style="font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;max-height:110px;overflow:auto;white-space:pre-wrap;">${esc(it.preview)}</div>`:''}
+      ${it.preview?`<div class="synth-preview" onclick="this.classList.toggle('expanded')" title="클릭하면 전체 내용을 펼쳐 봅니다">${esc(it.preview)}</div>`:''}
       ${reviewable?`
       <div class="q-actions">
         <span style="font-size:11px;color:var(--text-dim)">확정 등급</span>
@@ -3983,6 +4010,7 @@ async function loadSynthProviderStatus(){
     return;
   }
   const rows = Array.isArray(d && d.providers) ? d.providers : [];
+  renderCredentialPanel(rows);
   if(!rows.length){
     const btn=$('sy-gen'), note=$('sy-provider-note');
     sel.innerHTML='<option value="">실제 생성 제공자 없음</option>';
@@ -4018,6 +4046,62 @@ async function loadSynthProviderStatus(){
     if(note) note.textContent='선택한 제공자로 실제 생성 후 검토 큐에 적재합니다. noop 시험 제공자는 제외했습니다.';
   }
 }
+
+/* ---- 상용 LLM 키 관리(2026-10-11) ----
+ * GET /synth/providers/status 가 commercial(anthropic·openai) 행마다 credential_source·
+ * credential_masked 를 내려준다 — 평문은 절대 안 내려온다. 이 패널은 공급자별로
+ * "설정됨(마스킹)" 또는 "미설정"을 보여주고, 입력칸은 누를 때만 나타났다 저장/취소하면
+ * 즉시 사라진다 — 값을 화면에 남겨두지 않는다. */
+const _CRED_EDIT_OPEN = {};
+function renderCredentialPanel(rows){
+  const box=$('sy-cred-panel'); if(!box) return;
+  const commercial=(rows||[]).filter(function(r){ return r.kind==='commercial'; });
+  if(!commercial.length){ box.innerHTML=''; return; }
+  box.innerHTML = commercial.map(function(r){
+    const kr = LLM_PROVIDER_KR[r.name] || r.name;
+    const masked = r.credential_masked || '미설정';
+    const editing = !!_CRED_EDIT_OPEN[r.name];
+    const statusLine = '<span class="mono" style="font-size:11.5px;color:var(--text-dim)">'
+      + esc(kr) + ' — ' + esc(masked) + '</span>';
+    const actions = editing
+      ? '<input type="password" id="cred-input-' + esc(r.name) + '" autocomplete="off" '
+        + 'placeholder="새 API 키" style="width:220px;" />'
+        + '<button class="btn sm" type="button" onclick="saveCredential(\'' + esc(r.name) + '\')">저장</button>'
+        + '<button class="btn sec sm" type="button" onclick="cancelCredEdit(\'' + esc(r.name) + '\')">취소</button>'
+      : '<button class="btn sec sm" type="button" onclick="startCredEdit(\'' + esc(r.name) + '\')">키 설정</button>'
+        + (r.credential_source === 'console'
+            ? '<button class="btn sec sm" type="button" onclick="clearCredential(\'' + esc(r.name) + '\')">삭제</button>'
+            : '');
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + statusLine + actions + '</div>';
+  }).join('');
+}
+function startCredEdit(provider){ _CRED_EDIT_OPEN[provider]=true; loadSynthProviderStatus(); window.setTimeout(function(){ const i=$('cred-input-'+provider); if(i) i.focus(); },0); }
+function cancelCredEdit(provider){ delete _CRED_EDIT_OPEN[provider]; loadSynthProviderStatus(); }
+async function saveCredential(provider){
+  const input=$('cred-input-'+provider);
+  const value = input ? input.value : '';
+  if(!value || !value.trim()){ alert('키 값을 입력하세요.'); return; }
+  try{
+    await api('PUT', '/synth/providers/'+encodeURIComponent(provider)+'/credential', {api_key: value});
+    // 입력칸 값은 성공·실패와 무관하게 즉시 지운다 — 화면에 평문을 남기지 않는다.
+    if(input) input.value='';
+    delete _CRED_EDIT_OPEN[provider];
+    log(provider + ' 키를 설정했습니다.','ok');
+    loadSynthProviderStatus();
+  }catch(e){
+    if(input) input.value='';
+    alert('키 저장 실패: ' + (e.data?.detail || e.message));
+  }
+}
+async function clearCredential(provider){
+  if(!confirm(kr_cred_label(provider) + ' 키를 삭제하고 서버 설정(.env)으로 되돌릴까요?')) return;
+  try{
+    await api('DELETE', '/synth/providers/'+encodeURIComponent(provider)+'/credential');
+    log(provider + ' 키를 삭제했습니다.','ok');
+    loadSynthProviderStatus();
+  }catch(e){ alert('키 삭제 실패: ' + (e.data?.detail || e.message)); }
+}
+function kr_cred_label(provider){ return LLM_PROVIDER_KR[provider] || provider; }
 
 /* 생성 규칙은 팝업에서 기본 안전 규칙을 확인하고, 조직별 추가 규칙은 저장해 다음
  * 배치부터 적용한다. 코드 안전 기준을 지우는 설정은 제공하지 않는다. */

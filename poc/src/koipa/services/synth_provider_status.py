@@ -101,13 +101,21 @@ def provider_status() -> list[dict]:
     ]
     for name in _ADVERTISED_COMMERCIAL:
         key_field = f"{name}_api_key"
-        has_key = bool(getattr(settings, key_field, "") or "")
+        env_key = getattr(settings, key_field, "") or ""
+        # [2026-10-11] .env 뿐 아니라 콘솔에서 설정한 키(llm_credential_store)도 본다 —
+        # 안 그러면 admin 이 화면에서 키를 넣어도 드롭다운은 계속 "미설정"으로 보인다.
+        from koipa.services import llm_credential_store  # noqa: PLC0415
+
+        cred = llm_credential_store.status(name, env_default=env_key)
+        has_key = cred["configured"]
         out.append(
             {
                 "name": name,
                 "kind": "commercial",
                 "available": has_key,
                 "reason": "" if has_key else f"서버에 {key_field.upper()} 미설정",
+                "credential_source": cred["source"],
+                "credential_masked": cred["masked"],
             }
         )
     for name in _LOCAL_PROVIDERS:

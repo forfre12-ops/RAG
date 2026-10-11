@@ -182,6 +182,12 @@ def _reset_regulation_runtime_toggle():
             from koipa.regulation import runtime_toggle
             c = runtime_toggle._client()
             c.delete(runtime_toggle._KEY, runtime_toggle._LLM_KEY)
+            # [2026-10-11] LLM 공급자 키 저장소(llm_credential_store)도 같은 redis·같은 위험
+            # (청소 안 하면 다른 시험까지 "키 설정됨"을 물려받는다) — 같은 회로차단기를 공유해
+            # 별도 스레드·타임아웃을 또 두지 않는다.
+            from koipa.services import llm_credential_store
+            for _name in llm_credential_store.SUPPORTED_PROVIDERS:
+                c.delete(llm_credential_store._key(_name))
         except Exception:  # noqa: BLE001 — redis 미가용 환경도 시험은 계속 돈다
             pass
 

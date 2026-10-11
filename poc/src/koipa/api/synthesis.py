@@ -17,6 +17,8 @@ from koipa.schemas.synthesis import (
     SynthJobStatus,
     SynthPlaybookResponse,
     SynthPlaybookUpdateRequest,
+    SynthProviderCredentialRequest,
+    SynthProviderCredentialStatus,
     SynthProvidersStatusResponse,
     SyntheticDocDetail,
     SynthQueueResponse,
@@ -24,6 +26,7 @@ from koipa.schemas.synthesis import (
     SynthReviewResponse,
     SynthTrainingCandidateResponse,
 )
+from koipa.services import llm_credential_store
 from koipa.services.synth_coverage import DEFAULT_MIN_PER_CELL, coverage_report
 from koipa.services.synth_provider_status import provider_status
 from koipa.services.synthesis_service import SynthesisDispatchUnavailable, SynthesisService
@@ -112,6 +115,52 @@ def synth_providers_status():
         "active": getattr(settings, "llm_provider", "") or "",
         "providers": provider_status(),
     }
+
+
+def _actor(auth: dict) -> tuple[str | None, str | None]:
+    claims = auth.get("claims")
+    sub = getattr(claims, "sub", None) if claims is not None else None
+    return sub, auth.get("actor_role")
+
+
+def _credential_status_response(provider: str) -> SynthProviderCredentialStatus:
+    from koipa.config import settings  # noqa: PLC0415
+
+    env_default = getattr(settings, f"{provider}_api_key", "") or ""
+    s = llm_credential_store.status(provider, env_default=env_default)
+    return SynthProviderCredentialStatus(provider=provider, **s)
+
+
+@router.put("/synth/providers/{provider}/credential", response_model=SynthProviderCredentialStatus,
+            summary="상용 LLM 공급자(anthropic·openai) API 키 설정 — 콘솔, 재시작 불필요")
+def set_provider_credential(
+    provider: str,
+    req: SynthProviderCredentialRequest,
+    auth: dict = Depends(require_role("admin")),
+):
+    """[2026-10-11] 사용자 명시적 지시로 신설 — 전까지는 콘솔에 키 입력칸을 두지 않는 것이
+    확정 정책이었다([[no-credential-prompt-ever-2026-08-24]]). 이 경로에 한해 뒤집혔다
+    ([[llm-credential-console-input-reversal-2026-10-11]]). 응답은 마스킹된 값만 담는다 —
+    저장 직후에도 평문을 돌려주지 않는다.
+    """
+    if provider not in llm_credential_store.SUPPORTED_PROVIDERS:
+        raise HTTPException(status_code=404, detail=f"지원하지 않는 공급자: {provider}")
+    actor_id, actor_role = _actor(auth)
+    try:
+        llm_credential_store.set_credential(req.api_key, provider=provider, actor_id=actor_id, actor_role=actor_role)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _credential_status_response(provider)
+
+
+@router.delete("/synth/providers/{provider}/credential", response_model=SynthProviderCredentialStatus,
+               summary="콘솔에서 설정한 키 삭제 — .env 기본값으로 복귀")
+def clear_provider_credential(provider: str, auth: dict = Depends(require_role("admin"))):
+    if provider not in llm_credential_store.SUPPORTED_PROVIDERS:
+        raise HTTPException(status_code=404, detail=f"지원하지 않는 공급자: {provider}")
+    actor_id, actor_role = _actor(auth)
+    llm_credential_store.clear_credential(provider, actor_id=actor_id, actor_role=actor_role)
+    return _credential_status_response(provider)
 
 
 @router.get("/synth/playbook", response_model=SynthPlaybookResponse)

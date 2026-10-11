@@ -32,12 +32,18 @@ def build_provider(name: str | None = None) -> LLMProvider:
         return NoopProvider()
     if chosen == "anthropic":
         from koipa.adapters.llm.anthropic_provider import AnthropicProvider
+        from koipa.services.llm_credential_store import get_credential
 
-        return AnthropicProvider()
+        # [2026-10-11] 콘솔에서 설정한 키가 있으면 그걸 우선한다(재시작 불필요) —
+        # 없으면 기존처럼 .env(ANTHROPIC_API_KEY)로 fail back.
+        key = get_credential("anthropic", default=settings.anthropic_api_key or "") or None
+        return AnthropicProvider(api_key=key)
     if chosen == "openai":
         from koipa.adapters.llm.openai_provider import OpenAIProvider
+        from koipa.services.llm_credential_store import get_credential
 
-        return OpenAIProvider()
+        key = get_credential("openai", default=settings.openai_api_key or "") or None
+        return OpenAIProvider(api_key=key)
     if chosen in ("google", "gemini"):
         # Gemini는 OpenAI 호환 endpoint 재사용(신규 SDK 불요). gemini-2.5-pro는 PRICE_TABLE에 존재.
         from koipa.adapters.llm.local_openai_provider import LocalOpenAIProvider

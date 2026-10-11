@@ -932,6 +932,58 @@ paths:
                       additionalProperties: true
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /synth/providers/{provider}/credential:
+    put:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [synthesis]
+      summary: 상용 LLM 공급자 API 키 설정(콘솔, 재시작 불필요)
+      description: >-
+        2026-10-11 신설. anthropic·openai 키를 콘솔에서 즉시 설정한다(.env 재시작 불필요).
+        admin 역할만 호출 가능. 응답은 어떤 경우에도 평문 키를 담지 않으며 마지막 4자
+        마스킹만 돌려준다.
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema: { type: string, enum: [anthropic, openai] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [api_key]
+              properties:
+                api_key: { type: string, description: 저장 후 응답에 그대로 반영되지 않는다 }
+      responses:
+        '200':
+          description: 설정 후 상태(마스킹)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SynthProviderCredentialStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: admin 역할이 아님 }
+        '404': { description: 지원하지 않는 공급자 }
+        '422': { description: 빈 값 등 — 저장 거부 }
+    delete:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [synthesis]
+      summary: 콘솔에서 설정한 키 삭제 — .env 기본값으로 복귀
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema: { type: string, enum: [anthropic, openai] }
+      responses:
+        '200':
+          description: 삭제 후 상태(마스킹)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SynthProviderCredentialStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: admin 역할이 아님 }
+        '404': { description: 지원하지 않는 공급자 }
+
   /synth/playbook:
     get:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
@@ -3620,6 +3672,15 @@ components:
         domain: { type: string }
         n: { type: integer }
         real: { type: integer }
+    SynthProviderCredentialStatus:
+      type: object
+      description: 평문 키를 절대 담지 않는다 — 마스킹된 표시만.
+      required: [provider, configured, source, masked]
+      properties:
+        provider: { type: string, enum: [anthropic, openai] }
+        configured: { type: boolean }
+        source: { type: string, enum: [console, env, none] }
+        masked: { type: string, description: "예: …bC3D, 또는 '서버 설정(.env)'" }
     SyntheticDoc:
       type: object
       properties:
