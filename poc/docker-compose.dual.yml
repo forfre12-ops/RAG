@@ -49,6 +49,12 @@ services:
       redis:
         condition: service_started
     volumes: !override
+      # [2026-10-11] 로컬 개발 전용 실시간 소스 마운트 — static/HTML·py 수정을 재빌드 없이
+      # 컨테이너 재시작만으로 반영한다(base docker-compose.yml 이 원래 갖고 있던 마운트를
+      # 이 오버레이가 지워서 매번 풀 리빌드가 강제되던 것을 되살림). 고객 납품 번들·211
+      # 배포(docker-compose.airgap.yml)는 이 파일을 쓰지 않아 영향 없음 — 다만 이 compose를
+      # 진짜 공유 테스트서버에 띄울 때는 그 서버의 git 체크아웃 상태가 그대로 반영된다.
+      - ./src:/app/src
       - ./artifacts:/app/artifacts:ro                       # 분류 모델(v-fe4b386b · v5) ro 공급
       # [학습 산출] artifacts 는 ro(서빙 모델 보호)라 재학습이 쓸 수 없다 — 산출 전용 rw 경로를
       # 분리한다(settings.training_output_dir). worker 가 쓰고 api 가 서빙으로 읽으므로 양쪽 필수.
@@ -70,6 +76,7 @@ services:
       redis:
         condition: service_started
     volumes: !override
+      - ./src:/app/src                        # [2026-10-11] api 와 동일 — 위 주석 참조
       - ./artifacts:/app/artifacts:ro
       - ./artifacts_out:/app/artifacts_out    # [학습 산출] api 와 동일 — 위 주석 참조
       # [골든] datasets 는 .dockerignore 에 있어 이미지에 안 들어간다. 이 바인드가 없으면

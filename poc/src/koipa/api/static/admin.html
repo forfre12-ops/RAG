@@ -642,7 +642,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .synth-preview::-webkit-scrollbar{width:8px;}
 .synth-preview::-webkit-scrollbar-thumb{background:transparent;border-radius:4px;}
 .synth-preview:hover::-webkit-scrollbar-thumb{background:#c7d0dd;}
-.synth-preview::-webkit-scrollbar-track{background:transparent;}.distribution-taxonomy-row{display:grid;grid-template-columns:minmax(72px,1fr) minmax(40px,2.1fr) 33px;gap:7px;align-items:center;color:var(--ui-muted);font-size:10.5px;}.distribution-taxonomy-row>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.distribution-taxonomy-bar{height:7px;overflow:hidden;border-radius:99px;background:#eef1f4;}.distribution-taxonomy-bar i{display:block;height:100%;border-radius:inherit;background:#aab3bc;}.distribution-taxonomy-row b{color:var(--ui-ink);font:800 10px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;}.distribution-taxonomy-empty{color:var(--ui-muted);font-size:11px;padding:16px 0;}
+.synth-preview::-webkit-scrollbar-track{background:transparent;}
+.synth-preview h3{margin:10px 0 5px;color:var(--ui-navy,#1b2b4b);font-size:12.5px;font-weight:800;}
+.synth-preview h3:first-child{margin-top:0;}
+.synth-preview p{margin:0 0 8px;}
+.synth-preview table{width:100%;margin:8px 0;border-collapse:collapse;font-size:11px;line-height:1.5;}
+.synth-preview table th,.synth-preview table td{padding:5px 6px;border:1px solid var(--border);vertical-align:top;text-align:left;}
+.synth-preview table th{background:rgba(0,0,0,.03);font-weight:800;}.distribution-taxonomy-row{display:grid;grid-template-columns:minmax(72px,1fr) minmax(40px,2.1fr) 33px;gap:7px;align-items:center;color:var(--ui-muted);font-size:10.5px;}.distribution-taxonomy-row>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.distribution-taxonomy-bar{height:7px;overflow:hidden;border-radius:99px;background:#eef1f4;}.distribution-taxonomy-bar i{display:block;height:100%;border-radius:inherit;background:#aab3bc;}.distribution-taxonomy-row b{color:var(--ui-ink);font:800 10px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;}.distribution-taxonomy-empty{color:var(--ui-muted);font-size:11px;padding:16px 0;}
 @media(max-width:820px){.expert-progress-table-head{display:none;}.expert-progress-table-row{grid-template-columns:minmax(0,1fr) auto;gap:10px 16px;padding:14px;}.expert-progress-cell-rate,.expert-progress-cell-stats,.expert-progress-last{grid-column:1/-1;}.expert-progress-cell-rate{max-width:360px;}.expert-progress-last{margin-top:0;}.expert-progress-stats{gap:6px 10px;}}
 @media(max-width:760px){.distribution-taxonomy{grid-template-columns:1fr;gap:16px;}.distribution-taxonomy-list{max-height:230px;}.distribution-kpi strong{font-size:27px;}.distribution-scope-summary{grid-template-columns:1fr 1fr;}.distribution-scope-note{grid-column:1/-1;}}
 .document-sheet .doc-empty{padding:44px 12px;text-align:center;color:var(--ui-muted);font-size:13px;}
@@ -1062,7 +1068,7 @@ body *,body *::before,body *::after{border-radius:0 !important}
             <div class="btn-row" style="margin:0;">
               <button class="btn" id="sy-gen" onclick="synthGenerate()">생성 요청</button>
               <button class="btn sec sm" onclick="loadSynthQueue()">검토 큐 새로고침</button>
-              <button class="btn sec sm" onclick="checkSynthTrainingCandidate()">학습 후보 확인</button>
+              <button class="btn sec sm" onclick="checkSynthTrainingCandidate()" title="승인된 문서 전체를 모아 등급 누출 여부를 재검사합니다 — 학습에 써도 되는지 최종 판정">학습 편입 안전성 검사</button>
             </div>
           </div>
         </div>
@@ -2250,9 +2256,25 @@ function renderInspector(candidate){
   host.append(addInspectorCard('등록 정보',inspectorKv([
     ['문서 ID',candidate.doc_id],['문서유형',candidate.doc_format||candidate.info_type],['업무분야',candidate.department],['출처',candidate.document_origin],['상태',candidate.status],['분량',candidate.characters?Number(candidate.characters).toLocaleString()+'자':'—']
   ])));
-  const judgment=inspectorKv([['잠정 등급',candidate.proposed_grade||'블라인드 검수 또는 미지정'],['확정 등급',candidate.final_grade||'미확정'],['최근 결정',candidate.latest_decision&&workbenchActionLabel(candidate.latest_decision.action)||'기록 없음']]);
+  const gradeLabels={TS:'특급',S1:'1급',S2:'2급',S3:'3급'};
+  const judgment=inspectorKv([['최초 생성 등급',candidate.proposed_grade?(gradeLabels[candidate.proposed_grade]||candidate.proposed_grade)+' ('+candidate.proposed_grade+')':'정보 없음'],['확정 등급',candidate.final_grade||'미확정'],['최근 결정',candidate.latest_decision&&workbenchActionLabel(candidate.latest_decision.action)||'기록 없음']]);
   const judgmentCard=addInspectorCard('검수 상태',judgment);
-  const caveat=document.createElement('p');caveat.textContent='판정 제안값 숨김 · 독립 검수';judgmentCard.append(caveat);host.append(judgmentCard);
+  const caveat=document.createElement('p');caveat.textContent='모의문서 최초 생성 시 부여된 등급입니다. 최종 등급은 검수자가 원문을 읽고 직접 결정합니다 · 다른 검수자의 결정은 숨김';judgmentCard.append(caveat);host.append(judgmentCard);
+  // [2026-10-11 보호원 요청] 검수자 워크벤치(golden.py _REVIEWER_DOCUMENT_WORKBENCH_SCRIPT)와
+  // 같은 BERT 등급별 예측확률을 운영 콘솔 문서함에도 보여준다. 데이터는 이미 candidate.classifier_score
+  // 에 와 있다(selectWorkbenchDocument 가 단건 상세 GET /golden/candidates/{id} 로 받음) — 새 API 불필요.
+  const score=candidate.classifier_score;
+  const scoreBody=(score&&score.status==='available')
+    ? inspectorKv(['TS','S1','S2','S3'].map(code=>[gradeLabels[code],(Number(score.scores&&score.scores[code])*100).toFixed(1)+'%']))
+    : '현재 문서의 점수 스냅샷을 아직 사용할 수 없습니다.';
+  const scoreCard=addInspectorCard('BERT 등급별 예측확률',scoreBody);
+  if(score&&score.status==='available'){
+    const meta=document.createElement('p');
+    meta.textContent='최상위 예측: '+(gradeLabels[score.predicted_label]||score.predicted_label||'—')
+      +(score.calibrated?' · 보정됨':' · 보정 미확인')+(score.model_version?' · 모델 '+score.model_version:'');
+    scoreCard.append(meta);
+  }
+  host.append(scoreCard);
   host.append(addInspectorCard('검수 결정',renderWorkbenchDecision(candidate)));
 }
 function workbenchTitleKey(value){return String(value||'').replace(/^#+\s*/,'').replace(/\s+/g,' ').trim();}
@@ -3257,9 +3279,14 @@ async function loadSynthQueue(){
   try{
     const d=await api('GET',`/synth/queue?status=${encodeURIComponent(status)}&limit=50`);
     const items=Array.isArray(d.items)?d.items:[];
-    const omitted=items.filter(item=>String(item.llm_provider||'').toLowerCase()==='noop').length;
-    SYNTH=items.filter(item=>String(item.llm_provider||'').toLowerCase()!=='noop');
-    $('sy-info').textContent=`검토 대상 ${SYNTH.length}건${omitted?' · 테스트 데이터 '+omitted+'건 제외':''}`;
+    const isTestFixture=item=>String(item.llm_provider||'').toLowerCase()==='noop';
+    // [2026-10-11] noop_fallback/llm_nonjson = LLM이 실제로 못 만들어 대체본으로 채운 문서다.
+    // 승인해도 학습엔 절대 안 들어간다(TRAINING_EXCLUDED_LABEL_SOURCES, synthesis_service.py).
+    // 검수자가 읽어도 판단할 거리가 없으니 대기열에 아예 안 보이게 한다.
+    const isLlmFailure=item=>['noop_fallback','llm_nonjson'].includes(String(item.label_source||''));
+    const omitted=items.filter(item=>isTestFixture(item)||isLlmFailure(item)).length;
+    SYNTH=items.filter(item=>!isTestFixture(item)&&!isLlmFailure(item));
+    $('sy-info').textContent=`검토 대상 ${SYNTH.length}건${omitted?' · 테스트/생성 실패 '+omitted+'건 제외':''}`;
     renderSynthQueue();
   }catch(e){ $('sy-info').textContent=`검수 큐 조회 실패: ${errKoText(e)}`; }
 }
@@ -3270,9 +3297,9 @@ async function checkSynthTrainingCandidate(){
   try{
     const d=await api('GET','/synth/training-candidate');
     info.textContent=d.ready
-      ? `학습 후보 ${Number(d.included||0)}건 준비됨`
-      : `학습 후보 준비 안 됨 · ${(d.blockers||[]).join(' · ')||'확인 필요'}`;
-  }catch(e){ info.textContent=`학습 후보 확인 실패: ${errKoText(e)}`; }
+      ? `학습 편입 안전 — ${Number(d.included||0)}건 사용 가능`
+      : `학습 편입 보류 · ${(d.blockers||[]).join(' · ')||'확인 필요'}`;
+  }catch(e){ info.textContent=`학습 편입 안전성 검사 실패: ${errKoText(e)}`; }
 }
 
 function renderSynthQueue(){
@@ -3285,11 +3312,15 @@ function renderSynthQueue(){
         <div><span class="q-id">${esc(it.synth_id)}</span>${it.domain&&it.domain!=='mixed'?` · <span class="q-title">${esc(synthDomainLabel(it.domain))}</span>`:''}${it.document_type?` <span class="muted">— ${esc(it.document_type)}</span>`:''}</div>
         <div>${gradeTag(it.corrected_grade||it.target_grade)}${it.corrected_grade?`<span class="pill" title="검수자가 승인하면서 등급을 고쳤습니다. 학습 데이터는 이 등급으로 만들어집니다.">교정됨 · 생성 시 ${esc(it.target_grade)}</span>`:''}
           <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${esc(it.llm_provider)}/${esc(it.llm_model||'-')}</span>
-          ${it.quality_score!=null?`<span class="pill ${it.quality_score>=0.7?'ok':'warn'}">품질 ${Number(it.quality_score).toFixed(2)}</span>`:''}
-          ${it.label_source?`<span class="pill warn" title="LLM 이 정상 응답을 주지 못해 대체 본문으로 만들어진 문서입니다. 승인해도 학습 데이터에는 들어가지 않습니다.">대체본 · 학습 제외</span>`:''}
+          <!-- [2026-10-11] quality_score 표시 제거: 이 화면(요청 1건=1,000건 미만·단일 등급)에서는
+               코퍼스 누출 지표가 구조적으로 항상 미판정(0.5)이라, 숫자를 보여주면 "문서 품질이
+               중간"으로 오해를 산다. 실제 학습 편입 안전성은 "학습 편입 안전성 검사" 버튼이
+               승인분 전체를 모아 따로 재검사한다 — 그게 진짜 신호다. -->
+          <!-- label_source(noop_fallback·llm_nonjson) 문서는 loadSynthQueue()에서 이미 걸러져
+               여기 안 옴 — 더 이상 "대체본·학습 제외" 태그를 보여줄 대상이 없다. -->
           <span class="pill">${esc(it.review_status)}</span></div>
       </div>
-      ${it.preview?`<div class="synth-preview" onclick="this.classList.toggle('expanded')" title="클릭하면 전체 내용을 펼쳐 봅니다">${esc(it.preview)}</div>`:''}
+      ${it.preview?`<div class="synth-preview" id="sy-preview-${i}" onclick="this.classList.toggle('expanded')" title="클릭하면 전체 내용을 펼쳐 봅니다"></div>`:''}
       ${reviewable?`
       <div class="q-actions">
         <span style="font-size:11px;color:var(--text-dim)">확정 등급</span>
@@ -3298,6 +3329,13 @@ function renderSynthQueue(){
         <button class="btn sec sm" onclick="synthReview(${i},'reject')">반려</button>
       </div>`:''}
     </div>`).join('');
+  // [2026-10-11] 미리보기는 템플릿 문자열로는 못 만든다 — renderWorkbenchBody가 DOM 조각을
+  // 돌려주기 때문(표·헤더를 실제 태그로 만듦). innerHTML을 심은 뒤 칸마다 채운다.
+  SYNTH.forEach((it,i)=>{
+    if(!it.preview) return;
+    const host=$('sy-preview-'+i); if(!host) return;
+    host.append(renderWorkbenchBody({text:it.preview,title:''}));
+  });
 }
 
 async function synthReview(i, decision){
