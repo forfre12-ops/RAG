@@ -293,6 +293,7 @@ def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_bound
     ):
         assert removed_control not in console
     assert "안전 정지" not in console
+    assert 'href="../api/v1/golden/candidates/login.html"' not in console
 
 
 def test_console_overview_metric_cards_filter_the_document_screen_by_status(console: str):

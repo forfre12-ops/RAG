@@ -892,17 +892,15 @@ body *,body *::before,body *::after{border-radius:0 !important}
     <!-- [2026-10-03 사용자 결정] G3 "검증문서 현황 — 구성·서명" 카드의 지표(서명 확정/목표 5 등)를
          뺐다 — 그 숫자로 관리자가 할 수 있는 다른 행동이 없다는 판단. 자동배포를 막는 안전장치
          (golden_tiers.eval_readiness·deploy_gate_min_locked_per_grade)는 코드에 그대로 남지만,
-         관리자 화면에서는 표시하지 않는다.
-         ⚠ 링크 하나는 그대로 둔다 — [console_nav.py](CONSOLE_LINKS 주석)가 "후보 관리 화면
-         진입은 이 카드의 버튼이 맡는다"고 명시한 **유일한 진입로**였다(상단 공용 메뉴에는
-         의도적으로 안 둠 — 로그인이 필요한 업무 화면이라 층위가 다름). 지표 없이 링크만 남긴다. -->
+         관리자 화면에서는 표시하지 않는다. 과거 카드의 버튼도 별도 후보 관리 화면을 열지 않고
+         현재 관리자 콘솔의 문서 검토 화면으로 이동시킨다. -->
     <section class="card col-span" data-pane="review" data-product-view="experts" data-product-legacy="true" style="order:2" data-golden="1">
       <div class="card-head">
         <div class="ttl"><span class="step-no aux">이동</span> 검증문서 후보 관리</div>
       </div>
       <div class="card-body">
         <div class="btn-row" style="margin:0;flex-wrap:wrap;">
-          <a class="btn sec sm" href="../api/v1/golden/candidates/login.html" target="_blank" rel="noopener">후보 관리 화면 열기 ↗</a>
+          <button class="btn sec sm" type="button" onclick="showProductView('documents')">문서 검토 화면 열기</button>
         </div>
       </div>
     </section>
