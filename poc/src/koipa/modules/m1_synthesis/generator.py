@@ -767,6 +767,18 @@ class SyntheticDocGenerator:
         # 0·음수가 오면 아무것도 만들지 않거나 죽는다 — 조용한 0건 생성을 막는다.
         return max(1, min(32, resolved))
 
+    def _effective_max_output_tokens(self, requested: int) -> int:
+        """Keep local long-form synthesis from being cut off before JSON closes."""
+        resolved = max(512, int(requested))
+        provider = str(getattr(self.llm, "name", "") or "").lower()
+        if provider not in {"local_openai", "vllm", "ollama", "lm_studio"}:
+            return resolved
+        configured = getattr(_settings(), "local_llm_synth_min_output_tokens", 4500)
+        try:
+            return max(resolved, max(512, int(configured)))
+        except (TypeError, ValueError):
+            return max(resolved, 4500)
+
     @staticmethod
     def _record_usage(resp: object) -> None:
         """[QW] 합성 LLM 호출 비용 best-effort 기록 (purpose='synthesis')."""
@@ -1014,7 +1026,7 @@ class SyntheticDocGenerator:
         generation_mode: str = "single",
     ) -> SynthDoc:
         response_audit: list[dict[str, object]] = audit if audit is not None else []
-        max_output_tokens = max(512, int(req.max_output_tokens))
+        max_output_tokens = self._effective_max_output_tokens(req.max_output_tokens)
         user = self._build_user_prompt(
             req,
             grade_code,
@@ -1126,7 +1138,7 @@ class SyntheticDocGenerator:
         0건이 되면 안 된다 — 실패는 response_audit 의 step 값으로 남는다.
         """
         audit: list[dict[str, object]] = []
-        max_output_tokens = max(512, int(req.max_output_tokens))
+        max_output_tokens = self._effective_max_output_tokens(req.max_output_tokens)
         situation = GRADE_SITUATION_PROMPTS.get(
             grade_code, GRADE_SITUATION_PROMPTS["S3"]
         )

@@ -490,6 +490,10 @@ class Settings(BaseSettings):
     local_llm_model: str = "upstage/Solar-Open-100B"
     local_llm_api_key: str = "EMPTY"   # vLLM은 EMPTY, Ollama는 ollama, LM Studio는 lm-studio
     local_llm_enable_thinking: bool = False  # Qwen3 전용 /think 지시어 — Solar에는 해당 없음(무해한 기본값)
+    # 긴 한국어 합성문서는 JSON 닫힘까지 3,500 토큰을 넘길 수 있다. 로컬 서버의
+    # 컨텍스트는 배포 시 충분히 확보한 뒤 이 값 이상으로 요청한다. 외부 API 호출에는
+    # 적용하지 않아 비용·계약을 바꾸지 않는다.
+    local_llm_synth_min_output_tokens: int = 4500
 
     # ── 합성 생성(M1) 3설정 — 2026-09-10 신설 ─────────────────────────────────
     # [1] 구조화 출력. 프롬프트로 "JSON 으로 답해라" 부탁하는 대신 서버에 JSON 스키마를

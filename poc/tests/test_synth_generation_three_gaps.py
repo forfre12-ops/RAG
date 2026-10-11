@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import json
 import threading
+from types import SimpleNamespace
 
 import pytest
 
 from koipa.adapters.llm.base import LLMResponse, UsageRecord, accepts_json_schema
+from koipa.modules.m1_synthesis import generator as generator_module
 from koipa.modules.m1_synthesis.generator import (
     CRITIQUE_JSON_SCHEMA,
     OUTLINE_JSON_SCHEMA,
@@ -69,6 +71,7 @@ class RecordingProvider:
                     "prompt": prompt,
                     "system": system,
                     "temperature": temperature,
+                    "max_tokens": max_tokens,
                     "json_schema": json_schema,
                 }
             )
@@ -96,6 +99,11 @@ class LegacyProvider:
         return max(1, len(text) // 3)
 
 
+class LocalRecordingProvider(RecordingProvider):
+    name = "local_openai"
+    model = "qwen3"
+
+
 # ── ① 구조화 출력 ────────────────────────────────────────────────────────────
 
 
@@ -108,6 +116,30 @@ def test_schema_is_actually_sent_to_provider():
     assert llm.calls[0]["json_schema"] == SYNTH_DOC_JSON_SCHEMA
     assert doc.response_audit[0]["json_schema"] is True
     assert doc.response_audit[0]["step"] == "body"
+
+
+def test_local_provider_gets_configured_minimum_output_budget(monkeypatch):
+    """긴 한국어 문서가 JSON 닫힘 전에 잘리는 것을 로컬에만 방지한다."""
+    monkeypatch.setattr(
+        generator_module,
+        "_settings",
+        lambda: SimpleNamespace(local_llm_synth_min_output_tokens=4500),
+    )
+    llm = LocalRecordingProvider()
+    SyntheticDocGenerator(llm=llm, structured_output=False).generate_one(
+        SynthRequest(target_grade="S2", domain="tech", max_output_tokens=3500)
+    )
+
+    assert llm.calls[0]["max_tokens"] == 4500
+
+
+def test_non_local_provider_keeps_requested_output_budget():
+    llm = RecordingProvider()
+    SyntheticDocGenerator(llm=llm, structured_output=False).generate_one(
+        SynthRequest(target_grade="S2", domain="tech", max_output_tokens=3500)
+    )
+
+    assert llm.calls[0]["max_tokens"] == 3500
 
 
 def test_structured_output_off_sends_no_schema():
