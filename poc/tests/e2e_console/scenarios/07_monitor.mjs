@@ -120,14 +120,37 @@ export const scenarios = [
   {
     id: 'monitor.synth.queue-and-review',
     writes: true,
+    needsMock: true,
     title: '합성 검수 큐를 읽어 승인/반려하면 목록에서 빠진다',
+    why: '[2026-10-11] 기본 fixture의 둘째 건이 label_source:"llm_nonjson"이라 화면이 이제 큐에서 걸러낸다(승인해도 학습 편입 불가한 더미라서) — 이 시나리오가 보려는 건 그 필터링이 아니라 "승인하면 목록에서 빠진다"이므로, 전용 override로 둘 다 걸러지지 않는 2건을 둔다.',
     async run({ server, check }) {
+      server.overrides['GET /synth/queue'] = {
+        total: 2,
+        items: [
+          {
+            synth_id: '11111111-1111-4111-8111-111111111111',
+            target_grade: 'TS', domain: '반도체',
+            llm_provider: 'local', llm_model: 'qwen3-14b',
+            quality_score: 0.81, review_status: 'pending',
+            preview: '당사 EUV 공정 레시피 원본 — 대외 반출 금지.',
+            created_at: '2026-08-23T01:40:00Z',
+          },
+          {
+            synth_id: '22222222-2222-4222-8222-222222222222',
+            target_grade: 'S2', domain: 'hr',
+            llm_provider: 'local', llm_model: 'qwen3-14b',
+            quality_score: 0.72, review_status: 'pending',
+            preview: '조직 개편 계획 초안 — 대외비.',
+            created_at: '2026-08-23T01:42:00Z',
+          },
+        ],
+      };
       const page = await synthesisTab(server);
       page.click(page.q('button[onclick="loadSynthQueue()"]'));
       await page.settle();
 
       check.eq(page.qa('#sy-queue .q-item').length, 2, '2건이 그려졌다');
-      check.includes(page.html('sy-queue'), '품질 0.81', '품질 점수가 보인다');
+      check.excludes(page.html('sy-queue'), '품질 0.81', '[2026-10-11] 품질 점수 배지는 제거됐다 — 단건 생성에서는 코퍼스 지표가 항상 미판정으로 찍혀 오해를 줬다');
       check.includes(page.text('sy-queue'), 'EUV 공정 레시피', '본문 미리보기가 보인다');
 
       page.set('sy-g-0', 'S1');   // 목표 TS 와 다른 등급으로 승인
