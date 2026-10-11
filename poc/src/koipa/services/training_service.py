@@ -12,13 +12,16 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import json
 import logging
 import math
 import uuid
+from pathlib import Path
 from typing import Any, Optional
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from koipa.config import settings
 from koipa.db import session_scope
 from koipa.repositories import TrainingRepo
 from koipa.schemas.training import (
@@ -35,6 +38,62 @@ from koipa.services.async_classify_service import _celery_dispatch_available
 from koipa.services.job_store import get_default_store
 
 logger = logging.getLogger(__name__)
+
+
+class TrainingDatasetUnavailable(RuntimeError):
+    """학습 입력이 워커에 준비되지 않았을 때 제출을 막는 운영 오류.
+
+    내부 원인은 로그에만 남긴다. API/콘솔에 호스트 경로나 권한 정보를 그대로
+    노출하면 운영자에게는 도움이 되지만 일반 사용자에게는 조치할 수 없는 정보다.
+    """
+
+    public_message = "학습 데이터가 서버에 준비되지 않았습니다. 관리자에게 문의하세요."
+
+
+def _dataset_split_paths(spec_kwargs: dict[str, Any] | None = None) -> dict[str, Path]:
+    """이번 실행이 읽을 train/val/test 경로를 TrainSpec과 같은 규칙으로 계산한다."""
+    supplied = spec_kwargs or {}
+    configured_root = str(settings.training_dataset_dir or "").strip()
+    if configured_root:
+        root = Path(configured_root)
+    else:
+        # 빈 설정도 아래 공통 오류 경로에서 사용자가 이해할 수 있게 처리한다.
+        root = Path("__training_dataset_dir_not_configured__")
+    return {
+        split: Path(str(supplied.get(f"{split}_path") or root / f"{split}.jsonl"))
+        for split in ("train", "val", "test")
+    }
+
+
+def ensure_training_dataset_ready(spec_kwargs: dict[str, Any] | None = None) -> dict[str, int]:
+    """학습 큐 등록 전 세 분할을 모두 읽어 유효 JSONL·비어 있지 않음을 보장한다.
+
+    API 컨테이너가 통과해도 워커 마운트가 달라질 수 있으므로 workers.tasks에서도
+    같은 함수를 다시 호출한다. 실패하면 TrainingRun을 만들거나 무거운 모델 import를
+    하기 전에 막는다.
+    """
+    counts: dict[str, int] = {}
+    problems: list[str] = []
+    for split, path in _dataset_split_paths(spec_kwargs).items():
+        try:
+            rows = 0
+            with path.open(encoding="utf-8") as fh:
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    json.loads(line)
+                    rows += 1
+            if rows == 0:
+                problems.append(f"{split}: empty ({path})")
+            else:
+                counts[split] = rows
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            problems.append(f"{split}: {type(exc).__name__} ({path})")
+    if problems:
+        detail = "; ".join(problems)
+        logger.error("training submission blocked: dataset preflight failed: %s", detail)
+        raise TrainingDatasetUnavailable(detail)
+    return counts
 
 
 def _advisory_xact_lock(db, _key=None) -> None:
@@ -635,6 +694,7 @@ class TrainingService:
             "training submit enter: type=%s base_model=%s actor=%s",
             req.training_type, req.base_model, req.actor.user_id,
         )
+        dataset_counts = ensure_training_dataset_ready(req.hyperparams)
         run_id = self._create_run(req)
         # JobStore 등록 (DB 미가용 시에도 응답 가능)
         self.jobs.create(
@@ -644,6 +704,7 @@ class TrainingService:
                 "base_model": req.base_model,
                 "submitted_at": dt.datetime.now(dt.timezone.utc).isoformat(),
                 "actor": req.actor.user_id,
+                "dataset_counts": dataset_counts,
             },
         )
         # 운영(브로커 가용)은 여기서 Celery train_classifier_task.delay() 발사.

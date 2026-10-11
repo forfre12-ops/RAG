@@ -5,6 +5,7 @@
 
 import csv
 import io
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -19,9 +20,10 @@ from koipa.schemas.training import (
     TrainResponse,
     TrainStatus,
 )
-from koipa.services.training_service import TrainingService
+from koipa.services.training_service import TrainingDatasetUnavailable, TrainingService
 
 router = APIRouter(tags=["training"], dependencies=[Depends(require_auth)])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/train", response_model=TrainResponse, status_code=202)
@@ -29,7 +31,11 @@ router = APIRouter(tags=["training"], dependencies=[Depends(require_auth)])
 def train(request: Request, req: TrainRequest, auth: dict = Depends(require_auth)):
     # [#13] created_by 감사 신원을 인증 principal 로 확정(body 자칭 위조 차단; JWT sub 우선).
     bind_authenticated_actor(req.actor, auth)
-    return TrainingService().submit(req)
+    try:
+        return TrainingService().submit(req)
+    except TrainingDatasetUnavailable as exc:
+        logger.error("training request rejected before enqueue: %s", exc)
+        raise HTTPException(status_code=503, detail=exc.public_message) from exc
 
 
 @router.get("/train/jobs/{train_job_id}", response_model=TrainStatus)
