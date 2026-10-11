@@ -2451,6 +2451,7 @@ full = [
     { name = "rhwp-python" },
     { name = "sentence-transformers" },
     { name = "soynlp" },
+    { name = "unhwp" },
     { name = "xlrd" },
 ]
 hwp = [
@@ -2594,6 +2595,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0" },
     { name = "torch", specifier = ">=2.3" },
     { name = "transformers", specifier = ">=4.44" },
+    { name = "unhwp", marker = "extra == 'full'", specifier = ">=0.8" },
     { name = "unhwp", marker = "extra == 'hwp-tables'", specifier = ">=0.8" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
     { name = "xlrd", marker = "extra == 'full'", specifier = ">=2.0" },
