@@ -41,8 +41,17 @@ def classify(request: Request, req: ClassifyRequest, svc: ClassifyService = Depe
         # /classify 는 ClassifyResponse 계약(요청 처리 시간 포함)을 유지한다. 투영은
         # KL 에 보이면 안 되는 정책/그림자 진단값을 걷는 단계일 뿐이며, elapsed_ms 는
         # 의사결정 자료가 아닌 이 요청의 처리 시간이다.
-        result = ClassifyResponse.model_validate({
-            **wire.model_dump(mode="python"),
-            "elapsed_ms": result.elapsed_ms,
+        result = result.model_copy(update={
+            "rule_grade": wire.rule_grade,
+            "model_grade": wire.model_grade,
+            "grade_candidates": wire.grade_candidates,
+            "grade_candidates_reason": wire.grade_candidates_reason,
+            "regulation_reference": wire.regulation_reference,
+            "regulation_summary": wire.regulation_summary,
+            "explanation_status": wire.explanation_status,
+            "fallback_reason": wire.fallback_reason,
+            "automation_assessment": None,
+            "factor_shadow": None,
+            "policy_shadow": None,
         })
     return result
