@@ -235,11 +235,7 @@ export const scenarios = [
           check.gte(connectionSettings.length, 1, '연결·운영 도구 메뉴에서만 운영 연결 상태를 연다');
           const settings = connectionSettings[0];
           check.ok(settings.classList.contains('settings-card'), '설정 화면이 공용 설정 카드 표현을 사용한다');
-          // [2026-10-11] "운영 연결" 문구는 없어졌다 — 헤더가 "운영 설정"/"검수 운영 설정"으로
-          // 바뀌었고, 상태는 connection-summary 의 "서비스 상태"가 보여준다. data-tech 도
-          // 바깥 .settings-stack 전체가 아니라 그 안의 개별 섹션(.settings-section, "서버 연결과
-          // 기록 주체")에만 붙는다 — 규정 카드 같은 다른 섹션은 이제 기술상세가 아니라 기본
-          // 화면이기 때문이다(admin.html:851-852).
+          // 운영 상태는 요약에, 기술 설정은 개별 섹션에만 남긴다.
           check.ok(settings.textContent.includes('서비스 상태'), '설정 화면이 운영 연결 상태를 표시한다');
           check.ok(settings.querySelector('.settings-section[data-tech]'), '기술 연결 설정과 시연 정리는 기본 화면에서 숨긴다');
         } else {

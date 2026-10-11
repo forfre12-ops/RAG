@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import json
 import logging
+import os
 import uuid
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -21,6 +24,7 @@ from koipa.schemas.synthesis import (
     SynthGenerateResponse,
     SynthJobStatus,
     SyntheticDocDetail,
+    SynthTrainingCandidateResponse,
     SyntheticDocItem,
     SynthQueueResponse,
     SynthReviewRequest,
@@ -77,6 +81,39 @@ TRAINING_EXCLUDED_PROVIDERS = frozenset({"noop"})
 # ⚠ gate_error 는 "게이트를 못 돌렸다"이지 "누출이 있다"가 아니다 — 사유를 잡음과 섞지
 #   않는다(build_training_rows 가 사유별로 센다).
 TRAINING_EXCLUDED_VERDICTS = frozenset({"gate_error"})
+
+
+def _training_candidate_blockers(result: dict) -> list[str]:
+    """Return user-facing reasons that an approved synthetic snapshot is unsafe.
+
+    ``build_training_rows`` deliberately reports corpus hygiene instead of
+    deciding policy so the offline reporting script can inspect it.  The live
+    training path is stricter: an explicitly requested candidate must not be
+    merged when that report is absent or over its published ceiling.
+    """
+    blockers: list[str] = []
+    if int(result.get("included") or 0) <= 0:
+        blockers.append("학습에 포함할 승인 모의 문서가 없습니다")
+
+    leakage = result.get("corpus_leakage") or {}
+    if leakage.get("error"):
+        blockers.append("학습 후보 품질 검사를 완료하지 못했습니다")
+        return blockers
+
+    documents = int(leakage.get("documents") or 0)
+    if documents <= 0:
+        return blockers
+
+    from koipa.dataset_leakage import (  # noqa: PLC0415
+        DEFAULT_MAX_LENGTH_LEAK,
+        DEFAULT_MAX_TELL_COVERAGE,
+    )
+
+    if float(leakage.get("length_only_1nn") or 0.0) > DEFAULT_MAX_LENGTH_LEAK:
+        blockers.append("학습 후보의 문서 길이 편향이 허용 기준을 초과했습니다")
+    if float(leakage.get("tell_coverage") or 0.0) > DEFAULT_MAX_TELL_COVERAGE:
+        blockers.append("학습 후보에 등급 단서가 과도하게 포함되어 있습니다")
+    return blockers
 
 
 # [2026-09-05] **배치 게이트는 코퍼스를 재지 않는다.** screen_batch 는 생성 요청 한 건
@@ -165,6 +202,23 @@ def _dataset_version(rows: list[dict]) -> str:
             digest.update(b"|")
         digest.update(b";")
     return "synth-%s-%d" % (digest.hexdigest()[:10], len(rows))
+
+
+def training_dataset_version(rows: list[dict]) -> str:
+    """Stable version name for the exact synthetic rows handed to a train job."""
+    return _dataset_version(rows)
+
+
+def _snapshot_rows_sha256(rows: list[dict]) -> str:
+    """Deterministic digest for a frozen train input, independent of JSONL order."""
+    digest = hashlib.sha256()
+    for row in sorted(rows, key=lambda item: str(item.get("doc_id") or "")):
+        digest.update(
+            json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+            .encode("utf-8")
+        )
+        digest.update(b"\n")
+    return digest.hexdigest()
 
 
 class SynthesisService:
@@ -411,6 +465,145 @@ class SynthesisService:
             llm_fallback=rec.get("llm_fallback"),
             error=rec.get("error"),
         )
+
+    def training_candidate(self) -> tuple[dict, SynthTrainingCandidateResponse]:
+        """Build the approved snapshot and state whether the next train may use it.
+
+        Approval records the reviewer decision only.  This method is the
+        explicit handoff to training: it rebuilds the current approved set and
+        blocks an inclusion request when corpus hygiene is not satisfied.
+        """
+        result = self.build_training_rows()
+        blockers = _training_candidate_blockers(result)
+        response = SynthTrainingCandidateResponse(
+            ready=not blockers,
+            dataset_version=str(result.get("dataset_version") or _dataset_version([])),
+            approved_total=int(result.get("approved_total") or 0),
+            included=int(result.get("included") or 0),
+            excluded_noise=int(result.get("excluded_noise") or 0),
+            excluded_empty=int(result.get("excluded_empty") or 0),
+            excluded_gate_error=int(result.get("excluded_gate_error") or 0),
+            grade_corrected=int(result.get("grade_corrected") or 0),
+            blockers=blockers,
+        )
+        return result, response
+
+    def freeze_training_candidate(self, dataset_dir: str | Path) -> dict:
+        """Freeze the approved synthetic rows selected by one train submission.
+
+        A worker must not rebuild the live approval queue after it has accepted a
+        train job: approvals can change while the job waits in Celery.  The
+        manifest binds the exact JSONL, candidate gate, and content hash to this
+        run; a missing or changed manifest is a fail-closed worker error.
+        """
+        result, candidate = self.training_candidate()
+        if not candidate.ready:
+            return {"ready": False, "candidate": candidate}
+
+        rows = list(result.get("rows") or [])
+        rows_sha256 = _snapshot_rows_sha256(rows)
+        root = Path(dataset_dir).resolve()
+        snapshot_dir = root / "approved_synthetic_snapshots"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        snapshot_id = uuid.uuid4().hex[:12]
+        snapshot_path = snapshot_dir / f"{candidate.dataset_version}-{snapshot_id}.jsonl"
+        manifest_path = snapshot_path.with_suffix(".manifest.json")
+        created_at = dt.datetime.now(dt.timezone.utc).isoformat()
+        manifest = {
+            "schema_version": "approved-synthetic-snapshot-v1",
+            "dataset_version": candidate.dataset_version,
+            "snapshot_id": snapshot_id,
+            "created_at": created_at,
+            "rows_sha256": rows_sha256,
+            "approved_total": candidate.approved_total,
+            "included": candidate.included,
+            "excluded_noise": candidate.excluded_noise,
+            "excluded_empty": candidate.excluded_empty,
+            "excluded_gate_error": candidate.excluded_gate_error,
+            "grade_corrected": candidate.grade_corrected,
+            "corpus_leakage": result.get("corpus_leakage") or {},
+        }
+        jsonl = "".join(
+            json.dumps(row, ensure_ascii=False, sort_keys=True, default=str) + "\n"
+            for row in rows
+        )
+        # Write both artifacts fully before their names become visible.  The
+        # JSONL is written first; a worker only accepts it when its manifest is
+        # present and hash-valid, so a crash cannot produce an accepted partial
+        # snapshot.
+        tmp_jsonl = snapshot_path.with_name(f".{snapshot_path.name}.{uuid.uuid4().hex}.tmp")
+        tmp_manifest = manifest_path.with_name(f".{manifest_path.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            tmp_jsonl.write_text(jsonl, encoding="utf-8")
+            os.replace(tmp_jsonl, snapshot_path)
+            tmp_manifest.write_text(
+                json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            os.replace(tmp_manifest, manifest_path)
+        except OSError:
+            tmp_jsonl.unlink(missing_ok=True)
+            tmp_manifest.unlink(missing_ok=True)
+            raise
+        return {
+            "ready": True,
+            "candidate": candidate,
+            "snapshot_path": str(snapshot_path),
+            "manifest_path": str(manifest_path),
+            "rows_sha256": rows_sha256,
+            "created_at": created_at,
+        }
+
+    @staticmethod
+    def load_frozen_training_candidate(
+        snapshot_path: str | Path,
+        *,
+        expected_dataset_version: str | None = None,
+        expected_rows_sha256: str | None = None,
+    ) -> tuple[dict, SynthTrainingCandidateResponse]:
+        """Load one submit-time snapshot and reject missing/tampered evidence."""
+        path = Path(snapshot_path).resolve()
+        manifest_path = path.with_suffix(".manifest.json")
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("승인 모의 문서 스냅샷을 읽을 수 없습니다") from exc
+        if manifest.get("schema_version") != "approved-synthetic-snapshot-v1":
+            raise ValueError("승인 모의 문서 스냅샷 형식이 올바르지 않습니다")
+        version = str(manifest.get("dataset_version") or "")
+        if not version or (expected_dataset_version and version != expected_dataset_version):
+            raise ValueError("승인 모의 문서 스냅샷 버전이 일치하지 않습니다")
+        rows_sha256 = _snapshot_rows_sha256(rows)
+        if rows_sha256 != str(manifest.get("rows_sha256") or ""):
+            raise ValueError("승인 모의 문서 스냅샷 무결성 검증에 실패했습니다")
+        if expected_rows_sha256 and rows_sha256 != expected_rows_sha256:
+            raise ValueError("승인 모의 문서 스냅샷 요청 식별값이 일치하지 않습니다")
+        included = int(manifest.get("included") or 0)
+        if included != len(rows):
+            raise ValueError("승인 모의 문서 스냅샷 건수가 일치하지 않습니다")
+        candidate = SynthTrainingCandidateResponse(
+            ready=True,
+            dataset_version=version,
+            approved_total=int(manifest.get("approved_total") or 0),
+            included=included,
+            excluded_noise=int(manifest.get("excluded_noise") or 0),
+            excluded_empty=int(manifest.get("excluded_empty") or 0),
+            excluded_gate_error=int(manifest.get("excluded_gate_error") or 0),
+            grade_corrected=int(manifest.get("grade_corrected") or 0),
+            blockers=[],
+        )
+        return {"rows": rows, "dataset_version": version, "corpus_leakage": manifest.get("corpus_leakage") or {}}, candidate
+
+    def record_training_membership(self, sample_ids: list[str], dataset_version: str) -> int:
+        """Append the sample-to-training-snapshot evidence after train input is built."""
+        if not sample_ids:
+            return 0
+        try:
+            with session_scope() as db:
+                return SynthRepo(db).record_dataset_membership(sample_ids, dataset_version)
+        except SQLAlchemyError as exc:
+            raise RuntimeError("승인 모의 문서 학습 편입 이력을 기록하지 못했습니다") from exc
 
     def build_training_rows(
         self, *, limit: int | None = None, stamp_version: bool = False

@@ -124,9 +124,9 @@ export const scenarios = [
         await page.settle();
 
         check.ok(page.$('reg-card').classList.contains('reg-off'), `${status}: 카드가 숨겨져 있다`);
-        await goToPane(page, 'config');
+        await goToPane(page, 'settings');
         check.ok(!page.visible('reg-card'), `${status}: 설정 탭을 열어도 카드가 보이지 않는다`);
-        check.includes(page.text('pane-note'), '등급 체계와 태깅 규칙입니다', `${status}: 탭 안내문은 그대로다`);
+        check.includes(page.text('pane-note'), '운영 설정', `${status}: 탭 안내문은 그대로다`);
         check.excludes(page.text('pane-note'), '사내 규정', `${status}: 없는 기능을 안내문에 적지 않는다`);
         check.eq(page.logLines('err').filter((l) => l.includes('/regulations')).length, 0, `${status}: 요청 로그에 규정 오류 줄이 없다`);
         assertNoScriptErrors(check, page);

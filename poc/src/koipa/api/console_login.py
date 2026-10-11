@@ -16,8 +16,10 @@ URL 경로는 바꾸지 않았다(`/golden/candidates/login.html` 등 그대로)
 from __future__ import annotations
 
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from koipa.api._jwt_auth import SigningUnavailable, sign_jwt
 from koipa.api._rbac import require_role
@@ -35,6 +37,10 @@ from koipa.services import reviewer_credentials
 
 router = APIRouter(tags=["console-login"])
 html_router = APIRouter(tags=["console-login"])
+# ``/console`` is otherwise a StaticFiles mount.  Keep the two HTML entry
+# points ahead of that mount so a reviewer cannot bypass the navigation guard
+# by typing the administrator URL directly.
+console_page_router = APIRouter(tags=["console-login"])
 
 
 def _console_actor_id(auth: dict) -> str:
@@ -61,6 +67,24 @@ def _is_console_admin(auth: dict) -> bool:
     if not roles and auth.get("actor_role"):
         roles = {auth["actor_role"]}
     return not roles.isdisjoint(_CONSOLE_ADMIN_ROLES)
+
+
+@console_page_router.get("/console/admin.html", include_in_schema=False)
+@console_page_router.get("/demo/admin.html", include_in_schema=False)
+def protected_admin_console_html(
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> FileResponse:
+    """Serve the administrator shell only after role verification.
+
+    The static mount still serves its scripts and styles.  These explicit
+    routes take precedence for the administrator document itself, which is
+    the only entry point that exposes the full management menu.
+    """
+    _console_actor_id(auth)
+    page = Path(__file__).with_name("static") / "admin.html"
+    if not page.is_file():
+        raise HTTPException(status_code=404, detail="admin console is not installed")
+    return FileResponse(page, headers={"Cache-Control": "no-cache, must-revalidate"})
 
 
 def _demo_prefill_block() -> str:

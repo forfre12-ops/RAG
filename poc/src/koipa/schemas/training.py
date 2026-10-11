@@ -14,6 +14,9 @@ class TrainRequest(BaseModel):
     training_type: str = Field(pattern=r"^(full|incremental|hyperparam_search)$")
     base_model: str = "kf-deberta-base"
     hyperparams: dict[str, Any] = Field(default_factory=dict)
+    # 승인된 모의 문서는 기본 학습셋에 자동으로 섞지 않는다. 관리자가 새 학습을
+    # 제출할 때만 명시적으로 포함을 요청하고, 워커가 후보 품질·홀드아웃 중복을 다시 확인한다.
+    include_approved_synthetic: bool = False
     actor: Actor
 
 
@@ -50,6 +53,9 @@ class TrainJobSummary(BaseModel):
     # "skipped: retrain topology unavailable (FileNotFoundError: datasets/labeled/train.jsonl)"
     # 가 DB 에 있었는데 화면엔 안 나왔다). 상세 조회로 넘어가지 않고 목록에서 바로 보이게 한다.
     error: Optional[str] = None
+    # 제출 시점에 동결한 승인 모의 문서의 공개 가능한 식별값만 노출한다.
+    # 파일 경로·본문은 학습 노드 내부 증빙으로 남기고 API에는 싣지 않는다.
+    approved_synthetic_snapshot: Optional[dict[str, Any]] = None
 
 
 class TrainJobList(BaseModel):

@@ -165,7 +165,10 @@ export const scenarios = [
       );
       check.includes(page.html('result-dual'), 'S1', '룰·모델 두 판정이 나란히 보인다');
       check.ok(page.html('result-factors').length > 0, 'S·V·M 3요소가 그려졌다');
-      check.eq(page.$('btn-classify')?.disabled, false, '끝나고 버튼이 다시 눌린다');
+      // 결과 렌더링은 finally 에서 버튼을 다시 활성화하기 전에 끝날 수 있다. 결과만 보고
+      // 즉시 단정하면 비동기 종료 순서에 따라 간헐적으로 실패하므로, 실제 사용자 상태까지 기다린다.
+      const reenabled = await page.until(() => page.$('btn-classify')?.disabled === false, 8000);
+      check.ok(reenabled, '끝나고 버튼이 다시 눌린다');
       assertNoScriptErrors(check, page);
       return page;
     },

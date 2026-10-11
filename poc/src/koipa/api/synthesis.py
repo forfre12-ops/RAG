@@ -21,6 +21,7 @@ from koipa.schemas.synthesis import (
     SynthQueueResponse,
     SynthReviewRequest,
     SynthReviewResponse,
+    SynthTrainingCandidateResponse,
 )
 from koipa.services.synth_coverage import DEFAULT_MIN_PER_CELL, coverage_report
 from koipa.services.synth_provider_status import provider_status
@@ -56,7 +57,16 @@ def synth_queue(
     return SynthesisService().queue(status=status, limit=limit, offset=offset)
 
 
-# 조회는 broad(라우터의 require_auth 만). 학습셋의 등급×도메인 분포일 뿐 본문을 내지 않는다.
+@router.get(
+    "/synth/training-candidate",
+    response_model=SynthTrainingCandidateResponse,
+)
+def synth_training_candidate():
+    """Return whether approved synthetic documents may be included in a new train job."""
+    _, candidate = SynthesisService().training_candidate()
+    return candidate
+
+
 @router.get("/synth/coverage", response_model=SynthCoverageResponse)
 def synth_coverage(
     min_per_cell: int = Query(
@@ -88,8 +98,7 @@ def synth_providers_status():
     [2026-09-28] healthz.llm_providers_supported 는 스키마가 받는 값 9개를 전부 내려줘서
     "고를 수 있다"와 "지금 이 서버가 실제로 그 provider 로 생성할 수 있는가"가 갈렸다.
     상용은 키 설정 여부, 로컬은 그 주소가 응답하는지만 본다(실제 생성 호출은 하지 않는다 —
-    비용 없이 빠르게 재확인할 수 있어야 한다). 조회는 broad(라우터의 require_auth 만) —
-    /synth/coverage 와 같은 이유로 본문을 내지 않고 가용성 불리언뿐이다.
+    비용 없이 빠르게 재확인할 수 있어야 한다).
     """
     from koipa.config import settings  # noqa: PLC0415
 
@@ -105,8 +114,7 @@ def synth_playbook():
 
     [2026-09-28] 규칙(m1_synthesis/generation_playbook.py)은 이제 리포에 추적되고
     생성기가 기본으로 참고하지만, "무엇이 적용되고 있는지"를 관리자가 화면 밖에서 소스를
-    열어야만 알 수 있었다. 이 경로가 그 자리를 메운다. 조회는 broad — 비밀이 아니라
-    생성 안내문이다.
+    열어야만 알 수 있었다. 이 경로가 그 자리를 메운다.
     """
     from koipa.config import settings  # noqa: PLC0415
     from koipa.modules.m1_synthesis.generation_playbook import (  # noqa: PLC0415

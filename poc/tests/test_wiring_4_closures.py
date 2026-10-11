@@ -154,6 +154,137 @@ def test_train_classifier_task_no_consume_without_incorporation():
     assert out.get("corrections_incorporated") == 0
 
 
+def test_train_classifier_task_merges_approved_synthetic_when_requested():
+    """승인 모의 문서는 명시 요청 때만 이번 학습 입력에 포함하고 이력을 남긴다."""
+    import contextlib
+    from unittest.mock import MagicMock
+
+    from koipa.modules.m6_evaluation.corrections_rebuild import RebuildResult
+    from koipa.workers.tasks import train_classifier_task
+
+    rebuild = RebuildResult(rows=[], correction_ids=[], reason="no_unconsumed_corrections")
+    synth_rows = [{"doc_id": "synth-1", "text": "검토 완료 본문", "label": "S1"}]
+    candidate = SimpleNamespace(ready=True, dataset_version="synth-a1b2c3d4")
+    merged = MagicMock()
+    consume = MagicMock(return_value=0)
+
+    def _merge(base, result, _out, **_kwargs):
+        result.incorporated_doc_ids = list(result.doc_ids)
+        merged(base, result, _out, **_kwargs)
+        return "datasets/demo_retrain/train_synth.jsonl"
+
+    membership = MagicMock(return_value=1)
+    with contextlib.ExitStack() as stack:
+        for cm in _patch_retrain_closure(
+            rebuild=rebuild, run_uuid=uuid.uuid4(), consume=consume,
+        ):
+            stack.enter_context(cm)
+        stack.enter_context(patch(
+            "koipa.modules.m6_evaluation.corrections_rebuild.merge_into_train_jsonl",
+            side_effect=_merge,
+        ))
+        stack.enter_context(patch(
+            "koipa.services.synthesis_service.SynthesisService.training_candidate",
+            return_value=({"rows": synth_rows}, candidate),
+        ))
+        stack.enter_context(patch(
+            "koipa.services.synthesis_service.SynthesisService.record_training_membership",
+            membership,
+        ))
+        out = train_classifier_task(
+            spec_kwargs={"train_path": "base.jsonl", "include_approved_synthetic": True},
+        )
+
+    assert merged.call_count == 1
+    assert merged.call_args.args[0] == "base.jsonl"
+    assert merged.call_args.args[1].rows == synth_rows
+    membership.assert_called_once()
+    assert membership.call_args.args[0] == ["synth-1"]
+    assert membership.call_args.args[1].startswith("synth-")
+    assert consume.call_count == 0
+    assert out["corrections_incorporated"] == 0
+    assert out["corrections_consumed"] == 0
+    assert out["deploy"]["registered"] is True
+
+
+def test_train_classifier_task_uses_submit_time_synthetic_snapshot():
+    """새 작업은 대기 중 바뀐 승인 큐가 아니라 제출 시점 동결본만 소비한다."""
+    import contextlib
+    from unittest.mock import MagicMock
+
+    from koipa.modules.m6_evaluation.corrections_rebuild import RebuildResult
+    from koipa.workers.tasks import train_classifier_task
+
+    rebuild = RebuildResult(rows=[], correction_ids=[], reason="no_unconsumed_corrections")
+    synth_rows = [{"doc_id": "synth-1", "text": "동결 본문", "label": "S1"}]
+    candidate = SimpleNamespace(ready=True, dataset_version="synth-a1b2c3d4")
+
+    def _merge(_base, result, _out, **_kwargs):
+        result.incorporated_doc_ids = list(result.doc_ids)
+        return "datasets/demo_retrain/train_synth.jsonl"
+
+    loader = MagicMock(return_value=({"rows": synth_rows}, candidate))
+    with contextlib.ExitStack() as stack:
+        for cm in _patch_retrain_closure(
+            rebuild=rebuild, run_uuid=uuid.uuid4(), consume=MagicMock(return_value=0),
+        ):
+            stack.enter_context(cm)
+        stack.enter_context(patch(
+            "koipa.modules.m6_evaluation.corrections_rebuild.merge_into_train_jsonl",
+            side_effect=_merge,
+        ))
+        stack.enter_context(patch(
+            "koipa.services.synthesis_service.SynthesisService.load_frozen_training_candidate",
+            loader,
+        ))
+        stack.enter_context(patch(
+            "koipa.services.synthesis_service.SynthesisService.training_candidate",
+            side_effect=AssertionError("live approval queue must not be read"),
+        ))
+        stack.enter_context(patch(
+            "koipa.services.synthesis_service.SynthesisService.record_training_membership",
+            MagicMock(return_value=1),
+        ))
+        out = train_classifier_task(spec_kwargs={
+            "train_path": "base.jsonl",
+            "include_approved_synthetic": True,
+            "approved_synthetic_snapshot_path": "datasets/demo_retrain/snapshot.jsonl",
+            "approved_synthetic_dataset_version": "synth-a1b2c3d4",
+            "approved_synthetic_rows_sha256": "a" * 64,
+        })
+
+    loader.assert_called_once()
+    assert out["approved_synthetic_snapshot"]["snapshot_dataset_version"] == "synth-a1b2c3d4"
+    assert out["deploy"]["registered"] is True
+
+
+def test_train_classifier_task_blocks_requested_synthetic_that_is_not_ready():
+    """품질 검사를 통과하지 못한 후보는 기본 학습셋에 조용히 섞지 않는다."""
+    from unittest.mock import MagicMock
+
+    from koipa.workers.tasks import train_classifier_task
+
+    run_uuid = uuid.uuid4()
+    candidate = SimpleNamespace(
+        ready=False,
+        blockers=["학습 후보 품질 검사를 완료하지 못했습니다"],
+        dataset_version="synth-a1b2c3d4",
+    )
+    mark = MagicMock()
+    with patch("koipa.workers.tasks._create_training_run_guarded", return_value=run_uuid), \
+            patch("koipa.workers.tasks._mark_training_run", mark), \
+            patch("koipa.services.synthesis_service.SynthesisService.training_candidate",
+                  return_value=({"rows": []}, candidate)), \
+            patch("koipa.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
+                  return_value=SimpleNamespace(rows=[])):
+        out = train_classifier_task(spec_kwargs={"include_approved_synthetic": True})
+
+    assert out["skipped"] == "synthetic_candidate_blocked"
+    mark.assert_called_once_with(
+        run_uuid, status="failed", error="학습 후보 품질 검사를 완료하지 못했습니다",
+    )
+
+
 def test_train_classifier_task_handles_consume_failure():
     """consume_corrections가 실패해도 학습 자체 결과는 반환(-1 마크)."""
     import contextlib

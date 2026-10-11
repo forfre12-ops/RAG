@@ -551,6 +551,13 @@ paths:
                 hyperparams:
                   type: object
                   additionalProperties: true
+                include_approved_synthetic:
+                  type: boolean
+                  default: false
+                  description: >-
+                    승인된 모의 문서를 이번 학습에 포함할지 여부. true이면 제출 시점에
+                    품질 검사 통과 행을 스냅샷으로 동결하고, 워커는 해당 스냅샷과 평가
+                    데이터 중복을 다시 확인한 뒤 통과한 행만 학습용 데이터에 더한다.
                 actor: { $ref: '#/components/schemas/Actor' }
       responses:
         '202':
@@ -563,6 +570,8 @@ paths:
                   train_job_id: { type: string, format: uuid }
                   status_url: { type: string, format: uri }
                   websocket_url: { type: string, format: uri }
+        '409':
+          description: 승인 모의 문서 후보가 비어 있거나 품질·스냅샷 검증을 통과하지 못함
 
   /train/jobs/{train_job_id}:
     get:
@@ -763,6 +772,37 @@ paths:
                     nullable: true
                     description: dispatched=false 인 사유. 발사됐으면 null.
 
+  /synth/training-candidate:
+    get:
+      x-audience: internal
+      tags: [synthesis]
+      summary: 승인 모의 문서의 학습 후보 상태
+      description: >-
+        현재 승인본을 다시 계산해 다음 학습에 포함할 수 있는지 반환한다. 이 요청은
+        학습을 시작하거나 데이터를 변경하지 않는다.
+      responses:
+        '200':
+          description: 학습 후보 상태
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ready, dataset_version, approved_total, included, blockers]
+                properties:
+                  ready: { type: boolean }
+                  dataset_version: { type: string }
+                  approved_total: { type: integer }
+                  included: { type: integer }
+                  excluded_noise: { type: integer }
+                  excluded_empty: { type: integer }
+                  excluded_gate_error: { type: integer }
+                  grade_corrected: { type: integer }
+                  blockers:
+                    type: array
+                    items: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /synth/jobs/{synth_job_id}:
     get:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
@@ -803,7 +843,7 @@ paths:
     get:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [synthesis]
-      summary: 검수 대기 중인 합성 문서 목록 (KL 검수 UI용)
+      summary: 관리 콘솔의 합성 문서 검토 목록
       parameters:
         - in: query
           name: status
@@ -943,7 +983,7 @@ paths:
     post:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [synthesis]
-      summary: 합성 문서 검수 결과 등록 (승인/반려)
+      summary: 관리 콘솔의 합성 문서 검수 결과 등록
       parameters:
         - in: path
           name: synth_id
@@ -979,7 +1019,10 @@ paths:
                     description: >-
                       이 건이 학습행으로 만들어질 때 쓰일 등급. corrected_grade 를 보냈으면
                       그 값, 아니면 생성 시 목표 등급. 반려면 학습에 들어가지 않으므로 참고값.
-                  added_to_dataset_version: { type: string, nullable: true }
+                  dataset_versions:
+                    type: array
+                    items: { type: string }
+                    description: 이 문서가 실제 학습 입력에 포함된 이력
         '400':
           description: corrected_grade 가 현재 등급체계에 없는 코드
 
@@ -3439,13 +3482,22 @@ components:
       properties:
         train_job_id: { type: string, format: uuid }
         status: { type: string }
-        training_type: { type: string }
-        base_model: { type: string }
+        trigger_type: { type: string, nullable: true }
         started_at: { type: string, format: date-time }
-        finished_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+        duration_sec: { type: integer, nullable: true }
         model_version: { type: string, nullable: true }
-        f1_macro: { type: number, nullable: true }
-        fnr_overall: { type: number, nullable: true }
+        error: { type: string, nullable: true }
+        approved_synthetic_snapshot:
+          type: object
+          nullable: true
+          description: 제출 시점 동결 모의 문서의 식별값. 서버 파일 경로와 본문은 노출하지 않는다.
+          properties:
+            dataset_version: { type: string }
+            included: { type: integer }
+            approved_total: { type: integer }
+            rows_sha256: { type: string }
+            created_at: { type: string, format: date-time }
 
     SynthCoverageCell:
       type: object

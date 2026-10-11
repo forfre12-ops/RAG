@@ -96,6 +96,10 @@ def ensure_training_dataset_ready(spec_kwargs: dict[str, Any] | None = None) -> 
     return counts
 
 
+class TrainingInputRejected(ValueError):
+    """A requested training input failed its pre-enqueue evidence gate."""
+
+
 def _advisory_xact_lock(db, _key=None) -> None:
     """모델 활성 전환 직렬화 — 트랜잭션 단위 잠금(전용 표의 행 잠금, db/locks.py).
 
@@ -695,13 +699,52 @@ class TrainingService:
             req.training_type, req.base_model, req.actor.user_id,
         )
         dataset_counts = ensure_training_dataset_ready(req.hyperparams)
-        run_id = self._create_run(req)
+        run_hyperparameters = dict(req.hyperparams) if req.hyperparams else {}
+        worker_spec_kwargs = dict(run_hyperparameters)
+        synthetic_snapshot: dict | None = None
+        if req.include_approved_synthetic:
+            # 승인 큐는 작업 대기 중에도 바뀔 수 있다. 제출 시점의 검증 통과 행을
+            # JSONL+manifest로 동결하고, 워커는 이 파일만 소비한다.
+            from koipa.config import settings  # noqa: PLC0415
+            from koipa.services.synthesis_service import SynthesisService  # noqa: PLC0415
+
+            try:
+                frozen = SynthesisService().freeze_training_candidate(settings.retrain_dataset_dir)
+            except OSError as exc:
+                raise TrainingInputRejected("승인 모의 문서 스냅샷을 만들 수 없습니다") from exc
+            candidate = frozen.get("candidate")
+            if not frozen.get("ready") or candidate is None:
+                blockers = getattr(candidate, "blockers", []) or []
+                raise TrainingInputRejected(
+                    "승인 모의 문서를 학습에 포함할 수 없습니다"
+                    + (": " + "; ".join(blockers) if blockers else "")
+                )
+            synthetic_snapshot = {
+                "dataset_version": candidate.dataset_version,
+                "included": candidate.included,
+                "approved_total": candidate.approved_total,
+                "rows_sha256": frozen["rows_sha256"],
+                "created_at": frozen["created_at"],
+            }
+            # DB 이력에는 위치 대신 검증 가능한 식별값만 남긴다. 워커에만 로컬
+            # 스냅샷 경로를 전달해 API 응답·작업 목록에서 서버 파일경로가 새지 않는다.
+            run_hyperparameters["approved_synthetic_snapshot"] = synthetic_snapshot
+            worker_spec_kwargs.update({
+                "include_approved_synthetic": True,
+                "approved_synthetic_snapshot_path": frozen["snapshot_path"],
+                "approved_synthetic_dataset_version": candidate.dataset_version,
+                "approved_synthetic_rows_sha256": frozen["rows_sha256"],
+            })
+
+        run_id = self._create_run(req, hyperparameters=run_hyperparameters)
         # JobStore 등록 (DB 미가용 시에도 응답 가능)
         self.jobs.create(
             run_id,
             payload={
                 "training_type": req.training_type,
                 "base_model": req.base_model,
+                "include_approved_synthetic": req.include_approved_synthetic,
+                "approved_synthetic_snapshot": synthetic_snapshot,
                 "submitted_at": dt.datetime.now(dt.timezone.utc).isoformat(),
                 "actor": req.actor.user_id,
                 "dataset_counts": dataset_counts,
@@ -715,10 +758,9 @@ class TrainingService:
             try:
                 from koipa.workers.tasks import train_classifier_task  # noqa: PLC0415
 
-                spec_kwargs = dict(req.hyperparams) if req.hyperparams else None
                 # run_id 전달 — 워커가 이 행의 상태를 running→completed/failed 로 갱신하도록
                 # (미전달 시 워커가 별도 run 을 만들어 API 행이 영구 'queued' 고아가 됐다).
-                train_classifier_task.delay(spec_kwargs, run_id=str(run_id))
+                train_classifier_task.delay(worker_spec_kwargs, run_id=str(run_id))
                 logger.info("training enqueued to celery: train_job_id=%s status=queued", run_id)
             except Exception:  # noqa: BLE001
                 logger.warning(
@@ -798,6 +840,10 @@ class TrainingService:
                         # 성공 잡의 잔여 메시지까지 노출하지는 않는다.
                         error=(getattr(r, "error_message", None)
                                if str(r.status) in ("failed", "error") else None),
+                        approved_synthetic_snapshot=(
+                            (r.hyperparameters or {}).get("approved_synthetic_snapshot")
+                            if isinstance(r.hyperparameters, dict) else None
+                        ),
                     )
                     for r in runs
                 ]
@@ -864,13 +910,13 @@ class TrainingService:
     # internals
     # ------------------------------------------------------------
 
-    def _create_run(self, req: TrainRequest) -> uuid.UUID:
+    def _create_run(self, req: TrainRequest, *, hyperparameters: dict | None = None) -> uuid.UUID:
         try:
             with session_scope() as db:
                 repo = TrainingRepo(db)
                 run = repo.create_run(
                     total_samples=0,  # PoC: 데이터셋 미확정
-                    hyperparameters=req.hyperparams,
+                    hyperparameters=hyperparameters if hyperparameters is not None else req.hyperparams,
                     trigger_type=req.training_type,
                     created_by=req.actor.user_id,
                 )

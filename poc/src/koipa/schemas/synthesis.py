@@ -122,6 +122,20 @@ class SynthReviewResponse(BaseModel):
     dataset_versions: list[str] = Field(default_factory=list)
 
 
+class SynthTrainingCandidateResponse(BaseModel):
+    """승인된 모의 문서를 다음 학습에 포함할 수 있는지에 대한 현재 판정."""
+
+    ready: bool
+    dataset_version: str
+    approved_total: int = 0
+    included: int = 0
+    excluded_noise: int = 0
+    excluded_empty: int = 0
+    excluded_gate_error: int = 0
+    grade_corrected: int = 0
+    blockers: list[str] = Field(default_factory=list)
+
+
 class SynthJobStatus(BaseModel):
     """생성 작업 1건의 상태 — "이 작업이 성공했나 · 몇 건 만들었나 · 어느 문서인가"."""
 

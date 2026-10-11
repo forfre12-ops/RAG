@@ -95,6 +95,9 @@ class RebuildResult:
     # [#6] merge 가 홀드아웃/캡 제외 후 실제 편입된 correction_id(소비 대상). None = merge 미실행
     # → 호출부는 correction_ids 를 그대로 쓴다(하위호환·전량편입 경로).
     incorporated_correction_ids: list[int] | None = None
+    # 병합 뒤 실제 train 파일에 남은 문서 ID. 모의 문서는 correction ID가 없으므로
+    # 이 목록으로만 학습 입력 반영 이력을 정확히 남길 수 있다.
+    incorporated_doc_ids: list = field(default_factory=list)
     reason: str = ""
 
     @property
@@ -378,6 +381,7 @@ def merge_into_train_jsonl(
     try:
         cmap = getattr(result, "corr_ids_by_doc", None) or {}
         surviving = [d for d in aligned_dids if d is not None]
+        result.incorporated_doc_ids = list(surviving)
         result.incorporated_correction_ids = (
             sorted({cid for d in surviving for cid in cmap.get(d, [])})
             if cmap else list(result.correction_ids)

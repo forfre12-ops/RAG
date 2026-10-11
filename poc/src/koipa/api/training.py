@@ -20,7 +20,11 @@ from koipa.schemas.training import (
     TrainResponse,
     TrainStatus,
 )
-from koipa.services.training_service import TrainingDatasetUnavailable, TrainingService
+from koipa.services.training_service import (
+    TrainingDatasetUnavailable,
+    TrainingInputRejected,
+    TrainingService,
+)
 
 router = APIRouter(tags=["training"], dependencies=[Depends(require_auth)])
 logger = logging.getLogger(__name__)
@@ -33,6 +37,8 @@ def train(request: Request, req: TrainRequest, auth: dict = Depends(require_auth
     bind_authenticated_actor(req.actor, auth)
     try:
         return TrainingService().submit(req)
+    except TrainingInputRejected as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except TrainingDatasetUnavailable as exc:
         logger.error("training request rejected before enqueue: %s", exc)
         raise HTTPException(status_code=503, detail=exc.public_message) from exc

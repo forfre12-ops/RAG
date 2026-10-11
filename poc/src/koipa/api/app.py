@@ -500,6 +500,10 @@ else:
 # 고칠 필요가 없다). 자세한 이유는 console_login.py 머리말.
 app.include_router(console_login_api.html_router, prefix="/api/v1")
 app.include_router(console_login_api.router, prefix="/api/v1")
+# StaticFiles cannot apply FastAPI dependencies.  Register the protected HTML
+# entry points before the mounts below so only administrators receive the
+# management shell when they open its URL directly.
+app.include_router(console_login_api.console_page_router)
 # ⚠ html_router 를 **먼저** 등록해야 한다. golden_api.router 에 있는
 # `/golden/candidates/{doc_id}` 가 `/golden/candidates/manage.html` 을 doc_id="manage.html"
 # 로 삼켜서, 인증을 통과하면 404 "proxy-gold candidate not found" 가 났다(2026-08-09 실측).

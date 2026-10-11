@@ -52,7 +52,8 @@ export const scenarios = [
       check.ok(page.q('[data-product-nav="experts"]')?.classList.contains('pf-hidden'), '검수자 배정 탭이 숨는다');
       check.includes(page.text('overview-summary-body'), '제공하지 않습니다', '숨긴 이유를 운영 개요에 적는다');
       check.ok(!page.$('gold-jobs-card'), 'golden_jobs.js 카드도 뜨지 않는다(같은 플래그를 읽는다)');
-      check.eq(server.countCalls('GET', '/golden/candidates'), 0, '후보 API를 애초에 부르지 않는다');
+      const candidateListCalls = server.calls.filter((call) => call.method === 'GET' && call.path.split('?')[0] === '/golden/candidates');
+      check.eq(candidateListCalls.length, 0, '후보 목록 API를 애초에 부르지 않는다');
       assertNoScriptErrors(check, page);
       return page;
     },
@@ -332,9 +333,6 @@ export const scenarios = [
       await page.until(() => page.text('expert-assignment-list').includes('reviewer-01'));
 
       const row = page.text('expert-assignment-list');
-      // [2026-10-11] 계정 행 지표가 4분류("판정 완료"·"제외·폐기"·"미시작" 포함)에서 지금의
-      // 5분류(판정·미처리·보류·제외·재검토, admin.html:1823)로 바뀌었다 — "미시작"은 이제
-      // 별도 칸이 아니라 "미처리"(remaining_doc_count)에 합쳐진다.
       for (const label of ['배정 50건', '판정', '보류', '제외', '재검토', '미처리', '최근 활동']) {
         check.includes(row, label, `${label} 지표가 계정 행에 있다`);
       }

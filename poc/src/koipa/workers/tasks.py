@@ -783,8 +783,13 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
     from koipa.modules.m4_training.trainer import TrainSpec, train_classifier  # noqa: PLC0415
     from koipa.modules.m6_evaluation.active_learning import consume_corrections_for_run  # noqa: PLC0415
     from koipa.modules.m6_evaluation.corrections_rebuild import (  # noqa: PLC0415
+        RebuildResult,
         build_labeled_rows_from_corrections,
         merge_into_train_jsonl,
+    )
+    from koipa.services.synthesis_service import (  # noqa: PLC0415
+        SynthesisService,
+        training_dataset_version,
     )
     from koipa.services.training_service import (  # noqa: PLC0415
         TrainingDatasetUnavailable,
@@ -793,10 +798,15 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
     )
 
     spec_kwargs = dict(spec_kwargs or {})
+    include_approved_synthetic = bool(spec_kwargs.pop("include_approved_synthetic", False))
+    approved_snapshot_path = spec_kwargs.pop("approved_synthetic_snapshot_path", None)
+    approved_snapshot_version = spec_kwargs.pop("approved_synthetic_dataset_version", None)
+    approved_snapshot_sha256 = spec_kwargs.pop("approved_synthetic_rows_sha256", None)
+    approved_synthetic_evidence: dict | None = None
 
     # ── [A2-①] 교정→라벨 재빌드 + 학습셋 병합(train만 증강, 홀드아웃 불변) ──────────
     rebuild = build_labeled_rows_from_corrections()
-    incorporated_ids: list[int] = []
+    incorporated_correction_ids: list[int] = []
     if getattr(rebuild, "rows", None):
         try:
             import uuid as _uuid  # noqa: PLC0415
@@ -819,14 +829,14 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
                 # [#6] merge 가 홀드아웃/캡 제외 후 실제 편입된 교정만 소비(제외분은 미소비→다음 tick
                 # 재유입, 무음 유실·감사 오도 방지). incorporated_correction_ids=None 이면 전량 폴백.
                 inc = getattr(rebuild, "incorporated_correction_ids", None)
-                incorporated_ids = list(inc if inc is not None else rebuild.correction_ids)
+                incorporated_correction_ids = list(inc if inc is not None else rebuild.correction_ids)
                 logger.info(
                     "train_classifier: %d corrections(%d docs) merged into train set",
-                    len(incorporated_ids), rebuild.row_count,
+                    len(incorporated_correction_ids), rebuild.row_count,
                 )
         except Exception:  # noqa: BLE001
             logger.exception("corrections merge failed — 기본 학습셋으로 진행")
-            incorporated_ids = []
+            incorporated_correction_ids = []
 
     # 소비 FK·감사용 실제 TrainingRun (학습 전 생성). API /train submit 이 넘긴 run_id 가 있으면
     # 그 행을 채택해 상태를 갱신한다(별도 run 생성 시 API 행이 영구 'queued' 고아가 되던 것 차단).
@@ -842,6 +852,97 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
         run_uuid = _create_training_run_guarded(
             spec_kwargs, total_samples=_train_rows_count(spec_kwargs) or 0
         )
+    # ── 승인 모의 문서 → 학습 입력 병합 ────────────────────────────────────────
+    # 승인 자체는 검수 이력일 뿐 자동 학습 편입이 아니다. 관리자가 학습 요청에서 명시적으로
+    # 선택한 경우에만 현재 승인본을 다시 빌드하고, 코퍼스 품질·홀드아웃 중복을 모두 통과한
+    # 행만 이번 train 입력에 더한다.
+    if include_approved_synthetic:
+        synth_service = SynthesisService()
+        try:
+            if approved_snapshot_path:
+                from pathlib import Path  # noqa: PLC0415
+
+                root = Path(settings.retrain_dataset_dir).resolve()
+                snapshot = Path(str(approved_snapshot_path)).resolve()
+                if root != snapshot and root not in snapshot.parents:
+                    raise ValueError("승인 모의 문서 스냅샷 경로가 학습 데이터 경로 밖입니다")
+                synth_result, synth_candidate = synth_service.load_frozen_training_candidate(
+                    snapshot,
+                    expected_dataset_version=str(approved_snapshot_version or "") or None,
+                    expected_rows_sha256=str(approved_snapshot_sha256 or "") or None,
+                )
+            else:
+                # 직접 워커 호출·과거 대기 작업 호환. 새 API 제출은 항상 위 동결본을
+                # 전달하므로, 라이브 큐 재빌드는 새 작업의 경로가 아니다.
+                synth_result, synth_candidate = synth_service.training_candidate()
+        except ValueError as exc:
+            reason = str(exc)
+            _mark_training_run(run_uuid, status="failed", error=reason)
+            logger.warning("approved synthetic snapshot blocked: %s", reason)
+            return {"skipped": "synthetic_snapshot_invalid", "reason": reason}
+        if not synth_candidate.ready:
+            reason = "; ".join(synth_candidate.blockers) or "학습 후보 검증 실패"
+            _mark_training_run(run_uuid, status="failed", error=reason)
+            logger.warning("approved synthetic candidate blocked: %s", reason)
+            return {"skipped": "synthetic_candidate_blocked", "reason": reason}
+
+        synth_rows = list(synth_result.get("rows") or [])
+        synth_rebuild = RebuildResult(
+            rows=synth_rows,
+            doc_ids=[str(row["doc_id"]) for row in synth_rows if row.get("doc_id")],
+            doc_count=len(synth_rows),
+        )
+        try:
+            import uuid as _uuid  # noqa: PLC0415
+
+            _spec = TrainSpec()
+            base_train = spec_kwargs.get("train_path") or _spec.train_path
+            holdout_paths = [
+                spec_kwargs.get("val_path") or _spec.val_path,
+                spec_kwargs.get("test_path") or _spec.test_path,
+            ]
+            out_path = f"{settings.retrain_dataset_dir}/train_synth_{_uuid.uuid4().hex[:8]}.jsonl"
+            merged = merge_into_train_jsonl(
+                base_train, synth_rebuild, out_path, holdout_paths=holdout_paths
+            )
+            if not merged:
+                reason = "승인 모의 문서가 평가 데이터와 중복되어 학습 입력에 포함되지 않았습니다"
+                _mark_training_run(run_uuid, status="failed", error=reason)
+                logger.warning("approved synthetic candidate not merged: %s", reason)
+                return {"skipped": "synthetic_candidate_not_merged", "reason": reason}
+
+            spec_kwargs["train_path"] = merged
+            incorporated_synthetic_doc_ids = {
+                str(doc_id) for doc_id in synth_rebuild.incorporated_doc_ids
+            }
+            incorporated_rows = [
+                row
+                for row in synth_rows
+                if str(row.get("doc_id") or "") in incorporated_synthetic_doc_ids
+            ]
+            training_version = training_dataset_version(incorporated_rows)
+            recorded = synth_service.record_training_membership(
+                [str(doc_id) for doc_id in synth_rebuild.incorporated_doc_ids],
+                training_version,
+            )
+            approved_synthetic_evidence = {
+                "snapshot_dataset_version": synth_candidate.dataset_version,
+                "training_dataset_version": training_version,
+                "included": len(synth_rebuild.incorporated_doc_ids),
+                "membership_recorded": recorded,
+                "snapshot_rows_sha256": approved_snapshot_sha256 or None,
+            }
+            logger.info(
+                "train_classifier: approved synthetic merged rows=%d recorded=%d version=%s",
+                len(synth_rebuild.incorporated_doc_ids), recorded,
+                training_version,
+            )
+        except Exception as exc:  # noqa: BLE001
+            reason = f"승인 모의 문서 학습 입력 생성 실패: {type(exc).__name__}"
+            _mark_training_run(run_uuid, status="failed", error=reason)
+            logger.exception("approved synthetic candidate merge failed")
+            return {"skipped": "synthetic_candidate_merge_failed", "reason": reason}
+
     try:
         ensure_training_dataset_ready(spec_kwargs)
     except TrainingDatasetUnavailable as exc:
@@ -895,7 +996,9 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
         _mark_training_run(run_uuid, status="failed", error=f"{type(exc).__name__}: {exc}")
         raise
     out = dict(report.__dict__)
-    out["corrections_incorporated"] = len(incorporated_ids)
+    out["corrections_incorporated"] = len(incorporated_correction_ids)
+    if approved_synthetic_evidence is not None:
+        out["approved_synthetic_snapshot"] = approved_synthetic_evidence
 
     # ── [C-ver/A2-②] 등록 + 배포 게이트(활성은 게이트 통과 + opt-in 시에만) ────────
     model_uri = None
@@ -952,7 +1055,8 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
             duration_sec=int(_time.monotonic() - _run_t0),
             # 학습이 모은 것은 버리지 않는다 - 실패해도 무엇을 했는지는 남겨야 한다.
             final_metrics={
-                "corrections_incorporated": len(incorporated_ids),
+                "corrections_incorporated": len(incorporated_correction_ids),
+                "approved_synthetic_snapshot": approved_synthetic_evidence,
                 "deploy": out.get("deploy"),
             },
         )
@@ -963,20 +1067,21 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
             model_version=_mv,
             duration_sec=int(_time.monotonic() - _run_t0),
             final_metrics={
-                "corrections_incorporated": len(incorporated_ids),
+                "corrections_incorporated": len(incorporated_correction_ids),
+                "approved_synthetic_snapshot": approved_synthetic_evidence,
                 "deploy": out.get("deploy"),
             },
         )
 
     # ── [A2-①] 소비 — 실제 반영된 교정만, 실제 run_id로 (반영 없으면 소비 안 함=무손실) ──
     out["corrections_run_id"] = str(run_uuid) if run_uuid else None
-    if not incorporated_ids or run_uuid is None:
+    if not incorporated_correction_ids or run_uuid is None:
         out["corrections_consumed"] = 0
         if rebuild.correction_ids and run_uuid is None:
             logger.info("교정 반영했으나 TrainingRun 미생성(DB) — 소비 보류(다음 tick 재시도, 무손실)")
         return out
     try:
-        n = consume_corrections_for_run(run_uuid, correction_ids=incorporated_ids)
+        n = consume_corrections_for_run(run_uuid, correction_ids=incorporated_correction_ids)
         out["corrections_consumed"] = n
         if n > 0:
             logger.info("train_classifier: consumed %d incorporated corrections under run_id=%s", n, run_uuid)

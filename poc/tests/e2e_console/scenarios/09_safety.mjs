@@ -93,12 +93,11 @@ export const scenarios = [
     title: '상태를 바꾸는 요청에는 행위자가 반드시 실린다',
     why: '행위자 없이 나가면 감사 로그에 신원이 안 남는다 — 감리의 핵심 항목이다. '
        + '[2026-09-29] 종전에는 POST /confirm 도 같이 봤으나, 그 UI(검수 큐 카드)를 콘솔에서 뺐다 — '
-       + '남은 예시(키워드 추가) 하나로 같은 계약(actor.user_id·role·X-Actor-Role 헤더)을 확인한다.',
+       + '남은 예시(키워드 추가) 하나로 로그인 세션 기반 행위자 계약을 확인한다.',
     async run({ server, check }) {
+      server.overrides['GET /golden/candidates/session'] = { actor_id: 'admin-01', actor_role: 'admin' };
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      page.set('cfg-user', '검수자홍길동');
-      page.set('cfg-role', 'reviewer');
 
       await goToPane(page, 'config');
       page.set('kw-n-keyword', '신규키워드');
@@ -107,9 +106,9 @@ export const scenarios = [
 
       for (const [m, p] of [['POST', '/admin/keywords']]) {
         const c = server.lastCall(m, p);
-        check.eq(c?.body?.actor?.user_id, '검수자홍길동', `${p}: 행위자 이름이 실렸다`);
-        check.eq(c?.body?.actor?.role, 'reviewer', `${p}: 행위자 역할이 실렸다`);
-        check.eq(c?.headers['x-actor-role'], 'reviewer', `${p}: 헤더에도 역할이 실렸다`);
+        check.eq(c?.body?.actor?.user_id, 'admin-01', `${p}: 로그인 행위자 이름이 실렸다`);
+        check.eq(c?.body?.actor?.role, 'admin', `${p}: 로그인 행위자 역할이 실렸다`);
+        check.eq(c?.headers['x-actor-role'], 'admin', `${p}: 헤더에도 로그인 역할이 실렸다`);
       }
       return page;
     },

@@ -62,16 +62,16 @@ export const scenarios = [
     title: '권한이 없으면(403) 어떤 역할이 필요한지 알려준다',
     needsMock: true,
     async run({ server, check }) {
+      server.overrides['GET /golden/candidates/session'] = { actor_id: 'reviewer-01', actor_role: 'reviewer' };
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      page.set('cfg-role', 'reviewer');   // 관리자 콘솔의 역할 목록은 admin·reviewer·kl_backend·system
       server.faults.push({ path: '/admin/', status: 403, body: { detail: 'admin role required' } });
 
       await goToPane(page, 'audit');
       page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
       check.matches(page.text('au-body'), /admin 역할.*필요/, '감사 로그에서도 같은 안내를 준다');
-      check.eq(server.lastCall('GET', '/admin/')?.headers['x-actor-role'], 'reviewer', '고른 역할이 실제로 헤더에 실린다');
+      check.eq(server.lastCall('GET', '/admin/')?.headers['x-actor-role'], 'reviewer', '로그인 세션 역할이 실제로 헤더에 실린다');
       return page;
     },
   },

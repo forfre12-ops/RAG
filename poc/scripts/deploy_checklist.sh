@@ -42,6 +42,8 @@ warn() { printf '  WARN  %s\n' "$1"; }
 step "1. 배포 대상 커밋"
 HEAD_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
 [ -n "$HEAD_SHA" ] && ok "HEAD = ${HEAD_SHA:0:12}" || bad "git HEAD 를 못 읽는다"
+LOCAL_CONSOLE_SHA=$(python -c "import hashlib; print(hashlib.sha256(open('src/koipa/api/static/admin.html','rb').read()).hexdigest())" 2>/dev/null || echo "")
+[ -n "$LOCAL_CONSOLE_SHA" ] && ok "관리자 화면 SHA = ${LOCAL_CONSOLE_SHA:0:12}" || bad "관리자 화면 SHA 를 못 읽는다"
 DIRTY=$(git status --porcelain 2>/dev/null | wc -l)
 if [ "$DIRTY" -eq 0 ]; then ok "작업트리 깨끗"; else bad "미커밋 변경 ${DIRTY}건 - 배포 이미지와 소스가 갈린다"; fi
 
@@ -56,9 +58,10 @@ else
   else
     ok "healthz 응답"
     SRV_SHA=$(printf '%s' "$HZ" | python -c "import json,sys; d=json.load(sys.stdin); print((d.get('build') or {}).get('git_sha','unknown'))" 2>/dev/null || echo unknown)
+    SRV_CONSOLE_SHA=$(printf '%s' "$HZ" | python -c "import json,sys; d=json.load(sys.stdin); print((d.get('build') or {}).get('console_admin_html_sha256','unknown'))" 2>/dev/null || echo unknown)
     SRV_PROF=$(printf '%s' "$HZ" | python -c "import json,sys; print(json.load(sys.stdin).get('deploy_profile','?'))" 2>/dev/null || echo '?')
     SRV_MODEL=$(printf '%s' "$HZ" | python -c "import json,sys; print(json.load(sys.stdin).get('classifier_model_dir','?'))" 2>/dev/null || echo '?')
-    echo "        서버 sha=$SRV_SHA · profile=$SRV_PROF · model=$SRV_MODEL"
+    echo "        서버 sha=$SRV_SHA · 화면 sha=$SRV_CONSOLE_SHA · profile=$SRV_PROF · model=$SRV_MODEL"
     if [ "$SRV_SHA" = "unknown" ]; then
       warn "서버가 빌드 sha 를 노출하지 않는다 - 이 배포부터 KOIPA_BUILD_SHA 를 구워야 한다"
     elif [ "${SRV_SHA:0:12}" = "${HEAD_SHA:0:12}" ]; then
@@ -66,6 +69,15 @@ else
     else
       warn "서버 sha != HEAD - 미배포 커밋이 있다"
       git log --oneline "${SRV_SHA}..HEAD" 2>/dev/null | head -20 | sed 's/^/        /' || true
+    fi
+    if [ "$SRV_CONSOLE_SHA" = "unknown" ] || [ -z "$SRV_CONSOLE_SHA" ]; then
+      warn "서버가 관리자 화면 SHA 를 노출하지 않는다 - 정적 자산 판본을 대조할 수 없다"
+    elif [ "$SRV_CONSOLE_SHA" = "$LOCAL_CONSOLE_SHA" ]; then
+      ok "관리자 화면 자산 일치"
+    elif [ "${SRV_SHA:0:12}" = "${HEAD_SHA:0:12}" ]; then
+      bad "서버 코드 SHA 는 HEAD 이지만 관리자 화면 자산 SHA 가 다르다 - 이미지 재빌드/재기동 필요"
+    else
+      warn "서버 관리자 화면 자산 != 현재 HEAD (배포 전 상태)"
     fi
     [ -n "$PROFILE" ] && { [ "$SRV_PROF" = "$PROFILE" ] && ok "프로파일 일치" || bad "프로파일 $SRV_PROF != $PROFILE"; }
     [ -n "$MODEL_DIR" ] && { [ "$(basename "$SRV_MODEL")" = "$(basename "$MODEL_DIR")" ] && ok "모델 일치" || bad "모델 $SRV_MODEL != $MODEL_DIR"; }

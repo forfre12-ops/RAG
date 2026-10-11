@@ -93,3 +93,36 @@ def test_reviewer_manage_address_returns_the_reviewer_workspace() -> None:
     assert response.status_code == 200
     assert "reviewer-workspace" in response.text
     assert 'href="/console/admin.html"' not in response.text
+
+
+def test_reviewer_cannot_open_administrator_html_directly() -> None:
+    """정적 파일 경로를 직접 열어도 검수자에게 관리자 메뉴를 주지 않는다."""
+    claims = JWTClaims(sub="reviewer-test", roles=("reviewer",), exp=9999999999)
+    app.dependency_overrides[require_auth] = lambda: {
+        "mode": "jwt", "claims": claims, "actor_role": "reviewer", "actor_roles": ["reviewer"],
+    }
+    try:
+        client = TestClient(app)
+        console = client.get("/console/admin.html", follow_redirects=False)
+        legacy_demo = client.get("/demo/admin.html", follow_redirects=False)
+    finally:
+        app.dependency_overrides.pop(require_auth, None)
+
+    assert console.status_code == 403
+    assert legacy_demo.status_code == 403
+    assert "AI 영업비밀 분류" not in console.text
+
+
+def test_administrator_can_open_protected_administrator_html() -> None:
+    claims = JWTClaims(sub="admin-test", roles=("admin",), exp=9999999999)
+    app.dependency_overrides[require_auth] = lambda: {
+        "mode": "jwt", "claims": claims, "actor_role": "admin", "actor_roles": ["admin"],
+    }
+    try:
+        response = TestClient(app).get("/console/admin.html", follow_redirects=False)
+    finally:
+        app.dependency_overrides.pop(require_auth, None)
+
+    assert response.status_code == 200
+    assert "AI 영업비밀" in response.text
+    assert response.headers["cache-control"] == "no-cache, must-revalidate"
