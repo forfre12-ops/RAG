@@ -72,6 +72,7 @@ def test_admissible_predicate() -> None:
     assert _is_training_admissible("some_source") is True
     assert _is_training_admissible("noop_fallback") is False   # placeholder
     assert _is_training_admissible("llm_nonjson") is False     # 비-JSON 원문
+    assert _is_training_admissible("qwen_disallowed") is False  # 사용 금지 모델 산출물
 
 
 def test_excludes_noise_markers(monkeypatch) -> None:
@@ -79,12 +80,13 @@ def test_excludes_noise_markers(monkeypatch) -> None:
         _sample("TS"),                               # 정상 → 포함
         _sample("S1", label_source="noop_fallback"),  # 배제
         _sample("S2", label_source="llm_nonjson"),    # 배제
+        _sample("S2", label_source="qwen_disallowed"), # 배제
         _sample("S3"),                               # 정상 → 포함
     ])
     res = SynthesisService().build_training_rows()
-    assert res["approved_total"] == 4
+    assert res["approved_total"] == 5
     assert res["included"] == 2
-    assert res["excluded_noise"] == 2
+    assert res["excluded_noise"] == 3
     labels = sorted(r["label"] for r in res["rows"])
     assert labels == ["S3", "TS"]
     # 학습 행 스키마: 본문=generated_content, source=synthetic.

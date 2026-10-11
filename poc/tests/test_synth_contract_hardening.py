@@ -40,6 +40,7 @@ from koipa.services.synthesis_service import _is_training_admissible
         (None, "anthropic", True),
         ("noop_fallback", "anthropic", False),
         ("llm_nonjson", "anthropic", False),
+        ("qwen_disallowed", "anthropic", False),
         (None, None, True),           # provider 미상은 종전 동작 유지
     ],
 )

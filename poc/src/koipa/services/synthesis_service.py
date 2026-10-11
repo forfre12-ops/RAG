@@ -69,7 +69,7 @@ COST_PER_DOC_USD = {
 #   비-JSON 원문을 줘 raw를 body로 쓴 경우. 둘 다 "정상 생성 문서"가 아니므로 학습에 새면 합성
 #   노이즈로 작용한다. 정상 생성은 label_source=None(그 외 값도 허용). P0#1에서 이 마커를 검수큐에
 #   보존해 둔 목적이 바로 이 하드 위생 게이트다.
-TRAINING_EXCLUDED_LABEL_SOURCES = frozenset({"noop_fallback", "llm_nonjson"})
+TRAINING_EXCLUDED_LABEL_SOURCES = frozenset({"noop_fallback", "llm_nonjson", "qwen_disallowed"})
 
 # [2026-09-05] **provider 로도 막는다.** 위 마커만으로는 못 막는 구멍이 있었다 — 직접 실행 확인:
 #   LLM_PROVIDER=noop 생성 → label_source=None · 게이트 통과(학습편입가능=True)

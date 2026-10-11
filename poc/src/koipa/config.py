@@ -489,7 +489,7 @@ class Settings(BaseSettings):
     local_llm_base_url: str = "http://localhost:8001/v1"  # vLLM 기본
     local_llm_model: str = "upstage/Solar-Open-100B"
     local_llm_api_key: str = "EMPTY"   # vLLM은 EMPTY, Ollama는 ollama, LM Studio는 lm-studio
-    local_llm_enable_thinking: bool = False  # Qwen3 전용 /think 지시어 — Solar에는 해당 없음(무해한 기본값)
+    local_llm_enable_thinking: bool = False  # reasoning 지원 모델에서만 명시적으로 활성화
     # 긴 한국어 합성문서는 JSON 닫힘까지 3,500 토큰을 넘길 수 있다. 로컬 서버의
     # 컨텍스트는 배포 시 충분히 확보한 뒤 이 값 이상으로 요청한다. 외부 API 호출에는
     # 적용하지 않아 비용·계약을 바꾸지 않는다.
@@ -518,14 +518,12 @@ class Settings(BaseSettings):
     vllm_model: str = "upstage/Solar-Open-100B"
     vllm_enable_thinking: bool = False
 
-    # --- ConsensusJudge (골든 게이트 self-consistency + Qwen 섀도) ---
-    # 주 판정자=상용 택일(anthropic|gemini|openai), 미연동/민감문서면 airgap(Qwen 주판정).
-    # [2026-08-24] 기본값을 상용에서 온프렘으로 뒤집는다. 종전 기본값이 "anthropic"
-    # 이라, 상용 키가 꽂힌 서버에서 provider 를 명시하지 않은 호출은 아무도 그렇게
-    # 지시한 적 없는데 공개 클라우드로 나갔다. 상용은 **명시할 때만** 쓴다.
-    judge_primary_provider: str = "vllm"
-    judge_shadow_provider: str = "vllm"        # 섀도=배포급 Qwen3-14B (production_suspect 탐지)
-    judge_shadow_enabled: bool = True
+    # --- ConsensusJudge (골든 게이트 self-consistency + 선택적 섀도) ---
+    # 판정 모델은 운영자가 승인한 제공자를 명시할 때만 사용한다. 기본은 외부·로컬 호출
+    # 모두 하지 않는 noop 이며, Qwen을 기본 또는 섀도 경로로 사용하지 않는다.
+    judge_primary_provider: str = "noop"
+    judge_shadow_provider: str = "noop"
+    judge_shadow_enabled: bool = False
     judge_k_min: int = 3                        # self-consistency 최소 샘플(만장일치면 여기서 멈춤)
     judge_k_max: int = 5                        # 의견 갈릴 때 최대(adaptive-k)
     judge_temperature: float = 0.7             # 표 분산용(>0 필요)

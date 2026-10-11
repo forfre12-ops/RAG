@@ -91,11 +91,12 @@ services:
       KL_STREAM_REDIS_URL: ${KL_STREAM_REDIS_URL:-}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS(/app/.storage). MinIO 미사용.
       POC_MODE: ${POC_MODE:-full}
-      # 기본 생성 경로는 외부 API가 아닌 사내 OpenAI 호환 로컬 LLM이다.
-      LLM_PROVIDER: ${LLM_PROVIDER:-local_openai}
-      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://host.docker.internal:8001/v1}
-      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-Qwen/Qwen3-14B}
-      LOCAL_LLM_API_KEY: ${LOCAL_LLM_API_KEY:-EMPTY}
+      # 승인된 비-Qwen 로컬 모델을 명시적으로 설정하기 전까지 생성은 차단한다.
+      # 기본값으로 특정 모델을 실행하면 다음 배포에서 의도와 다르게 되살아날 수 있다.
+      LLM_PROVIDER: ${LLM_PROVIDER:-noop}
+      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-}
+      LOCAL_LLM_API_KEY: ${LOCAL_LLM_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nlpai-lab/KURE-v1}
       CLASSIFIER_BASE_MODEL: ${CLASSIFIER_BASE_MODEL:-kakaobank/kf-deberta-base}
       CLASSIFIER_MODEL_DIR: ${CLASSIFIER_MODEL_DIR:-/models/classifier-trained}
@@ -175,11 +176,11 @@ services:
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS. api 와 동일 storagedata 볼륨 공유.
       POC_MODE: ${POC_MODE:-full}
-      # api와 동일한 로컬 생성 설정을 사용해야 요청한 제공자와 실제 생성자가 갈리지 않는다.
-      LLM_PROVIDER: ${LLM_PROVIDER:-local_openai}
-      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://host.docker.internal:8001/v1}
-      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-Qwen/Qwen3-14B}
-      LOCAL_LLM_API_KEY: ${LOCAL_LLM_API_KEY:-EMPTY}
+      # api와 동일하다. 승인된 비-Qwen 로컬 모델을 명시하기 전에는 fail-closed 한다.
+      LLM_PROVIDER: ${LLM_PROVIDER:-noop}
+      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-}
+      LOCAL_LLM_API_KEY: ${LOCAL_LLM_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nlpai-lab/KURE-v1}
       CLASSIFIER_MODEL_DIR: ${CLASSIFIER_MODEL_DIR:-/models/classifier-trained}
       HF_HOME: /models/hf
