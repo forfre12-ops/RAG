@@ -27,7 +27,7 @@ repos:
         stages: [pre-push]
       - id: full-verification-gate
         name: 전수 검증 게이트(pytest 전체·데이터위생·콘솔e2e·도커빌드·인수팩·release-gate)
-        entry: bash poc/scripts/full_verification_gate.sh
+        entry: python poc/scripts/run_full_verification_gate.py
         language: system
         pass_filenames: false
         always_run: true
