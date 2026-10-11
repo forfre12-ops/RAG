@@ -104,12 +104,13 @@ run "임시 Redis 기동" bash -c '
     docker run -d --rm --name koipa-testredis -p 16379:6379 redis:7.2-alpine >/dev/null
     sleep 2
 '
-# A handful of integration tests deliberately resolve repository artifacts
-# (for example ``poc/src/...``) from the checkout root.  Keep the gate's
-# tools rooted in poc/, but run the repository-wide suite from its canonical
-# root so those tests exercise the same layout as CI and deployment bundles.
-run "전체 pytest(fullstack 포함, DB·Redis 연결)" bash -c \
-    "cd .. && TESTING=1 DATABASE_URL='$TEST_DB_URL' REDIS_URL='redis://localhost:16379/0' 'poc/$PY' -m pytest -q -c poc/pyproject.toml -m 'not gpu and not model_download' poc/tests"
+# 테스트와 데이터 fixture는 poc/를 기준으로 선언돼 있다. 이 스크립트도 처음에
+# poc/로 이동했으므로, 전체 suite 역시 같은 기준에서 실행해 실행 환경에 따라
+# datasets/·docs/ 경로가 달라지는 일을 막는다. 저장소 루트 경로가 필요한
+# 정적 콘솔 검사는 해당 테스트가 __file__ 기준으로 직접 해석한다.
+run "전체 pytest(fullstack 포함, DB·Redis 연결)" env \
+    TESTING=1 DATABASE_URL="$TEST_DB_URL" REDIS_URL='redis://localhost:16379/0' \
+    "$PY" -m pytest -q -m 'not gpu and not model_download' tests
 
 run "데이터 누출 게이트" "$PY" scripts/check_data_quality.py \
     --train-hash-manifest datasets/gold_real/train_subset.hashes.txt \
@@ -136,8 +137,8 @@ else
     echo "" ; echo "==[ gold_real 3층 분리 검사 ]== 건너뜀 — datasets/gold_real/classification_gold.jsonl 없음"
 fi
 
-run "콘솔 e2e 시나리오" bash -c \
-    "cd .. && TESTING=1 'poc/$PY' -m pytest -q -c poc/pyproject.toml poc/tests/test_e2e_console_scenarios.py poc/tests/test_e2e_console_api_contract.py"
+run "콘솔 e2e 시나리오" env TESTING=1 \
+    "$PY" -m pytest -q tests/test_e2e_console_scenarios.py tests/test_e2e_console_api_contract.py
 
 _sha=$(git rev-parse HEAD 2>/dev/null || echo unknown)
 _now=$(date -u +%Y-%m-%dT%H:%M:%SZ)

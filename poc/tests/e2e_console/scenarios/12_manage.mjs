@@ -229,8 +229,8 @@ export const scenarios = [
   {
     id: 'manage.management.defaults-to-unknown',
     needsMock: true,
-    title: '비밀관리성(M) 칸이 상세에 있고, 기본이 「확인 안 됨」이다',
-    why: '「확인 안 됨」과 「전 임직원 열람」은 M 을 정반대로 만든다 — 뭉치면 S1 이 사라지거나 미탐이 열린다',
+    title: '비밀관리성(M) 입력 칸은 판단 결과를 예고하지 않는다',
+    why: '검수자가 고른 사실은 결정과 함께 기록하되, 화면이 확정 전 등급 하락을 단정해 혼동시키면 안 된다',
     needsData: true,
     async run({ server, check }) {
       const page = await manage(server);
@@ -240,8 +240,8 @@ export const scenarios = [
       check.ok(page.visible('mgmtWrap'), '비밀관리성 칸이 상세에 있다');
       check.eq(page.$('secMarking')?.value, '', '보안표시 기본은 확인 안 됨이다');
       check.eq(page.$('accScope')?.value, '', '접근범위 기본은 확인 안 됨이다');
-      check.includes(page.text('mgmtState'), '확인 안 됨', '지금 M 이 미확인임을 말한다');
-      check.includes(page.text('mgmtState'), 'S1', '이 상태에서 무엇이 불가능한지 말한다');
+      check.eq(page.text('mgmtState'), '', '입력 전·후에 M 또는 등급 결과를 단정해 예고하지 않는다');
+      check.ok(!page.visible('mgmtState'), '결정에 영향을 주는 경고 문구를 노출하지 않는다');
       check.includes(page.text('mgmtWrap'), '모르면', '추측하지 말라고 말한다');
       assertNoScriptErrors(check, page);
       return page;

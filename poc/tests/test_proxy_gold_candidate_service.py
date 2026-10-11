@@ -92,6 +92,23 @@ def test_uploaded_document_starts_ungraded_and_never_becomes_proxy_gold(tmp_path
     assert summary["discarded"] == 1 and summary["fixed"] == 0
 
 
+def test_unfixed_listing_keeps_only_documents_without_a_reviewer_decision(tmp_path):
+    _candidate(tmp_path, "PENDING")
+    svc = ProxyGoldCandidateService(tmp_path)
+    actual = svc.create_uploaded_candidate(
+        filename="검토중.txt", content=("검토 대기 문서 " * 30).encode("utf-8"), actor_id="admin",
+    )
+    svc.decide(
+        doc_id="PENDING", action="change", grade="S1", reason="검토 완료", actor_id="reviewer-a",
+    )
+
+    listing = svc.list_candidates(status="unfixed")
+
+    assert {row["doc_id"] for row in listing["candidates"]} == {actual["doc_id"]}
+    assert listing["candidates"][0]["status"] == "under_review"
+    assert listing["listed_excludes_discarded"] is True
+
+
 def test_actual_s2_s3_intake_requires_provenance_and_stays_unlocked(tmp_path):
     svc = ProxyGoldCandidateService(tmp_path)
     payload = ("실제 조직 운영 문서이며 S2 또는 S3 분류 검토를 위한 근거를 포함합니다. " * 20).encode("utf-8")

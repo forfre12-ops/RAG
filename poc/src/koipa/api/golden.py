@@ -1360,13 +1360,7 @@ $('provSave').disabled=(p.status==='recorded');note('provMsg',p.status==='record
 // 보여준다 - 여기서 다시 계산하면 판정식이 두 곳에 생긴다.
 function renderMgmt(c){const w=$('mgmtWrap');if(!w)return;const m=c.management||{};
 $('secMarking').value=m.security_marking||'';$('accScope').value=m.access_scope||'';
-const box=$('mgmtState');const st=m.state||'unknown';
-if(st==='present'){box.style.color='#3f6212';
- box.innerHTML='현재 <b>M='+m.level+'</b> — 관리 수준이 확인됐습니다.';}
-else if(st==='proven_absent'){box.style.color='#9a3412';
- box.innerHTML='현재 <b>M=0</b> — 전 임직원 열람이므로 비밀관리성 요건 미충족이 <b>입증</b>됐습니다. 곱이 0이 되어 등급이 내려갑니다.';}
-else{box.style.color='#8d949b';
- box.innerHTML='현재 <b>M 확인 안 됨</b> — 보수적으로 2로 채웁니다. 이 상태에서는 <b>S1이 나올 수 없습니다</b>(S1은 M=0으로 확정될 때만 나오는 조합입니다).';}}
+const box=$('mgmtState');if(box){box.textContent='';box.hidden=true;}}
 async function saveProv(){try{if(!selected)throw new Error('문서를 먼저 선택하세요.');
 const src=$('provSrc').value.trim(),basis=$('provBasis').value.trim();
 if(!src&&!basis)throw new Error('원천 위치나 사용 권한 근거 중 하나는 적어야 합니다.');
@@ -1564,8 +1558,8 @@ _REVIEWER_DOCUMENT_WORKBENCH_SCRIPT = r"""<script>
     if(rendered)rendered.innerHTML=mdToHtml(body);
     const eyebrow=detail.querySelector('.reviewer-document-sheet .eyebrow');
     if(eyebrow){eyebrow.className='eyebrow document-kicker';eyebrow.textContent='점검/검토 기록';}
-    const scope=document.getElementById('scope'); if(scope)scope.remove();
-    const viewbar=detail.querySelector('.viewbar'); if(viewbar)viewbar.remove();
+    // #scope와 .viewbar는 CSS로만 숨긴다. 삭제하면 저장 뒤 원래 show()가
+    // #scope.textContent를 갱신할 때 null 오류가 나 상세 조회 실패로 보인다.
   };
   const side=detail.querySelector('.sideDetail');
   if(side&&!side.querySelector('.reviewer-inspector-head')){
@@ -1648,6 +1642,13 @@ def _as_reviewer_view(html: str) -> str:
     )
     for old, new in reviewer_labels:
         html = html.replace(old, new, 1)
+    # 검수자는 이미 결정한 항목보다 아직 등급을 정하지 않은 항목부터 본다. 이 값은
+    # 원본 스크립트의 첫 load() 전에 HTML에 들어가므로 최초 조회부터 적용된다.
+    html = html.replace(
+        '<select id="status"><option value="">전체 상태</option>',
+        '<select id="status"><option value="unfixed" selected>등급 미결정</option><option value="">전체 상태</option>',
+        1,
+    )
     reviewer_frame = '<div class="frame reviewer-workspace">'
     html = html.replace('<div class="frame">', reviewer_frame, 1)
     html = html.replace('<nav class="nav">', '<nav class="nav" aria-label="검수 작업 메뉴">', 1)

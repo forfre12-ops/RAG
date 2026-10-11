@@ -806,6 +806,7 @@ def test_reviewer_manage_html_uses_the_reviewer_workspace_without_admin_actions(
         "점검/검토 기록",
         "documentFacts",
         "originalShow=show",
+        '<select id="status"><option value="unfixed" selected>등급 미결정</option>',
         "#reviewer-workbench #candidates .doctitle{font-size:14px;font-weight:400;",
     ):
         assert expected in html
