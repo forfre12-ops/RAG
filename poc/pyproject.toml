@@ -166,6 +166,7 @@ lint = [
 # 활성: pip install -e ".[full]"
 full = [
   "rhwp-python>=0.8.1",
+  "unhwp>=0.8",
   "xlrd>=2.0",
   "pdfplumber>=0.11",
   "soynlp>=0.0.493",
