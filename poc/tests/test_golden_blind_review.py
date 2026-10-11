@@ -821,11 +821,18 @@ def test_screens_are_unchanged_unless_blind_is_on(h, monkeypatch):
     assert "proposed_grade" in plain_reviewer and "최초 생성 등급" in plain_reviewer
     # 관리자 화면은 어떤 손잡이 조합에서도 같은 관리자 전용 경계 필터를 포함한다.
     # 이 필터는 검수자 화면에는 절대 내려가지 않는다.
+    # [2026-10-11] 관리자 전용 "최초 생성 등급"·"BERT 등급별 예측확률" 카드가 실제 라우트
+    # (proxy_gold_candidate_manager_html)에서 admin/kl_backend 에게만 주입된다 — 여기서도
+    # 같은 두 주입(CSS 는 </head> 앞, SCRIPT 는 경계 필터 앞)을 재현해야 실제 응답과 맞는다.
     admin_html = _render().replace("제안 등급 숨김", "다른 검수결정 숨김", 1).replace(
         "켜면 검수자 화면에서 제안 등급과 다른 검수자의 결정이 보이지 않습니다.",
         "켜면 다른 검수자의 결정은 숨기고, 최초 생성 등급과 BERT 점수는 참고자료로 표시합니다.",
         1,
-    ).replace("</body>", golden_api._ADMIN_BOUNDARY_FILTER_SCRIPT + "</body>", 1)
+    ).replace("</head>", golden_api._CANDIDATE_SCORE_CARDS_CSS + "</head>", 1).replace(
+        "</body>",
+        golden_api._CANDIDATE_SCORE_CARDS_SCRIPT + golden_api._ADMIN_BOUNDARY_FILTER_SCRIPT + "</body>",
+        1,
+    )
     for flags in (dict(), dict(blind=True), dict(assignment=True, blind=True)):
         set_flags(monkeypatch, **flags)
         for who in (ADMIN, KL_BACKEND):
