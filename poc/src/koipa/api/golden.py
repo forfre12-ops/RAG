@@ -366,7 +366,8 @@ def proxy_gold_candidate_list(
     대상은 그중 일부라, 표식이 없으면 검수자가 어느 문서를 봐야 하는지 알 수 없다.
     """
     if status and status not in {"proposed", "under_review", "approved_proxy",
-                                 "grade_fixed_unlocked", "deferred", "discarded", "out_of_scope"}:
+                                 "grade_fixed_unlocked", "deferred", "discarded", "out_of_scope",
+                                 "unfixed", "training_ready", "excluded"}:
         raise HTTPException(status_code=422, detail="invalid candidate status")
     if grade and grade not in {"TS", "S1", "S2", "S3"}:
         raise HTTPException(status_code=422, detail="invalid grade")
@@ -1642,11 +1643,75 @@ def _as_reviewer_view(html: str) -> str:
     )
     for old, new in reviewer_labels:
         html = html.replace(old, new, 1)
-    # 검수자는 이미 결정한 항목보다 아직 등급을 정하지 않은 항목부터 본다. 이 값은
+    # 검수자는 내부 상태(제안·proxy 등)가 아니라 업무 상태 세 가지만 본다. 이 값은
     # 원본 스크립트의 첫 load() 전에 HTML에 들어가므로 최초 조회부터 적용된다.
     html = html.replace(
-        '<select id="status"><option value="">전체 상태</option>',
-        '<select id="status"><option value="unfixed" selected>등급 미결정</option><option value="">전체 상태</option>',
+        '<select id="status"><option value="">전체 상태</option><option value="proposed">제안</option><option value="under_review">검토중</option><option value="approved_proxy">Proxy 확정</option><option value="grade_fixed_unlocked">등급 확정</option><option value="deferred">보류</option><option value="discarded">폐기</option><option value="out_of_scope">검수 대상 아님</option></select>',
+        '<select id="status"><option value="unfixed" selected>검토 대기</option><option value="training_ready">확정됨</option><option value="excluded">학습 제외</option><option value="">전체</option></select>',
+        1,
+    )
+    # 상태 코드는 원장·API 호환을 위해 유지한다. 검수 화면에는 업무 의미만 보이고,
+    # 확정은 한 번의 등급 선택으로 끝난다. 실제 모델 학습 실행은 별도 학습 작업의
+    # 데이터셋 동결·검증 경로에서만 일어난다.
+    html = html.replace(
+        "function pill(status){",
+        "function reviewerStatusLabel(status){return {proposed:'검토 대기',under_review:'검토 대기',deferred:'검토 대기',approved_proxy:'확정됨',grade_fixed_unlocked:'확정됨',discarded:'학습 제외',out_of_scope:'학습 제외'}[status]||status}function pill(status){",
+        1,
+    )
+    html = html.replace(
+        "e.textContent={proposed:'제안',under_review:'검토중',approved_proxy:'Proxy 확정',grade_fixed_unlocked:'등급 확정',deferred:'보류',discarded:'폐기',out_of_scope:'검수 대상 아님'}[status]||status;",
+        "e.textContent=reviewerStatusLabel(status);",
+        1,
+    )
+    html = html.replace(
+        "+' · 폐기 '+(s.discarded||0)+'건 포함'),metric('등급 확정',s.fixed+'건','Proxy / Unlocked'),metric('미확정',s.unfixed+'건','검토 필요'),metric('보류 · 폐기',(s.deferred+s.discarded)+'건','감사 이력 보존'),metric('검수 대상 아님',(s.out_of_scope||0)+'건','범위 밖 · 되돌릴 수 있음'),",
+        "),metric('확정됨',s.fixed+'건','등급 결정 완료'),metric('검토 대기',s.unfixed+'건','등급 결정 필요'),metric('학습 제외',(s.discarded+(s.out_of_scope||0))+'건','제외 사유 기록'),",
+        1,
+    )
+    html = html.replace(
+        "let grade=(c.proposed_grade||'–')+(c.final_grade?' → '+c.final_grade:'');",
+        "let grade=c.final_grade?('확정 '+c.final_grade):'등급 미결정';",
+        1,
+    )
+    html = html.replace(
+        "function setActions(c){let a=$('action');a.replaceChildren();if(c.document_origin==='synthetic'&&c.proposed_grade)a.append(option('approve','승인 (제안 등급 그대로 확정)'));a.append(option('change','등급 지정/변경'),option('defer','보류'),option('discard','폐기'),option('exclude','검수 대상 아님'));if(c.status==='deferred'||c.status==='discarded'||c.status==='out_of_scope')a.append(option('reopen','재검토로 되돌림'));toggleGrade()}",
+        "function setActions(c){let a=$('action');a.replaceChildren();a.append(option('change','등급 확정'),option('exclude','학습 제외'));toggleGrade()}",
+        1,
+    )
+    html = html.replace(
+        '<select id="finalGrade"><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select>',
+        '<select id="finalGrade"><option value="">등급을 선택하세요</option><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select>',
+        1,
+    )
+    html = html.replace(
+        "[['상태',c.status],['출처',c.document_origin],['제안',c.proposed_grade||'없음'],['확정',c.final_grade||'미확정'],",
+        "[['상태',reviewerStatusLabel(c.status)],['출처',c.document_origin],['확정',c.final_grade||'미확정'],",
+        1,
+    )
+    html = html.replace(
+        "$('finalGrade').value=c.final_grade||c.proposed_grade||'S3';",
+        "$('finalGrade').value=c.final_grade||'';",
+        1,
+    )
+    html = html.replace(
+        "if(action==='change')body.grade=$('finalGrade').value;",
+        "if(action==='change'){body.grade=$('finalGrade').value;if(!body.grade)throw new Error('확정할 등급을 선택하세요.');}",
+        1,
+    )
+    html = html.replace(
+        "msg('저장 완료: '+out.status);await show(selected.doc_id,true);note('saveMsg','저장했습니다 · 상태 '+out.status)",
+        "msg('저장했습니다 · '+reviewerStatusLabel(out.status));await show(selected.doc_id,true);note('saveMsg','저장했습니다 · '+reviewerStatusLabel(out.status))",
+        1,
+    )
+    html = html.replace("<h2>보류 · 폐기 이력</h2>", "<h2>내 결정 이력</h2>", 1)
+    html = html.replace(
+        "let lbl={approve:'승인',change:'등급 변경',defer:'보류',discard:'폐기',reject:'반려',reopen:'재검토',exclude:'검수 대상 아님'}[e.action]||e.action;",
+        "let lbl={approve:'등급 확정',change:'등급 확정',defer:'검토 대기',discard:'학습 제외',reject:'학습 제외',reopen:'검토 대기',exclude:'학습 제외'}[e.action]||e.action;",
+        1,
+    )
+    html = html.replace(
+        "<div class=\"grade\">'+(e.proposed_grade||'–')+' → '+(e.final_grade||'–')+'</div>",
+        "<div class=\"grade\">'+(e.final_grade||'–')+'</div>",
         1,
     )
     reviewer_frame = '<div class="frame reviewer-workspace">'
@@ -1689,6 +1754,10 @@ _BLIND_VIEW_PATCHES: tuple[tuple[str, str], ...] = (
     ("if(c.document_origin==='synthetic'&&c.proposed_grade)a.append(option('approve','승인 (제안 등급 그대로 확정)'));", ""),
     # 목록의 등급 칸: 제안 등급 → 내 결정만
     ("let grade=(c.proposed_grade||'–')+(c.final_grade?' → '+c.final_grade:'');",
+     "let grade=c.final_grade?('내 결정 '+c.final_grade):'–';"),
+    # 일반 검수 화면도 제안 등급 대신 확정 여부만 표시한다. 숨김 검수에서는 미결정
+    # 자리에 등급 유추 단서가 아닌 대시만 남겨야 한다.
+    ("let grade=c.final_grade?('확정 '+c.final_grade):'등급 미결정';",
      "let grade=c.final_grade?('내 결정 '+c.final_grade):'–';"),
     # 상세의 '제안' 칩
     ("['제안',c.proposed_grade||'없음'],", ""),

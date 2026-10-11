@@ -806,7 +806,9 @@ def test_reviewer_manage_html_uses_the_reviewer_workspace_without_admin_actions(
         "점검/검토 기록",
         "documentFacts",
         "originalShow=show",
-        '<select id="status"><option value="unfixed" selected>등급 미결정</option>',
+        '<select id="status"><option value="unfixed" selected>검토 대기</option><option value="training_ready">확정됨</option><option value="excluded">학습 제외</option>',
+        "function reviewerStatusLabel(status)",
+        "option('change','등급 확정'),option('exclude','학습 제외')",
         "#reviewer-workbench #candidates .doctitle{font-size:14px;font-weight:400;",
     ):
         assert expected in html
@@ -816,6 +818,12 @@ def test_reviewer_manage_html_uses_the_reviewer_workspace_without_admin_actions(
     assert "CURRENT WORKSPACE" not in html
     assert "goldset/console-review" not in html
     assert 'href="/console/admin.html"' not in html
+
+
+@pytest.mark.parametrize("status", ("unfixed", "training_ready", "excluded"))
+def test_reviewer_workspace_status_filters_are_accepted_by_the_api(h, status):
+    response = h.get(ADMIN, "/golden/candidates", params={"status": status})
+    assert response.status_code == 200, response.text
 
 
 # ══ 5. 이 시험이 정말 격리를 잠그는가 — 무력화하면 잡아내야 한다 ═══════════════════════════════

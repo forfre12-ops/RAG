@@ -109,6 +109,19 @@ def test_unfixed_listing_keeps_only_documents_without_a_reviewer_decision(tmp_pa
     assert listing["listed_excludes_discarded"] is True
 
 
+def test_reviewer_status_groups_hide_internal_workflow_names(tmp_path):
+    for doc_id in ("PENDING", "APPROVED", "EXCLUDED", "DEFERRED"):
+        _candidate(tmp_path, doc_id)
+    svc = ProxyGoldCandidateService(tmp_path)
+    svc.decide(doc_id="APPROVED", action="change", grade="S1", reason="등급 확정", actor_id="reviewer")
+    svc.decide(doc_id="EXCLUDED", action="exclude", reason="학습 제외", actor_id="reviewer")
+    svc.decide(doc_id="DEFERRED", action="defer", reason="추가 검토", actor_id="reviewer")
+
+    assert [c["doc_id"] for c in svc.list_candidates(status="training_ready")["candidates"]] == ["APPROVED"]
+    assert [c["doc_id"] for c in svc.list_candidates(status="excluded")["candidates"]] == ["EXCLUDED"]
+    assert [c["doc_id"] for c in svc.list_candidates(status="unfixed")["candidates"]] == ["DEFERRED", "PENDING"]
+
+
 def test_actual_s2_s3_intake_requires_provenance_and_stays_unlocked(tmp_path):
     svc = ProxyGoldCandidateService(tmp_path)
     payload = ("실제 조직 운영 문서이며 S2 또는 S3 분류 검토를 위한 근거를 포함합니다. " * 20).encode("utf-8")

@@ -322,14 +322,24 @@ class ProxyGoldCandidateService:
         # ⚠ 원장은 그대로다 — status="discarded" 로 명시하면 전부 나온다(조회 가능 = 보존).
         # 부수효과 하나: 종전에는 필터가 하나도 없으면 candidates 가 캐시 리스트 **그 자체**라
         # 아래 sort 가 캐시를 제자리에서 뒤집었다. 이제 항상 새 리스트라 그 일이 없다.
-        # ``unfixed`` 는 검수 문서함의 기본 큐다. 아직 등급 결정을 하지 않은 문서만
-        # 보이게 하되, 보류ㆍ폐기처럼 이미 사람이 다른 결정을 내린 건을 다시 할 일로
-        # 되돌리지는 않는다. ``view`` 적용 뒤에 걸러 독립/숨김 검수자의 자기 시야도
-        # 그대로 지킨다.
+        # 검수 문서함은 내부 작업 상태를 그대로 노출하지 않는다. ``unfixed`` 는 다시
+        # 판단할 문서(제안·검토중·기존 보류), ``training_ready`` 는 등급 확정 문서,
+        # ``excluded`` 는 학습에서 제외한 문서를 뜻하는 화면용 묶음이다. ``view`` 적용
+        # 뒤에 걸러 독립/숨김 검수자의 자기 시야도 그대로 지킨다.
         if status == "unfixed":
             candidates = [
                 c for c in all_candidates
-                if c["status"] in {"proposed", "under_review"}
+                if c["status"] in {"proposed", "under_review", "deferred"}
+            ]
+        elif status == "training_ready":
+            candidates = [
+                c for c in all_candidates
+                if c["status"] in {"approved_proxy", "grade_fixed_unlocked"}
+            ]
+        elif status == "excluded":
+            candidates = [
+                c for c in all_candidates
+                if c["status"] in {"discarded", "out_of_scope"}
             ]
         elif status:
             candidates = [c for c in all_candidates if c["status"] == status]
