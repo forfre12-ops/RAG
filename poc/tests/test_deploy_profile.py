@@ -98,6 +98,19 @@ def test_incremental_retrain_and_admin_console_gated_by_profile(
         assert s.demo_console_enabled is False, f"{profile}: 하드닝 콘솔에 purge 노출 금지"
 
 
+def test_onprem_profile_enforces_assigned_reviewer_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """고객사 전수 검수는 담당 문서만 보이며, 최초 생성등급·BERT 점수 표시는 별도 UI 계약이다."""
+    monkeypatch.delenv("GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED", raising=False)
+    monkeypatch.delenv("GOLDEN_REVIEW_BLIND_ENFORCED", raising=False)
+    monkeypatch.delenv("ENABLE_TRAINING", raising=False)
+    monkeypatch.delenv("ENABLE_INCREMENTAL_RETRAIN", raising=False)
+    s = Settings(deploy_profile="onprem-local", _env_file=None)
+    apply_profile_defaults(s)
+    assert s.enable_golden_review_console is True
+    assert s.golden_reviewer_assignment_enforced is True
+    assert s.golden_review_blind_enforced is True
+
+
 def test_explicit_env_wins_over_profile(monkeypatch: pytest.MonkeyPatch) -> None:
     # lite-noapi default는 llm_provider=noop. env로 anthropic 명시 시 그대로 유지.
     # [Wave3 M-config-env] 다른 프로파일 필드(embedding_provider 등)의 'default 채움'을
@@ -253,7 +266,7 @@ _ALWAYS_ON_LOGIN_PATHS = {
     [
         ("lite-noapi", False),
         ("lite-cloud", False),
-        ("onprem-local", False),   # [2026-10-09 정정] 아래 참고 — 더는 고객사에 안 열린다
+        ("onprem-local", True),    # [2026-10-11 고객사 요청] 전수 사람 검수 + AI 참고점수 화면
         ("full-train", True),
     ],
 )
@@ -270,7 +283,9 @@ def test_golden_router_visibility(
     확정된 결과로 재학습"이지 골든셋 검수 화면 자체가 아니다(사용자 지적). 그 파일은 지재원이
     만들어 설치 패키지에 스냅샷으로 실어 보낸다(deploy_manifest.toml [bundle.locked_eval],
     setup.sh 6-1b단계) — 화면(api/golden.py)은 지재원(full-train)에만 남기고 고객사
-    (onprem-local)에서는 이미지에서도 물리적으로 뺀다(container.customer_exclude).
+    (onprem-local)에서는 이미지에서도 물리적으로 뺀다(container.customer_exclude). 이후
+    2026-10-11 고객사가 1,000건 전수 사람 검수와 AI 점수 참고표시를 요구해 onprem-local 기본도
+    다시 켰다. 점수는 사람의 최종 결정을 대체하지 않는다.
     합성 생성(test_synthesis_router_visibility)과 같은 패턴 — 스위치를 명시적으로 지워
     프로파일 기본값이 정하게 한다.
 

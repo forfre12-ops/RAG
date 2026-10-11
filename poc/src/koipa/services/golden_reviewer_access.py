@@ -95,7 +95,8 @@ EVENT_UNASSIGN = "unassign"
 #   HIDDEN  서버가 뺀다. 제안·정답을 직접 말하거나 다른 검수자를 드러낸다.
 #   OWN     그 검수자 **자신의 결정만으로 다시 계산한** 값이다. 저장된 값이 아니다(BlindView).
 #   ALIASED 문서를 가리키는 값이라 서버가 **별칭으로 바꿔** 내보낸다(2026-09-22). 실 doc_id 는 응답 어디에도 없다.
-#   KEPT    문서 자체의 사실(본문·출처·글자 수)이라 서버가 값을 바꿀 수 없고, 결정과 무관하다.
+#   KEPT    문서 자체의 사실(본문·출처·글자 수)과 고객사 요청의 모델 점수 스냅샷. 점수는
+#           전수 사람 검수의 참고자료이며, 제안 정답·다른 검수자의 판단은 아니다.
 #           ⚠ 남긴다고 안전하다는 뜻이 아니다(한계는 test_known_limits_* 와 작업 보고서 risks).
 #
 # 별칭 대상은 후보 풀 전 필드를 훑은 측정으로 정했다(2026-09-22, 후보 1,067건·문자열 필드 전수 —
@@ -112,10 +113,13 @@ EVENT_UNASSIGN = "unassign"
 #
 # ── 후보 (ProxyGoldCandidateService._candidates 가 만드는 dict + get_candidate 의 decision_history)
 #  HIDDEN
-#    proposed_grade         메타데이터 intended_label 그대로. 제안 등급이자 합성 문서의 정답.
 #    proposed_grade_basis   "공개 실문서 → S3 제안" 이라는 제안의 근거 문구.
 #    document_path          원본 파일 경로. 파일명이 doc_id·제목을 그대로 싣고, 정리본
 #                           (revisions/…) 경로는 어떤 문서가 손질됐는지까지 드러낸다. 화면은 안 쓴다.
+#  KEPT
+#    proposed_grade         보호원 요청의 "최초 생성 등급"이다. 이번 검수에서는 앵커링을
+#                           피하려는 종전 숨김보다 고객사 표시 요청을 우선한다. 근거 문구,
+#                           다른 검수자의 결정·관리성 입력은 계속 숨긴다.
 #  OWN — 자기 결정만으로 계산
 #    final_grade·latest_decision·decision_history   자기 결정의 등급·이벤트·이력.
 #    status·grade_fixed     자기가 아직 결정하지 않았으면 **결정이 없는 문서의 상태**(메타데이터의
@@ -124,7 +128,7 @@ EVENT_UNASSIGN = "unassign"
 #    management             M(보안표시·접근범위) 입력. 적재 때 들어온 값(문서의 사실)과 **자기가 적은 값**만.
 #                           M 은 등급을 거의 단독으로 가른다(TS/S1 을 M 하나로 88.3% 가름) — 남이 적은 값이
 #                           섞이면 앵커링이고, 값 대신 "가려졌다"는 표식을 내도 남이 적었다는 사실이 샌다.
-BLIND_HIDDEN_CANDIDATE_FIELDS = frozenset({"proposed_grade", "proposed_grade_basis", "document_path"})
+BLIND_HIDDEN_CANDIDATE_FIELDS = frozenset({"proposed_grade_basis", "document_path"})
 BLIND_OWN_ONLY_CANDIDATE_FIELDS = frozenset({
     "final_grade", "latest_decision", "decision_history", "status", "grade_fixed", "management",
 })
@@ -134,7 +138,7 @@ BLIND_KEPT_CANDIDATE_FIELDS = frozenset({
     "claim_scope", "content_revision", "characters", "document_sha256",
     "extraction", "provenance", "source_file_sha256", "is_actual_document", "text",
     "department", "info_type", "doc_format",  # [2026-10-02·10-08] 등급을 말하지 않는다 — 카테고리 조회에 쓴다
-    "review_batch_active",  # [2026-10-10] 전달본이 열려 있는지 여부 — 등급과 무관한 배치 상태
+    "review_batch_active", "proposed_grade", "classifier_score",  # 고객사 전수 검수의 참고자료
 })
 
 # ── 결정 이벤트 (원장 한 줄 = decide 가 적는 dict). 숨김 검수자가 보는 이벤트는 **자기 것뿐**이다.
@@ -675,7 +679,7 @@ class AssignmentLedger:
         # 의존하지 않아 재실행·감사 때 같은 계획을 다시 계산할 수 있다.
         ordered = tuple(sorted(
             batch_docs,
-            key=lambda doc_id: hashlib.sha256(f"{batch}\0{doc_id}".encode("utf-8")).hexdigest(),
+            key=lambda doc_id: hashlib.sha256(f"{batch}\\x00{doc_id}".encode("utf-8")).hexdigest(),
         ))
         plan = {
             reviewer: ordered[index * 50:(index + 1) * 50]
@@ -778,7 +782,7 @@ class AssignmentLedger:
 
         ordered = tuple(sorted(
             batch_docs,
-            key=lambda doc_id: hashlib.sha256(f"{batch}\0{doc_id}".encode("utf-8")).hexdigest(),
+            key=lambda doc_id: hashlib.sha256(f"{batch}\\x00{doc_id}".encode("utf-8")).hexdigest(),
         ))
         plan_lists: dict[str, list[str]] = {reviewer: [] for reviewer in reviewers}
         for index, doc_id in enumerate(ordered):
@@ -830,6 +834,114 @@ class AssignmentLedger:
                         "assignment_group_id": group_id,
                         "review_batch_context": batch,
                         "assignment_kind": "balanced_review_plan",
+                    })
+            with self.path.open("a", encoding="utf-8", newline="\n") as handle:
+                handle.writelines(dumps_line(row, sort_keys=True) + "\n" for row in rows)
+                handle.flush()
+                os.fsync(handle.fileno())
+        return rows, group_id, False, plan
+
+    def rebalance_exact_expert_review_plan(
+        self, *, review_batch: str, reviewer_ids: Iterable[str], doc_batches: Mapping[str, str | None],
+        actor_id: str, decision_events: Iterable[Mapping[str, Any]], reason: str = "",
+    ) -> tuple[list[dict[str, Any]], str, bool, dict[str, tuple[str, ...]]]:
+        """Atomically replace an unopened 1,000-document expert-review plan with 25 x 40.
+
+        Explicit unassign events preserve the prior plan in the append-only
+        ledger.  Reassignment is refused after a reviewer decision in the
+        batch, because moving a partly reviewed document breaks ownership and
+        progress evidence.
+        """
+        batch = norm_id(review_batch)
+        reviewers = tuple(norm_id(reviewer_id) for reviewer_id in reviewer_ids)
+        actor = norm_id(actor_id)
+        if not batch or not actor:
+            raise ValueError("review_batch and actor_id are required")
+        if len(reviewers) != 25 or not all(reviewers) or len(set(reviewers)) != 25:
+            raise ValueError("expert review rebalance requires exactly 25 distinct reviewer IDs")
+
+        batch_docs = tuple(sorted(
+            doc_id for doc_id, doc_batch in doc_batches.items() if norm_id(doc_batch) == batch
+        ))
+        if len(batch_docs) != 1000:
+            raise ValueError(
+                f"expert review batch must contain exactly 1000 candidates (got {len(batch_docs)})")
+        batch_doc_set = frozenset(batch_docs)
+        # Keep the same deterministic order used for the live 25x40 migration.
+        # ``chr(92) + "x00"`` is intentionally literal text, not a NUL byte:
+        # it avoids source-escape ambiguity and makes plan replay unambiguous.
+        separator = chr(92) + "x00"
+        ordered = tuple(sorted(
+            batch_docs,
+            key=lambda doc_id: hashlib.sha256(f"{batch}{separator}{doc_id}".encode("utf-8")).hexdigest(),
+        ))
+        plan = {
+            reviewer: ordered[index * 40:(index + 1) * 40]
+            for index, reviewer in enumerate(reviewers)
+        }
+        if any(len(doc_ids) != 40 for doc_ids in plan.values()):
+            raise RuntimeError("expert review rebalance did not resolve to 40 candidates per reviewer")
+
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with _exclusive_ledger_lock(self.lock_path):
+            events = self.read_events()
+            state = self.replay(events)
+            visible_by_reviewer = {}
+            for reviewer, slot in state.items():
+                visible = self._resolve(slot, doc_batches) & batch_doc_set
+                if visible:
+                    visible_by_reviewer[reviewer] = visible
+            # An administrator's prior preparation/metadata decision does not
+            # mean an expert has started reviewing the assigned work.  Block
+            # only decisions made by a current or requested reviewer; those
+            # are the records whose ownership would be moved by this plan.
+            reviewer_actors = set(reviewers) | set(visible_by_reviewer)
+            reviewed = sorted({
+                str(event.get("doc_id") or "")
+                for event in decision_events
+                if str(event.get("doc_id") or "") in batch_doc_set
+                and norm_id(event.get("actor_id")) in reviewer_actors
+                and str(event.get("action") or "") not in {"", "record_provenance"}
+            })
+            if reviewed:
+                raise ValueError(
+                    "cannot rebalance a batch with reviewer decisions: " + ", ".join(reviewed[:10])
+                )
+            desired = {reviewer: frozenset(doc_ids) for reviewer, doc_ids in plan.items()}
+            exact_existing = (
+                set(visible_by_reviewer) == set(desired)
+                and all(visible_by_reviewer.get(reviewer, frozenset()) == docs
+                        for reviewer, docs in desired.items())
+            )
+            if exact_existing:
+                return [], self._existing_group_id(events, desired), True, plan
+
+            group_id = str(uuid4())
+            now = dt.datetime.now(dt.timezone.utc).isoformat()
+            clean_reason = (reason or "").strip()
+            rows: list[dict[str, Any]] = []
+            for reviewer, slot in sorted(state.items()):
+                if batch in slot["review_batches"]:
+                    rows.append({
+                        "schema_version": 1, "event_id": str(uuid4()), "event": EVENT_UNASSIGN,
+                        "reviewer_id": reviewer, "review_batch": batch, "actor_id": actor, "at": now,
+                        "reason": clean_reason, "assignment_group_id": group_id,
+                        "review_batch_context": batch, "assignment_kind": "exact_expert_review_25x40_rebalance",
+                    })
+                for doc_id in sorted(slot["doc_ids"] & batch_doc_set):
+                    rows.append({
+                        "schema_version": 1, "event_id": str(uuid4()), "event": EVENT_UNASSIGN,
+                        "reviewer_id": reviewer, "doc_id": doc_id, "actor_id": actor, "at": now,
+                        "reason": clean_reason, "assignment_group_id": group_id,
+                        "review_batch_context": batch, "assignment_kind": "exact_expert_review_25x40_rebalance",
+                    })
+            for reviewer, doc_ids in plan.items():
+                for doc_id in doc_ids:
+                    rows.append({
+                        "schema_version": 1, "event_id": str(uuid4()), "event": EVENT_ASSIGN,
+                        "reviewer_id": reviewer, "doc_id": doc_id, "actor_id": actor, "at": now,
+                        "reason": clean_reason, "assignment_group_id": group_id,
+                        "review_batch_context": batch, "assignment_kind": "exact_expert_review_25x40_rebalance",
                     })
             with self.path.open("a", encoding="utf-8", newline="\n") as handle:
                 handle.writelines(dumps_line(row, sort_keys=True) + "\n" for row in rows)

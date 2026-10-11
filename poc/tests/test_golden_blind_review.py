@@ -34,6 +34,9 @@ from fastapi.testclient import TestClient
 from koipa.api import golden as golden_api
 from koipa.api._jwt_auth import require_auth
 from koipa.api.app import app
+from koipa.services.candidate_classifier_scores import (
+    SCORE_SCHEMA_VERSION, write_score_snapshot,
+)
 from koipa.services import golden_reviewer_access as access
 from koipa.services import proxy_gold_candidate_service as pgs
 from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService
@@ -55,7 +58,7 @@ def h(tmp_path, monkeypatch):
 
 # 응답 어디에도 있으면 안 되는 키 — 재귀로 찾는다(중첩 dict·list 안까지).
 ANSWER_KEYS = {
-    "proposed_grade", "proposed_grade_basis", "document_path",     # 후보·이벤트
+    "proposed_grade_basis", "document_path",     # 후보·이벤트
     "by_proposed_grade", "by_final_grade", "quality",              # 집계
     "management_before",         # 이벤트 — 결정 직전의 저장된 M 이라 다른 검수자가 적은 값·신원이 그대로 실려 있다
 }
@@ -90,14 +93,14 @@ def _full_candidate(h) -> dict:
 def test_blind_field_lists_are_locked_literally():
     """이 목록이 바뀌면 검수자에게 보이는 것이 바뀐다 — 의도한 변경이면 여기도 함께 고친다."""
     # 후보
-    assert access.BLIND_HIDDEN_CANDIDATE_FIELDS == {"proposed_grade", "proposed_grade_basis", "document_path"}
+    assert access.BLIND_HIDDEN_CANDIDATE_FIELDS == {"proposed_grade_basis", "document_path"}
     assert access.BLIND_OWN_ONLY_CANDIDATE_FIELDS == {
         "final_grade", "latest_decision", "decision_history", "status", "grade_fixed", "management"}
     assert access.BLIND_ALIASED_CANDIDATE_FIELDS == {"doc_id", "title"}
     assert access.BLIND_KEPT_CANDIDATE_FIELDS == {
         "document_origin", "requires_manual_audit", "review_batch", "claim_scope", "content_revision", "characters",
         "document_sha256", "extraction", "provenance", "source_file_sha256", "is_actual_document", "text",
-        "department", "info_type", "doc_format", "review_batch_active"}
+        "department", "info_type", "doc_format", "review_batch_active", "proposed_grade", "classifier_score"}
     # 이벤트
     assert access.BLIND_HIDDEN_EVENT_FIELDS == {"proposed_grade", "management_before"}
     assert access.BLIND_REBUILT_EVENT_FIELDS == {"management_after"}
@@ -141,6 +144,7 @@ def test_every_candidate_key_is_classified_as_hidden_own_or_kept(h):
     assert {k for k in row if "grade" in k} == {
         "proposed_grade", "proposed_grade_basis", "final_grade", "grade_fixed"}
     assert "grade_fixed" in access.BLIND_OWN_ONLY_CANDIDATE_FIELDS and isinstance(row["grade_fixed"], bool)
+    assert "proposed_grade" in access.BLIND_KEPT_CANDIDATE_FIELDS
     # 결정에서 온 값(status·management 포함)은 남겨 두는 분류에 하나도 없다
     assert not ({"status", "grade_fixed", "management", "final_grade"} & access.BLIND_KEPT_CANDIDATE_FIELDS)
     # 문서를 가리키는 값은 남겨 두는 분류에 없다 — 별칭으로 바꿔 나간다(2026-09-22 측정: doc_id 988/1,067건·title 1건이 등급 코드를 품는다)
@@ -215,7 +219,7 @@ def test_unclassified_keys_do_not_leave_the_server_fail_closed():
     listed = scope.shape_list({
         "total": 1, "candidates": [{"doc_id": an_alias, "brand_new_key": "누설", "proposed_grade": "TS"}],
         "summary": {"total": 1, "new_dist": {"TS": 1}}, "batch_summary": {"total": 1, "new_dist": {"TS": 1}}})
-    assert listed["candidates"] == [{"doc_id": an_alias}]
+    assert listed["candidates"] == [{"doc_id": an_alias, "proposed_grade": "TS"}]
     assert listed["summary"] == {"total": 1} and listed["batch_summary"] == {"total": 1}
     event = {"event_id": "e", "actor_id": "expert-a", "reason": "r", "brand_new_key": "누설", "management_before": {}}
     assert access.BlindView("expert-a")._shape_event(event, {}) == {
@@ -241,7 +245,7 @@ def _reviewer_responses(h, who) -> dict[str, dict]:
 
 
 @pytest.mark.parametrize("assignment", [False, True])
-def test_no_answer_key_reaches_a_blind_reviewer_on_any_route(h, monkeypatch, assignment):
+def test_no_hidden_answer_key_reaches_a_blind_reviewer_on_any_route(h, monkeypatch, assignment):
     """숨김만 켠 경우(배정 꺼짐 — 전 문서가 보임)와 둘 다 켠 경우 모두."""
     h.standard_assignments()
     blind(monkeypatch, assignment=assignment)
@@ -251,6 +255,8 @@ def test_no_answer_key_reaches_a_blind_reviewer_on_any_route(h, monkeypatch, ass
         for name, payload in _reviewer_responses(h, who).items():
             leaked = walk_keys(payload) & ANSWER_KEYS
             assert not leaked, f"{who[1]} · {name}: 정답을 암시하는 키가 응답에 있다 {sorted(leaked)}"
+        if who == EXPERT_A:
+            assert _reviewer_responses(h, who)[f"detail:{A1}"]["proposed_grade"] == "TS"
     # 자기 결정 응답에도 없다(latest_decision 은 이벤트 그대로라 proposed_grade 가 실려 있다)
     r = h.post(EXPERT_A, f"/golden/candidates/{A2}/decision",
                json={"action": "change", "grade": "S1", "reason": "본문 근거"})
@@ -783,19 +789,23 @@ def test_blind_patch_anchors_are_all_alive():
         assert html.count(old) == 1, f"앵커가 검수자 화면에 정확히 한 번 있어야 한다: {old[:70]}"
 
 
-def test_blind_screen_never_mentions_the_proposal(h, monkeypatch):
+def test_blind_screen_shows_requested_initial_grade_but_not_proposal_basis(h, monkeypatch):
     blind(monkeypatch)
     r = h.get(EXPERT_A, "/golden/candidates/manage.html")
     assert r.status_code == 200
     html = r.text
-    # 화면 JS 에 제안 등급을 쓰는 자리가 하나도 남지 않아야 한다 — 새로 생기면 서버가 뺀 값을 다시 쓰려는 것
-    assert "proposed_grade" not in html, "숨김 화면 JS 에 제안 등급을 읽는 코드가 남았다"
+    # 보호원 요청에 따라 최초 생성 등급과 BERT 확률은 명시적으로 표시한다. 제안 근거와
+    # 다른 검수자의 결정은 계속 브라우저로 보내지지 않는다.
+    assert "proposed_grade" in html and "최초 생성 등급" in html
+    assert "proposed_grade_basis" not in html
     assert "제안 등급 그대로 확정" not in html and "option('approve'" not in html
     assert "['제안'," not in html
     assert '<select id="finalGrade"><option value="">등급을 선택하세요</option>' in html, "미리 고른 등급이 앵커다"
     assert "$('finalGrade').value=c.final_grade||'';" in html
     assert "확정할 등급을 선택하세요" in html, "빈 등급으로 저장되면 서버 422 원문이 화면에 뜬다"
-    assert "독립 검수 모드" in html
+    assert "사람 검수 모드" in html
+    assert "BERT 등급별 예측 확률" in html and "renderClassifierScore(candidate)" in html
+    assert "renderInitialGrade(candidate)" in html
     assert "#quality,a[href=\"#quality\"]{display:none!important}" in html and "#grade{display:none!important}" in html
     # 관리자 전용 조작을 감추는 기존 검수자 화면 위에 얹힌다
     assert "검수자 권한으로 열었습니다" in html and "#openUpload,#promote,#provBox{display:none!important}" in html
@@ -804,16 +814,22 @@ def test_blind_screen_never_mentions_the_proposal(h, monkeypatch):
 def test_screens_are_unchanged_unless_blind_is_on(h, monkeypatch):
     plain_reviewer = golden_api._as_reviewer_view(_render())
     # 기본(둘 다 꺼짐)과 배정만 켠 상태에도 동일한 검수자 작업 화면을 준다.
-    # 제안 등급은 독립 검수 손잡이와 무관하게 일반 검수자 UI에서 제거한다.
+    # 최초 생성 등급은 보호원 요청에 따라 일반 검수자 화면에도 표시한다.
     for flags in (dict(), dict(assignment=True)):
         set_flags(monkeypatch, **flags)
         assert h.get(EXPERT_A, "/golden/candidates/manage.html").text == plain_reviewer, flags
-    assert "proposed_grade" not in plain_reviewer, "검수자 화면은 제안 등급을 읽지 않아야 한다"
-    # 관리자 화면은 어떤 손잡이 조합에서도 그대로
+    assert "proposed_grade" in plain_reviewer and "최초 생성 등급" in plain_reviewer
+    # 관리자 화면은 어떤 손잡이 조합에서도 같은 관리자 전용 경계 필터를 포함한다.
+    # 이 필터는 검수자 화면에는 절대 내려가지 않는다.
+    admin_html = _render().replace("제안 등급 숨김", "다른 검수결정 숨김", 1).replace(
+        "켜면 검수자 화면에서 제안 등급과 다른 검수자의 결정이 보이지 않습니다.",
+        "켜면 다른 검수자의 결정은 숨기고, 최초 생성 등급과 BERT 점수는 참고자료로 표시합니다.",
+        1,
+    ).replace("</body>", golden_api._ADMIN_BOUNDARY_FILTER_SCRIPT + "</body>", 1)
     for flags in (dict(), dict(blind=True), dict(assignment=True, blind=True)):
         set_flags(monkeypatch, **flags)
         for who in (ADMIN, KL_BACKEND):
-            assert h.get(who, "/golden/candidates/manage.html").text == _render(), (who, flags)
+            assert h.get(who, "/golden/candidates/manage.html").text == admin_html, (who, flags)
 
 
 # 실제 DOM(jsdom)에서 숨김 화면을 눌러 본다 — 문자열 치환이 문법·동작을 깨지 않았는지는 HTML 을 읽어서는
@@ -835,7 +851,7 @@ const cand = (extra = {}) => ({
   characters: 320, document_sha256: 'a'.repeat(64), grade_fixed: false, extraction: null,
   provenance: {}, source_file_sha256: null, management: { state: 'unknown', security_marking: null, access_scope: null, level: null },
   is_actual_document: false, latest_decision: null, final_grade: null,
-  ...(blind ? {} : { proposed_grade: 'TS', proposed_grade_basis: null, document_path: 'x/GOLD-T-TS-001_문서.md' }), ...extra,
+  proposed_grade: 'TS', ...(blind ? {} : { proposed_grade_basis: null, document_path: 'x/GOLD-T-TS-001_문서.md' }), ...extra,
 });
 const summary = { total: 1, fixed: 0, unfixed: 1, deferred: 0, discarded: 0, out_of_scope: 0, by_status: { proposed: 1 },
   by_origin: { synthetic: 1 }, actual_document_intake: 0, actual_provenance_recorded: 0, actual_provenance_partial: 0,
@@ -874,6 +890,7 @@ out.gradeCellText = d.querySelector('#rows .grade')?.textContent;
 d.querySelector('#rows .candidate').click();
 await tick(300);
 out.metas = [...d.querySelectorAll('#metas span')].map(s => s.textContent);
+out.initialGrade = d.querySelector('#initialGrade .initial-grade-value')?.textContent;
 out.actions = [...d.querySelectorAll('#action option')].map(o => o.value);
 out.finalGradeValue = d.getElementById('finalGrade').value;
 out.finalGradeOptions = [...d.querySelectorAll('#finalGrade option')].map(o => o.value || o.textContent);
@@ -924,6 +941,7 @@ def test_blind_screen_behaves_in_a_real_dom(h, monkeypatch, tmp_path):
     assert out["errors"] == [], out["errors"]
     assert out["gradeCellText"] == "–" and "TS" not in out["rows"].replace("RV-7K2M9Q4XN8D1T5HB", "")
     assert not any("제안" in m for m in out["metas"]), out["metas"]
+    assert out["initialGrade"] == "특급 (TS)"
     assert out["actions"] == ["change", "exclude"], "검수자 화면은 등급 확정과 학습 제외만 제공한다"
     assert out["finalGradeValue"] == "" and out["finalGradeOptions"][0] == "등급을 선택하세요"
     assert out["postsAfterBlankSave"] == 0 and "등급을 선택하세요" in out["saveMsg"], (
@@ -950,6 +968,81 @@ def test_known_limits_body_title_and_order_inputs_still_carry_what_the_server_ca
     assert d["title"] == f"제목 {h.alias(A1)}" and d["characters"] > 0 and d["document_origin"] == "synthetic"
 
 
+def test_reviewer_can_read_hash_bound_classifier_score_from_detail_and_api(h, monkeypatch):
+    """AI 점수는 사람 검수 보조 정보로만 배정·별칭 권한 안에서 제공한다."""
+    h.standard_assignments()
+    blind(monkeypatch)
+    source = ProxyGoldCandidateService().get_candidate(A1)
+    assert source is not None
+    expected_scores = {"TS": 0.1, "S1": 0.7, "S2": 0.15, "S3": 0.05}
+    write_score_snapshot(h.root, [{
+        "schema_version": SCORE_SCHEMA_VERSION,
+        "doc_id": A1,
+        "document_sha256": source["document_sha256"],
+        "model_version": "test-model-v1",
+        "scored_at": "2026-10-11T00:00:00+00:00",
+        "score_basis": "serving_pipeline",
+        "predicted_label": "S1",
+        "scores": expected_scores,
+        "calibrated": False,
+    }])
+
+    detail = h.get(EXPERT_A, f"/golden/candidates/{A1}")
+    assert detail.status_code == 200, detail.text
+    score = detail.json()["classifier_score"]
+    assert score == {
+        "status": "available", "scores": expected_scores, "predicted_label": "S1",
+        "model_version": "test-model-v1", "scored_at": "2026-10-11T00:00:00+00:00",
+        "score_basis": "serving_pipeline", "calibrated": False,
+    }
+
+    direct = h.get(EXPERT_A, f"/golden/candidates/{A1}/classifier-score")
+    assert direct.status_code == 200, direct.text
+    assert direct.json() == {"doc_id": h.alias(A1), "classifier_score": score}
+    assert h.get(EXPERT_B, f"/golden/candidates/{A1}/classifier-score").status_code == 404
+
+
+def test_admin_can_filter_boundary_and_generation_mismatch_documents(h, monkeypatch):
+    """10%p is represented as 0.10 in the API; the four-way scores stay out of list rows."""
+    h.standard_assignments()
+    blind(monkeypatch)
+    svc = ProxyGoldCandidateService()
+    a1 = svc.get_candidate(A1)
+    a2 = svc.get_candidate(A2)
+    assert a1 and a2
+    write_score_snapshot(h.root, [
+        {
+            "schema_version": SCORE_SCHEMA_VERSION, "doc_id": A1,
+            "document_sha256": a1["document_sha256"], "model_version": "test-model-v1",
+            "scored_at": "2026-10-11T00:00:00+00:00", "score_basis": "serving_pipeline",
+            "predicted_label": "TS", "scores": {"TS": 0.45, "S1": 0.44, "S2": 0.08, "S3": 0.03},
+            "calibrated": True,
+        },
+        {
+            "schema_version": SCORE_SCHEMA_VERSION, "doc_id": A2,
+            "document_sha256": a2["document_sha256"], "model_version": "test-model-v1",
+            "scored_at": "2026-10-11T00:00:00+00:00", "score_basis": "serving_pipeline",
+            "predicted_label": "S2", "scores": {"TS": 0.05, "S1": 0.10, "S2": 0.80, "S3": 0.05},
+            "calibrated": True,
+        },
+    ])
+
+    boundary = h.get(ADMIN, "/golden/candidates", params={"boundary_gap_max": "0.10"})
+    assert boundary.status_code == 200, boundary.text
+    rows = boundary.json()["candidates"]
+    assert [row["doc_id"] for row in rows] == [A1]
+    assert rows[0]["classifier_score_summary"] == {
+        "predicted_label": "TS", "top_score": 0.45, "second_label": "S1", "top_two_gap": pytest.approx(0.01),
+        "generation_prediction_mismatch": False,
+    }
+    mismatch = h.get(ADMIN, "/golden/candidates", params={"prediction_mismatch": "true"})
+    assert [row["doc_id"] for row in mismatch.json()["candidates"]] == [A2]
+    assert h.get(EXPERT_A, "/golden/candidates", params={"boundary_gap_max": "0.10"}).status_code == 403
+    admin_html = h.get(ADMIN, "/golden/candidates/manage.html")
+    assert admin_html.status_code == 200
+    assert "boundary_gap_max" in admin_html.text and "최초생성 ≠ BERT 예측" in admin_html.text
+
+
 # ══ 8. 이 시험이 정말 숨김을 잠그는가 — 무력화하면 잡아내야 한다 ═══════════════════════════════════════
 
 
@@ -964,7 +1057,7 @@ def blind_leaks(h, monkeypatch) -> list[str]:
         leaks.append("grade 필터가 열려 있다")
     if h.post(EXPERT_A, f"/golden/candidates/{A2}/decision", json={"action": "approve"}).status_code != 403:
         leaks.append("approve 가 받아들여진다")
-    if "독립 검수 모드" not in h.get(EXPERT_A, "/golden/candidates/manage.html").text:
+    if "사람 검수 모드" not in h.get(EXPERT_A, "/golden/candidates/manage.html").text:
         leaks.append("화면이 숨김 모드로 안 바뀐다")
     # 다른 검수자의 흔적 — b 가 공유 문서(A3)를 M 입력과 함께 결정하면 a 의 응답 어디에도 그 흔적이 없어야 한다
     h.post(EXPERT_B, f"/golden/candidates/{A3}/decision", json={
@@ -993,8 +1086,7 @@ def test_blind_probe_detects_disabled_blind(h, monkeypatch):
     monkeypatch.setattr(access, "resolve_scope", lambda auth: access.UNRESTRICTED)
     monkeypatch.setattr(access, "enforcement_active", lambda: False)
     leaks = blind_leaks(h, monkeypatch)
-    for expected in ("list 에 proposed_grade", "list 에 quality", "list 에 by_proposed_grade",
-                     f"detail:{A1} 에 proposed_grade", "summary 에 quality", "grade 필터가 열려 있다",
+    for expected in ("list 에 quality", "list 에 by_proposed_grade", "summary 에 quality", "grade 필터가 열려 있다",
                      "approve 가 받아들여진다", "화면이 숨김 모드로 안 바뀐다",
                      "다른 검수자의 흔적 SENTINEL-B", f"다른 검수자의 흔적 {EXPERT_B[1]}",
                      "다른 검수자의 흔적 top_secret", "다른 검수자가 결정했다는 사실(status·grade_fixed)"):

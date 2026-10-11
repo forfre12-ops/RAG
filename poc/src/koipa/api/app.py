@@ -484,11 +484,10 @@ else:
 # 서명에 검수 화면이 필요하다")을 뒤집는다. locked_eval_readiness()(m6_evaluation/
 # locked_readiness.py)를 직접 읽어 확인한 결과 서명 게이트는 locked_eval.jsonl 파일 I/O 뿐이고
 # 살아있는 검수 UI 에 의존하지 않는다 — 고객사가 필요한 건 "이미 등급 확정된 결과로 재학습"
-# 기능뿐, 골든셋 검수 화면 자체가 아니다(사용자 지적, 2026-10-09). golden.py 는 이제
-# enable_golden_review_console 로 synthesis_api 와 같은 패턴으로 묶는다 — 지재원(full-train)만
-# 켜고, 고객사(onprem-local)는 꺼서 이미지에서도 물리적으로 뺀다(deploy_manifest.toml 의
-# container.customer_exclude 참고). 고객사의 locked_eval.jsonl 은 검수 화면이 아니라 설치
-# 패키지에 미리 구워 넣은 스냅샷 파일로 공급한다.
+# 기능뿐, 골든셋 검수 화면 자체가 아니다(사용자 지적, 2026-10-09). 이후 고객사가
+# 1,000건 전수 사람 검수와 AI 점수 참고표시를 명시적으로 요청했다(2026-10-11). 따라서
+# golden.py 는 enable_golden_review_console 스위치로 묶되 onprem-local·full-train 프로파일은
+# 켜고, 경량 프로파일이나 golden.py가 없는 분리 이미지는 계속 노출하지 않는다.
 #
 # ⚠ [2026-10-09 실제로 띄워보고 발견] golden.py 를 통째로 빼면 **고객사 관리 콘솔 전체가
 # 로그인조차 안 된다** — admin.html 의 유일한 로그인 경로(LOGIN_URL)와 `koipa_access_token`

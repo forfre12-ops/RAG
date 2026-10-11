@@ -6,11 +6,12 @@ import pytest
 from koipa.api import golden
 from koipa.api._jwt_auth import JWTClaims
 from koipa.config import settings
-from koipa.schemas.golden import GoldenExpertReviewPlanRequest
+from koipa.schemas.golden import GoldenExpertReviewPlanRequest, GoldenExpertReviewRebalanceRequest
 from koipa.services import golden_reviewer_access as access
 
 
 REVIEWERS = [f"reviewer-{number:02d}" for number in range(1, 21)]
+REBALANCED_REVIEWERS = [f"reviewer-{number:02d}" for number in range(1, 26)]
 BATCH = "KL_EXPERT_REVIEW_20261010"
 
 
@@ -118,6 +119,53 @@ def test_exact_expert_plan_is_idempotent_only_for_the_same_exclusive_plan(tmp_pa
     assert len(ledger.read_events()) == 1000
 
 
+def test_rebalance_replaces_an_unopened_20x50_plan_with_an_auditable_25x40_plan(tmp_path):
+    ledger = access.AssignmentLedger(tmp_path)
+    ledger.apply_exact_expert_review_plan(
+        review_batch=BATCH, reviewer_ids=REVIEWERS, doc_batches=_index(), actor_id="admin-operator",
+    )
+
+    rows, group_id, already_applied, plan = ledger.rebalance_exact_expert_review_plan(
+        review_batch=BATCH, reviewer_ids=REBALANCED_REVIEWERS, doc_batches=_index(),
+        decision_events=[], actor_id="admin-operator", reason="보호원 25명 x 40건 재배정",
+    )
+    assert already_applied is False and group_id
+    assert len(rows) == 2000
+    assert sum(row["event"] == access.EVENT_UNASSIGN for row in rows) == 1000
+    assert sum(row["event"] == access.EVENT_ASSIGN for row in rows) == 1000
+    assert {row["assignment_kind"] for row in rows} == {"exact_expert_review_25x40_rebalance"}
+    assert set(plan) == set(REBALANCED_REVIEWERS)
+    assert all(len(doc_ids) == 40 for doc_ids in plan.values())
+
+    state = ledger.status(_index(), review_batch=BATCH)
+    assert state["assigned_candidate_count"] == 1000
+    assert {row["visible_doc_count"] for row in state["reviewers"]} == {40}
+    assert len(state["reviewers"]) == 25
+
+    repeat = ledger.rebalance_exact_expert_review_plan(
+        review_batch=BATCH, reviewer_ids=REBALANCED_REVIEWERS, doc_batches=_index(),
+        decision_events=[], actor_id="admin-operator",
+    )
+    assert repeat[0] == [] and repeat[2] is True
+
+
+def test_rebalance_refuses_a_reviewed_batch_without_changing_assignments(tmp_path):
+    ledger = access.AssignmentLedger(tmp_path)
+    _, _, _, plan = ledger.apply_exact_expert_review_plan(
+        review_batch=BATCH, reviewer_ids=REVIEWERS, doc_batches=_index(), actor_id="admin-operator",
+    )
+    before = ledger.read_events()
+    with pytest.raises(ValueError, match="reviewer decisions"):
+        ledger.rebalance_exact_expert_review_plan(
+            review_batch=BATCH, reviewer_ids=REBALANCED_REVIEWERS, doc_batches=_index(),
+            decision_events=[{
+                "doc_id": plan["reviewer-01"][0], "actor_id": "reviewer-01", "action": "change",
+            }],
+            actor_id="admin-operator",
+        )
+    assert ledger.read_events() == before
+
+
 def test_exact_expert_plan_refuses_collision_without_writing_a_partial_plan(tmp_path):
     ledger = access.AssignmentLedger(tmp_path)
     ledger.apply(event=access.EVENT_ASSIGN, reviewer_id="other-reviewer", actor_id="admin-operator",
@@ -189,6 +237,44 @@ def test_expert_plan_endpoint_records_an_auditable_atomic_group(monkeypatch, tmp
     assert {row["assignment_group_id"] for row in access.AssignmentLedger(tmp_path).read_events()} == {
         out.assignment_group_id
     }
+
+
+def test_rebalance_endpoint_replaces_the_plan_only_with_25_active_reviewers(monkeypatch, tmp_path):
+    class FakeService:
+        root = tmp_path
+
+        @staticmethod
+        def review_batch_index():
+            return _index()
+
+        @staticmethod
+        def ledger_rows():
+            return []
+
+    monkeypatch.setattr(golden, "ProxyGoldCandidateService", FakeService)
+    monkeypatch.setattr(
+        golden.reviewer_credentials,
+        "list_accounts",
+        lambda: [{"username": reviewer, "roles": ("reviewer",), "active": True}
+                 for reviewer in REBALANCED_REVIEWERS],
+    )
+    monkeypatch.setattr(settings, "golden_reviewer_assignment_enforced", True)
+    monkeypatch.setattr(settings, "golden_review_blind_enforced", True)
+    ledger = access.AssignmentLedger(tmp_path)
+    ledger.apply_exact_expert_review_plan(
+        review_batch=BATCH, reviewer_ids=REVIEWERS, doc_batches=_index(), actor_id="admin-operator",
+    )
+
+    out = golden.golden_expert_review_plan_rebalance(
+        GoldenExpertReviewRebalanceRequest(
+            review_batch=BATCH, reviewer_ids=REBALANCED_REVIEWERS, reason="25명 전환",
+        ),
+        _auth(),
+    )
+    assert out.reviewer_count == 25 and out.documents_per_reviewer == 40
+    assert out.revoked_assignment_events == out.assigned_events == 1000
+    assert out.events_written == 2000
+    assert set(out.reviewer_document_counts.values()) == {40}
 
 
 def test_expert_plan_refuses_unprovisioned_reviewer_before_writing(monkeypatch, tmp_path):

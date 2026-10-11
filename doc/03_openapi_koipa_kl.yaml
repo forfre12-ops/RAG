@@ -1889,6 +1889,9 @@ paths:
         - { in: query, name: grade, schema: { type: string, enum: [TS, S1, S2, S3] } }
         - { in: query, name: origin, schema: { type: string }, description: "public_real | organization_real 등" }
         - { in: query, name: query, schema: { type: string }, description: 본문·제목 부분일치 }
+        - { in: query, name: review_batch, schema: { type: string }, description: 검수 전달본 식별자 }
+        - { in: query, name: boundary_gap_max, schema: { type: number, minimum: 0, maximum: 1 }, description: "관리자 전용: BERT 상위 두 등급 확률 차이 이하 (0.10 = 10%p)" }
+        - { in: query, name: prediction_mismatch, schema: { type: boolean, default: false }, description: "관리자 전용: 최초 생성 등급과 BERT 최상위 예측이 다른 문서" }
       responses:
         '200':
           description: 후보 목록 + summary(품질 지표 포함)
@@ -1896,6 +1899,7 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: 경계·불일치 필터는 관리자 전용 }
 
   /golden/candidates/summary:
     get:
@@ -2102,6 +2106,51 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /golden/candidates/{doc_id}/classifier-score:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [golden]
+      summary: 검수 후보의 AI 분류 참고 점수
+      description: >-
+        TS/S1/S2/S3의 모델 점수 스냅샷을 반환한다. 요청 시 모델을 실행하지 않으며,
+        스냅샷은 문서 본문 SHA-256과 모델 버전에 묶여 있다. 값은 전수 사람 검수의 참고자료일
+        뿐 최종 등급이나 자동확정 결과가 아니다. 본문이 바뀌었거나 스냅샷이 없으면
+        classifier_score.status=unavailable 로 반환한다.
+      parameters:
+        - in: path
+          name: doc_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 해시-바인딩 AI 분류 참고 점수
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [doc_id, classifier_score]
+                properties:
+                  doc_id: { type: string }
+                  classifier_score:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: { type: string, enum: [available, unavailable] }
+                      scores:
+                        type: object
+                        properties:
+                          TS: { type: number, format: float }
+                          S1: { type: number, format: float }
+                          S2: { type: number, format: float }
+                          S3: { type: number, format: float }
+                      predicted_label: { type: string, enum: [TS, S1, S2, S3] }
+                      model_version: { type: string }
+                      scored_at: { type: string, format: date-time }
+                      calibrated: { type: boolean }
+                      reason: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -2418,6 +2467,32 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { description: "배정 강제 또는 블라인드 강제가 켜져 있지 않음" }
         '422': { description: "배치가 정확히 1,000건이 아님 · 검수자가 서로 다른 20명이 아님 · 기존 배정과 충돌" }
+
+  /golden/assignments/expert-review-plan/rebalance:
+    post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [golden]
+      summary: 미검수 전문가 배치를 25명 x 40건으로 원자 재배정
+      description: >-
+        기존 20명 x 50건 계획을 아직 검수 결정이 없는 경우에만 25명 x 40건으로 교체한다.
+        기존 배정은 삭제하지 않고 unassign 이벤트로 남긴 뒤 새 1,000건 계획을 한 번에 append 한다.
+        기존 계정의 ID·비밀번호는 이 경로에서 변경하지 않는다. 목표 배치에 검수자 결정이 하나라도
+        있으면 422로 거절한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoldenExpertReviewRebalanceRequest' }
+      responses:
+        '201':
+          description: 25x40 재배정 원장 기록(또는 동일 기존 계획 확인)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoldenExpertReviewRebalanceResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: "배정 강제 또는 검수 격리가 켜져 있지 않음" }
+        '422': { description: "배치가 정확히 1,000건이 아님 · 검수자가 서로 다른 25명이 아님 · 이미 검수자 결정이 있음" }
 
   /golden/assignments/review-plan:
     post:
@@ -3020,6 +3095,44 @@ components:
           description: 검수자 ID별 현재 정확 배정 문서 수. 성공한 계획은 모든 값이 50이다.
           additionalProperties:
             type: integer
+
+    GoldenExpertReviewRebalanceRequest:
+      type: object
+      additionalProperties: false
+      required: [review_batch, reviewer_ids]
+      properties:
+        review_batch:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: 기존 20x50 계획이 있는 정확히 1,000건 전문가 검수 배치
+        reviewer_ids:
+          type: array
+          minItems: 25
+          maxItems: 25
+          uniqueItems: true
+          description: 서로 다른 활성 검수자 25명. 각자 정확히 40건을 받는다.
+          items:
+            type: string
+            minLength: 1
+        reason:
+          type: string
+          maxLength: 1000
+          default: ""
+          description: 기존 배정 해제와 새 배정 원장에 공통으로 남길 사유
+
+    GoldenExpertReviewRebalanceResponse:
+      allOf:
+        - $ref: '#/components/schemas/GoldenExpertReviewPlanResponse'
+        - type: object
+          required: [revoked_assignment_events, assigned_events]
+          properties:
+            revoked_assignment_events:
+              type: integer
+              description: 기존 계획을 무효화하기 위해 append한 unassign 이벤트 수
+            assigned_events:
+              type: integer
+              description: 새 25x40 계획을 위해 append한 assign 이벤트 수
 
     GoldenReviewerRosterEntry:
       type: object

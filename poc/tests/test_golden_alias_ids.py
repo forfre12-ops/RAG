@@ -181,9 +181,13 @@ def independent_alias(salt_hex: str, doc_id: str) -> str:
     return "RV-" + std.translate(table)[:16]
 
 
-def strings_outside_body(obj, skip_keys=("text", "final_grade")) -> list[str]:
-    """응답 안의 모든 문자열(중첩 dict·list, 키 이름 포함). 본문(text)과 검수자 **자신의 결정 등급**(final_grade)은 뺀다 —
-    앞의 것은 문서의 사실이고 뒤의 것은 검수자가 방금 정한 값이다."""
+def strings_outside_body(obj, skip_keys=("text", "final_grade", "proposed_grade", "classifier_score")) -> list[str]:
+    """응답 안의 모든 문자열(중첩 dict·list, 키 이름 포함).
+
+    본문(text), 검수자 자신의 결정 등급(final_grade), 보호원이 검수 참고자료로
+    명시 요청한 최초 생성 등급(proposed_grade)과 BERT 점수(classifier_score)는
+    이 별칭 누출 탐침의 대상에서 뺀다. 그 밖의 실 doc_id·등급 코드는 계속 탐지한다.
+    """
     out: list[str] = []
     if isinstance(obj, dict):
         for k, v in obj.items():
@@ -280,7 +284,7 @@ def test_manage_html_is_a_static_shell_without_any_doc_id(api, monkeypatch):
     standard_assignments(api)
     blind_on(monkeypatch)
     html = api.get(RV_A, "/golden/candidates/manage.html").text
-    assert "독립 검수 모드" in html and "별칭" in html
+    assert "사람 검수 모드" in html and "별칭" in html
     for doc_id in ALL_IDS:
         assert doc_id not in html
     for _d, _l, _o, _b, title, _k in ALIAS_POOL:
@@ -310,13 +314,24 @@ def _detail_modulo_alias(api: Api, who, doc_id: str, table: dict[str, str]) -> d
 
 @pytest.mark.parametrize("a, b", [(P1S1, P1S3), (P2S1, P2NC)], ids=["S1-vs-S3-code", "S1-code-vs-no-code"])
 def test_a_pair_of_documents_with_the_same_body_looks_the_same_whatever_their_doc_id_says(api, monkeypatch, a, b):
-    """doc_id 에 S1 이 든 문서와 S3 가 든(또는 코드가 아예 없는) 문서가 본문·제목이 같으면, 별칭만 빼고 응답이 **같다.**"""
+    """최초 생성 등급 외에는, 등급 코드가 다른 doc_id 가 응답 모양을 바꾸지 않는다."""
     blind_on(monkeypatch, assignment=False)
     table = api.alias_table()
     assert table[a] != table[b]
-    assert _detail_modulo_alias(api, RV_A, a, table) == _detail_modulo_alias(api, RV_A, b, table)
+    def without_requested_reference(detail: dict) -> dict:
+        detail = dict(detail)
+        detail.pop("proposed_grade", None)
+        detail.pop("classifier_score", None)
+        return detail
+
+    left = _detail_modulo_alias(api, RV_A, a, table)
+    right = _detail_modulo_alias(api, RV_A, b, table)
+    assert "proposed_grade" in left and "proposed_grade" in right
+    assert without_requested_reference(left) == without_requested_reference(right)
     for who in (RV_A, RV_B):
-        assert _detail_modulo_alias(api, who, a, table) == _detail_modulo_alias(api, who, b, table)
+        assert without_requested_reference(_detail_modulo_alias(api, who, a, table)) == without_requested_reference(
+            _detail_modulo_alias(api, who, b, table)
+        )
 
 
 def test_titles_are_kept_unless_they_carry_a_grade_code_or_the_real_doc_id(api, monkeypatch):

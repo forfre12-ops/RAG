@@ -29,6 +29,8 @@ from koipa.schemas.golden import (
     GoldenAssignmentResponse,
     GoldenExpertReviewPlanRequest,
     GoldenExpertReviewPlanResponse,
+    GoldenExpertReviewRebalanceRequest,
+    GoldenExpertReviewRebalanceResponse,
     GoldenReviewPlanRequest,
     GoldenReviewPlanResponse,
     GoldenReviewerRosterEntry,
@@ -40,6 +42,7 @@ from koipa.schemas.golden import (
     GoldenJobListResponse,
     GoldenJobSummary,
     GoldenRegisterRequest,
+    CandidateClassifierScoreResponse,
     ProxyGoldCandidateDecisionRequest,
     ProxyGoldCandidateProvenanceRequest,
     ProxyGoldCandidateProvenanceResponse,
@@ -150,6 +153,8 @@ def _signed_html_urls(job_id) -> tuple[str, str]:
 #   GET  /golden/candidates/decisions       배정된 문서의 이벤트만 + 숨김이면 자기 이벤트만(M 입력은 자기가 적은 값으로만) · doc_id 는 별칭
 #   GET  /golden/candidates/session         본인 신원뿐 — 후보 데이터 없음(적용 대상 아님)
 #   GET  /golden/candidates/{doc_id}        배정 밖이면 404 + 숨김 필터 · 숨김이면 {doc_id} 는 별칭만 받는다(실 doc_id 는 404)
+#   GET  /golden/candidates/{doc_id}/classifier-score
+#                                           본문 해시에 묶인 AI 분류 참고 점수만 반환(고객사 전수 사람 검수 보조)
 #   POST /golden/candidates/{doc_id}/decision  배정 밖이면 404 · 숨김이면 approve 거절 · 응답도 자기 시야 · {doc_id} 는 별칭만
 #   GET  /golden/candidates/manage.html     후보 데이터가 인라인으로 박히지 않는 정적 틀(시험이 잠금) + 숨김이면 화면 조정
 #                                           + 관리자 전용 「검수 배정」 패널은 검수자 화면에서 통째로 제거(_strip_assignment_panel — 2026-09-22)
@@ -352,6 +357,8 @@ def proxy_gold_candidate_list(
     origin: str | None = None, query: str | None = None,
     review_batch: str | None = None,
     department: str | None = None, info_type: str | None = None, doc_format: str | None = None,
+    boundary_gap_max: float | None = Query(default=None, ge=0, le=1),
+    prediction_mismatch: bool = False,
     limit: int | None = Query(default=None, ge=1, le=2000),
     offset: int = Query(default=0, ge=0),
     auth: dict = Depends(require_auth),
@@ -364,6 +371,8 @@ def proxy_gold_candidate_list(
 
     review_batch 는 검수 전달본 단위 표식이다. 콘솔 전체가 306건인데 한 회차 검수
     대상은 그중 일부라, 표식이 없으면 검수자가 어느 문서를 봐야 하는지 알 수 없다.
+    boundary_gap_max 는 BERT 상위 두 등급 점수 차이(0.10 = 10%p) 이하만, prediction_mismatch
+    는 최초 생성 등급과 BERT 최상위 예측이 다른 문서만 남긴다. 둘을 함께 주면 교집합이다.
     """
     if status and status not in {"proposed", "under_review", "approved_proxy",
                                  "grade_fixed_unlocked", "deferred", "discarded", "out_of_scope",
@@ -378,6 +387,11 @@ def proxy_gold_candidate_list(
         # 조용히 무시하면 호출자가 걸러진 목록으로 오해하므로 거절한다.
         raise HTTPException(
             status_code=422, detail="grade filter is not available in blind review")
+    if scope.restricted and (boundary_gap_max is not None or prediction_mismatch):
+        # 경계 문서의 선별은 관리자 검수 우선순위 기능이다. 검수자에게 특정 문서가
+        # "애매하다"는 목록 정보까지 주면 독립 판단의 기준이 바뀔 수 있다.
+        raise HTTPException(
+            status_code=403, detail="classifier boundary filters are available to administrators only")
     svc = ProxyGoldCandidateService()
     # 숨김이면 서비스가 행을 별칭 시야로 바꾼 **뒤에** 정렬·검색한다 — 목록 순서는 별칭 순이고(실 doc_id 순이면 줄 위치로 등급이
     # 읽힌다), query 는 등급 코드를 담을 수 있는 doc_id·title 에 맞추지 않고 별칭 앞부분에만 닿는다(blind_query_match).
@@ -385,6 +399,8 @@ def proxy_gold_candidate_list(
         return scope.shape_list(svc.list_candidates(
             status=status, grade=grade, origin=origin, query=query, review_batch=review_batch,
             department=department, info_type=info_type, doc_format=doc_format,
+            boundary_gap_max=boundary_gap_max, prediction_mismatch=prediction_mismatch,
+            include_classifier_summary=not scope.restricted,
             visible_doc_ids=scope.visible_doc_ids(svc), view=scope.candidate_view(svc),
             query_match=scope.query_match(), limit=limit, offset=offset), svc)
 
@@ -514,6 +530,34 @@ async def proxy_gold_candidate_upload(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {k: v for k, v in candidate.items() if k != "text"}
+
+
+@router.get(
+    "/golden/candidates/{doc_id}/classifier-score",
+    response_model=CandidateClassifierScoreResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+    summary="검수 후보의 AI 분류 참고 점수",
+)
+def proxy_gold_candidate_classifier_score(doc_id: str, auth: dict = Depends(require_auth)) -> dict:
+    """Return the hash-bound score snapshot for a candidate visible to this caller.
+
+    This is deliberately a read-only score snapshot.  It neither invokes a
+    model during a reviewer request nor changes the human-review decision.
+    """
+    scope = _scope(auth)
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        real_id = _resolve_doc_id(scope, svc, doc_id)
+        _require_visible(scope, svc, real_id)
+        candidate = svc.get_candidate(real_id)
+        if candidate is None:
+            raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+        shaped = scope.shape_candidate(candidate, svc)
+    return {
+        "doc_id": shaped["doc_id"],
+        "classifier_score": shaped["classifier_score"],
+    }
 
 
 @router.get(
@@ -830,6 +874,64 @@ def golden_expert_review_plan(
         assignment_group_id=group_id,
         already_applied=already_applied,
         reviewer_document_counts={reviewer: len(doc_ids) for reviewer, doc_ids in plan.items()},
+    )
+
+
+@router.post(
+    "/golden/assignments/expert-review-plan/rebalance",
+    response_model=GoldenExpertReviewRebalanceResponse,
+    status_code=201,
+    summary="미검수 전문가 배치를 25명 x 40건으로 원자 재배정",
+)
+def golden_expert_review_plan_rebalance(
+    req: GoldenExpertReviewRebalanceRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> GoldenExpertReviewRebalanceResponse:
+    """Move an unopened 1,000-document expert-review batch from 20 x 50 to 25 x 40.
+
+    Existing passwords are unrelated to this endpoint and never changed.  The
+    ledger retains every old assignment as an explicit unassign event, while a
+    reviewer decision in the target batch makes this operation fail closed.
+    """
+    if not bool(getattr(settings, "golden_reviewer_assignment_enforced", False)):
+        raise HTTPException(
+            status_code=409,
+            detail="expert review rebalance requires GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1",
+        )
+    if not bool(getattr(settings, "golden_review_blind_enforced", False)):
+        raise HTTPException(
+            status_code=409,
+            detail="expert review rebalance requires GOLDEN_REVIEW_BLIND_ENFORCED=1",
+        )
+    _require_active_reviewer_accounts(req.reviewer_ids)
+    actor_id = _console_actor_id(auth)
+    svc = ProxyGoldCandidateService()
+    ledger = access.AssignmentLedger(svc.root)
+    try:
+        rows, group_id, already_applied, plan = ledger.rebalance_exact_expert_review_plan(
+            review_batch=req.review_batch,
+            reviewer_ids=req.reviewer_ids,
+            doc_batches=svc.review_batch_index(),
+            decision_events=svc.ledger_rows(),
+            actor_id=actor_id,
+            reason=req.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    revoked = sum(1 for row in rows if row["event"] == access.EVENT_UNASSIGN)
+    assigned = sum(1 for row in rows if row["event"] == access.EVENT_ASSIGN)
+    return GoldenExpertReviewRebalanceResponse(
+        review_batch=access.norm_id(req.review_batch),
+        reviewer_count=len(plan),
+        documents_per_reviewer=40,
+        total_documents=1000,
+        actor_id=actor_id,
+        events_written=len(rows),
+        assignment_group_id=group_id,
+        already_applied=already_applied,
+        reviewer_document_counts={reviewer: len(doc_ids) for reviewer, doc_ids in plan.items()},
+        revoked_assignment_events=revoked,
+        assigned_events=assigned,
     )
 
 
@@ -1312,6 +1414,47 @@ reloadAll();
 </script>""")
 
 
+_ADMIN_BOUNDARY_FILTER_SCRIPT = r"""<script>
+/* 관리자만 경계 문서를 선별한다. 상세의 네 등급 확률은 검수자 화면에서만 읽는다. */
+(function(){
+  const filters=document.querySelector('#candidates .filters');
+  const after=document.getElementById('doc_format');
+  if(!filters||!after||document.getElementById('boundary_gap_max'))return;
+  const gap=document.createElement('select'); gap.id='boundary_gap_max'; gap.setAttribute('aria-label','경계데이터');
+  gap.title='BERT 상위 두 등급 예측확률 차이로 경계 문서를 조회합니다.';
+  gap.append(option('','전체 문서'),option('0.10','경계: 상위 2등급 차이 10%p 이하'));
+  const mismatch=document.createElement('label'); mismatch.id='boundaryMismatch';
+  mismatch.style.cssText='font-size:12px;display:flex;align-items:center;gap:5px;white-space:nowrap';
+  const check=document.createElement('input'); check.id='prediction_mismatch'; check.type='checkbox';
+  mismatch.append(check,document.createTextNode(' 최초생성 ≠ BERT 예측'));
+  after.insertAdjacentElement('afterend',gap); gap.insertAdjacentElement('afterend',mismatch);
+  qurl=function(){
+    let q=new URLSearchParams();
+    ['status','grade','origin','query','review_batch','department','doc_format','boundary_gap_max'].forEach(function(id){
+      let node=$(id),value=node&&String(node.value||'').trim(); if(value)q.set(id,value);
+    });
+    if(check.checked)q.set('prediction_mismatch','true');
+    q.set('limit',PAGE_SIZE);q.set('offset',curPage*PAGE_SIZE);return api+'?'+q;
+  };
+  [gap,check].forEach(function(node){node.addEventListener('change',function(){curPage=0;load(true);});});
+  const originalRenderRows=renderRows;
+  renderRows=function(data){
+    originalRenderRows(data);
+    (data.candidates||[]).forEach(function(candidate,index){
+      const summary=candidate.classifier_score_summary;
+      const row=document.querySelectorAll('#rows .candidate')[index];
+      if(!summary||!row||!row.children[2]||!row.children[2].children[1])return;
+      const label={TS:'특급',S1:'1급',S2:'2급',S3:'3급'}[summary.predicted_label]||summary.predicted_label;
+      const gapPercent=(Number(summary.top_two_gap)*100).toFixed(1);
+      row.children[2].children[1].textContent='BERT '+label+' · 상위 2등급 차이 '+gapPercent+'%p'
+        +(summary.generation_prediction_mismatch?' · 최초생성 불일치':'');
+    });
+  };
+  load(true);
+})();
+</script>"""
+
+
 def _render_specledger_gold_console_html() -> str:
     """Golden-set console using the same KOIPA console visual system as admin/login."""
     return r"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>한국지식재산보호원 | 골든셋 등록</title>
@@ -1483,8 +1626,19 @@ _REVIEWER_DOCUMENT_WORKBENCH_CSS = r"""
 #reviewer-workbench .reviewer-inspector-head{padding:22px 20px 17px;border-bottom:1px solid var(--border);background:#fff}
 #reviewer-workbench .reviewer-inspector-head h3{margin:0;font-size:16px;letter-spacing:-.35px}
 #reviewer-workbench .reviewer-inspector-head p{margin:7px 0 0;font-size:12px;line-height:1.55;color:var(--text-soft)}
-#reviewer-workbench #detail .sideDetail>.action,#reviewer-workbench #detail .sideDetail>.history{margin:16px;padding:17px;background:#fff;border:1px solid var(--border)}
+#reviewer-workbench #detail .sideDetail>.action,#reviewer-workbench #detail .sideDetail>.history,#reviewer-workbench #detail .sideDetail>.classifier-score,#reviewer-workbench #detail .sideDetail>.initial-grade{margin:16px;padding:17px;background:#fff;border:1px solid var(--border)}
 #reviewer-workbench #detail .sideDetail>.history{margin-top:0}
+#reviewer-workbench #detail .sideDetail>.classifier-score,#reviewer-workbench #detail .sideDetail>.initial-grade{margin-bottom:0}
+#reviewer-workbench .initial-grade h4{margin:0 0 7px;color:#0f172a;font-size:15px}
+#reviewer-workbench .initial-grade .initial-grade-value{margin:0;color:#1e3a5f;font-size:22px;font-weight:800}
+#reviewer-workbench .initial-grade .initial-grade-help{margin:8px 0 0;color:var(--text-soft);font-size:12px;line-height:1.5}
+#reviewer-workbench .classifier-score h4{margin:0 0 7px;color:#0f172a;font-size:15px}
+#reviewer-workbench .classifier-score .score-help{margin:0 0 14px;color:var(--text-soft);font-size:12px;line-height:1.5}
+#reviewer-workbench .classifier-score .score-row{display:grid;grid-template-columns:25px minmax(0,1fr) 46px;gap:8px;align-items:center;margin:8px 0;font-size:12px}
+#reviewer-workbench .classifier-score .score-track{height:8px;overflow:hidden;background:#e7edf3}
+#reviewer-workbench .classifier-score .score-fill{height:100%;background:#2563a8}
+#reviewer-workbench .classifier-score .score-value{text-align:right;font-variant-numeric:tabular-nums;color:#334155}
+#reviewer-workbench .classifier-score .score-meta{margin:13px 0 0;color:#64748b;font-size:11px;line-height:1.5;word-break:break-all}
 #reviewer-workbench #detail .sideDetail h4{margin:0 0 12px;color:#334155}
 #reviewer-workbench #detail .sideDetail .reviewer-decision-title{margin:0 0 15px;color:#0f172a;font-size:15px;font-weight:800;letter-spacing:-.25px}
 #reviewer-workbench #detail .sideDetail .action label{margin-top:13px}
@@ -1526,11 +1680,73 @@ _REVIEWER_DOCUMENT_WORKBENCH_SCRIPT = r"""<script>
   }
   /* 원문은 "증거 카드"가 아니라 실제 문서처럼 읽힌다. 원문 데이터는 바꾸지 않고
      제목과 첫 기본정보 블록만 문서 머리말로 올린다. */
+  function renderInitialGrade(candidate){
+    const side=detail.querySelector('.sideDetail');
+    if(!side)return;
+    let card=side.querySelector('#initialGrade');
+    if(!card){
+      card=document.createElement('section'); card.id='initialGrade'; card.className='initial-grade';
+      const action=side.querySelector('.action');
+      if(action)side.insertBefore(card,action); else side.append(card);
+    }
+    card.replaceChildren();
+    const heading=document.createElement('h4'); heading.textContent='최초 생성 등급'; card.append(heading);
+    const labels={TS:'특급',S1:'1급',S2:'2급',S3:'3급'};
+    const code=String(candidate&&candidate.proposed_grade||'');
+    const value=document.createElement('p'); value.className='initial-grade-value';
+    value.textContent=labels[code]?(labels[code]+' ('+code+')'):'정보 없음'; card.append(value);
+    const help=document.createElement('p'); help.className='initial-grade-help';
+    help.textContent='모의문서 최초 생성 시 부여된 등급입니다. 최종 등급은 검수자가 원문을 읽고 직접 결정합니다.';
+    card.append(help);
+  }
+  function renderClassifierScore(candidate){
+    const side=detail.querySelector('.sideDetail');
+    if(!side)return;
+    let card=side.querySelector('#classifierScore');
+    if(!card){
+      card=document.createElement('section'); card.id='classifierScore'; card.className='classifier-score';
+      const action=side.querySelector('.action');
+      if(action)side.insertBefore(card,action); else side.append(card);
+    }
+    card.replaceChildren();
+    const heading=document.createElement('h4'); heading.textContent='BERT 등급별 예측 확률'; card.append(heading);
+    const help=document.createElement('p'); help.className='score-help';
+    help.textContent='최종 등급은 검수자가 문서를 읽고 직접 결정합니다.'; card.append(help);
+    const score=candidate&&candidate.classifier_score;
+    if(!score||score.status!=='available'){
+      const unavailable=document.createElement('p'); unavailable.className='score-meta';
+      unavailable.textContent='현재 문서의 점수 스냅샷을 아직 사용할 수 없습니다.'; card.append(unavailable);
+      return;
+    }
+    ['TS','S1','S2','S3'].forEach(function(grade){
+      const value=Number(score.scores&&score.scores[grade]);
+      if(!Number.isFinite(value))return;
+      const row=document.createElement('div'); row.className='score-row';
+      const label=document.createElement('strong'); label.textContent={TS:'특급',S1:'1급',S2:'2급',S3:'3급'}[grade]||grade;
+      const track=document.createElement('div'); track.className='score-track';
+      const fill=document.createElement('div'); fill.className='score-fill';
+      const percent=Math.max(0,Math.min(100,value*100));
+      fill.style.width=percent+'%'; fill.setAttribute('role','progressbar');
+      fill.setAttribute('aria-label',grade+' 점수'); fill.setAttribute('aria-valuemin','0');
+      fill.setAttribute('aria-valuemax','100'); fill.setAttribute('aria-valuenow',String(percent));
+      track.append(fill);
+      const shown=document.createElement('span'); shown.className='score-value'; shown.textContent=percent.toFixed(1)+'%';
+      row.append(label,track,shown); card.append(row);
+    });
+    const meta=document.createElement('p'); meta.className='score-meta';
+    const calibrated=score.calibrated?'보정됨':'보정 미확인';
+    meta.textContent='최상위 점수: '+String(score.predicted_label||'–')+' · '+calibrated
+      +(score.model_version?' · 모델 '+String(score.model_version):'')
+      +(score.scored_at?' · 산출 '+String(score.scored_at):'');
+    card.append(meta);
+  }
   const originalShow=show;
   show=async function(id,reload){
     await originalShow(id,reload);
     const candidate=selected;
     if(!candidate)return;
+    renderInitialGrade(candidate);
+    renderClassifierScore(candidate);
     const titleNode=document.getElementById('detailTitle');
     const tags=document.getElementById('metas');
     const facts=document.getElementById('documentFacts')||document.createElement('div');
@@ -1685,7 +1901,7 @@ def _as_reviewer_view(html: str) -> str:
     )
     html = html.replace(
         "[['상태',c.status],['출처',c.document_origin],['제안',c.proposed_grade||'없음'],['확정',c.final_grade||'미확정'],",
-        "[['상태',reviewerStatusLabel(c.status)],['출처',c.document_origin],['확정',c.final_grade||'미확정'],",
+        "[['상태',reviewerStatusLabel(c.status)],['출처',c.document_origin],['최초 생성 등급',({'TS':'특급','S1':'1급','S2':'2급','S3':'3급'}[c.proposed_grade]||c.proposed_grade||'없음')],['확정',c.final_grade||'미확정'],",
         1,
     )
     html = html.replace(
@@ -1736,10 +1952,9 @@ def _as_reviewer_view(html: str) -> str:
 
 
 # ── 숨김 검수(golden_review_blind_enforced) 화면 조정 ────────────────────────────────
-# ⚠ **이것은 화면 정리일 뿐 격리가 아니다.** 제안 등급은 서버가 응답에서 이미 뺐다(golden_reviewer_access
-#   .shape_*) — 이 화면에 실을 값 자체가 브라우저에 오지 않는다. 그래서 아래 치환이 어긋나도(화면 JS 가
-#   고쳐져 앵커 문자열이 사라져도) 답이 새지는 않고 "제안: 없음" 같은 어색한 표기가 남을 뿐이다.
-#   앵커가 살아 있는지는 tests/test_golden_blind_review.py 가 지킨다.
+# ⚠ **이것은 화면 정리일 뿐 격리가 아니다.** 다른 검수자의 결정·관리성 입력은 서버가
+#   응답에서 이미 뺐다(golden_reviewer_access.shape_*). 보호원 요청에 따라 최초 생성 등급과
+#   BERT 점수는 검수자에게 의도적으로 표시한다. 앵커가 살아 있는지는 tests/test_golden_blind_review.py 가 지킨다.
 # 문서 ID 는 서버가 내려주는 별칭을 그대로 표시하고 그 별칭으로 상세·결정·이력 이동을 요청한다 — 이 화면 JS 에서 doc_id 를
 # 다루는 자리(목록 행·선택 표시·상세 조회·결정 저장·결정 이력 이동)는 전부 응답에서 받은 값만 쓰므로 고칠 곳이 없다
 # (tests/test_golden_alias_ids.py 가 jsdom 으로 목록→상세→저장을 눌러 요청 주소에 별칭만 나가는지 확인한다).
@@ -1751,8 +1966,8 @@ _BLIND_VIEW_CSS = (
     "</style>"
 )
 _BLIND_VIEW_NOTE = (
-    '<div class="reviewer-access-note">독립 검수 모드입니다 — 제안 등급과 다른 검수자의 '
-    "결정은 표시되지 않습니다. 문서 ID 는 이 검수를 위해 붙인 별칭(RV-…)입니다. 본문을 읽고 등급을 직접 지정하십시오.</div>"
+    '<div class="reviewer-access-note">사람 검수 모드입니다 — 최초 생성 등급과 BERT 예측 확률은 '
+    "참고자료로 표시되며, 다른 검수자의 결정은 표시되지 않습니다. 최종 등급은 검수자가 결정합니다. 문서 ID 는 이 검수를 위해 붙인 별칭(RV-…)입니다.</div>"
 )
 _BLIND_VIEW_PATCHES: tuple[tuple[str, str], ...] = (
     # '승인 (제안 등급 그대로 확정)' 선택지 — 서버도 approve 를 거절한다
@@ -1764,8 +1979,6 @@ _BLIND_VIEW_PATCHES: tuple[tuple[str, str], ...] = (
     # 자리에 등급 유추 단서가 아닌 대시만 남겨야 한다.
     ("let grade=c.final_grade?('확정 '+c.final_grade):'등급 미결정';",
      "let grade=c.final_grade?('내 결정 '+c.final_grade):'–';"),
-    # 상세의 '제안' 칩
-    ("['제안',c.proposed_grade||'없음'],", ""),
     # 확정 등급 기본값이 제안 등급(없으면 S3)이었다 — 미리 골라 둔 값 자체가 앵커다
     ("$('finalGrade').value=c.final_grade||c.proposed_grade||'S3';", "$('finalGrade').value=c.final_grade||'';"),
     ('<select id="finalGrade"><option>TS</option>',
@@ -1809,7 +2022,14 @@ def proxy_gold_candidate_manager_html(
     """
     _console_actor_id(auth)
     html = _render_specledger_gold_console_html()
-    if not _is_console_admin(auth):
+    html = html.replace("제안 등급 숨김", "다른 검수결정 숨김", 1).replace(
+        "켜면 검수자 화면에서 제안 등급과 다른 검수자의 결정이 보이지 않습니다.",
+        "켜면 다른 검수자의 결정은 숨기고, 최초 생성 등급과 BERT 점수는 참고자료로 표시합니다.",
+        1,
+    )
+    if _is_console_admin(auth):
+        html = html.replace("</body>", _ADMIN_BOUNDARY_FILTER_SCRIPT + "</body>", 1)
+    else:
         html = _as_reviewer_view(html)
         if _scope(auth).blind_active:       # 숨김 검수 — 서버가 데이터를 뺀 위에 화면도 맞춘다
             html = _as_blind_reviewer_view(html)

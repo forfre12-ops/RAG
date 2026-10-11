@@ -129,10 +129,15 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # [고객사 관리자 콘솔] 거버넌스 콘솔(검수→재학습→활성화) 서빙 ON. demo_console_enabled와
         # 분리 — 파괴적 purge/데모 SPA는 계속 OFF(위), 관리 UI만 노출. 모든 쓰기는 RBAC 보호.
         "serve_admin_console": True,
-        # [2026-10-09 정정] 골든셋 검증 화면은 고객사에 필요 없다(위 enable_golden_review_console
-        # 주석 — locked_eval.jsonl 은 지재원이 만들어 설치 패키지로 보낸다, 화면이 있어야 하는
-        # 게 아니었다). 명시적으로 꺼서 "onprem-local 은 켜져 있었다"는 드리프트를 막는다.
-        "enable_golden_review_console": False,
+        # [2026-10-11 고객사 운영 요구] 1,000건을 사람이 전수 검수하므로, 검수 화면과
+        # 해시-바인딩 AI 참고점수 API를 고객사 폐쇄망에도 제공한다. 점수는 최종결정이나
+        # 자동확정 근거가 아니며 검수자가 직접 등급을 남긴다.
+        "enable_golden_review_console": True,
+        # 1,000건 전수 전문가 검수는 담당자별 40건만 보이게 한다. 이름은 과거 호환상
+        # blind지만, 현재 화면에는 보호원 요청의 최초 생성 등급·BERT 참고점수는 의도적으로
+        # 보이고 다른 검수자의 결정·관리성 입력만 격리한다.
+        "golden_reviewer_assignment_enforced": True,
+        "golden_review_blind_enforced": True,
     },
     "full-train": {
         "llm_provider": "anthropic",
@@ -391,9 +396,10 @@ class Settings(BaseSettings):
     #   배정이 없는 문서는 아예 없는 것처럼 보인다(404). 잡 단위 화면(signoff.html 등)은
     #   배정으로 걸러낼 수 없어 이 값이 켜져 있는 동안 검수자에게 닫힌다.
     golden_reviewer_assignment_enforced: bool = False
-    # golden_review_blind_enforced: True 이면 reviewer 역할의 응답에서 제안 등급·근거·집계와
+    # golden_review_blind_enforced: True 이면 reviewer 역할의 응답에서 제안 근거·집계와
     #   다른 사람의 결정을 서버가 제거하고, '제안 등급 그대로 확정'(approve)을 거절한다.
-    #   화면에서 가리는 것이 아니라 응답에서 빼는 것이 본체다(API 로 직접 읽히므로).
+    #   보호원 요청으로 최초 생성 등급과 BERT 참고점수는 예외적으로 표시한다. 화면에서
+    #   가리는 것이 아니라 응답에서 격리하는 것이 본체다(API 로 직접 읽히므로).
     golden_review_blind_enforced: bool = False
     # golden_default_review_batch: 후보 관리 화면이 처음 열릴 때 좁혀 보는 검수 배치 표식.
     #   후보 풀에는 예전 적재분이 지워지지 않고 쌓인다(실측 2026-09-25: 3,598건 = 이번 회차 1,731 +
