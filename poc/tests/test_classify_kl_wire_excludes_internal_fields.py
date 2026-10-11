@@ -20,6 +20,7 @@ from koipa.schemas.classify import (
     ClassifyOutcome,
     ClassifyResponse,
     StoredClassificationResponse,
+    kl_wire_projection,
 )
 
 
@@ -43,14 +44,17 @@ def _response(**overrides) -> ClassifyResponse:
         model_version="v-test",
         elapsed_ms=10,
         automation_assessment=_assessment(),
+        factor_shadow={"state": "ok", "factor_grade": "S1"},
+        policy_shadow={"state": "ok", "proposal": {"policy_version": "v1"}},
     )
     fields.update(overrides)
     return ClassifyResponse(**fields)
 
 
-def test_automation_assessment_is_not_declared_on_the_shared_outcome_base():
+def test_internal_shadow_fields_are_not_declared_on_the_shared_outcome_base():
     """ClassifyOutcome 은 ClassifyResponse·ClassifyJobResult 가 함께 쓰는 기반이다 — 여기 두면 둘 다에 실린다."""
-    assert "automation_assessment" not in ClassifyOutcome.model_fields
+    for field in ("automation_assessment", "factor_shadow", "policy_shadow"):
+        assert field not in ClassifyOutcome.model_fields
 
 
 def test_automation_assessment_stays_on_the_internal_sync_response():
@@ -59,18 +63,22 @@ def test_automation_assessment_stays_on_the_internal_sync_response():
     r = _response()
     assert r.automation_assessment is not None
     assert r.automation_assessment.selected_label == "S2"
+    assert r.factor_shadow == {"state": "ok", "factor_grade": "S1"}
+    assert r.policy_shadow == {"state": "ok", "proposal": {"policy_version": "v1"}}
 
 
 def test_automation_assessment_is_absent_from_the_kl_facing_job_result_schema():
     """IF-05 results[]/콜백 본문이 실제로 쓰는 타입에는 필드 자체가 없다(null 로 감추는 것이 아니라 없다)."""
-    assert "automation_assessment" not in ClassifyJobResult.model_fields
-    assert "automation_assessment" not in StoredClassificationResponse.model_fields
+    for field in ("automation_assessment", "factor_shadow", "policy_shadow"):
+        assert field not in ClassifyJobResult.model_fields
+        assert field not in StoredClassificationResponse.model_fields
 
 
 def test_job_result_dict_omits_automation_assessment_even_when_set():
     """job_result() 는 IF-05 results[]·콜백 본문으로 그대로 나가는 JSON 을 만든다(services/async_classify_service.py·workers/tasks.py)."""
     d = _response().job_result()
     assert "automation_assessment" not in d
+    assert "factor_shadow" not in d and "policy_shadow" not in d
     assert "elapsed_ms" not in d
     # 대조군 — 그 밖의 선택 항목은 그대로 실린다(자동확정 관측치만 빠진 것이지, 전부 걷어낸 게 아님).
     assert "evaluation_factors" in d and "grade_candidates" in d
@@ -81,7 +89,16 @@ def test_job_result_round_trips_into_classify_job_result_without_the_field():
     d = _response(automation_assessment=_assessment()).job_result()
     jr = ClassifyJobResult.model_validate(d)
     assert not hasattr(jr, "automation_assessment")
+    assert not hasattr(jr, "factor_shadow") and not hasattr(jr, "policy_shadow")
     assert jr.label == "S2" and jr.doc_id == "d1"
+
+
+def test_kl_projection_drops_internal_shadow_values_from_a_sync_response():
+    """동기 /classify의 kl_backend 분기도 ClassifyResponse 서브클래스 값을 보존하면 안 된다."""
+    wire = kl_wire_projection(_response())
+    assert type(wire) is ClassifyOutcome
+    assert not hasattr(wire, "automation_assessment")
+    assert not hasattr(wire, "factor_shadow") and not hasattr(wire, "policy_shadow")
 
 
 def test_mutation_reintroducing_the_field_on_outcome_would_leak_it_to_kl():

@@ -916,6 +916,29 @@ paths:
                   text: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /synth/{synth_id}:
+    get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
+      tags: [synthesis]
+      summary: 합성 문서 원문 조회
+      description: >-
+        검수자가 목록에서 특정 합성 문서를 열 때만 전체 본문을 반환한다.
+        큐 목록의 preview와 달리 원문을 포함하므로 인증된 사용자만 호출할 수 있다.
+      parameters:
+        - in: path
+          name: synth_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: 합성 문서 상세
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SyntheticDocDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: 해당 합성 문서 없음
+
   /synth/{synth_id}/review:
     post:
       x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
@@ -3442,6 +3465,23 @@ components:
         preview: { type: string, description: "본문 앞 200자" }
         generated_at: { type: string, format: date-time }
         status: { type: string, enum: [pending, approved, rejected] }
+
+    SyntheticDocDetail:
+      allOf:
+        - $ref: '#/components/schemas/SyntheticDoc'
+        - type: object
+          required: [content]
+          properties:
+            document_type: { type: string, nullable: true }
+            llm_model: { type: string }
+            quality_score: { type: number, nullable: true }
+            review_status: { type: string }
+            corrected_grade:
+              allOf: [{ $ref: '#/components/schemas/Grade' }]
+              nullable: true
+            created_at: { type: string, nullable: true }
+            label_source: { type: string, nullable: true }
+            content: { type: string, description: 검수 대상 합성 문서 전체 본문 }
 
     HttpError:
       type: object

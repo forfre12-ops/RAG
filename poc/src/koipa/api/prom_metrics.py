@@ -351,6 +351,16 @@ CLASSIFY_GRADE_TOTAL = Counter(
     registry=registry,
 )
 
+# 정책엔진·독립 S/V/M 모델은 서빙 최종결정의 권한이 아니다. 그래도 연산이 실제 요청
+# 경로에서 돌았는지, 설정/입력/모델 문제가 어디서 나는지는 운영자가 측정할 수 있어야 한다.
+# state/direction은 코드가 허용한 작은 집합으로만 기록한다(원문·규정·정책내용은 라벨 금지).
+CLASSIFY_SHADOW_OBSERVATION_TOTAL = Counter(
+    "koipa_classify_shadow_observation_total",
+    "Serving-side shadow observations by path, safe state, and factor direction (never changes label/status)",
+    ["path", "state", "direction"],  # policy|factor; finite values normalized in ClassifyService
+    registry=registry,
+)
+
 # 교정(correction) 발생률 — direction별(confirm/underclass/overclass/lateral) 실시간 카운터.
 # underclass = 모델이 비밀을 낮게 본 것을 사람이 올린 것(보안 미탐 신호) → 자동확정 품질·
 # 죽음의 나선(러버스탬프·운영 정확도 저하) 모니터링의 핵심 지표. add_correction(모든 교정의

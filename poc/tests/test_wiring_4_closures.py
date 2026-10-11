@@ -98,6 +98,10 @@ def _patch_retrain_closure(*, rebuild, run_uuid, consume):
               return_value=rebuild),
         patch("koipa.modules.m6_evaluation.corrections_rebuild.merge_into_train_jsonl",
               return_value="datasets/demo_retrain/merged.jsonl"),
+        # 이 모듈은 교정 병합·학습·등록·소비의 배선만 검증한다. 새 데이터셋
+        # 사전검사는 test_training_dataset_preflight.py에서 실제 파일로 별도 검증한다.
+        patch("koipa.services.training_service.ensure_training_dataset_ready",
+              return_value={"train": 1, "val": 1, "test": 1}),
         patch("koipa.workers.tasks._create_training_run_guarded", return_value=run_uuid),
         patch("koipa.services.training_service.register_and_gate_model",
               return_value={"registered": True, "activated": False, "gate": {"passed": True}}),
@@ -191,6 +195,9 @@ def test_train_classifier_task_adopts_submitted_run_id():
             return_value=rebuild))
         stack.enter_context(patch("koipa.services.training_service.register_and_gate_model",
                                   return_value={"registered": True}))
+        stack.enter_context(patch(
+            "koipa.services.training_service.ensure_training_dataset_ready",
+            return_value={"train": 1, "val": 1, "test": 1}))
         stack.enter_context(patch("koipa.workers.tasks._create_training_run_guarded", create_guard))
         stack.enter_context(patch("koipa.workers.tasks._mark_training_run",
                                   lambda rid, *, status, **kw: marks.append((str(rid), status))))
@@ -221,6 +228,9 @@ def _run_task_with_train_error(exc):
         stack.enter_context(patch(
             "koipa.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
             return_value=rebuild))
+        stack.enter_context(patch(
+            "koipa.services.training_service.ensure_training_dataset_ready",
+            return_value={"train": 1, "val": 1, "test": 1}))
         stack.enter_context(patch("koipa.workers.tasks._create_training_run_guarded", return_value=uuid.uuid4()))
         stack.enter_context(patch("koipa.workers.tasks._mark_training_run", MagicMock()))
         return train_classifier_task(spec_kwargs={"train_path": "base.jsonl"})

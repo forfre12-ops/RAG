@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import time
 
@@ -67,6 +68,32 @@ _DOMAIN_TYPES = {
 }
 
 
+def build_noop_fixture_body(domain: str) -> str:
+    """파이프라인 검증용으로도 읽을 수 있는, 등급 중립의 결정론적 문서 본문.
+
+    ``noop``은 실제 생성기가 아니므로 결과가 학습에 들어가면 안 된다. 다만 한 문장짜리
+    응답은 콘솔의 ``문서 열기``에서 빈 화면처럼 보여, 검수 흐름 자체를 확인할 수 없었다.
+    이 본문은 테스트 문서임을 밝히되 문서형 단락·검토 항목을 갖춘다. 등급·공개범위·피해
+    같은 판정 단서는 어떤 도메인에도 넣지 않는다.
+    """
+    key = domain if domain in _DOMAIN_BODY else "mixed"
+    summary = _DOMAIN_BODY[key]
+    doc_type = _DOMAIN_TYPES.get(key, _DOMAIN_TYPES["mixed"])
+    return (
+        "1. 작성 목적\n"
+        f"본 문서는 {doc_type} 형식의 파이프라인 검증용 테스트 자료이다. "
+        "실제 업무 의사결정이나 배포 자료로 사용하지 않는다.\n\n"
+        "2. 검토 배경\n"
+        f"{summary}\n\n"
+        "3. 확인 항목\n"
+        "가. 문서 제목·유형·생성 제공자 정보가 화면에 일치하게 표시되는지 확인한다.\n"
+        "나. 본문 열기, 검토 상태 변경, 이력 조회가 같은 문서를 가리키는지 확인한다.\n"
+        "다. 테스트 문서는 학습 데이터에 포함되지 않는지 확인한다.\n\n"
+        "4. 후속 조치\n"
+        "운영자는 실제 생성 제공자로 만든 문서를 별도 검토한 뒤, 필요한 경우에만 다음 절차를 진행한다."
+    )
+
+
 def _infer_domain(prompt: str) -> str:
     """USER_TEMPLATE_V2의 [도메인] 필드에서 도메인 추출."""
     m = re.search(r"\[도메인\]\s*\n?(.+?)(?:\n|$)", prompt)
@@ -107,18 +134,20 @@ class NoopProvider:
         start = time.perf_counter()
         domain = _infer_domain(prompt)
         title = _DOMAIN_TITLES.get(domain, "내부 보고서")
-        body = _DOMAIN_BODY.get(domain, _DOMAIN_BODY["mixed"])
+        body = build_noop_fixture_body(domain)
         doc_type = _DOMAIN_TYPES.get(domain, "내부 보고서")
 
-        # JSON 이스케이프 (개행 없는 body라 간단)
-        text = (
-            "{\n"
-            f'  "title": "{title}",\n'
-            f'  "body": "{body}",\n'
-            f'  "document_type": "{doc_type}",\n'
-            '  "dept_hint": "기획팀",\n'
-            '  "rationale_tags": ["noop"]\n'
-            "}"
+        # 본문에 문단 개행이 있으므로 손으로 JSON 문자열을 만들지 않는다. 수동 조립하면
+        # 개행이 깨져 파서가 raw body 경로로 떨어지고, 검수 화면에는 다시 짧은 문장만 남는다.
+        text = json.dumps(
+            {
+                "title": title,
+                "body": body,
+                "document_type": doc_type,
+                "dept_hint": "기획팀",
+                "rationale_tags": ["noop"],
+            },
+            ensure_ascii=False,
         )
         text = text[: max(max_tokens * 4, 512)]
 

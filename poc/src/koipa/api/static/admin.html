@@ -1036,11 +1036,6 @@ body *,body *::before,body *::after{border-radius:0 !important}
              감리에서 "이 기능 고장났다"로 읽힌다. 알려야 할 사실은 그대로 두고 색과 분량만 줄인다. -->
         <div id="sy-noop-note" class="sec-note" data-tech style="display:none;margin-top:10px;line-height:1.6;"></div>
         <div id="sy-info" class="hint"></div>
-        <!-- [2026-09-06] 무엇을 만들지 화면이 알려준다.
-             종전에는 사람이 터미널에서 scripts/synth_coverage_gaps.py 를 돌려 표를 읽고,
-             조합을 외운 뒤 위 폼에 등급·도메인을 손으로 다시 넣어야 했다. 필요한 정보가
-             이미 있는데 화면이 그것을 몰랐다. 칸을 누르면 폼이 채워진다. -->
-        <div id="sy-coverage" style="margin-top:12px;"></div>
         <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">검토 대기 0건</div></div>
       </div>
     </section>
@@ -1061,6 +1056,11 @@ body *,body *::before,body *::after{border-radius:0 !important}
           </div>
           <p class="sec-note" style="margin-top:6px;">학습에는 학습 데이터만 사용하고, 검증·평가 데이터는 모델 성능 확인에 분리해 사용합니다.</p>
         </div>
+        <details id="training-coverage" class="operations-advanced" style="margin-top:14px;">
+          <summary>학습 데이터 분포 점검 <span class="muted">데이터 담당자용</span></summary>
+          <p class="sec-note" style="margin:8px 0 0;">등급·도메인별 데이터 공백을 확인하는 분석 도구입니다. 검수 대기 건수나 생성 지시가 아니며, 실제로 채울지는 데이터 담당자가 판단합니다.</p>
+          <div id="sy-coverage" style="margin-top:10px;"></div>
+        </details>
         <!-- 학습 규모 preset — 자유 입력란을 열지 않는다. 임의 값이 들어가면 얼마나 걸릴지
              예측이 안 되고 되돌리는 절차도 없다. 두 조합만 고정한다.
              라벨에 절대 소요 시간을 적지 않는 이유는 아래 TRAIN_PRESETS 주석 참조 —
@@ -1244,24 +1244,23 @@ body *,body *::before,body *::after{border-radius:0 !important}
     <!-- ===== E. 등급체계 관리 (FUN-005-①) ===== -->
     <section class="card col-span" data-pane="config" data-product-view="policy" style="order:1">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">설정</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag" data-tech>FUN-005-①</span><span class="secmark" data-tech title="제출본 RFP 구현현황이 이 카드를 §E 로 지목한다">§E</span></div>
+        <div class="ttl"><span class="step-no aux">설정</span> 고정 등급체계 표시 관리 <span class="reqtag" data-tech>FUN-005-①</span><span class="secmark" data-tech title="제출본 RFP 구현현황이 이 카드를 §E 로 지목한다">§E</span></div>
         <span class="ep" data-tech>GET · PUT /schema/grades</span>
       </div>
       <div class="card-body">
         <div class="btn-row">
           <button class="btn sec sm" onclick="loadGradeEditor()">현재 등급체계 불러오기</button>
-          <button class="btn sec sm" onclick="addGradeRow()">등급 행 추가</button>
           <button class="btn" id="grade-save" onclick="saveGrades()">변경 저장 (PUT)</button>
           <span id="grade-info" class="hint" style="margin:0;"></span>
         </div>
         <div class="tbl-wrap" style="margin-top:10px;">
           <table>
-            <thead><tr><th>코드</th><th>명칭</th><th>순서</th><th>설명</th><th>색상</th><th></th></tr></thead>
-            <tbody id="grade-body"><tr><td colspan="6" style="color:var(--text-dim)">「현재 등급체계 불러오기」를 누르면 등급 목록이 나옵니다</td></tr></tbody>
+            <thead><tr><th>코드</th><th>명칭</th><th>순서</th><th>설명</th><th>색상</th></tr></thead>
+            <tbody id="grade-body"><tr><td colspan="5" style="color:var(--text-dim)">「현재 등급체계 불러오기」를 누르면 등급 목록이 나옵니다</td></tr></tbody>
           </table>
         </div>
         <div id="grade-result" style="margin-top:10px;" role="status" aria-live="polite"></div>
-        <p class="sec-note">삭제는 <b>비활성 처리</b>이고 이력은 보존됩니다. 등급을 바꾸면 재학습이 필요합니다.</p>
+        <p class="sec-note"><b>TS · S1 · S2 · S3 네 코드는 정책상 고정</b>입니다. 여기서는 명칭·설명·표시 순서·색상만 수정할 수 있으며, 코드 추가·삭제·변경은 서버가 거부합니다.</p>
       </div>
     </section>
 
@@ -1755,8 +1754,8 @@ function productShowView(view, fromLegacy){
   if(view==='overview' && productGoldenReviewAvailable()) loadProductOverview();
   if(view==='documents' && productGoldenReviewAvailable()) loadWorkbench(false);
   if(view==='experts' && productGoldenReviewAvailable()) loadExpertOperations();
-  if(view==='synthesis' && synthConsoleAvailable()){ loadSynthCoverage(); loadSynthQueue(); }
-  if(view==='models'){ loadJobs(); loadMetrics(); loadActiveLearning(); }
+  if(view==='synthesis' && synthConsoleAvailable()) loadSynthQueue();
+  if(view==='models'){ loadJobs(); loadMetrics(); loadActiveLearning(); loadSynthCoverage(); }
   if(!fromLegacy){
     try{ history.replaceState(null,'','#view='+encodeURIComponent(view)); }catch(e){}
   }
@@ -2823,6 +2822,8 @@ async function pollSynthJob(jobId, expected){
  * 서버가 계산해 준다(GET /synth/coverage). 화면은 **보여주기만** 한다 — 자동으로
  * 만들어 주는 버튼은 두지 않는다. 현실에 없는 조합인지는 사람이 판단해야 한다. */
 function pickCoverageCell(grade, domain){
+  // 분포 점검은 모델 화면에 두되, 생성 값은 실제 생성 화면에서만 바꾼다.
+  productShowView('synthesis');
   const g=$('sy-grade'), d=$('sy-domain');
   if(g && Array.from(g.options).some(o=>o.value===grade)) g.value=grade;
   syncSynthDomains();
@@ -3020,43 +3021,25 @@ async function loadGradeEditor(){
 
 function renderGradeEditor(){
   const body=$('grade-body');
-  if(!GRADE_ROWS.length){ body.innerHTML='<tr><td colspan="6" style="color:var(--text-dim)">등급이 없습니다 — 「등급 행 추가」로 새 체계를 만드세요</td></tr>'; return; }
+  if(!GRADE_ROWS.length){ body.innerHTML='<tr><td colspan="5" style="color:var(--text-dim)">등급체계를 불러오지 못했습니다. TS · S1 · S2 · S3 고정 정책은 서버에서 유지됩니다.</td></tr>'; return; }
   body.innerHTML=GRADE_ROWS.map((g,i)=>`
     <tr>
-      <td><input class="mono" id="ge-code-${i}" type="text" value="${esc(g.code)}" style="width:88px" placeholder="TS" /></td>
+      <td><span class="mono">${esc(g.code)}</span></td>
       <td><input id="ge-name-${i}" type="text" value="${esc(g.name)}" placeholder="특급기밀" /></td>
       <td><input id="ge-order-${i}" type="number" value="${Number(g.order)||0}" style="width:74px" /></td>
       <td><input id="ge-desc-${i}" type="text" value="${esc(g.description)}" placeholder="(선택)" /></td>
       <td><input id="ge-color-${i}" type="text" value="${esc(g.color)}" style="width:96px" placeholder="#7B1FA2" /></td>
-      <td><button class="btn sec sm" onclick="removeGradeRow(${i})">행 삭제</button></td>
     </tr>`).join('');
 }
 
 function readGradeEditor(){
   return GRADE_ROWS.map((_,i)=>({
-    code:($('ge-code-'+i).value||'').trim(),
+    code:GRADE_ROWS[i].code,
     name:($('ge-name-'+i).value||'').trim(),
     order:parseInt($('ge-order-'+i).value||'0',10)||0,
     description:($('ge-desc-'+i).value||'').trim() || null,
     color:($('ge-color-'+i).value||'').trim() || null,
   }));
-}
-
-function addGradeRow(){
-  if(GRADE_ROWS.length) GRADE_ROWS=readGradeEditor();   // 입력 중 값 보존
-  const nextOrder=GRADE_ROWS.reduce((m,g)=>Math.max(m, Number(g.order)||0), 0)+1;
-  GRADE_ROWS.push({code:'', name:'', order:nextOrder, description:'', color:'#888888'});
-  renderGradeEditor();
-}
-
-function removeGradeRow(i){
-  GRADE_ROWS=readGradeEditor();
-  const gone=GRADE_ROWS[i];
-  GRADE_ROWS.splice(i,1);
-  renderGradeEditor();
-  if(gone && gone.code && GRADE_LOADED_CODES.includes(gone.code)){
-    $('grade-info').textContent=`표에서 ${gone.code} 제거됨 — 저장하면 비활성 처리됩니다.`;
-  }
 }
 
 async function saveGrades(){
@@ -3067,38 +3050,24 @@ async function saveGrades(){
   const dup=codes.find((c,i)=>codes.indexOf(c)!==i);
   if(dup){ alert(`등급 코드가 중복됩니다: ${dup}`); return; }
   if(!rows.length){ alert('등급을 0개로 저장할 수 없습니다.'); return; }
-  const removed=GRADE_LOADED_CODES.filter(c=>!codes.includes(c));
-  const added=codes.filter(c=>!GRADE_LOADED_CODES.includes(c));
-  let msg='등급체계를 저장합니다.';
-  if(removed.length) msg+=`\n\n비활성될 등급: ${removed.join(', ')}\n기존 분류 이력은 보존되지만 신규 분류에서 해당 등급은 사라집니다.`;
-  if(added.length) msg+=`\n\n추가될 등급: ${added.join(', ')}\n학습 라벨 공간이 바뀌므로 재학습이 필요합니다.`;
+  const fixed=['TS','S1','S2','S3'];
+  if(codes.length!==fixed.length || fixed.some(c=>!codes.includes(c))){
+    alert('등급 코드는 TS, S1, S2, S3 네 개로 고정되어 있습니다. 코드 추가·삭제·변경은 할 수 없습니다.'); return;
+  }
+  let msg='등급체계 표시 정보를 저장합니다.';
+  msg+='\n\n등급 코드와 모델의 4등급 라벨 공간은 변경되지 않습니다.';
   if(!confirm(msg)) return;
 
   const btn=$('grade-save'); btn.disabled=true; btn.textContent='저장 중…';
   try{
-    let d;
-    try{
-      d=await api('PUT','/schema/grades',{grades:rows, actor:actor()});
-    }catch(e){
-      // [2026-09-11] 409 = 서빙 분류기를 멈추게 하는 변경이라 서버가 저장 전에 거부했다.
-      // 영향을 보여 주고, 사유를 받으면 force 로 다시 보낸다(모델 롤백과 같은 방식 — 사유는
-      // 감사에 남는다). 이 경로가 없으면 서빙 모델이 있는 서버에서 콘솔로는 등급을 추가·삭제할
-      // 수 없어 FUN-005-01 기능이 화면에서 사라진다.
-      if(e.status!==409) throw e;
-      // 서버 문구 끝의 API 사용법(force=true …)은 화면 사용자에게 필요 없어 뗀다.
-      const impact=String(errDetail(e)||'서빙 분류기에 영향이 있는 변경입니다').replace(/\.?\s*그래도 저장하려면 force.*$/,'');
-      const reason=prompt(`${impact}.\n\n그래도 저장하려면 사유를 입력하세요 (감사에 기록됩니다):`,'');
-      if(reason===null){ $('grade-result').innerHTML=`<div class="warnbox">저장하지 않았습니다 — ${esc(impact)}</div>`; return; }
-      if(!String(reason).trim()){ alert('사유는 필수입니다.'); $('grade-result').innerHTML='<div class="warnbox">저장하지 않았습니다 — 사유가 비어 있습니다</div>'; return; }
-      d=await api('PUT','/schema/grades',{grades:rows, actor:actor(), force:true, force_reason:String(reason).trim()});
-    }
+    const d=await api('PUT','/schema/grades',{grades:rows, actor:actor()});
     GRADE_ROWS=rows; GRADE_LOADED_CODES=codes;
     syncActiveGrades(codes);
     $('grade-result').innerHTML = d.requires_retraining
       ? `<div class="warnbox"><b>재학습 필요</b> — version ${esc(d.version)} · 사유: ${esc(d.reason)}<br/>${d.serving_impact ? `<b>분류기 영향</b> — ${esc(d.serving_impact)}<br/>` : ''}등급 구조가 바뀌었습니다. 「모델 학습 및 평가」에서 새 학습 작업을 시작한 뒤 성능 평가 결과를 확인하세요.</div>`
       : `<div class="kv"><div><span>저장됨</span> <b>version ${esc(d.version)}</b></div><div><span>재학습</span> <b>불필요</b></div><div><span>사유</span> <b>${esc(d.reason)}</b></div></div>`;
-    $('grade-info').textContent=`저장 완료 · 활성 ${rows.length}개`;
-    log(`등급체계 저장: ${codes.join(', ')} · requires_retraining=${d.requires_retraining}`, d.requires_retraining?'info':'ok');
+    $('grade-info').textContent=`저장 완료 · 고정 ${rows.length}개`;
+    log(`고정 등급 표시 저장: ${codes.join(', ')} · requires_retraining=${d.requires_retraining}`, d.requires_retraining?'info':'ok');
   }catch(e){ $('grade-result').innerHTML=`<div class="warnbox">저장 실패: ${errKo(e)}</div>`; }
   finally{ btn.disabled=false; btn.textContent='변경 저장 (PUT)'; }
 }
@@ -3838,8 +3807,7 @@ syncSynthDomains();
 // 합성 API는 profile 이름이 아니라 healthz가 보고한 실제 router capability 뒤에만 호출한다.
 // 따라서 lite/dev/customer 이미지에서 숨겨진 카드가 404 요청 로그를 만들지 않는다.
 checkHealth().then(()=>{
-  if(!synthConsoleAvailable()){ const b=$('sy-coverage'); if(b) b.innerHTML='<div class="hint">'+esc(synthConsoleUnavailableMessage())+'</div>'; }
-  else loadSynthCoverage();
+  if(PRODUCT_VIEW==='models') loadSynthCoverage();
   if(!window.__hideGoldenReview) loadGoldenBuilds();
 });
 /* [2026-09-29] 검수 큐·확정 대기 초기 조회(loadReviewQueue·loadStagingQueue)를 뺐다 — 그 카드들을

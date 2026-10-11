@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from .common import Actor, GradeDefinition
 
@@ -13,12 +13,12 @@ class GradesGetResponse(BaseModel):
 
 
 class GradesPutRequest(BaseModel):
+    # `force`가 정책으로 확정된 4등급을 다시 우회하지 못하게, 알 수 없는 필드는
+    # 무시하지 않고 422로 돌린다. 관리자 화면도 코드 추가·삭제 UI를 제공하지 않는다.
+    model_config = ConfigDict(extra="forbid")
+
     grades: list[GradeDefinition]
     actor: Actor
-    # [2026-09-10] 서빙 모델과 등급 집합이 어긋나는 변경을 그래도 저장할 때만 쓴다.
-    # 기본 False — 그런 변경은 409 로 거부된다(schema_admin_service.assess_grade_change).
-    force: bool = False
-    force_reason: str | None = None
 
 
 class GradesPutResponse(BaseModel):

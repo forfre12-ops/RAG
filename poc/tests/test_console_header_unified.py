@@ -119,7 +119,7 @@ def test_login_uses_the_single_console_theme_not_a_blue_subtheme():
         "background:var(--bg)",
         "border-radius:var(--radius-lg)",
         "background:var(--bg-inverse)",
-        "textarea:focus,input:focus{border-color:var(--text)}",
+        "input:focus{border-color:var(--text)}",
         "color:var(--text-dim)",
     ):
         assert fragment in html

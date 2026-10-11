@@ -1,7 +1,9 @@
 """Shadow-only comparison of serving, factor, regulation, and policy paths.
 
 This module deliberately does not change a classification, policy, feature flag,
-or database row.  It is for measuring the four inputs that would be needed
+or database row.  ``ClassifyService`` may call the configured factor/policy
+helpers, but only as structured observations; they cannot rewrite the final
+label or review status.  It measures the four inputs that would be needed
 before any future automation decision:
 
 * the current :class:`ClassifyService` final serving result;
@@ -21,11 +23,12 @@ import hashlib
 import json
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from koipa.policy_facts import FactContext, FactContractError, text_digest
-from koipa.policy_shadow import Policy, evaluate_shadow
+from koipa.policy_shadow import Policy, evaluate_shadow, parse_shadow_policy
 from koipa.services.review_reasons import causal_review_reason, gate_hits
 
 
@@ -212,6 +215,60 @@ def configured_factor_shadow(text: str, metadata: dict[str, Any] | None, serving
         return {"state": "ok", **_to_plain(result)}
     except Exception as exc:  # noqa: BLE001 - preserve baseline result if shadow cannot run
         return _error_state(exc)
+
+
+def configured_policy_shadow(
+    text: str,
+    metadata: dict[str, Any] | None,
+    source_doc_id: str,
+) -> dict[str, Any]:
+    """Evaluate an operator-owned policy package as a serving-side shadow.
+
+    The policy comes only from ``POLICY_SHADOW_POLICY_PATH`` on the server;
+    callers cannot supply a policy or its organization scope.  They may attach
+    a typed, evidence-bound ``metadata.policy_packet`` produced upstream.  The
+    service derives document id, normalized-text digest, and observation time
+    itself so a caller cannot choose a different document binding or make a
+    future policy effective.  This is observation-only: a proposal can never
+    change the returned grade or status.
+    """
+    from koipa.config import settings  # noqa: PLC0415
+
+    if not getattr(settings, "policy_shadow_enabled", False):
+        return {"state": "not_configured", "reason": "policy_shadow_disabled"}
+    if not isinstance(metadata, dict) or not isinstance(metadata.get("policy_packet"), dict):
+        return {"state": "missing_input", "missing": ["policy_packet"]}
+    if not isinstance(source_doc_id, str) or not source_doc_id.strip():
+        return {"state": "invalid_input", "error_code": "invalid_document_id"}
+
+    policy_path = str(getattr(settings, "policy_shadow_policy_path", "") or "").strip()
+    if not policy_path:
+        return {"state": "unavailable", "reason": "policy_shadow_policy_path_missing"}
+    try:
+        raw_policy = json.loads(Path(policy_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {"state": "unavailable", "reason": "policy_package_unavailable"}
+    try:
+        policy = parse_shadow_policy(raw_policy)
+    except FactContractError as exc:
+        return {"state": "unavailable", "reason": "invalid_policy_package", "error_code": str(exc)}
+
+    context = FactContext(
+        org_id=policy.org_id,
+        document_id=source_doc_id,
+        document_sha256=text_digest(text),
+        as_of=datetime.now(timezone.utc).isoformat(),
+    )
+    try:
+        proposal = evaluate_shadow(policy, copy.deepcopy(metadata["policy_packet"]), context=context)
+    except Exception as exc:  # noqa: BLE001 - a malformed observation must not block serving
+        return _error_state(exc)
+    return {
+        "state": "ok",
+        "proposal": proposal,
+        "would_require_review": bool(proposal.get("would_require_review", True)),
+        "missing_evidence": list(proposal.get("missing_evidence", [])),
+    }
 
 
 def configured_regulation_lookup(source_doc_id: str) -> dict[str, Any]:

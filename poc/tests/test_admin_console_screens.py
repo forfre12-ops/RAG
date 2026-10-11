@@ -36,7 +36,7 @@ def console() -> str:
 @pytest.mark.parametrize(
     ("requirement", "needle"),
     [
-        # FUN-005-① 등급체계 추가·변경·삭제 — 조회(GET)만으로는 불충분, 쓰기(PUT)가 화면에 있어야 한다.
+        # FUN-005-① 고정 4등급의 표시 메타데이터 — 조회(GET)만으로는 불충분, 쓰기(PUT)가 화면에 있어야 한다.
         ("FUN-005-①", "'PUT','/schema/grades'"),
         # FUN-023-④ 라벨링·태깅 규칙 관리 — 목록·추가·수정/비활성 3경로.
         ("FUN-023-④", "'GET','/admin/keywords?'"),
@@ -123,11 +123,27 @@ def test_console_keeps_rag_settings_visible_but_hides_technical_connection_contr
         'class="coverage-panel"',
         'class="coverage-summary"',
         'class="coverage-details"',
+        'id="training-coverage"',
         '점검 대상',
     ):
         assert marker in console
     assert "학습셋 분포·검토 후보" not in console
     assert "d.caveat" not in console
+
+
+def test_console_keeps_training_coverage_out_of_synthesis_review(console: str):
+    """분포 공백은 데이터 담당자용 분석이며 합성 검토 큐의 상태가 아니다."""
+    synth_start = console.index('data-product-view="synthesis"')
+    model_start = console.index('id="model-training"')
+    active_learning_start = console.index('<!-- ===== Active Learning =====')
+
+    synthesis_card = console[synth_start:model_start]
+    model_training_card = console[model_start:active_learning_start]
+
+    assert 'id="sy-coverage"' not in synthesis_card
+    assert 'id="training-coverage"' in model_training_card
+    assert '데이터 담당자용' in model_training_card
+    assert "productShowView('synthesis');" in console
 
 
 def test_console_exposes_regulation_rag_switches_when_the_feature_is_installed(console: str):
@@ -143,13 +159,12 @@ def test_console_exposes_regulation_rag_switches_when_the_feature_is_installed(c
         assert marker in console
 
 
-def test_console_warns_before_grade_deactivation(console: str):
-    """PUT /schema/grades 는 목록 치환이라 행 삭제 = 비활성이다. 무경고 저장은 사고 경로.
-
-    [2026-08-24] 문구에서 「소프트 삭제」를 뺐다 — 우리가 만든 말이고 제출본·사용매뉴얼에
-    0회다. 지키는 것은 문구가 아니라 **경고가 무엇을 말하는가**다: 어느 등급이 비활성되는지.
-    """
-    assert "비활성될 등급" in console
+def test_console_does_not_offer_a_force_or_code_set_change(console: str):
+    """9/20 4등급 고정: 화면에 추가·삭제·force 우회가 남으면 API 보호를 다시 무력화한다."""
+    assert "등급 행 추가" not in console
+    assert "removeGradeRow" not in console
+    assert "force_reason" not in console
+    assert "TS · S1 · S2 · S3 네 코드는 정책상 고정" in console
 
 
 # ── B. 계약 축 ────────────────────────────────────────────────────────────────
@@ -167,24 +182,23 @@ def test_grade_put_payload_matches_schema():
     assert [g.code for g in req.grades] == ["TS", "S1"]
 
 
-def test_grade_put_handler_returns_retraining_signal(monkeypatch):
+def test_grade_put_handler_returns_fixed_metadata_signal(monkeypatch):
     from koipa.api import schema_admin as sa
     from koipa.schemas.schema_admin import GradesPutRequest, GradesPutResponse
 
     monkeypatch.setattr(
         sa.SchemaAdminService, "put",
         lambda self, req: GradesPutResponse(
-            version="v1", requires_retraining=True, reason="added codes: ['S4']"
+            version="v1", requires_retraining=False, reason="fixed grade metadata updated"
         ),
     )
     resp = sa.put_grades(
         GradesPutRequest(
-            grades=[GradeDefinition(code="S4", name="4급", order=5)],
+            grades=[GradeDefinition(code="TS", name="특급기밀", order=1)],
             actor=Actor(user_id="console", role="admin"),
         )
     )
-    # 콘솔은 이 플래그로 재학습 경고 배너를 띄운다 — 형태가 바뀌면 화면이 조용히 침묵한다.
-    assert resp.requires_retraining is True and "S4" in resp.reason
+    assert resp.requires_retraining is False and "fixed" in resp.reason
 
 
 def test_keyword_create_payload_matches_schema():

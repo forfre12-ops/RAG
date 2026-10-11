@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field, computed_field
 from .common import FactorRegistry, Grade
@@ -259,7 +259,7 @@ def kl_wire_projection(
     *,
     fallback_reason: Optional[str] = None,
 ) -> "ClassifyOutcome":
-    """KL(지재원 포털)이 실제로 받을 사본 — 같은 클래스, 진단용 필드 일부만 비운다.
+    """KL(지재원 포털)이 실제로 받을 공용 계약 사본.
 
     [2026-09-29] KL 요청: "등급이 같으면 예상 등급 하나, 다르면 분류기(label)를 메인으로 하고
     룰분류기 예측은 따로, RAG+LLM 인 경우엔 관련 참고도 같이". label(최종판정)은 이미 시스템의
@@ -277,13 +277,17 @@ def kl_wire_projection(
     역할로 부르는 내부 대용량 테스트 화면은 이 함수를 거치지 않아 그대로 전체를 본다
     (api/async_classify.py 의 kl_backend 역할 분기, workers/tasks.py 의 콜백 발사 지점).
     """
-    rule_grade = result.rule_grade if result.rule_grade is not None and result.rule_grade != result.label else None
+    # ClassifyResponse의 내부 전용 섀도 관측값은 model_copy()만으로는 사라지지 않는다.
+    # 공용 기반 타입으로 먼저 재검증해 KL 동기 호출에서도 정책 사실·독립모델 관측값이
+    # 넘어가지 않게 한다.
+    wire = ClassifyOutcome.model_validate(result.model_dump(mode="json"))
+    rule_grade = wire.rule_grade if wire.rule_grade is not None and wire.rule_grade != wire.label else None
     explanation_status, explanation_reason = kl_explanation_metadata(
         regulation_reference,
         regulation_summary,
         fallback_reason=fallback_reason,
     )
-    return result.model_copy(update={
+    return wire.model_copy(update={
         "model_grade": None,
         "grade_candidates": [],
         "grade_candidates_reason": None,
@@ -309,6 +313,10 @@ class ClassifyResponse(ClassifyOutcome):
     # 에는 안 싣기 위해서다. DB 저장(_try_persist)은 이 필드를 그대로 받아 독립적으로
     # 남기므로 scripts/analyze_auto_confirm_shadow.py 같은 내부 집계는 영향 없다.
     automation_assessment: Optional[AutomationAssessment] = None
+    # 독립 요소 모델과 고객사 정책 패키지의 관측값. 둘 다 현재 서빙 label/status와
+    # 분리된 섀도 결과이며, KL 비동기 결과·콜백에는 절대 넣지 않는다.
+    factor_shadow: Optional[dict[str, Any]] = None
+    policy_shadow: Optional[dict[str, Any]] = None
 
     def job_result(self) -> dict:
         """비동기 작업 결과(IF-05 results[] · 콜백 본문)로 저장할 JSON — KL 이 실제로 받는 값.
@@ -316,7 +324,10 @@ class ClassifyResponse(ClassifyOutcome):
         elapsed_ms 는 비동기 결과는 시간을 재지 않으므로 안 싣는다. automation_assessment 는 내부 전용
         그림자 관측치라 안 싣는다(2026-09-27) — 값은 DB 에 별도로 남는다(위 클래스 docstring 참고).
         """
-        return self.model_dump(mode="json", exclude={"elapsed_ms", "automation_assessment"})
+        return self.model_dump(
+            mode="json",
+            exclude={"elapsed_ms", "automation_assessment", "factor_shadow", "policy_shadow"},
+        )
 
 
 class ClassifyJobResult(ClassifyOutcome):

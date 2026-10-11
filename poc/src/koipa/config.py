@@ -717,6 +717,14 @@ class Settings(BaseSettings):
     # 안 함). 메타데이터 신뢰도에 의존하며 오류/부재는 silent 폴백(기존 동작 보존).
     metadata_floor_enabled: bool = False
 
+    # [정책 섀도] 운영자가 소유·승인한 정책 패키지와 증거 바인딩된 사실 패킷을
+    # 서빙 결과 옆에서만 평가한다. 기본 OFF이며, 켜도 label/status/자동확정을 바꾸지
+    # 않는다. 정책 파일은 서버 로컬 경로만 받는다. 요청자가 policy/context를 고르는
+    # 경로를 만들지 않아, 단일 고객사 엔진에서도 문서 바인딩·정책 버전의 출처가 섞이지
+    # 않는다. policy_packet은 metadata로 들어오되 서비스가 문서 hash·관측 시각을 만든다.
+    policy_shadow_enabled: bool = False
+    policy_shadow_policy_path: str = ""
+
     # [요소 모델 섀도] v8 S/V/M 요소 모델을 같은 입력에 나란히 돌려 **계량만** 한다.
     # 등급·상태를 바꾸지 않는다. 배포본은 등급 우선·요소 후행이고 v8 은 요소 우선이라
     # 두 구조를 바로 합치면 결정이 바뀌는데, 그 전에 두 모델이 얼마나 다른지를 알아야

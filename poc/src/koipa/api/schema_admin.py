@@ -1,4 +1,4 @@
-"""GET/PUT /schema/grades — 등급체계 조회·변경 + 재학습 필요성 응답."""
+"""GET/PUT /schema/grades — 고정 4등급의 표시 메타데이터 조회·변경."""
 
 from __future__ import annotations
 
@@ -23,10 +23,10 @@ def get_grades():
 @router.put(
     "/schema/grades",
     response_model=GradesPutResponse,
-    responses={409: {"description": "서빙 분류기를 멈추게 하는 등급체계 변경 — force 와 사유 없이는 거부"}},
+    responses={409: {"description": "TS/S1/S2/S3 고정 정책을 깨는 등급 코드 집합 변경"}},
 )
 def put_grades(req: GradesPutRequest):
-    # 이 사업의 오류 계약은 심볼릭 코드 없이 HTTP 상태로 분기한다(ICD) — 거부는 409.
+    # 이 사업의 오류 계약은 심볼릭 코드 없이 HTTP 상태로 분기한다(ICD) — 정책 위반은 409.
     try:
         return SchemaAdminService().put(req)
     except GradeSchemaBlocked as exc:

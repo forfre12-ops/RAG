@@ -17,7 +17,7 @@ from __future__ import annotations
 
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from koipa.api._jwt_auth import SigningUnavailable, sign_jwt
 from koipa.api._rbac import require_role
@@ -163,26 +163,6 @@ def _render_console_login_html() -> str:
 def proxy_gold_console_login_html() -> HTMLResponse:
     """콘솔 진입 화면 — 무인증. 성공 시 서버가 HttpOnly 세션을 발급한다."""
     return HTMLResponse(content=_render_console_login_html())
-
-
-@html_router.get("/golden/candidates/manage.html", include_in_schema=False)
-def redirect_legacy_gold_console(
-    auth: dict = Depends(require_role("admin", "kl_backend", "reviewer")),
-) -> Response:
-    """관리자는 운영 콘솔, 검수자는 권한이 분리된 검수 문서함으로 보낸다."""
-    _console_actor_id(auth)
-    if not _is_console_admin(auth):
-        # console_login 은 golden.py 보다 먼저 등록돼 이 고정 URL을 먼저 잡는다.
-        # 검수자까지 관리자 정적 화면으로 보내면 화면 API는 막혀도 관리자 작업공간을
-        # 보게 된다. 실행 시점 import로 순환 의존 없이 원래의 제한된 검수 화면을 돌려준다.
-        from koipa.api.golden import proxy_gold_candidate_manager_html
-
-        return proxy_gold_candidate_manager_html(auth)
-    return RedirectResponse(
-        url="/console/admin.html",
-        status_code=307,
-        headers={"Cache-Control": "no-store"},
-    )
 
 
 @html_router.post("/golden/candidates/prefill-login", summary="폐쇄망 시연 계정 로그인")

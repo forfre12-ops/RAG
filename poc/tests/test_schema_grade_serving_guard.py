@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
-"""등급체계 변경이 서빙 분류기를 멈추게 하면 막는다 — FUN-005-01 · 감리 별첨 177(마).
+"""확정된 TS/S1/S2/S3 이외 등급은 API에서 만들 수 없다.
 
-서빙은 모델의 등급 집합이 DB 활성 등급 집합과 다르면 모델 로드를 거부하고 규칙엔진으로
-내려간다(m5_inference/pipeline.py _id2label_from_config). 종전에는 그런 변경이
-requires_retraining=True 만 달고 저장돼, 다음 재기동부터 분류기가 조용히 멈췄다(2026-09-10).
-콘솔은 그 상태를 "재학습 전까지 기존 라벨로 추론합니다"라고 안내하고 있었다.
+9/20의 4등급 고정은 모델이 우연히 로드돼 있을 때만의 안전장치가 아니다. 모델이 없거나
+모델 메타를 못 읽는 상황, 관리자 force 요청까지 포함해 코드 집합의 추가·삭제·변경을
+동일하게 거부해야 한다.
 """
 from __future__ import annotations
 
@@ -31,41 +30,15 @@ def test_no_change_passes_even_when_db_already_mismatched():
     assert assess_grade_change(FOUR, set(FOUR), frozenset({"A", "B"})) == ("", [])
 
 
-def test_adding_grade_with_served_model_is_blocked():
-    with pytest.raises(GradeSchemaBlocked, match="규칙엔진"):
-        assess_grade_change(FOUR, FOUR | {"S4"}, MODEL)
-
-
-def test_deactivating_grade_with_served_model_is_blocked():
-    with pytest.raises(GradeSchemaBlocked, match="force"):
-        assess_grade_change(FOUR, FOUR - {"S2"}, MODEL)
-
-
-@pytest.mark.parametrize("reason", [None, "", "   "])
-def test_force_without_reason_is_blocked(reason):
-    with pytest.raises(GradeSchemaBlocked, match="사유"):
-        assess_grade_change(FOUR, FOUR - {"S2"}, MODEL, force=True, force_reason=reason)
-
-
-def test_force_with_reason_passes_and_reports_impact():
-    impact, extra = assess_grade_change(
-        FOUR, FOUR - {"S2"}, MODEL, model_name="v-x", force=True, force_reason="S2 폐지 결정 — 재학습 예정",
-    )
-    assert "규칙엔진" in impact and "v-x" in impact
-    assert "forced: S2 폐지 결정 — 재학습 예정" in extra
-
-
-def test_without_served_model_nothing_to_protect():
-    assert assess_grade_change(FOUR, FOUR - {"S3"}, None)[0] == ""
-
-
-def test_untrainable_code_is_reported_even_without_model():
-    _, extra = assess_grade_change(FOUR, FOUR | {"S4"}, None)
-    assert any("S4" in e and "4등급" in e for e in extra)
+@pytest.mark.parametrize("proposed", [FOUR | {"S4"}, FOUR - {"S2"}, {"TS", "S1", "S2", "X"}])
+@pytest.mark.parametrize("model_codes", [MODEL, None, frozenset({"A", "B"})])
+def test_any_noncanonical_grade_set_is_blocked_even_without_a_served_model(proposed, model_codes):
+    with pytest.raises(GradeSchemaBlocked, match="고정"):
+        assess_grade_change(FOUR, proposed, model_codes)
 
 
 def test_restoring_model_code_set_is_allowed():
-    # DB 가 이미 어긋나 있을 때(S2 비활성) 모델과 같은 집합으로 되돌리는 변경은 통과
+    # 과거 우회로 DB가 어긋났어도 정본 4등급으로 되돌리는 저장은 허용한다.
     assert assess_grade_change(FOUR - {"S2"}, set(FOUR), MODEL) == ("", [])
 
 
@@ -103,9 +76,16 @@ def test_api_translates_block_to_409(monkeypatch):
     assert ei.value.status_code == 409 and "분류기가 멈춥니다" in ei.value.detail
 
 
-def test_request_defaults_keep_old_callers_working():
-    req = GradesPutRequest(
-        grades=[GradeDefinition(code="TS", name="특급기밀", order=1)],
-        actor=Actor(user_id="kl", role="admin"),
-    )
-    assert req.force is False and req.force_reason is None
+def test_request_schema_has_no_force_bypass_fields():
+    assert "force" not in GradesPutRequest.model_fields and "force_reason" not in GradesPutRequest.model_fields
+
+
+def test_force_fields_are_rejected_not_silently_ignored():
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="force"):
+        GradesPutRequest.model_validate({
+            "grades": [GradeDefinition(code="TS", name="특급기밀", order=1)],
+            "actor": {"user_id": "kl", "role": "admin"},
+            "force": True,
+        })

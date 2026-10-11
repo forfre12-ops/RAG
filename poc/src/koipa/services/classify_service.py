@@ -36,9 +36,6 @@ StageCallback = Callable[[str], None]
 
 logger = logging.getLogger(__name__)
 
-# 섀도 비교 실패는 문서마다 반복된다 — 매 건 찍으면 로그가 묻히므로 한 번만 남긴다.
-_WARNED_FACTOR_SHADOW = False
-
 import re as _re  # noqa: E402
 
 # [FIX-D] 공개특허공보 마스트헤드 탐지 — 서지헤더 3요소가 문서 '머리'에 동시 존재할 때만 True.
@@ -621,71 +618,34 @@ class ClassifyService:
                 )
                 self._record_gate_fail_open("icd_conformance")
 
-            # [요소 모델 섀도] v8 을 같은 입력에 나란히 돌려 **계량만** 한다.
-            # 등급도 status 도 바꾸지 않는다 — 배포본은 등급 우선·요소 후행이고 v8 은
-            # 요소 우선이라 두 구조를 바로 합치면 결정이 바뀐다. 그 전에 두 모델이
-            # 얼마나 다른지를 알아야 하고, 모르고 거부 조건을 걸면 검수량이 얼마나
-            # 늘지 예측할 수 없다.
-            #
-            # 방향이 중요하다 — v8 이 더 높게 보면 v5 미탐 의심(1차 목표에 직결),
-            # 더 낮게 보면 v5 과분류 의심이다. 경고에 그 방향을 남긴다.
-            factor_shadow = None
+            # [정책·요소 섀도] 두 독립 판단을 실제 서빙 요청에서 계량한다. 둘은 최종
+            # label/status의 입력이 아니며, 정책은 서버가 소유한 패키지+문서 바인딩 사실만
+            # 받는다. 결과는 내부 응답과 저카디널리티 메트릭에만 남긴다.
+            _v5 = pred.label.value if hasattr(pred.label, "value") else str(pred.label)
             try:
-                from koipa.config import settings as _fs  # noqa: PLC0415
-                if getattr(_fs, "factor_shadow_enabled", False) and getattr(_fs, "factor_model_dir", ""):
-                    from koipa.modules.m5_inference.pipeline import (  # noqa: PLC0415
-                        _source_prior_is_public as _is_pub,
-                    )
-                    from koipa.modules.m5_inference.factor_model import (  # noqa: PLC0415
-                        apply_serving_gate,
-                        get_factor_inference,
-                        shadow_compare,
-                    )
+                from koipa.four_path_shadow import configured_factor_shadow  # noqa: PLC0415
 
-                    _inf = get_factor_inference(
-                        _fs.factor_model_dir,
-                        base=getattr(_fs, "factor_model_base", "kakaobank/kf-deberta-base"),
-                        max_len=int(getattr(_fs, "factor_model_max_len", 768)),
-                    )
-                    _out = _inf.predict(cleaned)
-                    if _out is not None:
-                        _codes, _probs = _out
-                        _pred = apply_serving_gate(
-                            _codes, _probs,
-                            metadata=getattr(req, "metadata", None),
-                            tau=float(getattr(_fs, "factor_tau", 0.99)),
-                            kappa=float(getattr(_fs, "factor_kappa", 0.99)),
-                            source_is_public=_is_pub(
-                                (getattr(req, "metadata", None) or {}).get("source_type")
-                                if isinstance(getattr(req, "metadata", None), dict) else None
-                            ),
-                        )
-                        _v5 = pred.label.value if hasattr(pred.label, "value") else str(pred.label)
-                        factor_shadow = shadow_compare(_v5, _pred)
-                        warnings_acc.append(
-                            "factor-shadow: v8="
-                            + factor_shadow["factor_grade"]
-                            + " vs v5=" + str(_v5)
-                            + " · " + factor_shadow["direction"]
-                            + " · conf=" + str(factor_shadow["min_confidence"])
-                            + " (계량 전용 — 등급·상태 미변경)"
-                        )
+                factor_shadow = configured_factor_shadow(cleaned, eff_meta, _v5)
             except Exception as _shadow_exc:  # noqa: BLE001 — 섀도 실패가 분류를 막지 않는다
-                factor_shadow = None
-                # [무음 예외] None 은 "섀도를 안 켰다"와 "켰는데 죽었다"가 같은 값이다.
-                # 그래서 체크포인트 경로가 틀렸거나 모델 적재가 실패해도 조용히 측정만
-                # 사라지고, v8 승격 근거가 비어 가는 것을 아무도 모른다. 등급에는 영향이
-                # 없으므로 **동작은 그대로 두고** 흔적만 남긴다. 응답에 실을지는 별개 결정이다.
-                global _WARNED_FACTOR_SHADOW
-                if not _WARNED_FACTOR_SHADOW:
-                    _WARNED_FACTOR_SHADOW = True
-                    logger.warning(
-                        "factor-shadow 비교 실패 — 이 문서부터 섀도 계량이 비어 있다 "
-                        "(model_dir=%r · %s: %s)",
-                        # settings import 자체가 깨졌으면 _fs 가 없다 — 그 경우도 찍혀야 한다.
-                        getattr(locals().get("_fs"), "factor_model_dir", "?"),
-                        type(_shadow_exc).__name__, _shadow_exc,
-                    )
+                factor_shadow = {"state": "unavailable", "error_type": type(_shadow_exc).__name__}
+            self._record_shadow_observation("factor", factor_shadow)
+            if factor_shadow.get("state") == "ok":
+                warnings_acc.append(
+                    "factor-shadow: v8="
+                    + str(factor_shadow.get("factor_grade", "unknown"))
+                    + " vs v5=" + str(_v5)
+                    + " · " + str(factor_shadow.get("direction", "unknown"))
+                    + " · conf=" + str(factor_shadow.get("min_confidence", "unknown"))
+                    + " (계량 전용 — 등급·상태 미변경)"
+                )
+
+            try:
+                from koipa.four_path_shadow import configured_policy_shadow  # noqa: PLC0415
+
+                policy_shadow = configured_policy_shadow(cleaned, eff_meta, req.doc_id)
+            except Exception as _shadow_exc:  # noqa: BLE001 — 섀도 실패가 분류를 막지 않는다
+                policy_shadow = {"state": "unavailable", "error_type": type(_shadow_exc).__name__}
+            self._record_shadow_observation("policy", policy_shadow)
 
             # [agreement-gate] 등급차등 + 룰·모델 합의 게이트 (opt-in, 기본 off).
             # conf 단독 자동확정은 신뢰성이 측정으로 부정됨(golden500: AUROC 0.58, 자동확정
@@ -788,6 +748,8 @@ class ClassifyService:
                 grade_candidates=list(getattr(pred, "grade_candidates", None) or []),
                 grade_candidates_reason=getattr(pred, "grade_candidates_reason", None),
                 automation_assessment=automation_assessment,
+                factor_shadow=factor_shadow,
+                policy_shadow=policy_shadow,
             )
 
     @staticmethod
@@ -971,6 +933,33 @@ class ClassifyService:
             grade = label.value if hasattr(label, "value") else str(label)
             CLASSIFY_GRADE_TOTAL.labels(grade=grade).inc()
         except Exception:  # noqa: BLE001
+            pass
+
+    @staticmethod
+    def _record_shadow_observation(path: str, observation: dict | None) -> None:
+        """Emit only bounded shadow-state metrics; never export policy or document data.
+
+        The shadow result itself is exposed only on the internal synchronous
+        response.  Metrics let async/production traffic prove that the path
+        executed without retaining raw facts or regulation text.
+        """
+        safe_paths = {"factor", "policy"}
+        safe_states = {"ok", "not_configured", "missing_input", "invalid_input", "unavailable"}
+        safe_directions = {"agree", "factor_higher", "factor_lower"}
+        path_label = path if path in safe_paths else "unknown"
+        raw_state = str((observation or {}).get("state", "unavailable"))
+        state = raw_state if raw_state in safe_states else "unavailable"
+        direction = "not_applicable"
+        if path_label == "factor" and state == "ok":
+            raw_direction = str((observation or {}).get("direction", ""))
+            direction = raw_direction if raw_direction in safe_directions else "unknown"
+        try:
+            from koipa.api.prom_metrics import CLASSIFY_SHADOW_OBSERVATION_TOTAL  # noqa: PLC0415
+
+            CLASSIFY_SHADOW_OBSERVATION_TOTAL.labels(
+                path=path_label, state=state, direction=direction,
+            ).inc()
+        except Exception:  # noqa: BLE001 — observability is best-effort
             pass
 
     @staticmethod

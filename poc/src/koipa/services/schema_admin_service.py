@@ -2,10 +2,9 @@
 
 설계:
 - GET: classification_levels 테이블에서 현재 등급체계 조회 (DB 진실 소스)
-- PUT: 등급 추가/수정 (level_code 매치로 upsert), 등급 삭제는 is_active=FALSE.
-       재학습 필요성은 '등급 수가 변경되거나 신규 코드 추가' 시 True.
+- PUT: 확정된 TS/S1/S2/S3의 표시 메타데이터(명칭·설명·색·순서)만 수정한다.
+       등급 코드 추가·삭제·변경은 모델 유무와 무관하게 409로 거부한다.
 - 모두 best-effort: DB 미가용 시 기본 4등급 응답 / PUT은 warning.
-- [2026-09-10] 서빙 분류기를 멈추게 하는 변경은 거부한다(assess_grade_change → API 409).
 """
 
 from __future__ import annotations
@@ -35,13 +34,15 @@ _DEFAULT_GRADES = [
     GradeDefinition(code="S3", name="3급 공개", order=4, color="#388E3C"),
 ]
 
-# 학습기 라벨 목록(m4_training/trainer.py _LABEL_LIST)과 같은 4등급. 이 밖의 코드는
-# 재학습으로도 학습되지 않는다 — 학습기 코드를 고쳐야 한다(scripts/audit_grade_arity.py).
-_TRAINABLE_CODES = frozenset(g.value for g in Grade)
+# 2026-09-20에 확정한 단일 등급 체계. 학습기 라벨 목록
+# (m4_training/trainer.py _LABEL_LIST)과도 같다. 이 경계는 경고나 재학습 안내가 아니라
+# API가 강제하는 불변식이다. 새 등급 체계가 필요하면 별도 정책·모델·마이그레이션 출시로
+# 다루며, 운영 중 PUT과 force로 바꾸지 않는다.
+_FIXED_GRADE_CODES = frozenset(g.value for g in Grade)
 
 
 class GradeSchemaBlocked(Exception):
-    """서빙 분류기를 멈추게 하는 등급체계 변경 — API 가 409 로 돌려준다."""
+    """확정된 4등급 체계를 깨는 변경 — API 가 409 로 돌려준다."""
 
 
 def served_model_codes() -> tuple[str | None, frozenset[str] | None]:
@@ -76,40 +77,20 @@ def assess_grade_change(
     model_codes: frozenset[str] | None,
     *,
     model_name: str = "",
-    force: bool = False,
-    force_reason: str | None = None,
 ) -> tuple[str, list[str]]:
-    """등급 집합 변경이 서빙 분류기에 주는 영향을 판정한다 → (영향 문장, 덧붙일 사유).
+    """PUT이 확정된 4개 코드 외의 집합을 만들지 못하게 한다.
 
-    서빙(m5_inference/pipeline.py)은 모델의 등급 집합이 DB 활성 등급 집합과 다르면 모델
-    로드를 거부하고 규칙엔진으로 내려간다. 그러므로 활성 집합을 모델과 다르게 만드는 변경은
-    다음 로드(재기동·리로드)부터 분류기를 멈춘다. 종전에는 이런 변경이
-    requires_retraining=True 만 달고 그대로 저장됐다(2026-09-10 발견).
-
-    거부(GradeSchemaBlocked)하는 경우 — 활성 집합이 바뀌고 · 서빙 모델이 있고 · 새 집합이
-    모델 집합과 다르고 · force 가 아니다. force 면 사유가 있어야 한다.
-    이름·설명·색·순서만 바꾸는 변경은 집합이 같으므로 통과한다(순서는 모델 매핑과 무관).
+    ``model_codes``와 ``model_name``은 기존 호출자와 복구 진단 호환을 위해 받지만,
+    이제 정책 불변식을 우회시키는 근거가 될 수 없다. 모델이 없거나 메타를 못 읽는 경우도
+    동일하게 차단해야 했던 것이 이전 force 경로의 구멍이었다.
     """
-    extra: list[str] = []
-    untrainable = sorted(proposed - existing - _TRAINABLE_CODES)
-    if untrainable:
-        extra.append(
-            "학습기 라벨이 4등급(TS·S1·S2·S3) 고정이라 재학습으로도 학습하지 못하는 등급: "
-            f"{untrainable}"
+    del existing, model_codes, model_name
+    if proposed != _FIXED_GRADE_CODES:
+        raise GradeSchemaBlocked(
+            "등급 코드 집합은 정책상 TS·S1·S2·S3 네 개로 고정되어 있습니다. "
+            "PUT /schema/grades에서는 코드 추가·삭제·변경을 할 수 없습니다."
         )
-    if proposed == existing or model_codes is None or proposed == set(model_codes):
-        return "", extra
-    impact = (
-        f"서빙 모델{f'({model_name})' if model_name else ''}의 등급 {sorted(model_codes)} 과 "
-        f"새 활성 등급 {sorted(proposed)} 이 달라, 다음 모델 로드(재기동·리로드)부터 "
-        "분류기가 로드를 거부하고 규칙엔진으로 판정합니다"
-    )
-    if not force:
-        raise GradeSchemaBlocked(impact + ". 그래도 저장하려면 force=true 와 force_reason 을 함께 보내십시오.")
-    if not (force_reason or "").strip():
-        raise GradeSchemaBlocked("force=true 는 사유(force_reason)가 있어야 합니다. " + impact)
-    extra.append(f"forced: {force_reason.strip()}")
-    return impact, extra
+    return "", []
 
 
 class SchemaAdminService:
@@ -161,27 +142,18 @@ class SchemaAdminService:
     def put(self, req: GradesPutRequest) -> GradesPutResponse:
         """등급체계 변경. 새 코드 추가 / 순서 변경 시 requires_retraining=True."""
         logger.debug(
-            "schema put enter: grades_count=%d actor=%s",
+        "schema metadata put enter: grades_count=%d actor=%s",
             len(req.grades), req.actor.user_id,
         )
         reasons: list[str] = []
-        requires = False
-        serving_impact = ""
         new_codes = {g.code for g in req.grades}
-        # 판정은 쓰기 세션 **밖**에서 한다 — 쓰기 전에 거부하므로 아무것도 바뀌지 않는다.
-        # 세션 안에서 거부를 던지면 session_scope 가 정상적인 409 를 ERROR 추적 로그
-        # ("session_scope rollback")로 남긴다(2026-09-10 실측). 활성 모델 조회도 자기 세션을 연다.
-        model_dir, model_codes = served_model_codes()
-        current = self._active_codes()
-        if current is not None:
-            serving_impact, extra = assess_grade_change(
-                current, new_codes, model_codes,
-                model_name=Path(model_dir).name if model_dir else "",
-                force=req.force, force_reason=req.force_reason,
+        # 집합 검증은 DB·서빙 모델 상태보다 먼저 수행한다. DB가 잠시 비가용하거나 모델이
+        # 아직 로드되지 않았다는 이유로 새 등급이 저장되는 우회 경로를 만들지 않는다.
+        if len(req.grades) != len(_FIXED_GRADE_CODES) or len(new_codes) != len(req.grades):
+            raise GradeSchemaBlocked(
+                "등급 코드는 TS·S1·S2·S3 네 개를 각각 한 번씩만 포함해야 합니다."
             )
-            reasons.extend(extra)
-            if serving_impact:
-                logger.warning("등급체계 강제 변경 — actor=%s · %s", req.actor.user_id, serving_impact)
+        assess_grade_change(set(), new_codes, None)
         try:
             with session_scope() as db:
                 existing_codes = {
@@ -189,15 +161,10 @@ class SchemaAdminService:
                     for lv in db.query(ClassificationLevel).filter(ClassificationLevel.is_active.is_(True)).all()
                 }
 
-                added = new_codes - existing_codes
                 removed = existing_codes - new_codes
-
-                if added:
-                    requires = True
-                    reasons.append(f"added codes: {sorted(added)}")
                 if removed:
-                    requires = True
-                    reasons.append(f"deactivated codes: {sorted(removed)}")
+                    # 과거 force 우회로 남은 비정상 활성 코드만 이 경로로 정리한다.
+                    reasons.append(f"legacy codes deactivated: {sorted(removed)}")
 
                 # upsert
                 for g in req.grades:
@@ -218,9 +185,6 @@ class SchemaAdminService:
                         )
                         db.add(lv)
                     else:
-                        if lv.level_order != g.order:
-                            requires = True
-                            reasons.append(f"order changed for {g.code}")
                         lv.level_name = g.name
                         lv.level_order = g.order
                         lv.description = g.description
@@ -244,12 +208,12 @@ class SchemaAdminService:
         GradeRegistry.invalidate()
         FactorRegistry.invalidate()
         logger.info(
-            "schema put done: requires_retraining=%s reasons=%s",
-            requires, reasons,
+            "schema metadata put done: reasons=%s",
+            reasons,
         )
         return GradesPutResponse(
             version=self._version_tag(),
-            requires_retraining=requires,
-            reason="; ".join(reasons) if reasons else "no structural change",
-            serving_impact=serving_impact,
+            requires_retraining=False,
+            reason="; ".join(reasons) if reasons else "fixed grade metadata updated",
+            serving_impact="",
         )

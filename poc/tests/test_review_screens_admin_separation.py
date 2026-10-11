@@ -57,7 +57,12 @@ def test_review_screens_do_not_link_to_the_admin_console() -> None:
         ("login", _render_console_login_html()),
         ("review", _nav_html("검수", "full-train", "review")),
     ):
-        assert ADMIN_HREF not in html, f"{name}: 검수 화면에 관리자 콘솔 링크가 있다"
+        # 로그인 화면의 역할 기반 post-login 목적지는 관리자에게만 적용되는 JS 경로다.
+        # 검수자가 누를 수 있는 관리자 콘솔 앵커가 있는지만 검사한다.
+        if name == "login":
+            assert f'href="{ADMIN_HREF}"' not in html, f"{name}: 검수 화면에 관리자 콘솔 링크가 있다"
+        else:
+            assert ADMIN_HREF not in html, f"{name}: 검수 화면에 관리자 콘솔 링크가 있다"
 
 
 def test_reviewer_opens_the_candidate_console_without_admin_controls(client) -> None:

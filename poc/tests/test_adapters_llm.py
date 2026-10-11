@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from koipa.adapters.llm import NoopProvider, build_provider
@@ -30,6 +32,15 @@ def test_noop_provider_avoids_grade_signal_leakage():
     assert "TS" not in ts
     assert "S3" not in s3
     assert "Top Secret" not in ts
+
+
+def test_noop_provider_returns_a_readable_test_document() -> None:
+    """noop도 검수 화면에서 문서 흐름을 점검할 수 있는 본문을 낸다."""
+    payload = json.loads(NoopProvider().generate("[도메인]\ntech").text)
+    body = payload["body"]
+    assert "1. 작성 목적" in body
+    assert "3. 확인 항목" in body
+    assert len(body) >= 300
 
 
 def test_build_provider_unknown_raises():
