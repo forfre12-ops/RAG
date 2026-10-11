@@ -59,7 +59,7 @@ for service in "${requested[@]}"; do
 done
 
 # Output is tab-delimited and derived from the signed-off manifest, never from user input.
-mapfile -t images < <(python - "$bundle_dir/release-images.json" "${selected[*]}" <<'PY'
+mapfile -t images < <(python3 - "$bundle_dir/release-images.json" "${selected[*]}" <<'PY'
 import json, re, sys
 manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 if manifest.get("schema") != 1 or not re.fullmatch(r"[0-9a-f]{40}", manifest.get("git_sha", "")):
@@ -86,7 +86,7 @@ for row in "${images[@]}"; do
     [ -n "$archive" ] || { echo "load transport needs an archive for $service" >&2; exit 2; }
     archive_path="$bundle_dir/$archive"
     [ -f "$archive_path" ] || { echo "missing image archive: $archive_path" >&2; exit 2; }
-    actual_archive_sha="$(python - "$archive_path" <<'PY'
+    actual_archive_sha="$(python3 - "$archive_path" <<'PY'
 import hashlib, sys
 h = hashlib.sha256()
 with open(sys.argv[1], 'rb') as f:
@@ -136,7 +136,7 @@ if [ -n "${image_for[api]:-}" ]; then
   deadline=$(( $(date +%s) + health_timeout ))
   while :; do
     health="$(curl --fail --silent --show-error "$health_url" 2>/dev/null || true)"
-    if [ -n "$health" ] && HEALTH_JSON="$health" EXPECTED_SHA="$release_sha" python - <<'PY'
+    if [ -n "$health" ] && HEALTH_JSON="$health" EXPECTED_SHA="$release_sha" python3 - <<'PY'
 import json, os, sys
 try:
     payload = json.loads(os.environ["HEALTH_JSON"])
