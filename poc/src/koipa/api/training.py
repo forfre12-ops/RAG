@@ -21,6 +21,7 @@ from koipa.schemas.training import (
     TrainStatus,
 )
 from koipa.services.training_service import (
+    TrainingDatasetTooSmall,
     TrainingDatasetUnavailable,
     TrainingInputRejected,
     TrainingService,
@@ -37,6 +38,10 @@ def train(request: Request, req: TrainRequest, auth: dict = Depends(require_auth
     bind_authenticated_actor(req.actor, auth)
     try:
         return TrainingService().submit(req)
+    except TrainingDatasetTooSmall as exc:
+        # 파일·볼륨 장애(503)와 달리, 운영자가 데이터를 보완하면 해소되는
+        # 제출 조건이므로 409와 사용자용 기준을 돌려준다.
+        raise HTTPException(status_code=409, detail=exc.public_message) from exc
     except TrainingInputRejected as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except TrainingDatasetUnavailable as exc:

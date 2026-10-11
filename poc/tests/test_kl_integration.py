@@ -21,6 +21,7 @@ from sqlalchemy.exc import OperationalError
 from koipa.api.app import app
 from koipa.config import settings
 from koipa.db import engine
+from koipa.services import training_service as training_service_module
 
 pytestmark = pytest.mark.slow
 
@@ -217,14 +218,21 @@ class TestS6SynthFlow:
 # ============================================================
 
 class TestS7ActiveLearningUrgent:
-    def test_train_submit_returns_202(self):
+    def test_train_submit_returns_202(self, monkeypatch):
         """학습 트리거가 정상 등록되는지 (urgent 알람 자체는 corrections 누적 후 별도)."""
+        # JSONL의 최소량·4등급 균형은 파일 기반 preflight 단위 테스트가 담당한다.
+        # KL 계약은 배포 전용 datasets 볼륨 없이도 큐 등록 응답을 검증한다.
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_training_dataset_ready",
+            lambda: {"train": 400, "val": 80, "test": 80},
+        )
         with TestClient(app) as cli:
             r = cli.post(
                 "/api/v1/train",
                 headers=_hdr(),
                 json={
-                    "training_type": "incremental",
+                    "training_type": "full",
                     "actor": _actor(role="system"),
                 },
             )

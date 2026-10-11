@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -11,8 +11,13 @@ from .common import Actor
 
 
 class TrainRequest(BaseModel):
-    training_type: str = Field(pattern=r"^(full|incremental|hyperparam_search)$")
-    base_model: str = "kf-deberta-base"
+    # The admin console has one evidence-backed operating profile.  Do not
+    # accept names for training strategies that do not have a distinct worker
+    # implementation; recording a different trigger name would be misleading.
+    training_type: Literal["full"] = "full"
+    # Keep the serving/training base model explicit and immutable at this API
+    # boundary.  The trainer pins the corresponding Hugging Face revision.
+    base_model: Literal["kakaobank/kf-deberta-base"] = "kakaobank/kf-deberta-base"
     hyperparams: dict[str, Any] = Field(default_factory=dict)
     # 승인된 모의 문서는 기본 학습셋에 자동으로 섞지 않는다. 관리자가 새 학습을
     # 제출할 때만 명시적으로 포함을 요청하고, 워커가 후보 품질·홀드아웃 중복을 다시 확인한다.

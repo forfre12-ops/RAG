@@ -692,7 +692,7 @@ def s7_urgent_retrain(ctx: ScenarioContext) -> None:
                 lambda: cli.post(
                     "/api/v1/train",
                     headers=_hdr(role="system"),
-                    json={"training_type": "incremental", "actor": actor},
+                    json={"training_type": "full", "actor": actor},
                 )
             )
             if i == 0:

@@ -802,6 +802,7 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
         training_dataset_version,
     )
     from koipa.services.training_service import (  # noqa: PLC0415
+        TrainingInputRejected,
         TrainingDatasetUnavailable,
         ensure_training_dataset_ready,
         register_and_gate_model,
@@ -955,12 +956,13 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
 
     try:
         ensure_training_dataset_ready(spec_kwargs)
-    except TrainingDatasetUnavailable as exc:
+    except (TrainingDatasetUnavailable, TrainingInputRejected) as exc:
         # API preflight를 우회한 legacy/Celery 호출도 같은 일반 사용자용 오류로 닫는다.
         # 워커·API의 볼륨이 달라진 배포 실수는 여기서만 드러날 수 있다.
-        _mark_training_run(run_uuid, status="failed", error=exc.public_message)
+        public_message = getattr(exc, "public_message", str(exc))
+        _mark_training_run(run_uuid, status="failed", error=public_message)
         logger.error("train_classifier_task blocked before start: %s", exc)
-        return {"skipped": "training_dataset_unavailable", "reason": exc.public_message}
+        return {"skipped": "training_input_rejected", "reason": public_message}
     _mark_training_run(run_uuid, status="running")
     # [소요시간 2026-08-16] `_mark_training_run(..., "completed")` 이 duration_sec 을
     # 안 넘겨서 `GET /train/jobs` 의 소요시간이 **항상 null** 이었다(tasks.py 의

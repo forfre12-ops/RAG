@@ -40,6 +40,10 @@ from koipa.services.job_store import get_default_store
 logger = logging.getLogger(__name__)
 
 
+class TrainingInputRejected(ValueError):
+    """A requested training input failed its pre-enqueue evidence gate."""
+
+
 class TrainingDatasetUnavailable(RuntimeError):
     """학습 입력이 워커에 준비되지 않았을 때 제출을 막는 운영 오류.
 
@@ -48,6 +52,21 @@ class TrainingDatasetUnavailable(RuntimeError):
     """
 
     public_message = "학습 데이터가 서버에 준비되지 않았습니다. 관리자에게 문의하세요."
+
+
+class TrainingDatasetTooSmall(TrainingInputRejected):
+    """The formal training dataset is present but not large or balanced enough."""
+
+    public_message = (
+        "정식 학습 데이터가 부족합니다. 학습 데이터는 총 400건 이상 및 "
+        "등급(TS/S1/S2/S3)별 50건 이상, 검증·평가 데이터는 각각 총 80건 이상 및 "
+        "등급별 10건 이상이 필요합니다."
+    )
+
+
+_REQUIRED_LABELS = ("TS", "S1", "S2", "S3")
+_MIN_ROWS_BY_SPLIT = {"train": 400, "val": 80, "test": 80}
+_MIN_ROWS_PER_LABEL_BY_SPLIT = {"train": 50, "val": 10, "test": 10}
 
 
 def _dataset_split_paths(spec_kwargs: dict[str, Any] | None = None) -> dict[str, Path]:
@@ -66,38 +85,65 @@ def _dataset_split_paths(spec_kwargs: dict[str, Any] | None = None) -> dict[str,
 
 
 def ensure_training_dataset_ready(spec_kwargs: dict[str, Any] | None = None) -> dict[str, int]:
-    """학습 큐 등록 전 세 분할을 모두 읽어 유효 JSONL·비어 있지 않음을 보장한다.
+    """학습 큐 등록 전 데이터셋의 형식·최소량·등급 균형을 보장한다.
 
     API 컨테이너가 통과해도 워커 마운트가 달라질 수 있으므로 workers.tasks에서도
     같은 함수를 다시 호출한다. 실패하면 TrainingRun을 만들거나 무거운 모델 import를
     하기 전에 막는다.
+
+    이 값은 "학습 후보를 만들 최소선"일 뿐, 배포 승인 기준은 아니다. 학습(train)은
+    400건 및 등급별 50건, 검증·평가(val/test)는 각각 80건 및 등급별 10건을 요구한다.
     """
     counts: dict[str, int] = {}
+    label_counts: dict[str, dict[str, int]] = {}
     problems: list[str] = []
     for split, path in _dataset_split_paths(spec_kwargs).items():
         try:
             rows = 0
+            labels = {label: 0 for label in _REQUIRED_LABELS}
+            unknown_labels: set[str] = set()
             with path.open(encoding="utf-8") as fh:
                 for line in fh:
                     if not line.strip():
                         continue
-                    json.loads(line)
+                    row = json.loads(line)
+                    label = str(row.get("label") or "").strip()
+                    if label in labels:
+                        labels[label] += 1
+                    else:
+                        unknown_labels.add(label or "(empty)")
                     rows += 1
             if rows == 0:
                 problems.append(f"{split}: empty ({path})")
             else:
                 counts[split] = rows
+                label_counts[split] = labels
+                if unknown_labels:
+                    problems.append(
+                        f"{split}: unknown labels {','.join(sorted(unknown_labels))} ({path})"
+                    )
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             problems.append(f"{split}: {type(exc).__name__} ({path})")
     if problems:
         detail = "; ".join(problems)
         logger.error("training submission blocked: dataset preflight failed: %s", detail)
         raise TrainingDatasetUnavailable(detail)
+
+    shortages: list[str] = []
+    for split in ("train", "val", "test"):
+        minimum = _MIN_ROWS_BY_SPLIT[split]
+        if counts[split] < minimum:
+            shortages.append(f"{split} total={counts[split]}<{minimum}")
+        per_label_minimum = _MIN_ROWS_PER_LABEL_BY_SPLIT[split]
+        for label in _REQUIRED_LABELS:
+            actual = label_counts[split][label]
+            if actual < per_label_minimum:
+                shortages.append(f"{split}.{label}={actual}<{per_label_minimum}")
+    if shortages:
+        detail = "; ".join(shortages)
+        logger.warning("training submission blocked: insufficient dataset: %s", detail)
+        raise TrainingDatasetTooSmall(detail)
     return counts
-
-
-class TrainingInputRejected(ValueError):
-    """A requested training input failed its pre-enqueue evidence gate."""
 
 
 def _advisory_xact_lock(db, _key=None) -> None:
@@ -698,9 +744,21 @@ class TrainingService:
             "training submit enter: type=%s base_model=%s actor=%s",
             req.training_type, req.base_model, req.actor.user_id,
         )
-        dataset_counts = ensure_training_dataset_ready(req.hyperparams)
-        run_hyperparameters = dict(req.hyperparams) if req.hyperparams else {}
+        # The operating console has one reproducible profile: 5 epochs,
+        # seq512, batch8 (TrainSpec defaults).  A one-epoch demo or an
+        # arbitrary API override must not produce a record that looks like a
+        # formal training candidate.
+        if req.hyperparams:
+            raise TrainingInputRejected(
+                "운영 학습은 검증된 기본 설정(5에폭·seq512·batch8)으로만 제출할 수 있습니다."
+            )
+        dataset_counts = ensure_training_dataset_ready()
+        run_hyperparameters: dict[str, Any] = {}
         worker_spec_kwargs = dict(run_hyperparameters)
+        # This is deliberately passed to the worker, not merely recorded in
+        # JobStore, so the displayed model and the model actually trained stay
+        # identical.
+        worker_spec_kwargs["base_model"] = req.base_model
         synthetic_snapshot: dict | None = None
         if req.include_approved_synthetic:
             # 승인 큐는 작업 대기 중에도 바뀔 수 있다. 제출 시점의 검증 통과 행을

@@ -22,6 +22,7 @@ from sqlalchemy.exc import OperationalError
 from koipa.api.app import app
 from koipa.config import settings
 from koipa.db import engine
+from koipa.services import training_service as training_service_module
 
 
 def _pg_ok() -> bool:
@@ -91,15 +92,22 @@ class TestConfirmRouter:
 # ============================================================
 
 class TestTrainingRouter:
-    def test_train_submit_returns_202(self):
+    def test_train_submit_returns_202(self, monkeypatch):
+        # This is a router-contract test.  The actual JSONL shape/volume gate is
+        # exercised with files in test_training_dataset_preflight.py; do not
+        # make this test depend on a deployment-only dataset mount.
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_training_dataset_ready",
+            lambda: {"train": 400, "val": 80, "test": 80},
+        )
         with TestClient(app) as cli:
             r = cli.post(
                 "/api/v1/train",
                 headers=HDR,
                 json={
                     "training_type": "full",
-                    "base_model": "kf-deberta-base",
-                    "hyperparams": {"lr": 2e-5, "epochs": 5},
+                    "base_model": "kakaobank/kf-deberta-base",
                     "actor": ACTOR,
                 },
             )
@@ -107,6 +115,25 @@ class TestTrainingRouter:
             body = r.json()
             assert "train_job_id" in body
             assert body["status_url"].startswith("/api/v1/train/jobs/")
+
+    def test_train_returns_409_when_dataset_is_below_operating_minimum(self, monkeypatch):
+        def reject_small_dataset():
+            raise training_service_module.TrainingDatasetTooSmall("train total=12<400")
+
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_training_dataset_ready",
+            reject_small_dataset,
+        )
+        with TestClient(app) as cli:
+            r = cli.post(
+                "/api/v1/train",
+                headers=HDR,
+                json={"training_type": "full", "actor": ACTOR},
+            )
+
+        assert r.status_code == 409, r.text
+        assert "400건 이상" in r.json()["detail"]
 
     def test_train_jobs_list_returns_shape(self):
         with TestClient(app) as cli:
