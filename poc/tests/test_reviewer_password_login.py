@@ -162,6 +162,24 @@ def test_password_change_overwrites_not_duplicates(credential_store):
     assert rc.list_usernames() == ["reviewer-01"]
 
 
+def test_bulk_create_adds_only_new_accounts_and_preserves_existing_password(credential_store):
+    rc.set_password("reviewer-01", "existing-password")
+    assert rc.create_accounts({
+        "reviewer-21": "new-reviewer-21-password",
+        "reviewer-22": "new-reviewer-22-password",
+    }) == ["reviewer-21", "reviewer-22"]
+    assert rc.verify_password("reviewer-01", "existing-password") == ("reviewer",)
+    assert rc.verify_password("reviewer-21", "new-reviewer-21-password") == ("reviewer",)
+
+
+def test_bulk_create_refuses_duplicate_without_changing_any_account(credential_store):
+    rc.set_password("reviewer-01", "existing-password")
+    with pytest.raises(rc.ReviewerCredentialError, match="already exists"):
+        rc.create_accounts({"reviewer-01": "would-reset-password", "reviewer-21": "new-password-21"})
+    assert rc.verify_password("reviewer-01", "existing-password") == ("reviewer",)
+    assert rc.verify_password("reviewer-21", "new-password-21") is None
+
+
 def test_short_password_rejected(credential_store):
     with pytest.raises(rc.ReviewerCredentialError):
         rc.set_password("reviewer-01", "short")

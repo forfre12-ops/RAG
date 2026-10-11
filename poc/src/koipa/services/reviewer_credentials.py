@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import bcrypt
 
@@ -71,6 +71,48 @@ def set_password(username: str, password: str, *, roles: tuple[str, ...] = ("rev
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     _save(resolved, data)
+
+
+def create_accounts(
+    accounts: Mapping[str, str], *, roles: tuple[str, ...] = ("reviewer",),
+    path: Path | str | None = None,
+) -> list[str]:
+    """Create a set of new accounts without changing any existing account.
+
+    Bulk reviewer issuance must never silently reset an existing password.  All
+    names and passwords are validated before the one atomic credential-store
+    replacement, so a duplicate or invalid password leaves every account as it
+    was.  Plaintext passwords are accepted only from the caller and are not
+    stored or returned.
+    """
+    normalized: dict[str, str] = {}
+    for raw_username, password in accounts.items():
+        username = str(raw_username).strip()
+        if not username:
+            raise ReviewerCredentialError("username must not be empty")
+        if username in normalized:
+            raise ReviewerCredentialError(f"duplicate username: {username}")
+        if len(password) < 8:
+            raise ReviewerCredentialError("password must be at least 8 characters")
+        normalized[username] = password
+    if not normalized:
+        raise ReviewerCredentialError("at least one account is required")
+
+    resolved = _resolve(path)
+    data = _load(resolved)
+    existing = sorted(set(normalized) & set(data))
+    if existing:
+        raise ReviewerCredentialError("account already exists: " + ", ".join(existing))
+
+    now = datetime.now(timezone.utc).isoformat()
+    for username, password in normalized.items():
+        data[username] = {
+            "password_hash": bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("ascii"),
+            "roles": list(roles),
+            "created_at": now,
+        }
+    _save(resolved, data)
+    return sorted(normalized)
 
 
 def remove_account(username: str, *, path: Path | str | None = None) -> bool:

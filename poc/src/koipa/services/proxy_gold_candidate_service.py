@@ -25,6 +25,11 @@ from pathlib import Path
 from typing import AbstractSet, Any, Callable, Iterator
 from uuid import uuid4
 
+from koipa.services.candidate_classifier_scores import (
+    SCORE_SNAPSHOT_NAME,
+    load_score_index,
+    score_for_document,
+)
 from koipa.jsonl_lines import dumps_line, split_lines
 
 logger = logging.getLogger(__name__)
@@ -42,8 +47,7 @@ _LOCKED_LEDGER_NAME = "locked_console_review.jsonl"
 # 파일시스템 시계 해상도(223 실측 4ms) 안에서 일어난 두 번째 기록을 놓친다.
 # 값 = (후보 행, doc_id → 메타데이터의 candidate_status). 뒤의 것은 후보 행에 없는 값이다 —
 # 행의 status 는 결정이 있으면 결정의 것으로 덮인다. 숨김 검수(golden_reviewer_access)가 "내가
-# 아직 결정하지 않은 문서"의 원래 상태를 보이려면 필요하다. 행에 새 키를 얹지 않고 캐시 옆에 둔 것은
-# 행이 모든 응답에 그대로 나가기 때문이다(키를 얹으면 손잡이를 끈 응답도 바뀐다).
+# 아직 결정하지 않은 문서"의 원래 상태를 보이려면 필요하다.
 #
 # [2026-09-25] 후보가 3,598건(파일 7천 개)이 되자 이 캐시 구조가 무너졌다 — 실측(Docker Desktop
 # 바인드 마운트): ① 캐시 키를 만드는 디렉터리 전수 stat 이 **요청마다** 3.6초, ② 결정 한 번(원장이
@@ -298,6 +302,8 @@ class ProxyGoldCandidateService:
         origin: str | None = None, query: str | None = None,
         review_batch: str | None = None,
         department: str | None = None, info_type: str | None = None, doc_format: str | None = None,
+        boundary_gap_max: float | None = None, prediction_mismatch: bool = False,
+        include_classifier_summary: bool = False,
         visible_doc_ids: AbstractSet[str] | None = None,
         view: CandidateView | None = None,
         query_match: QueryMatch | None = None,
@@ -369,6 +375,21 @@ class ProxyGoldCandidateService:
             if needle:
                 match = query_match or _default_query_match
                 candidates = [c for c in candidates if match(c, needle)]
+        # 모델 점수 스냅샷이 본문 해시와 맞는 문서만 경계 데이터로 판정한다. 누락/오래된
+        # 점수를 0%처럼 취급하면 경계 목록에 섞여 검수 우선순위가 왜곡되므로 제외한다.
+        if boundary_gap_max is not None or prediction_mismatch:
+            summarized = [(candidate, self._classifier_score_summary(candidate)) for candidate in candidates]
+            if boundary_gap_max is not None:
+                summarized = [
+                    (candidate, summary) for candidate, summary in summarized
+                    if summary is not None and summary["top_two_gap"] <= boundary_gap_max
+                ]
+            if prediction_mismatch:
+                summarized = [
+                    (candidate, summary) for candidate, summary in summarized
+                    if summary is not None and summary["generation_prediction_mismatch"]
+                ]
+            candidates = [candidate for candidate, _summary in summarized]
         candidates.sort(key=lambda c: c["doc_id"])
         # 화면은 목록 응답에 실린 summary 로 KPI·품질 지표를 그린다(별도 /summary 를 안 부른다).
         # quality 를 여기 빼먹으면 품질 패널이 "지표를 낼 수 없습니다"로만 뜬다(실측).
@@ -417,8 +438,50 @@ class ProxyGoldCandidateService:
             # 값+건수)으로 채운다.
             "available_departments": self._available_departments(all_candidates),
             "available_doc_formats": self._available_doc_formats(all_candidates),
-            "candidates": [{k: v for k, v in c.items() if k != "text"} for c in page],
+            # 전체 네 등급 분포는 상세 API에서만 돌려준다. 목록은 관리자 경계 필터에
+            # 필요한 상위 예측/상위 2등급 차이만 별도 요약으로 싣는다.
+            "candidates": [self._list_candidate(
+                candidate, include_classifier_summary=include_classifier_summary,
+            ) for candidate in page],
         }
+
+    @staticmethod
+    def _classifier_score_summary(candidate: dict[str, Any]) -> dict[str, Any] | None:
+        score = candidate.get("classifier_score")
+        if not isinstance(score, dict) or score.get("status") != "available":
+            return None
+        scores = score.get("scores")
+        if not isinstance(scores, dict) or set(scores) != {"TS", "S1", "S2", "S3"}:
+            return None
+        try:
+            ordered = sorted(
+                ((grade, float(value)) for grade, value in scores.items()),
+                key=lambda item: item[1], reverse=True,
+            )
+        except (TypeError, ValueError):
+            return None
+        if len(ordered) != 4:
+            return None
+        top_grade, top_score = ordered[0]
+        second_grade, second_score = ordered[1]
+        proposed_grade = str(candidate.get("proposed_grade") or "")
+        return {
+            "predicted_label": top_grade,
+            "top_score": top_score,
+            "second_label": second_grade,
+            "top_two_gap": max(0.0, top_score - second_score),
+            "generation_prediction_mismatch": proposed_grade in {"TS", "S1", "S2", "S3"}
+            and top_grade != proposed_grade,
+        }
+
+    @classmethod
+    def _list_candidate(cls, candidate: dict[str, Any], *, include_classifier_summary: bool) -> dict[str, Any]:
+        row = {key: value for key, value in candidate.items() if key not in {"text", "classifier_score"}}
+        if include_classifier_summary:
+            summary = cls._classifier_score_summary(candidate)
+            if summary is not None:
+                row["classifier_score_summary"] = summary
+        return row
 
     def _quality_memo(
         self, candidates: list[dict[str, Any]], *, base: list[dict[str, Any]] | None = None, tag: str = "",
@@ -1269,11 +1332,12 @@ class ProxyGoldCandidateService:
         if not self.root.exists():
             return [], {}
         snap = self._base_snapshot()
-        key = (str(self.root), snap.version, self._ledger_key())
+        key = (str(self.root), snap.version, self._ledger_key(), self._score_snapshot_key())
         cached = _CANDIDATE_CACHE.get(key)
         if cached is not None:
             return cached
         latest = self._latest_decisions()
+        score_index = load_score_index(self.root)
         rows = []
         for meta_name in snap.order:
             base = snap.rows[meta_name]
@@ -1284,6 +1348,13 @@ class ProxyGoldCandidateService:
             row["status"] = decision.get("status") or snap.status_of[meta_name]
             row["latest_decision"] = decision or None
             row["grade_fixed"] = bool(decision.get("final_grade"))
+            # 고객사 전수 사람 검수에서 쓰는 참고 점수. 원본 모의문서 메타를 바꾸지 않고
+            # 본문 해시와 일치하는 별도 모델-실행 스냅샷만 노출한다.
+            row["classifier_score"] = score_for_document(
+                score_index,
+                doc_id=row["doc_id"],
+                document_sha256=row["document_sha256"],
+            )
             rows.append(row)
         result = (rows, dict(snap.base_status))
         # 폭주를 막기 위해 최근 몇 세대만 유지한다.
@@ -1291,6 +1362,14 @@ class ProxyGoldCandidateService:
             dict.clear(_CANDIDATE_CACHE)
         _CANDIDATE_CACHE[key] = result
         return result
+
+    def _score_snapshot_key(self) -> tuple[int, int]:
+        """점수 스냅샷이 바뀌면 후보 응답 캐시도 즉시 바꾼다."""
+        try:
+            stat = (self.root / SCORE_SNAPSHOT_NAME).stat()
+        except OSError:
+            return (0, 0)
+        return (stat.st_mtime_ns, stat.st_size)
 
     def _build_row(
         self, meta_name: str, docs_by_id: dict[str, list[str]],

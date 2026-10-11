@@ -271,6 +271,26 @@ class ProxyGoldCandidateDecisionResponse(BaseModel):
     latest_decision: Optional[dict] = None
 
 
+class CandidateClassifierScore(BaseModel):
+    """A hash-bound model score snapshot shown as a review aid, never a human decision."""
+
+    status: Literal["available", "unavailable"]
+    scores: dict[str, float] = Field(default_factory=dict)
+    predicted_label: Optional[str] = None
+    model_version: Optional[str] = None
+    scored_at: Optional[str] = None
+    score_basis: Optional[str] = None
+    calibrated: Optional[bool] = None
+    reason: Optional[str] = None
+
+
+class CandidateClassifierScoreResponse(BaseModel):
+    """GET /golden/candidates/{doc_id}/classifier-score response."""
+
+    doc_id: str
+    classifier_score: CandidateClassifierScore
+
+
 class ProxyGoldPromoteRequest(BaseModel):
     """콘솔 결정 → 사람 서명 승격 요청. 서명자는 요청 본문이 아니라 **원장의 결정자**다.
 
@@ -377,6 +397,34 @@ class GoldenExpertReviewPlanResponse(BaseModel):
     assignment_group_id: str
     already_applied: bool = False
     reviewer_document_counts: dict[str, int]
+
+
+class GoldenExpertReviewRebalanceRequest(BaseModel):
+    """Replace an unopened expert-review plan with the requested 25 x 40 plan."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    review_batch: str = Field(min_length=1, max_length=128)
+    reviewer_ids: list[str] = Field(min_length=25, max_length=25)
+    reason: str = Field(default="", max_length=1000)
+
+    @model_validator(mode="after")
+    def _rebalance_contract(self) -> "GoldenExpertReviewRebalanceRequest":
+        if not self.review_batch.strip():
+            raise ValueError("review_batch 가 비어 있다(공백만은 불가)")
+        reviewers = [str(value).strip() for value in self.reviewer_ids]
+        if any(not reviewer for reviewer in reviewers):
+            raise ValueError("reviewer_ids 에 빈 값이 있다")
+        if len(set(reviewers)) != 25:
+            raise ValueError("reviewer_ids 는 서로 다른 25명이어야 한다")
+        return self
+
+
+class GoldenExpertReviewRebalanceResponse(GoldenExpertReviewPlanResponse):
+    """Audit counts make replacement visible without exposing document contents."""
+
+    revoked_assignment_events: int
+    assigned_events: int
 
 
 class GoldenReviewPlanRequest(BaseModel):

@@ -691,6 +691,7 @@ ROUTE_TABLE: dict[tuple[str, str], str] = {
     ("POST", "/golden/candidates/promote"): ADMIN_ONLY,
     ("POST", "/golden/assignments"): ADMIN_ONLY,
     ("POST", "/golden/assignments/expert-review-plan"): ADMIN_ONLY,
+    ("POST", "/golden/assignments/expert-review-plan/rebalance"): ADMIN_ONLY,
     ("POST", "/golden/assignments/review-plan"): ADMIN_ONLY,
     ("POST", "/golden/assignments/revoke"): ADMIN_ONLY,
     ("GET", "/golden/assignments"): ADMIN_ONLY,
@@ -700,6 +701,7 @@ ROUTE_TABLE: dict[tuple[str, str], str] = {
     ("GET", "/golden/candidates/category-stats"): ADMIN_ONLY,
     ("POST", "/golden/candidates/export"): ADMIN_ONLY,
     ("GET", "/golden/candidates/decisions"): REVIEWER_SCOPED,
+    ("GET", "/golden/candidates/{doc_id}/classifier-score"): REVIEWER_SCOPED,
     ("GET", "/golden/candidates/{doc_id}"): REVIEWER_SCOPED,
     ("POST", "/golden/candidates/{doc_id}/decision"): REVIEWER_SCOPED,
     ("GET", "/golden/candidates/manage.html"): REVIEWER_SCOPED,
@@ -757,6 +759,7 @@ def test_admin_only_routes_are_403_for_reviewers_under_every_flag_combination(h,
         ("POST", "/golden/candidates/promote"): {"json": {}},
         ("POST", "/golden/assignments"): {"json": {}},
         ("POST", "/golden/assignments/expert-review-plan"): {"json": {}},
+        ("POST", "/golden/assignments/expert-review-plan/rebalance"): {"json": {}},
         ("POST", "/golden/assignments/review-plan"): {"json": {}},
         ("POST", "/golden/assignments/revoke"): {"json": {}},
         ("GET", "/golden/assignments"): {},
@@ -858,8 +861,7 @@ def isolation_leaks(h: Harness, monkeypatch) -> list[str]:
     note(any(h.real(e["doc_id"]) not in A_VISIBLE
              for e in h.get(EXPERT_A, "/golden/candidates/decisions").json().get("events", [])),
          "결정 원장에 배정 밖 문서가 보인다")
-    row = h.get(EXPERT_A, f"/golden/candidates/{A1}").json()
-    note("proposed_grade" in row, "숨김인데 제안 등급이 응답에 있다")
+    # 보호원 요청으로 최초 생성 등급은 검수 참고자료로 의도적으로 공개한다.
     note(h.get(EXPERT_A, "/golden/candidates", params={"grade": "TS"}).status_code != 422,
          "grade 필터로 제안 등급을 캘 수 있다")
     r = h.post(EXPERT_A, f"/golden/candidates/{A2}/decision", json={"action": "approve"})
@@ -886,7 +888,7 @@ def test_isolation_probe_detects_disabled_isolation(h, monkeypatch):
     for expected in (
         "목록에 배정 밖 문서가 보인다", "배정 밖 문서 상세가 열린다", "배정 밖 문서에 결정이 기록된다",
         "집계에 배정 밖 문서가 섞인다", "배정 밖 배치 이름이 보인다", "결정 원장에 배정 밖 문서가 보인다",
-        "숨김인데 제안 등급이 응답에 있다", "grade 필터로 제안 등급을 캘 수 있다",
+        "grade 필터로 제안 등급을 캘 수 있다",
         "숨김인데 제안 등급 그대로 확정(approve)이 받아들여진다", "잡 목록이 검수자에게 열린다",
         "잡 상태(서명 URL 발급)가 검수자에게 열린다",
     ):

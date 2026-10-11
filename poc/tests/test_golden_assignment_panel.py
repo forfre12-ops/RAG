@@ -44,7 +44,7 @@ FLAG_COMBOS = [dict(), dict(assignment=True), dict(blind=True), dict(assignment=
 # 검수자 화면에 하나라도 있으면 새는 것 — 패널의 표식·id·문구·관리자 API 주소.
 PANEL_TOKENS = (
     "assign-panel", "golden/assignments", 'id="assignments"', 'id="asn', "asnRevoke",
-    "검수 배정", "배정 강제", "제안 등급 숨김", "배정한 관리자", "배정일시",
+    "검수 배정", "배정 강제", "다른 검수결정 숨김", "배정한 관리자", "배정일시",
 )
 
 
@@ -120,7 +120,7 @@ def test_reviewer_screen_is_still_a_reviewer_screen_without_the_panel(h, monkeyp
     set_flags(monkeypatch, **flags)
     text = manage_html(h, EXPERT_A)
     assert "검수자 권한으로 열었습니다" in text and "#openUpload,#promote,#provBox{display:none!important}" in text
-    assert ("독립 검수 모드입니다" in text) == bool(flags.get("blind"))
+    assert ("사람 검수 모드입니다" in text) == bool(flags.get("blind"))
     for anchor in ('id="rows"', 'id="detail"', 'id="ledgerAll"', "load();"):
         assert anchor in text, anchor
 

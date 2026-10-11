@@ -326,7 +326,7 @@ def main() -> int:
         skip_prefixes += (f"{server_prefix}/synth",)
         print("  ℹ 합성문서 라우터 비활성 (enable_synthetic_generation=False) — /synth/* YAML 경로 제외")
     # [2026-10-09 #9 이미지 분리] golden.py(검수·서명 화면) 라우터도 같은 profile-conditional
-    # 패턴 — enable_golden_review_console=False(onprem-local 기본)면 app.py 가 golden_api.router
+    # 패턴 — enable_golden_review_console=False(경량 프로파일 기본)면 app.py 가 golden_api.router
     # 를 통째로 include_router 하지 않는다. ⚠ 로그인/세션·시연 프리필 4경로
     # (login.html·login·session·prefill-login)는
     # koipa.api.console_login 이 **플래그와 무관하게 항상** 등록하므로, 아래처럼 /golden 전체를
