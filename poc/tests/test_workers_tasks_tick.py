@@ -508,21 +508,24 @@ def test_train_classifier_task_no_corrections_no_run_early_return():
         "koipa.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
         return_value=_empty_rebuild(),
     ):
-        with patch(
-            "koipa.workers.tasks._create_training_run_guarded", return_value=None
-        ):
+        # 이 단위 시험은 학습셋 파일 배선이 아니라, preflight 이후의 worker
+        # 제어 흐름을 검증한다. 실제 파일 검증은 training_dataset_preflight 시험이 맡는다.
+        with patch("koipa.services.training_service.ensure_training_dataset_ready"):
             with patch(
-                "koipa.modules.m4_training.trainer.train_classifier",
-                return_value=fake_report,
-            ) as tc:
+                "koipa.workers.tasks._create_training_run_guarded", return_value=None
+            ):
                 with patch(
-                    "koipa.services.training_service.register_and_gate_model",
-                    return_value={"registered": True},
-                ):
+                    "koipa.modules.m4_training.trainer.train_classifier",
+                    return_value=fake_report,
+                ) as tc:
                     with patch(
-                        "koipa.modules.m6_evaluation.active_learning.consume_corrections_for_run"
-                    ) as consume:
-                        out = train_classifier_task(spec_kwargs={})
+                        "koipa.services.training_service.register_and_gate_model",
+                        return_value={"registered": True},
+                    ):
+                        with patch(
+                            "koipa.modules.m6_evaluation.active_learning.consume_corrections_for_run"
+                        ) as consume:
+                            out = train_classifier_task(spec_kwargs={})
 
     assert tc.call_count == 1
     assert out["corrections_incorporated"] == 0
@@ -543,18 +546,19 @@ def test_train_classifier_task_register_exception_falls_back():
         "koipa.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
         return_value=_empty_rebuild(),
     ):
-        with patch(
-            "koipa.workers.tasks._create_training_run_guarded", return_value=None
-        ):
+        with patch("koipa.services.training_service.ensure_training_dataset_ready"):
             with patch(
-                "koipa.modules.m4_training.trainer.train_classifier",
-                return_value=fake_report,
+                "koipa.workers.tasks._create_training_run_guarded", return_value=None
             ):
                 with patch(
-                    "koipa.services.training_service.register_and_gate_model",
-                    side_effect=RuntimeError("db down"),
+                    "koipa.modules.m4_training.trainer.train_classifier",
+                    return_value=fake_report,
                 ):
-                    out = train_classifier_task(spec_kwargs={})
+                    with patch(
+                        "koipa.services.training_service.register_and_gate_model",
+                        side_effect=RuntimeError("db down"),
+                    ):
+                        out = train_classifier_task(spec_kwargs={})
 
     assert out["deploy"] == {"registered": False, "reason": "exception"}
     assert out["corrections_consumed"] == 0
