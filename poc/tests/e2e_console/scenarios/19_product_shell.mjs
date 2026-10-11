@@ -289,6 +289,67 @@ export const scenarios = [
   },
 
   {
+    id: 'product.workbench-tablet-inspector-drawer-keeps-focus-and-panel-state',
+    title: '태블릿에서 결정 정보는 드로어로 열리고 ESC·Tab·키보드 리사이즈가 동작한다',
+    why: '중간 폭에서 Inspector를 숨기면 근거와 최종 결정을 확인할 수 없고, 마우스 전용 리사이즈는 접근성을 깨뜨린다',
+    async run({ server, check }) {
+      const page = await productTab(server, 'documents', {
+        beforeBoot(win) {
+          Object.defineProperty(win, 'innerWidth', { configurable: true, value: 900 });
+          win.matchMedia = (query) => ({
+            matches: String(query).includes('min-width: 761px'),
+            media: query,
+            addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {},
+          });
+        },
+      });
+      await page.until(() => !!page.$('wb-inspector-body'));
+
+      const trigger = page.$('wb-inspector-open');
+      // jsdom does not evaluate this page's width media query consistently;
+      // force the two tablet-only controls visible while exercising their
+      // keyboard behavior. CSS breakpoint existence is locked by pytest.
+      trigger.style.display = 'inline-flex';
+      page.$('wb-inspector').style.display = 'block';
+      page.$('wb-inspector-close').style.display = 'inline-flex';
+      trigger.focus();
+      page.win.toggleWorkbenchInspector(true);
+      await page.wait(250);
+      check.ok(page.$('document-workbench')?.classList.contains('inspector-open'), '태블릿에서 정보 패널이 드로어로 열린다');
+      check.eq(trigger.getAttribute('aria-expanded'), 'true', '열림 상태를 보조기술에도 알린다');
+      check.gte(page.win.inspectorFocusableElements().length, 1, '드로어 안에 포커스 가능한 조작 요소가 있다');
+      check.eq(page.$('product-documents').hasAttribute('inert'), false, '열린 문서 화면은 inert 상태가 아니다');
+
+      const focusables = page.qa('#wb-inspector button, #wb-inspector select, #wb-inspector textarea').filter((el) => !el.disabled);
+      const first = focusables[0];
+      // jsdom does not make CSS-hidden controls focusable.  Spy on the
+      // boundary call itself; actual breakpoint visibility is separately
+      // locked in the CSS/source test.
+      let trappedFocuses = 0;
+      const originalFirstFocus = first.focus.bind(first);
+      first.focus = (...args) => { trappedFocuses += 1; return originalFirstFocus(...args); };
+      trigger.focus();
+      page.doc.dispatchEvent(new page.win.KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+      check.gte(trappedFocuses, 1, '드로어 밖으로 나가려는 Tab을 첫 조작 요소로 되돌린다');
+
+      const leftHandle = page.q('[data-resize="left"]');
+      leftHandle.dispatchEvent(new page.win.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      check.ok(page.$('document-workbench').style.getPropertyValue('--wb-left').endsWith('px'), '화살표 키로 문서함 폭을 조절한다');
+      check.ok(page.win.localStorage.getItem('koipa_admin_workbench_layout_v1'), '패널 폭을 이 브라우저에만 저장한다');
+
+      let restoredFocuses = 0;
+      const originalTriggerFocus = trigger.focus.bind(trigger);
+      trigger.focus = (...args) => { restoredFocuses += 1; return originalTriggerFocus(...args); };
+      page.doc.dispatchEvent(new page.win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      check.ok(!page.$('document-workbench')?.classList.contains('inspector-open'), 'ESC로 드로어를 닫는다');
+      check.eq(trigger.getAttribute('aria-expanded'), 'false', '닫힘 상태를 보조기술에도 알린다');
+      check.gte(restoredFocuses, 1, '닫은 뒤 열기 버튼으로 포커스를 되돌린다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     id: 'product.experts-is-progress-only-not-assignment-setup',
     title: '검수 계정별 진행 화면은 배정 설정을 요구하거나 실행하지 않는다',
     why: '진행 현황은 이미 배정된 업무의 상태를 읽는 화면이며, 수동 배정 절차가 섞이면 역할과 흐름이 흐려진다',

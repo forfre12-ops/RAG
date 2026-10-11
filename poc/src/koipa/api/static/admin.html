@@ -454,8 +454,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .settings-maintenance .btn.btn{flex:0 0 auto;border-color:#e7b45f;background:#fffaf0;color:#92400e;}
 .settings-maintenance .btn:hover{background:#fff4db;}
 
+:root{--motion-fast:140ms;--motion-panel:180ms;--motion-ease:cubic-bezier(.2,.7,.2,1);}
 .product-view{display:none;}
 .product-view.is-visible{display:block;}
+.product-view.is-entering{animation:product-view-enter var(--motion-fast) var(--motion-ease) both;}
+@keyframes product-view-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .console-view-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:0 0 16px;}
 .console-view-title{margin:0;color:var(--ui-navy);font-size:20px;letter-spacing:-.035em;}
 .console-view-help{margin:4px 0 0;color:var(--ui-muted);font-size:12.5px;}
@@ -551,8 +554,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .workbench-drawer{border-right:1px solid var(--ui-line-soft);}
 .workbench-inspector{border-left:1px solid var(--ui-line-soft);background:#fbfcfe;}
 .workbench-handle{position:relative;background:#f6f8fb;cursor:col-resize;touch-action:none;}
+.workbench-handle:focus-visible{z-index:3;outline:2px solid var(--ui-blue);outline-offset:-2px;}
 .workbench-handle::after{content:"";position:absolute;left:2px;right:2px;top:50%;height:38px;transform:translateY(-50%);border-left:2px dotted #a6b2c3;border-right:2px dotted #a6b2c3;}
 .workbench-pane-head{position:sticky;top:0;z-index:2;padding:14px 15px;border-bottom:1px solid var(--ui-line-soft);background:rgba(255,255,255,.96);backdrop-filter:blur(8px);}
+.workbench-inspector .workbench-pane-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.workbench-inspector-close,.workbench-inspector-open,.workbench-inspector-backdrop{display:none;}
+.workbench-inspector-close{flex:0 0 auto;width:32px;height:32px;border:1px solid var(--ui-line);background:#fff;color:var(--ui-navy);font-size:22px;line-height:1;cursor:pointer;}
 .workbench-pane-head h2{margin:0;color:var(--ui-navy);font-size:13px;letter-spacing:-.01em;}
 .workbench-pane-head p{margin:3px 0 0;color:var(--ui-muted);font-size:11px;}
 .workbench-filter{display:flex;gap:7px;margin-top:11px;}
@@ -620,9 +627,22 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 @media(max-width:1120px){
   .wrap{padding:18px 18px 100px;}.console-layout{grid-template-columns:1fr;}.console-sidebar{position:static;display:flex;align-items:center;gap:9px;padding:10px;overflow:auto;}.console-sidebar-kicker,.console-sidebar-foot{display:none}.console-nav{flex-direction:row;min-width:max-content}.console-nav button{width:auto;white-space:nowrap}.overview-grid{grid-template-columns:1fr;}.workbench{grid-template-columns:minmax(180px,30%) 7px minmax(0,1fr);}.workbench-inspector,.workbench-handle:last-of-type{display:none;}
 }
+@media (min-width:761px) and (max-width:1120px){
+  body.workbench-inspector-drawer-open{overflow:hidden;}
+  .workbench-inspector-open{display:inline-flex;}
+  .workbench{overflow:visible;}
+  .workbench-inspector{display:block;position:fixed;top:calc(var(--shell-header-height) + 12px);right:0;bottom:0;width:min(440px,92vw);border:1px solid var(--ui-line);box-shadow:-12px 0 28px rgba(9,9,11,.16);transform:translateX(104%);transition:transform var(--motion-panel) var(--motion-ease);visibility:hidden;z-index:120;}
+  .workbench.inspector-open .workbench-inspector{transform:translateX(0);visibility:visible;}
+  .workbench-inspector-close{display:inline-flex;align-items:center;justify-content:center;}
+  .workbench-inspector-backdrop{display:block;position:fixed;inset:0;z-index:110;border:0;background:rgba(9,9,11,.26);opacity:0;pointer-events:none;transition:opacity var(--motion-panel) var(--motion-ease);}
+  .workbench.inspector-open + .workbench-inspector-backdrop{opacity:1;pointer-events:auto;}
+}
 @media(max-width:760px){
   .top{height:64px;}.wrap{padding:14px 12px 90px;}.lede-row{align-items:flex-start;flex-direction:column;margin-bottom:14px;}.console-meta{justify-content:flex-start}.metrics-grid,.model-metrics{grid-template-columns:1fr 1fr;}.grade-rows{grid-template-columns:62px repeat(4,minmax(42px,1fr));gap:4px;}.grade-number{padding:7px 3px;font-size:12px;}.category-panel{overflow:auto}.category-table{min-width:620px}.workbench{display:block;height:auto;min-height:0;overflow:visible;}.workbench-handle{display:none}.workbench-drawer,.workbench-canvas,.workbench-inspector{display:block;max-height:none;border:0;border-bottom:1px solid var(--ui-line-soft);}.workbench-canvas{min-height:480px;padding:14px;}.document-sheet{padding:30px 24px;}.workbench-inspector{display:block;}.console-nav button{min-height:38px;padding:7px 9px;font-size:12px;}
   .settings-hero{display:block;padding:21px 18px 18px;}.settings-hero-note{margin-top:14px;max-width:none;}.settings-stack{padding:14px;}.settings-section{padding:15px;}.settings-fields{grid-template-columns:1fr;gap:12px;}.settings-maintenance-body{align-items:stretch;flex-direction:column;}.settings-maintenance .btn{width:100%;}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:1ms!important;}
 }
 @media(max-width:640px){
   .top{height:auto;min-height:58px;padding:8px 12px;gap:7px;align-items:center;flex-wrap:wrap;}
@@ -759,18 +779,19 @@ body *,body *::before,body *::after{border-radius:0 !important}
   <section id="product-documents" class="product-view" data-product-requires-golden="1" aria-labelledby="documents-heading">
     <div class="console-view-head">
       <div><h2 id="documents-heading" class="console-view-title">문서 검토 및 확정</h2><p class="console-view-help">문서함, 원문, 결정 정보를 한 화면에서 확인합니다.</p></div>
-      <div class="console-view-actions"><button class="btn sec sm" type="button" onclick="loadWorkbench(true)">목록 새로고침</button><button class="btn sm" type="button" onclick="focusWorkbenchDecision()">선택 문서 보기</button></div>
+      <div class="console-view-actions"><button class="btn sec sm" type="button" onclick="loadWorkbench(true)">목록 새로고침</button><button class="btn sec sm workbench-inspector-open" id="wb-inspector-open" type="button" aria-controls="wb-inspector" aria-expanded="false" onclick="toggleWorkbenchInspector(true)">결정 정보</button><button class="btn sm" type="button" onclick="focusWorkbenchDecision()">선택 문서 보기</button></div>
     </div>
     <div id="document-workbench" class="workbench" aria-live="polite">
       <aside class="workbench-drawer" id="wb-drawer">
         <div class="workbench-pane-head"><h2>문서함</h2><p id="wb-count">문서 목록을 불러오는 중입니다.</p><div class="workbench-filter"><input id="wb-query" type="text" placeholder="제목·ID 검색" onkeydown="workbenchSearchKey(event)" /><select id="wb-format" onchange="loadWorkbench(true)"><option value="">전체 유형</option></select><select id="wb-status" onchange="applyWorkbenchStatusFilter()"><option value="">전체 상태</option><option value="fixed">검수완료</option><option value="unfixed">미검수</option><option value="deferred">보류</option><option value="discarded">폐기</option><option value="out_of_scope">검수대상제외</option></select></div></div>
         <div id="wb-list" class="workbench-list"><div class="inspector-empty">문서 목록을 불러오는 중입니다.</div></div>
       </aside>
-      <div class="workbench-handle" role="separator" aria-orientation="vertical" aria-label="문서함 너비 조절" data-resize="left"></div>
+      <div class="workbench-handle" role="separator" aria-orientation="vertical" aria-label="문서함 너비 조절" aria-valuemin="210" aria-valuenow="210" tabindex="0" data-resize="left"></div>
       <main class="workbench-canvas" id="wb-canvas"><article id="wb-document" class="document-sheet"><div class="doc-empty">왼쪽 문서함에서 문서를 선택하면 원문과 메타데이터를 표시합니다.</div></article></main>
-      <div class="workbench-handle" role="separator" aria-orientation="vertical" aria-label="근거 패널 너비 조절" data-resize="right"></div>
-      <aside class="workbench-inspector" id="wb-inspector"><div class="workbench-pane-head"><h2>문서 결정 정보</h2><p>선택 문서의 등록 정보와 결정 이력</p></div><div class="inspector-tabs" role="tablist"><button type="button" class="active" data-inspector-tab="detail" onclick="showInspectorTab('detail')">상세</button><button type="button" data-inspector-tab="history" onclick="showInspectorTab('history')">이력</button></div><div id="wb-inspector-body" class="inspector-body"><div class="inspector-empty">문서를 선택하면 상세 정보가 표시됩니다.</div></div></aside>
+      <div class="workbench-handle" role="separator" aria-orientation="vertical" aria-label="근거 패널 너비 조절" aria-valuemin="248" aria-valuenow="248" tabindex="0" data-resize="right"></div>
+      <aside class="workbench-inspector" id="wb-inspector"><div class="workbench-pane-head"><div><h2>문서 결정 정보</h2><p>선택 문서의 등록 정보와 결정 이력</p></div><button type="button" class="workbench-inspector-close" id="wb-inspector-close" aria-label="결정 정보 패널 닫기" onclick="toggleWorkbenchInspector(false)">×</button></div><div class="inspector-tabs" role="tablist" aria-label="문서 결정 정보 탭"><button type="button" class="active" role="tab" aria-selected="true" aria-controls="wb-inspector-body" data-inspector-tab="detail" onclick="showInspectorTab('detail')">상세</button><button type="button" role="tab" aria-selected="false" aria-controls="wb-inspector-body" data-inspector-tab="history" onclick="showInspectorTab('history')">이력</button></div><div id="wb-inspector-body" class="inspector-body" role="tabpanel" aria-live="polite"><div class="inspector-empty">문서를 선택하면 상세 정보가 표시됩니다.</div></div></aside>
     </div>
+    <button type="button" class="workbench-inspector-backdrop" id="wb-inspector-backdrop" tabindex="-1" aria-label="결정 정보 패널 닫기" onclick="toggleWorkbenchInspector(false)"></button>
   </section>
 
   <section id="product-experts" class="product-view" data-product-requires-golden="1" aria-labelledby="experts-heading">
@@ -1694,6 +1715,9 @@ let PRODUCT_REVIEW_BATCH='';
 let WORKBENCH_ROWS=[];
 let WORKBENCH_SELECTED=null;
 let WORKBENCH_INSPECTOR_TAB='detail';
+let PRODUCT_TRANSITION_ID=0;
+let WORKBENCH_INSPECTOR_RETURN_FOCUS=null;
+const WORKBENCH_LAYOUT_STORAGE_KEY='koipa_admin_workbench_layout_v1';
 // 후보 문서·검수자 배정 API는 full-train 이미지에만 있다. healthz 확인 전에는 이 기능을
 // 열지 않아 고객사 이미지에서 404를 "오류"로 보여 주지 않는다.
 let PRODUCT_PROFILE_READY=false;
@@ -1726,6 +1750,59 @@ function productSetLegacyVisibility(view){
   });
   show(`.grid > [data-product-view="${view}"]`);
 }
+function productMotionReduced(){
+  return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+function setProductPanelHidden(panel, hidden){
+  panel.hidden=hidden;
+  panel.setAttribute('aria-hidden',String(hidden));
+  if(hidden) panel.setAttribute('inert',''); else panel.removeAttribute('inert');
+}
+function focusProductHeading(panel){
+  const heading=panel&&panel.querySelector('.console-view-title,h2');
+  if(!heading)return;
+  heading.setAttribute('tabindex','-1');
+  try{heading.focus({preventScroll:true});}catch(e){heading.focus();}
+}
+function activateProductPanel(next, fromLegacy){
+  const active=document.querySelector('.product-view.is-visible');
+  const transitionId=++PRODUCT_TRANSITION_ID;
+  document.querySelectorAll('.product-view').forEach(panel=>{
+    if(panel===next||panel===active)return;
+    panel.classList.remove('is-visible','is-entering','is-leaving');
+    setProductPanelHidden(panel,true);
+  });
+  if(active===next){
+    next.classList.add('is-visible');
+    next.classList.remove('is-leaving');
+    setProductPanelHidden(next,false);
+    return;
+  }
+  next.classList.remove('is-leaving');
+  next.classList.add('is-visible');
+  setProductPanelHidden(next,false);
+  if(!productMotionReduced()){
+    next.classList.add('is-entering');
+    window.setTimeout(()=>next.classList.remove('is-entering'),180);
+  }
+  if(active){
+    active.setAttribute('aria-hidden','true');
+    active.setAttribute('inert','');
+    const finish=()=>{
+      if(transitionId!==PRODUCT_TRANSITION_ID)return;
+      active.classList.remove('is-visible','is-entering','is-leaving');
+      setProductPanelHidden(active,true);
+    };
+    if(!productMotionReduced()&&typeof active.animate==='function'){
+      const animation=active.animate([{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-4px)'}],{duration:140,easing:'cubic-bezier(.2,.7,.2,1)'});
+      animation.finished.then(finish,finish);
+    }else finish();
+  }
+  if(!fromLegacy){
+    const schedule=window.requestAnimationFrame||((callback)=>window.setTimeout(callback,0));
+    schedule(()=>focusProductHeading(next));
+  }
+}
 function productShowView(view, fromLegacy){
   if(!PRODUCT_VIEWS.includes(view)) view='overview';
   // healthz가 오기 전에는 검수 기능의 포함 여부를 아직 모른다. 이때 저장한 검수 화면이나
@@ -1740,7 +1817,7 @@ function productShowView(view, fromLegacy){
     button.classList.toggle('active',active);
     button.setAttribute('aria-current',active?'page':'false');
   });
-  document.querySelectorAll('.product-view').forEach(panel=>panel.classList.toggle('is-visible',panel.id==='product-'+view));
+  activateProductPanel($('product-'+view),fromLegacy);
   // 숨겨진 구 탭의 active 상태와 저장 키만 맞춘다. 표시 제어를 showPane에 넘기면
   // Product View와 legacy pane 두 체계가 같은 카드를 번갈아 보이게 하므로 호출하지 않는다.
   const legacyPane=PRODUCT_VIEW_TO_LEGACY_PANE[view];
@@ -1801,7 +1878,8 @@ function applyProductReviewBatch(query){
 }
 function focusWorkbenchDecision(){
   productShowView('documents');
-  const inspector=$('wb-inspector'); if(inspector) inspector.scrollIntoView({behavior:'smooth',block:'nearest'});
+  if(workbenchInspectorUsesDrawer())toggleWorkbenchInspector(true);
+  else {const inspector=$('wb-inspector'); if(inspector) inspector.scrollIntoView({behavior:'smooth',block:'nearest'});}
 }
 function expertSetState(state, text){
   const host=$('expert-assignment-summary');if(!host)return;
@@ -1820,7 +1898,7 @@ function renderExpertAssignmentRows(reviewers){
     const assigned=Number(row.visible_doc_count||0), reviewed=Number(row.reviewed_doc_count||0), rate=Number(row.progress_percent||0);
     const who=document.createElement('div');who.className='expert-progress-account';who.setAttribute('role','cell');const name=document.createElement('strong');name.textContent=row.reviewer_id||'검수자 미상';const note=document.createElement('span');note.textContent='배정 '+assigned.toLocaleString()+'건 · 결정 '+reviewed.toLocaleString()+'건';who.append(name,note);
     const progress=document.createElement('div');progress.className='expert-progress-cell-rate';progress.setAttribute('role','cell');const rateText=document.createElement('div');rateText.className='expert-progress-rate';const rateLabel=document.createElement('span');rateLabel.textContent=rate.toFixed(1)+'%';const rateCount=document.createElement('span');rateCount.textContent=reviewed.toLocaleString()+' / '+assigned.toLocaleString();rateText.append(rateLabel,rateCount);const bar=document.createElement('div');bar.className='expert-progress-bar';const fill=document.createElement('i');fill.style.width=Math.max(0,Math.min(100,rate))+'%';bar.append(fill);progress.append(rateText,bar);
-    const stats=document.createElement('div');stats.className='expert-progress-stats expert-progress-cell-stats';stats.setAttribute('role','cell');[['판정',row.fixed_doc_count,''],['미처리',row.remaining_doc_count,'is-pending'],['보류',row.deferred_doc_count,'is-attention'],['제외',row.excluded_doc_count,''],['재검토',row.in_progress_doc_count,'is-attention']].forEach(([label,value,tone])=>{const stat=document.createElement('span');stat.className='expert-progress-stat '+tone;stat.textContent=label;const count=document.createElement('b');count.textContent=Number(value||0).toLocaleString();stat.append(count);stats.append(stat);});
+    const stats=document.createElement('div');stats.className='expert-progress-stats expert-progress-cell-stats';stats.setAttribute('role','cell');[['판정 완료',row.fixed_doc_count,''],['미처리',row.remaining_doc_count,'is-pending'],['보류',row.deferred_doc_count,'is-attention'],['제외·폐기',row.excluded_doc_count,''],['재검토',row.in_progress_doc_count,'is-attention'],['미시작',row.not_started_doc_count,'']].forEach(([label,value,tone])=>{const stat=document.createElement('span');stat.className='expert-progress-stat '+tone;stat.textContent=label;const count=document.createElement('b');count.textContent=Number(value||0).toLocaleString();stat.append(count);stats.append(stat);});
     const meta=document.createElement('div');meta.className='expert-progress-last';meta.setAttribute('role','cell');const action={approve:'승인',change:'등급 변경',defer:'보류',reject:'폐기',discard:'폐기',exclude:'검수 대상 제외',reopen:'재검토'}[row.last_action]||'';meta.textContent=row.last_decided_at?action+' · '+new Date(row.last_decided_at).toLocaleString('ko-KR'):'결정 기록 없음';
     item.append(who,progress,stats,meta);table.append(item);
   });
@@ -2125,18 +2203,119 @@ async function selectWorkbenchDocument(docId){
 }
 function showInspectorTab(tab){
   WORKBENCH_INSPECTOR_TAB=tab;
-  document.querySelectorAll('[data-inspector-tab]').forEach(button=>button.classList.toggle('active',button.dataset.inspectorTab===tab));
+  document.querySelectorAll('[data-inspector-tab]').forEach(button=>{
+    const active=button.dataset.inspectorTab===tab;
+    button.classList.toggle('active',active);
+    button.setAttribute('aria-selected',String(active));
+  });
   if(WORKBENCH_SELECTED)selectWorkbenchDocument(WORKBENCH_SELECTED);
 }
+function workbenchInspectorUsesDrawer(){
+  const query='(min-width: 761px) and (max-width: 1120px)';
+  if(window.matchMedia)return window.matchMedia(query).matches;
+  return window.innerWidth>=761&&window.innerWidth<=1120;
+}
+function inspectorFocusableElements(){
+  const inspector=$('wb-inspector');if(!inspector)return [];
+  return [...inspector.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')]
+    .filter(element=>!element.disabled&&!element.hidden);
+}
+function toggleWorkbenchInspector(open){
+  const board=$('document-workbench'), inspector=$('wb-inspector'), trigger=$('wb-inspector-open');
+  if(!board||!inspector)return;
+  if(!workbenchInspectorUsesDrawer()){
+    if(open){
+      inspector.scrollIntoView({behavior:productMotionReduced()?'auto':'smooth',block:'nearest'});
+      const tab=inspector.querySelector('[data-inspector-tab="detail"]');if(tab)tab.focus({preventScroll:true});
+    }
+    return;
+  }
+  const shouldOpen=!!open;
+  if(shouldOpen){
+    // 실제 클릭은 열기 버튼에서 오지만, 프로그램형 진입이나 브라우저 포커스 복구가
+    // 바깥 제목을 가리킬 수도 있다. 닫을 때는 항상 의미 있는 열기 버튼으로 돌아간다.
+    WORKBENCH_INSPECTOR_RETURN_FOCUS=document.activeElement===trigger?document.activeElement:trigger;
+    board.classList.add('inspector-open');document.body.classList.add('workbench-inspector-drawer-open');
+    inspector.setAttribute('role','dialog');inspector.setAttribute('aria-modal','true');inspector.setAttribute('aria-label','문서 결정 정보');
+    if(trigger)trigger.setAttribute('aria-expanded','true');
+    window.setTimeout(()=>{const focusables=inspectorFocusableElements();(focusables[0]||inspector).focus({preventScroll:true});},productMotionReduced()?0:180);
+    return;
+  }
+  board.classList.remove('inspector-open');document.body.classList.remove('workbench-inspector-drawer-open');
+  inspector.removeAttribute('role');inspector.removeAttribute('aria-modal');inspector.removeAttribute('aria-label');
+  if(trigger)trigger.setAttribute('aria-expanded','false');
+  const returnFocus=WORKBENCH_INSPECTOR_RETURN_FOCUS;WORKBENCH_INSPECTOR_RETURN_FOCUS=null;
+  if(returnFocus&&typeof returnFocus.focus==='function')returnFocus.focus({preventScroll:true});
+}
+function setupWorkbenchInspectorKeyboard(){
+  document.addEventListener('keydown',event=>{
+    const board=$('document-workbench'), inspector=$('wb-inspector');
+    if(!board||!inspector||!board.classList.contains('inspector-open'))return;
+    if(event.key==='Escape'){event.preventDefault();toggleWorkbenchInspector(false);return;}
+    if(event.key!=='Tab')return;
+    const focusables=inspectorFocusableElements();if(!focusables.length)return;
+    const first=focusables[0],last=focusables[focusables.length-1];
+    if(!inspector.contains(document.activeElement)){event.preventDefault();(event.shiftKey?last:first).focus();}
+    else if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+  });
+}
+function savedWorkbenchLayout(){
+  try{
+    const parsed=JSON.parse(localStorage.getItem(WORKBENCH_LAYOUT_STORAGE_KEY)||'{}');
+    return parsed&&typeof parsed==='object'?parsed:{};
+  }catch(e){return {};}
+}
+function persistWorkbenchLayout(){
+  const board=$('document-workbench');if(!board)return;
+  const left=Number.parseFloat(board.style.getPropertyValue('--wb-left'));
+  const right=Number.parseFloat(board.style.getPropertyValue('--wb-right'));
+  try{localStorage.setItem(WORKBENCH_LAYOUT_STORAGE_KEY,JSON.stringify({left:Number.isFinite(left)?left:null,right:Number.isFinite(right)?right:null}));}catch(e){}
+}
+function restoreWorkbenchLayout(){
+  const board=$('document-workbench');if(!board)return;
+  const saved=savedWorkbenchLayout();
+  if(Number.isFinite(saved.left)&&saved.left>=210)board.style.setProperty('--wb-left',saved.left+'px');
+  if(Number.isFinite(saved.right)&&saved.right>=248)board.style.setProperty('--wb-right',saved.right+'px');
+}
+function setWorkbenchPanelWidth(side, width){
+  const board=$('document-workbench');if(!board)return;
+  const rect=board.getBoundingClientRect();const minimum=side==='left'?210:248;
+  const maximum=rect.width?(side==='left'?rect.width*.44:rect.width*.38):640;
+  const value=Math.max(minimum,Math.min(maximum,Math.round(width)));
+  board.style.setProperty(side==='left'?'--wb-left':'--wb-right',value+'px');
+  const handle=board.querySelector(`[data-resize="${side}"]`);
+  if(handle){handle.setAttribute('aria-valuemax',String(Math.round(maximum)));handle.setAttribute('aria-valuenow',String(value));}
+  return value;
+}
 function setupWorkbenchResizers(){
+  restoreWorkbenchLayout();
   document.querySelectorAll('[data-resize]').forEach(handle=>{
+    const side=handle.dataset.resize,board=$('document-workbench');
+    if(side&&board){
+      const initial=Number.parseFloat(board.style.getPropertyValue(side==='left'?'--wb-left':'--wb-right'))||(side==='left'?210:248);
+      setWorkbenchPanelWidth(side,initial);
+    }
     handle.addEventListener('pointerdown',event=>{
       const board=$('document-workbench');if(!board)return;event.preventDefault();handle.setPointerCapture(event.pointerId);
       const rect=board.getBoundingClientRect(), side=handle.dataset.resize;
-      const move=e=>{const x=Math.max(0,Math.min(rect.width,e.clientX-rect.left));if(side==='left')board.style.setProperty('--wb-left',Math.max(210,Math.min(rect.width*.44,x))+'px');else board.style.setProperty('--wb-right',Math.max(248,Math.min(rect.width*.38,rect.width-x))+'px');};
-      const up=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);};handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up,{once:true});
+      const move=e=>{const x=Math.max(0,Math.min(rect.width,e.clientX-rect.left));setWorkbenchPanelWidth(side,side==='left'?x:rect.width-x);};
+      const up=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);persistWorkbenchLayout();};handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up,{once:true});
+    });
+    handle.addEventListener('keydown',event=>{
+      const side=handle.dataset.resize;const board=$('document-workbench');if(!side||!board)return;
+      if(event.key==='Home'){
+        event.preventDefault();board.style.removeProperty(side==='left'?'--wb-left':'--wb-right');persistWorkbenchLayout();return;
+      }
+      if(!['ArrowLeft','ArrowRight'].includes(event.key))return;
+      event.preventDefault();
+      const property=side==='left'?'--wb-left':'--wb-right';
+      const current=Number.parseFloat(board.style.getPropertyValue(property))||(side==='left'?board.getBoundingClientRect().width*.21:board.getBoundingClientRect().width*.24);
+      const delta=(event.key==='ArrowRight'?1:-1)*(event.shiftKey?32:16);
+      setWorkbenchPanelWidth(side,current+delta);persistWorkbenchLayout();
     });
   });
+  setupWorkbenchInspectorKeyboard();
 }
 function initProductShell(){
   window.__KOIPA_PRODUCT_SHELL=true;
