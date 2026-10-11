@@ -320,10 +320,6 @@ details.adv[open]{padding-bottom:12px;}
          background:#f0fdf4;border:1px solid #86efac;color:#14532d;}
 
 /* 쓰기 게이트 — 허용(기본)일 땐 조용히, 해제했을 때만 경고색으로 */
-.writegate{padding:9px 12px;border:1px solid var(--border-mid);background:var(--bg-mid);}
-.writegate.off{background:#fffbeb !important;border-color:#fcd34d !important;color:#b45309 !important;}
-.writegate.off #write-gate-msg{color:#b45309 !important;}
-
 /* 드래그&드롭 업로드 */
 .dropzone{border:2px dashed var(--border-strong);background:var(--bg-mid);cursor:pointer;
           padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:3px;
@@ -850,22 +846,6 @@ body *,body *::before,body *::after{border-radius:0 !important}
               <p class="hint">연결·권한 설정을 다시 읽습니다.</p>
             </div>
           </div>
-        </section>
-        <section class="settings-section" aria-labelledby="settings-access-title">
-          <header class="settings-section-head">
-            <span class="settings-section-no" aria-hidden="true">02</span>
-            <div><h3 id="settings-access-title">상태 변경 권한</h3><p>조회만 할 때는 해제하고, 실제 변경이 필요할 때에만 허용합니다.</p></div>
-          </header>
-          <!-- 기본 상태(허용)에서는 조용히 있고, 해제했을 때만 눈에 띈다 —
-               "눌렀는데 아무 일도 안 일어나는" 이유가 화면에 보여야 하는 쪽은 해제 상태다. -->
-          <div id="write-gate" class="writegate">
-            <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin:0;">
-              <input id="cfg-write-enable" type="checkbox" style="width:auto" checked onchange="syncWriteGate()" />
-              <b>쓰기 작업 허용</b>
-              <span id="write-gate-msg" style="font-size:11.5px;color:var(--text-dim);"></span>
-            </label>
-          </div>
-          <p class="settings-access-copy">이 설정은 이 브라우저 화면에서만 적용됩니다. 서버 권한은 로그인 정보와 서버 설정이 최종 결정합니다.</p>
         </section>
         <!-- [2026-10-03] /console/index.html의 「실시간 반영 시연」·업로드 실적재 안내가 이 버튼을
              가리키고 있었는데(created_by=demo-console → admin의 「데모 데이터 초기화」) 실제로는
@@ -1468,25 +1448,6 @@ const cfg = () => ({
   user: $('cfg-user').value.trim() || 'console',
 });
 const actor = () => { const c=cfg(); return {user_id:c.user, role:c.role}; };
-function writesEnabled(){ return $('cfg-write-enable') && $('cfg-write-enable').checked; }
-function guardWrite(action){
-  if(writesEnabled()) return true;
-  const msg = `Safe Mode: ${action} 작업은 차단됐습니다. 실행하려면 상단의 "쓰기 작업 허용"을 체크하세요.`;
-  log(msg, 'err');
-  alert(msg);
-  return false;
-}
-// [2026-09-29] 「1. CLASSIFY」 섹션과 함께 실수로 지웠다가 되살렸다 — 이 함수는 분류 카드 전용이
-// 아니라 전체 쓰기 잠금 표시(연결·인증 카드의 「쓰기 작업 허용」 체크박스, 공통)다. 근처(guardWrite)로
-// 옮겨 다시는 카드별 섹션과 함께 지워지지 않게 한다.
-function syncWriteGate(){
-  const on=($('cfg-write-enable')||{}).checked;
-  const box=$('write-gate'), msg=$('write-gate-msg');
-  if(box) box.classList.toggle('off', !on);
-  if(msg) msg.textContent = on
-    ? '해제하면 읽기 전용이 됩니다.'
-    : '읽기 전용 — 확정·재라벨·재학습·활성화 같은 상태 변경은 실행되지 않습니다.';
-}
 
 // XSS 방어 — 문서 본문 유래(근거 text/tag) 및 사용자 입력(title/doc_id)을 innerHTML에
 // 넣기 전 이스케이프. 실데이터 문서/제목에 HTML이 섞이면 운영 콘솔에서 실행될 수 있다.
@@ -2358,8 +2319,6 @@ function onTrainPresetChange(){
   const el=$('tr-preset-note'); if(el) el.textContent=p.note;
 }
 async function submitTrain(){
-  if(!guardWrite('재학습 제출')) return;
-  // Safe Mode 기본값을 '허용'으로 바꾸면서(오조작 방지를 체크박스 대신 확인창으로 옮김)
   // 재학습이 무확인 1클릭으로 나가지 않도록 여기서 한 번 확인받는다. 학습은 시작하면
   // 되돌리는 절차가 없고 GPU/CPU 를 길게 점유한다.
   const _tt=$('tr-type').value;
@@ -2406,9 +2365,8 @@ async function loadJobs(){
 
 /* ---- 4. MODEL RELOAD ---- */
 async function reloadModel(){
-  if(!guardWrite('모델 핫리로드')) return;
   // 서빙 모델 교체는 되돌리는 절차가 따로 없다(직전 버전을 다시 활성화해야 함).
-  // Safe Mode 해제 상태에서 1클릭으로 나가지 않도록 확인 단계를 둔다.
+  // 확인 없이 실행되지 않도록 확인 단계를 둔다.
   if(!confirm('서빙 중인 분류 모델을 디스크의 활성 버전으로 다시 읽어들입니다.\n\n이후 들어오는 분류 요청은 새로 로드된 모델로 응답합니다. 진행할까요?')) return;
   try{
     const d=await api('POST','/admin/model/reload');
@@ -2425,7 +2383,6 @@ async function reloadModel(){
 
 // [G1] 특정 ModelVersion 수동 활성화(배포) — deploy gate 적용, force로만 우회(감사 기록).
 async function activateModel(){
-  if(!guardWrite('모델 활성화')) return;
   const ver=$('act-ver').value.trim();
   if(!ver){ alert('활성화할 version_label을 입력하세요.'); return; }
   const force=$('act-force').checked;
@@ -2456,7 +2413,6 @@ async function activateModel(){
  * 복구가 불가능해진다. 대신 사유를 필수로 받아 감사에 남긴다(활성화의 force reason 과 같은 취지).
  * 서버가 활성 전환과 같은 advisory lock 으로 직렬화하므로 동시 activate/rollback 은 엇갈리지 않는다. */
 async function rollbackModel(){
-  if(!guardWrite('모델 롤백')) return;
   const reason=prompt('직전 활성본으로 되돌립니다.\n\n사유를 입력하세요 (감사에 기록됩니다):','운영 회귀 확인 — 직전 버전으로 복귀');
   if(reason===null) return;                       // 취소
   if(!String(reason).trim()){ alert('사유는 필수입니다.'); return; }
@@ -2563,9 +2519,8 @@ async function loadAuditLog(offset){
 
 /* ---- 데모 데이터 초기화 (시연 반복용) ---- */
 // 실적재 시연으로 쌓인 created_by=demo-console 문서·분류·RAG벡터만 스코프 물리삭제.
-// Safe Mode 가드 + 확인 팝업. 운영 데이터(다른 created_by)는 서버 스코프상 대상이 아님.
+// 운영 데이터(다른 created_by)는 서버 스코프상 대상이 아니다. 삭제는 확인 팝업을 거친다.
 async function purgeDemoData(){
-  if(!guardWrite('데모 데이터 초기화')) return;
   if(!confirm('「실시간 반영 시연」·실적재 업로드로 쌓인 데모 데이터(created_by=demo-console)만 지웁니다.\n\n운영 데이터는 스코프상 대상이 아니지만, 삭제된 데모 데이터는 되돌릴 수 없습니다. 진행할까요?')) return;
   try{
     const r=await api('POST','/admin/demo/purge');
@@ -2743,7 +2698,6 @@ async function loadGoldenBuilds(){
   }
 }
 async function registerGoldenBuild(){
-  if(!guardWrite('골든 문서 묶음 등록')) return;
   const path=($('gold-build-path').value||'').trim();
   if(!path){ goldenProgress('위 목록에서 문서 묶음을 하나 고르세요.'); return; }
   const btn=$('gold-reg');
@@ -2811,7 +2765,6 @@ let SYNTH = [];   // /synth/queue 응답 items
 
 async function synthGenerate(){
   if(!synthConsoleAvailable()){ const info=$('sy-info'); if(info) info.textContent=synthConsoleUnavailableMessage(); return; }
-  if(!guardWrite('합성 생성')) return;
   const domain=$('sy-domain').value;
   if(!domain){ $('sy-info').textContent='문서 주제를 선택하세요.'; return; }
   const btn=$('sy-gen'); btn.disabled=true; btn.textContent='요청 중…';
@@ -3038,7 +2991,6 @@ function renderSynthQueue(){
 }
 
 async function synthReview(i, decision){
-  if(!guardWrite('합성 검수')) return;
   const it=SYNTH[i]; if(!it) return;
   const chosen=$('sy-g-'+i) ? $('sy-g-'+i).value : (it.corrected_grade||it.target_grade);
   const body={decision, comment:'console synth review', actor:actor()};
@@ -3116,7 +3068,6 @@ function removeGradeRow(i){
 }
 
 async function saveGrades(){
-  if(!guardWrite('등급체계 변경')) return;
   const rows=readGradeEditor();
   // 클라이언트 선검증 — 서버 400 왕복 전에 명확히 알린다.
   const codes=rows.map(r=>r.code);
@@ -3208,7 +3159,6 @@ function noteKeywordReload(d, what){
 }
 
 async function createKeyword(){
-  if(!guardWrite('키워드 추가')) return;
   const kw=($('kw-n-keyword').value||'').trim();
   if(!kw){ alert('키워드를 입력하세요.'); return; }
   const body={
@@ -3228,7 +3178,6 @@ async function createKeyword(){
 }
 
 async function patchKeyword(i){
-  if(!guardWrite('키워드 수정')) return;
   const k=KEYWORDS[i]; if(!k) return;
   const body={
     keyword:($('kw-k-'+i).value||'').trim(),
@@ -3248,7 +3197,6 @@ async function patchKeyword(i){
 async function toggleKeyword(i){
   const k=KEYWORDS[i]; if(!k) return;
   const turningOff=k.is_active;
-  if(!guardWrite(turningOff?'키워드 비활성':'키워드 활성화')) return;
   if(turningOff && !confirm(`키워드 "${k.keyword}"(id=${k.keyword_id})를 비활성합니다.\n\n완전 삭제가 아니라 **비활성 처리**이며, 감사 이력은 보존됩니다. 룰엔진에서는 즉시 제외됩니다.`)) return;
   try{
     const d=await api('PATCH',`/admin/keywords/${k.keyword_id}`,{is_active:!k.is_active, actor:actor()});
@@ -3342,10 +3290,9 @@ async function initRegulationCard(){
 async function loadRegRuntimeToggle(){
   const box=$('reg-runtime-toggle'); if(!box) return;
   try{ const d=await api('GET','/regulations/runtime-toggle'); box.checked=!!d.enabled; }
-  catch(e){ /* 검수자 권한 등으로 못 읽으면 체크 상태를 안 바꾼다 — 쓰기 버튼도 guardWrite 가 막는다 */ }
+  catch(e){ /* 검수자 권한 등으로 못 읽으면 체크 상태를 바꾸지 않는다. 서버 권한은 요청마다 강제한다. */ }
 }
 async function toggleRegRuntime(on){
-  if(!guardWrite('규정 노출 스위치 변경')){ loadRegRuntimeToggle(); return; }
   try{
     await api('PUT','/regulations/runtime-toggle',{enabled:!!on});
     regClearRefCache();
@@ -3365,7 +3312,6 @@ async function loadRegLlmToggle(){
   }catch(e){ /* 검수자 권한 등으로 못 읽으면 체크 상태를 안 바꾼다 */ }
 }
 async function toggleRegLlm(on){
-  if(!guardWrite('규정 LLM 스위치 변경')){ loadRegLlmToggle(); return; }
   try{
     await api('PUT','/regulations/llm-select-toggle',{enabled:!!on});
     regClearRefCache();
@@ -3491,7 +3437,6 @@ function toggleRegClauseText(cid){
 }
 async function toggleRegClause(cid, on){
   const rid=REG_SEL_ID; if(!rid) return;
-  if(!guardWrite('조항 표시 수정')){ renderRegClauses(); return; }   // 체크 표시를 서버 값으로 되돌린다
   try{
     const d=await api('PATCH',`/regulations/${encodeURIComponent(rid)}/clauses/${encodeURIComponent(cid)}`,{display:!!on});
     if(rid!==REG_SEL_ID) return;
@@ -3512,7 +3457,6 @@ function regFilePicked(){
   if(f && !nm.value.trim()) nm.value=String(f.name||'').replace(/\.[^.]+$/,'');   // 규정명 초안 — 고치면 그대로 쓴다
 }
 async function uploadRegulation(){
-  if(!guardWrite('규정 올리기')) return;
   const fileEl=$('reg-file'), f=fileEl && fileEl.files && fileEl.files[0];
   const name=($('reg-name').value||'').trim(), ver=($('reg-ver').value||'').trim(), date=($('reg-date').value||'').trim();
   if(!f){ regNotice('warn','올릴 규정 파일을 고르십시오'); return; }
@@ -3545,7 +3489,6 @@ async function uploadRegulation(){
   }finally{ if(btn) btn.disabled=false; }
 }
 async function activateRegulation(){
-  if(!guardWrite('규정 활성화')) return;
   const r=REG_SEL; if(!r) return;
   if(!$('reg-scope-ok').checked){
     regNotice('warn','활성화하려면 「이 규정은 검수 대상 문서의 취급 기준입니다」를 확인하고 체크하십시오');
@@ -3563,7 +3506,6 @@ async function activateRegulation(){
   }catch(e){ regNotice('warn', `활성화하지 못했습니다: ${errKoText(e)}`); }
 }
 async function archiveRegulation(id){
-  if(!guardWrite('규정 보관')) return;
   const r=REGS.find(x=>x.reg_id===id); if(!r) return;
   if(!confirm(`"${r.name} ${r.version_label}" 규정을 보관합니다.\n\n검수 화면에 이 규정의 원문이 더 표시되지 않습니다. 보관한 규정은 다시 활성화할 수 있습니다.`)) return;
   try{
@@ -3575,7 +3517,6 @@ async function archiveRegulation(id){
   }catch(e){ regNotice('warn', `보관하지 못했습니다: ${errKoText(e)}`); }
 }
 async function deleteRegulation(id){
-  if(!guardWrite('규정 삭제')) return;
   const r=REGS.find(x=>x.reg_id===id); if(!r) return;
   if(!confirm(`"${r.name} ${r.version_label}" 규정을 삭제합니다.\n\n조항·문장과 올린 원본 파일이 함께 지워지며 되돌릴 수 없습니다.`)) return;
   try{
@@ -3883,7 +3824,6 @@ $('sy-grade') && $('sy-grade').addEventListener('change',()=>syncSynthDomains())
 initPane();          // 기존 카드 초기화 — V2 작업공간이 그 위에 같은 기능을 배치한다.
 initProductShell();  // 좌측 메뉴·운영 개요 초기 표시(후보 API는 healthz 확인 뒤에만 호출)
 onTrainPresetChange();   // 학습 규모 preset 설명 채우기(기본=정식 학습)
-syncWriteGate();
 syncActiveGrades();
 syncLlmProviders();  // 빈 셀렉트를 남기지 않는다 — checkHealth 가 곧 서버 목록으로 덮는다
 syncSynthDomains();

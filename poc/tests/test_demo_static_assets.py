@@ -14,7 +14,7 @@ def test_demo_pages_are_airgap_safe_static_assets():
         assert "devkey" not in text
 
 
-def test_demo_safe_mode_and_golden_builder_are_visible():
+def test_demo_console_uses_server_authorization_and_keeps_golden_builder():
     """[2026-08-24] 확인 대상을 AI 후보 생성 → **묶음 등록**으로 바꿨다.
 
     AI 후보 생성(`POST /golden/build` · startGoldenBuild)을 화면에서 뺐다 — 요건이 아니고
@@ -23,11 +23,12 @@ def test_demo_safe_mode_and_golden_builder_are_visible():
     화면에 남아 있어야 하는 것은 이 서버에서 실제로 쓰는 경로다.
     """
     admin = (STATIC / "admin.html").read_text(encoding="utf-8")
-    assert 'id="cfg-write-enable"' in admin
-    assert "Safe Mode" in admin
+    # 쓰기 권한은 브라우저 토글이 아닌 인증·RBAC가 서버에서 판정한다. 화면의 임시
+    # Safe Mode는 기본 허용 상태와 중복되고, 사용자가 권한을 얻은 것처럼 오해하게 한다.
+    assert 'id="cfg-write-enable"' not in admin
+    assert "function guardWrite" not in admin
     assert "POST /golden/jobs/register" in admin
     assert "function registerGoldenBuild" in admin
-    assert "guardWrite('골든 문서 묶음 등록')" in admin
     # 되살아나면 여기서 먼저 걸린다(콘솔 e2e golden.build.ai-generation-is-not-on-screen 과 같은 축).
     assert "function startGoldenBuild" not in admin
 

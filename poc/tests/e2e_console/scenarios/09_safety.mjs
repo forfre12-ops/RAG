@@ -1,121 +1,12 @@
-/* 9. 안전장치 — 쓰기 차단(Safe Mode) · 프로파일별 화면 구성 · 서버 설정 반영.
+/* 9. 안전장치 — 프로파일별 화면 구성 · 서버 설정 반영.
  *
- * "읽기 전용으로 두고 보여만 준다"가 실제로 지켜지는지, 그리고 회원사 서버에서 지재원
- * 전용 기능이 그대로 보이지 않는지를 본다. 둘 다 화면에만 있는 규칙이라 서버 시험으로는
- * 확인되지 않는다.
+ * 쓰기 권한은 UI 토글이 아니라 서버의 인증·RBAC가 강제한다. 여기서는 화면 구성과
+ * 서버 설정 반영처럼 브라우저에서만 확인할 수 있는 규칙을 검증한다.
  */
 
 import { openPage, goToPane } from '../lib/page.mjs';
-import { assertNoScriptErrors } from '../lib/expect.mjs';
-
-/* 쓰기 동작 전수 — 이름 · 누를 것 · 사전 준비 · 나가면 안 되는 요청
- * [2026-09-29] '확정'·'재라벨'을 뺐다 — 그 UI(검수 큐 카드)를 콘솔에서 뺐다(실고객 문서
- * 검수·확정은 이제 KL 포털의 몫). POST /confirm·/relabel 은 더 이상 이 콘솔에서 누를 수 없다. */
-const WRITES = [
-  { name: '재학습 제출', pane: 'train', endpoint: 'POST /train', press: (p) => p.q('button[onclick="submitTrain()"]') },
-  { name: '모델 핫리로드', pane: 'train', endpoint: 'POST /admin/model/reload', press: (p) => p.q('button[onclick="reloadModel()"]') },
-  {
-    name: '모델 활성화', pane: 'train', endpoint: 'POST /admin/model/activate',
-    async setup(page) { page.set('act-ver', 'v-cccccccc'); },
-    press: (p) => p.q('button[onclick="activateModel()"]'),
-  },
-  { name: '모델 롤백', pane: 'train', endpoint: 'POST /admin/model/rollback', press: (p) => p.q('button[onclick="rollbackModel()"]') },
-  { name: '합성 생성', pane: 'synthesis', endpoint: 'POST /synth/generate', press: (p) => p.$('sy-gen') },
-  {
-    name: '등급체계 저장', pane: 'config', endpoint: 'PUT /schema/grades',
-    async setup(page) {
-      page.click(page.q('button[onclick="loadGradeEditor()"]'));
-      await page.settle();
-    },
-    press: (p) => p.$('grade-save'),
-  },
-  {
-    name: '키워드 추가', pane: 'config', endpoint: 'POST /admin/keywords',
-    async setup(page) { page.set('kw-n-keyword', '테스트'); },
-    press: (p) => p.q('button[onclick="createKeyword()"]'),
-  },
-  {
-    name: '검증문서 등록', pane: 'review', endpoint: 'POST /golden/jobs/register',
-    async setup(page) { page.set('gold-build-path', 'datasets/golden_review/ff5a822c/candidates.jsonl'); },
-    press: (p) => p.$('gold-reg'),
-  },
-  /* 사내 규정(참고 표시, 2026-09-25) — 카드의 쓰기 다섯 가지. 미리보기(POST)는 상태를 바꾸지 않아 여기 없다. */
-  {
-    name: '규정 올리기', pane: 'config', endpoint: 'POST /regulations',
-    async setup(page) {
-      page.attachFile('reg-file', { name: 'guide.md', type: 'text/markdown', size: 64 });
-      page.set('reg-name', '안전 시험'); page.set('reg-ver', 'v0');
-    },
-    press: (p) => p.$('reg-upload'),
-  },
-  {
-    name: '규정 활성화', pane: 'config', endpoint: 'POST /regulations/',
-    async setup(page) {
-      page.click(page.q('button[onclick^="selectRegulation("]:not([onclick*="aaaaaaaa"])'));
-      await page.settle();
-      page.check('reg-scope-ok', true);
-    },
-    press: (p) => p.$('reg-activate'),
-  },
-  { name: '규정 보관', pane: 'config', endpoint: 'POST /regulations/', press: (p) => p.q('button[onclick^="archiveRegulation("]') },
-  { name: '규정 삭제', pane: 'config', endpoint: 'DELETE /regulations/', press: (p) => p.q('button[onclick^="deleteRegulation("]') },
-  {
-    name: '조항 표시 수정', pane: 'config', endpoint: 'PATCH /regulations/',
-    async setup(page) {
-      page.click(page.q('button[onclick^="selectRegulation("]'));
-      await page.settle();
-    },
-    press: (p) => p.q('#reg-clauses input[type="checkbox"]'),
-  },
-];
 
 export const scenarios = [
-  {
-    id: 'safety.safe-mode.blocks-every-write',
-    writes: true,
-    title: '쓰기 허용을 끄면 상태를 바꾸는 동작이 하나도 나가지 않는다',
-    why: '시연·감리 중 실수로 누르는 것을 막는 장치다 — 한 곳이라도 새면 장치가 아니다',
-    async run({ server, check }) {
-      const page = await openPage(server, '/console/admin.html');
-      await page.settle();
-      page.check('cfg-write-enable', false);
-      check.includes(page.text('write-gate-msg'), '읽기 전용', '읽기 전용이라고 화면이 말한다');
-
-      for (const w of WRITES) {
-        await goToPane(page, w.pane);
-        if (w.setup) await w.setup(page);
-        const before = server.calls.length;
-        const btn = w.press(page);
-        if (!btn) { check.ok(false, `${w.name}: 누를 버튼을 찾지 못했다`); continue; }
-        btn.click();
-        await page.settle();
-        const [method, path] = w.endpoint.split(' ');
-        const sent = server.calls.slice(before).some((c) => c.method === method && c.path.startsWith(path));
-        check.ok(!sent, `${w.name}: 차단됐다 (${w.endpoint} 미발생)`);
-      }
-      const alerts = page.dialogs.filter((d) => d.kind === 'alert' && d.message.includes('Safe Mode'));
-      check.gte(alerts.length, WRITES.length - 2, '차단될 때마다 이유를 알려준다');
-      assertNoScriptErrors(check, page);
-      return page;
-    },
-  },
-
-  {
-    id: 'safety.safe-mode.reads-still-work',
-    title: '쓰기를 막아도 조회는 그대로 된다',
-    async run({ server, check }) {
-      const page = await openPage(server, '/console/admin.html');
-      await page.settle();
-      page.check('cfg-write-enable', false);
-
-      await goToPane(page, 'audit');
-      page.click(page.q('button[onclick="loadAuditLog()"]'));
-      await page.settle();
-      check.ok(server.lastCall('GET', '/admin/audit-log'), '감사 로그 조회는 된다');
-      return page;
-    },
-  },
-
   {
     id: 'safety.profile.customer-hides-factory-cards',
     title: '고객사 프로파일에서는 모델 공장 전용 카드가 사라진다',

@@ -29,20 +29,17 @@ export const scenarios = [
       // ③ onTrainPresetChange — preset 설명
       check.ok(page.$('tr-preset'), 'onTrainPresetChange: 학습 preset 셀렉트가 있다');
 
-      // ④ syncWriteGate
-      check.ok(page.$('write-gate-msg') && page.text('write-gate-msg').length > 0, 'syncWriteGate: 안내문이 채워졌다');
-
-      // ⑤ syncActiveGrades — 등급 셀렉트 3곳
+      // ④ syncActiveGrades — 등급 셀렉트 3곳
       for (const id of ['sy-grade', 'kw-f-grade', 'kw-n-grade']) {
         if (page.$(id)) check.gte(page.$(id).options.length, 4, `syncActiveGrades: ${id} 가 등급으로 채워졌다`);
       }
 
-      // ⑥ checkHealth — **초기화 마지막 줄에 가까운 것**. 여기까지 왔으면 앞이 안 죽은 것이다.
+      // ⑤ checkHealth — **초기화 마지막 줄에 가까운 것**. 여기까지 왔으면 앞이 안 죽은 것이다.
       check.gte(server.countCalls('GET', '/healthz'), 1, 'checkHealth: /healthz 를 실제로 불렀다');
       check.includes(page.text('health-txt'), '정상', 'checkHealth: 헬스 표시가 정상으로 바뀌었다');
       check.eq(page.$('health')?.className, 'health-pill ok', 'checkHealth: 헬스 pill 이 ok');
 
-      // ⑦ applyServerConfig — **끝까지 돌았다**(2026-08-23 회귀 지점: 앞 함수 하나가 던지면
+      // ⑥ applyServerConfig — **끝까지 돌았다**(2026-08-23 회귀 지점: 앞 함수 하나가 던지면
       // 뒤 초기화가 통째로 멈춘다). 종전에는 검수 임계 표시로 이걸 확인했는데, 2026-08-24 에
       // 그 칸을 화면에서 뺐다. 마지막 호출인 applySynthAvailability 의 결과로 바꾼다 —
       // 잠그는 대상은 숫자가 아니라 "뒤 코드가 살아 있다" 는 사실이다.
