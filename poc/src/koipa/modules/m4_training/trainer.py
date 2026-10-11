@@ -259,6 +259,11 @@ DEFAULT_BASE_MODEL_REVISION = "363b171d71443b0874b0bf9cea053eb5b1650633"
 @dataclass
 class TrainSpec:
     base_model: str = DEFAULT_BASE_MODEL
+    # 증분 학습은 Hub의 최초 베이스가 아니라 현재 활성화된 분류기 checkpoint에서
+    # 이어서 시작한다. 경로는 worker 내부용이며 API/모델 리포트에는 노출하지 않는다.
+    initial_model_path: str | None = None
+    initial_model_version: str | None = None
+    training_mode: str = "full"
     train_path: str = field(default_factory=lambda: _dataset_split("train.jsonl"))
     val_path: str = field(default_factory=lambda: _dataset_split("val.jsonl"))
     test_path: str | None = field(default_factory=lambda: _dataset_split("test.jsonl"))
@@ -1072,17 +1077,22 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         print(f"  [pre-chunked] consuming {len(train_x)} weighted train chunk rows; "
               "val/test 문서단위 유지(누수차단)")
 
-    # [재현성] 핀을 실제 내려받기에 적용한다. 종전에는 spec.base_model_revision 이 기본 None
+    # [재현성] 최초 기준 모델은 핀을 실제 내려받기에 적용한다. 증분 경로는 이미
+    # 승인·활성화된 로컬 checkpoint를 그대로 읽어야 하므로 Hub revision을 섞지 않는다.
     # 이라 kwargs 가 비어, 검증부만 사후 기록하고 다운로드는 무핀이었다.
     _pinned_revision = _effective_base_revision(spec)
     revision_kwargs = {"revision": _pinned_revision} if _pinned_revision else {}
+    model_source = spec.initial_model_path or spec.base_model
+    model_source_kwargs = {} if spec.initial_model_path else revision_kwargs
     # [2026-10-10] HF_HUB_OFFLINE 만으로는 안 끊기는 배경 네트워크 호출이 있다(아래
     # safetensors 변환검사 스레드류) — local_files_only=True 로 명시해 완전 차단한다.
     # 로컬 e2e 실측: 이 플래그 없이 모델 로드까지는 되는데 그 직후 CPU 0%대로 멈춰 있었다
     # (py-spy 로 스택을 못 봐 확정은 못 했지만, 네트워크 egress 가 막힌 환경에서 fire-and-forget
     # 백그라운드 스레드가 응답 없는 소켓을 기다리는 쪽이 가장 유력).
     _offline = bool(os.environ.get("HF_HUB_OFFLINE") or os.environ.get("TRANSFORMERS_OFFLINE"))
-    tok = AutoTokenizer.from_pretrained(spec.base_model, local_files_only=_offline, **revision_kwargs)
+    tok = AutoTokenizer.from_pretrained(
+        model_source, local_files_only=_offline, **model_source_kwargs
+    )
 
     def tokenize(batch):
         return tok(batch["text"], truncation=True, max_length=spec.max_seq_len)
@@ -1149,12 +1159,12 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
     )
 
     model = AutoModelForSequenceClassification.from_pretrained(
-        spec.base_model,
+        model_source,
         num_labels=len(_LABEL_LIST),
         id2label=_ID2LABEL,
         label2id=_LABEL2ID,
         local_files_only=_offline,
-        **revision_kwargs,
+        **model_source_kwargs,
     )
     base_model_attestation = (
         _attest_base_model(model, tok, spec) if spec.proxy_candidate_mode else None
@@ -1189,6 +1199,8 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         "batch_size": spec.batch_size,
         "lr": spec.lr,
         "max_seq_len": spec.max_seq_len,
+        "training_mode": spec.training_mode,
+        "initial_model_version": spec.initial_model_version,
     }
 
     # class weight (불균형 보정) + FNR 비대칭 cost

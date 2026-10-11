@@ -11,10 +11,10 @@ from .common import Actor
 
 
 class TrainRequest(BaseModel):
-    # The admin console has one evidence-backed operating profile.  Do not
-    # accept names for training strategies that do not have a distinct worker
-    # implementation; recording a different trigger name would be misleading.
-    training_type: Literal["full"] = "full"
+    # 운영 콘솔의 정상 경로는 활성 분류기에 새로 확정된 검수 데이터를 반영하는 증분 학습이다.
+    # full은 초기 기준 모델 재구축/사고 복구용 내부 절차에만 남긴다. 서비스 계층이 외부
+    # 제출을 막으므로, 여기서는 이력/내부 호출을 위한 표현만 보존한다.
+    training_type: Literal["incremental", "full"] = "incremental"
     # Keep the serving/training base model explicit and immutable at this API
     # boundary.  The trainer pins the corresponding Hugging Face revision.
     base_model: Literal["kakaobank/kf-deberta-base"] = "kakaobank/kf-deberta-base"

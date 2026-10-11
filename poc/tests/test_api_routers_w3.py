@@ -101,12 +101,22 @@ class TestTrainingRouter:
             "ensure_training_dataset_ready",
             lambda: {"train": 400, "val": 80, "test": 80},
         )
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_incremental_training_ready",
+            lambda: {
+                "confirmed_correction_count": 50,
+                "minimum_confirmed_corrections": 50,
+                "initial_model_path": "artifacts/v-active",
+                "initial_model_version": "v-active",
+            },
+        )
         with TestClient(app) as cli:
             r = cli.post(
                 "/api/v1/train",
                 headers=HDR,
                 json={
-                    "training_type": "full",
+                    "training_type": "incremental",
                     "base_model": "kakaobank/kf-deberta-base",
                     "actor": ACTOR,
                 },
@@ -129,7 +139,7 @@ class TestTrainingRouter:
             r = cli.post(
                 "/api/v1/train",
                 headers=HDR,
-                json={"training_type": "full", "actor": ACTOR},
+                json={"training_type": "incremental", "actor": ACTOR},
             )
 
         assert r.status_code == 409, r.text
@@ -150,13 +160,28 @@ class TestTrainingRouter:
             assert r.status_code == 404
 
     @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
-    def test_train_submit_then_status_round_trip(self):
+    def test_train_submit_then_status_round_trip(self, monkeypatch):
         """제출 → 상태 폴링 → queued 응답."""
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_training_dataset_ready",
+            lambda: {"train": 400, "val": 80, "test": 80},
+        )
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_incremental_training_ready",
+            lambda: {
+                "confirmed_correction_count": 50,
+                "minimum_confirmed_corrections": 50,
+                "initial_model_path": "artifacts/v-active",
+                "initial_model_version": "v-active",
+            },
+        )
         with TestClient(app) as cli:
             r1 = cli.post(
                 "/api/v1/train",
                 headers=HDR,
-                json={"training_type": "full", "actor": ACTOR},
+                json={"training_type": "incremental", "actor": ACTOR},
             )
             train_job_id = r1.json()["train_job_id"]
             r2 = cli.get(f"/api/v1/train/jobs/{train_job_id}", headers=HDR)

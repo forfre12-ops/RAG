@@ -96,50 +96,19 @@ def test_freeze_training_candidate_binds_rows_and_manifest(tmp_path, monkeypatch
         SynthesisService.load_frozen_training_candidate(frozen["snapshot_path"])
 
 
-def test_training_submit_records_only_snapshot_identity(monkeypatch) -> None:
-    """DB/job metadata retains reproducible identifiers, never the server file path."""
-    from types import SimpleNamespace
-    from unittest.mock import MagicMock
-    from uuid import uuid4
-
+def test_incremental_training_submit_rejects_synthetic_documents() -> None:
+    """운영 증분 경로는 사람이 확정한 검수 데이터만 허용한다."""
     from koipa.schemas.common import Actor
     from koipa.schemas.training import TrainRequest
-    from koipa.services import training_service as training_module
-    from koipa.services.training_service import TrainingService
+    from koipa.services.training_service import TrainingInputRejected, TrainingService
 
-    candidate = SimpleNamespace(dataset_version="synth-a1b2c3d4", included=2, approved_total=3)
-    frozen = {
-        "ready": True,
-        "candidate": candidate,
-        "snapshot_path": "datasets/retrain/approved_synthetic_snapshots/synth-a1b2c3d4.jsonl",
-        "rows_sha256": "a" * 64,
-        "created_at": "2026-10-11T00:00:00+00:00",
-    }
-    monkeypatch.setattr(SynthesisService, "freeze_training_candidate", lambda *_args: frozen)
-    monkeypatch.setattr(training_module, "ensure_training_dataset_ready", lambda *_args: {"train": 1, "val": 1, "test": 1})
-    monkeypatch.setattr(training_module, "_celery_dispatch_available", lambda: False)
-    service = TrainingService()
-    service.jobs = MagicMock()
-    captured: dict = {}
-
-    def create_run(_req, *, hyperparameters):
-        captured["hyperparameters"] = hyperparameters
-        return uuid4()
-
-    monkeypatch.setattr(service, "_create_run", create_run)
-    service.submit(
-        TrainRequest(
-            training_type="full",
-            actor=Actor(user_id="admin", role="admin"),
-            include_approved_synthetic=True,
+    with pytest.raises(TrainingInputRejected, match="사람이 확정한 검수 데이터"):
+        TrainingService().submit(
+            TrainRequest(
+                actor=Actor(user_id="admin", role="admin"),
+                include_approved_synthetic=True,
+            )
         )
-    )
-
-    snapshot = captured["hyperparameters"]["approved_synthetic_snapshot"]
-    assert snapshot["dataset_version"] == "synth-a1b2c3d4"
-    assert snapshot["rows_sha256"] == "a" * 64
-    assert "snapshot_path" not in snapshot
-    assert service.jobs.create.call_args.kwargs["payload"]["approved_synthetic_snapshot"] == snapshot
 
 
 def test_training_candidate_endpoint_returns_current_snapshot(monkeypatch) -> None:

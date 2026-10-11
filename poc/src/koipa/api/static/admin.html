@@ -1097,26 +1097,24 @@ body *,body *::before,body *::after{border-radius:0 !important}
             <div><span>평가</span><b>최종 성능 확인에 사용</b></div>
           </div>
         </div>
-        <!-- 운영 학습은 검증된 한 가지 설정만 노출한다. 1에폭 시연 학습은 정식 후보처럼
-             보일 수 있어 운영 콘솔에서 제거했다. -->
+        <!-- 운영 화면은 새로 확정된 검수 데이터만 활성 모델에 반영한다. 전체 재구축은
+             초기 기준 모델/복구 절차에서만 수행하고 여기에는 노출하지 않는다. -->
         <div class="field">
           <label class="fld">학습 범위</label>
-          <input id="tr-preset" type="text" value="정식 학습 — 기본값 (5에폭 · seq512 · batch8)" readonly>
-          <p class="sec-note" id="tr-preset-note" style="margin-top:4px;">전체 학습셋 · 검증된 기본 설정</p>
+          <input id="tr-preset" type="text" value="사람이 확정한 새 검수 데이터 반영" readonly>
+          <p class="sec-note" id="tr-preset-note" style="margin-top:4px;">미반영 확정 검수 데이터가 50건 이상일 때만 시작합니다.</p>
         </div>
         <div class="row3">
           <div class="field">
             <label class="fld">학습 방식</label>
-            <input id="tr-type" type="text" value="정식 전체 학습" readonly>
+            <input id="tr-type" type="text" value="증분 학습" readonly>
           </div>
           <div class="field">
             <label class="fld">기본 모델</label>
             <input id="tr-base" type="text" value="한국어 분류 모델 (KakaoBank DeBERTa)" readonly>
           </div>
         </div>
-        <label class="fld" style="display:flex;align-items:center;gap:8px;margin:12px 0 0;cursor:pointer;">
-          <input id="tr-include-approved-synth" type="checkbox" style="width:auto;"> 승인 모의 문서 포함
-        </label>
+        <p class="sec-note" style="margin:12px 0 0;">현재 활성 모델에서 이어 학습하며, 전체 학습셋 대신 제한된 기준 표본과 이번 확정 검수 데이터만 사용합니다.</p>
         <div class="btn-row">
           <button class="btn" onclick="submitTrain()">학습 작업 제출</button>
           <button class="btn sec sm" onclick="loadJobs()">작업 목록 새로고침</button>
@@ -2577,52 +2575,20 @@ function applyServerConfig(d){
    참고). QUEUE·STAGING 은 regPreviewDocs()가 여전히 참조해 선언만 남겼다(항상 빈 배열). */
 
 /* ---- 3. TRAIN ---- */
-/* 학습 규모 preset — 자유 입력란을 열지 않는다. 임의 값이 들어가면 학습이 얼마나 걸릴지
- * 예측이 안 되고 되돌리는 절차도 없다. 두 조합만 고정한다.
- *
- * ⚠ 소요 시간을 라벨에 고정 숫자로 적지 않는다. CPU 의 SIMD 지원 여부에 따라 **한 자릿수 배**로
- * 갈리기 때문이다. 실측 2026-08-08:
- *     테스트서버  QEMU Virtual CPU · AVX 전무(torch capability=DEFAULT) · 4스레드
- *                 → 37초/스텝 · 정식 학습 약 13시간
- *     일반 PC     AMD Zen4 · AVX-512 · 8스레드
- *                 → 같은 작업이 약 6배 빠름(≈1시간/1,000행 → 정식 약 2시간)
- * 같은 코드·같은 데이터인데 하드웨어만으로 13시간 ↔ 2시간이 된다. 화면에 절대 시간을 박아 두면
- * 회원사 환경에서 그대로 틀린 숫자가 된다. 규모(정식 대비 배수)만 밝히고, 실제 예상 시간은
- * 진행률 배선(estimated_finish_at)이 첫 스텝 몇 개로 그 서버에서 직접 계산해 보여 준다. */
+/* 운영 콘솔은 증분 반영만 제출한다. 학습기의 내부 재현성 파라미터는 운영자가 조정하거나
+ * 화면에서 비교할 항목이 아니며, 초기 기준 모델 재구축은 별도 통제 절차로 분리한다. */
 function onTrainPresetChange(){
-  const el=$('tr-preset-note'); if(el) el.textContent='전체 학습셋 · 검증된 기본 설정';
+  const el=$('tr-preset-note'); if(el) el.textContent='미반영 확정 검수 데이터가 50건 이상일 때만 시작합니다.';
 }
 async function submitTrain(){
-  // 재학습이 무확인 1클릭으로 나가지 않도록 여기서 한 번 확인받는다. 학습은 시작하면
-  // 되돌리는 절차가 없고 GPU/CPU 를 길게 점유한다.
-  const _tt='정식 전체 학습';
-  const _includeSynth=Boolean($('tr-include-approved-synth')?.checked);
-  let _synthCandidate=null;
-  if(_includeSynth){
-    try{
-      _synthCandidate=await api('GET','/synth/training-candidate');
-      if(!_synthCandidate.ready){
-        alert('승인 모의 문서를 학습에 포함할 수 없습니다.\n'+((_synthCandidate.blockers||[]).join('\n')||'후보 상태를 확인하세요.'));
-        return;
-      }
-    }catch(e){
-      alert('학습 후보 확인 실패: '+errKoText(e));
-      return;
-    }
-  }
-  // 확인창에 절대 시간을 적지 않는다 — 서버 CPU(AVX 지원)에 따라 수 배로 갈려 어느 숫자를
-  // 적어도 다른 환경에서는 틀린다. 대신 "무엇을 눌렀는지"와 "시간은 진행률에서 확인"을 알린다.
-  if(!confirm(`재학습을 제출합니다 (${_tt}).\n\n`
-    + '학습 규모: 정식 학습(기본값 5에폭·seq512·batch8)\n'
-    + `승인 모의 문서: ${_includeSynth?(_synthCandidate.included+'건 스냅샷 포함'):'미포함'}\n`
-    + `예상 소요는 서버 CPU 에 따라 크게 다릅니다 — 시작 후 진행률의 예상 완료 시각을 확인하십시오.\n\n`
-    + '학습이 시작되면 중간에 되돌리는 절차가 없고, 완료까지 자원을 점유합니다.\n'
+  if(!confirm('증분 학습을 제출합니다.\n\n'
+    + '사람이 확정한 미반영 검수 데이터가 50건 이상일 때만 시작합니다.\n'
+    + '현재 활성 모델에서 이어 학습하며, 전체 학습셋은 다시 학습하지 않습니다.\n\n'
     + '산출 모델과 성능 평가는 학습 이력에 기록됩니다. 진행할까요?')) return;
   try{
-    const body={training_type:'full', base_model:'kakaobank/kf-deberta-base',
-      include_approved_synthetic:_includeSynth, actor:actor()};
+    const body={training_type:'incremental', base_model:'kakaobank/kf-deberta-base', actor:actor()};
     const d=await api('POST','/train',body);
-    log(`재학습 제출: job ${d.train_job_id} · status_url ${d.status_url}`,'ok'); markFlow(3);
+    log(`증분 학습 제출: job ${d.train_job_id} · status_url ${d.status_url}`,'ok'); markFlow(3);
     loadJobs();
   }catch(e){
     if(e.status===404) alert('재학습 라우터 비활성 (순수 추론 프로파일). 학습 노드(지재원 full-train 또는 고객사 onprem-local 증분 재학습)에서만 동작합니다.');
@@ -2648,7 +2614,9 @@ async function loadJobs(){
            값이라 여기선 절대 맞지 않았고, 성공한 학습 잡이 회색 pill 로 떴다. -->
       <td><span class="pill ${j.status==='completed'?'ok':(j.status==='failed'?'err':'')}">${j.status}</span>${
         j.error?`<div style="color:var(--red);font-size:11.5px;margin-top:4px;word-break:break-all">${esc(j.error)}</div>`:''}</td>
-      <td>${j.approved_synthetic_snapshot
+      <td>${j.trigger_type==='incremental'
+        ? '확정 검수 데이터 + 기준 표본'
+        : j.approved_synthetic_snapshot
         ? `모의 ${Number(j.approved_synthetic_snapshot.included||0).toLocaleString()}건<br><span class="mono">${esc(j.approved_synthetic_snapshot.dataset_version||'')}</span>`
         : '기본 학습셋'}</td>
       <td class="mono">${j.model_version||'-'}</td>

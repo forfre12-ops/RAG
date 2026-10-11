@@ -227,12 +227,22 @@ class TestS7ActiveLearningUrgent:
             "ensure_training_dataset_ready",
             lambda: {"train": 400, "val": 80, "test": 80},
         )
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_incremental_training_ready",
+            lambda: {
+                "confirmed_correction_count": 50,
+                "minimum_confirmed_corrections": 50,
+                "initial_model_path": "artifacts/v-active",
+                "initial_model_version": "v-active",
+            },
+        )
         with TestClient(app) as cli:
             r = cli.post(
                 "/api/v1/train",
                 headers=_hdr(),
                 json={
-                    "training_type": "full",
+                    "training_type": "incremental",
                     "actor": _actor(role="system"),
                 },
             )

@@ -64,9 +64,21 @@ class TrainingDatasetTooSmall(TrainingInputRejected):
     )
 
 
+class IncrementalTrainingNotReady(TrainingInputRejected):
+    """The confirmed correction batch cannot safely start an incremental run yet."""
+
+
 _REQUIRED_LABELS = ("TS", "S1", "S2", "S3")
 _MIN_ROWS_BY_SPLIT = {"train": 400, "val": 80, "test": 80}
 _MIN_ROWS_PER_LABEL_BY_SPLIT = {"train": 50, "val": 10, "test": 10}
+# trainer._dataset_split와 같은 run-directory 파일명 규약. API preflight만 옛
+# ``train.jsonl``을 고집하면 worker가 읽을 수 있는 materialized dataset을 두고도
+# 제출을 막거나, 반대로 API/worker가 서로 다른 파일을 검증하게 된다.
+_DATASET_SPLIT_ALIASES = {
+    "train": ("train_chunks.jsonl", "train_documents.jsonl"),
+    "val": ("validation_documents.jsonl",),
+    "test": ("calibration_documents.jsonl",),
+}
 
 
 def _dataset_split_paths(spec_kwargs: dict[str, Any] | None = None) -> dict[str, Path]:
@@ -78,21 +90,38 @@ def _dataset_split_paths(spec_kwargs: dict[str, Any] | None = None) -> dict[str,
     else:
         # 빈 설정도 아래 공통 오류 경로에서 사용자가 이해할 수 있게 처리한다.
         root = Path("__training_dataset_dir_not_configured__")
-    return {
-        split: Path(str(supplied.get(f"{split}_path") or root / f"{split}.jsonl"))
-        for split in ("train", "val", "test")
-    }
+    paths: dict[str, Path] = {}
+    for split in ("train", "val", "test"):
+        supplied_path = supplied.get(f"{split}_path")
+        if supplied_path:
+            paths[split] = Path(str(supplied_path))
+            continue
+        primary = root / f"{split}.jsonl"
+        if primary.is_file():
+            paths[split] = primary
+            continue
+        paths[split] = next(
+            (root / name for name in _DATASET_SPLIT_ALIASES[split] if (root / name).is_file()),
+            primary,
+        )
+    return paths
 
 
-def ensure_training_dataset_ready(spec_kwargs: dict[str, Any] | None = None) -> dict[str, int]:
+def ensure_training_dataset_ready(
+    spec_kwargs: dict[str, Any] | None = None,
+    *,
+    require_full_train_distribution: bool = True,
+) -> dict[str, int]:
     """학습 큐 등록 전 데이터셋의 형식·최소량·등급 균형을 보장한다.
 
     API 컨테이너가 통과해도 워커 마운트가 달라질 수 있으므로 workers.tasks에서도
     같은 함수를 다시 호출한다. 실패하면 TrainingRun을 만들거나 무거운 모델 import를
     하기 전에 막는다.
 
-    이 값은 "학습 후보를 만들 최소선"일 뿐, 배포 승인 기준은 아니다. 학습(train)은
-    400건 및 등급별 50건, 검증·평가(val/test)는 각각 80건 및 등급별 10건을 요구한다.
+    이 값은 "학습 후보를 만들 최소선"일 뿐, 배포 승인 기준은 아니다. 기준 모델의
+    train은 400건 및 등급별 50건, 검증·평가(val/test)는 각각 80건 및 등급별 10건을
+    요구한다. 증분 배치 자체는 별도 50건 게이트와 제한된 replay로 구성되므로,
+    ``require_full_train_distribution=False``일 때는 비어 있지 않은지만 확인한다.
     """
     counts: dict[str, int] = {}
     label_counts: dict[str, dict[str, int]] = {}
@@ -131,6 +160,10 @@ def ensure_training_dataset_ready(spec_kwargs: dict[str, Any] | None = None) -> 
 
     shortages: list[str] = []
     for split in ("train", "val", "test"):
+        if split == "train" and not require_full_train_distribution:
+            if counts[split] < 1:
+                shortages.append("train total=0<1")
+            continue
         minimum = _MIN_ROWS_BY_SPLIT[split]
         if counts[split] < minimum:
             shortages.append(f"{split} total={counts[split]}<{minimum}")
@@ -144,6 +177,65 @@ def ensure_training_dataset_ready(spec_kwargs: dict[str, Any] | None = None) -> 
         logger.warning("training submission blocked: insufficient dataset: %s", detail)
         raise TrainingDatasetTooSmall(detail)
     return counts
+
+
+def resolve_active_incremental_model() -> tuple[str, str]:
+    """Return the active classifier checkpoint for a true incremental run.
+
+    The database contains an internal artifact location; it is deliberately
+    returned to the worker only and never copied into an API response or run
+    history.  The worker checks its own volume topology before loading it.
+    """
+    try:
+        with session_scope() as db:
+            active = TrainingRepo(db).get_active()
+            if active is None:
+                raise IncrementalTrainingNotReady(
+                    "증분 학습을 시작할 활성 분류 모델이 없습니다. 초기 기준 모델을 먼저 승인·활성화하세요."
+                )
+            model_uri = str(getattr(active, "model_uri", "") or "").strip()
+            version_label = str(getattr(active, "version_label", "") or "").strip()
+            if not model_uri or not version_label:
+                raise IncrementalTrainingNotReady(
+                    "활성 분류 모델의 학습 산출물을 확인할 수 없습니다. 초기 기준 모델을 다시 배포하세요."
+                )
+            return model_uri, version_label
+    except IncrementalTrainingNotReady:
+        raise
+    except SQLAlchemyError as exc:
+        logger.warning("incremental model lookup failed: %s", exc)
+        raise IncrementalTrainingNotReady(
+            "증분 학습에 사용할 활성 분류 모델을 확인할 수 없습니다. 관리자에게 문의하세요."
+        ) from exc
+
+
+def ensure_incremental_training_ready() -> dict[str, Any]:
+    """Enforce the operator-facing incremental-training admission gate.
+
+    A raw correction count is an early gate.  The worker repeats the gate after
+    reconstructing text and removing evaluation-set overlaps, before it can
+    consume any correction.  This prevents a superficially large but unusable
+    batch from being marked as learned.
+    """
+    from koipa.modules.m6_evaluation.active_learning import (  # noqa: PLC0415
+        DEFAULT_RECOMMENDED,
+        evaluate_retraining_need,
+    )
+
+    status = evaluate_retraining_need(recommended_threshold=DEFAULT_RECOMMENDED)
+    if status.unconsumed_total < DEFAULT_RECOMMENDED:
+        raise IncrementalTrainingNotReady(
+            "증분 학습은 사람이 확정한 미반영 검수 데이터가 "
+            f"{DEFAULT_RECOMMENDED}건 이상일 때만 시작할 수 있습니다 "
+            f"(현재 {status.unconsumed_total}건)."
+        )
+    initial_model_path, initial_model_version = resolve_active_incremental_model()
+    return {
+        "confirmed_correction_count": status.unconsumed_total,
+        "minimum_confirmed_corrections": DEFAULT_RECOMMENDED,
+        "initial_model_path": initial_model_path,
+        "initial_model_version": initial_model_version,
+    }
 
 
 def _advisory_xact_lock(db, _key=None) -> None:
@@ -744,21 +836,39 @@ class TrainingService:
             "training submit enter: type=%s base_model=%s actor=%s",
             req.training_type, req.base_model, req.actor.user_id,
         )
-        # The operating console has one reproducible profile: 5 epochs,
-        # seq512, batch8 (TrainSpec defaults).  A one-epoch demo or an
-        # arbitrary API override must not produce a record that looks like a
-        # formal training candidate.
+        # 운영 화면은 사람이 확정한 새 검수 데이터를 활성 분류기에 반영하는 증분
+        # 학습만 연다. 전체 재구축은 초기 기준 모델/사고 복구용 내부 절차다.
+        if req.training_type != "incremental":
+            raise TrainingInputRejected(
+                "정식 전체 학습은 초기 기준 모델 재구축 절차에서만 수행합니다. 운영 화면에서는 증분 학습만 제출할 수 있습니다."
+            )
+        # 내부 설정값은 재현성·감사 목적의 TrainSpec에 고정하고, 운영자가 임의 값으로
+        # 후보를 만들어 비교 불가능하게 하는 API 입력은 받지 않는다.
         if req.hyperparams:
             raise TrainingInputRejected(
-                "운영 학습은 검증된 기본 설정(5에폭·seq512·batch8)으로만 제출할 수 있습니다."
+                "운영 증분 학습의 실행 설정은 검증된 기본값으로 고정되어 있습니다."
+            )
+        if req.include_approved_synthetic:
+            raise TrainingInputRejected(
+                "운영 증분 학습에는 사람이 확정한 검수 데이터만 반영할 수 있습니다."
             )
         dataset_counts = ensure_training_dataset_ready()
-        run_hyperparameters: dict[str, Any] = {}
+        incremental = ensure_incremental_training_ready()
+        # DB 작업 이력에는 artifact filesystem 경로를 저장하지 않는다. 버전/건수만
+        # 남기고, checkpoint 경로는 Celery worker payload에서만 사용한다.
+        run_hyperparameters: dict[str, Any] = {
+            "training_mode": "incremental",
+            "confirmed_correction_count": incremental["confirmed_correction_count"],
+            "minimum_confirmed_corrections": incremental["minimum_confirmed_corrections"],
+            "initial_model_version": incremental["initial_model_version"],
+        }
         worker_spec_kwargs = dict(run_hyperparameters)
         # This is deliberately passed to the worker, not merely recorded in
         # JobStore, so the displayed model and the model actually trained stay
         # identical.
         worker_spec_kwargs["base_model"] = req.base_model
+        worker_spec_kwargs["initial_model_path"] = incremental["initial_model_path"]
+        worker_spec_kwargs["initial_model_version"] = incremental["initial_model_version"]
         synthetic_snapshot: dict | None = None
         if req.include_approved_synthetic:
             # 승인 큐는 작업 대기 중에도 바뀔 수 있다. 제출 시점의 검증 통과 행을
