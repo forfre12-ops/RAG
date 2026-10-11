@@ -60,8 +60,11 @@ def test_prebuilt_switcher_never_builds_on_the_target_host() -> None:
 
 def test_release_builder_is_exact_sha_and_component_scoped() -> None:
     script = _read("scripts/build_release_images.sh")
-    assert "git diff --quiet" in script
+    # Windows Git-Bash runs can inject the Git executable explicitly, but both
+    # staged and unstaged source changes must still block a release build.
+    assert "diff --quiet" in script
     assert "--services" in script
     assert "docker save -o" in script
+    assert "out.parent / archive" in script
     assert "docker push" in script
     assert "git push" not in script

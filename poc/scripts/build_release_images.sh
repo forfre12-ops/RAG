@@ -141,7 +141,7 @@ for row in filter(None, os.environ["RELEASE_ENTRIES"].splitlines()):
     service, image, image_id, archive = row.split("\t")
     item = {"service": service, "image": image, "image_id": image_id}
     if archive:
-        path = out / archive
+        path = out.parent / archive
         item["archive"] = archive
         item["archive_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
     images.append(item)
