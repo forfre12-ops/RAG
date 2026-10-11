@@ -57,18 +57,32 @@ def row_domain(row: dict) -> str:
         return str(raw)
 
 
-def load_training_rows(root: Path | str) -> list[dict]:
-    """학습셋 디렉터리의 train/val/test.jsonl 을 읽는다. 없는 split 은 건너뛴다."""
+def load_training_splits(root: Path | str) -> dict[str, list[dict]]:
+    """학습·검증·평가 split을 분리해 읽는다.
+
+    화면의 ``학습 문서`` 숫자는 학습(train)만이 아니라 현재 설정된 데이터셋의
+    train/val/test 전체 합계다. 이 근거를 같이 내보내야 2,554 같은 숫자가 무엇인지
+    운영자가 화면만 보고 알 수 있다.
+    """
     base = Path(root)
-    rows: list[dict] = []
+    splits: dict[str, list[dict]] = {}
     for name in _SPLITS:
         path = base / f"{name}.jsonl"
         if not path.exists():
+            splits[name] = []
             continue
+        rows: list[dict] = []
         for line in path.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 rows.append(json.loads(line))
-    return rows
+        splits[name] = rows
+    return splits
+
+
+def load_training_rows(root: Path | str) -> list[dict]:
+    """학습셋 디렉터리의 train/val/test.jsonl 을 읽는다. 없는 split 은 건너뛴다."""
+    splits = load_training_splits(root)
+    return [row for name in _SPLITS for row in splits[name]]
 
 
 def analyse(
@@ -81,10 +95,12 @@ def analyse(
     """
     grid: collections.Counter = collections.Counter()
     real: collections.Counter = collections.Counter()
+    source_counts: collections.Counter = collections.Counter()
     for row in rows:
         label = row.get("label")
         if label not in GRADES:
             continue
+        source_counts["synthetic" if (row.get("source") or "") == "synthetic" else "real"] += 1
         cell = (label, row_domain(row))
         grid[cell] += 1
         if (row.get("source") or "") != "synthetic":
@@ -117,6 +133,10 @@ def analyse(
         # 칸의 real 수를 알 수 없어 화면이 전체 수를 합성 수처럼 오해할 수 있었다.
         "real_grid": {f"{g}|{d}": real[(g, d)] for g in GRADES for d in domains},
         "real_share": round(sum(real.values()) / total, 3) if total else 0.0,
+        "source_counts": {
+            "real": int(source_counts["real"]),
+            "synthetic": int(source_counts["synthetic"]),
+        },
     }
 
 
@@ -134,7 +154,8 @@ def coverage_report(
     if not root:
         return {"available": False, "reason": "training_dataset_dir 이 설정되지 않았다"}
     try:
-        rows = load_training_rows(root)
+        splits = load_training_splits(root)
+        rows = [row for name in _SPLITS for row in splits[name]]
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         logger.warning("커버리지 격자: 학습셋을 읽지 못했다 (%s)", exc)
         return {"available": False, "reason": f"학습셋을 읽지 못했다: {exc}",
@@ -144,6 +165,7 @@ def coverage_report(
     out = analyse(rows, min_per_cell=min_per_cell)
     out["available"] = True
     out["dataset_dir"] = str(root)
+    out["split_counts"] = {name: len(splits[name]) for name in _SPLITS}
     # 화면이 그대로 띄울 경고. 판단은 사람이 한다는 것을 서버가 말해 준다.
     out["caveat"] = CAVEAT
     return out
@@ -191,6 +213,7 @@ __all__: Sequence[str] = (
     "GRADES",
     "DEFAULT_MIN_PER_CELL",
     "row_domain",
+    "load_training_splits",
     "load_training_rows",
     "analyse",
     "coverage_report",

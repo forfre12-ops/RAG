@@ -118,8 +118,12 @@ def test_console_shows_operating_state_but_keeps_connection_controls_out_of_sett
         '시연 데이터 정리',
         'data-pane="settings" data-product-view="settings"',
         'productSetLegacyVisibility(PRODUCT_VIEW)',
-        'id="training-coverage"',
-        '데이터 담당자용',
+        'class="coverage-panel"',
+        'class="coverage-summary"',
+        '현재 학습 데이터',
+        '학습·검증·평가 파일을 모두 합산한 값',
+        'id="sy-playbook-dialog"',
+        '생성 규칙 관리',
     ):
         assert marker in console
     assert "학습셋 분포·검토 후보" not in console

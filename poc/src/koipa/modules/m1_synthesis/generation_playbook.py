@@ -81,6 +81,21 @@ AVOID_PHRASES: tuple[str, ...] = (
 )
 
 
+def _effective_playbook_parts() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """기본 안전 규칙에 관리자 추가 규칙을 합친다.
+
+    추가 규칙은 콘솔에서 관리하되 기본 규칙을 덮어쓰지 않는다. 이렇게 해야 조직별 문서
+    관행은 반영하면서도 등급 자기표기·개인정보 같은 공통 안전 기준이 사라지지 않는다.
+    """
+    try:
+        from koipa.services.synth_playbook_service import effective_parts  # noqa: PLC0415
+
+        rules, avoid_phrases, _meta = effective_parts()
+        return rules, avoid_phrases
+    except Exception:  # noqa: BLE001 - 규칙 저장소 문제로 생성 전체를 멈추지 않는다.
+        return GENERATION_RULES, AVOID_PHRASES
+
+
 def playbook_text() -> str:
     """생성 프롬프트 [구조·완성도 요구] 칸에 덧붙일 지침 블록.
 
@@ -89,12 +104,11 @@ def playbook_text() -> str:
     lines = [
         "[작성 지침 — 앞선 생성 시행에서 얻은 규칙. 아래를 반드시 지킨다]",
     ]
-    lines.extend(
-        f"{i}. {rule}" for i, rule in enumerate(GENERATION_RULES, start=1)
-    )
-    avoid = ", ".join(f"'{w}'" for w in AVOID_PHRASES)
+    rules, avoid_phrases = _effective_playbook_parts()
+    lines.extend(f"{i}. {rule}" for i, rule in enumerate(rules, start=1))
+    avoid = ", ".join(f"'{w}'" for w in avoid_phrases)
     lines.append(
-        f"{len(GENERATION_RULES) + 1}. 아래 표현은 이전 문서에서 너무 반복돼 쓰지 않는다: "
+        f"{len(rules) + 1}. 아래 표현은 이전 문서에서 너무 반복돼 쓰지 않는다: "
         f"{avoid}."
     )
     return "\n".join(lines)

@@ -43,6 +43,10 @@ LLM_PROVIDER_PATTERN = r'^(' + '|'.join(sorted(_LLM_PROVIDERS)) + r')$'
 class SynthGenerateRequest(BaseModel):
     target_grade: Grade
     domain: str = Field(default="mixed", pattern=SYNTH_DOMAIN_PATTERN)
+    # 콘솔은 외부 산업 목록을 문서 주제로 강요하지 않는다. 이 두 값은 조직의 실제
+    # 업무 맥락과 문서 유형을 프롬프트에 전달하며, 원문 문서는 받지 않는다.
+    scenario_context: str = Field(default="", max_length=1200)
+    document_type_hint: str = Field(default="", max_length=300)
     count: int = Field(ge=1, le=500)
     llm_provider: str = Field(default="anthropic", pattern=LLM_PROVIDER_PATTERN)
     actor: Actor
@@ -59,10 +63,8 @@ class SynthGenerateResponse(BaseModel):
     synth_job_id: UUID
     expected_count: int
     estimated_cost_usd: float
-    # [2026-09-05] 발사 여부를 응답에 담는다. 종전에는 브로커가 없거나 발사에 실패해도
-    # 202 만 돌려줘 **호출자가 "등록만 되고 생성은 안 됨"을 알 수 없었다**(로그에만 남았다).
-    #   dispatched=True   워커로 발사됨 — 생성이 진행된다
-    #   dispatched=False  등록만 됨 — 브로커 미가용이거나 발사 실패. 생성은 일어나지 않는다
+    # 이 응답은 실제 워커 발사가 성공한 경우에만 202으로 반환된다. 준비·발사 실패는
+    # 503이며 검토 후보를 만들지 않는다. false 는 저장된 구 응답 호환을 위한 기본값이다.
     dispatched: bool = False
     dispatch_note: str | None = None
 
@@ -190,9 +192,10 @@ class SynthProvidersStatusResponse(BaseModel):
 
 
 class SynthPlaybookResponse(BaseModel):
-    """[2026-09-28] 지금 생성에 기본 적용되는 규칙 — 관리자가 화면에서 확인한다.
+    """지금 생성에 적용되는 규칙과 조직별 추가 규칙.
 
-    m1_synthesis.generation_playbook 이 정본이고 이 응답은 그것을 읽기 전용으로 노출한다.
+    기본 안전 규칙은 코드 정본으로 유지하고, 관리자는 custom_*을 통해 조직의 문서
+    관행과 반복 금지 표현을 저장한다.
     """
 
     enabled: bool
@@ -200,15 +203,32 @@ class SynthPlaybookResponse(BaseModel):
     rules: list[str]
     avoid_phrases: list[str]
     text: str
+    # 기본 안전 규칙은 읽기 전용, custom_*은 관리자 팝업에서 추가·수정한다.
+    baseline_rules: list[str] = Field(default_factory=list)
+    baseline_avoid_phrases: list[str] = Field(default_factory=list)
+    custom_rules: list[str] = Field(default_factory=list)
+    custom_avoid_phrases: list[str] = Field(default_factory=list)
+    updated_at: Optional[str] = None
+    updated_by: Optional[str] = None
+
+
+class SynthPlaybookUpdateRequest(BaseModel):
+    """조직별 추가 생성 규칙 저장 요청.
+
+    공통 안전 규칙은 삭제할 수 없다. 이 요청은 그 위에 더할 조직별 작성 규칙과 반복
+    금지 표현만 교체한다.
+    """
+
+    custom_rules: list[str] = Field(default_factory=list, max_length=50)
+    custom_avoid_phrases: list[str] = Field(default_factory=list, max_length=100)
+    actor: Actor
 
 
 class SynthCoverageResponse(BaseModel):
-    """합성으로 채울 자리 — 등급 × 도메인 격자.
+    """현재 학습 데이터셋의 구성과 개발용 균형 진단.
 
-    화면이 이 값으로 표를 그리고, 칸을 누르면 생성 폼(등급·도메인)이 채워진다. 종전에는
-    사람이 터미널에서 표를 읽고 조합을 외운 뒤 폼에 손으로 다시 넣어야 했다.
-
-    ⚠ 이 응답은 **후보**다. 판단은 사람이 한다 — caveat 를 화면에 그대로 띄운다.
+    운영 화면은 분할별 합계와 출처를 설명하는 데 사용한다. 등급×외부 산업 격자는
+    보조 진단일 뿐, 조직의 생성 주제를 정하거나 생성 폼을 채우는 값이 아니다.
     """
 
     # 학습셋을 못 읽으면 available=False + reason. 격자는 참고 정보라, 이것 때문에
@@ -218,6 +238,10 @@ class SynthCoverageResponse(BaseModel):
     dataset_dir: Optional[str] = None
 
     documents: int = 0
+    # 학습 문서 수는 train/val/test 전체 합계다. UI가 숫자의 출처를 설명할 수 있게
+    # split별 건수와 실문서/합성 구성을 함께 준다.
+    split_counts: dict[str, int] = Field(default_factory=dict)
+    source_counts: dict[str, int] = Field(default_factory=dict)
     grades: dict[str, int] = Field(default_factory=dict)
     domains: list[str] = Field(default_factory=list)
     cells_total: int = 0

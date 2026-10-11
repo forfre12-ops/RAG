@@ -1,7 +1,7 @@
 """Synthesis service — 합성 생성 큐 + 검수 워크플로우.
 
-PoC: /synth/generate는 작업 등록만 (실 생성은 Celery synthesize_batch 또는 dryrun mode).
-/synth/queue·/synth/{id}/review는 SampleDocument(DB) 진실 소스.
+``/synth/generate`` 는 생성 워커에 실제로 전달할 수 있을 때만 접수한다.
+``/synth/queue``·``/synth/{id}/review`` 는 SampleDocument(DB) 진실 소스다.
 """
 
 from __future__ import annotations
@@ -34,6 +34,14 @@ from koipa.services.async_classify_service import _celery_dispatch_available
 from koipa.services.job_store import get_default_store
 
 logger = logging.getLogger(__name__)
+
+
+class SynthesisDispatchUnavailable(RuntimeError):
+    """검수 후보를 실제로 만들 수 없는 상태에서의 생성 요청.
+
+    종전에는 이 상태도 작업을 "등록"한 뒤 202로 돌려줬다. 그 결과 운영자는 생성했다고
+    믿지만 검토 대상은 0건으로 남았다. 이제 요청을 거절해 가짜 성공을 만들지 않는다.
+    """
 
 
 def _grade_code(grade) -> str:
@@ -230,6 +238,7 @@ class SynthesisService:
             "synth submit enter: target_grade=%s domain=%s count=%d provider=%s actor=%s",
             req.target_grade, req.domain, req.count, req.llm_provider, req.actor.user_id,
         )
+        self._assert_generation_ready(req.llm_provider)
         job_id = uuid.uuid4()
         unit = COST_PER_DOC_USD.get(req.llm_provider, 0.01)
         self.jobs.create(
@@ -237,19 +246,18 @@ class SynthesisService:
             payload={
                 "target_grade": req.target_grade.value,
                 "domain": req.domain,
+                "scenario_context": req.scenario_context,
+                "document_type_hint": req.document_type_hint,
                 "count": req.count,
                 "llm_provider": req.llm_provider,
                 "submitted_at": dt.datetime.now(dt.timezone.utc).isoformat(),
                 "actor": req.actor.user_id,
             },
         )
-        # 운영(브로커 가용): 실제 Celery synthesize_batch.delay() 발사 → worker가 생성·검수큐 적재.
-        # 테스트/브로커 미가용/eager는 발사하지 않고 작업 등록만(동작·테스트 보존, dryrun 의미).
-        #
-        # [2026-09-05] 그 사실을 **응답으로도 알린다.** 종전에는 브로커가 없거나 발사가
-        # 실패해도 202 만 돌려줘 호출자는 "등록만 되고 생성은 안 됨"을 알 수 없었다.
+        # 사전 점검을 통과했으므로 실제 Celery 작업을 발사한다. 발사 자체가 실패하면
+        # 방금 만든 작업을 failed 로 남기고 503으로 돌려, "접수 성공/검토 대상 0"을 만들지 않는다.
         dispatched = False
-        dispatch_note = "브로커 미가용 — 작업 등록만 됨(생성은 일어나지 않는다)"
+        dispatch_note = "생성 작업을 워커에 전달하지 못했습니다"
         if _celery_dispatch_available():
             try:
                 from koipa.workers.tasks import synthesize_batch  # noqa: PLC0415
@@ -261,6 +269,8 @@ class SynthesisService:
                     req.target_grade.value,
                     req.count,
                     domain=req.domain,
+                    scenario_context=req.scenario_context,
+                    document_type_hint=req.document_type_hint,
                     job_id=str(job_id),
                     llm_provider=req.llm_provider,
                 )
@@ -268,13 +278,21 @@ class SynthesisService:
                 dispatched = True
                 dispatch_note = None
             except Exception as exc:  # noqa: BLE001
-                dispatch_note = "발사 실패 — 작업 등록만 됨(생성은 일어나지 않는다): %s" % (
+                dispatch_note = "발사 실패: %s" % (
                     type(exc).__name__,
                 )
                 logger.warning(
-                    "celery enqueue failed for synth — left as registered: job_id=%s",
+                    "celery enqueue failed for synth: job_id=%s",
                     job_id, exc_info=True,
                 )
+        if not dispatched:
+            # 요청을 받았지만 검수 후보는 하나도 만들지 못한 상태다. 202 Accepted를
+            # 돌려주면 운영 화면이 "생성 요청"과 "검토 대상 0"을 모순 없이 설명할 방법이 없다.
+            self.jobs.update(job_id, status="failed", error=dispatch_note)
+            raise SynthesisDispatchUnavailable(
+                "생성 작업을 워커에 전달하지 못했습니다. 검토 대상은 생성되지 않았습니다. "
+                "브로커와 생성 워커 상태를 확인하세요."
+            )
         logger.info(
             "synth submit done: job_id=%s count=%d est_cost_usd=%.4f",
             job_id, req.count, round(unit * req.count, 4),
@@ -286,6 +304,38 @@ class SynthesisService:
             dispatched=dispatched,
             dispatch_note=dispatch_note,
         )
+
+    @staticmethod
+    def _assert_generation_ready(llm_provider: str) -> None:
+        """실제 생성으로 이어질 수 있는 요청만 접수한다."""
+        provider = (llm_provider or "").strip().lower()
+        if provider == "noop":
+            raise SynthesisDispatchUnavailable(
+                "noop은 시험용 대체본 제공자라 검토·학습 후보를 생성할 수 없습니다. "
+                "연결된 실제 생성 제공자를 선택하세요."
+            )
+        if not _celery_dispatch_available():
+            raise SynthesisDispatchUnavailable(
+                "생성 워커 또는 브로커에 연결할 수 없습니다. 요청을 등록만 하지 않았으며 "
+                "검토 대상도 생성되지 않았습니다."
+            )
+        try:
+            from koipa.services.synth_provider_status import provider_status  # noqa: PLC0415
+
+            states = {str(item.get("name")): item for item in provider_status()}
+            state = states.get(provider)
+            if state is None or not bool(state.get("available")):
+                reason = (state or {}).get("reason") or "사용 가능한 생성 제공자가 아닙니다"
+                raise SynthesisDispatchUnavailable(
+                    f"{provider} 제공자로 실제 생성할 수 없습니다: {reason}"
+                )
+        except SynthesisDispatchUnavailable:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise SynthesisDispatchUnavailable(
+                "생성 제공자의 준비 상태를 확인하지 못했습니다. 검토 대상이 0건인 "
+                "가짜 요청을 만들지 않기 위해 접수를 중단했습니다."
+            ) from exc
 
     def queue(
         self,

@@ -16,6 +16,7 @@ from koipa.schemas.synthesis import (
     SynthGenerateResponse,
     SynthJobStatus,
     SynthPlaybookResponse,
+    SynthPlaybookUpdateRequest,
     SynthProvidersStatusResponse,
     SyntheticDocDetail,
     SynthQueueResponse,
@@ -25,7 +26,7 @@ from koipa.schemas.synthesis import (
 )
 from koipa.services.synth_coverage import DEFAULT_MIN_PER_CELL, coverage_report
 from koipa.services.synth_provider_status import provider_status
-from koipa.services.synthesis_service import SynthesisService
+from koipa.services.synthesis_service import SynthesisDispatchUnavailable, SynthesisService
 
 router = APIRouter(tags=["synthesis"], dependencies=[Depends(require_auth)])
 
@@ -36,6 +37,7 @@ router = APIRouter(tags=["synthesis"], dependencies=[Depends(require_auth)])
     "/synth/generate",
     response_model=SynthGenerateResponse,
     status_code=202,
+    responses={503: {"description": "생성 제공자 또는 워커가 준비되지 않아 접수되지 않음"}},
 )
 @limiter.limit("10/minute")
 def synth_generate(
@@ -45,7 +47,12 @@ def synth_generate(
 ):
     # [#13] created_by 감사 신원 = 인증 principal(body 자칭 위조 차단; JWT sub 우선).
     bind_authenticated_actor(req.actor, auth)
-    return SynthesisService().submit(req)
+    try:
+        return SynthesisService().submit(req)
+    except SynthesisDispatchUnavailable as exc:
+        # 등록만 하고 "성공"으로 보이는 길을 닫는다. 호출자는 실제 검토 후보가 하나도
+        # 생성되지 않았다는 사실과 고칠 대상을 즉시 알 수 있다.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.get("/synth/queue", response_model=SynthQueueResponse)
@@ -76,10 +83,9 @@ def synth_coverage(
 ):
     """합성으로 채울 자리 — 등급 × 도메인 격자.
 
-    [2026-09-06] 왜 이 경로가 생겼나. 계산은 scripts/synth_coverage_gaps.py 안에만 있어서
-    사람이 터미널에서 표를 읽고 → 조합을 외우고 → 콘솔 폼에 손으로 다시 넣어야 했다.
-    필요한 정보가 이미 있는데 화면이 그것을 몰랐다. 이제 화면이 격자를 띄우고, 칸을
-    누르면 생성 폼(등급·도메인)이 채워진다.
+    이 경로는 데이터셋 구성과 개발용 균형 진단을 위한 읽기 전용 정보다. 운영 콘솔은
+    train·val·test 합계와 출처를 설명하는 데만 쓰고, 외부 산업 카테고리 격자를 생성
+    주제 선택지로 강요하지 않는다.
 
     합성의 쓸모를 '빈 칸 채우기'로 좁히는 근거는 실측이다 — 합성-only 로 학습해 실문서를
     재면 F1 0.26 이라 양을 늘려도 실문서 성능이 그만큼 오르지 않는다. 남는 쓸모는
@@ -117,20 +123,40 @@ def synth_playbook():
     열어야만 알 수 있었다. 이 경로가 그 자리를 메운다.
     """
     from koipa.config import settings  # noqa: PLC0415
-    from koipa.modules.m1_synthesis.generation_playbook import (  # noqa: PLC0415
-        AVOID_PHRASES,
-        GENERATION_RULES,
-        playbook_text,
-        playbook_version,
+    from koipa.services.synth_playbook_service import view  # noqa: PLC0415
+
+    return {"enabled": bool(getattr(settings, "synth_use_generation_playbook", True)), **view()}
+
+
+@router.put("/synth/playbook", response_model=SynthPlaybookResponse)
+def update_synth_playbook(
+    req: SynthPlaybookUpdateRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend", "system")),
+):
+    """조직별 생성 규칙을 저장한다.
+
+    기본 안전 규칙은 코드에 남기고, 여기서는 조직별 업무 문서 규칙·반복 금지 표현만
+    수정한다. API·worker가 공유하는 영속 경로에 원자적으로 저장한다.
+    """
+    from koipa.config import settings  # noqa: PLC0415
+    from koipa.services.synth_playbook_service import (  # noqa: PLC0415
+        PlaybookValidationError,
+        save_override,
+        view,
     )
 
-    return {
-        "enabled": bool(getattr(settings, "synth_use_generation_playbook", True)),
-        "version": playbook_version(),
-        "rules": list(GENERATION_RULES),
-        "avoid_phrases": list(AVOID_PHRASES),
-        "text": playbook_text(),
-    }
+    bind_authenticated_actor(req.actor, auth)
+    try:
+        save_override(
+            custom_rules=req.custom_rules,
+            custom_avoid_phrases=req.custom_avoid_phrases,
+            updated_by=req.actor.user_id,
+        )
+    except PlaybookValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail="생성 규칙 저장소에 쓸 수 없습니다") from exc
+    return {"enabled": bool(getattr(settings, "synth_use_generation_playbook", True)), **view()}
 
 
 @router.get("/synth/jobs/{synth_job_id}", response_model=SynthJobStatus)

@@ -191,17 +191,47 @@ export const scenarios = [
     async run({ server, check }) {
       const page = await synthesisTab(server);
       page.set('sy-grade', 'TS');
-      page.set('sy-domain', 'tech');
+      page.set('sy-context', '연구기획팀 기술 검토와 협력사 일정 조율');
+      page.set('sy-document-type', '기술 검토 회의록');
       page.set('sy-count', '20');
       page.click('sy-gen');
       await page.settle();
 
       const call = server.lastCall('POST', '/synth/generate');
       check.eq(call?.body?.target_grade, 'TS', '목표 등급이 실렸다');
+      check.eq(call?.body?.scenario_context, '연구기획팀 기술 검토와 협력사 일정 조율', '업무 맥락이 실렸다');
+      check.eq(call?.body?.document_type_hint, '기술 검토 회의록', '문서 유형 힌트가 실렸다');
       check.eq(call?.body?.count, 20, '건수가 실렸다');
       check.includes(page.text('sy-info'), '예상 20건', '예상 건수가 보인다');
       check.includes(page.text('sy-info'), '$', '예상 비용이 보인다');
       check.eq(page.$('sy-gen')?.disabled, false, '버튼이 잠긴 채 남지 않는다');
+      return page;
+    },
+  },
+
+  {
+    id: 'monitor.synth.playbook-manage',
+    writes: true,
+    title: '생성 규칙 팝업에서 조직별 규칙을 저장하면 다음 생성 적용본을 받는다',
+    async run({ server, check }) {
+      const page = await synthesisTab(server);
+      page.click(page.q('button[onclick="openSynthPlaybookDialog()"]'));
+      await page.settle();
+
+      const dialog = page.$('sy-playbook-dialog');
+      check.ok(dialog?.hasAttribute('open'), '생성 규칙 팝업이 열린다');
+      check.includes(page.text('sy-playbook-baseline'), '기밀·보안 수준', '기본 안전 규칙을 볼 수 있다');
+
+      page.set('sy-playbook-custom-rules', '회의록에는 결정 사항과 담당 부서를 함께 적는다.');
+      page.set('sy-playbook-custom-avoid', '당사');
+      page.click('sy-playbook-save');
+      await page.settle();
+
+      const call = server.lastCall('PUT', '/synth/playbook');
+      check.data.includes(call?.body?.custom_rules || [], '결정 사항', '추가 규칙을 저장했다');
+      check.data.includes(call?.body?.custom_avoid_phrases || [], '당사', '반복 금지 표현을 저장했다');
+      check.includes(page.text('sy-info'), '다음 생성 요청부터 적용', '적용 시점을 분명히 말한다');
+      assertNoScriptErrors(check, page);
       return page;
     },
   },

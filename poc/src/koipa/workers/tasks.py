@@ -468,6 +468,8 @@ def synthesize_batch(
     grade: str,
     count: int,
     domain: str = "mixed",
+    scenario_context: str = "",
+    document_type_hint: str = "",
     job_id: str | None = None,
     llm_provider: str | None = None,
 ) -> list[dict]:
@@ -516,7 +518,15 @@ def synthesize_batch(
             "synth 생성 설정: 구조화출력=%s · 동시성=%d · 다단계=%s (job_id=%s)",
             gen.structured_output, gen.concurrency, gen.multi_step, job_id,
         )
-        docs = gen.generate(SynthRequest(target_grade=grade, domain=domain, count=count))
+        docs = gen.generate(
+            SynthRequest(
+                target_grade=grade,
+                domain=domain,
+                count=count,
+                scenario_context=scenario_context,
+                document_type_hint=document_type_hint,
+            )
+        )
         partial = [
             {
                 "title": d.title,

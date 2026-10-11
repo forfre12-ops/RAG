@@ -160,6 +160,14 @@ details summary{cursor:pointer;font-size:11.5px;font-weight:600;color:var(--text
 details[open] summary{border-bottom:1px solid var(--border);}
 details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 
+/* 생성 규칙은 페이지를 벗어나지 않는 팝업에서 확인·수정한다. */
+.playbook-dialog{width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 48px);border:1px solid var(--border-strong);padding:18px;background:#fff;color:var(--text);overflow:auto;}
+.playbook-dialog::backdrop{background:rgba(0,0,0,.34);}
+.playbook-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px;}
+.playbook-dialog-head b{font-size:16px;}
+.playbook-readonly{font-size:12px;line-height:1.6;color:var(--text-soft);max-height:260px;overflow:auto;padding:4px 0;}
+.playbook-readonly ol{margin:4px 0 8px 20px;padding:0;}
+
 /* LOG CONSOLE */
 .logbar{position:fixed;bottom:0;left:0;right:0;z-index:90;background:var(--bg-inverse);color:#e4e4e7;font-family:var(--font-mono);font-size:11px;border-top:1px solid #27272a;}
 .logbar-head{display:flex;align-items:center;justify-content:space-between;padding:6px 16px;border-bottom:1px solid #27272a;cursor:pointer;}
@@ -963,14 +971,21 @@ body *,body *::before,body *::after{border-radius:0 !important}
             <select id="sy-grade"></select>
           </div>
           <div class="field">
-            <!-- 서버의 카탈로그가 산업·업무·공개 범위를 optgroup으로 분리한다. mixed는
-                 이전 API의 fallback일 뿐 새 생성의 기본값/선택지가 아니다. -->
-            <label class="fld">문서 주제 <span class="muted">(산업·업무·공개 범위)</span></label>
-            <select id="sy-domain"></select>
+            <label class="fld">업무 맥락</label>
+            <input id="sy-context" type="text" maxlength="1200" placeholder="예: 연구기획팀의 기술 검토와 협력사 일정 조율" />
           </div>
+          <div class="field">
+            <label class="fld">문서 유형 힌트</label>
+            <input id="sy-document-type" type="text" maxlength="300" placeholder="예: 기술 검토 회의록" />
+          </div>
+        </div>
+        <div class="row3" style="margin-top:8px;">
           <div class="field">
             <label class="fld">생성 건수</label>
             <input id="sy-count" type="number" min="1" max="500" value="5" />
+          </div>
+          <div class="field" style="grid-column:span 2;">
+            <p class="sec-note" style="margin:24px 0 0;">외부 산업 분류를 고르게 하지 않습니다. 우리 업무 맥락과 필요한 문서 유형을 직접 적어 생성 규칙과 함께 적용합니다.</p>
           </div>
         </div>
         <div class="row3" style="margin-top:8px;">
@@ -1008,19 +1023,41 @@ body *,body *::before,body *::after{border-radius:0 !important}
           </div>
         </div>
         <p class="hint" id="sy-provider-note" data-tech style="margin-top:2px"></p>
-        <!-- [2026-09-28] 생성 규칙(플레이북) — 지금 생성에 기본 적용되는 규칙을 관리자가
-             확인할 수 있어야 한다. 기본 접힘(요약 한 줄)·펼치면 규칙·금지
-             낱말이 보인다. 정본은 m1_synthesis/generation_playbook.py, 조회는 GET /synth/playbook. -->
-        <details id="sy-playbook" data-tech style="margin-top:8px;">
-          <summary class="hint" style="cursor:pointer;">생성 규칙(플레이북) — <span id="sy-playbook-version">불러오는 중…</span></summary>
-          <div id="sy-playbook-body" class="hint" style="margin-top:6px;line-height:1.6;"></div>
-        </details>
+        <div class="btn-row" style="margin-top:10px;align-items:center;">
+          <button class="btn sec sm" type="button" onclick="openSynthPlaybookDialog()">생성 규칙 관리</button>
+          <span class="hint" id="sy-playbook-version">생성 규칙을 불러오는 중…</span>
+        </div>
         <!-- [2026-08-24] warnbox(노랑) → sec-note(회색). 이 카드는 제출본이 §N 으로 지목한
              **요건 증빙 화면**이다(FUN-003-①⑦). 다섯 줄짜리 노란 경고가 카드를 덮고 있으면
              감리에서 "이 기능 고장났다"로 읽힌다. 알려야 할 사실은 그대로 두고 색과 분량만 줄인다. -->
         <div id="sy-noop-note" class="sec-note" data-tech style="display:none;margin-top:10px;line-height:1.6;"></div>
         <div id="sy-info" class="hint"></div>
+        <div id="sy-coverage" style="margin-top:12px;"></div>
         <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">검토 대기 0건</div></div>
+
+        <dialog id="sy-playbook-dialog" class="playbook-dialog" aria-labelledby="sy-playbook-title">
+          <div class="playbook-dialog-head">
+            <div><b id="sy-playbook-title">생성 규칙 관리</b><div class="hint" id="sy-playbook-status"></div></div>
+            <button class="btn sec sm" type="button" onclick="closeSynthPlaybookDialog()">닫기</button>
+          </div>
+          <p class="sec-note">기본 안전 규칙은 모든 생성에 유지됩니다. 아래 조직별 규칙과 반복 금지 표현은 수정 후 다음 생성부터 적용됩니다.</p>
+          <details class="adv">
+            <summary>기본 안전 규칙 보기</summary>
+            <div id="sy-playbook-baseline" class="playbook-readonly"></div>
+          </details>
+          <div class="field">
+            <label class="fld">조직별 추가 규칙 <span class="muted">한 줄에 하나</span></label>
+            <textarea id="sy-playbook-custom-rules" rows="7" maxlength="100000" placeholder="예: 회의록에는 결정 사항과 담당 부서를 반드시 적습니다."></textarea>
+          </div>
+          <div class="field" style="margin-top:10px;">
+            <label class="fld">반복 금지 표현 <span class="muted">쉼표 또는 줄바꿈으로 구분</span></label>
+            <textarea id="sy-playbook-custom-avoid" rows="3" maxlength="30000" placeholder="예: 당사, 관련 부서 협의"></textarea>
+          </div>
+          <div class="btn-row" style="margin-top:12px;">
+            <button class="btn" id="sy-playbook-save" type="button" onclick="saveSynthPlaybook()">규칙 저장</button>
+            <button class="btn sec" type="button" onclick="closeSynthPlaybookDialog()">취소</button>
+          </div>
+        </dialog>
       </div>
     </section>
 
@@ -1039,11 +1076,6 @@ body *,body *::before,body *::after{border-radius:0 !important}
             <div><span>평가</span><b>최종 성능 확인에 사용</b></div>
           </div>
         </div>
-        <details id="training-coverage" class="operations-advanced" style="margin-top:14px;">
-          <summary>학습 데이터 분포 점검 <span class="muted">데이터 담당자용</span></summary>
-          <p class="sec-note" style="margin:8px 0 0;">등급·도메인별 데이터 공백을 확인하는 분석 도구입니다. 검수 대기 건수나 생성 지시가 아니며, 실제로 채울지는 데이터 담당자가 판단합니다.</p>
-          <div id="sy-coverage" style="margin-top:10px;"></div>
-        </details>
         <!-- 학습 규모 preset — 자유 입력란을 열지 않는다. 임의 값이 들어가면 얼마나 걸릴지
              예측이 안 되고 되돌리는 절차도 없다. 두 조합만 고정한다.
              라벨에 절대 소요 시간을 적지 않는 이유는 아래 TRAIN_PRESETS 주석 참조 —
@@ -2294,18 +2326,9 @@ function applyProfileVisibility(d){
   }
   document.dispatchEvent(new Event('koipa:profile-ready'));
 }
-/* [2026-08-23] 등급 판정 LLM 이 없는 서버에서 「생성 요청」을 누르면 무슨 일이 벌어지는가.
- *
- * 근거(코드):
- *   - noop 이면 생성기가 placeholder 본문을 쓰고 label_source="noop_fallback" 를 찍는다
- *     (m1_synthesis/generator.py:455-459).
- *   - 그 문서는 검수에서 승인해도 build_training_rows() 가 배제한다
- *     (services/synthesis_service.py:41-52 TRAINING_EXCLUDED_LABEL_SOURCES, :177).
- *   → 큐에는 쌓이지만 **학습행은 0건**이다. 화면에 그 말이 없어서 「승인했는데 왜 학습에
- *     안 들어가는가」를 결과를 보고 나서야 알게 된다.
- *
- * 검증 기준문서 카드와 달리 버튼은 잠그지 않는다 — 여기서의 생성은 파이프라인(생성→큐→검수)
- * 이 도는지 보는 용도로는 그대로 유효하고, 학습 유입은 서버가 자동으로 막기 때문이다. */
+/* 실제 생성 가능 상태는 정적 설정값만으로 판단하지 않는다. noop·미연결 제공자·브로커
+ * 미연결에서 "요청 성공 → 검토 대상 0"이 생겼기 때문에, 상태 확인이 끝날 때까지
+ * 생성 버튼을 잠그고 서버도 같은 조건을 503으로 거절한다. */
 function applySynthAvailability(active){
   const a=String(active||'').toLowerCase();
   const note=$('sy-provider-note');
@@ -2341,8 +2364,6 @@ function applyServerConfig(d){
   // 같은 이유로 따로 감싼다 — 목록 채우기가 죽어도 나머지 초기화는 살아야 한다.
   try{ syncLlmProviders(d&&d.llm_providers_supported, d&&d.llm_provider); }
   catch(e){ console && console.warn && console.warn('provider list skipped', e); }
-  try{ syncSynthDomains(d&&d.synth_domain_catalog, d&&d.synth_domains_supported); }
-  catch(e){ console && console.warn && console.warn('domain list skipped', e); }
   // [2026-09-28] "우리가 실제로 가진 것만" — healthz 의 정적 허용목록으로 채운 뒤,
   // 실측 가용성(로컬 연결·상용 키 유무)으로 다시 좁힌다. 실패해도 앞서 채운 목록은 남는다.
   // 고객사 분리 이미지에는 합성 라우터가 없으므로 상태 조회도 호출하지 않는다.
@@ -2864,22 +2885,31 @@ let SYNTH = [];   // /synth/queue 응답 items
 
 async function synthGenerate(){
   if(!synthConsoleAvailable()){ const info=$('sy-info'); if(info) info.textContent=synthConsoleUnavailableMessage(); return; }
-  const domain=$('sy-domain').value;
-  if(!domain){ $('sy-info').textContent='문서 주제를 선택하세요.'; return; }
+  const context=String($('sy-context')?.value||'').trim();
+  const documentType=String($('sy-document-type')?.value||'').trim();
+  const provider=String($('sy-provider')?.value||'').trim();
+  if(!context){ $('sy-info').textContent='우리 업무에 맞는 업무 맥락을 적어주세요.'; return; }
+  if(!provider || provider==='noop'){
+    $('sy-info').textContent='실제 생성 가능한 제공자가 연결되어 있지 않습니다. noop은 시험용이라 생성 요청을 보낼 수 없습니다.';
+    return;
+  }
   const btn=$('sy-gen'); btn.disabled=true; btn.textContent='요청 중…';
   try{
     const body={
       target_grade: $('sy-grade').value,
-      domain,
+      // 외부 산업 카테고리 대신 조직의 업무 맥락을 전달한다. mixed는 레거시 저장
+      // 호환용 코드일 뿐 프롬프트에는 scenario_context·document_type_hint가 적용된다.
+      domain: 'mixed',
+      scenario_context: context,
+      document_type_hint: documentType,
       count: Math.max(1, Math.min(500, parseInt($('sy-count').value||'5',10)||5)),
-      llm_provider: $('sy-provider').value,
+      llm_provider: provider,
       actor: actor(),
     };
     const d=await api('POST','/synth/generate',body);
-    $('sy-info').textContent=`생성 작업 접수 — job ${d.synth_job_id} · 예상 ${d.expected_count}건 · 예상비용 $${Number(d.estimated_cost_usd||0).toFixed(4)}`;
-    log(`합성 생성 요청: ${body.target_grade}/${body.domain} ${body.count}건 (${body.llm_provider}) → job ${d.synth_job_id}`,'ok');
-    // 접수까지만 알리고 끝내지 않는다 — 아래 참조.
-    if(d.dispatched!==false) pollSynthJob(d.synth_job_id, d.expected_count);
+    $('sy-info').textContent=`실제 생성 작업 접수 — job ${d.synth_job_id} · 예상 ${d.expected_count}건 · 예상비용 $${Number(d.estimated_cost_usd||0).toFixed(4)}`;
+    log(`합성 생성 요청: ${body.target_grade}/${body.scenario_context} ${body.count}건 (${body.llm_provider}) → job ${d.synth_job_id}`,'ok');
+    pollSynthJob(d.synth_job_id, d.expected_count);
   }catch(e){ $('sy-info').textContent=`생성 실패: ${errKo(e)}`; }
   finally{ btn.disabled=false; btn.textContent='생성 요청'; }
 }
@@ -2913,6 +2943,9 @@ async function pollSynthJob(jobId, expected){
     }else if(st==='done'){
       $('sy-info').textContent=`생성 완료 — ${made||expected}건 생성 · 검수 큐 적재 ${kept}건`;
       log(`합성 생성 완료: job ${jobId} · 적재 ${kept}건`,'ok');
+    }else if(st==='failed'){
+      $('sy-info').textContent=`생성 실패 — 검토 대상은 생성되지 않았습니다${d&&d.error?' · '+String(d.error):''}`;
+      log(`합성 생성 실패: job ${jobId}${d&&d.error?' · '+String(d.error):''}`,'err');
     }else{
       $('sy-info').textContent=`생성 작업 상태 ${st} — job ${jobId} · 적재 ${kept}건`;
       log(`합성 생성 상태 ${st}: job ${jobId}`,'warn');
@@ -2929,18 +2962,6 @@ async function pollSynthJob(jobId, expected){
  * 남는 쓸모는 실데이터가 구조적으로 못 주는 칸을 메우는 것이고, 그 칸이 어디인지는
  * 서버가 계산해 준다(GET /synth/coverage). 화면은 **보여주기만** 한다 — 자동으로
  * 만들어 주는 버튼은 두지 않는다. 현실에 없는 조합인지는 사람이 판단해야 한다. */
-function pickCoverageCell(grade, domain){
-  // 분포 점검은 모델 화면에 두되, 생성 값은 실제 생성 화면에서만 바꾼다.
-  productShowView('synthesis');
-  const g=$('sy-grade'), d=$('sy-domain');
-  if(g && Array.from(g.options).some(o=>o.value===grade)) g.value=grade;
-  syncSynthDomains();
-  if(d && Array.from(d.options).some(o=>o.value===domain)) d.value=domain;
-  else if(d) log(`도메인 「${domain}」 은 생성 목록에 없다 — 등급만 채웠다`,'warn');
-  log(`생성 대상 선택: ${grade} × ${domain}`,'ok');
-  const c=$('sy-count'); if(c) c.focus();
-}
-
 async function loadSynthCoverage(){
   const box=$('sy-coverage'); if(!box) return;
   if(!synthConsoleAvailable()){ box.innerHTML='<div class="hint">'+esc(synthConsoleUnavailableMessage())+'</div>'; return; }
@@ -2956,24 +2977,17 @@ async function loadSynthCoverage(){
     box.innerHTML=`<div class="hint">학습 데이터 분포 없음 — ${esc((d&&d.reason)||'학습셋을 읽지 못했습니다')}</div>`;
     return;
   }
-  const targets=[
-    ...(d.empty||[]).map(cell=>({...cell,state:'미구성'})),
-    ...(d.thin||[]).map(cell=>({...cell,state:'표본 부족'})),
-  ].sort((a,b)=>Number(a.n||0)-Number(b.n||0));
-  const rows=targets.map(cell=>{
-    const grade=esc(cell.grade||'—'), domain=esc(cell.domain||'');
-    const gradeArg=esc(JSON.stringify(cell.grade||'')), domainArg=esc(JSON.stringify(cell.domain||''));
-    return `<tr><td>${grade}</td><td>${esc(synthDomainLabel(cell.domain||''))}</td><td>${Number(cell.n||0)}건</td><td>${Number(cell.real||0)}건</td><td><button class="btn sec sm" type="button" onclick="pickCoverageCell(${gradeArg},${domainArg})">선택</button></td></tr>`;
-  }).join('');
+  const splits=d.split_counts||{}, sources=d.source_counts||{};
   const realShare=d.real_share!=null?`${Math.round(Number(d.real_share)*100)}%`:'기록 없음';
   box.innerHTML=`<section class="coverage-panel" aria-label="학습 데이터 분포">
     <div class="coverage-summary">
-      <div class="coverage-metric"><span>학습 문서</span><b>${Number(d.documents||0).toLocaleString()}건</b></div>
-      <div class="coverage-metric"><span>구성 완료</span><b>${Number(d.cells_filled||0)} / ${Number(d.cells_total||0)}</b></div>
-      <div class="coverage-metric"><span>실문서 비중</span><b>${realShare}</b></div>
-      <div class="coverage-metric ${targets.length?'is-caution':''}"><span>점검 대상</span><b>${targets.length}개</b></div>
+      <div class="coverage-metric"><span>현재 학습 데이터</span><b>${Number(d.documents||0).toLocaleString()}건</b></div>
+      <div class="coverage-metric"><span>학습 분할</span><b>${Number(splits.train||0).toLocaleString()}건</b></div>
+      <div class="coverage-metric"><span>검증 분할</span><b>${Number(splits.val||0).toLocaleString()}건</b></div>
+      <div class="coverage-metric"><span>평가 분할</span><b>${Number(splits.test||0).toLocaleString()}건</b></div>
     </div>
-    ${targets.length?`<details class="coverage-details"><summary>점검 대상 ${targets.length}개</summary><table class="coverage-table"><thead><tr><th>등급</th><th>업무 분야</th><th>학습 문서</th><th>실문서</th><th></th></tr></thead><tbody>${rows}</tbody></table></details>`:'<div class="coverage-clear">점검 대상 없음</div>'}
+    <div class="coverage-clear">위 ${Number(d.documents||0).toLocaleString()}건은 현재 설정된 학습셋의 학습·검증·평가 파일을 모두 합산한 값입니다. 현재 검토 대기 건수나 이번 생성 요청 수가 아닙니다.</div>
+    <div class="hint" style="margin-top:6px">실문서 ${Number(sources.real||0).toLocaleString()}건 · 합성 문서 ${Number(sources.synthetic||0).toLocaleString()}건 · 실문서 비중 ${realShare}</div>
   </section>`;
 }
 
@@ -3084,7 +3098,7 @@ function renderSynthQueue(){
   box.innerHTML=SYNTH.map((it,i)=>`
     <div class="q-item">
       <div class="q-top">
-        <div><span class="q-id">${esc(it.synth_id)}</span>${it.domain?` · <span class="q-title">${esc(synthDomainLabel(it.domain))}</span>`:''}${it.document_type?` <span class="muted">— ${esc(it.document_type)}</span>`:''}</div>
+        <div><span class="q-id">${esc(it.synth_id)}</span>${it.domain&&it.domain!=='mixed'?` · <span class="q-title">${esc(synthDomainLabel(it.domain))}</span>`:''}${it.document_type?` <span class="muted">— ${esc(it.document_type)}</span>`:''}</div>
         <div>${gradeTag(it.corrected_grade||it.target_grade)}${it.corrected_grade?`<span class="pill" title="검수자가 승인하면서 등급을 고쳤습니다. 학습 데이터는 이 등급으로 만들어집니다.">교정됨 · 생성 시 ${esc(it.target_grade)}</span>`:''}
           <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${esc(it.llm_provider)}/${esc(it.llm_model||'-')}</span>
           ${it.quality_score!=null?`<span class="pill ${it.quality_score>=0.7?'ok':'warn'}">품질 ${Number(it.quality_score).toFixed(2)}</span>`:''}
@@ -3758,7 +3772,6 @@ function syncActiveGrades(codes){
       + ACTIVE_GRADES.map(g=>`<option value="${esc(g)}">${esc(g)}${GRADE_KR[g]?' — '+esc(GRADE_KR[g]):''}</option>`).join('');
     if(prev && Array.from(sel.options).some(o=>o.value===prev)) sel.value=prev;
   });
-  if(typeof syncSynthDomains==='function') syncSynthDomains();
 }
 
 /* ---- 생성 제공자 목록 동기화 — 서버가 받는 값만 화면에 둔다 ----
@@ -3767,8 +3780,8 @@ function syncActiveGrades(codes){
  * ollama·vllm·local_openai·lm_studio 는 화면에 없었다 — 폐쇄망 기본값이 ollama 인데
  * 콘솔로는 그걸 지정할 방법이 없었다는 뜻이다. 이제 healthz 가 목록을 내려준다.
  *
- * 목록을 못 받으면(구버전 서버·healthz 실패) 이 서버가 쓰는 제공자 하나만 남긴다.
- * 서버가 자기 설정으로 쓰는 값은 정의상 서버가 받는 값이라, 폼이 422 를 만들지 않는다. */
+ * 목록을 못 받으면 서버 설정 하나를 표시하되, 실제 연결 상태를 확인하기 전에는
+ * 생성 버튼을 열지 않는다. 설정값을 받는 것과 지금 생성할 수 있는 것은 다르다. */
 const LLM_PROVIDER_KR = {
   noop: '결정론 · 외부 API 없이',
   anthropic: 'Claude',
@@ -3794,29 +3807,46 @@ function syncLlmProviders(list, active){
   // 고르던 값이 여전히 유효하면 유지하고, 아니면 이 서버가 쓰는 제공자를 기본으로 둔다.
   if(prev && names.indexOf(prev)>=0) sel.value=prev;
   else if(act && names.indexOf(act)>=0) sel.value=act;
+  const btn=$('sy-gen'), note=$('sy-provider-note');
+  sel.disabled=true;
+  if(btn) btn.disabled=true;
+  if(note) note.textContent='실제 생성 제공자와 워커 상태를 확인하는 중입니다.';
 }
 
 /* [2026-09-28] 로컬 LLM은 보유 중인 것만 목록에 나와야 한다.
  * syncLlmProviders 는 healthz 의 정적 허용목록(스키마가 받는 값 9개)을 그대로 보여준다 —
  * 실제로 이 서버가 지금 그 provider 로 생성할 수 있는지와 무관하다. 이 함수가 그 위에
  * GET /synth/providers/status(상용은 키 유무, 로컬은 연결 가능 여부)를 얹어 목록을 좁힌다.
- * 실패하면 조용히 넘어간다 — syncLlmProviders 가 채운 목록이 그대로 남는다(안전한 기본값). */
+ * 확인을 못하면 요청을 열지 않는다. 정적 허용목록은 "API 형식이 받는 값"일 뿐 실제
+ * 연결 가능성을 증명하지 못한다. */
 async function loadSynthProviderStatus(){
   if(!synthConsoleAvailable()) return;
   const sel=$('sy-provider'); if(!sel) return;
   let d;
   try{ d = await api('GET','/synth/providers/status'); }
-  catch(e){ return; }
+  catch(e){
+    const btn=$('sy-gen'), note=$('sy-provider-note');
+    sel.innerHTML='<option value="">실제 생성 상태를 확인할 수 없음</option>';
+    sel.disabled=true;
+    if(btn) btn.disabled=true;
+    if(note) note.textContent='생성 제공자 상태를 확인하지 못해 요청을 막았습니다. 제공자·워커 연결을 확인하세요.';
+    return;
+  }
   const rows = Array.isArray(d && d.providers) ? d.providers : [];
-  if(!rows.length) return;
+  if(!rows.length){
+    const btn=$('sy-gen'), note=$('sy-provider-note');
+    sel.innerHTML='<option value="">실제 생성 제공자 없음</option>';
+    sel.disabled=true;
+    if(btn) btn.disabled=true;
+    if(note) note.textContent='생성 제공자 상태가 비어 있어 요청을 막았습니다.';
+    return;
+  }
   const active = String((d && d.active) || '');
   const reasonByName = {};
   rows.forEach(function(r){ if(!r.available) reasonByName[r.name] = r.reason || '연결 안 됨'; });
-  let names = rows.filter(function(r){ return r.available; }).map(function(r){ return r.name; });
-  // 서버가 지금 쓰는 provider 는 연결 확인에 실패해도 목록에서 빼지 않는다 — 그것이
-  // 바로 지금 생성에 실제로 쓰이는 값이라, 감추면 무엇이 되는지 화면에서 알 수 없다.
-  if(active && names.indexOf(active) < 0) names.push(active);
-  if(!names.length) names = active ? [active] : ['noop'];
+  // noop은 응답 형태만 확인하는 시험용이다. 검수·학습 후보가 되는 실제 생성 목록에는
+  // 넣지 않는다. 선택지에 남기면 "요청 성공 → 검토 대상 0"을 다시 만든다.
+  let names = rows.filter(function(r){ return r.available && r.name!=='noop'; }).map(function(r){ return r.name; });
   const prev = sel.value;
   sel.innerHTML = names.map(function(n){
     const kr = LLM_PROVIDER_KR[n];
@@ -3826,30 +3856,84 @@ async function loadSynthProviderStatus(){
   }).join('');
   if(prev && names.indexOf(prev) >= 0) sel.value = prev;
   else if(active && names.indexOf(active) >= 0) sel.value = active;
+  const btn=$('sy-gen'), note=$('sy-provider-note');
+  if(!names.length){
+    sel.innerHTML='<option value="">실제 생성 제공자 없음</option>';
+    sel.disabled=true;
+    if(btn) btn.disabled=true;
+    if(note) note.textContent='실제 생성 제공자가 연결되어 있지 않아 요청을 막았습니다. 제공자 연결 후 다시 시도하세요.';
+  }else{
+    sel.disabled=false;
+    if(btn) btn.disabled=false;
+    if(note) note.textContent='선택한 제공자로 실제 생성 후 검토 큐에 적재합니다. noop 시험 제공자는 제외했습니다.';
+  }
 }
 
-/* [2026-09-28] 지금 생성에 기본 적용되는 규칙(플레이북)을 관리자가 확인할 수 있어야
- * 한다. 정본은 m1_synthesis/generation_playbook.py — 여기는 읽기 전용으로
- * 보여주기만 한다(콘솔에서 고치지 않는다). */
+/* 생성 규칙은 팝업에서 기본 안전 규칙을 확인하고, 조직별 추가 규칙은 저장해 다음
+ * 배치부터 적용한다. 코드 안전 기준을 지우는 설정은 제공하지 않는다. */
+let SYNTH_PLAYBOOK=null;
 async function loadSynthPlaybook(){
   if(!synthConsoleAvailable()) return;
-  const verEl=$('sy-playbook-version'), bodyEl=$('sy-playbook-body');
-  if(!verEl || !bodyEl) return;
+  const verEl=$('sy-playbook-version');
+  if(!verEl) return;
   let d;
   try{ d = await api('GET','/synth/playbook'); }
   catch(e){ verEl.textContent = '조회 실패'; return; }
+  SYNTH_PLAYBOOK=d;
   verEl.textContent = (d.enabled ? '적용됨 · ' : '꺼짐 · ') + d.version;
-  const rules = (d.rules || []).map(function(r){ return '<li>' + esc(r) + '</li>'; }).join('');
-  const avoid = (d.avoid_phrases || []).map(esc).join(', ');
-  bodyEl.innerHTML = '<ol style="margin:4px 0 8px 18px;padding:0;">' + rules + '</ol>'
-    + '<div>반복 금지 낱말(' + (d.avoid_phrases || []).length + '개): ' + avoid + '</div>';
+  renderSynthPlaybookDialog(d);
+}
+function renderSynthPlaybookDialog(d){
+  const baseline=$('sy-playbook-baseline');
+  if(!baseline || !d) return;
+  const rules=(d.baseline_rules||[]).map(r=>'<li>'+esc(r)+'</li>').join('');
+  const avoids=(d.baseline_avoid_phrases||[]).map(esc).join(', ');
+  baseline.innerHTML='<ol>'+rules+'</ol><div>기본 반복 금지 표현('+(d.baseline_avoid_phrases||[]).length+'개): '+avoids+'</div>';
+  const custom=$('sy-playbook-custom-rules'), avoid=$('sy-playbook-custom-avoid'), status=$('sy-playbook-status');
+  if(custom) custom.value=(d.custom_rules||[]).join('\n');
+  if(avoid) avoid.value=(d.custom_avoid_phrases||[]).join('\n');
+  if(status){
+    const owner=d.updated_by?`최근 저장: ${d.updated_by}${d.updated_at?' · '+d.updated_at:''}`:'조직별 추가 규칙 없음';
+    status.textContent=`${owner} · 기본 ${Number((d.baseline_rules||[]).length)}개 + 추가 ${Number((d.custom_rules||[]).length)}개 적용`;
+  }
+}
+async function openSynthPlaybookDialog(){
+  if(!SYNTH_PLAYBOOK) await loadSynthPlaybook();
+  const dlg=$('sy-playbook-dialog');
+  if(!dlg) return;
+  renderSynthPlaybookDialog(SYNTH_PLAYBOOK);
+  if(typeof dlg.showModal==='function' && !dlg.open) dlg.showModal();
+  else dlg.setAttribute('open','open');
+}
+function closeSynthPlaybookDialog(){
+  const dlg=$('sy-playbook-dialog'); if(!dlg) return;
+  if(typeof dlg.close==='function' && dlg.open) dlg.close(); else dlg.removeAttribute('open');
+}
+function splitSynthRuleLines(value){
+  return String(value||'').split(/\r?\n|,/).map(v=>v.trim()).filter(Boolean);
+}
+async function saveSynthPlaybook(){
+  const button=$('sy-playbook-save'); if(button){button.disabled=true;button.textContent='저장 중…';}
+  try{
+    const d=await api('PUT','/synth/playbook',{
+      custom_rules:splitSynthRuleLines($('sy-playbook-custom-rules')?.value),
+      custom_avoid_phrases:splitSynthRuleLines($('sy-playbook-custom-avoid')?.value),
+      actor:actor(),
+    });
+    SYNTH_PLAYBOOK=d;
+    renderSynthPlaybookDialog(d);
+    const ver=$('sy-playbook-version'); if(ver) ver.textContent=(d.enabled?'적용됨 · ':'꺼짐 · ')+d.version;
+    $('sy-info').textContent='생성 규칙을 저장했습니다. 다음 생성 요청부터 적용됩니다.';
+    log('생성 규칙 저장: '+d.version,'ok');
+  }catch(e){
+    const status=$('sy-playbook-status'); if(status) status.textContent='저장 실패: '+errKo(e);
+  }finally{
+    if(button){button.disabled=false;button.textContent='규칙 저장';}
+  }
 }
 
-/* ---- 생성 문서 주제 목록 동기화 ---- */
-let SYNTH_DOMAIN_CATALOG=[];
-/* 레거시 서버는 코드 목록만 내려준다. 선택값은 코드 그대로 API에 보내되, 운영자가 보는
- * 모든 문구는 한글로 고정한다. 산업·업무·공개 범위를 같은 축으로 섞지 않는 최신 catalog가
- * 오면 그 서버 제공 라벨을 우선한다. */
+/* 이미 생성된 과거 문서의 레거시 코드만 한글로 표시한다. 새 생성 화면에는 외부 산업
+ * 카테고리 선택지가 없다. */
 const SYNTH_DOMAIN_DISPLAY_NAMES=Object.freeze({
   ai:'인공지능', bio:'바이오·신약', business:'사업전략', defense:'방위산업',
   finance:'재무', hr:'인사', legal:'법무', ma:'인수합병', mixed:'복합 내부 문서',
@@ -3858,45 +3942,9 @@ const SYNTH_DOMAIN_DISPLAY_NAMES=Object.freeze({
   '반도체':'반도체', '배터리':'배터리', '소프트웨어':'소프트웨어', '화학_제약':'화학·제형',
   semiconductor:'반도체', battery:'배터리', pharma:'화학·제형',
 });
-function synthDomainDisplayName(code){
-  return SYNTH_DOMAIN_DISPLAY_NAMES[String(code||'')]||'기타 내부 문서';
-}
-function syncSynthDomains(catalog, list){
-  const sel=$('sy-domain'); if(!sel) return;
-  if(Array.isArray(catalog)){
-    SYNTH_DOMAIN_CATALOG=catalog.filter(item=>item && item.code && item.label && item.group_label)
-      .map(item=>({
-        code:String(item.code), label:String(item.label), group:String(item.group),
-        group_label:String(item.group_label),
-        grade_codes:Array.isArray(item.grade_codes)?item.grade_codes.map(String):[],
-      }));
-  }
-  if(!SYNTH_DOMAIN_CATALOG.length && Array.isArray(list)){
-    SYNTH_DOMAIN_CATALOG=list.map(String).filter(Boolean).filter(code=>code!=='mixed')
-      .map(code=>({code,label:synthDomainDisplayName(code),group:'legacy',group_label:'기존 서버 분류',grade_codes:[]}));
-  }
-  const grade=($('sy-grade')||{}).value||'';
-  const rows=SYNTH_DOMAIN_CATALOG.filter(item=>!item.grade_codes.length || item.grade_codes.includes(grade));
-  const prev=sel.value;
-  const groups=[];
-  rows.forEach(item=>{
-    let group=groups.find(x=>x.key===item.group);
-    if(!group){ group={key:item.group,label:item.group_label,items:[]}; groups.push(group); }
-    group.items.push(item);
-  });
-  sel.innerHTML='<option value="" disabled>문서 주제를 선택하세요</option>'+
-    groups.map(group=>`<optgroup label="${esc(group.label)}">${group.items.map(item=>
-      `<option value="${esc(item.code)}">${esc(item.label)}</option>`).join('')}</optgroup>`).join('');
-  if(prev && rows.some(item=>item.code===prev)) sel.value=prev;
-  else sel.value='';
-}
-
 function synthDomainLabel(code){
-  const item=SYNTH_DOMAIN_CATALOG.find(x=>x.code===code);
-  return (item&&item.label)||synthDomainDisplayName(code);
+  return SYNTH_DOMAIN_DISPLAY_NAMES[String(code||'')]||String(code||'기타 내부 문서');
 }
-
-$('sy-grade') && $('sy-grade').addEventListener('change',()=>syncSynthDomains());
 
 /* [2026-08-24] 「API 키 자동 채움」 블록을 없앴다. 주소에 ?key= 를 붙여 여는 경로였는데,
  * 원칙상 **웹 화면에서 키·토큰을 받지 않는다**. 인증은 같은 오리진 쿠키가
@@ -3922,7 +3970,6 @@ initProductShell();  // 좌측 메뉴·운영 개요 초기 표시(후보 API는
 onTrainPresetChange();   // 학습 규모 preset 설명 채우기(기본=정식 학습)
 syncActiveGrades();
 syncLlmProviders();  // 빈 셀렉트를 남기지 않는다 — checkHealth 가 곧 서버 목록으로 덮는다
-syncSynthDomains();
 // 합성 API는 profile 이름이 아니라 healthz가 보고한 실제 router capability 뒤에만 호출한다.
 // 따라서 lite/dev/customer 이미지에서 숨겨진 카드가 404 요청 로그를 만들지 않는다.
 checkHealth().then(()=>{

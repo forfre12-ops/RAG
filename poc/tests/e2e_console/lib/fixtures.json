@@ -1707,12 +1707,12 @@
     ]
   },
   "GET /synth/providers/status": {
-    "active": "noop",
+    "active": "ollama",
     "providers": [
       { "name": "noop", "kind": "deterministic", "available": true, "reason": "" },
       { "name": "anthropic", "kind": "commercial", "available": false, "reason": "서버에 ANTHROPIC_API_KEY 미설정" },
       { "name": "openai", "kind": "commercial", "available": false, "reason": "서버에 OPENAI_API_KEY 미설정" },
-      { "name": "ollama", "kind": "local", "available": false, "reason": "http://localhost:11434/v1 응답 없음" },
+      { "name": "ollama", "kind": "local", "available": true, "reason": "" },
       { "name": "vllm", "kind": "local", "available": false, "reason": "http://localhost:8001/v1 응답 없음" },
       { "name": "local_openai", "kind": "local", "available": false, "reason": "http://localhost:8001/v1 응답 없음" },
       { "name": "lm_studio", "kind": "local", "available": false, "reason": "http://localhost:1234/v1 응답 없음" }
@@ -1727,6 +1727,43 @@
     "avoid_phrases": [
       "명단"
     ],
+    "baseline_rules": [
+      "문서가 자기 자신의 기밀·보안 수준을 말하지 않는다."
+    ],
+    "baseline_avoid_phrases": [
+      "명단"
+    ],
+    "custom_rules": [],
+    "custom_avoid_phrases": [],
+    "updated_at": null,
+    "updated_by": null,
+    "text": "[작성 지침 — 앞선 생성 시행에서 얻은 규칙. 아래를 반드시 지킨다]"
+  },
+  "PUT /synth/playbook": {
+    "enabled": true,
+    "version": "pb1-00000001",
+    "rules": [
+      "문서가 자기 자신의 기밀·보안 수준을 말하지 않는다.",
+      "회의록에는 결정 사항과 담당 부서를 함께 적는다."
+    ],
+    "avoid_phrases": [
+      "명단",
+      "당사"
+    ],
+    "baseline_rules": [
+      "문서가 자기 자신의 기밀·보안 수준을 말하지 않는다."
+    ],
+    "baseline_avoid_phrases": [
+      "명단"
+    ],
+    "custom_rules": [
+      "회의록에는 결정 사항과 담당 부서를 함께 적는다."
+    ],
+    "custom_avoid_phrases": [
+      "당사"
+    ],
+    "updated_at": "2026-10-11T01:23:45+00:00",
+    "updated_by": "console-admin",
     "text": "[작성 지침 — 앞선 생성 시행에서 얻은 규칙. 아래를 반드시 지킨다]"
   }
 }

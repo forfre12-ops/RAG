@@ -891,6 +891,10 @@ class Settings(BaseSettings):
     # (datasets/labeled_p1_v5_clean/GATE_RESULTS.md · manifests/dataset_v1.0.yaml).
     # 학습셋 세대가 바뀌면 코드가 아니라 이 값만 바꾼다.
     training_dataset_dir: str = "datasets/labeled_p1_v5_clean"
+    # 관리자 콘솔에서 추가하는 조직별 생성 규칙. api와 worker가 함께 보는 datasets 볼륨에
+    # 두어 재기동·작업 분산 뒤에도 같은 규칙을 사용한다. 코드에 박힌 안전 기준은 이 파일로
+    # 대체하지 않고, 이 파일 내용은 그 위에 덧붙는다.
+    synth_playbook_path: str = "datasets/runtime/synth_playbook.json"
     # 재학습 산출물 디렉터리 — TrainSpec.output_dir 기본값이 여기서 온다.
     # artifacts/ 는 서빙 모델 공급용으로 **ro 마운트**다(compose prod/dual 양쪽). 학습이 거기
     # 쓰려다 실패했다(2026-08-08 실서버 실측: OSError [Errno 30] Read-only file system:

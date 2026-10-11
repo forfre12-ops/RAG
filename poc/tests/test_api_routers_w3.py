@@ -142,7 +142,7 @@ class TestTrainingRouter:
 # ============================================================
 
 class TestSynthesisRouter:
-    def test_synth_generate_returns_202(self):
+    def test_synth_generate_never_reports_success_when_runtime_is_unavailable(self):
         with TestClient(app) as cli:
             r = cli.post(
                 "/api/v1/synth/generate",
@@ -155,12 +155,12 @@ class TestSynthesisRouter:
                     "actor": ACTOR,
                 },
             )
-            assert r.status_code == 202
-            body = r.json()
-            assert body["expected_count"] == 10
-            assert body["estimated_cost_usd"] > 0
+            # TestClient에는 실 워커를 붙이지 않는다. 과거처럼 202로 "등록만" 성공을
+            # 말하면 검토 대상 0건 원인을 숨기므로, 운영 준비가 안 된 환경에서는 503이다.
+            assert r.status_code == 503
+            assert "검토 대상" in r.json()["detail"]
 
-    def test_synth_generate_noop_zero_cost(self):
+    def test_synth_generate_rejects_noop_instead_of_creating_test_documents(self):
         with TestClient(app) as cli:
             r = cli.post(
                 "/api/v1/synth/generate",
@@ -172,8 +172,8 @@ class TestSynthesisRouter:
                     "actor": ACTOR,
                 },
             )
-            assert r.status_code == 202
-            assert r.json()["estimated_cost_usd"] == 0.0
+            assert r.status_code == 503
+            assert "noop" in r.json()["detail"]
 
     def test_synth_queue_returns_shape(self):
         with TestClient(app) as cli:

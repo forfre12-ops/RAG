@@ -92,12 +92,13 @@ def test_rate_limit_disabled_env_bypasses(monkeypatch):
             "actor": {"user_id": "rl-bypass", "role": "admin"},
         }
         with TestClient(app) as cli:
-            # 한도(10)보다 많은 12건 호출 — 비활성이므로 모두 202
+        # 한도(10)보다 많은 12건 호출 — limiter가 비활성이면 실제 생성 준비 오류(503)가
+        # 그대로 보이고, 429로 바뀌면 안 된다.
             statuses = []
             for _ in range(12):
                 r = cli.post("/api/v1/synth/generate", headers=HDR, json=payload)
                 statuses.append(r.status_code)
-            assert all(s == 202 for s in statuses), f"unexpected statuses: {statuses}"
+            assert all(s == 503 for s in statuses), f"unexpected statuses: {statuses}"
     finally:
         limiter.enabled = prev_enabled
         limiter.reset()

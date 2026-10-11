@@ -164,31 +164,47 @@ def test_every_advertised_domain_is_accepted_by_synth_api(health_payload: dict) 
     assert not rejected, f"광고하는데 API 가 거부하는 도메인: {rejected}"
 
 
-def test_console_does_not_hardcode_domain_options() -> None:
-    """③ 콘솔이 도메인 목록을 다시 손으로 적지 않는다."""
+def test_console_uses_organization_context_instead_of_generic_domain_options() -> None:
+    """③ 운영 화면은 외부 산업 분류를 문서 주제로 강요하지 않는다."""
     html = ADMIN_HTML.read_text(encoding="utf-8")
-    match = re.search(r'<select[^>]*id="sy-domain"[^>]*>(.*?)</select>', html, re.S)
-    assert match, "admin.html 에서 sy-domain 셀렉트를 찾지 못했다 — id 가 바뀌었으면 이 시험도 고칠 것."
-    assert "<option" not in match.group(1), (
-        "sy-domain 안에 <option> 이 다시 박혔다. 목록은 healthz 의 synth_domains_supported "
-        "로 채운다(syncSynthDomains). 손으로 적으면 생성기가 아는 것보다 적어진다 — "
-        "실제로 배터리·화학_제약·소프트웨어·경영정보·기타를 고를 수 없었다."
+    assert not re.search(r'<select[^>]*id="sy-domain"', html), (
+        "외부 산업·업무 카테고리 셀렉트가 운영 화면에 남아 있다"
     )
-    assert "synth_domain_catalog" in html
-    assert "optgroup" in html
-    assert "mixed 하나만" not in html
+    assert 'id="sy-context"' in html
+    assert 'id="sy-document-type"' in html
+    assert "scenario_context: context" in html
+    assert "document_type_hint: documentType" in html
 
 
-def test_console_translates_legacy_server_domain_codes_for_display() -> None:
-    """구형 healthz가 코드만 내려도 운영 화면에는 한글 주제명을 보인다."""
+def test_console_does_not_reoffer_an_unavailable_active_provider() -> None:
+    """현재 설정값이어도 연결이 끊겼으면 생성 버튼을 열어 두지 않는다."""
+    html = ADMIN_HTML.read_text(encoding="utf-8")
+    status_loader = re.search(
+        r"async function loadSynthProviderStatus\(\)\{(.*?)\n\}", html, re.S
+    )
+    assert status_loader, "실제 제공자 상태를 확인하는 함수가 없다"
+    body = status_loader.group(1)
+    assert "names.push(active)" not in body, (
+        "연결 불가한 활성 제공자를 선택지에 되살렸다. 버튼이 켜지고 결국 503이 되는 대신 "
+        "처음부터 '실제 생성 제공자 없음'으로 막아야 한다."
+    )
+    assert "실제 생성 제공자 없음" in body
+    assert "생성 제공자 상태를 확인하지 못해 요청을 막았습니다." in body
+
+    static_loader = re.search(r"function syncLlmProviders\([^)]*\)\{(.*?)\n\}", html, re.S)
+    assert static_loader, "정적 제공자 목록을 채우는 함수가 없다"
+    assert "sel.disabled=true;" in static_loader.group(1), (
+        "실제 연결 상태를 확인하기 전부터 생성 버튼을 열어 두면, 빠른 클릭이 다시 가짜 요청이 된다"
+    )
+
+
+def test_console_keeps_legacy_domain_mapping_out_of_the_generation_form() -> None:
+    """구형 API의 도메인 호환 코드는 남겨도 생성 폼에는 노출하지 않는다."""
     html = ADMIN_HTML.read_text(encoding="utf-8")
 
     assert "SYNTH_DOMAIN_DISPLAY_NAMES" in html
-    assert "ai:'인공지능'" in html
-    assert "tech:'기술개발'" in html
-    assert "'화학_제약':'화학·제형'" in html
-    assert "label:synthDomainDisplayName(code)" in html
-    assert "(item&&item.label)||synthDomainDisplayName(code)" in html
+    form = re.search(r'<section class="card col-span" data-pane="train" data-product-view="synthesis".*?</section>', html, re.S)
+    assert form and 'id="sy-domain"' not in form.group(0)
 
 
 def test_bio_is_pharma_not_agriculture() -> None:

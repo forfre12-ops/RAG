@@ -191,7 +191,7 @@ class TestS4SchemaGrades:
 # ============================================================
 
 class TestS6SynthFlow:
-    def test_generate_then_queue_then_review(self):
+    def test_generation_refuses_a_noop_request_without_claiming_queue_creation(self):
         with TestClient(app) as cli:
             r1 = cli.post(
                 "/api/v1/synth/generate",
@@ -200,13 +200,12 @@ class TestS6SynthFlow:
                     "target_grade": "S2",
                     "domain": "tech",
                     "count": 3,
-                    "llm_provider": "noop",  # PoC: 비용 0
+                    "llm_provider": "noop",
                     "actor": _actor(role="reviewer"),
                 },
             )
-            assert r1.status_code == 202
-            assert r1.json()["estimated_cost_usd"] == 0.0
-            assert r1.json()["expected_count"] == 3
+            assert r1.status_code == 503
+            assert "noop" in r1.json()["detail"]
 
             r2 = cli.get("/api/v1/synth/queue?status=pending&limit=10", headers=_hdr())
             assert r2.status_code == 200
