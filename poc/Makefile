@@ -6,6 +6,7 @@
 #   make api / worker         # 로컬 기동
 
 PY ?= python
+VERIFY_PROFILE ?= console
 # 시험용 DB — make test-db-up 이 띄우는 일회용 컨테이너를 가리킨다.
 TEST_DB_URL ?= postgresql+psycopg://koipa:koipa_dev@localhost:15432/koipa
 VENV_DIR ?= .venv
@@ -21,7 +22,7 @@ UV ?= $(PY) -m uv
         gold-set retrieval-gold check-data check-gold check-leakage check-patent-proxy check-release-evidence check-parser-support openapi-consistency check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-gate-recalculate release-manifest \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers eval-trusted-ci \
-        test-lite test-slow test-fullstack test-kl-integration test-model-download test-full test-parallel
+        test-lite test-slow test-fullstack test-kl-integration test-model-download test-full test-parallel verify-fast verify-release
 
 help:
 	@echo "Targets:"
@@ -56,6 +57,8 @@ help:
 	@echo "  recover-llm-judge  uncertain_cases → llm_judge_primary 회수"
 	@echo "  test-lite    빠른 테스트 (2분 이내, slow/fullstack/model_download 제외)"
 	@echo "  test-full    전체 테스트 (인프라 + GPU 필요)"
+	@echo "  verify-fast VERIFY_PROFILE=console|synthesis|classify  범위 제한 커밋 검증(배포 승인 불가)"
+	@echo "  verify-release  전체 릴리스 게이트(이미지·인수팩·모델 게이트 포함)"
 	@echo "  p1           P1 classifier dryrun (synthetic_masked eval)"
 	@echo "  p5           P5 E2E smoke (inproc)"
 	@echo "  poc-all      P4 -> P3 -> P2 -> P1 -> P5 in order"
@@ -81,6 +84,12 @@ lock: ## uv.lock 재생성 (pyproject 변경 후 실행)
 
 lock-check: ## uv.lock 이 pyproject 와 일치하는지 검사 (CI용, drift 시 exit 1)
 	$(UV) lock --locked
+
+verify-fast: ## 범위 제한 커밋 검증 — 배포 승인은 verify-release만 가능
+	$(PY) scripts/verify_fast.py --profile $(VERIFY_PROFILE)
+
+verify-release: ## 전체 릴리스 게이트 — 이미지·인수팩·적대/메타모픽 검증
+	$(PY) scripts/run_full_verification_gate.py
 
 env:
 	@[ -f .env ] || cp .env.example .env

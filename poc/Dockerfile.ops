@@ -11,10 +11,6 @@
 # [재현성] Dockerfile.api.prod 와 같은 base digest — 반입본과 재빌드본의 동일성을 보증한다.
 FROM python:3.11-slim@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce AS base
 
-ARG KOIPA_BUILD_SHA=unknown
-ARG KOIPA_BUILD_AT=unknown
-ENV KOIPA_BUILD_SHA=${KOIPA_BUILD_SHA} \
-    KOIPA_BUILD_AT=${KOIPA_BUILD_AT}
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
@@ -26,6 +22,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
+COPY scripts/docker_install_locked.sh ./scripts/docker_install_locked.sh
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
+# 소스와 빌드 신원(SHA·시각)은 아래 의존성 레이어 뒤에 둔다. 그래야 코드 한 줄이나
+# 매 빌드마다 바뀌는 신원 값이 torch·문서 파서 설치 캐시를 무효화하지 않는다.
+# api/worker와 같은 원칙으로, ops도 lock이 바뀔 때만 무거운 설치를 다시 한다.
+RUN pip install --upgrade pip && \
+    TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh --no-project-install \
+        psh otel jwt hwp hwp-tables pdf-tables xls llm && \
+    pip install -U "wheel>=0.46.2" "jaraco.context>=6.1.0" && \
+    apt-mark manual libpq5 libfreetype6 libexpat1 curl && \
+    apt-get purge -y --auto-remove build-essential libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY src ./src
 # BEGIN deploy_manifest:container_ops_scripts — 자동 생성(scripts/check_deploy_manifest.py --write). 손으로 고치지 않는다.
 # 이미지에는 정본(deploy_manifest.toml)의 container.ops_scripts.allow 만 싣는다.
@@ -64,17 +73,14 @@ COPY scripts/_cli_io.py \
 # (console_signoff._EXCLUSIONS, 2026-09-24 발견 — api 이미지와 같은 이유로 필요).
 COPY evidence ./evidence
 
-# [용량] extras 는 api.prod 와 동일하게 전부 깐다 — 어떤 ops 도구가 어떤 extra 를 쓰는지
-# 개별 확인 안 함(calibrate_classifier.py 는 torch 필요, hwp 류는 안 쓸 수 있음) — 과소
-# 설치로 도구가 ImportError 로 죽는 쪽이 이미지 몇백MB 아끼는 것보다 나쁘다고 판단.
-ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
-RUN pip install --upgrade pip && \
-    TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh \
-        psh otel jwt hwp hwp-tables pdf-tables xls llm && \
-    pip install -U "wheel>=0.46.2" "jaraco.context>=6.1.0" && \
-    apt-mark manual libpq5 libfreetype6 libexpat1 curl && \
-    apt-get purge -y --auto-remove build-essential libpq-dev && \
-    rm -rf /var/lib/apt/lists/*
+ARG KOIPA_BUILD_SHA=unknown
+ARG KOIPA_BUILD_AT=unknown
+ENV KOIPA_BUILD_SHA=${KOIPA_BUILD_SHA} \
+    KOIPA_BUILD_AT=${KOIPA_BUILD_AT}
+
+# 의존성은 lock 기준으로 위에서 설치했다. 소스가 필요한 프로젝트 설치만 이 레이어에서
+# 수행해 코드/SHA 변경이 무거운 의존성 설치 캐시를 깨지 않게 한다.
+RUN python -m pip install -e . --no-deps
 
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 

@@ -16,7 +16,7 @@
 #
 # 무엇을 확인하는가(순서대로, 하나라도 실패하면 즉시 중단):
 #   0. uv.lock·OpenAPI 정합성 — 의존성/계약 드리프트
-#   1. 임시 PostgreSQL 기동 + 전체 pytest(fullstack 포함) — DB 없이 돌리면
+#   1. HWP/XLS 실파일 파서 사전점검 + 임시 PostgreSQL 기동 + 전체 pytest(fullstack 포함) — DB 없이 돌리면
 #      fullstack ~100여 건이 조용히 skip된다(실측 2026-08-29, Makefile 주석) — 이 게이트는
 #      그 침묵을 허용하지 않는다.
 #   2. 데이터 위생 게이트(누출·특허프록시 과라벨·gold 3층 분리)
@@ -85,6 +85,9 @@ echo "전수 검증 게이트 시작 — $(date)"
 
 run "uv.lock 정합성" "$PY" -m uv lock --locked
 run "OpenAPI 계약 정합성" "$PY" scripts/openapi_consistency.py --strict
+# 이 단계는 분류 모델을 불러오지 않는다. HWP/XLS 선택 의존성이 빠진 경우를 전체 suite와
+# 이미지 빌드 뒤가 아니라 수 초 안에 잡는다. 최종 인수팩 채점은 아래에서 그대로 다시 한다.
+run "인수팩 레거시 파서 사전점검" "$PY" scripts/check_acceptance_parser_preflight.py
 
 run "임시 PostgreSQL 기동" bash -c '
     docker rm -f koipa-testdb >/dev/null 2>&1 || true
@@ -108,9 +111,11 @@ run "임시 Redis 기동" bash -c '
 # poc/로 이동했으므로, 전체 suite 역시 같은 기준에서 실행해 실행 환경에 따라
 # datasets/·docs/ 경로가 달라지는 일을 막는다. 저장소 루트 경로가 필요한
 # 정적 콘솔 검사는 해당 테스트가 __file__ 기준으로 직접 해석한다.
-run "전체 pytest(fullstack 포함, DB·Redis 연결)" env \
+run "전체 pytest(fullstack 포함, DB·Redis 연결; 콘솔 E2E는 아래 1회 실행)" env \
     TESTING=1 DATABASE_URL="$TEST_DB_URL" REDIS_URL='redis://localhost:16379/0' \
-    "$PY" -m pytest -q -m 'not gpu and not model_download' tests
+    "$PY" -m pytest -q -m 'not gpu and not model_download' tests \
+    --ignore=tests/test_e2e_console_scenarios.py \
+    --ignore=tests/test_e2e_console_api_contract.py
 
 run "데이터 누출 게이트" "$PY" scripts/check_data_quality.py \
     --train-hash-manifest datasets/gold_real/train_subset.hashes.txt \
