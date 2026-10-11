@@ -918,7 +918,7 @@ def test_blind_screen_behaves_in_a_real_dom(h, monkeypatch, tmp_path):
     assert out["errors"] == [], out["errors"]
     assert out["gradeCellText"] == "–" and "TS" not in out["rows"].replace("RV-7K2M9Q4XN8D1T5HB", "")
     assert not any("제안" in m for m in out["metas"]), out["metas"]
-    assert out["actions"] == ["change", "defer", "discard", "exclude"], "approve 선택지가 화면에 남았다"
+    assert out["actions"] == ["change", "exclude"], "검수자 화면은 등급 확정과 학습 제외만 제공한다"
     assert out["finalGradeValue"] == "" and out["finalGradeOptions"][0] == "등급을 선택하세요"
     assert out["postsAfterBlankSave"] == 0 and "등급을 선택하세요" in out["saveMsg"], (
         "등급을 안 고르고 저장하면 요청이 나가면 안 된다")

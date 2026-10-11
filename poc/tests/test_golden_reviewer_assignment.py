@@ -818,6 +818,14 @@ def test_reviewer_manage_html_uses_the_reviewer_workspace_without_admin_actions(
     assert "CURRENT WORKSPACE" not in html
     assert "goldset/console-review" not in html
     assert 'href="/console/admin.html"' not in html
+    for obsolete_control in (
+        '<option value="approved_proxy">Proxy 확정</option>',
+        '<option value="under_review">검토중</option>',
+        '<option value="out_of_scope">검수 대상 아님</option>',
+        "option('exclude','검수 대상 아님')",
+        "option('change','등급 지정/변경')",
+    ):
+        assert obsolete_control not in html
 
 
 @pytest.mark.parametrize("status", ("unfixed", "training_ready", "excluded"))

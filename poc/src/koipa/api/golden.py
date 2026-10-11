@@ -1705,6 +1705,11 @@ def _as_reviewer_view(html: str) -> str:
     )
     html = html.replace("<h2>보류 · 폐기 이력</h2>", "<h2>내 결정 이력</h2>", 1)
     html = html.replace(
+        '<select id="ledgerFilter"><option value="">전체 결정</option><option value="defer">보류</option><option value="discard">폐기</option><option value="exclude">검수 대상 아님</option><option value="change">등급 변경</option><option value="approve">승인</option><option value="reopen">재검토</option></select>',
+        '<select id="ledgerFilter"><option value="">전체 결정</option></select>',
+        1,
+    )
+    html = html.replace(
         "let lbl={approve:'승인',change:'등급 변경',defer:'보류',discard:'폐기',reject:'반려',reopen:'재검토',exclude:'검수 대상 아님'}[e.action]||e.action;",
         "let lbl={approve:'등급 확정',change:'등급 확정',defer:'검토 대기',discard:'학습 제외',reject:'학습 제외',reopen:'검토 대기',exclude:'학습 제외'}[e.action]||e.action;",
         1,
