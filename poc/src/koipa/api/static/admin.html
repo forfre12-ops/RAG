@@ -633,6 +633,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .distribution-taxonomy{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:18px;padding-top:15px;border-top:1px solid var(--ui-line-soft);}.distribution-taxonomy-panel h4{margin:0 0 8px;color:var(--ui-muted);font-size:11px;}.distribution-taxonomy-list{display:grid;gap:6px;max-height:276px;overflow:auto;padding-right:5px;scrollbar-width:thin;scrollbar-color:transparent transparent;}.distribution-taxonomy-list:hover{scrollbar-color:#c7d0dd transparent;}.distribution-taxonomy-list::-webkit-scrollbar{width:8px;}.distribution-taxonomy-list::-webkit-scrollbar-thumb{background:transparent;border-radius:4px;}.distribution-taxonomy-list:hover::-webkit-scrollbar-thumb{background:#c7d0dd;}.distribution-taxonomy-list::-webkit-scrollbar-track{background:transparent;}
 .synth-preview{font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;max-height:110px;overflow:auto;white-space:pre-wrap;scrollbar-width:thin;scrollbar-color:transparent transparent;cursor:pointer;transition:max-height .15s ease;}
 .synth-preview.expanded{max-height:600px;}
+/* [2026-10-11] 학습 작업 실패 사유 전용 — 원문 그대로 보여주는 건 그대로 두되
+   (2026-08-08 교훈: 요약하면 원인 추적이 안 됨) 똑같은 영어 예외 전문이 실패 건마다
+   반복되며 표 세로 길이를 과도하게 늘리던 것만 .synth-preview의 접기/펼치기 상자에 담는다. */
+.job-error{color:var(--red);margin-top:4px;max-height:54px;}
+.job-error.expanded{max-height:600px;}
 .synth-preview:hover{scrollbar-color:#c7d0dd transparent;}
 .synth-preview::-webkit-scrollbar{width:8px;}
 .synth-preview::-webkit-scrollbar-thumb{background:transparent;border-radius:4px;}
@@ -2641,7 +2646,7 @@ async function loadJobs(){
       <!-- 성공 상태는 'completed' 다(TrainingRepo.mark_completed). 'done' 은 문서처리 잡의
            값이라 여기선 절대 맞지 않았고, 성공한 학습 잡이 회색 pill 로 떴다. -->
       <td><span class="pill ${j.status==='completed'?'ok':(j.status==='failed'?'err':'')}">${j.status}</span>${
-        j.error?`<div style="color:var(--red);font-size:11.5px;margin-top:4px;word-break:break-all">${esc(j.error)}</div>`:''}</td>
+        j.error?`<div class="synth-preview job-error" style="font-size:11.5px;word-break:break-all" onclick="this.classList.toggle('expanded')" title="클릭하면 전체 내용을 펼쳐 봅니다">${esc(j.error)}</div>`:''}</td>
       <td>${j.trigger_type==='incremental'
         ? '확정 검수 데이터 + 기준 표본'
         : j.approved_synthetic_snapshot
