@@ -172,6 +172,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .logline.ok .m{color:#86efac;} .logline.err .m{color:#fca5a5;} .logline.info .m{color:#e4e4e7;} .logline.req .m{color:#93c5fd;}
 
 .warnbox{font-size:12px;color:var(--amber);background:var(--amber-soft);border:1px solid #fcd34d;border-radius:8px;padding:9px 12px;}
+.model-evaluation-empty{display:grid;gap:4px;margin-top:12px;padding:15px 16px;border:1px solid var(--ui-line-soft);background:#fbfcfe;color:var(--ui-ink);}.model-evaluation-empty strong{color:var(--ui-navy);font-size:13px;}.model-evaluation-empty p{margin:0;color:var(--ui-muted);font-size:12px;line-height:1.55;}.model-evaluation-empty p:last-child{margin-top:2px;font-size:11px;}
 
 /* 검수 근거 펼침 — 클릭한 행에서만 조회한다(lazy). */
 .q-why{margin-top:2px;}
@@ -2511,10 +2512,13 @@ async function loadMetrics(){
     markFlow(5);
   }catch(e){
     $('metrics-cards').innerHTML=''; $('metrics-context').innerHTML='';
-    const detail=e&&e.status===404
-      ? '아직 평가할 활성 모델이 없습니다. 「학습 작업 제출」 → 작업 완료 → 「완료된 모델 적용」 후 다시 조회하세요.'
-      : '평가 이력이 없거나 데이터 저장소에 연결할 수 없습니다.';
-    $('metrics-extra').innerHTML=`<div class="warnbox">평가 결과를 조회하지 못했습니다: ${errKo(e)} — ${detail}</div>`;
+    if(e&&e.status===404){
+      LAST_MODEL_VERSION=null;
+      $('metrics-extra').innerHTML=`<section class="model-evaluation-empty" role="status"><strong>아직 평가 결과가 없습니다</strong><p>학습 작업이 완료되고 모델이 적용되면 이곳에서 성능 평가 결과를 확인할 수 있습니다.</p><p>현재는 활성 모델이 없어 표시할 평가 결과가 없습니다.</p></section>`;
+      log('평가 결과 없음: 활성 모델이 아직 적용되지 않았습니다.','info');
+      return;
+    }
+    $('metrics-extra').innerHTML=`<div class="warnbox">평가 결과를 조회하지 못했습니다: ${errKo(e)} — 평가 이력이 없거나 데이터 저장소에 연결할 수 없습니다.</div>`;
   }
 }
 function modelMetricCard(label,value,detail,caution){ return `<div class="model-metric${caution?' is-caution':''}"><span class="model-metric-label">${label}</span><b class="model-metric-value">${value}</b><small class="model-metric-detail">${detail}</small></div>`; }
