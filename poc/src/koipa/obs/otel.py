@@ -17,8 +17,77 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
+
+
+# Observability must never become a second document store.  Manual spans are
+# allow-listed instead of relying on every caller to remember which values are
+# sensitive.  Adding a new attribute is therefore an explicit privacy review.
+_SAFE_MANUAL_SPAN_ATTRIBUTES = frozenset(
+    {
+        "koipa.has_doc_id",
+        "koipa.has_content",
+        "koipa.model_dir",
+        "model_version",
+        "n_chunks",
+        "device",
+    }
+)
+_HTTP_ROUTE_ATTRIBUTES_TO_REDACT = (
+    "http.url",
+    "http.target",
+    "url.full",
+    "url.path",
+    "url.query",
+    "http.request.header.authorization",
+    "http.request.header.cookie",
+    "http.response.header.set-cookie",
+)
+
+
+def safe_span_attributes(attrs: Mapping[str, object]) -> dict[str, bool | int | float | str]:
+    """Return only explicitly approved, scalar observability attributes.
+
+    Request text, prompt text, evidence and authentication material have no
+    allow-list entry.  Unknown keys are intentionally dropped rather than
+    emitted and reviewed later.
+    """
+    safe: dict[str, bool | int | float | str] = {}
+    for key, value in attrs.items():
+        if key not in _SAFE_MANUAL_SPAN_ATTRIBUTES:
+            continue
+        if not isinstance(value, (bool, int, float, str)):
+            continue
+        if isinstance(value, str) and len(value) > 128:
+            continue
+        safe[key] = value
+    return safe
+
+
+def redact_server_request_span(span, _scope) -> None:
+    """Remove URL/query/header values from the automatic server span.
+
+    FastAPI instrumentation does not need request bodies for useful route
+    timing.  Redacting the transport values as well keeps an accidental query
+    parameter out of an OTLP collector.  ``http.route`` remains available as
+    the low-cardinality operational route name.
+    """
+    if span is None:
+        return
+    for key in _HTTP_ROUTE_ATTRIBUTES_TO_REDACT:
+        try:
+            span.set_attribute(key, "[redacted]")
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _deep_instrumentation_enabled() -> bool:
+    """Allow potentially payload-adjacent dependency traces only by opt-in."""
+    return str(os.getenv("KOIPA_OTEL_DEEP_INSTRUMENTATION", "")).strip().lower() in {
+        "1", "true", "yes", "on"
+    }
 
 
 def setup_tracing(app=None, *, service_name: str | None = None) -> bool:
@@ -57,25 +126,30 @@ def setup_tracing(app=None, *, service_name: str | None = None) -> bool:
     if app is not None:
         try:
             from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor  # type: ignore
-            FastAPIInstrumentor.instrument_app(app)
+            FastAPIInstrumentor.instrument_app(
+                app,
+                server_request_hook=redact_server_request_span,
+            )
         except Exception as e:  # noqa: BLE001
             logger.warning("FastAPIInstrumentor failed: %s", e)
 
-    # SQLAlchemy / Redis / httpx
-    # #30: Celery(워커 task trace 전파) / Logging(로그에 trace_id/span_id 주입) 자동계측 추가.
-    #      미설치 시 아래 try/except가 흡수 → silent skip (기존 자동계측 패턴 그대로).
-    for mod, label in (
-        ("opentelemetry.instrumentation.sqlalchemy", "SQLAlchemyInstrumentor"),
-        ("opentelemetry.instrumentation.redis", "RedisInstrumentor"),
-        ("opentelemetry.instrumentation.httpx", "HTTPXClientInstrumentor"),
-        ("opentelemetry.instrumentation.celery", "CeleryInstrumentor"),
-        ("opentelemetry.instrumentation.logging", "LoggingInstrumentor"),
-    ):
-        try:
-            m = __import__(mod, fromlist=[label])
-            getattr(m, label)().instrument()
-        except Exception as e:  # noqa: BLE001
-            logger.debug("instrumentation %s skipped: %s", label, e)
+    # SQL/Redis/httpx/Celery can carry statements, commands, URLs or task
+    # arguments.  They are deliberately opt-in after a deployment-specific
+    # data review; route timing and the allow-listed manual spans above remain
+    # available by default.
+    if _deep_instrumentation_enabled():
+        for mod, label in (
+            ("opentelemetry.instrumentation.sqlalchemy", "SQLAlchemyInstrumentor"),
+            ("opentelemetry.instrumentation.redis", "RedisInstrumentor"),
+            ("opentelemetry.instrumentation.httpx", "HTTPXClientInstrumentor"),
+            ("opentelemetry.instrumentation.celery", "CeleryInstrumentor"),
+            ("opentelemetry.instrumentation.logging", "LoggingInstrumentor"),
+        ):
+            try:
+                m = __import__(mod, fromlist=[label])
+                getattr(m, label)().instrument()
+            except Exception as e:  # noqa: BLE001
+                logger.debug("instrumentation %s skipped: %s", label, e)
 
     logger.info("OpenTelemetry tracing enabled: service=%s endpoint=%s", svc, endpoint)
     return True
@@ -119,11 +193,9 @@ def span(name: str, **attrs):
     with cm as sp:
         # set_attribute는 None/복합타입에 민감 — 스칼라만, None 제외로 방어.
         if sp is not None:
-            for k, v in attrs.items():
-                if v is None:
-                    continue
+            for key, value in safe_span_attributes(attrs).items():
                 try:
-                    sp.set_attribute(k, v)
+                    sp.set_attribute(key, value)
                 except Exception:  # noqa: BLE001
                     pass
         yield sp
