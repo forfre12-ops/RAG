@@ -12,3 +12,13 @@ def test_distribution_scope_buttons_show_selected_scope_metrics():
     assert "addMetric('등급 미지정',missing,'distribution-scope-missing')" in console
     assert "전체 검수 완료율" in console
     assert "button.onclick=()=>renderScope(scope)" in console
+
+
+def test_model_evaluation_uses_plain_language_for_grade_comparison():
+    """관리 화면에는 내부 ML 용어 대신 표의 의미를 직접 설명한다."""
+    console = Path("poc/src/koipa/api/static/admin.html").read_text(encoding="utf-8")
+
+    assert ">실제 등급 · 모델 예측 비교<" in console
+    assert "평가 기준 등급과 모델 예측 등급을 한 표에서 비교합니다." in console
+    assert "실제 등급 · 모델 예측 비교 — 모델" in console
+    assert "오분류 표(혼동행렬)" not in console

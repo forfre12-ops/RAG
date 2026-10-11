@@ -1106,9 +1106,9 @@ body *,body *::before,body *::after{border-radius:0 !important}
         <div class="btn-row">
           <button class="btn" onclick="loadMetrics()">평가 결과 조회</button>
           <button class="btn sec sm" onclick="loadHistory()">평가 이력</button>
-          <button class="btn sec sm" onclick="loadConfusionMatrix()">오분류 표(혼동행렬)</button>
+          <button class="btn sec sm" onclick="loadConfusionMatrix()">실제 등급 · 모델 예측 비교</button>
         </div>
-        <p class="sec-note">오분류 표는 실제 등급과 모델 예측 등급을 교차해 보여 줍니다. 대각선은 맞춘 건, 대각선 밖은 잘못 분류한 건이며 평가된 활성 모델이 있을 때만 표시됩니다.</p>
+        <p class="sec-note">평가 기준 등급과 모델 예측 등급을 한 표에서 비교합니다. 대각선은 맞춘 건, 대각선 밖은 다르게 예측한 건이며 평가된 활성 모델이 있을 때만 표시됩니다.</p>
         <div id="metrics-cards" class="model-metrics"></div>
         <div id="metrics-context"></div>
         <div id="metrics-extra"></div>
@@ -2567,17 +2567,17 @@ async function loadHistory(){
   }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">이력 조회 실패: ${errKo(e)}</div>`; }
 }
 async function loadConfusionMatrix(){
-  if(!LAST_MODEL_VERSION){ alert('오분류 표는 평가된 활성 모델에서만 볼 수 있습니다. 먼저 학습·적용 후 「평가 결과 조회」를 실행하세요.'); return; }
+  if(!LAST_MODEL_VERSION){ alert('등급 비교표는 평가된 활성 모델에서만 볼 수 있습니다. 먼저 학습·적용 후 「평가 결과 조회」를 실행하세요.'); return; }
   try{
     const d=await api('GET',`/metrics/confusion-matrix/${encodeURIComponent(LAST_MODEL_VERSION)}`);
     const labels=d.labels||[], m=d.matrix||[];
     const head=`<tr><th class="mono">실제 \\ 예측</th>${labels.map(l=>`<th class="mono" style="text-align:center">${esc(l)}</th>`).join('')}</tr>`;
     const rows=m.map((row,i)=>`<tr><td class="mono"><b>${esc(labels[i]??i)}</b></td>${row.map((v,j)=>`<td style="text-align:center;${i===j?'font-weight:700;background:var(--green-soft);color:var(--green)':''}">${v}</td>`).join('')}</tr>`).join('');
     const fnr=d.fnr_by_grade||{};
-    $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">혼동행렬 — 모델 ${esc(d.model_version||LAST_MODEL_VERSION)} <span style="color:var(--text-dim)">(대각선=정분류)</span></label>
+    $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">실제 등급 · 모델 예측 비교 — 모델 ${esc(d.model_version||LAST_MODEL_VERSION)} <span style="color:var(--text-dim)">(대각선=일치)</span></label>
       <div class="tbl-wrap"><table><thead>${head}</thead><tbody>${rows||'<tr><td style="color:var(--text-dim)">데이터 없음</td></tr>'}</tbody></table></div>
       ${Object.keys(fnr).length?`<div class="kv" style="margin-top:8px">${Object.entries(fnr).map(([g,v])=>`<div><span>FNR ${esc(g)}</span> <b style="color:${v>0.05?'var(--red)':'var(--green)'}">${(v*100).toFixed(1)}%</b></div>`).join('')}</div>`:''}</div>`;
-  }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">혼동행렬 조회 실패: ${errKo(e)} — 활성 모델(${esc(LAST_MODEL_VERSION)})의 혼동행렬 이력이 없을 수 있습니다.</div>`; }
+  }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">등급 비교표 조회 실패: ${errKo(e)} — 활성 모델(${esc(LAST_MODEL_VERSION)})의 평가 이력이 없을 수 있습니다.</div>`; }
 }
 /* [2026-08-24] loadSchema() 를 지웠다 — 메트릭 카드의 「등급체계 조회」 버튼이 유일한 호출처였고,
  * 그 버튼을 없앴다(설정 탭이 같은 것을 편집한다). 등급체계 조회·편집은 loadGradeEditor() 한 곳. */
