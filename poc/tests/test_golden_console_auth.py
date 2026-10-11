@@ -32,6 +32,23 @@ def test_jwt_cookie_is_accepted_without_authorization_header(monkeypatch):
     assert auth["mode"] == "jwt" and auth["claims"].sub == "portal-admin-kim"
 
 
+def test_both_mode_prefers_console_jwt_over_a_stale_stored_api_key(monkeypatch):
+    """로그인한 콘솔은 오래 남은 API 키보다 JWT 개인 신원으로 감사돼야 한다."""
+    claims = JWTClaims(sub="portal-admin-kim", roles=("admin",), exp=9999999999)
+    request = _request()
+    monkeypatch.setattr(settings, "auth_mode", "both")
+    monkeypatch.setattr(settings, "api_key", "legacy-browser-key")
+    monkeypatch.setattr(_jwt_auth, "verify_jwt", lambda token: claims)
+    auth = _jwt_auth.require_auth(
+        request,
+        authorization=None,
+        x_api_key="legacy-browser-key",
+        koipa_access_token="console-jwt-cookie",
+    )
+    assert auth["mode"] == "jwt"
+    assert request.state.auth_actor == "portal-admin-kim"
+
+
 def test_none_mode_still_honors_a_console_login_cookie(monkeypatch):
     """[2026-10-10] KL 요청 — "AI API 인증 생략"과 "검수 콘솔 로그인"은 별개다.
 

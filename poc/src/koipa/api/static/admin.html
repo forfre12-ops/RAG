@@ -1118,27 +1118,25 @@ body *,body *::before,body *::after{border-radius:0 !important}
 
     <!-- ===== 감사 로그 ===== 미들웨어가 쓰기만 하고 읽는 경로가 없어, 35,000행이 쌓여도
          화면에서 "누가 언제 무엇을 했는가"를 볼 수 없었다. -->
-    <section class="card col-span" data-pane="ops" data-product-view="audit" style="order:4">
+    <section class="card col-span audit-card" data-pane="ops" data-product-view="audit" style="order:4">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">조회</span> 감사 기록 — 누가 · 언제 · 무엇을</div>
+        <div><div class="ttl">감사 기록</div><p class="sec-note">누가 · 언제 · 무엇을 했는지 조건별로 확인합니다.</p></div>
         <span class="ep" data-tech>GET /admin/audit-log</span>
       </div>
       <div class="card-body">
-        <div class="btn-row" style="align-items:center;flex-wrap:wrap;gap:8px">
-          <input id="au-action" type="text" placeholder="동작 코드 검색 (예: train, confirm, activate)" style="flex:1;min-width:180px" />
-          <input id="au-actor" type="text" placeholder="행위자 ID" style="width:140px" />
-          <label class="hint" for="au-from">시작 <input id="au-from" type="datetime-local" /></label>
-          <label class="hint" for="au-to">종료 <input id="au-to" type="datetime-local" /></label>
-          <select id="au-success" style="width:auto">
-            <option value="">전체</option>
-            <option value="true">성공만</option>
-            <option value="false">실패만</option>
-          </select>
-          <button class="btn sm" onclick="loadAuditLog()">조회</button>
+        <div class="audit-toolbar" aria-label="감사 기록 검색 조건">
+          <div class="audit-field"><label for="au-action">동작 코드</label><input id="au-action" type="text" placeholder="예: train, confirm, activate" /></div>
+          <div class="audit-field"><label for="au-actor">행위자 ID</label><input id="au-actor" type="text" placeholder="사용자 또는 서비스" /></div>
+          <div class="audit-field"><label for="au-from">시작 시각</label><input id="au-from" type="datetime-local" /></div>
+          <div class="audit-field"><label for="au-to">종료 시각</label><input id="au-to" type="datetime-local" /></div>
+          <div class="audit-field"><label for="au-success">결과</label><select id="au-success">
+              <option value="">전체</option><option value="true">성공만</option><option value="false">실패만</option>
+          </select></div>
+          <button class="btn audit-run" onclick="loadAuditLog()">조회</button>
         </div>
-        <p class="sec-note" id="au-info" style="margin-top:6px;">서버 상태 확인 · 정적 자산 · 지표 수집은 제외됩니다.</p>
+        <p class="sec-note audit-info" id="au-info">서버 상태 확인 · 정적 자산 · 지표 수집은 제외됩니다.</p>
         <div id="au-warn"></div>
-        <div class="tbl-wrap" style="margin-top:8px;max-height:340px;overflow:auto">
+        <div class="tbl-wrap audit-table" style="overflow:auto">
           <table>
             <thead><tr><th>시각</th><th>동작 코드</th><th>행위자</th><th>대상</th><th>결과</th></tr></thead>
             <tbody id="au-body"><tr><td colspan="5" style="color:var(--text-dim)">「조회」를 누르면 감사 기록이 나옵니다</td></tr></tbody>
@@ -2436,7 +2434,7 @@ async function loadAuditLog(offset){
     const actorlessRatio=Number(d.actorless_ratio);
     if(Number.isFinite(actorlessRatio)&&actorlessRatio>0&&warn){
       const actorlessPercent=(actorlessRatio*100).toFixed(1);
-      warn.innerHTML+=`<div class="warnbox" style="margin-top:8px">현재 조회 결과 ${items.length}건 중 행위자 신원이 기록되지 않은 비율은 ${actorlessPercent}%입니다. 이 비율은 현재 조회 결과 기준입니다.</div>`;
+      warn.innerHTML+=`<div class="warnbox audit-warning">현재 조회 결과 ${items.length}건 중 행위자 신원이 기록되지 않은 비율은 ${actorlessPercent}%입니다. 이 비율은 현재 조회 결과 기준입니다.</div>`;
     }
     (d.warnings||[]).forEach(w=>{ if(warn) warn.innerHTML+=`<div class="warnbox" style="margin-top:8px">${esc(w)}</div>`; });
     log(`감사 로그 ${items.length}건 조회 (전체 ${d.total??0})`,'ok');

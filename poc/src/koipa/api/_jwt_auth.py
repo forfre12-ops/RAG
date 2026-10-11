@@ -376,6 +376,26 @@ def require_auth(
         roles = _resolve_api_key_roles(request)
         _stash_auth(request, mode="none", actor=None, role=roles[0])
         return {"mode": "none", "actor_role": roles[0], "actor_roles": roles}
+    # 로그인한 콘솔은 개인 JWT 쿠키를 가진다. 과거 키 기반 콘솔의 localStorage에
+    # X-API-Key가 남아 있어도, 사람이 로그인한 브라우저라면 공유 키보다 서명된
+    # 개인 JWT를 먼저 사용해야 감사 기록이 서비스 계정으로 뭉개지지 않는다.
+    # Authorization 헤더가 있으면 쿠키보다 그 값을 우선한다.
+    if mode == "both" and (authorization or koipa_access_token):
+        token = authorization or f"Bearer {koipa_access_token}"
+        try:
+            claims = verify_jwt(
+                token[7:].strip() if token.lower().startswith("bearer ") else token
+            )
+        except JWTError as e:
+            raise HTTPException(status_code=401, detail=f"invalid jwt: {e}") from e
+        jwt_roles = tuple(r for r in claims.roles if r in VALID_ROLES)
+        _stash_auth(request, mode="jwt", actor=claims.sub, role=_highest_role(jwt_roles))
+        return {
+            "mode": "jwt",
+            "claims": claims,
+            "actor_role": _highest_role(jwt_roles),
+            "actor_roles": jwt_roles,
+        }
     if mode in ("api_key", "both"):
         # 상수시간 비교(hmac.compare_digest) — 평문 `==`의 바이트단위 early-exit
         # 타이밍 사이드채널 차단. 빈 settings.api_key는 인증 불가(가드 유지).

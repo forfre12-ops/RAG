@@ -6,9 +6,8 @@
 - payload는 SHA-256 해시만. 본문은 PG에 저장하지 않음.
 - /healthz·/docs·/openapi.json은 audit 제외 (노이즈 차단)
 - actor_id·role은 인증이 해소한 request.state.auth_*를 우선 사용(JWT는 sub=개별 신원).
-  auth_*가 비면 X-Actor-Id 헤더로 폴백 — 인증 실패뿐 아니라 **공유 api_key 모드**(개별
-  신원 미해석)의 성공 요청도 포함된다. 즉 shared-key 배포에서 X-Actor-Id는 KL 포털이
-  주입하는 신뢰 신원 채널이다(단일 고객사·폐쇄망 전제; JWT 모드에선 위조 불가한 sub 우선).
+  공유 api_key 모드는 명시 연동 주체가 없으면 service:api-key로, 미인증 실패 요청은
+  unauthenticated로 기록해 빈 신원이 남지 않게 한다.
 - tenant 제거: 단일 고객사 엔진(격리는 KL 포털 전담), audit에 tenant 기록 없음.
 """
 
@@ -168,6 +167,32 @@ def _raw_body_hash(body: bytes) -> str:
     return _hash_bytes(body) if body else ""
 
 
+def _audit_identity(request: Request) -> tuple[str, str | None]:
+    """감사 기록의 주체를 빈칸으로 남기지 않는다.
+
+    JWT 주체는 개인 신원이고 가장 우선한다. 공유 API 키는 개인 신원을 증명하지 않으므로
+    요청이 명시한 신뢰 연동 주체가 없을 때 ``service:api-key``로만 기록한다. 이는 사람
+    이름을 추정하는 것이 아니라, 감사 화면에서 *누가 아니라 어떤 서비스가* 호출했는지를
+    정직하게 드러내기 위한 구분이다.
+    """
+    auth_actor = getattr(request.state, "auth_actor", None)
+    auth_role = getattr(request.state, "auth_role", None)
+    if auth_actor:
+        return str(auth_actor), auth_role
+
+    supplied_actor = (request.headers.get("x-actor-id") or "").strip()
+    supplied_role = (request.headers.get("x-actor-role") or "").strip()
+    if supplied_actor:
+        return supplied_actor, auth_role or supplied_role or None
+
+    auth_mode = getattr(request.state, "auth_mode", None)
+    if auth_mode == "api_key":
+        return "service:api-key", auth_role or "system"
+    if auth_mode == "none":
+        return "service:auth-disabled", auth_role or "system"
+    return "unauthenticated", auth_role or None
+
+
 async def _read_body(request: Request) -> bytes:
     """body를 한 번만 읽고, 다운스트림 핸들러가 재사용할 수 있게 cache."""
     body = await request.body()
@@ -271,14 +296,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
             return True
 
         action = _derive_action(request)
-        # 보안: 인증이 해소한 신원(request.state.auth_*)을 우선 사용 — 위조 가능한
-        # X-Actor-Id 헤더로 감사 기록이 날조되는 것을 차단. 인증이 신원을 못 채운
-        # 경우(인증 실패/미인증 요청)에만 헤더로 폴백(success=False로 이미 구분됨).
-        # tenant 제거: 단일 고객사 엔진(격리는 KL 포털 전담), audit에 tenant 기록 없음.
-        auth_actor = getattr(request.state, "auth_actor", None)
-        auth_role = getattr(request.state, "auth_role", None)
-        actor_id = auth_actor if auth_actor is not None else request.headers.get("x-actor-id")
-        actor_role = auth_role if auth_role is not None else request.headers.get("x-actor-role")
+        # 개인 JWT 신원을 우선하고, 공유키·미인증 요청도 빈 행위자로 남기지 않는다.
+        actor_id, actor_role = _audit_identity(request)
         request_id = getattr(request.state, "request_id", None)
         ip = request.client.host if request.client else None
         ua = request.headers.get("user-agent")
