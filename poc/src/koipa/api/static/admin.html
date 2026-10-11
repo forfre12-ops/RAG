@@ -1423,7 +1423,7 @@ body *,body *::before,body *::after{border-radius:0 !important}
             <p class="sec-note" style="margin-top:6px;">「표시」를 켠 조항만 문서별 규정참고 조회 결과에 나옵니다. 총칙·절차처럼 문서 한 건에 직접 적용되지 않는 조항은 처음부터 꺼져 있습니다.</p>
             <div class="btn-row" style="margin-top:8px;">
               <button class="btn sec sm" onclick="previewRegulation()">미리보기</button>
-              <span class="hint" style="margin:0;">아래 목록에 올라와 있는 문서로 미리 봅니다 — 이 목록은 자동으로 채워지지 않습니다(알려진 한계, QUEUE 참고).</span>
+              <span class="hint" style="margin:0;">규정 적용 결과를 확인합니다.</span>
             </div>
             <div id="reg-preview"></div>
           </div>
@@ -3651,9 +3651,7 @@ async function previewRegulation(){
   const r=REG_SEL, box=$('reg-preview'); if(!r || !box) return;
   const docs=regPreviewDocs();
   if(!docs.length){
-    box.innerHTML='<div class="warnbox" style="margin-top:8px">미리볼 문서가 없습니다 — 이 목록은 더 이상 자동으로 채워지지 않습니다(운영 탭 검수 화면이 빠졌습니다). '
-      + '테스트 페이지(/console/index.html)에서 문서를 올려 doc_id 를 얻은 뒤, 개발자 도구 콘솔에서 '
-      + '<code>QUEUE.push({doc_id:"…",title:"…"})</code> 로 임시로 추가하십시오.</div>';
+    box.innerHTML='<div class="sec-note" role="status" style="margin-top:8px">미리보기에 사용할 문서가 없습니다.</div>';
     return;
   }
   box.innerHTML='<div class="sec-note" style="margin-top:8px">불러오는 중…</div>';

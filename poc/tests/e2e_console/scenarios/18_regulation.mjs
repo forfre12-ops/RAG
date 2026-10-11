@@ -560,8 +560,8 @@ export const scenarios = [
       p2.click(p2.q('button[onclick="previewRegulation()"]'));
       await p2.settle();
       check.eq(calls(server, 'POST', `/regulations/${REG2}/preview`).length, 0, '미리볼 문서가 없으면 요청이 나가지 않는다');
-      check.includes(p2.text('reg-preview'), '미리볼 문서가 없습니다', '이유와 다음에 할 일을 말한다');
-      check.includes(p2.text('reg-preview'), '더 이상 자동으로 채워지지 않습니다', '자동으로 안 채워지는 이유를 말한다');
+      check.includes(p2.text('reg-preview'), '미리보기에 사용할 문서가 없습니다', '비어 있는 이유를 중립적으로 알린다');
+      check.ok(!p2.text('reg-preview').includes('개발자 도구'), '운영자용 내부 안내를 노출하지 않는다');
       return p2;
     },
   },
