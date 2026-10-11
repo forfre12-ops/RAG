@@ -33,9 +33,47 @@ def _bash() -> str:
     )
 
 
+def _gate_env(shell: str) -> dict[str, str]:
+    """Give Git Bash its POSIX utilities even when launched from a bare shell.
+
+    The desktop runner can start Python with a minimal Windows ``PATH``.  Git
+    Bash finds ``bash.exe`` in that case but cannot subsequently find its own
+    ``dirname`` or ``date`` utilities, so the verification gate fails before
+    it has tested anything.  Prepending Git's ``usr/bin`` keeps the caller's
+    environment intact while making the Bash script self-contained.
+    """
+    env = os.environ.copy()
+    if os.name != "nt":
+        return env
+
+    executable = Path(shell).resolve()
+    utility_dirs = [executable.parent]
+    for parent in executable.parents:
+        candidate = parent / "usr" / "bin"
+        if candidate.is_dir():
+            utility_dirs.append(candidate)
+            break
+
+    existing = env.get("PATH", "").split(os.pathsep)
+    prefixes = [str(directory) for directory in utility_dirs if directory.is_dir()]
+    unique: list[str] = []
+    seen: set[str] = set()
+    for entry in [*prefixes, *existing]:
+        if entry and entry.casefold() not in seen:
+            unique.append(entry)
+            seen.add(entry.casefold())
+    env["PATH"] = os.pathsep.join(unique)
+    return env
+
+
 def main() -> int:
     poc_root = Path(__file__).resolve().parents[1]
-    return subprocess.run([_bash(), "scripts/full_verification_gate.sh"], cwd=poc_root).returncode
+    shell = _bash()
+    return subprocess.run(
+        [shell, "scripts/full_verification_gate.sh"],
+        cwd=poc_root,
+        env=_gate_env(shell),
+    ).returncode
 
 
 if __name__ == "__main__":
