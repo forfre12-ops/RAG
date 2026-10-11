@@ -27,6 +27,7 @@ from koipa.db.models import (
 from koipa.modules.m6_evaluation.corrections_rebuild import (
     RebuildResult,
     _correction_admissible,
+    build_incremental_train_jsonl,
     build_labeled_rows_from_corrections,
     merge_into_train_jsonl,
     write_labeled_jsonl,
@@ -76,6 +77,73 @@ def test_merge_without_base_uses_corrections_only(tmp_path: Path):
 
 def test_merge_no_rows_returns_none(tmp_path: Path):
     assert merge_into_train_jsonl(None, RebuildResult(), tmp_path / "x.jsonl") is None
+
+
+def test_incremental_input_is_bounded_replay_plus_confirmed_batch(tmp_path: Path):
+    base = tmp_path / "base.jsonl"
+    base_rows = [
+        {"text": f"base-{label}-{i}", "label": label}
+        for label in ("TS", "S1", "S2", "S3")
+        for i in range(3)
+    ]
+    base.write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in base_rows),
+        encoding="utf-8",
+    )
+    correction_rows = [
+        {"text": f"confirmed-{i}", "label": ("TS", "S1", "S2", "S3")[i % 4]}
+        for i in range(50)
+    ]
+    doc_ids = [f"doc-{i}" for i in range(50)]
+    res = RebuildResult(
+        rows=correction_rows,
+        correction_ids=list(range(1, 51)),
+        doc_ids=doc_ids,
+        corr_ids_by_doc={doc_id: [index + 1] for index, doc_id in enumerate(doc_ids)},
+    )
+
+    built = build_incremental_train_jsonl(
+        base,
+        res,
+        tmp_path / "incremental.jsonl",
+        holdout_paths=[],
+        minimum_correction_rows=50,
+        replay_per_label=1,
+    )
+
+    assert built.reason == "ok"
+    assert built.correction_rows == 50
+    assert built.replay_rows == 4
+    lines = Path(built.path).read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 54
+    assert {json.loads(line)["text"] for line in lines[:4]} <= {
+        row["text"] for row in base_rows
+    }
+    assert {json.loads(line)["text"] for line in lines[4:]} == {
+        row["text"] for row in correction_rows
+    }
+    assert res.incorporated_correction_ids == list(range(1, 51))
+
+
+def test_incremental_input_rejects_batch_below_minimum_after_filtering(tmp_path: Path):
+    base = tmp_path / "base.jsonl"
+    base.write_text(json.dumps({"text": "base", "label": "TS"}) + "\n", encoding="utf-8")
+    res = RebuildResult(
+        rows=[{"text": f"confirmed-{i}", "label": "TS"} for i in range(49)],
+        doc_ids=[f"doc-{i}" for i in range(49)],
+    )
+
+    built = build_incremental_train_jsonl(
+        base,
+        res,
+        tmp_path / "too-small.jsonl",
+        holdout_paths=[],
+    )
+
+    assert built.path is None
+    assert built.correction_rows == 49
+    assert "eligible_corrections=49<minimum=50" == built.reason
+    assert not (tmp_path / "too-small.jsonl").exists()
 
 
 def test_rebuild_db_unavailable_graceful(monkeypatch):

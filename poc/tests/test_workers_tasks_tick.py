@@ -61,23 +61,33 @@ def test_tick_snapshot_mode_returns_status_no_enqueue():
     assert enq.call_count == 0
 
 
-def test_tick_auto_urgent_enqueues_train():
+def test_tick_auto_urgent_enqueues_incremental_after_minimum_gate():
     with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
-               return_value=_status(retrain="URGENT_RETRAIN", underclass=20,
+               return_value=_status(retrain="URGENT_RETRAIN", underclass=20, total=50,
                                      reason="pending_underclass=20 >= urgent=10")):
         with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
             out = active_learning_tick(mode="auto")
-    assert out["triggered"] == "URGENT_RETRAIN"
+    assert out["triggered"] == "URGENT_INCREMENTAL"
     assert enq.call_count == 1
+    assert enq.call_args.kwargs == {"kwargs": {"spec_kwargs": {"training_mode": "incremental"}}}
 
 
 def test_tick_auto_urgent_enqueue_failure_marked():
     with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
-               return_value=_status(retrain="URGENT_RETRAIN", underclass=20)):
+               return_value=_status(retrain="URGENT_RETRAIN", underclass=20, total=50)):
         with patch("koipa.workers.tasks.train_classifier_task.apply_async",
                    side_effect=RuntimeError("broker down")):
             out = active_learning_tick(mode="auto")
     assert out["triggered"] == "ENQUEUE_FAILED"
+
+
+def test_tick_auto_urgent_below_minimum_is_held():
+    with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+               return_value=_status(retrain="URGENT_RETRAIN", underclass=20, total=49)):
+        with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
+            out = active_learning_tick(mode="auto")
+    assert out["triggered"] == "HOLD_MINIMUM_CONFIRMED_CORRECTIONS"
+    assert enq.call_count == 0
 
 
 def test_tick_auto_recommended_outside_window_skips():
@@ -129,8 +139,9 @@ def test_tick_auto_recommended_inside_window_enqueues():
                        return_value=_status(retrain="RETRAIN_RECOMMENDED", total=60)):
                 with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                     out = active_learning_tick(mode="auto")
-    assert out["triggered"] == "RETRAIN_RECOMMENDED"
+    assert out["triggered"] == "INCREMENTAL_RECOMMENDED"
     assert enq.call_count == 1
+    assert enq.call_args.kwargs == {"kwargs": {"spec_kwargs": {"training_mode": "incremental"}}}
 
 
 def test_tick_auto_recommended_second_tick_same_week_does_not_requeue():
@@ -157,7 +168,7 @@ def test_tick_auto_recommended_second_tick_same_week_does_not_requeue():
                 with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                     first = active_learning_tick(mode="auto")
                     second = active_learning_tick(mode="auto")  # 30분 뒤 다음 틱 재현
-    assert first["triggered"] == "RETRAIN_RECOMMENDED"
+    assert first["triggered"] == "INCREMENTAL_RECOMMENDED"
     assert second["triggered"] == "SKIP_ALREADY_TRIGGERED_THIS_WEEK"
     assert enq.call_count == 1
 
@@ -185,7 +196,7 @@ def test_tick_auto_recommended_enqueue_failure_releases_lock_for_retry():
                 with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                     retried = active_learning_tick(mode="auto")
     assert failed["triggered"] == "ENQUEUE_FAILED"
-    assert retried["triggered"] == "RETRAIN_RECOMMENDED"
+    assert retried["triggered"] == "INCREMENTAL_RECOMMENDED"
     assert enq.call_count == 1
 
 
@@ -205,29 +216,25 @@ def test_tick_auto_training_disabled_skips_enqueue():
     고객사 차단). status 평가는 유지하되 triggered=SKIP_TRAINING_DISABLED로 조기 반환.
     """
     with patch("koipa.config.settings.enable_training", False, create=True):
-        with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
-                   return_value=_status(retrain="URGENT_RETRAIN", underclass=20)):
-            with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
-                out = active_learning_tick(mode="auto")
-    assert out["triggered"] == "SKIP_TRAINING_DISABLED"
-    assert enq.call_count == 0
-
-
-def test_active_learning_urgent_stays_training_gated_not_incremental():
-    """[안전 분리] enable_incremental_retrain(고객사 야간)만으론 URGENT 자동재학습을 열지 않는다.
-
-    고객사(enable_training=False, enable_incremental_retrain=True)에서도 active_learning URGENT
-    자동재학습(30분틱)은 여전히 차단돼야 한다 — 증분 플래그는 통제된 야간 배치만 켜고, 공격적
-    드리프트-트리거 자동재학습(죽음의 나선 우려)은 지재원(enable_training) 전용으로 유지.
-    """
-    with patch("koipa.config.settings.enable_training", False, create=True):
-        with patch("koipa.config.settings.enable_incremental_retrain", True, create=True):
+        with patch("koipa.config.settings.enable_incremental_retrain", False, create=True):
             with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
-                       return_value=_status(retrain="URGENT_RETRAIN", underclass=20)):
+                       return_value=_status(retrain="URGENT_RETRAIN", underclass=20, total=50)):
                 with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                     out = active_learning_tick(mode="auto")
     assert out["triggered"] == "SKIP_TRAINING_DISABLED"
     assert enq.call_count == 0
+
+
+def test_active_learning_incremental_worker_can_handle_urgent_batch():
+    """증분 노드는 50건 이상 확정 교정이 쌓인 urgent batch만 증분으로 큐잉한다."""
+    with patch("koipa.config.settings.enable_training", False, create=True):
+        with patch("koipa.config.settings.enable_incremental_retrain", True, create=True):
+            with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+                       return_value=_status(retrain="URGENT_RETRAIN", underclass=20, total=50)):
+                with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
+                    out = active_learning_tick(mode="auto")
+    assert out["triggered"] == "URGENT_INCREMENTAL"
+    assert enq.call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -247,29 +254,30 @@ def test_nightly_incremental_disabled_skips_without_db():
     assert enq.call_count == 0
 
 
-def test_nightly_incremental_no_new_corrections_skips():
-    """플래그 ON이지만 unconsumed 교정 0 → SKIP_NO_NEW_CORRECTIONS(무의미한 야간 재학습 방지)."""
+def test_nightly_incremental_below_minimum_corrections_skips():
+    """플래그 ON이어도 확정 교정이 50건 미만이면 학습하지 않는다."""
     from koipa.workers.tasks import nightly_incremental_retrain_tick
     with patch("koipa.config.settings.enable_incremental_retrain", True, create=True):
         with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                    return_value=_status(retrain="OK", total=0)):
             with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                 out = nightly_incremental_retrain_tick()
-    assert out["triggered"] == "SKIP_NO_NEW_CORRECTIONS"
+    assert out["triggered"] == "SKIP_MINIMUM_CONFIRMED_CORRECTIONS"
     assert enq.call_count == 0
 
 
-def test_nightly_incremental_enqueues_with_new_corrections():
-    """플래그 ON + unconsumed 교정 존재 → train_classifier_task 1회 enqueue(NIGHTLY_INCREMENTAL)."""
+def test_nightly_incremental_enqueues_only_a_qualified_incremental_batch():
+    """플래그 ON + 확정 교정 50건 → incremental mode으로 한 번만 enqueue."""
     from koipa.workers.tasks import nightly_incremental_retrain_tick
     with patch("koipa.config.settings.enable_incremental_retrain", True, create=True):
         with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
-                   return_value=_status(retrain="RETRAIN_RECOMMENDED", total=12)):
+                   return_value=_status(retrain="RETRAIN_RECOMMENDED", total=50)):
             with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                 out = nightly_incremental_retrain_tick()
     assert out["triggered"] == "NIGHTLY_INCREMENTAL"
-    assert out["unconsumed_total"] == 12
+    assert out["unconsumed_total"] == 50
     assert enq.call_count == 1
+    assert enq.call_args.kwargs == {"kwargs": {"spec_kwargs": {"training_mode": "incremental"}}}
 
 
 def test_nightly_incremental_eval_failure_skips_conservatively():

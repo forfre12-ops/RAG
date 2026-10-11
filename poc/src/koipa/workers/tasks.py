@@ -794,6 +794,7 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
     from koipa.modules.m6_evaluation.active_learning import consume_corrections_for_run  # noqa: PLC0415
     from koipa.modules.m6_evaluation.corrections_rebuild import (  # noqa: PLC0415
         RebuildResult,
+        build_incremental_train_jsonl,
         build_labeled_rows_from_corrections,
         merge_into_train_jsonl,
     )
@@ -805,20 +806,79 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
         TrainingInputRejected,
         TrainingDatasetUnavailable,
         ensure_training_dataset_ready,
+        ensure_incremental_training_ready,
         register_and_gate_model,
     )
 
     spec_kwargs = dict(spec_kwargs or {})
+    training_mode = str(spec_kwargs.pop("training_mode", "full") or "full").strip().lower()
+    # 제출 시점 admission 정보는 감사 payload용이지 TrainSpec 인자가 아니다.
+    spec_kwargs.pop("confirmed_correction_count", None)
+    spec_kwargs.pop("minimum_confirmed_corrections", None)
+    if training_mode not in {"full", "incremental"}:
+        return {"skipped": "training_input_rejected", "reason": "unknown training mode"}
+    spec_kwargs["training_mode"] = training_mode
     include_approved_synthetic = bool(spec_kwargs.pop("include_approved_synthetic", False))
     approved_snapshot_path = spec_kwargs.pop("approved_synthetic_snapshot_path", None)
     approved_snapshot_version = spec_kwargs.pop("approved_synthetic_dataset_version", None)
     approved_snapshot_sha256 = spec_kwargs.pop("approved_synthetic_rows_sha256", None)
     approved_synthetic_evidence: dict | None = None
+    incremental_input_evidence: dict | None = None
+    incremental_preflight_error: str | None = None
 
     # ── [A2-①] 교정→라벨 재빌드 + 학습셋 병합(train만 증강, 홀드아웃 불변) ──────────
     rebuild = build_labeled_rows_from_corrections()
     incorporated_correction_ids: list[int] = []
-    if getattr(rebuild, "rows", None):
+    if training_mode == "incremental":
+        if include_approved_synthetic:
+            incremental_preflight_error = "운영 증분 학습에는 사람이 확정한 검수 데이터만 반영할 수 있습니다"
+        try:
+            # API 통과 뒤 worker 볼륨이 달라지는 배포 실수도 여기서 막는다. 이 검사는
+            # 기준 train/val/test에 대한 검증이고, 아래에서 만든 작은 delta 입력 검사는 별개다.
+            ensure_training_dataset_ready(spec_kwargs)
+            ready = ensure_incremental_training_ready()
+            spec_kwargs.setdefault("initial_model_path", ready["initial_model_path"])
+            spec_kwargs.setdefault("initial_model_version", ready["initial_model_version"])
+            if not getattr(rebuild, "rows", None):
+                incremental_preflight_error = "증분 학습에 반영할 사람이 확정한 검수 데이터가 없습니다"
+            else:
+                import uuid as _uuid  # noqa: PLC0415
+
+                _spec = TrainSpec()
+                base_train = spec_kwargs.get("train_path") or _spec.train_path
+                holdout_paths = [
+                    spec_kwargs.get("val_path") or _spec.val_path,
+                    spec_kwargs.get("test_path") or _spec.test_path,
+                ]
+                out_path = f"{settings.retrain_dataset_dir}/train_incremental_{_uuid.uuid4().hex[:8]}.jsonl"
+                incremental_input = build_incremental_train_jsonl(
+                    base_train,
+                    rebuild,
+                    out_path,
+                    holdout_paths=holdout_paths,
+                )
+                if not incremental_input.path:
+                    incremental_preflight_error = (
+                        "증분 학습에 실제 반영 가능한 확정 검수 데이터가 50건 이상 필요합니다"
+                        f" ({incremental_input.reason})"
+                    )
+                else:
+                    spec_kwargs["train_path"] = incremental_input.path
+                    inc = getattr(rebuild, "incorporated_correction_ids", None)
+                    incorporated_correction_ids = list(
+                        inc if inc is not None else rebuild.correction_ids
+                    )
+                    incremental_input_evidence = {
+                        "correction_rows": incremental_input.correction_rows,
+                        "replay_rows": incremental_input.replay_rows,
+                        "initial_model_version": spec_kwargs.get("initial_model_version"),
+                    }
+        except (TrainingDatasetUnavailable, TrainingInputRejected) as exc:
+            incremental_preflight_error = getattr(exc, "public_message", str(exc))
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("incremental train input preparation failed")
+            incremental_preflight_error = f"증분 학습 입력을 준비하지 못했습니다: {type(exc).__name__}"
+    elif getattr(rebuild, "rows", None):
         try:
             import uuid as _uuid  # noqa: PLC0415
             _spec = TrainSpec()
@@ -863,6 +923,10 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
         run_uuid = _create_training_run_guarded(
             spec_kwargs, total_samples=_train_rows_count(spec_kwargs) or 0
         )
+    if incremental_preflight_error:
+        _mark_training_run(run_uuid, status="failed", error=incremental_preflight_error)
+        logger.warning("incremental training blocked before start: %s", incremental_preflight_error)
+        return {"skipped": "training_input_rejected", "reason": incremental_preflight_error}
     # ── 승인 모의 문서 → 학습 입력 병합 ────────────────────────────────────────
     # 승인 자체는 검수 이력일 뿐 자동 학습 편입이 아니다. 관리자가 학습 요청에서 명시적으로
     # 선택한 경우에만 현재 승인본을 다시 빌드하고, 코퍼스 품질·홀드아웃 중복을 모두 통과한
@@ -955,7 +1019,10 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
             return {"skipped": "synthetic_candidate_merge_failed", "reason": reason}
 
     try:
-        ensure_training_dataset_ready(spec_kwargs)
+        ensure_training_dataset_ready(
+            spec_kwargs,
+            require_full_train_distribution=(training_mode != "incremental"),
+        )
     except (TrainingDatasetUnavailable, TrainingInputRejected) as exc:
         # API preflight를 우회한 legacy/Celery 호출도 같은 일반 사용자용 오류로 닫는다.
         # 워커·API의 볼륨이 달라진 배포 실수는 여기서만 드러날 수 있다.
@@ -1009,6 +1076,8 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
         raise
     out = dict(report.__dict__)
     out["corrections_incorporated"] = len(incorporated_correction_ids)
+    if incremental_input_evidence is not None:
+        out["incremental_input"] = incremental_input_evidence
     if approved_synthetic_evidence is not None:
         out["approved_synthetic_snapshot"] = approved_synthetic_evidence
 
@@ -1296,12 +1365,12 @@ def verify_audit_chain_tick(limit: int = 100000) -> dict:
 def active_learning_tick(mode: str = "auto") -> dict:
     """P1-A5: Active learning 주기 트리거.
 
-    mode="auto":     beat 30분 주기. URGENT 도달 시 train_classifier 자동 enqueue.
+    mode="auto":     beat 30분 주기. 50건 gate를 통과한 증분 학습만 enqueue.
     mode="snapshot": 일별 스냅샷. 학습 트리거 없이 status만 기록.
     mode="dry":      평가만 수행. 호출용.
 
     재학습 트리거 정책:
-    - URGENT_RETRAIN: 즉시 train_classifier_task enqueue (보안 미탐 누적)
+    - URGENT_RETRAIN: 50건 gate를 통과했을 때만 즉시 증분 학습 enqueue
     - RETRAIN_RECOMMENDED: 누적 ≥ recommended_threshold 일 때만 weekly window에 큐잉
       (간단히는 weekday=월요일 새벽에 한번)
     - OK: nothing
@@ -1321,22 +1390,28 @@ def active_learning_tick(mode: str = "auto") -> dict:
     if mode == "dry":
         return payload
 
-    # auto mode — [재학습 토폴로지 가드] 분류기 자동 재학습은 enable_training=True 노드(지재원
-    # full-train)에서만 발화한다. 고객사(onprem-local, enable_training=False)는 설계상 추론+비모수
-    # 전용이므로 자동 재학습을 금지한다. status 평가·기록은 위에서 끝났으므로(진단·집계 리포트용
-    # 으로 유지) 여기서는 train_classifier_task enqueue만 차단한다 — 옛 'beat 미게이트로 고객사에서도
-    # 재학습' 동작을 task 레벨에서 막아 코드를 설계에 정합시킨다(죽음의 나선 고객사 차단).
+    # auto mode — 학습 토폴로지에서만 수행하고, 모든 자동 경로는 전체 학습 대신
+    # 활성 checkpoint 기반의 증분 모드만 보낸다.
     from koipa.config import settings as _settings  # noqa: PLC0415
+    from koipa.modules.m6_evaluation.active_learning import DEFAULT_RECOMMENDED  # noqa: PLC0415
 
-    if not _settings.enable_training:
+    if not (_settings.enable_training or _settings.enable_incremental_retrain):
         payload["triggered"] = "SKIP_TRAINING_DISABLED"
         return payload
 
+    if status.retrain_status == "OK":
+        payload["triggered"] = "NONE"
+        return payload
+
+    if status.unconsumed_total < DEFAULT_RECOMMENDED:
+        payload["triggered"] = "HOLD_MINIMUM_CONFIRMED_CORRECTIONS"
+        return payload
+
     if status.retrain_status == "URGENT_RETRAIN":
-        logger.warning("URGENT_RETRAIN triggered: %s", status.reason)
+        logger.warning("URGENT incremental retrain triggered: %s", status.reason)
         try:
-            train_classifier_task.apply_async(kwargs={"spec_kwargs": None})
-            payload["triggered"] = "URGENT_RETRAIN"
+            train_classifier_task.apply_async(kwargs={"spec_kwargs": {"training_mode": "incremental"}})
+            payload["triggered"] = "URGENT_INCREMENTAL"
         except Exception:  # noqa: BLE001
             logger.exception("train_classifier_task enqueue failed")
             payload["triggered"] = "ENQUEUE_FAILED"
@@ -1364,8 +1439,8 @@ def active_learning_tick(mode: str = "auto") -> dict:
             else:
                 logger.info("weekly RETRAIN_RECOMMENDED triggered: %s", status.reason)
                 try:
-                    train_classifier_task.apply_async(kwargs={"spec_kwargs": None})
-                    payload["triggered"] = "RETRAIN_RECOMMENDED"
+                    train_classifier_task.apply_async(kwargs={"spec_kwargs": {"training_mode": "incremental"}})
+                    payload["triggered"] = "INCREMENTAL_RECOMMENDED"
                     store.store(lock_key, (200, b"{}", "application/json"))
                 except Exception:  # noqa: BLE001
                     logger.exception("train_classifier_task enqueue failed")
@@ -1383,19 +1458,21 @@ def active_learning_tick(mode: str = "auto") -> dict:
 def nightly_incremental_retrain_tick() -> dict:
     """고객사(onprem-local) 야간 증분 재학습 트리거 — enable_incremental_retrain=True 노드 전용.
 
-    2026-07 결정(cpu-incremental-retrain-measured): 고객사 현장서 사람검수 교정을 기존 학습셋에
-    섞어 CPU 풀 파인튜닝을 야간 배치로 무인 실행. enable_training(지재원)이 여는 URGENT 드리프트
-    자동재학습(active_learning 30분틱)과는 별개 축 — 이 틱은 통제된 야간 1회만 발화한다.
+    고객사 현장서 사람이 확정한 교정을 현재 활성 checkpoint에만 반영한다. 전체
+    학습셋을 다시 학습하지 않고, 제한된 replay와 새 교정 배치로 야간 1회 수행한다.
 
     안전:
-    - 플래그 OFF(지재원 full-train·순수 추론 노드)면 no-op.
-    - unconsumed 교정이 0이면 skip — 새 신호 없는 야간 재학습(CPU ~1h)을 낭비하지 않는다.
+    - 플래그 OFF면 no-op.
+    - 사람이 확정한 미반영 교정이 50건 미만이면 skip.
     - 재학습본은 train_classifier_task 에서 **후보로만** 등록됨(retrain_auto_activate=False 불변).
       실제 서빙 전환은 사람서명 locked-eval / 감사 force 로만(activate 게이트 불변).
     """
     from datetime import datetime  # noqa: PLC0415
     from koipa.config import settings as _settings  # noqa: PLC0415
-    from koipa.modules.m6_evaluation.active_learning import evaluate_retraining_need  # noqa: PLC0415
+    from koipa.modules.m6_evaluation.active_learning import (  # noqa: PLC0415
+        DEFAULT_RECOMMENDED,
+        evaluate_retraining_need,
+    )
 
     payload = {
         "task": "nightly_incremental_retrain",
@@ -1409,7 +1486,7 @@ def nightly_incremental_retrain_tick() -> dict:
         payload["triggered"] = "SKIP_INCREMENTAL_DISABLED"
         return payload
 
-    # 새 교정 없으면 skip — base 재현뿐인 야간 재학습(CPU 고비용)을 낭비하지 않는다.
+    # 기준 미달이면 skip — 새 신호가 적은 상태에서 재학습을 돌리지 않는다.
     # 평가 실패 시 보수적 skip(불확실 상태에서 무거운 재학습을 돌리지 않음).
     try:
         status = evaluate_retraining_need()
@@ -1420,12 +1497,12 @@ def nightly_incremental_retrain_tick() -> dict:
         payload["triggered"] = "SKIP_EVAL_FAILED"
         return payload
 
-    if status.unconsumed_total <= 0:
-        payload["triggered"] = "SKIP_NO_NEW_CORRECTIONS"
+    if status.unconsumed_total < DEFAULT_RECOMMENDED:
+        payload["triggered"] = "SKIP_MINIMUM_CONFIRMED_CORRECTIONS"
         return payload
 
     try:
-        train_classifier_task.apply_async(kwargs={"spec_kwargs": None})
+        train_classifier_task.apply_async(kwargs={"spec_kwargs": {"training_mode": "incremental"}})
         payload["triggered"] = "NIGHTLY_INCREMENTAL"
         logger.info(
             "nightly incremental retrain enqueued (unconsumed=%d, profile=%s)",

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import hashlib
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -103,6 +104,16 @@ class RebuildResult:
     @property
     def row_count(self) -> int:
         return len(self.rows)
+
+
+@dataclass(frozen=True)
+class IncrementalTrainingInput:
+    """A bounded correction batch plus small, deterministic replay data."""
+
+    path: str | None = None
+    correction_rows: int = 0
+    replay_rows: int = 0
+    reason: str = ""
 
 
 def _reconstruct_text(db, doc_id, *, min_chars: int) -> str | None:
@@ -418,6 +429,92 @@ def merge_into_train_jsonl(
         n_base, len(rows), excluded, out,
     )
     return str(out)
+
+
+def build_incremental_train_jsonl(
+    base_train_path: str | Path,
+    result: RebuildResult,
+    out_path: str | Path,
+    *,
+    holdout_paths: Sequence[str | Path],
+    minimum_correction_rows: int = 50,
+    replay_per_label: int = 50,
+) -> IncrementalTrainingInput:
+    """Build a real incremental input, never a full-corpus re-training input.
+
+    First the confirmed corrections are filtered against val/test with the same
+    leak guard used by the regular merge.  A batch that shrinks below the
+    admission threshold is not written and cannot be consumed.  The remaining
+    rows are trained together with a deterministic, bounded replay sample from
+    the original train split.  Reading the source split to choose replay is
+    inexpensive; the trainer receives at most ``replay_per_label`` historical
+    examples for each class, not the whole historical corpus.
+    """
+    correction_path = merge_into_train_jsonl(
+        None,
+        result,
+        out_path,
+        holdout_paths=holdout_paths,
+    )
+    if not correction_path:
+        return IncrementalTrainingInput(reason="no_eligible_corrections")
+
+    out = Path(correction_path)
+    try:
+        correction_lines = [
+            line for line in out.read_text(encoding="utf-8").splitlines() if line.strip()
+        ]
+    except OSError as exc:
+        return IncrementalTrainingInput(reason=f"correction_batch_unreadable:{type(exc).__name__}")
+
+    correction_rows = len(correction_lines)
+    if correction_rows < minimum_correction_rows:
+        out.unlink(missing_ok=True)
+        return IncrementalTrainingInput(
+            correction_rows=correction_rows,
+            reason=(
+                f"eligible_corrections={correction_rows}<minimum={minimum_correction_rows}"
+            ),
+        )
+
+    by_label: dict[str, list[tuple[str, dict]]] = {label: [] for label in _TRAINABLE_LABELS}
+    try:
+        for raw_line in Path(base_train_path).read_text(encoding="utf-8").splitlines():
+            if not raw_line.strip():
+                continue
+            row = json.loads(raw_line)
+            label = str(row.get("label") or "").strip()
+            text = row.get("text")
+            if label not in by_label or not isinstance(text, str) or not text.strip():
+                continue
+            canonical = json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+            by_label[label].append((digest, row))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        out.unlink(missing_ok=True)
+        return IncrementalTrainingInput(reason=f"replay_source_unreadable:{type(exc).__name__}")
+
+    replay_rows: list[dict] = []
+    for label in _TRAINABLE_LABELS:
+        replay_rows.extend(
+            row for _, row in sorted(by_label[label], key=lambda item: item[0])[:replay_per_label]
+        )
+
+    with out.open("w", encoding="utf-8") as fh:
+        for row in replay_rows:
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+        for line in correction_lines:
+            fh.write(line + "\n")
+    logger.info(
+        "incremental train set: replay=%d + corrections=%d (per_label=%d) → %s",
+        len(replay_rows), correction_rows, replay_per_label, out,
+    )
+    return IncrementalTrainingInput(
+        path=str(out),
+        correction_rows=correction_rows,
+        replay_rows=len(replay_rows),
+        reason="ok",
+    )
 
 
 def write_labeled_jsonl(result: RebuildResult, out_path: str | Path) -> str:
