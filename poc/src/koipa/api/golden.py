@@ -1414,8 +1414,101 @@ reloadAll();
 </script>""")
 
 
+_CANDIDATE_SCORE_CARDS_CSS = r"""<style>
+#detail .sideDetail>.classifier-score,#detail .sideDetail>.initial-grade{margin:16px;margin-bottom:0;padding:17px;background:#fff;border:1px solid var(--border)}
+.initial-grade h4,.classifier-score h4{margin:0 0 7px;color:#0f172a;font-size:15px}
+.initial-grade .initial-grade-value{margin:0;color:#1e3a5f;font-size:22px;font-weight:800}
+.initial-grade .initial-grade-help{margin:8px 0 0;color:var(--text-soft);font-size:12px;line-height:1.5}
+.classifier-score .score-help{margin:0 0 14px;color:var(--text-soft);font-size:12px;line-height:1.5}
+.classifier-score .score-row{display:grid;grid-template-columns:25px minmax(0,1fr) 46px;gap:8px;align-items:center;margin:8px 0;font-size:12px}
+.classifier-score .score-track{height:8px;overflow:hidden;background:#e7edf3}
+.classifier-score .score-fill{height:100%;background:#2563a8}
+.classifier-score .score-value{text-align:right;font-variant-numeric:tabular-nums;color:#334155}
+.classifier-score .score-meta{margin:13px 0 0;color:#64748b;font-size:11px;line-height:1.5;word-break:break-all}
+</style>"""
+
+# 검수자 화면(_REVIEWER_DOCUMENT_WORKBENCH_SCRIPT)의 renderInitialGrade/renderClassifierScore 와
+# 같은 두 카드를 관리자 화면에도 보여준다([2026-10-11] 사용자 지시 — 관리자도 보호원 요청의
+# 최초 생성 등급·BERT 등급별 예측확률을 볼 수 있어야 한다). .reviewer-workspace 래퍼에 의존하지
+# 않도록 두 함수만 떼어 독립 스크립트로 둔다 — 로직은 그대로, 복제는 의도적이다(관리자 화면을
+# 검수자 전용 변환(_as_reviewer_view)에 태우면 배정 패널·등급분포 등 관리자 전용 UI가 사라진다).
+_CANDIDATE_SCORE_CARDS_SCRIPT = r"""<script>
+(function(){
+  const detail=document.getElementById('detail');
+  if(!detail)return;
+  function renderInitialGrade(candidate){
+    const side=detail.querySelector('.sideDetail');
+    if(!side)return;
+    let card=side.querySelector('#initialGrade');
+    if(!card){
+      card=document.createElement('section'); card.id='initialGrade'; card.className='initial-grade';
+      const action=side.querySelector('.action');
+      if(action)side.insertBefore(card,action); else side.append(card);
+    }
+    card.replaceChildren();
+    const heading=document.createElement('h4'); heading.textContent='최초 생성 등급'; card.append(heading);
+    const labels={TS:'특급',S1:'1급',S2:'2급',S3:'3급'};
+    const code=String(candidate&&candidate.proposed_grade||'');
+    const value=document.createElement('p'); value.className='initial-grade-value';
+    value.textContent=labels[code]?(labels[code]+' ('+code+')'):'정보 없음'; card.append(value);
+    const help=document.createElement('p'); help.className='initial-grade-help';
+    help.textContent='모의문서 최초 생성 시 부여된 등급입니다. 최종 등급은 검수자가 원문을 읽고 직접 결정합니다.';
+    card.append(help);
+  }
+  function renderClassifierScore(candidate){
+    const side=detail.querySelector('.sideDetail');
+    if(!side)return;
+    let card=side.querySelector('#classifierScore');
+    if(!card){
+      card=document.createElement('section'); card.id='classifierScore'; card.className='classifier-score';
+      const action=side.querySelector('.action');
+      if(action)side.insertBefore(card,action); else side.append(card);
+    }
+    card.replaceChildren();
+    const heading=document.createElement('h4'); heading.textContent='BERT 등급별 예측 확률'; card.append(heading);
+    const help=document.createElement('p'); help.className='score-help';
+    help.textContent='최종 등급은 검수자가 문서를 읽고 직접 결정합니다.'; card.append(help);
+    const score=candidate&&candidate.classifier_score;
+    if(!score||score.status!=='available'){
+      const unavailable=document.createElement('p'); unavailable.className='score-meta';
+      unavailable.textContent='현재 문서의 점수 스냅샷을 아직 사용할 수 없습니다.'; card.append(unavailable);
+      return;
+    }
+    ['TS','S1','S2','S3'].forEach(function(grade){
+      const value=Number(score.scores&&score.scores[grade]);
+      if(!Number.isFinite(value))return;
+      const row=document.createElement('div'); row.className='score-row';
+      const label=document.createElement('strong'); label.textContent={TS:'특급',S1:'1급',S2:'2급',S3:'3급'}[grade]||grade;
+      const track=document.createElement('div'); track.className='score-track';
+      const fill=document.createElement('div'); fill.className='score-fill';
+      const percent=Math.max(0,Math.min(100,value*100));
+      fill.style.width=percent+'%'; fill.setAttribute('role','progressbar');
+      fill.setAttribute('aria-label',grade+' 점수'); fill.setAttribute('aria-valuemin','0');
+      fill.setAttribute('aria-valuemax','100'); fill.setAttribute('aria-valuenow',String(percent));
+      track.append(fill);
+      const shown=document.createElement('span'); shown.className='score-value'; shown.textContent=percent.toFixed(1)+'%';
+      row.append(label,track,shown); card.append(row);
+    });
+    const meta=document.createElement('p'); meta.className='score-meta';
+    const calibrated=score.calibrated?'보정됨':'보정 미확인';
+    meta.textContent='최상위 점수: '+String(score.predicted_label||'–')+' · '+calibrated
+      +(score.model_version?' · 모델 '+String(score.model_version):'')
+      +(score.scored_at?' · 산출 '+String(score.scored_at):'');
+    card.append(meta);
+  }
+  const originalShow=show;
+  show=async function(id,reload){
+    await originalShow(id,reload);
+    const candidate=selected;
+    if(!candidate)return;
+    renderInitialGrade(candidate);
+    renderClassifierScore(candidate);
+  };
+})();
+</script>"""
+
 _ADMIN_BOUNDARY_FILTER_SCRIPT = r"""<script>
-/* 관리자만 경계 문서를 선별한다. 상세의 네 등급 확률은 검수자 화면에서만 읽는다. */
+/* 관리자도 ②③(최초 생성 등급·BERT 등급별 예측확률)을 본다(_CANDIDATE_SCORE_CARDS_SCRIPT) — 관리자 화면 전용은 ④ 경계 문서 선별이다. */
 (function(){
   const filters=document.querySelector('#candidates .filters');
   const after=document.getElementById('doc_format');
@@ -1478,6 +1571,7 @@ return (opt?opt.textContent:'').replace(/\s*\(.*\)$/,'').trim()||'이 결정'}
 function syncMgmt(){const w=$('mgmtWrap');if(!w)return;
 const used=['change','approve','defer'].includes($('action').value);
 w.style.display=used?'':'none';$('secMarking').disabled=!used;$('accScope').disabled=!used;}
+function fmtWhen(v){if(!v)return'';const s=String(v).replace('T',' ');const dot=s.indexOf('.');return(dot>0?s.slice(0,dot):s.split('+')[0]).trim()}
 const HISTORY_ACTION_LABELS={change:'등급 변경',approve:'승인',defer:'보류',discard:'폐기',exclude:'검수 대상 아님',reopen:'재검토'};
 const HISTORY_STATUS_LABELS={proposed:'검토 대기',under_review:'검토 대기',deferred:'검토 대기',approved_proxy:'확정됨',grade_fixed_unlocked:'확정됨',discarded:'학습 제외',out_of_scope:'학습 제외'};
 function history(events){let box=$('history');box.replaceChildren();if(!events.length){box.className='empty';box.textContent='결정 이력이 없습니다.';return}box.className='';events.slice().reverse().forEach(e=>{let d=document.createElement('div');d.className='event '+(e.action||'');let a=document.createElement('b');a.textContent=(HISTORY_ACTION_LABELS[e.action]||e.action||'결정')+(e.status?' · '+(HISTORY_STATUS_LABELS[e.status]||e.status):'');let w=document.createElement('div');w.className='when';let t=document.createElement('span');t.textContent=String(e.decided_at||'').replace('T',' ').split('.')[0].split('+')[0].trim();let who=document.createElement('span');who.className='who';who.textContent='담당: '+(e.actor_id||'—');w.append(t,who);let r=document.createElement('div');r.textContent=e.reason||'사유 없음';d.append(a,w,r);box.append(d)})}async function load(showProgress){
@@ -2030,7 +2124,12 @@ def proxy_gold_candidate_manager_html(
         1,
     )
     if _is_console_admin(auth):
-        html = html.replace("</body>", _ADMIN_BOUNDARY_FILTER_SCRIPT + "</body>", 1)
+        html = html.replace("</head>", _CANDIDATE_SCORE_CARDS_CSS + "</head>", 1)
+        html = html.replace(
+            "</body>",
+            _CANDIDATE_SCORE_CARDS_SCRIPT + _ADMIN_BOUNDARY_FILTER_SCRIPT + "</body>",
+            1,
+        )
     else:
         html = _as_reviewer_view(html)
         if _scope(auth).blind_active:       # 숨김 검수 — 서버가 데이터를 뺀 위에 화면도 맞춘다

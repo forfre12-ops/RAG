@@ -664,6 +664,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--ui-blue);box-shadow:0
 .inspector-card p{margin:0;color:var(--ui-muted);font-size:11.5px;line-height:1.65;}
 .inspector-kv{display:grid;grid-template-columns:88px 1fr;gap:7px 9px;font-size:11px;}
 .inspector-kv dt{color:var(--ui-muted);}.inspector-kv dd{margin:0;color:var(--ui-ink);font-weight:650;word-break:break-word;}
+.score-help{margin:0 0 11px;color:var(--ui-muted);font-size:11px;line-height:1.5;}
+.score-row{display:grid;grid-template-columns:30px minmax(0,1fr) 44px;gap:8px;align-items:center;margin:7px 0;font-size:11px;}
+.score-row strong{color:var(--ui-ink);}
+.score-track{height:7px;border-radius:4px;overflow:hidden;background:var(--ui-line);}
+.score-fill{height:100%;background:var(--ui-blue);}
+.score-value{text-align:right;font-variant-numeric:tabular-nums;color:var(--ui-ink);}
+.score-meta{margin:11px 0 0;color:var(--ui-muted);font-size:10.5px;line-height:1.5;word-break:break-all;}
 .inspector-empty{padding:50px 12px;text-align:center;color:var(--ui-muted);font-size:12px;}
 
 @media(max-width:1120px){
@@ -2185,6 +2192,39 @@ function addInspectorCard(title, content){
   const card=document.createElement('section');card.className='inspector-card';const h=document.createElement('h3');h.textContent=title;card.append(h);
   if(typeof content==='string'){const p=document.createElement('p');p.textContent=content;card.append(p);}else card.append(content);return card;
 }
+function renderClassifierScoreCard(score){
+  // golden.py _REVIEWER_DOCUMENT_WORKBENCH_SCRIPT 의 renderClassifierScore 와 같은 모양으로 맞춘다.
+  const labels={TS:'특급',S1:'1급',S2:'2급',S3:'3급'};
+  const body=document.createElement('div');
+  const help=document.createElement('p');help.className='score-help';
+  help.textContent='최종 등급은 검수자가 문서를 읽고 직접 결정합니다.';body.append(help);
+  if(!score||score.status!=='available'){
+    const unavailable=document.createElement('p');unavailable.className='score-meta';
+    unavailable.textContent='현재 문서의 점수 스냅샷을 아직 사용할 수 없습니다.';body.append(unavailable);
+    return addInspectorCard('BERT 등급별 예측확률',body);
+  }
+  ['TS','S1','S2','S3'].forEach(grade=>{
+    const value=Number(score.scores&&score.scores[grade]);if(!Number.isFinite(value))return;
+    const row=document.createElement('div');row.className='score-row';
+    const label=document.createElement('strong');label.textContent=labels[grade]||grade;
+    const track=document.createElement('div');track.className='score-track';
+    const fill=document.createElement('div');fill.className='score-fill';
+    const percent=Math.max(0,Math.min(100,value*100));
+    fill.style.width=percent+'%';fill.setAttribute('role','progressbar');
+    fill.setAttribute('aria-label',grade+' 점수');fill.setAttribute('aria-valuemin','0');
+    fill.setAttribute('aria-valuemax','100');fill.setAttribute('aria-valuenow',String(percent));
+    track.append(fill);
+    const shown=document.createElement('span');shown.className='score-value';shown.textContent=percent.toFixed(1)+'%';
+    row.append(label,track,shown);body.append(row);
+  });
+  const meta=document.createElement('p');meta.className='score-meta';
+  const calibrated=score.calibrated?'보정됨':'보정 미확인';
+  meta.textContent='최상위 점수: '+String(score.predicted_label||'—')+' · '+calibrated
+    +(score.model_version?' · 모델 '+String(score.model_version):'')
+    +(score.scored_at?' · 산출 '+String(score.scored_at):'');
+  body.append(meta);
+  return addInspectorCard('BERT 등급별 예측확률',body);
+}
 function inspectorKv(values){
   const dl=document.createElement('dl');dl.className='inspector-kv';
   values.forEach(([label,value])=>{const dt=document.createElement('dt');dt.textContent=label;const dd=document.createElement('dd');dd.textContent=value||'—';dl.append(dt,dd);});return dl;
@@ -2261,20 +2301,10 @@ function renderInspector(candidate){
   const judgmentCard=addInspectorCard('검수 상태',judgment);
   const caveat=document.createElement('p');caveat.textContent='모의문서 최초 생성 시 부여된 등급입니다. 최종 등급은 검수자가 원문을 읽고 직접 결정합니다 · 다른 검수자의 결정은 숨김';judgmentCard.append(caveat);host.append(judgmentCard);
   // [2026-10-11 보호원 요청] 검수자 워크벤치(golden.py _REVIEWER_DOCUMENT_WORKBENCH_SCRIPT)와
-  // 같은 BERT 등급별 예측확률을 운영 콘솔 문서함에도 보여준다. 데이터는 이미 candidate.classifier_score
-  // 에 와 있다(selectWorkbenchDocument 가 단건 상세 GET /golden/candidates/{id} 로 받음) — 새 API 불필요.
-  const score=candidate.classifier_score;
-  const scoreBody=(score&&score.status==='available')
-    ? inspectorKv(['TS','S1','S2','S3'].map(code=>[gradeLabels[code],(Number(score.scores&&score.scores[code])*100).toFixed(1)+'%']))
-    : '현재 문서의 점수 스냅샷을 아직 사용할 수 없습니다.';
-  const scoreCard=addInspectorCard('BERT 등급별 예측확률',scoreBody);
-  if(score&&score.status==='available'){
-    const meta=document.createElement('p');
-    meta.textContent='최상위 예측: '+(gradeLabels[score.predicted_label]||score.predicted_label||'—')
-      +(score.calibrated?' · 보정됨':' · 보정 미확인')+(score.model_version?' · 모델 '+score.model_version:'');
-    scoreCard.append(meta);
-  }
-  host.append(scoreCard);
+  // 같은 모양(막대그래프)의 BERT 등급별 예측확률을 운영 콘솔 문서함에도 보여준다. 데이터는 이미
+  // candidate.classifier_score 에 와 있다(selectWorkbenchDocument 가 단건 상세
+  // GET /golden/candidates/{id} 로 받음) — 새 API 불필요.
+  host.append(renderClassifierScoreCard(candidate.classifier_score));
   host.append(addInspectorCard('검수 결정',renderWorkbenchDecision(candidate)));
 }
 function workbenchTitleKey(value){return String(value||'').replace(/^#+\s*/,'').replace(/\s+/g,' ').trim();}
