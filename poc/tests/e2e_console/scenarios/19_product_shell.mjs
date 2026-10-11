@@ -87,8 +87,8 @@ export const scenarios = [
     async run({ server, check }) {
       candidatesWith(server, {
         total: 3,
-        summary: { total: 3, fixed: 1, unfixed: 1, deferred: 1, discarded: 0,
-          by_proposed_grade: { TS: 1 }, by_proposed_grade_unfixed: { TS: 1 }, by_final_grade: { S1: 1 } },
+        summary: { total: 3, fixed: 1, unfixed: 2, unreviewed: 1, deferred: 1, discarded: 0, out_of_scope: 0,
+          by_proposed_grade: { TS: 1 }, by_proposed_grade_unfixed: { TS: 1 }, by_proposed_grade_unreviewed: { TS: 1 }, by_final_grade: { S1: 1 } },
         candidates: [
           { doc_id: 'X-1', doc_format: '회의록' },
           { doc_id: 'X-2', doc_format: '회의록' },

@@ -122,6 +122,26 @@ def test_reviewer_status_groups_hide_internal_workflow_names(tmp_path):
     assert [c["doc_id"] for c in svc.list_candidates(status="unfixed")["candidates"]] == ["DEFERRED", "PENDING"]
 
 
+def test_summary_review_buckets_are_disjoint_while_reviewer_inbox_keeps_holds(tmp_path):
+    for doc_id in ("PENDING", "FIXED", "DEFERRED", "EXCLUDED"):
+        _candidate(tmp_path, doc_id)
+    svc = ProxyGoldCandidateService(tmp_path)
+    svc.decide(doc_id="FIXED", action="change", grade="S1", reason="등급 확정", actor_id="reviewer")
+    svc.decide(doc_id="DEFERRED", action="defer", reason="근거 보완 대기", actor_id="reviewer")
+    svc.decide(doc_id="EXCLUDED", action="exclude", reason="학습 제외", actor_id="reviewer")
+
+    summary = svc.summary()
+
+    # 보류는 검수자 문서함에서는 다시 볼 수 있지만, 관리자 합계에서는 별도 칸이다.
+    assert summary["unfixed"] == 2
+    assert summary["unreviewed"] == 1
+    assert summary["by_proposed_grade_unreviewed"] == {"S1": 1}
+    assert (
+        summary["fixed"] + summary["unreviewed"] + summary["deferred"]
+        + summary["discarded"] + summary["out_of_scope"]
+    ) == summary["total"]
+
+
 def test_actual_s2_s3_intake_requires_provenance_and_stays_unlocked(tmp_path):
     svc = ProxyGoldCandidateService(tmp_path)
     payload = ("실제 조직 운영 문서이며 S2 또는 S3 분류 검토를 위한 근거를 포함합니다. " * 20).encode("utf-8")

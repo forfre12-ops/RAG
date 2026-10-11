@@ -253,6 +253,9 @@ DISCARDED_STATUS = "discarded"
 OUT_OF_SCOPE_STATUS = "out_of_scope"      # 검수 대상 아님(B2)
 # 검수가 끝나 큐에서 빠지는 집합. deferred(보류)는 여기 없다 — 다시 볼 것이기 때문이다.
 QUEUE_EXCLUDED_STATUSES = frozenset({DISCARDED_STATUS, OUT_OF_SCOPE_STATUS})
+# 관리 현황판의 상태 칸은 서로 겹치면 안 된다. 보류는 검수자 문서함에서는 다시 볼
+# 대상(unfixed)이지만, 현황판에서는 별도 상태로 보여야 합계가 전체 문서 수와 맞는다.
+UNREVIEWED_STATUSES = frozenset({"proposed", "under_review"})
 
 # [E1-2] 배치가 "끝났나" 를 판정하는 집합 — 코드에 녹여 두면 세는 곳마다 달라진다.
 #
@@ -1398,6 +1401,10 @@ class ProxyGoldCandidateService:
     @staticmethod
     def _summary(candidates: list[dict[str, Any]]) -> dict[str, Any]:
         actual = [c for c in candidates if c["is_actual_document"]]
+        # ``unfixed`` 는 검수자 문서함의 "등급 미확정" 묶음으로, 재검토할 보류도 포함한다.
+        # 따라서 상태별 합계를 보여주는 관리자 현황판에는 쓰면 안 된다. ``unreviewed`` 는
+        # 아직 어떤 결정을 내리지 않은 상태만 세므로 fixed/deferred/excluded와 배타적이다.
+        unreviewed = [c for c in candidates if c["status"] in UNREVIEWED_STATUSES]
         return {
             "total": len(candidates),
             "fixed": sum(1 for c in candidates if c["grade_fixed"]),
@@ -1405,6 +1412,7 @@ class ProxyGoldCandidateService:
             # 이 영원히 안 줄어 검수자에게 끝나지 않는 할 일로 보인다.
             "unfixed": sum(1 for c in candidates
                            if not c["grade_fixed"] and c["status"] not in QUEUE_EXCLUDED_STATUSES),
+            "unreviewed": len(unreviewed),
             "deferred": sum(1 for c in candidates if c["status"] == "deferred"),
             "discarded": sum(1 for c in candidates if c["status"] == DISCARDED_STATUS),
             "out_of_scope": sum(1 for c in candidates if c["status"] == OUT_OF_SCOPE_STATUS),
@@ -1419,6 +1427,9 @@ class ProxyGoldCandidateService:
             "by_proposed_grade_unfixed": dict(sorted(Counter(
                 c["proposed_grade"] or "unassigned" for c in candidates
                 if not c["grade_fixed"] and c["status"] not in QUEUE_EXCLUDED_STATUSES
+            ).items())),
+            "by_proposed_grade_unreviewed": dict(sorted(Counter(
+                c["proposed_grade"] or "unassigned" for c in unreviewed
             ).items())),
             "actual_document_intake": len(actual),
             "actual_provenance_recorded": sum(

@@ -167,14 +167,15 @@ ADMIN_ALIAS_KEY = "reviewer_alias"
 #          by_proposed_grade  제안 등급 분포 그 자체.
 #          by_final_grade     확정 등급 분포. 자기 것만으로 세도 화면이 쓰지 않는 등급 지표라 뺀다.
 #  OWN     결정을 세는 값 — 서비스가 **자기 시야로 바꾼 행 위에서** 센다(list_candidates·summary 의 view).
-#          fixed·unfixed·deferred·discarded·out_of_scope·by_status·actual_grade_fixed_unlocked,
+#          fixed·unfixed·unreviewed·deferred·discarded·out_of_scope·by_status·actual_grade_fixed_unlocked,
 #          batch_summary 의 terminal·pending·deferred·by_status.
 #  KEPT    문서 수·출처 분포·출처 기록 현황 — 결정과 무관하다.
 BLIND_HIDDEN_SUMMARY_FIELDS = frozenset({
     "quality", "by_proposed_grade", "by_final_grade", "by_proposed_grade_unfixed",
+    "by_proposed_grade_unreviewed",
 })
 BLIND_OWN_SUMMARY_FIELDS = frozenset({
-    "fixed", "unfixed", "deferred", "discarded", "out_of_scope", "by_status",
+    "fixed", "unfixed", "unreviewed", "deferred", "discarded", "out_of_scope", "by_status",
     "actual_grade_fixed_unlocked",
 })
 # ledger_total(원장 전량 건수)은 배정으로 좁힌 **뒤**의 값이라 검수자에게는 자기에게 보이는 문서 수와 같다 — 총량이 새지 않는다.

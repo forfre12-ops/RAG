@@ -2001,14 +2001,14 @@ function productOpenDocumentsWithStatus(statusFilter){
 function productDistributionBoard(summary,data){
   const board=document.createElement('section');board.className='distribution-board';
   const main=document.createElement('div');main.className='distribution-main';
-  const kpi=document.createElement('div');kpi.className='distribution-kpi';const total=document.createElement('strong');total.textContent=Number(summary.total||0).toLocaleString()+'건';const sub=document.createElement('span');sub.textContent='검수 완료 '+Number(summary.fixed||0).toLocaleString()+' · 미검수 '+Number(summary.unfixed||0).toLocaleString()+' · 보류 '+Number(summary.deferred||0).toLocaleString();kpi.append(total,sub);
+  const kpi=document.createElement('div');kpi.className='distribution-kpi';const total=document.createElement('strong');total.textContent=Number(summary.total||0).toLocaleString()+'건';const sub=document.createElement('span');sub.textContent='검수 완료 '+Number(summary.fixed||0).toLocaleString()+' · 미검수 '+Number(summary.unreviewed||0).toLocaleString()+' · 보류 '+Number(summary.deferred||0).toLocaleString()+' · 학습 제외 '+Number((summary.discarded||0)+(summary.out_of_scope||0)).toLocaleString();kpi.append(total,sub);
   const gradeBox=document.createElement('section');const gradeHead=document.createElement('div');gradeHead.className='distribution-grade-head';const gradeTitle=document.createElement('h3');gradeTitle.textContent='등급별 분포';const scopes=document.createElement('div');scopes.className='distribution-scopes';gradeHead.append(gradeTitle,scopes);
   const stack=document.createElement('div');stack.className='distribution-grade-stack';const legend=document.createElement('div');legend.className='distribution-grade-legend';
   const grades=[['TS','특급','grade-ts'],['S1','1급','grade-s1'],['S2','2급','grade-s2'],['S3','3급','grade-s3']];
   const scopeSummary=document.createElement('section');scopeSummary.className='distribution-scope-summary';scopeSummary.setAttribute('aria-live','polite');
   const scopeRows=[
     {label:'전체',counts:summary.by_proposed_grade,total:Number(summary.total||0)},
-    {label:'미검수',counts:summary.by_proposed_grade_unfixed,total:Number(summary.unfixed||0)},
+    {label:'미검수',counts:summary.by_proposed_grade_unreviewed,total:Number(summary.unreviewed||0)},
     {label:'검수 완료',counts:summary.by_final_grade,total:Number(summary.fixed||0)}
   ];
   const buttons=[];
@@ -2065,9 +2065,9 @@ async function loadProductOverview(force){
     metrics.append(
       productMetric('전체 문서',summary.total||data.total||0,'현재 범위',''),
       productMetric('검수 완료',summary.fixed||0,'등급 확정','fixed'),
-      productMetric('미검수',summary.unfixed||0,'검토 필요','unfixed'),
+      productMetric('미검수',summary.unreviewed||0,'아직 결정 전','unfixed'),
       productMetric('보류',summary.deferred||0,'후속 판단 필요','deferred'),
-      productMetric('폐기',summary.discarded||0,'원장 보존','discarded'),
+      productMetric('학습 제외',(summary.discarded||0)+(summary.out_of_scope||0),'원장 보존','discarded'),
     );
     body.append(metrics);
     body.append(productDistributionBoard(summary,data));
