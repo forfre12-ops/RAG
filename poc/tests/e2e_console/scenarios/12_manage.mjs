@@ -95,7 +95,8 @@ export const scenarios = [
       check.includes(page.text('scope'), '접근 금지', '주장 범위가 보인다');
       check.includes(page.text('document'), 'EUV 노광 공정', '원문이 들어갔다');
       check.includes(page.html('documentRendered'), '<h1', '읽기 좋게 보기가 마크다운을 렌더했다');
-      check.includes(page.text('history'), 'reopen', '결정 이력이 보인다');
+      // [2026-10-11] 이력 카드가 원시 코드 대신 한글 라벨을 보여주도록 바뀌었다(HISTORY_ACTION_LABELS, golden.py).
+      check.includes(page.text('history'), '재검토', '결정 이력이 보인다');
       // 합성 후보에는 출처 기록 칸을 띄우지 않는다
       check.ok(!page.visible('provBox'), '합성 후보에는 출처 기록 칸이 안 뜬다');
       assertNoScriptErrors(check, page);
