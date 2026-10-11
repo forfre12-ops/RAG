@@ -245,9 +245,11 @@ class TestHwpRealFixture:
         body = fx.read_bytes()
         result = extract(fx)
 
-        # hwpx는 hwp5 모듈 의존성 — 미충족 시 xfail
-        if result.error and "hwp5" in str(result.error):
-            pytest.xfail(f"hwpx 파서 hwp5 모듈 의존성 미충족: {result.error}")
+        # HWP/HWPX 실파서는 선택 의존성(hwp5 또는 rhwp-python)이다. 기본 검증
+        # 환경에 파서 모듈이 없으면 추출 품질을 주장할 수 없으므로 명시적으로 xfail 한다.
+        error = str(result.error or "")
+        if error and ("hwp5" in error or "rhwp" in error):
+            pytest.xfail(f"HWP/HWPX 파서 선택 의존성 미충족: {result.error}")
         assert result.method == "rhwp", f"expected rhwp, got {result.method}: {result.error}"
         assert result.text, f"본문 추출 실패: {result.error}"
         assert result.quality > 0

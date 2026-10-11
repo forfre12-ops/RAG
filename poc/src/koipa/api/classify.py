@@ -33,9 +33,16 @@ def classify(request: Request, req: ClassifyRequest, svc: ClassifyService = Depe
     # 비어도 label·룰 불일치·근거를 포함한 Agent 답 자체를 막지 않는다.
     if getattr(request.state, "auth_role", None) == "kl_backend":
         reference = regulation_reference_for_kl_wire(result.doc_id)
-        result = kl_wire_projection(
+        wire = kl_wire_projection(
             result,
             regulation_reference=reference,
             regulation_summary=regulation_summary_for_kl_wire(result.doc_id, reference),
         )
+        # /classify 는 ClassifyResponse 계약(요청 처리 시간 포함)을 유지한다. 투영은
+        # KL 에 보이면 안 되는 정책/그림자 진단값을 걷는 단계일 뿐이며, elapsed_ms 는
+        # 의사결정 자료가 아닌 이 요청의 처리 시간이다.
+        result = ClassifyResponse.model_validate({
+            **wire.model_dump(mode="python"),
+            "elapsed_ms": result.elapsed_ms,
+        })
     return result
