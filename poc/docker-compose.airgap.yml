@@ -91,9 +91,11 @@ services:
       KL_STREAM_REDIS_URL: ${KL_STREAM_REDIS_URL:-}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS(/app/.storage). MinIO 미사용.
       POC_MODE: ${POC_MODE:-full}
-      LLM_PROVIDER: ${LLM_PROVIDER:-vllm}
+      # 기본 생성 경로는 외부 API가 아닌 사내 OpenAI 호환 로컬 LLM이다.
+      LLM_PROVIDER: ${LLM_PROVIDER:-local_openai}
       LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://host.docker.internal:8001/v1}
       LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-Qwen/Qwen3-14B}
+      LOCAL_LLM_API_KEY: ${LOCAL_LLM_API_KEY:-EMPTY}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nlpai-lab/KURE-v1}
       CLASSIFIER_BASE_MODEL: ${CLASSIFIER_BASE_MODEL:-kakaobank/kf-deberta-base}
       CLASSIFIER_MODEL_DIR: ${CLASSIFIER_MODEL_DIR:-/models/classifier-trained}
@@ -108,6 +110,10 @@ services:
       # [스레드 정합] torch 는 cgroup CPU 한도를 보지 못한다 — 아래 cpus 한도와 같은 값으로 묶는다.
       OMP_NUM_THREADS: "${API_CPU_LIMIT:-4}"
       MKL_NUM_THREADS: "${API_CPU_LIMIT:-4}"
+    # Linux Docker에는 host.docker.internal 별칭이 기본으로 없다. 로컬 llama.cpp/vLLM
+    # 서버가 호스트 8001 포트에서 실행될 때 api·worker 모두 같은 주소로 접근하게 한다.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # [SELinux] `z` 는 공유 라벨(container_file_t) 재지정이다. RHEL·Rocky 계열은 SELinux 가
       # 기본 enforcing 이라 라벨 없이 bind mount 하면 컨테이너가 이 경로를 못 읽고 **모델 적재가
@@ -169,9 +175,11 @@ services:
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS. api 와 동일 storagedata 볼륨 공유.
       POC_MODE: ${POC_MODE:-full}
-      LLM_PROVIDER: ${LLM_PROVIDER:-vllm}
+      # api와 동일한 로컬 생성 설정을 사용해야 요청한 제공자와 실제 생성자가 갈리지 않는다.
+      LLM_PROVIDER: ${LLM_PROVIDER:-local_openai}
       LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://host.docker.internal:8001/v1}
       LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-Qwen/Qwen3-14B}
+      LOCAL_LLM_API_KEY: ${LOCAL_LLM_API_KEY:-EMPTY}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nlpai-lab/KURE-v1}
       CLASSIFIER_MODEL_DIR: ${CLASSIFIER_MODEL_DIR:-/models/classifier-trained}
       HF_HOME: /models/hf
@@ -189,6 +197,8 @@ services:
       #   celery_app.py 가 기동 시점에 cgroup CPU·메모리 한도를 읽어 자동 계산한다
       #   (_resolve_worker_scaling, 곱해도 cgroup 한도를 안 넘게). 고객사마다 서버
       #   사양이 달라도 설치 스크립트가 숫자를 안 넣어도 되게 — 넣으면 그 값이 우선.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ../models:/models:ro,z      # [SELinux] api 와 같은 공유 라벨 — 위 api 블록 주석 참조
       - storagedata:/app/.storage   # api 와 공유 — 로컬FS 문서·원본

@@ -163,8 +163,12 @@ celery_app.conf.task_annotations = {
         "time_limit": max(settings.celery_task_time_limit, 28800),
     },
     "koipa.synthesize_batch": {
-        "soft_time_limit": min(settings.celery_task_soft_time_limit, 300),
-        "time_limit": min(settings.celery_task_time_limit, 420),
+        # 문서별 LLM 응답이 순차 재시도되면 5건도 300/420초 상한을 넘는다. hard limit은
+        # 태스크의 보상 처리까지 건너뛰므로, 화면에는 "대기"인데 검수 큐는 0건인 유령
+        # 작업으로 남는다. 전역 운영 한도(기본 900/1200초)를 존중하고, 그보다 짧게
+        # 설정된 환경에서도 합성의 정리 경로가 실행될 최소 시간을 보장한다.
+        "soft_time_limit": max(settings.celery_task_soft_time_limit, 900),
+        "time_limit": max(settings.celery_task_time_limit, 1200),
     },
     "koipa.golden_build": {
         "soft_time_limit": max(settings.celery_task_soft_time_limit, 900),

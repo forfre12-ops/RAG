@@ -48,6 +48,16 @@ def test_celery_worker_limits_follow_settings():
     assert celery_app.conf.worker_max_tasks_per_child == settings.celery_worker_max_tasks_per_child
 
 
+def test_synthesis_task_keeps_enough_time_to_persist_results():
+    """합성은 LLM 재시도 뒤에도 잡 상태·검수큐를 정리할 시간이 필요하다."""
+    from koipa.workers.celery_app import celery_app
+
+    limits = celery_app.conf.task_annotations["koipa.synthesize_batch"]
+    assert limits["soft_time_limit"] >= 900
+    assert limits["time_limit"] >= 1200
+    assert limits["soft_time_limit"] < limits["time_limit"]
+
+
 def test_deliver_outbox_tick_invokes_deliver_once():
     """task 본문이 deliver_once를 store + http_send와 함께 호출."""
     from koipa.workers.tasks import deliver_outbox_tick

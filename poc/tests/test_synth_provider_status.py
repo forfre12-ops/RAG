@@ -59,9 +59,23 @@ def test_local_provider_unavailable_when_unreachable(monkeypatch):
 
 def test_local_provider_available_when_reachable(monkeypatch):
     monkeypatch.setattr(sps, "_probe_http", lambda base_url: True)
+    monkeypatch.setattr(sps.settings, "local_llm_api_key", "test-local-key", raising=False)
     rows = {r["name"]: r for r in sps.provider_status()}
     for name in ("ollama", "vllm", "local_openai", "lm_studio"):
         assert rows[name]["available"] is True
+
+
+def test_authenticated_local_provider_requires_real_key(monkeypatch):
+    """401이 예상되는 자리표시자 키로는 생성 요청을 접수하면 안 된다."""
+    monkeypatch.setattr(sps, "_probe_http", lambda base_url: True)
+    monkeypatch.setattr(sps.settings, "local_llm_api_key", "EMPTY", raising=False)
+
+    rows = {r["name"]: r for r in sps.provider_status()}
+    for name in ("vllm", "local_openai"):
+        assert rows[name]["available"] is False
+        assert rows[name]["reason"] == "LOCAL_LLM_API_KEY 미설정"
+    assert rows["ollama"]["available"] is True
+    assert rows["lm_studio"]["available"] is True
 
 
 def test_probe_result_is_cached_within_ttl(monkeypatch):

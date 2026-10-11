@@ -39,6 +39,13 @@ _LOCAL_DEFAULT_BASE_URL = {
     "lm_studio": "http://localhost:1234/v1",
 }
 
+# ``EMPTY`` 는 LocalOpenAIProvider 가 설정이 없을 때 넣는 호환용 자리표시자다.
+# 인증을 요구하는 OpenAI 호환 서버에 이 값을 넘기면 화면에는 "연결됨"으로 보이지만
+# 실제 생성은 401로 끝난다. 비밀값 자체를 검사하거나 노출하지 않고, 자리표시자인지만
+# 구분한다.
+_LOCAL_API_KEY_PLACEHOLDERS = frozenset({"", "empty", "none", "null"})
+_AUTHENTICATED_LOCAL_PROVIDERS = frozenset({"vllm", "local_openai"})
+
 _cache: dict[str, tuple[float, bool]] = {}
 
 
@@ -76,6 +83,12 @@ def _cached_probe(name: str, base_url: str) -> bool:
     return ok
 
 
+def _has_local_api_key() -> bool:
+    """로컬 OpenAI 호환 서버에 보낼 실제 인증값이 있는지만 판단한다."""
+    value = str(getattr(settings, "local_llm_api_key", "") or "").strip()
+    return value.casefold() not in _LOCAL_API_KEY_PLACEHOLDERS
+
+
 def provider_status() -> list[dict]:
     """advertise 대상 provider 각각의 가용성. noop→상용→로컬 순서."""
     out: list[dict] = [
@@ -95,12 +108,25 @@ def provider_status() -> list[dict]:
     for name in _LOCAL_PROVIDERS:
         base_url = _local_base_url(name)
         ok = _cached_probe(name, base_url)
+        needs_key = name in _AUTHENTICATED_LOCAL_PROVIDERS
+        key_ready = _has_local_api_key()
+        if not ok:
+            available = False
+            reason = f"{base_url} 응답 없음"
+        elif needs_key and not key_ready:
+            # /models 가 401을 돌려도 이전 구현은 "서버가 응답했다"만 보고 선택지에
+            # 남겼다. 생성 요청은 결국 실패하므로, 접수 전에 명확히 막는다.
+            available = False
+            reason = "LOCAL_LLM_API_KEY 미설정"
+        else:
+            available = True
+            reason = ""
         out.append(
             {
                 "name": name,
                 "kind": "local",
-                "available": ok,
-                "reason": "" if ok else f"{base_url} 응답 없음",
+                "available": available,
+                "reason": reason,
             }
         )
     return out
