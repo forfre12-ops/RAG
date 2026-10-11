@@ -44,6 +44,38 @@ def test_local_storage_put_leaves_no_temp_file(tmp_path: Path):
     assert not list(parent.glob("*.tmp"))
 
 
+def test_local_storage_grants_read_only_to_configured_worker_group(tmp_path: Path, monkeypatch):
+    """root API가 쓴 암호화 원본을 지정 worker 그룹만 읽게 한다."""
+    calls: list[tuple[str, tuple]] = []
+
+    def _chown(path, uid, gid):
+        calls.append(("chown", (Path(path), uid, gid)))
+
+    def _chmod(path, mode):
+        calls.append(("chmod", (Path(path), mode)))
+
+    monkeypatch.setattr("koipa.adapters.storage.local_store.os.chown", _chown, raising=False)
+    monkeypatch.setattr("koipa.adapters.storage.local_store.os.chmod", _chmod)
+    storage = LocalStorage(root=str(tmp_path), shared_read_gid=1000)
+
+    storage.put("regulations-raw", "sample.md", b"ciphertext")
+
+    target = tmp_path / "regulations-raw" / "sample.md"
+    assert calls == [
+        ("chown", (target, -1, 1000)),
+        ("chmod", (target, 0o640)),
+    ]
+
+
+def test_local_storage_factory_reads_explicit_shared_gid(monkeypatch, tmp_path: Path):
+    from koipa.adapters.storage import _local_storage
+
+    monkeypatch.setenv("STORAGE_LOCAL_SHARED_GID", "1000")
+    storage = _local_storage(str(tmp_path))
+
+    assert storage._shared_read_gid == 1000
+
+
 # --- F: S3 호환 백엔드 키 정규화/traversal 가드 (인프라 불필요 — 순수 staticmethod) ---
 
 @pytest.mark.parametrize(

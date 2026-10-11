@@ -45,6 +45,9 @@ class _FakeRepo:
     def count_by_status(self, status):
         return 1
 
+    def get(self, sample_id):
+        return _fake_sample("pending_review")
+
 
 @contextmanager
 def _fake_scope():
@@ -99,3 +102,12 @@ def test_queue_keeps_domain_and_document_type_separate(monkeypatch) -> None:
     item = SynthesisService().queue(status="pending").items[0]
     assert item.domain == "finance"
     assert item.document_type == "결산 초안"
+
+
+def test_document_returns_full_content_for_the_open_document_view(monkeypatch) -> None:
+    """큐 발췌문과 별도로 문서 열기 API가 전체 본문을 가져온다."""
+    _patch(monkeypatch)
+    detail = SynthesisService().document(uuid.uuid4())
+    assert detail is not None
+    assert detail.content == "본문 미리보기"
+    assert detail.preview == "본문 미리보기"

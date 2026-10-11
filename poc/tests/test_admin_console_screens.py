@@ -70,13 +70,19 @@ def test_console_shows_precision_and_recall(console: str):
     assert "정밀도" in console and "재현율" in console
 
 
-def test_console_model_release_uses_evidence_scoped_metrics(console: str):
-    """모델 화면은 내부 단계번호가 아니라 릴리스 업무와 평가 근거를 먼저 보여 준다."""
+def test_console_model_learning_and_evaluation_uses_evidence_scoped_metrics(console: str):
+    """FUN-004·024 모델 화면은 학습, 평가, Active Learning 상태를 보여 준다."""
     for marker in (
-        'class="card release-card"',
-        '학습 작업',
-        '릴리스 관리',
-        '모델 평가',
+        'class="card model-card"',
+        '분류 모델 학습',
+        '데이터 분할',
+        'train.jsonl',
+        'val.jsonl',
+        'test.jsonl',
+        '학습 반영 대기',
+        'id="active-learning-status"',
+        'function loadActiveLearning()',
+        '성능 평가 및 재학습 이력',
         'F1 점수',
         '고등급 미탐률',
         '평가 데이터',
@@ -86,22 +92,34 @@ def test_console_model_release_uses_evidence_scoped_metrics(console: str):
         'id="metrics-context"',
     ):
         assert marker in console
-    assert "안전층 적용 전" not in console
-    assert "3 재학습 트리거" not in console
-    assert "4 모델 서빙·배포" not in console
+    for removed in (
+        '릴리스 관리',
+        '모델 활성화',
+        '강제 활성화',
+        '직전 모델로 롤백',
+        "'/admin/model/activate'",
+        "'/admin/model/rollback'",
+        "'/admin/model/reload'",
+    ):
+        assert removed not in console
 
 
-def test_console_model_release_does_not_use_a_top_accent_band(console: str):
-    """모델 학습·릴리스 카드는 굵고 둥근 상단 띠로 구분하지 않는다."""
-    assert ".release-card{border-top:1px solid var(--border-mid);}" in console
-    assert ".release-card{border-top:3px solid var(--ui-navy);}" not in console
+def test_console_model_cards_do_not_use_a_top_accent_band(console: str):
+    """모델 학습·평가 카드는 굵고 둥근 상단 띠로 구분하지 않는다."""
+    assert ".model-card{border-top:1px solid var(--border-mid);}" in console
+    assert ".model-card{border-top:3px solid var(--ui-navy);}" not in console
 
 
-def test_console_hides_technical_settings_and_compacts_synth_coverage(console: str):
+def test_console_keeps_rag_settings_visible_but_hides_technical_connection_controls(console: str):
     for marker in (
         'class="connection-summary"',
         'id="settings-health-state"',
-        'class="settings-stack" data-tech',
+        'class="settings-stack"',
+        'class="settings-section" data-tech aria-labelledby="settings-connection-title"',
+        'class="settings-section settings-maintenance" data-tech',
+        '검수 운영 설정',
+        'data-pane="settings" data-product-view="settings"',
+        'productSetLegacyVisibility(PRODUCT_VIEW)',
         'class="coverage-panel"',
         'class="coverage-summary"',
         'class="coverage-details"',
@@ -113,7 +131,7 @@ def test_console_hides_technical_settings_and_compacts_synth_coverage(console: s
 
 
 def test_console_exposes_regulation_rag_switches_when_the_feature_is_installed(console: str):
-    """정책 화면에서 규정 RAG 표시와 로컬 LLM 정밀선택을 각각 제어할 수 있어야 한다."""
+    """운영 설정에서 규정 RAG 표시와 로컬 LLM 정밀선택을 각각 제어할 수 있어야 한다."""
     for marker in (
         "사내 규정 참고 RAG",
         "규정 참고 RAG 사용",
@@ -256,7 +274,7 @@ def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_bound
         'id="document-workbench"',
         'id="product-experts"',
         'progress_summary',
-        'expert-progress-metrics',
+        'expert-progress-stats',
         'data-product-requires-golden="1"',
         'id="overview-help"',
         'data-resize="left"',
@@ -276,11 +294,11 @@ def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_bound
     for wording in (
         "문서 검토 및 확정",
         "검수 계정별 진행 현황",
-        "판정 완료",
-        "미시작",
+        "판정",
+        "미처리",
         "최근 활동",
         "분류 정책 및 근거",
-        "모델 학습 및 릴리스",
+        "모델 학습 및 평가",
         "감사 기록",
         "운영 설정",
     ):
@@ -302,22 +320,8 @@ def test_console_v2_product_shell_keeps_the_operational_views_and_real_api_bound
     assert 'href="../api/v1/golden/candidates/login.html"' not in console
 
 
-def test_console_overview_metric_cards_filter_the_document_screen_by_status(console: str):
-    """운영 개요의 검수완료·미검수·보류·폐기 카드를 누르면 그 상태로 문서 검토 화면이 걸러진다.
-
-    카드가 눌러도 반응 없는 숫자판이면, 검수완료·폐기로 넘어간 문서를 다시 보려 할 때
-    사용자가 스스로 필터를 만들 방법이 없다(2026-10-11 사용자 요청).
-    """
-    assert "function productOpenDocumentsWithStatus(statusFilter)" in console
-    assert "card.className='metric-card'+(clickable?' metric-card-link':'')" in console
-    for call in (
-        "productMetric('전체 문서',summary.total||data.total||0,'현재 범위',''),",
-        "productMetric('검수 완료',summary.fixed||0,'등급 확정','fixed'),",
-        "productMetric('미검수',summary.unfixed||0,'검토 필요','unfixed'),",
-        "productMetric('보류',summary.deferred||0,'후속 판단 필요','deferred'),",
-        "productMetric('폐기',summary.discarded||0,'원장 보존','discarded'),",
-    ):
-        assert call in console
+def test_console_document_screen_filters_by_review_status(console: str):
+    """통일된 개요와 별개로 문서 검토 화면에서 상태별 재조회가 가능해야 한다."""
     assert 'id="wb-status" onchange="applyWorkbenchStatusFilter()"' in console
     for option in (
         '<option value="fixed">검수완료</option>',
@@ -329,6 +333,13 @@ def test_console_overview_metric_cards_filter_the_document_screen_by_status(cons
         assert option in console
     assert "function workbenchStatusMatches(row,filter)" in console
     assert "function applyWorkbenchStatusFilter()" in console
+
+
+def test_console_uses_the_batch_selector_without_a_duplicate_batch_stamp(console: str):
+    """선택한 검수 배치는 필터로 남기되, 개요 카드에 같은 이름을 다시 넣지 않는다."""
+    assert 'id="product-review-batch"' in console
+    assert "function applyProductReviewBatch(" in console
+    assert "distribution-stamp" not in console
 
 
 def test_console_does_not_use_the_undefined_jargon_workbench(console: str):

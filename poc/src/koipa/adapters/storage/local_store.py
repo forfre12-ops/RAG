@@ -10,11 +10,14 @@ from pathlib import Path
 class LocalStorage:
     name = "local"
 
-    def __init__(self, root: str = ".storage") -> None:
+    def __init__(self, root: str = ".storage", *, shared_read_gid: int | None = None) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         # 경로 탈출 검증 기준 — 심볼릭 링크까지 해소한 절대 루트.
         self._root_resolved = self.root.resolve()
+        # API와 비특권 worker가 같은 로컬 볼륨을 공유할 때만 설정한다. 파일을 world-readable로
+        # 넓히지 않고 지정된 worker 그룹에만 읽기 권한을 준다.
+        self._shared_read_gid = shared_read_gid
 
     def _path(self, bucket: str, key: str) -> Path:
         p = self.root / bucket / key
@@ -52,6 +55,15 @@ class LocalStorage:
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp_name, p)
+            if self._shared_read_gid is not None:
+                # mkstemp는 0600으로 만들기 때문에 root API와 non-root worker 조합에서는
+                # worker가 동일 볼륨의 암호화 원본을 읽지 못한다. owner는 API에 남기고,
+                # 명시된 공유 그룹에만 r 권한을 준다. 권한 부여 실패는 업로드 성공으로
+                # 가장하지 않고 호출자에게 올린다.
+                if not hasattr(os, "chown"):
+                    raise OSError("shared_read_gid requires a POSIX filesystem")
+                os.chown(p, -1, self._shared_read_gid)
+                os.chmod(p, 0o640)
         finally:
             try:
                 os.unlink(tmp_name)

@@ -88,6 +88,17 @@ class SyntheticDocItem(BaseModel):
     label_source: Optional[str] = None
 
 
+class SyntheticDocDetail(SyntheticDocItem):
+    """합성 문서 한 건의 전체 본문.
+
+    큐에서는 목록 성능을 위해 발췌문만 보내고, 사람이 ``문서 열기``를 선택했을 때만
+    이 계약으로 전체 본문을 가져온다. 합성 원문도 검수 대상이므로 인증된 사용자에게만
+    노출하는 synthesis router 의 인증 경계를 그대로 따른다.
+    """
+
+    content: str
+
+
 class SynthQueueResponse(BaseModel):
     total: int
     items: list[SyntheticDocItem]

@@ -7,6 +7,7 @@ build_storage()가 settings.storage_backend(local | minio | seaweedfs)를 단일
 from __future__ import annotations
 
 import logging
+import os
 
 from koipa.adapters.storage.base import ObjectStorage
 from koipa.adapters.storage.local_store import LocalStorage
@@ -14,6 +15,21 @@ from koipa.adapters.storage.local_store import LocalStorage
 __all__ = ["ObjectStorage", "LocalStorage", "build_storage"]
 
 logger = logging.getLogger(__name__)
+
+
+def _local_storage(root: str) -> LocalStorage:
+    """운영에서만 API/worker 간 최소 공유 권한을 명시적으로 적용한다."""
+    raw_gid = (os.environ.get("STORAGE_LOCAL_SHARED_GID") or "").strip()
+    if not raw_gid:
+        shared_gid = None
+    else:
+        try:
+            shared_gid = int(raw_gid)
+        except ValueError as exc:
+            raise ValueError("STORAGE_LOCAL_SHARED_GID must be a non-negative integer") from exc
+        if shared_gid < 0:
+            raise ValueError("STORAGE_LOCAL_SHARED_GID must be a non-negative integer")
+    return LocalStorage(root=root, shared_read_gid=shared_gid)
 
 
 def _strict_remote_storage_required() -> bool:
@@ -69,7 +85,7 @@ def _build_inner(
     폴백한다(드라이런·테스트 비파괴). 알 수 없는 backend 값도 안전하게 local로 폴백.
     """
     if force_local:
-        return LocalStorage(root=local_root or ".storage")
+        return _local_storage(local_root or ".storage")
 
     if backend is None:
         from koipa.config import settings  # noqa: PLC0415
@@ -78,7 +94,7 @@ def _build_inner(
     name = (backend or "minio").lower()
 
     if name == "local":
-        return LocalStorage(root=local_root or ".storage")
+        return _local_storage(local_root or ".storage")
 
     if name == "minio":
         builder = _build_minio
@@ -88,7 +104,7 @@ def _build_inner(
         if _strict_remote_storage_required():
             raise RuntimeError(f"[storage] unknown backend {name!r} in full mode")
         logger.warning("[storage] unknown backend %r — falling back to LocalStorage", name)
-        return LocalStorage(root=local_root or ".storage")
+        return _local_storage(local_root or ".storage")
 
     try:
         return builder()
@@ -102,7 +118,7 @@ def _build_inner(
             RuntimeWarning,
             stacklevel=2,
         )
-        return LocalStorage(root=local_root or ".storage")
+        return _local_storage(local_root or ".storage")
 
 
 def _maybe_encrypt(storage: ObjectStorage) -> ObjectStorage:

@@ -20,6 +20,7 @@ from koipa.schemas.synthesis import (
     SynthGenerateRequest,
     SynthGenerateResponse,
     SynthJobStatus,
+    SyntheticDocDetail,
     SyntheticDocItem,
     SynthQueueResponse,
     SynthReviewRequest,
@@ -282,6 +283,48 @@ class SynthesisService:
         except SQLAlchemyError as exc:
             logger.warning("synth queue skipped: %s", exc)
             return SynthQueueResponse(total=0, items=[])
+
+    def document(self, synth_id: uuid.UUID) -> SyntheticDocDetail | None:
+        """검수자가 열어 보는 합성 문서 한 건의 전체 본문.
+
+        목록 API는 화면을 빠르게 열기 위해 preview만 주므로, 전체 본문을 억지로 큐
+        응답에 싣지 않는다. 존재하지 않는 ID와 DB 조회 실패는 호출부가 각각 404와
+        안전한 오류로 표현할 수 있게 ``None``으로 구분한다.
+        """
+        try:
+            with session_scope() as db:
+                sample = SynthRepo(db).get(synth_id)
+                if sample is None:
+                    return None
+                return SyntheticDocDetail(
+                    synth_id=sample.sample_id,
+                    target_grade=self._level_id_to_code(db, sample.target_level_id),
+                    domain=getattr(sample, "domain_code", None) or sample.doc_type,
+                    document_type=(
+                        sample.doc_type if getattr(sample, "domain_code", None) else None
+                    ),
+                    llm_provider=sample.llm_provider,
+                    llm_model=sample.llm_model,
+                    quality_score=(
+                        float(sample.quality_score)
+                        if sample.quality_score is not None
+                        else None
+                    ),
+                    review_status=sample.review_status,
+                    corrected_grade=(
+                        self._level_id_to_code(db, sample.corrected_level_id)
+                        if sample.corrected_level_id else None
+                    ),
+                    preview=(sample.generated_content or "")[:2000],
+                    created_at=(
+                        sample.created_at.isoformat() if sample.created_at else None
+                    ),
+                    label_source=getattr(sample, "label_source", None),
+                    content=sample.generated_content or "",
+                )
+        except SQLAlchemyError as exc:
+            logger.warning("synth document lookup failed: synth_id=%s err=%s", synth_id, exc)
+            return None
 
     def review(self, synth_id: uuid.UUID, req: SynthReviewRequest) -> Optional[SynthReviewResponse]:
         logger.debug(

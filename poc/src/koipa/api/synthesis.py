@@ -17,6 +17,7 @@ from koipa.schemas.synthesis import (
     SynthJobStatus,
     SynthPlaybookResponse,
     SynthProvidersStatusResponse,
+    SyntheticDocDetail,
     SynthQueueResponse,
     SynthReviewRequest,
     SynthReviewResponse,
@@ -132,6 +133,19 @@ def synth_job_status(synth_job_id: UUID):
     "이 작업이 성공했나 · 몇 건 만들었나 · 어느 문서인가"를 물을 수 없었다.
     """
     return SynthesisService().job_status(synth_job_id)
+
+
+@router.get("/synth/{synth_id}", response_model=SyntheticDocDetail)
+def synth_document(synth_id: UUID):
+    """검수 화면에서 합성 문서의 전체 본문을 연다.
+
+    큐 목록은 발췌문만 내려 전송량을 제한한다. 이 경로는 사용자가 특정 문서를 열었을
+    때만 전체 본문을 반환하며, router의 ``require_auth`` 경계를 그대로 사용한다.
+    """
+    item = SynthesisService().document(synth_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="synth_id not found")
+    return item
 
 
 @router.post(
