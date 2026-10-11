@@ -17,7 +17,7 @@ from __future__ import annotations
 
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from koipa.api._jwt_auth import SigningUnavailable, sign_jwt
 from koipa.api._rbac import require_role
@@ -154,7 +154,7 @@ def _render_console_login_html() -> str:
         # 절대경로 한 종류만** 받는다(`/` 로 시작하고 `//` 도 역슬래시도 아닌 것).
         "function dest(){try{var n=new URLSearchParams(location.search).get('next');"
         "if(n&&n.charAt(0)==='/'&&n.charAt(1)!=='/'&&n.indexOf(String.fromCharCode(92))===-1)return n}catch(e){}"
-        "return '/api/v1/golden/candidates/manage.html'+(location.hash||'')}"
+        "return '/console/admin.html'+(location.hash||'')}"
         "function maxAge(v){try{var p=v.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');"
         "p+='='.repeat((4-p.length%4)%4);var e=JSON.parse(atob(p)).exp;"
         "var s=Math.floor(e-Date.now()/1000);return s>60?s:0}catch(err){return 43200}}"
@@ -191,6 +191,19 @@ def _render_console_login_html() -> str:
 def proxy_gold_console_login_html() -> HTMLResponse:
     """콘솔 진입 화면 — 무인증. 데이터는 없고 토큰을 쿠키로 심기만 한다."""
     return HTMLResponse(content=_render_console_login_html())
+
+
+@html_router.get("/golden/candidates/manage.html", include_in_schema=False)
+def redirect_legacy_gold_console(
+    auth: dict = Depends(require_role("admin", "kl_backend", "reviewer")),
+) -> RedirectResponse:
+    """구형 검수 콘솔 주소를 현재 관리자 콘솔로 단일화한다."""
+    _console_actor_id(auth)
+    return RedirectResponse(
+        url="/console/admin.html",
+        status_code=307,
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @html_router.post("/golden/candidates/prefill-login", summary="폐쇄망 시연 계정 로그인")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from koipa.api._jwt_auth import JWTClaims, require_auth
 from koipa.api.app import app
 from koipa.config import settings
 
@@ -41,3 +42,21 @@ def test_prefill_endpoint_is_absent_without_unsafe_configuration(monkeypatch):
     response = client.post("/api/v1/golden/candidates/prefill-login")
 
     assert response.status_code == 404
+
+
+def test_legacy_manage_address_redirects_to_the_admin_console() -> None:
+    """구형 검수 콘솔 북마크는 현재 관리자 콘솔로만 연다."""
+    claims = JWTClaims(sub="kl-admin-test", roles=("admin",), exp=9999999999)
+    app.dependency_overrides[require_auth] = lambda: {
+        "mode": "jwt", "claims": claims, "actor_role": "admin", "actor_roles": ["admin"],
+    }
+    try:
+        response = TestClient(app).get(
+            "/api/v1/golden/candidates/manage.html", follow_redirects=False,
+        )
+    finally:
+        app.dependency_overrides.pop(require_auth, None)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/console/admin.html"
+    assert response.headers["cache-control"] == "no-store"
