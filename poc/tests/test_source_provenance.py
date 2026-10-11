@@ -9,6 +9,7 @@ post-model 서빙 규칙을 명시적으로 제외하므로 그 번들을 막지
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 
@@ -17,6 +18,7 @@ import pytest
 from koipa.source_provenance import (
     BYPASS_ENV,
     SourceProvenanceError,
+    _GIT_LOCAL_ENV_VARS,
     git_provenance,
     require_clean_source_tree,
 )
@@ -28,7 +30,10 @@ pytestmark = pytest.mark.skipif(
 
 
 def _run(cwd, *args):
-    subprocess.run(args, cwd=str(cwd), check=True, capture_output=True)
+    env = os.environ.copy()
+    for name in _GIT_LOCAL_ENV_VARS:
+        env.pop(name, None)
+    subprocess.run(args, cwd=str(cwd), env=env, check=True, capture_output=True)
 
 
 @pytest.fixture
@@ -50,6 +55,15 @@ def test_clean_tree_passes_and_reports_commit(repo):
     assert provenance["dirty"] is False
     assert provenance["bypassed"] is False
     assert len(str(provenance["commit"])) == 40
+
+
+def test_hook_git_environment_does_not_redirect_provenance(repo, monkeypatch):
+    """pre-push 훅이 넘긴 GIT_DIR도 명시한 작업트리를 바꾸지 않는다."""
+    monkeypatch.setenv("GIT_DIR", str(repo / "not-the-repository"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(repo / "other-tree"))
+    provenance = require_clean_source_tree(repo)
+    assert provenance["available"] is True
+    assert provenance["dirty"] is False
 
 
 def test_modified_tracked_file_blocks(repo):

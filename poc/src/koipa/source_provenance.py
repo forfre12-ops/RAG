@@ -40,16 +40,36 @@ DEFAULT_WATCHED_PATHS: tuple[str, ...] = ("src", "scripts")
 
 BYPASS_ENV = "KOIPA_ALLOW_DIRTY_FINALIZE"
 
+# Git hooks export repository-local variables such as GIT_DIR and GIT_WORK_TREE.
+# They are correct for the hook repository, but would redirect a subprocess that
+# explicitly receives a different ``cwd`` (for example a temporary provenance
+# fixture) back to the hook repository.  A provenance check must inspect its
+# requested root, not ambient hook state.
+_GIT_LOCAL_ENV_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_COMMON_DIR",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_GRAFT_FILE",
+    "GIT_PREFIX",
+)
+
 
 class SourceProvenanceError(RuntimeError):
     """소스 계보를 증명할 수 없다 — finalize 를 진행하면 안 되는 상태."""
 
 
 def _git(root: Path, *args: str) -> tuple[int, str]:
+    env = os.environ.copy()
+    for name in _GIT_LOCAL_ENV_VARS:
+        env.pop(name, None)
     try:
         proc = subprocess.run(
             ["git", *args],
             cwd=str(root),
+            env=env,
             capture_output=True,
             text=True,
             encoding="utf-8",
