@@ -495,11 +495,17 @@ def image_tar_plan(components: dict[str, ComponentEntry]) -> dict[str, str]:
     """docker save 로 만들 tar 이름(확장자 제외) → 이미지. 같은 이미지를 쓰는 서비스는 tar 하나로 합친다.
 
     beat 는 worker 와 같은 koipa-worker 이미지다. 서비스마다 저장하면 바이트까지 같은 796MB 짜리
-    tar 가 하나 더 실린다(20260928 번들에서 cmp 로 확인). 먼저 나온 서비스(worker)의 이름을 쓴다.
+    tar 가 하나 더 실린다(20260928 번들에서 cmp 로 확인). compose 선언 순서가 바뀌거나
+    ``training-storage-init`` 같은 같은-이미지 보조 서비스가 앞에 추가돼도, 배포 정본의
+    ``bundle.images.save`` 에 선언한 서비스명을 우선한다.
     """
     plan: dict[str, str] = {}
     seen: set[str] = set()
-    for svc, entry in components.items():
+    declared = _dm.bundle_images()
+    ordered_services = [svc for svc in declared if svc in components]
+    ordered_services.extend(svc for svc in components if svc not in declared)
+    for svc in ordered_services:
+        entry = components[svc]
         image = getattr(entry, "image", None) or svc  # 이미지 정보가 없는 항목은 서비스 하나당 tar 하나
         if image in seen:
             continue
