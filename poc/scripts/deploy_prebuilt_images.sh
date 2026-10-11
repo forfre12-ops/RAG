@@ -116,7 +116,12 @@ trap 'rm -f "$tmp_overlay"' EXIT
     printf '  api:\n    image: %s\n' "${image_for[api]}"
   fi
   if [ -n "${image_for[worker]:-}" ]; then
-    printf '  worker:\n    image: %s\n  beat:\n    image: %s\n' "${image_for[worker]}" "${image_for[worker]}"
+    # training-storage-init도 worker와 같은 이미지를 쓴다. 이 매핑을 빼면
+    # worker 빠른 전환 뒤 다음 전체 compose 기동에서 .env의 과거 이미지 태그로
+    # 되돌아갈 수 있다. 초기화 작업은 이미 완료된 볼륨을 다시 만질 필요가 없으므로
+    # 아래 up 대상에는 넣지 않는다.
+    printf '  worker:\n    image: %s\n  beat:\n    image: %s\n  training-storage-init:\n    image: %s\n' \
+      "${image_for[worker]}" "${image_for[worker]}" "${image_for[worker]}"
   fi
 } > "$tmp_overlay"
 
