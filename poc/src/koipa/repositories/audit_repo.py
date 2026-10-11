@@ -49,8 +49,24 @@ class AuditRepo:
             except (ValueError, TypeError):
                 request_id = None
 
+        # 미들웨어 외의 도메인 서비스도 직접 감사 행을 남긴다(예: 비동기 규정 색인).
+        # 이 경로가 빈 actor·단일 SHA-256을 그대로 넣으면 화면에는 신원 없음으로 보이고
+        # 전역 체인도 끊긴다. 개인 신원이 없는 내부 작업은 사람 이름을 추정하지 않고
+        # 명시적 서비스 주체로 남긴다.
+        actor_id = (actor_id or "").strip() or "service:internal"
+        actor_role = (actor_role or "").strip() or "system"
+
         if payload_hash is None and payload is not None:
-            payload_hash = self._hash_payload(payload)
+            raw_payload_hash = self._hash_payload(payload)
+            # HTTP 미들웨어는 이미 advisory lock 안에서 패킹된 값을 넘긴다. 여기서는
+            # 도메인 서비스의 직접 기록만 같은 lock·체인 규율로 합류시킨다.
+            if hasattr(self.db, "execute"):
+                from koipa.services.audit_chain import build_chained_hash_locked  # noqa: PLC0415
+
+                payload_hash = build_chained_hash_locked(self.db, raw_payload_hash)
+            else:
+                # DB 없는 저장소 단위 시험용 폴백. 실제 영속 경로는 위 체인 생성기를 쓴다.
+                payload_hash = raw_payload_hash
 
         entry = AuditLog(
             request_id=request_id,

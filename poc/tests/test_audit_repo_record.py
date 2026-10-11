@@ -144,11 +144,22 @@ def test_record_preserves_failure_fields(repo):
     assert entry.error_code == "HTTP_422"
 
 
-def test_record_keeps_actor_none_when_not_given(repo):
-    """공유 API 키 모드에서 actor_id 가 NULL 로 남는 것은 사실이고, 그 사실이 보여야 한다."""
+def test_record_marks_a_direct_internal_write_with_an_explicit_service_actor(repo):
+    """직접 기록도 빈 신원을 남기지 않고, 사람을 지어내지도 않는다."""
     r, _ = repo
     entry = r.record(action="classify")
-    assert entry.actor_id is None and entry.actor_role is None
+    assert entry.actor_id == "service:internal" and entry.actor_role == "system"
+
+
+def test_record_chains_a_direct_payload_write(monkeypatch, repo):
+    """도메인 서비스의 직접 감사 기록도 미들웨어와 같은 체인으로 합류한다."""
+    r, session = repo
+    session.execute = lambda *_args, **_kwargs: None
+    import koipa.services.audit_chain as audit_chain
+
+    monkeypatch.setattr(audit_chain, "build_chained_hash_locked", lambda _db, raw: f"packed:{raw}")
+    entry = r.record(action="regulation.upload", payload={"version": "v1"})
+    assert entry.payload_hash.startswith("packed:")
 
 
 def test_oversized_action_is_clipped_not_dropped(repo):
