@@ -6,6 +6,7 @@ ClassifyService가 사용. 모든 메서드는 외부 Session을 주입받고
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Iterable
 
@@ -22,6 +23,13 @@ from koipa.db.models import (
 )
 from koipa.schemas.classify import EvidenceSpan
 from koipa.schemas.common import Grade
+
+logger = logging.getLogger(__name__)
+
+# tad_cm_clsf_bss_mng.cndg_nvl 컬럼 = Numeric(4,3) → 최대 9.999. span.weight(= count*weight,
+# rule_engine._count 가 상한 없이 누적)가 이 범위를 넘으면 psycopg.errors.NumericValueOutOfRange
+# 로 INSERT 전체가 실패해 근거 행이 통째로 사라진다(2026-10-12, KL 실운영 로그로 발견).
+_CONTRIBUTION_MAX = 9.999
 
 
 def _try_uuid(value: str | None) -> uuid.UUID | None:
@@ -111,12 +119,20 @@ class ClassifyRepo:
         """
         objs: list[ClassificationEvidence] = []
         for span in spans:
+            raw_contribution = float(span.weight) if span.weight else 0.0
+            contribution = max(-_CONTRIBUTION_MAX, min(_CONTRIBUTION_MAX, raw_contribution))
+            if contribution != raw_contribution:
+                logger.warning(
+                    "evidence contribution %.4f clamped to %.3f (classification_id=%s, tag=%s) — "
+                    "컬럼 상한(Numeric(4,3))을 넘는 값, 근거 점수 설계가 count*weight 로 무상한 누적됨",
+                    raw_contribution, contribution, classification_id, span.tag,
+                )
             objs.append(ClassificationEvidence(
                 classification_id=classification_id,
                 chunk_id=default_chunk_id,
                 evidence_type=span.tag or "keyword_match",
                 excerpt=span.text,
-                contribution=float(span.weight) if span.weight else 0.0,
+                contribution=contribution,
                 excerpt_start=span.start,
                 excerpt_end=span.end,
             ))
