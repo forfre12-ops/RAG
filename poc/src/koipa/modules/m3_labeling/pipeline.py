@@ -21,6 +21,20 @@ from koipa.modules.m3_labeling.rule_engine import (
 
 logger = logging.getLogger(__name__)
 
+# tad_cm_clsf_bss_mng.cndg_nvl (ClassificationEvidence.contribution) 컬럼 = Numeric(4,3),
+# 최대 9.999. rule_engine의 MatchedKeyword.score(=count*weight)는 count에 상한이 없어 그
+# 값 그대로 쓰면 쉽게 넘친다(2026-10-12, KL 실운영 로그로 발견 — psycopg
+# NumericValueOutOfRange). count*weight는 등급 판정 누적(grade_scores)에는 그대로 쓰고,
+# 사람이 보는 근거 숫자는 이 함수로 따로 정규화한다 — count가 아무리 커져도
+# weight(관리자 설정 최대 9.99, 컬럼 상한 9.999 안에 항상 들어감) 미만으로 수렴하므로
+# 클램프 없이도 컬럼을 못 넘는다(체감 함수). count=1일 때 weight의 절반만 반영되고,
+# count가 커질수록 weight에 가까워지되 절대 weight를 넘지 않는다 — "반복될수록 근거가
+# 강해지지만 그 강도엔 한계가 있다"는 신호를 보존하면서 상한을 수학적으로 보장한다.
+def _evidence_contribution(count: int, weight: float) -> float:
+    if count <= 0 or weight == 0:
+        return 0.0
+    return round(weight * (1 - 1 / (count + 1)), 3)
+
 # ClassifyService 호환 스키마 (있으면 import, 없으면 dataclass 폴백)
 try:
     from koipa.schemas.classify import EvaluationFactors, EvidenceSpan
@@ -238,7 +252,7 @@ class LabelingPipeline:
                     start=start,
                     end=end,
                     text=m.keyword,
-                    weight=m.score,
+                    weight=_evidence_contribution(m.count, m.weight),
                     tag=m.factor,
                 )
             )

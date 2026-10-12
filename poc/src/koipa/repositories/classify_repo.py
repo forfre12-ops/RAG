@@ -26,9 +26,13 @@ from koipa.schemas.common import Grade
 
 logger = logging.getLogger(__name__)
 
-# tad_cm_clsf_bss_mng.cndg_nvl 컬럼 = Numeric(4,3) → 최대 9.999. span.weight(= count*weight,
-# rule_engine._count 가 상한 없이 누적)가 이 범위를 넘으면 psycopg.errors.NumericValueOutOfRange
-# 로 INSERT 전체가 실패해 근거 행이 통째로 사라진다(2026-10-12, KL 실운영 로그로 발견).
+# tad_cm_clsf_bss_mng.cndg_nvl 컬럼 = Numeric(4,3) → 최대 9.999. 원래는 span.weight(=
+# count*weight, rule_engine._count 가 상한 없이 누적)가 그대로 들어와 이 범위를 넘으면
+# psycopg.errors.NumericValueOutOfRange 로 INSERT 전체가 실패해 근거 행이 통째로 사라졌다
+# (2026-10-12, KL 실운영 로그로 발견). 호출부(m3_labeling/pipeline.py의
+# _evidence_contribution)가 이제 애초에 9.99(weight 상한) 밑으로만 값을 만들어 보내므로
+# 평소엔 아래 클램프가 동작할 일이 없다 — 그래도 다른 호출부가 생기거나 공식이 바뀌어도
+# 행이 조용히 사라지는 일만은 없게 하는 2차 방어선으로 남겨둔다.
 _CONTRIBUTION_MAX = 9.999
 
 
