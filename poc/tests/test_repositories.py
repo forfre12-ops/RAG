@@ -9,10 +9,9 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.exc import OperationalError
+from _pg_probe import postgres_available
 
-from koipa.db import SessionLocal, engine
+from koipa.db import SessionLocal
 from koipa.db.models import (
     ClassificationLevel,
     Correction,
@@ -27,23 +26,15 @@ from koipa.repositories import (
 )
 from koipa.services.audit_chain import parse_chained_hash
 
-
-def _pg_ok() -> bool:
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return True
-    except OperationalError:
-        return False
-    except Exception:  # noqa: BLE001
-        return False
-
-
 pytestmark = pytest.mark.fullstack
 
 
 def _require_pg() -> None:
-    if not _pg_ok():
+    # [2026-10-12] 종전엔 이 파일만의 engine.connect() 직접 호출(타임아웃 없음)이었다 —
+    # 2026-10-11에 7개 파일에서 고친 것과 같은 패턴(_pg_probe 미사용 복붙)이 여기 하나
+    # 더 있었다. postgres_available()은 소켓 1초 타임아웃이 있어 PG가 내려간 채 이름
+    # 해석이 멈추는 함정(localhost IPv6)을 피한다 — 공용 도구로 교체.
+    if not postgres_available():
         pytest.skip("Postgres not reachable - start docker compose up -d postgres")
 
 
