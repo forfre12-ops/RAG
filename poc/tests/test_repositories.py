@@ -162,6 +162,58 @@ class TestClassifyRepo:
         )
         assert len(evs) == 2
 
+    def test_evidence_does_not_overflow_real_numeric_column(self, db, document, levels):
+        """2026-10-12 KL 실운영 로그: psycopg.errors.NumericValueOutOfRange로 근거 INSERT가
+        통째로 실패했었다. 지금까지의 테스트는 전부 MagicMock DB라 실제 Postgres의
+        Numeric(4,3) 제약을 통과한 적이 없었다 — 이게 실제 제약에 부딫혀보는 첫 테스트다.
+
+        1) 원래 버그를 그대로 재현하는 값(과거엔 여기서 NumericValueOutOfRange가 났다)이
+           classify_repo.py의 2차 방어(클램프)만으로도 실제 DB에 안전하게 들어가는지.
+        2) m3_labeling/pipeline.py._evidence_contribution()이 애초에 만들어내는 값(극단적인
+           count)도 실제 DB에 그대로 들어가는지 — 클램프가 동작할 필요조차 없어야 한다.
+        """
+        from koipa.modules.m3_labeling.pipeline import _evidence_contribution
+        from koipa.schemas.classify import EvidenceSpan
+
+        repo = ClassifyRepo(db)
+        cls = repo.create_classification(
+            doc_id=document.doc_id,
+            model_version="v",
+            predicted_level_id=levels["TS"],
+            confidence=0.85,
+            alternatives=[],
+        )
+
+        # (1) 수정 전 코드가 그대로 DB에 보냈을 값 — count=2 * weight=9.99.
+        pre_fix_overflow_value = 19.98
+        # (2) 지금 공식이 극단적인 count(=100만 회 매칭)에서 실제로 내놓는 값.
+        extreme_count_value = _evidence_contribution(1_000_000, 9.99)
+        # count가 이 정도로 크면 round(...,3)이 weight와 '정확히 같게' 반올림할 수 있다
+        # (test_evidence_contribution_bound.py에서 이미 증명한 성질) — 그래도 9.999는 못 넘는다.
+        assert extreme_count_value <= 9.99
+
+        spans = [
+            EvidenceSpan(start=0, end=4, text="과거버그재현", weight=pre_fix_overflow_value),
+            EvidenceSpan(start=5, end=9, text="극단count", weight=extreme_count_value),
+        ]
+        added = repo.add_evidence_from_spans(
+            cls.classification_id, spans=spans, default_chunk_id=uuid.uuid4()
+        )
+        db.flush()  # 실제 INSERT가 여기서 나간다 — 터진다면 여기서 OperationalError/DataError
+
+        assert added == 2
+        from koipa.db.models import ClassificationEvidence
+
+        evs = (
+            db.query(ClassificationEvidence)
+            .filter_by(classification_id=cls.classification_id)
+            .order_by(ClassificationEvidence.excerpt_start)
+            .all()
+        )
+        assert len(evs) == 2
+        assert float(evs[0].contribution) == pytest.approx(9.999, abs=1e-3)  # 클램프됨
+        assert float(evs[1].contribution) == pytest.approx(extreme_count_value, abs=1e-3)
+
     def test_correction_direction_underclass(self, db, document, levels):
         """원본 S2(3) → 보정 TS(1): order 감소 = underclass (보안 미탐)."""
         repo = ClassifyRepo(db)
