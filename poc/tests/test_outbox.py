@@ -150,6 +150,23 @@ def test_publish_kl_stream_noop_when_url_unset(monkeypatch):
     assert outbox_mod.publish_kl_stream({"job_id": "j1", "status": "done"}) is False
 
 
+def test_publish_kl_stream_disabled_logs_once_not_every_call(monkeypatch, caplog):
+    """2026-10-12 KL 지적: 비활성(URL 미설정)과 장애를 로그로 구분할 수 없었다. 이제
+    비활성 상태는 warning 1회로 남아야 하고, 매 분류 완료마다 반복되면 안 된다(핫패스)."""
+    from koipa.services import outbox as outbox_mod
+
+    outbox_mod.reset_kl_stream_client()
+    monkeypatch.setattr(settings, "kl_stream_redis_url", "")
+
+    with caplog.at_level("WARNING"):
+        for _ in range(3):
+            assert outbox_mod.publish_kl_stream({"job_id": "j1", "status": "done"}) is False
+
+    disabled_logs = [r for r in caplog.records if "kl stream disabled" in r.message]
+    assert len(disabled_logs) == 1
+    outbox_mod.reset_kl_stream_client()
+
+
 def test_publish_kl_stream_xadds_with_configured_name_and_maxlen(monkeypatch):
     from koipa.services import outbox as outbox_mod
 

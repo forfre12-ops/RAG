@@ -561,6 +561,7 @@ def _kick_immediate_delivery() -> None:
 
 _kl_stream_client = None
 _kl_stream_lock = threading.Lock()
+_kl_stream_disabled_logged = False
 
 
 def _get_kl_stream_client(url: str):
@@ -581,9 +582,10 @@ def _get_kl_stream_client(url: str):
 
 def reset_kl_stream_client() -> None:
     """테스트용."""
-    global _kl_stream_client
+    global _kl_stream_client, _kl_stream_disabled_logged
     with _kl_stream_lock:
         _kl_stream_client = None
+        _kl_stream_disabled_logged = False
 
 
 def publish_kl_stream(payload: dict) -> bool:
@@ -595,8 +597,14 @@ def publish_kl_stream(payload: dict) -> bool:
     """
     from koipa.config import settings  # noqa: PLC0415
 
+    global _kl_stream_disabled_logged
     url = (getattr(settings, "kl_stream_redis_url", "") or "").strip()
     if not url:
+        # KL 2026-10-12 지적: 비활성 상태와 장애를 로그로 구분할 수 없었다. 매 분류 완료마다
+        # 찍으면 로그가 넘치므로(핫패스) 프로세스당 1회만 — 의도된 비활성임을 분명히 한다.
+        if not _kl_stream_disabled_logged:
+            logger.warning("kl stream disabled: KL_STREAM_REDIS_URL is empty — publish_kl_stream will no-op")
+            _kl_stream_disabled_logged = True
         return False
     try:
         client = _get_kl_stream_client(url)
