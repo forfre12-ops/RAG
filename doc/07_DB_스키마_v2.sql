@@ -1,11 +1,14 @@
+-- specledger-document-status: superseded
+-- canonical-schema: poc/alembic/versions (alembic upgrade head)
+-- 이 v2 SQL은 2026-05 설계 보관본입니다. 현행 운영 스키마의 정본은 Alembic head이며,
+-- pgvector 및 tb_ 물리명은 최신 DB 부록과 migration을 따릅니다.
 -- ============================================================
 -- 한국지식재산보호원 AI 영업비밀 등급분류 시스템
--- Lloydk AI 파이프라인 DB 스키마 v2 (PostgreSQL 15+)
+-- Koipa AI 파이프라인 DB 스키마 v2 (PostgreSQL 15+)
 --
 -- v1 → v2 주요 개선:
 --   [F1] 대용량 텍스트 분리: documents.raw_text → MinIO 외부화
---   [F2] 멀티 테넌트: tenant_id 컬럼 + tenants 마스터 추가
---   [F3] 청크 파티셔닝: chunks RANGE PARTITION (tenant_id, created_at)
+--   [F3] 청크 파티셔닝: chunks RANGE PARTITION (created_at)
 --   [F4] (제거됨) pgvector — 자체 결정으로 ES 단일 벡터스토어 확정. 벡터 인덱스는 ES dense_vector(int8_hnsw) 단독 사용
 --   [F5] FK 보호: classification_levels ON DELETE RESTRICT
 --   [F6] 평가요소 정규화 테이블 추가 (document_factor_scores)
@@ -25,33 +28,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 
 -- ============================================================
--- [A] 테넌트 마스터 (멀티 테넌트 대비)
--- ============================================================
-
-CREATE TABLE tenants (
-    tenant_id           VARCHAR(50)     PRIMARY KEY,
-    name                VARCHAR(200)    NOT NULL,
-    rag_enabled         BOOLEAN         DEFAULT TRUE,
-    active_model_version VARCHAR(50),
-    api_key_hash        VARCHAR(128),
-    metadata            JSONB           DEFAULT '{}',
-    is_active           BOOLEAN         DEFAULT TRUE,
-    created_at          TIMESTAMPTZ     DEFAULT NOW()
-);
-
-COMMENT ON TABLE tenants IS '기업/조직 마스터. 단일 테넌트 운영 시 "default" 1건만 사용';
-COMMENT ON COLUMN tenants.rag_enabled IS '기업 자원 상황 고려 RAG 옵션 토글 (FUN-004)';
-
-INSERT INTO tenants (tenant_id, name) VALUES ('default', '기본 테넌트')
-ON CONFLICT DO NOTHING;
-
-
--- ============================================================
 -- [B] 등급 체계 도메인
 -- ============================================================
 
 CREATE TABLE classification_levels (
-    level_id        SERIAL          PRIMARY KEY,
+    level_id        INTEGER GENERATED ALWAYS AS IDENTITY          PRIMARY KEY,
     level_code      VARCHAR(20)     NOT NULL UNIQUE,    -- TS/S1/S2/S3 (OpenAPI Grade enum 정합)
     level_name      VARCHAR(50)     NOT NULL,
     level_order     SMALLINT        NOT NULL,           -- 1=최고등급
@@ -80,7 +61,7 @@ ON CONFLICT DO NOTHING;
 
 
 CREATE TABLE evaluation_factors (
-    factor_id       SERIAL          PRIMARY KEY,
+    factor_id       INTEGER GENERATED ALWAYS AS IDENTITY          PRIMARY KEY,
     factor_code     VARCHAR(30)     NOT NULL UNIQUE,
     factor_name     VARCHAR(100)    NOT NULL,
     description     TEXT,
@@ -102,14 +83,13 @@ ON CONFLICT DO NOTHING;
 
 
 CREATE TABLE level_keywords (
-    keyword_id      SERIAL          PRIMARY KEY,
+    keyword_id      INTEGER GENERATED ALWAYS AS IDENTITY          PRIMARY KEY,
     level_id        INT             NOT NULL REFERENCES classification_levels(level_id) ON DELETE RESTRICT,
     keyword         VARCHAR(200)    NOT NULL,
     pattern_type    VARCHAR(20)     NOT NULL DEFAULT 'exact',  -- exact/regex/semantic
     factor_id       INT             REFERENCES evaluation_factors(factor_id) ON DELETE RESTRICT,
     weight          DECIMAL(3,2)    DEFAULT 1.0,
     source          VARCHAR(30)     DEFAULT 'manual',
-    example_context TEXT,
     is_active       BOOLEAN         DEFAULT TRUE,
     created_at      TIMESTAMPTZ     DEFAULT NOW()
 );
@@ -126,7 +106,6 @@ CREATE INDEX idx_lk_keyword_trgm ON level_keywords USING gin (keyword gin_trgm_o
 
 CREATE TABLE documents (
     doc_id              UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id           VARCHAR(50)     NOT NULL REFERENCES tenants(tenant_id),
     external_ref        VARCHAR(100),   -- KL FUN-007 문서 ID
     filename            VARCHAR(500)    NOT NULL,
     source_format       VARCHAR(10)     NOT NULL,
@@ -136,8 +115,8 @@ CREATE TABLE documents (
     metadata            JSONB           DEFAULT '{}',  -- {author_dept, doc_type, title, created_date, ...}
 
     -- 대용량 텍스트는 MinIO 외부화. PG에는 위치 + 미리보기만.
-    raw_text_uri        VARCHAR(500),   -- s3://lloydk/docs/raw/{doc_id}.txt
-    normalized_text_uri VARCHAR(500),   -- s3://lloydk/docs/normalized/{doc_id}.txt
+    raw_text_uri        VARCHAR(500),   -- s3://koipa/docs/raw/{doc_id}.txt
+    normalized_text_uri VARCHAR(500),   -- s3://koipa/docs/normalized/{doc_id}.txt
     text_preview        VARCHAR(2000),  -- 검색/UI 표시용 앞부분
     char_count          INT,
 
@@ -157,26 +136,23 @@ COMMENT ON TABLE documents IS '원본 문서 메타. 대용량 텍스트는 MinI
 COMMENT ON COLUMN documents.text_preview IS '최대 2KB 미리보기. 풀텍스트는 raw_text_uri/normalized_text_uri 참조';
 COMMENT ON COLUMN documents.extraction_method IS 'parser=PyMuPDF/python-docx, rhwp=rhwp-python(1순위 HWP), ocr=PaddleOCR, ocr_llm=Qwen2-VL';
 
-CREATE UNIQUE INDEX idx_doc_hash ON documents(tenant_id, file_hash) WHERE file_hash IS NOT NULL;
-CREATE INDEX idx_doc_tenant_status ON documents(tenant_id, processing_status);
+CREATE UNIQUE INDEX idx_doc_hash ON documents(file_hash) WHERE file_hash IS NOT NULL;
+CREATE INDEX idx_doc_status ON documents(processing_status);
 CREATE INDEX idx_doc_format ON documents(source_format);
 CREATE INDEX idx_doc_metadata ON documents USING gin (metadata jsonb_path_ops);
 CREATE INDEX idx_doc_uploaded ON documents(uploaded_at DESC);
 CREATE INDEX idx_doc_pending ON documents(uploaded_at) WHERE processing_status = 'pending'; -- 처리 대기 큐 조회
 
 
--- 청크: 멀티 테넌트 + 월별 파티셔닝 (대규모 운영 대비)
+-- 청크: 월별 파티셔닝 (대규모 운영 대비)
 CREATE TABLE chunks (
     chunk_id        UUID            DEFAULT gen_random_uuid(),
     doc_id          UUID            NOT NULL,
-    tenant_id       VARCHAR(50)     NOT NULL,
     chunk_index     INT             NOT NULL,           -- v1 SMALLINT → INT (긴 문서 대응)
     content         TEXT            NOT NULL,
     token_count     INT             NOT NULL,
     char_count      INT             NOT NULL,
 
-    page_start      SMALLINT,
-    page_end        SMALLINT,
     section_path    TEXT[],
 
     -- 임베딩 벡터는 ES `secrets-guides-koipa-*` 인덱스에 저장 (chunk_id로 연결)
@@ -198,7 +174,6 @@ CREATE TABLE chunks_2026_07 PARTITION OF chunks FOR VALUES FROM ('2026-07-01') T
 CREATE TABLE chunks_default PARTITION OF chunks DEFAULT;
 
 CREATE INDEX idx_chunk_doc ON chunks(doc_id, chunk_index);
-CREATE INDEX idx_chunk_tenant ON chunks(tenant_id);
 -- 벡터 HNSW 인덱스는 ES 측에서 관리 (doc/13 §4.2).
 
 
@@ -244,7 +219,6 @@ COMMENT ON TABLE document_factor_scores IS '정본 3요건 S·V·M 점수(각 0~
 CREATE TABLE classifications (
     classification_id   UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
     doc_id              UUID            NOT NULL REFERENCES documents(doc_id) ON DELETE RESTRICT,
-    tenant_id           VARCHAR(50)     NOT NULL REFERENCES tenants(tenant_id),
     model_version       VARCHAR(50)     NOT NULL,
 
     predicted_level_id  INT             NOT NULL REFERENCES classification_levels(level_id) ON DELETE RESTRICT,
@@ -257,7 +231,6 @@ CREATE TABLE classifications (
 
     rag_used            BOOLEAN         DEFAULT FALSE,
     rag_top_k           SMALLINT,
-    rag_agreement       BOOLEAN,
 
     status              VARCHAR(20)     DEFAULT 'staging',
     -- staging → confirmed/corrected/rejected (확정 라벨은 corrections.corrected_level_id가 진실 소스)
@@ -271,13 +244,14 @@ COMMENT ON COLUMN classifications.aggregation_method IS 'hybrid: 고등급 청�
 COMMENT ON COLUMN classifications.alternatives IS 'JSONB 스키마: [{"level_id":int, "level_code":str, "confidence":float}, ...]';
 
 CREATE INDEX idx_cls_doc ON classifications(doc_id, classified_at DESC);
-CREATE INDEX idx_cls_tenant_status ON classifications(tenant_id, status);
+CREATE INDEX idx_cls_status ON classifications(status);
+CREATE INDEX idx_cls_classified ON classifications(classified_at);
 CREATE INDEX idx_cls_model_level ON classifications(model_version, predicted_level_id, status);
 CREATE INDEX idx_cls_staging ON classifications(classified_at DESC) WHERE status = 'staging';
 
 
 CREATE TABLE classification_evidence (
-    evidence_id         BIGSERIAL       PRIMARY KEY,
+    evidence_id         BIGINT GENERATED ALWAYS AS IDENTITY       PRIMARY KEY,
     classification_id   UUID            NOT NULL REFERENCES classifications(classification_id) ON DELETE CASCADE,
     chunk_id            UUID            NOT NULL,
     -- 주: chunks가 파티션 테이블이라 FK 미설정. 무결성은 애플리케이션 레벨에서 보장.
@@ -290,7 +264,6 @@ CREATE TABLE classification_evidence (
     excerpt_end         INT,
     contribution        DECIMAL(4,3)    NOT NULL,
 
-    attention_scores    JSONB,
     rag_ref_doc_id      UUID,
     rag_similarity      DECIMAL(4,3),
 
@@ -320,8 +293,7 @@ CREATE TABLE model_versions (
     metrics             JSONB           NOT NULL DEFAULT '{}',
     -- 스키마: {accuracy, f1_macro, fnr_overall, per_class:{TS:{precision,recall,f1,fnr},...}, confusion_matrix}
 
-    model_uri           VARCHAR(500),                     -- s3://lloydk/models/{version_id}/
-    model_size_mb       INT,
+    model_uri           VARCHAR(500),                     -- s3://koipa/models/{version_id}/
 
     mlflow_run_id       VARCHAR(64),                      -- v1에 누락된 MLflow 추적 키
 
@@ -362,7 +334,6 @@ CREATE TABLE training_runs (
     split_seed          INT,
 
     hyperparameters     JSONB           NOT NULL DEFAULT '{}',
-    gpu_info            JSONB,
     final_metrics       JSONB,
 
     trigger_type        VARCHAR(30)     DEFAULT 'manual',  -- manual/active_learning/schedule/level_change
@@ -396,7 +367,7 @@ COMMENT ON TABLE training_epochs IS 'epoch별 학습 로그. training_runs와 �
 
 
 CREATE TABLE training_datasets (
-    id              BIGSERIAL       PRIMARY KEY,
+    id              BIGINT GENERATED ALWAYS AS IDENTITY       PRIMARY KEY,
     run_id          UUID            NOT NULL REFERENCES training_runs(run_id) ON DELETE CASCADE,
     doc_id          UUID            NOT NULL REFERENCES documents(doc_id) ON DELETE RESTRICT,
     split_type      VARCHAR(10)     NOT NULL,  -- train/val/test
@@ -413,7 +384,7 @@ CREATE INDEX idx_td_doc ON training_datasets(doc_id);
 -- ============================================================
 
 CREATE TABLE corrections (
-    correction_id       BIGSERIAL       PRIMARY KEY,
+    correction_id       BIGINT GENERATED ALWAYS AS IDENTITY       PRIMARY KEY,
     classification_id   UUID            NOT NULL REFERENCES classifications(classification_id) ON DELETE CASCADE,
 
     -- corrections 자체가 진실 소스. classifications에는 status만.
@@ -449,9 +420,6 @@ CREATE TABLE prompt_versions (
     prompt_version      VARCHAR(30)     PRIMARY KEY,
     chain_stage         VARCHAR(20)     NOT NULL,   -- outline/body/quality_check
     template            TEXT            NOT NULL,
-    avg_quality_score   DECIMAL(3,2),
-    usage_count         INT             DEFAULT 0,
-    approval_rate       DECIMAL(3,2),
     created_at          TIMESTAMPTZ     DEFAULT NOW(),
     created_by          VARCHAR(50),
     notes               TEXT
@@ -463,7 +431,6 @@ COMMENT ON TABLE prompt_versions IS '샘플 생성 프롬프트 체인 버전. R
 CREATE TABLE sample_documents (
     sample_id           UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
     doc_id              UUID            REFERENCES documents(doc_id),  -- 승인 후 편입 시
-    tenant_id           VARCHAR(50)     NOT NULL REFERENCES tenants(tenant_id),
 
     target_level_id     INT             NOT NULL REFERENCES classification_levels(level_id) ON DELETE RESTRICT,
     doc_type            VARCHAR(50),
@@ -493,7 +460,6 @@ COMMENT ON COLUMN sample_documents.doc_id IS '검수 승인 시 documents에 INS
 
 CREATE INDEX idx_sd_status ON sample_documents(review_status);
 CREATE INDEX idx_sd_level ON sample_documents(target_level_id);
-CREATE INDEX idx_sd_tenant ON sample_documents(tenant_id);
 
 
 -- ============================================================
@@ -501,14 +467,13 @@ CREATE INDEX idx_sd_tenant ON sample_documents(tenant_id);
 -- ============================================================
 
 CREATE TABLE llm_usage (
-    usage_id            BIGSERIAL,
+    usage_id            BIGINT GENERATED ALWAYS AS IDENTITY,
     provider            VARCHAR(30)     NOT NULL,    -- anthropic/openai/google/vllm
     model               VARCHAR(50)     NOT NULL,
 
     purpose             VARCHAR(30)     NOT NULL,    -- sample_generation/ocr_llm/rag_query/keyword_extraction
     reference_type      VARCHAR(20),                 -- sample/classification/extraction
     reference_id        VARCHAR(100),                -- 해당 도메인의 PK (sample_id 등)
-    tenant_id           VARCHAR(50)     REFERENCES tenants(tenant_id),
 
     input_tokens        INT             NOT NULL,
     output_tokens       INT             NOT NULL,
@@ -545,9 +510,8 @@ CREATE INDEX idx_lu_ref ON llm_usage(reference_type, reference_id);
 -- ============================================================
 
 CREATE TABLE audit_log (
-    audit_id        BIGSERIAL,
+    audit_id        BIGINT GENERATED ALWAYS AS IDENTITY,
     request_id      UUID,
-    tenant_id       VARCHAR(50),
     actor_id        VARCHAR(50),
     actor_role      VARCHAR(30),       -- admin/reviewer/system/kl_backend
     action          VARCHAR(50)     NOT NULL,  -- classify/confirm/relabel/train/synth/...
@@ -604,7 +568,6 @@ CREATE OR REPLACE VIEW v_classification_final AS
 SELECT
   c.classification_id,
   c.doc_id,
-  c.tenant_id,
   c.model_version,
   c.predicted_level_id,
   pl.level_code AS predicted_code,

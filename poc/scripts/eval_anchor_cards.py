@@ -12,7 +12,7 @@
 
 사용:
   python scripts/eval_anchor_cards.py \
-    --model-dir artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9 \
+    --model-dir artifacts/classifier_p1_v5_clean/v-fe4b386b \
     --cap-per-cell 200 \
     --report reports/anchor_eval_cards.md
 """
@@ -23,6 +23,11 @@ import json
 import sys
 from pathlib import Path
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 _HERE = Path(__file__).resolve().parent
 _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
@@ -31,20 +36,46 @@ if str(_SRC) not in sys.path:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9")
+    ap.add_argument("--model-dir", default="artifacts/classifier_p1_v5_clean/v-fe4b386b")
     ap.add_argument("--cap-per-cell", type=int, default=0,
                     help="(출처×등급) 칸당 최대 표본(CPU 비용 제어). 0=전수. 절단은 로그로 명시.")
     ap.add_argument("--min-n", type=int, default=30, help="칸당 최소 표본(미달=INCONCLUSIVE)")
     ap.add_argument("--report", default="reports/anchor_eval_cards.md")
     ap.add_argument("--tau", default="", help="escalation τ override(빈칸=settings 기본). 0=argmax")
+    ap.add_argument("--constructed-floor", action="append", default=[], metavar="RUN_DIR",
+                    help="constructed_floor run 디렉터리(또는 admitted.jsonl)를 자체 slice로 편입"
+                         "(opt-in·반복 가능). 라벨=floor(≥등급): FNR verdict만 의미, recall은 참고용.")
+    ap.add_argument("--patent-timeaxis-prepub", action="append", default=[], metavar="DIR_OR_JSONL",
+                    help="특허 시간축 prepub_floor_eval.jsonl(또는 그 run 디렉터리)를 자체 slice로 편입"
+                         "(opt-in·반복 가능). 라벨=S2 floor(≥등급): FNR verdict만 의미, recall은 참고용.")
     args = ap.parse_args()
 
-    from lloydk.config import settings
-    from lloydk.modules.m6_evaluation.anchor_eval import run_anchor_cards
+    from koipa.config import settings
+    from koipa.modules.m6_evaluation.anchor_corpus import (
+        DEFAULT_ANCHOR_SOURCES,
+        constructed_floor_source,
+        patent_timeaxis_prepub_source,
+    )
+    from koipa.modules.m6_evaluation.anchor_eval import run_anchor_cards
 
     model_dir = Path(args.model_dir)
     if not model_dir.is_absolute():
         model_dir = _HERE.parent / model_dir
+
+    # constructed_floor·patent_timeaxis는 opt-in — 지정 시에만 기본 앵커에 자체 slice로 덧붙인다
+    # (기본 경로 무변경). 둘 다 floor 라벨 = FNR verdict만 의미·recall 참고용.
+    extra = []
+    if args.constructed_floor:
+        cf = [constructed_floor_source(p) for p in args.constructed_floor]
+        extra += cf
+        print(f"[constructed-floor] {len(cf)}개 run 편입(자체 slice, floor 라벨) — "
+              f"FNR verdict만 의미·recall 참고용", file=sys.stderr)
+    if args.patent_timeaxis_prepub:
+        px = [patent_timeaxis_prepub_source(p) for p in args.patent_timeaxis_prepub]
+        extra += px
+        print(f"[patent-timeaxis] {len(px)}개 prepub 편입(자체 slice, S2 floor) — "
+              f"FNR verdict만 의미·recall 참고용", file=sys.stderr)
+    sources = (list(DEFAULT_ANCHOR_SOURCES) + extra) if extra else None
 
     saved_tau = settings.classifier_escalation_tau
     if args.tau.strip():
@@ -53,6 +84,7 @@ def main() -> int:
     try:
         out_json = run_anchor_cards(
             model_dir=str(model_dir),
+            sources=sources,
             cap_per_cell_n=args.cap_per_cell,
             min_n=args.min_n,
         )

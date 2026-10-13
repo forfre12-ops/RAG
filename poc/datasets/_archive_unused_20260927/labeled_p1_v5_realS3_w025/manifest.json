@@ -1,0 +1,55 @@
+{
+  "base_dir": "datasets/labeled_p1_v5_clean",
+  "added": "datasets/real_s3_forms_w025/train_s3.jsonl",
+  "splits": {
+    "train": {
+      "n": 2642,
+      "by_label": {
+        "S1": 365,
+        "S2": 463,
+        "S3": 1413,
+        "TS": 401
+      },
+      "weight_sum": {
+        "S1": 267.7,
+        "S2": 295.8,
+        "S3": 541.4,
+        "TS": 280.1
+      },
+      "sha256": "6f2bf5dbb62ad4087b9e0bbb0134a74ecf44c02f7a6091057b4b11be4ef060a9"
+    },
+    "val": {
+      "n": 256,
+      "by_label": {
+        "S1": 46,
+        "S2": 58,
+        "S3": 102,
+        "TS": 50
+      },
+      "weight_sum": {
+        "S1": 33.5,
+        "S2": 37.6,
+        "S3": 48.4,
+        "TS": 37.5
+      },
+      "sha256": "7485d838294a80a5d5ba7f7110bc5d99bf0b24d5b26073a93a23f54be354e2c8"
+    },
+    "test": {
+      "n": 256,
+      "by_label": {
+        "S1": 46,
+        "S2": 58,
+        "S3": 102,
+        "TS": 50
+      },
+      "weight_sum": {
+        "S1": 35.4,
+        "S2": 37.6,
+        "S3": 48.7,
+        "TS": 35.8
+      },
+      "sha256": "e25cdd2e371c7d6524f7d29a0bcf48c45982dc677fd066d59fec62049dfcafc1"
+    }
+  },
+  "new_forms_share_of_s3_weight": 0.2771
+}

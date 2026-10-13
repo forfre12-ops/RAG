@@ -1,0 +1,18 @@
+{
+  "catalog_sha256": "9a19cad62f04a2ee51b4a84222ef447d4743c4b2d62dd36aeafc58c21fdfd803",
+  "catalog_version": "proxy-training-scenarios-v2",
+  "evaluation_case_ledger": "disjoint_from_direct_authored_proxy_eval_v2_1",
+  "factor_profiles": 21,
+  "grade_counts": {
+    "S1": 750,
+    "S2": 750,
+    "S3": 450,
+    "TS": 750
+  },
+  "no_llm_generation": true,
+  "records": 2700,
+  "records_sha256": "177349e749032b3e8845b6f28c9f93762bf70a6afb4f7627393e2cede37f43d3",
+  "scenarios": 315,
+  "schema": "direct-authored-catalog-training-v3",
+  "training_only": true
+}

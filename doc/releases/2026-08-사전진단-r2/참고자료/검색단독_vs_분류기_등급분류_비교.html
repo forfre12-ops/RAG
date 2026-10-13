@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>검색 단독 vs 검색+분류기 — 등급분류 방식 비교</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-elevated:#ffffff; --bg-code:#f4f4f4;
+  --bg-nav:rgba(255,255,255,0.80);
+  --text:#0a0a0a; --text-soft:#525252; --text-dim:#737373; --text-faint:#a3a3a3;
+  --border:rgba(0,0,0,0.08); --border-strong:rgba(0,0,0,0.16); --border-soft:rgba(0,0,0,0.05);
+  --accent:#0a0a0a; --accent-blue:rgba(0,0,0,0.04);
+  --pass:#2a2a2a; --fail:#525252; --warn:#737373; --pend:#737373;
+  --radius-sm:6px; --radius:8px; --radius-lg:12px; --radius-pill:999px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04);
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.06);
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  /* ===== 직선형 띠 토큰 (모노톤·타원 금지·사각 띠) ===== */
+  --c-bad:#595959;  --c-bad-bg:#f6f6f6;  --c-bad-bd:rgba(0,0,0,0.20);
+  --c-good:#0a0a0a; --c-good-bg:#ededed; --c-good-bd:rgba(0,0,0,0.32);
+  --c-warn:#808080; --c-warn-bg:#fafafa; --c-warn-bd:rgba(0,0,0,0.14);
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-0.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+
+/* ===== Navbar ===== */
+.nav{position:sticky;top:0;z-index:50;background:var(--bg-nav);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:1320px;margin:0 auto;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;}
+.brand{display:inline-flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;white-space:nowrap;min-width:0;line-height:1;}
+.brand-mark{width:40px;height:40px;display:grid;place-items:center;flex-shrink:0;background:#ffffff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,0.12);overflow:visible;box-shadow:var(--shadow-sm);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:600;font-size:15px;letter-spacing:-0.02em;color:var(--text);}
+.brand-sep{color:var(--text-dim);font-size:14px;margin:0 6px;font-weight:400;}
+.brand-url{font-family:var(--font-mono);font-size:13.5px;font-weight:400;color:var(--text-dim);letter-spacing:0;}
+.nav-search{display:inline-flex;align-items:center;gap:8px;padding:6px 10px 6px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:13px;cursor:default;min-width:200px;}
+.nav-actions{display:flex;align-items:center;gap:8px;}
+
+/* ===== Layout ===== */
+.page{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:0;padding:0 32px;}
+.sidebar{order:2;position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:32px 0 32px 0;border-right:1px solid var(--border);}
+.sidebar::-webkit-scrollbar{width:3px;} .sidebar::-webkit-scrollbar-thumb{background:var(--border-strong);}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);padding:0 24px 10px;font-family:var(--font-mono);}
+.toc-item{display:block;padding:5px 24px;font-size:13px;color:var(--text-dim);text-decoration:none;border-left:2px solid transparent;transition:all .15s;line-height:1.4;}
+.toc-item:hover{color:var(--text);border-left-color:var(--border-strong);}
+.toc-item.active{color:var(--text);border-left-color:var(--text);font-weight:600;}
+.toc-group{margin-top:16px;}
+
+article{padding:40px 0 120px 40px;min-width:0;}
+
+/* ===== Article header ===== */
+.meta-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px;font-size:12.5px;}
+/* 직선형(사각) 배지 — 타원/pill 금지 */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:3px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;font-family:var(--font-mono);}
+.badge.blue{background:#404040;}
+.badge.bad{background:var(--c-bad);}
+.badge.good{background:var(--c-good);}
+.meta-dot{color:var(--text-faint);}
+.meta-soft{color:var(--text-dim);}
+h1.title{font-size:50px;font-weight:800;letter-spacing:-0.04em;line-height:1.07;margin:0 0 20px;color:var(--text);}
+.lede{font-size:19px;font-weight:300;color:var(--text-soft);line-height:1.55;margin:0 0 28px;letter-spacing:-0.012em;max-width:760px;}
+.hero-kpis{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 32px;}
+.hero-kpi{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--text-soft);font-family:var(--font-mono);}
+.hero-kpi b{color:var(--text);font-weight:600;}
+.hero-kpi.bad{background:var(--c-bad-bg);border-color:var(--c-bad-bd);}
+.hero-kpi.good{background:var(--c-good-bg);border-color:var(--c-good-bd);}
+.hero-sep{border:none;border-top:1px solid var(--border-strong);margin:44px 0 52px;}
+
+/* ===== Section headings ===== */
+article h2{font-size:30px;font-weight:700;letter-spacing:-0.028em;line-height:1.2;margin:80px 0 10px;scroll-margin-top:80px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+article h2 .num{font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--text-dim);padding:2px 8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);line-height:1;}
+article h2+.h2-sub{color:var(--text-dim);font-size:15px;margin:0 0 24px;max-width:720px;}
+article h3{font-size:18px;font-weight:600;letter-spacing:-0.018em;margin:36px 0 12px;}
+article h4{font-size:14.5px;font-weight:600;margin:24px 0 8px;color:var(--text);}
+article p{margin:12px 0;color:var(--text);}
+article ul,article ol{padding-left:22px;}
+article li{margin:6px 0;}
+section{position:relative;padding-top:8px;}
+
+/* ===== 직선형 색띠 (approach header ribbon — 사각) ===== */
+.appr-head{display:flex;align-items:center;gap:10px;padding:11px 18px;border-radius:0;color:#fff;font-weight:700;font-size:15px;letter-spacing:-0.01em;margin:18px 0 0;}
+.appr-head.bad{background:var(--c-bad);}
+.appr-head.good{background:var(--c-good);}
+.appr-head .tagn{margin-left:auto;font-family:var(--font-mono);font-size:11px;font-weight:600;opacity:.85;letter-spacing:0.04em;}
+
+/* ===== 직선형 색띠 카드 (왼쪽 색선·사각) ===== */
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px;position:relative;overflow:hidden;min-width:0;}
+.card-grid{display:grid;gap:12px;min-width:0;}
+.card-grid>*{min-width:0;}
+.card-grid.col2{grid-template-columns:repeat(2,minmax(0,1fr));}
+.card-grid.col3{grid-template-columns:repeat(3,minmax(0,1fr));}
+.card-label{font-size:10.5px;font-weight:700;letter-spacing:0.06em;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:6px;}
+.card-value{font-size:26px;font-weight:700;letter-spacing:-0.03em;line-height:1.1;margin-bottom:4px;}
+.card-desc{font-size:12.5px;color:var(--text-dim);word-break:keep-all;overflow-wrap:break-word;}
+.band{border-left:4px solid var(--text);border-radius:0;background:var(--bg-surface);padding:16px 18px;margin:14px 0;}
+.band.bad{border-left-color:var(--c-bad);background:var(--c-bad-bg);}
+.band.good{border-left-color:var(--c-good);background:var(--c-good-bg);}
+.band.warn{border-left-color:var(--c-warn);background:var(--c-warn-bg);}
+.band .bt{font-size:13px;font-weight:700;font-family:var(--font-mono);letter-spacing:0.02em;margin-bottom:8px;}
+.band.bad .bt{color:var(--c-bad);}
+.band.good .bt{color:var(--c-good);}
+.band.warn .bt{color:var(--c-warn);}
+.band p{margin:6px 0;font-size:13.5px;line-height:1.62;}
+.band ul{margin:6px 0;}
+.band li{font-size:13.5px;}
+
+/* 직선형 색값(텍스트) */
+.v-bad{color:var(--c-bad);font-weight:700;}
+.v-good{color:var(--c-good);font-weight:700;}
+
+/* ===== Tables ===== */
+.tbl-wrap{overflow-x:auto;margin:18px 0;border:1px solid var(--border);border-radius:var(--radius);}
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+thead{background:var(--bg-surface);}
+th{padding:10px 14px;text-align:left;font-weight:600;font-size:12px;letter-spacing:0.02em;color:var(--text-soft);border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:10px 14px;border-bottom:1px solid var(--border-soft);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--bg-surface);}
+.td-code{font-family:var(--font-mono);font-size:12.5px;}
+.td-center{text-align:center;}
+.row-good td{background:var(--c-good-bg);}
+.row-good:hover td{background:#e8e8e8;}
+.row-bad td{background:var(--c-bad-bg);}
+.row-bad:hover td{background:#f0f0f0;}
+.row-base td{color:var(--text-dim);}
+/* 직선형 셀 띠(좌측 색선) */
+.cell-bad{border-left:4px solid var(--c-bad);font-weight:700;color:var(--c-bad);font-family:var(--font-mono);}
+.cell-good{border-left:4px solid var(--c-good);font-weight:700;color:var(--c-good);font-family:var(--font-mono);}
+
+/* 직선형 막대(분포 시각화·사각) */
+.bar{height:14px;background:var(--border);border-radius:0;overflow:hidden;display:flex;min-width:120px;}
+.bar i{display:block;height:100%;}
+.bar .seg-ts{background:var(--text);}
+.bar .seg-ok{background:#d4d4d4;}
+.barlbl{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);margin-top:3px;}
+
+/* ===== Callout / Honesty ===== */
+.callout{display:flex;gap:12px;padding:14px 16px;border-radius:0;border-left:4px solid var(--text);margin:16px 0;background:var(--bg-surface);}
+.callout.info{border-left-color:var(--text-dim);}
+.callout.good{border-left-color:var(--c-good);background:var(--c-good-bg);}
+.callout.bad{border-left-color:var(--c-bad);background:var(--c-bad-bg);}
+.callout-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.callout-body{font-size:13.5px;line-height:1.62;}
+.honesty{background:var(--bg-surface);border:1px solid var(--border-strong);border-radius:0;border-left:4px solid var(--text);padding:22px 24px;margin:16px 0;}
+.honesty-title{font-size:13px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;font-family:var(--font-mono);color:var(--text-dim);margin-bottom:12px;}
+
+/* ===== Footer ===== */
+footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size:12.5px;color:var(--text-dim);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;max-width:1380px;margin-left:auto;margin-right:auto;}
+
+/* ===== 반응형 ===== */
+@media(max-width:1200px){.nav-search{display:none;}}
+@media(max-width:1024px){.page{padding:0 24px;}article{padding:36px 0 80px 32px;}h1.title{font-size:42px;}}
+@media(max-width:900px){
+  .page{grid-template-columns:1fr;padding:0 24px;}
+  .sidebar{display:none;}
+  article{padding:32px 0 80px;}
+  h1.title{font-size:34px;letter-spacing:-0.03em;}
+  article h2{font-size:24px;margin:56px 0 8px;}
+  .lede{font-size:16px;}
+  .card-grid.col2,.card-grid.col3{grid-template-columns:minmax(0,1fr);}
+}
+@media(max-width:680px){
+  .page{padding:0 16px;}
+  h1.title{font-size:28px;}
+  article h2{font-size:21px;}
+  table{font-size:12.5px;} th,td{padding:7px 9px;}
+  footer{flex-direction:column;gap:6px;}
+}
+@media print{.nav,.sidebar,footer{display:none !important;}.page{grid-template-columns:1fr;padding:0;}article{padding:0;}.card,table{break-inside:avoid;}}
+</style>
+</head>
+
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAREAAAERCAYAAABclJOOAAAqkUlEQVR4nO2deVBVZ9bun41xHkAGJ0RxIo4YJyKCCooCShzQOKDG6KexOuncP1Ldfav6v/T9bn1VN3XrVveXSnUSYxLjHI0TigOIA0bjHCdsZ1FUnCfUaGTfevbhpEw6DnDO2e979l6/KqrTiZ69ec85z17vetd6lmGaJgRBEKpLSLX/piAIgoiIIAi+IpGIIAg+ISIiCIJPiIgIguATIiKCIPiEiIggCD4hIiIIgk+IiAiC4BMiIoIg+ISIiCAIPiEiIgiCT4iICILgEyIigiD4hIiIIAg+ISIiCIJPiIgIguATIiKCIPiEiIggCD4hIiIIgk+IiAiC4BMiIoIg+ISIiCAIPiEiIgiCT7zi218XfuHsVRPT3wWKTwH3HsjCOI2Y5kBmGvB//2qovhXdkEjEX8RGGcgeCUSEVa5qhfw4aQ3u3QVOngJOl8nIyN8gIuJP/jjZQFx7oH5dv76soAE37wDHTgKLv1N9J9ohIuJv3kgHOnaQpXUid+4Aa/OBooMSjTyFiIi/mTbGwIB+QONGQM0afn95QSE//QScKwE2FMjb8BQiIoEgPQ1oEwvUrhOQlxcU8fgJcPMesHUnMGepRCOViIgEgsQuBrKGAGGNAvLygkoqgBMngNwN8jZUIiISKMaNBjrFebY1grMofwAcPw18ulCiERGRANI6wkC/vkB0tCyz03hSAdy4DixeARw563ohkUgkkEzMBnrGVyZYZakdRflD4NhxYPlauB35ZAeS6DAD6YOA2JZAnVoBvZRgMxUVwN37QNEOYOkGV0cjIiKBZkSKgdd7Aw3ry3I7jhDg6DHgu9VwMyIidjB1PNA0AqjBtgtZcufAcvhy4NgpYGGea6MR+UTbQd9uBgYPBNrE2HI5webakWtXgRWrgdJbrhQSERG7GD8W6Na1MhoRHMW9cmDHbiA3D25ERMQuusUaSB0A1K0NhMiyO4rHpkdItuwAdh5xXTQin2Y7GZEBpA0EwhrYelkh0FR4tjVHioGV7jvyFRGxk4jaBnLeBJo1k+Y8J1J6Cdi2Ayg64KpoRETEbjKTDMR3AcLCbL+0EGAePwEuXga+XgTc5h7HHYiIqGBCNtAjXnIjTixAu3cX+GEvsL4QbsG1IpKXl2euW79ezdNicIKB1GQgPEy2NU7jwSPgzAVg81ag9IYrohFXisjBgwfNjz76CP/7P//T+mclNzEyE0joCTRgJavgOHbuAWbPhxtwpYjk5eXh0KFDOHLkCNavX6/mJmIiDIzKApo2AWrXVHMPQoCoAC5fAXbsAo6XOj4aCXHjNmbr1q24du0abt68ic2bN0PZtmZipoHOcUCjRm58K5zN3XLg1Flg3hI4Hdd9cpcuXYqjR4/+8v8PHz6MJYsXq7VSbNdG3fWFwHHrlqdupGC3o6MRV4nImjVrzIMHD1pRiJerV68yL2JFKEpuKme4gaS+QOMGkmR1Go9+Bi5eAtY729jZNSJy+fJlc8GCBbhw4QLu3bv3y79/8OABLl68iIULF+L27dtqhCQ9pdLYubaSywsBPPJ9+Bj4fifw8TzHRiOuEZHVq1Zhy5YtuHHjxr/9t1u3bln/bcWKFUruDYndxNjZyZwuAdZvAq7ec6SQuEJEDhw4YG7esoXRCB49evRv/53RCP9bQUEBT2zUvNFv5wCvtgdCGyq5vBBgY+czTLJ+68hldoWILFq0CPv378eTJ0+e+WcoLvv27cO8efOghKgGBgYkAdHN3fK2uGtbc70yyXrglOOiEcd/Wvfu3WsWFRXh/PnzL/yz586dw7Zt2yg4at7o/5gCJPauHCItOIoHDz0DwVc7z3PE8SLy1VdfoaSk5FfJ1GfBP0OxYQJWCaE1DevIt20roG6dyrdHfqq3Bprx5Alw94GnAM1hxs6vwMEsWbLEXLly5a+OdF8EE69r1qzBoEGDzMzMTENJl29hmol9P3oKloSq8/gx8PAhcO0K8OCxPitYAaD4BLBqLTB2KJyCY0Xk9OnTJkvaKSBMnL4s/LOMRtauXYvevXubUVFR9gvJ//mfBk5dNnHnru2XdkyR16Fi4LOvgPOXPDkJLagAbt8Fjh4HlqwzMS7DEV6ZjhURbkmYKK2KgBAmX7mt2blzJ77++mv86U9/ghLaNTOAZmqu7QRS+7DQy7SOVk+eVX03v46SrlwFvlsDJPQwEds06IVEw82j75w4ccKKQk6ePFnt12BzHrdCpaXOb6ByLFMmAt276lcJfK/cM/RqtaLmTz/jSBH54osvrMrUqkYhvz3y5Wt88sknfr03wUa6tDIwMBmoVweoGaKXA1r5fWD7bmC7IisKP6LRyvqHrVu3WoVlt2/ffm5dyIvg3+Vr5Ofno6ioKOjfaNeSnQVrlGlDdkprxM9PgKPFwIrgN3Z2nIisXr0aRw4fxp07d3x+Lb4GfUe4rRGCFB6bT54AxETr15t0rhTYvA3YqqguyU84SkQ+/+wzc8eOHdY2xpcoxAtfg9saJlnnzJkT1G+0q0ntbaB3d6BJuF4f+YoK4Mo1YPZcBDMarajv5BcU8GjXLwLiha915swZa1sjBDFjRwKvxQO1X9HLILu8HNizH1i4JmgfUhqtpm988sknJvtjLl265PfXZnPe3r17rWv4/cUFe0h+zUD/RP3MsX96DJwvA9ZvBo6cD8rPV4hT+mMWL178u23+/opG+NrLly/HsWPHgvKNFgBkpQPdugD16uq3HD/sBuZ8jWDEESKyceNGHD9+HHfvBq7Ck0nW4uJiq5JVCFJiwg2MHlZpjq1TkrUCuHYd2PMjsPd40D2kgl5EcnNzTXbePssrxF/wtUtLS63cCK8ZsAsJgWXyCAPdOgNhmpljP3wEnC8Fvl6IYEOjVawetDX88ccfbbse/Vh5TSGIGTUc6Nge2nHvLrDte2Dd9qB6SAW1iKxcudKkczvNlu2C1+I1ly9fHlRvtPAUI1IMJCUCofX1SrI++tkzr2bjFuDGT0Hz+QoJduPlQG9jfguvxWsykVtWVhY0b7TwGzIGAe3b6JUbecJZvg89niPzFI4xcYuIcH4Mh1AF6kTmefCaNHZeJZWswUuPDgbGjQQah0IvKoAz54B1+UEzyzcoRWTz5s3mpk2bbI9CfhuNsEdH2SxfwXfenWygSyegsWZ9NfceAmdKgHlLEQwEpYhwYh0Ly1SzZ88efPPNN6pvQ/CFgf2BVjGafRUqgFu3gbUbgV1HtX9I6bRyL825khKrw1Y1HHq1rahIunyDmT/mGHid5tiacf8hcPykR0g0JyhFpFevXmjRooXq27Ac0C7Q2Hn+fNW3Ivhaydq9E1Cvnl7NeffoOfIDsEDvuqSgFJGxY8eie/fuqFWrlupbsZKsGzZulCPfYCa1l4G0gUB4qF7NeaT4OLB8DXRGsxV7OeLj4420tDREREQoFxImWbmtoefI8ePBV7IsVDJtMtAqGqij/sH0K+7fB06eAeau1PazFZQiQrKzs5GZmWkJiUrYnEf/Elayfvfdd0rvRfCB1hEGhqR6Zv7oxOMnwNVrwLJVwImLWgpJ0IpIaGioMWXKFMTExKBuXfVdmRyQVVhYyHETWr7Rwkt6jvSIB+rW1mtbc7fckxvJ1dPYWaOVqjopKSlG7969tUiy3rp1C6dOncI///lP1bciVJfYKAOD+nu6fGu9oleS9fETYHMRsH6Hdg8pjVaqekycOBFXrlzB2bNn/epoVl3PkYJNm5C+das5YMAAdfNELt/1DL6qEcTPCL6XoWFA0/r2ruPYDAOF35vIywce3tRnLnJFhefId9UaID0ROhH0IpKcnGzs27/f3L59O65fv66kgvVpzxGaROfm5mLAgAFqbuJquYn/9ZFnePQvohpMYlL5peWTt1kT4J2pJgYn2CskI7OA/YeBO/eAn36CNly8AuzYAyzPNzE6TZuhV0EvIiRr+HBsLiwEhYRRieok6/fff49PP/3UnDVrlv1vdFR9Aw3rmbh6HSi7ApgmoM3HrYpaUnoJ+OeXQLt2JmIj7PsthiYYWN3VxPXrni+uNtEIPOZFi5cDyYmm9V5rgCNEpG3btkZ2drZJQ2W6m/kytMofQkKzaJoXzZo1S81NjHoDKCkFTpxBUMORkz8eBtbnA7PG23vtnDeBG7eAvE2ANRNcByGp8FSyHjwCrM0Hpo6EDgRTnPtcJk+ebHTq1Anh4RwLoBaaRdMo6eOPP1aTBOvbxTP5LbShXn4Z1TExvnQNKNwO7Dxi71omdjMweIDHAU2nNfzpEVB6BcjfDOw/oUWS1TEiQrKyshAXFwcduHbtGubNn89GQTVv9BvDgN499CrlrhYVAJst5yvw1xhGY2eWw6svIfgVFU+Aw4eBZXoMVXOUiOTk5BiDBg1C8+bNlVeylpeX49TJk+BgcSW0aGhg6gSgSaReNQ/V4fpNYP9B+yfFNWtoYMp4ICpCvzUsuwbs3g/sV18lrdnK+CcaadeuHRo2bKj0PnhKxGiExknKjJ1HDzbQKQ4IbYCghtsaJlm/mmf/tccONdBZwzW8e9+T85qr3gHNcSLy2muvGcOHD0ejRnoYzdD35Ouvv1Zbhdm1S/C/1RwHsnUHsGSD/YI8cRzQvRu0484djwMaj3wVEuSfrN9n5syZ6NKlC5o0aaL6Vixj5yNHjmDevHnqopFByUB4A70ShFXlpyee05KNhcCJy/auZVaygYH9Ko2dQ/SK0MquAoVFngJDRWi0Iv4jIiLCSE1NtfpqVMMjXwoJTaWV9dUMGwLEtQPqaGRKXB0em8BOTopTsK1JH+RZw9p1oN2a7N4PLFBnpehIESEffPCBkZycDB1gJeuBAwcsuwAldG5tYOKbQLjajmffqQCulAE7dgN7bB5n2q2tgak5QKRua1gBnD4LbChUFo04VkS8SdYePXooz48wycqSfDrEb926VU00Mn2Mge6dgSj1dTQ+cf9noLQUWLLC/mtPHW0gnmvYGFpxn8bO54Bv1AxVc7SIpKWlWeZFLECrUaOGciHZu3cvFqmcnsfiqdhWgOK18I0KWM2FmzYD+TvtF+Q0rmFr/Zobb90Blq0BdhyyfU00Wwn/8+6776Jly5bK60YIcyO79+zBhg0KThjI9LEG+r3u8csIZiGx5tZeAnI3Atcf2ruW08Z6jJ1fqalX7cjDyjETK9fZfmmNViEwxMbGGnRA69ixoxbGziyJV+qAlpEGtG/rEZJghW3xDOH37gcWK1jL4UOATu2BeholWa01ue+ZnvfZEluF1fEiQiZMmGA5xNMBTfW2hqMumBtZvHixmmgkOd7AwCQgjKbEQRyNkFNngfUF9s+tTX7N05vENayp2RrSc2SNvVXSrhARdvmyHJ4OaKq3NewwvnDhAtasWcP6ETVC8u50TzTSoE5wfwTKHwKnmVBcZP+133nbc+Rbr55ea/jgJ+DUOeD/fWnbZ0uj3z6wTJw40RKSyMhI5XUj3Nawy5fzhJXQIsxAWn+gdStNWtx9aETjLGZ6j9p95Nsq3MCgykS1TjypLMpbXwgcOWvLmrhGRMi4ceOsJKvqI19CO0fOE1Y2ZoLl8N27ArU1SxBWlTvlnmKrVXnq1rDuK3qt4cP7wOFiIHeDLZfT6De358g3KSlJC2NndvnSIX727NlqbiA63EDmYCCisX77+qpCF0gWoNk9KS46zMCwoUDzZnoZO7OK9X45ULQTWLU54GviKhEhY8aM0WJ6ntfYmQ5oyo58R6QaSB8MNFLb8ew7FZ4k64YC+y89PNlAWqrHAEob6A5vAidPA+s3wVEicuvWLXPnzp2mytksffv2NWii3KxZM+XzalgOzy7fvDwFobiXyeOAmBZAXfV1ND5BT9n9h4DFa+z/bI0fBTRv7tka6gSHXu3ZDywLbJevrSLy0Ucf4b/+678wZ84cqGTUqFFISEjgACzoAI2d//Hf/61GWBM6G+iXADRtGvyB6bUbHn+NUzZ3+SZ0NtC3j8edXhsqZ9VcvgIsWgKU3gjYmtj2qWH0sWPHDqv0m1+as2ftyRz/Hi1atDDefPNNyypA9baGMDeyqaCA/TVq1iRnPNCrB4KeBw+Bo/9SMyluynigZ3doBQvQysuBA8Uew+lgFxEa8/BEorS0FCdOnMA333wDlYwbN86g54jqWb7k8uXL1ixfZUnWbrGe4qlIDYunqgKfvNduAZu2ABu22yvI8W0MpPYHwnUzdn4MXKbZ9VZgd2BOAm0RkV27dplr1661Rk0SdrSyLb6wsFCpIxOjkW7d9HCs4tqwboRrpeQGRqTDqmRVbCvpF4qPA8vX2n/dYUOBZB3XsMKTG5m7AEErIpwIx5kwPNYk/F9GJcpMjCsZPXq0ZV6kw7aGSVauEcVWCRF1DEzIBqKbB3+S9eZt4McjwBqbbReaNjAw+U1PbkSnaMRrdn3gILD9oBl0IjJnzhyzsLDQCtm9Iy55vMlohBPrZs+erTQaycjIQIcOHVC/fn2Vt/HLmtDYeeHChWrWJCPJQHwnQJOEs09dvhcuAfO/BW7/bO9aZiYZ6NoJCAuDVnBbwzUJgOdIwEWE0QafsL8HvUeVdrRWGjtPmjRJeTm8l5MnT6qLRsjoLKDLq8F/UsOO1gOMRhREu5PHAj266reGNLvO3wYsL/CrsIYEOgo5duyYVVT1e9y8edP60iibFFfJH/7wB4MFaJxXoxquyeHDh5mIVrMm6UkGUgcATRvrV/dQFX7+mck3oHCbbT0kv5CaYGBAMhDFRHVNvaIRzvKllaIfj3wDJiLsCVmyZAkuXrz43Nm4FJjFixfj0CH7HZmehg5osbGxUA2b87hmTLKqM3ZOA15tD9QJ4i7fJ/TXeATs2gssVBDtDkkF4joAdTXyHPGuyw+7gdn+Ox0N2Cdk1apVVk0IE4YvOpUoLi5WG8IDHL5tGTurTrASDiVnNLJ69Wo1N9Ah2sDI4Z6+Gs3yg1WjArh0Bfj+B+CAzXNrO8cYGDkMaKy+2fPfOH8R2PY9cMw/D6mAiEh+fr65bds2awKcN5n6ooQijXpWrVqlNBoZNmwYevTsicaNG2sxPa+goIA/atbknfEG4rsA4aHBX4BWUgp8o2BS3B8mGlaXr27Gzkw8n7sILPJPhBYQEVm4cKE1IqEqsIeEs1lUkpKSYgweNAhhYWFKHdC8niN79uxRuyZsLKMpsU5t7tWB9Ul5G4FVCuqShnrXULOQjjuE9fnA5r0+r4nfPx15eXkmDXdoSlwVmBvhtmbJEnv9IX/LlClTrNyIDp4jXEOupbIu36kjDQzoB9TUzC+jOpWsV24A+VuAMptns0wdbSC5L1Cnpl4O8YxGTpf45fTKr7/V1atXTT45X5RMfVYIf+XKFSxbtoyl8cqEpGPHjkZ6ejotFaEariHXkmvKDmglN8EqzK4d9TIlrk4PyU9Msu731I7YTdZQoGN7vZKslrHzI2Dvj8CcZaY2IsJE4Lp166wcR3VgNMJcirJJcZWMHz/eGnrVoEED5cbOXEvW2ixfvlzNDSR0MqyQPKxRkCdZeWR4wtOcd/W+zV2+XQwMSqlcQ42iEWL5sPjWnOe334g+Ifyw8zTmRcnUF02KY0KxqKjIVDlmgtEIHdBUe45wTSiutFJUZuw88y0guhnwSpCrCLc1ly4Dn39t/7Xffwdo1VIvBzSeXrEArfgk8HH1B877TUS+/fZbK5laXQHxwr/P3AiPiFUyduxYK8mq+qTGuyZMPDNhrYSoBgaGpXvqHoIdK8maD+w6aq8gh9c2rJk/GmyT/01Ymb/M2wAcOGUqE5E9u3ebPKI9deqUP17Osgug54jKaITkTJqEFtHR1rZGNaz83bhxozpj5ykTgITeQJ1awZ1kvfcQOHAYyLV/UhxyxgJ9e3rySzqt4f0HwL4fgdXVc9jzy28y+4svrAY7Hk36A3b5nj9/Xt2Tt5Lk5GSjT+/eiIqKgmq4tpye9/HHH6u5gah6BtIHAS2bAbV1CsmryZbtwGybTwKbNjTwRiYQE+0RY52qWB88BrbvApZU/STQZxFhgRgdy1hl6c8vDCtZGY2sXLlS+ZFvnz59oAOcnseO6Nxcm13Nn+5QTU8DGrFDVaMnaXU4WwJs3GL/dQcnGBg2BAhtpNcaMgCwjJ3zq/xXffotLl68aK7Ly7OcyrxeIf6CCdqjR49ak+LOlZQoE5KEhAQjbfBgqzlPdUk814Tl8PRn4XG6kpvIeRNoFQPU0+hJWh1u3AEOFfuUUKw2E8bquYZlV4E9P1bZ2NknEaHF4a7du63En7+2Mk/D12WU84Uq28BKxo0fj8GDB2thpUhYyUq7SSXEtzUwKBmIidHrSVodbt8CVuQC+xX01aQke05rdFtDdvny9OrEy5tdV3tze+LECZMGOsxdBEJAvDAPQCHh9Tp06GBAAaGhoUZOTo5JH1QWxAXy930ZuOZMZPOeaDpt+w384W2Pe9f+g57/r9n34OUIAQwDqF8PqMt5ujbz7n8ATSI9CU3WIumyhkYNT+K3CsWFhmlWT4Q//PBD86uvvrJsDgMNy9CZm/jb3/6mRES88Eu7efNmS9hU06ZNG8yYMQN//etf1a1JWbmJEKPyC6DLt6CKVZs84mzRUN0anr9l6nPiVQH8zJ+fPdP9XhaKSFV/tmzZYiYmJpqNGzemAgX8p0GDBmZcXJyZt26dWZ379dfPxo0bzREjRtjyO7/oh2uflJTEbmmlayI/puvXIMQXy0N/J1OfBTtaGfEU5Fc9c+zvWb4pKSmIjo5WnmTl2rMuZ8MGe4Y2C8KzqLKIfPnll2ZRUdGvjJftgNeisfPnn32m9Mg3PSODTXpoqHgsANeD7wHfiwULFihdE8HdVFlEeLx4/PhxqKraXKbY2Llzp07W9Lzw8HDoAN8L1S0CgrupkogwCvjXv/71TOPlQOM1dlY2t/YpK8XevXsjxjrmVIvXh4Wm2KrvRXAnLy0ix44dM+cvWGD7Nua3sJL12yVLOHZS+bya9u3bK7cK8HqO0Nj51KnqNVAJgi0iwqcdqyW9ozBV4TV25pdGJW+99ZZl7MwuX9VCwkpWdvmq9mER3ElIVeoS4uLilNsGeo2dWYC2ePFi5cbOnTt3tjxZVcLIkFaKLEBTZqUouJaQqkyKy8rKsibFqX7yEh08R/r27WvN8lVt7OwVV0YjixYtUnofgvuoUmL1vffesyIS1dEI4ZOXZejKJsVVMnPmTG3WhGMmaAylevSG4C5CqtpDMnbMGCuEV413NguHXqns8o2OjjYyMzPRrl07qIZJVpbk09i5rKxMhETQs05k5jvvGP369bOevKpDePpr7Nq1C2tyc5Xex4QJE9CrVy/Lj1X1mjBCy8/Px4oVK5Teh+AeQnyZW1u/fn2ojkbKysqsL42ySXEADZ0NrkmzZs2Ul8N7DZ24JjTPVnozgiuologMHTrUSrLSNlD1pDiG8Dx6Vn28SWPnMWPGWIln1XBdjhw5gu8UV/cK7qDa/cdszWdCUfXxJjl9+rQ1r0ZlNEKmTZ+O1q1ba2HsTM8R9tXs2rVLohFBTxHhpDgWW9E2UIcnL7c1c+bMUd5X07dvX2tejWoYodE1n+5zghBIfHJCYTSSmJioRdUm8wC7d++mQ7zSJ+9bb70F9tWoxpsbYeezarNrwdn4JCJt27a1JsUxoah6UhyfvDSMpteJstksALp162YlWXUwdqbnCDufaXZ9/vx5ERIhIPjsyTZmzBhrWxMaGgod+OGHH+h5ovQesrOzrRMs1cbOjEZ4grVv3z7Mnz9f6b0IziXEXyF8y5gYLRKKzI2wr4Zdx6ruwTJ2njTJsgpQvSYUEiZZmXiWLl9BWxHhpLhePXtqMSmOniM8rfn000+V3kdGerrRvXt3LY586VDPXiNWsgqCv/GbxTSTrKza1AEKybp165T3kOTk5IBCojrpTNj5TPuEwsJCyY0IeooIO1qHDhmCVq1aaZFkvXDhglW1ef36dWVfmpSUFGPo0KGWsbPqNWGSlWbXYuws+Bu/DrsYnpVFywDlJsbMA9AhnknWefPmQbXnSJcuXbRYE5oXsQCNZttKb0ZwFCH+7iFha7wOuRHC3AiPfFUeb8bGxhpjx461Tmp02NYwN/Ltt9+yeVGERPAL1Z6A9zzeeecdk1sJzqZRCb+0bNHnpLg///nPSqfnTZgwwRq1wSpS1bB5curUqejfvz/ad+jwy783ORFOcDQVFRVWfZc/X7Pas3ifx4gRI6wvS0lJidK5tV4rRRZbpaakmL379FEmJMyNME9Do2vVs3x5DM6B4Hl5eb/qfeIHTHA2pmkiPT3d9OdDNSAikpWVZRQXF5v0+uBJicovDUu/2dGau2YNevfpo+w+pk+fbpSUlJgs/GIBmMo18Voo0I9Fhy2WYK+IsBjS7y8aiJ/Dhw+bVLzIyEjlc2v5k5aWZtLYWeXs2D179pgDBw40IyIilK+H/LhvDSIjI83MzEyTD3h/fq4DNoq8S5cuv3iOqO4hIYxGli1bpvQeevXqZa2JLklWwT3UqlXL6nFj7RI78P364oF++mZnZ5vNmjVTrsK1atUyu3btan7xxRdKoxH+8Gkg0Yj6J7ObfqKjo82cnJyAfPYDFol4GT58uDWvRjXeAdjLly9X3kMyetQoayi4INhFfHw8xo8fH5DXDrEjoUh/DR08R5jk3bp1q/J5NTS7pg+LDmbXgrOpUaOGtX0eMGAAT02NoBQRMnLkSC2MnXkiwvJv1rDk5eUpjUYGp6XxvF75mgjOJiwsDF27drUqpwOFLSIyYMAAg0Ki2l/DKySs2lRt7MwuX76xOnjUCs6kbt26VjKVFdPx8fFGUIsIeXvaNOvJy22NalhJS9tA1R2tnFfDhkXVniOCMwkLC7PykeywDyS2iUjrVq2MlJQUy6hHBzg9j54jKntIaKU4cOBAyyFeEPwNUwhDhgyxTLLgBBEh06dPt4yddagbYbXmnj17lM9mmTx5Ml5//XVJsgp+T6byu8a6kEBjq4iwy5fKyGhEB8+RU6dOWbN8Vc5mYeGPd3qe6jURnEH9+vWtKIQzogMdhdguIl5j59GjR2tjF6DDpLiJEycaSUlJyj1HBGcQHh6OjIwMmoXb0nBqu4iQSZMmWUrJOgkd/EfZKLh3716lSVaGnToYOwvBTUREBNq3b2+lDuxCiYi89tprVgEaQ3jV0Crg5MmTVmu8SvjU6NGjhzYRmhCcNG/eHIxq/e0Zop2IEJri6DApzptk3bJlC3Jzc5VGIyxL7tatm8pbEIKcxMREmoLZek1lIsLiF07P4zm26hCeVaw0UaKJcVlZmTIhSU1N1SbxLAQXjRo1srx8mUzlAYYrRISwLZ7RiGoR8TqgceiV6gHYb4wYYUUjUg4vVAUm5TmJcvTo0ba79ykVkfDw8F9MjHWAR740dj5XUqIsGmFRHpNikhsRqgK/Q2+//TZUoFRECJWzX79+aNOmjepbsbp8KSTfzJ2r9D54DN63b1/rBEsQXgRtJejhy9lPcKOIkOwxY6z9nA6VrPRkZXNeUVGR0iSr14dFrAKE58HcWc+ePa0+LFVoISLsaGXVJotkVAsJBzwxGqETuupohCMduB4iJMKzBISzngcPHmxZb8LNIuJNsrJOQnUBGpOs3Nawy3fu3LlKoxFm2rmtEbsA4ffg54IPmkB6hQSViLRr18544403tDF2Pnz4sBbGzjqtiaCfV0h2djb/V+lgNqWGxc8ydm7SpIlyY9saNWqYHTt2NP/+j38oN3bWxexafvRZg9jYWHPGjBnKP5u2GDVXlTGVSVbVcFtDz5HVq1axSc9UvdXTwexa0INatWqhc+fOlu2oDmgnIjk5OdaRrw4mxsyN7N27l+XwSu9j2rRpRkJCghZrIqgXkPDwcCsXwkmTOrwf2omI93izQ4cOyqs2GY3wtGbTpk3MjyiNRpgb4XBy1WsiqK9M7dSpE0aNGqXNW6GliCQmJmpTyUohOX78uDUUXCU0u5bpee6mVuUUu4kTJvh/ip1uA739wbRp01BQUGAVf3FboZKzZ89aniMrV640R44caajsfN6/fz9CQkLw+PFj69/xnwXnU1FRgXr16qF79+7W3CJohLYi0rRpU+ONESPMu/fu4YedO1XfjtWgt3jxYvqh8qTEUHUM/v7775v0hqW41qxZU8VtCIoi4qZNm6J/crJ262/wiEZXrl+/bn744Yf48ssvLU9ULqQq2GlMw5e//OUvmDFjhlZPAkFQidaxcEREhMGSXh38Ne7du4cTJ05YSdYDBw7oq7yCYDNaiwhhDoKnNTzW0oEDBw5g0aJFqm9DELRBexHxGjvTKkCH6Xk0dt65cyd7ayQaEYRgEREaO7PYioklXYydVTugCYIuBIWIeEcqsMtXh4rNGzduID8/H0uXLpVoRHA9QSMijEZYbMWqTdWerI8ePcLFixctISktLRUhEVxN0IiIt6+Gxs6qJ8XxqJlHzjR2Vj2vRhBUE1Qi4h2ATX8NHbY1rGRlNHL+/HmJRgTXEnQikpmZadAaXwcTYzbnnTlzBp9//rnqWxEEZQSdiBAOBGcnow7RCD1Hli5disLCQolGBFcSlCLCubWDBg2y2uJVCwlzI+fPn8eqVauU3ocgqCIoRcQbjbAkXrVdAJOsLInfvXs3Pv30U4lGBNcRtCISGxtrcNZGixYttDAxPnbsmEQjgisJWhEh48aNMzi3VodKVrbmnz59Gn//+98lGhFcRVCLCKEDWteuXbUxdl67di0OHTokQiK4hqAXkREjRljGzsyNqE6y0oFt3759WL16tdL7EAQ7CXoRIbQKiI+PVz4pzjs9r7CwkC5oEo0IrsARItKjRw9rUpwO0Yguxs6CYBeOEBEyceJEtG/fXgvPkZKSEtAHVfWYCUGwA8eICM2TR4wYYc2r0QH6jsydOxfnSkpESARH4xgRIbNmzTKSkpK0mBR39+5dy0pxrWxrBIfjKBEhg9PSEB0drdzYmeXw3NbQ2Hnnzp0SjQiOxXEikpGebpkXRUZGQgeYG5krniOCg3GciJAZM2ZoY+xcVlaGvfv2YevWrRKNCI7EkSISFxdnvP7661qUw3u7fOfMmaP6VgQhIDhSRLzRCIVEB9hXs2XLFlopSjQiOA7Higjn1mZmZlpHvqqNnRmN0Ng5NzcXy5cvFyERHIXWs3j9wZQpU8yCggJcunRJ9a1Yp0YtY2LQ8dVXUU/x6ZFgDxWmicePH1stGWwWTUxMdNwc51fgcGbNmmV5fbD4i6MeVHL16lXcv38fJefOISTEsUGg8Dt07NgR7733HpyI40UkOTmZQ8FNbimOHDmi9F4oYqqFTLCfTp06oU+fPmjbtq3johDiisfh2DFjrC5f1QVogvuoVasWevXqZY06cSquEJHeffoYqSkpVgGaCIlgp4BERUVxzAm6dOniyCjENSJCMjIzQfOi0NBQ1bciuISoqCgMHTrUmtwIB+MaEYmJiTHoEN+sWTOJRoSA06BBA+s0btKkSY5fbdeICBk/frzBBBeFRBACSYsWLazId/DgwY6OQlwnIk9PzxOEQFGjRg267VlGWW7AdSLCWb6JiYlaWCkKzkymNmnSBAMGDEBCQoLjoxBXiggZOXKkFY2oNnYWnEdYWBirUjE8KwtuwZUi0q1bN2P8+PESjQh+pW7dulYyddy4cWjdqpUrohDXigj54x//aMTFxWnhOSI4g8jISCvCZQIfLsK1IkJYBNS2bVvVtyE4hLi4OGur7DZcLSLvvvuukZycbJ3pS5JV8CWZGhkZiYEDB1rzod22kq4WETJs2DC0bt1aCtCEalO/fn3LtyYzI8OVq+h6EWExUE5OjlWiLAjVITIyEhMmTrR6tNy4gq4XETJlyhRrP8vaEUGoCk2aNLGSqf/j/fddKSBERKSyr4a5ER7PCUJViImJsXIhbkZE5CkHtKR+/STBKlSJ/v3744MPPnBtFEJERCqJiooy0jMy6PtgjeEUhOfBzwj7Y4YPH+76hRIReYqRI0ca7Hlg6bIc+QrPgp+N8PBwJuWRlpbm6iiEiIj8hgkTJqB5ixZy5Cs8ty6E+bOZM2fKKomI/DtJSUlGysCBVu2IIPwer776KjIyMqxJixAkEvk9srOzfzF2lm2N4IWfBVY309jKLV4hL4NsZ34H+kAMGTLEmuXL0FUQCB8qPNJlzxUnLMqqeBAReQZZWVli7Cz8CnZ8M5k6evRoEZCnEBF5zpEvtzX0Y5VoROA2pkV0tLXVFX6NiMhzGDNmjNG1a1fpqxHQsmVLJPbti9TUVIlC3DZG01fYnHfjxg2UlpaqvhVBId27d5dk6jMQEXkJY+cTJ0+axcXFME3zRX9ccCDczqalpbnGeLmqiIi8BOzQfHD/vlleXo4nT55UeZGF4BaQFs2bY8aMGSIgz8CQp6sgCL4giVVBEHxCREQQBJ8QEREEwSdERARB8AkREUEQfEJERBAEnxAREQTBJ0REBEHwCRERQRB8QkREEASfEBERBMEnREQEQfAJERFBEHxCREQQBJ8QEREEwSdERARB8AkREUEQfEJERBAEnxAREQTBJ0REBEHwCRERQRB8QkREEASfEBERBMEnREQEQYAv/H94e7YLewGYSQAAAABJRU5ErkJggg==" alt="한국지식재산보호원 Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">·</span>
+      <span class="brand-url">www.koipa.re.kr</span>
+    </a>
+    <div class="nav-actions">
+      <div class="nav-search" role="search" aria-label="문서">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        검색 단독 vs 검색+분류기 비교
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <aside class="sidebar">
+    <div class="toc-title">목차</div>
+    <div class="toc-group">
+      <a class="toc-item active" href="#s01">01 한눈에 보기 — 결론 먼저</a>
+      <a class="toc-item" href="#s02">02 왜 검색만으로는 안 되나 — 비유로 쉽게</a>
+      <a class="toc-item" href="#s03">03 두 방식 정의</a>
+      <a class="toc-item" href="#s04">04 검색은 잘 된다 — 분류는 다르다</a>
+      <a class="toc-item" href="#s05">05 결과 수치 — 정확도·미탐·분포</a>
+      <a class="toc-item" href="#s5b">06 키워드 룩업으로는 왜 등급을 못 매기나</a>
+      <a class="toc-item" href="#s06">07 검색 단독(가장 높은 등급)의 함정</a>
+      <a class="toc-item" href="#s07">08 장단점 종합 비교</a>
+      <a class="toc-item" href="#s08">09 결론 · 권고</a>
+      <a class="toc-item" href="#s09">10 측정 방법 · 한계</a>
+    </div>
+  </aside>
+
+  <article id="top">
+    <div class="meta-row">
+      <span class="badge">실측 비교 보고서</span>
+      <span class="badge blue">2026-06 · 의사결정 보조</span>
+      <span class="meta-dot">·</span>
+      <span class="meta-soft">검색 단독 분류 (BM25 실측) vs 검색+분류기</span>
+      <span class="meta-dot">·</span>
+      <span class="meta-soft">Koipa AI Engine</span>
+    </div>
+
+    <h1 class="title">검색 단독 vs 검색 + 분류기</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
+    <p class="lede">"분류기를 빼고 <b>검색엔진에서 BM25로 조회한 상위 5건 중 가장 높은 등급</b>을 그대로 매기면 되지 않나"라는 안(案)을, 동일 테스트셋·누출 0 조건에서 분류기와 정면 실측해 비교한다. 핵심 결론: <b>검색은 우수(R@5 94%)하지만 그 방식의 등급분류 정확도는 20%로 붕괴</b>하며, 사실상 <span class="v-bad">"무조건 1급비밀(TS) 도장기"</span>가 된다.</p>
+
+    <div class="callout" style="margin:10px 0;"><span class="callout-icon">⚠️</span>
+      <div class="callout-body"><b>오해 주의 — 이건 "ES가 나쁘다"가 아니라 "검색 단독으로 등급분류"가 안 된다는 얘기다.</b> 본 비교는 그 방안을 당시 검색엔진 <b>Elasticsearch(BM25)</b>로 실측한 기록일 뿐이고, 결함은 <b>엔진이 아니라 방법</b>(분류기 없이 검색 이웃의 등급을 투표로 채택)에 있다. 그래서 <b>PostgreSQL pgvector(dense)·BM25·하이브리드 어느 것으로 바꿔도 결과는 같다.</b> (본문에서 "검색 단독"은 특정 엔진이 아니라 이 <b>방법</b> — 분류기 없이 검색 이웃 등급을 채택 — 을 가리킨다. 실측만 당시 ES로 했을 뿐이다.)
+      <br><br>실제로 <b>dense 벡터 kNN(=pgvector가 쓰는 바로 그 방식)도 동일 조건에서 별도 실측</b>해 같은 붕괴를 확인했다 — <b>벡터 kNN 최선 49%</b>, 레퍼런스에 따라 <b>28~76%로 출렁</b>이며, S1(고가치 영업비밀) 검출은 5~9%, "최고등급" 집계는 전부 TS로 퇴행한다(<b>기술구현_백서 v7 §검색 vs 분류</b> · <b>시스템_설계도</b>: 분류기 59–77% vs 검색기반 kNN 38–49%). 시스템은 이후 <b>pgvector로 단일화</b>됐지만(의사결정_대장 §03) "검색=retrieval, 등급분류=모델"이라는 역할 분리는 그대로다. <b>요약: 분류기를 빼고 무엇으로 검색하든 결과는 같다.</b></div>
+    </div>
+
+    <div class="hero-kpis">
+      <div class="hero-kpi bad"><b>검색 단독</b> 정확도 20%</div>
+      <div class="hero-kpi good"><b>검색+분류기</b> 정확도 59%</div>
+      <div class="hero-kpi bad"><b>검색 단독</b> 문서 54%를 TS로 (실제 7%)</div>
+      <div class="hero-kpi good"><b>분류기</b> 고등급 미탐 5%</div>
+      <div class="hero-kpi">BM25 <b>검색</b> R@5 94%</div>
+    </div>
+
+    <hr class="hero-sep" />
+
+    <!-- 01 -->
+    <section id="s01">
+      <h2><span class="num">01</span> 한눈에 보기 — 결론 먼저</h2>
+      <p class="h2-sub">전문 용어 없이 핵심부터. 쉬운 비유 설명은 02장, 상세 근거는 05~06장에서.</p>
+
+      <div class="appr-head bad">방식 A · 검색 단독 — BM25 조회 후 상위 5 중 "가장 높은 등급" 선택 <span class="tagn">검토안</span></div>
+      <div class="band bad">
+        <div class="bt">결과: 사실상 분류 포기</div>
+        <p>업로드 문서를 검색해 비슷한 골든셋 5건을 찾은 뒤, 그중 제일 높은 등급을 매기는 방식이다. 미탐(비밀을 공개로 흘림)은 거의 0이 되지만 — 그 이유가 <b>문서의 절반 이상(54%)을 1급비밀(TS)로 찍기 때문</b>이다. 실제 TS는 7%뿐인데 말이다. 미탐을 안 해서가 아니라 <b>전부 최고등급으로 밀어서</b> 미탐이 0이다. 이는 <b>모델도 검색도 필요 없는 "무조건 TS"</b>와 같은 결과다.</p>
+      </div>
+
+      <div class="appr-head good">방식 B · 검색 + 분류기 — 분류기가 1차 등급 산출, 검색은 근거·후보 보완 <span class="tagn">권장</span></div>
+      <div class="band good">
+        <div class="bt">결과: 정확도·미탐 모두 양호</div>
+        <p>학습된 분류기(DeBERTa)가 등급을 매기고, 검색은 "왜 이 등급인지" 유사 근거 제시·후보 좁히기로 보완한다. <b>정확도 59~65%, 고등급 미탐 5~14%</b>로 두 축 모두 방식 A를 크게 앞선다. 과탐(전부 TS) 없이 정상 분포를 유지한다.</p>
+      </div>
+
+      <div class="callout good">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body"><b>한 줄 요약.</b> 검색엔진의 강점은 <b>검색</b>(BM25 R@5 94%)이지 <b>분류</b>가 아니다. "가장 높은 등급 선택"은 검색을 분류로 오용한 것이라, 검색이 아무리 좋아도 <b>"무조건 TS"</b>로 퇴행한다. 분류기를 1차로 두고 검색을 보완으로 쓰는 방식 B가 정답이다.</div>
+      </div>
+    </section>
+
+    <!-- 02 · 초보자 쉬운 설명 -->
+    <section id="s02">
+      <h2><span class="num">02</span> 왜 "검색만으로"는 안 되나 — 비유로 쉽게</h2>
+      <p class="h2-sub">전문 용어를 일상 비유로 바꿔, "검색은 잘하는데 왜 등급은 못 매기나"를 그림처럼 설명한다. 실제 숫자 근거는 05~06장.</p>
+
+      <div class="callout info">
+        <span class="callout-icon">🔑</span>
+        <div class="callout-body"><b>딱 한 문장.</b> 검색엔진은 <b>"비슷한 문서를 찾아오는 일(검색)"</b>의 달인이다. 하지만 <b>"이 문서가 몇 급 비밀이냐(등급)"</b>를 정하는 건 완전히 다른 일이다. <b>비슷한 걸 잘 찾아온다고 해서, 등급을 잘 매기는 건 아니다.</b> "검색만으로 등급까지 매기자"는 안(案)이 무너지는 이유가 전부 여기서 나온다.</div>
+      </div>
+
+      <h3>비유 1 — 도서관 사서에게 "보안등급"을 맡기면? <span style="font-weight:400;color:var(--text-dim);font-size:0.82em;">(검색 ≠ 등급)</span></h3>
+      <div class="band warn">
+        <div class="bt">주제로 찾는 것 ≠ 비밀로 나누는 것</div>
+        <p>검색엔진(BM25)은 <b>주제가 비슷한 책을 귀신같이 찾아오는 사서</b>와 같다. "반도체 책 줘" 하면 반도체 책을 한 아름 안아온다 — 이건 정말 잘한다(실측 검색 정확도 94%).</p>
+        <p>그런데 <b>"보안등급"은 책의 주제가 아니라, '세상에 공개됐는지·회사가 비밀로 관리하는지'로 갈린다.</b> 같은 "반도체" 주제 안에도 <b>서점에서 파는 공개 스펙시트</b>도 있고, <b>밖에 나가면 회사가 망하는 1급 비밀 레시피</b>도 있다. 주제는 똑같지만 등급은 정반대다. 주제로 책을 찾는 사서에게 "이거 1급 비밀이야?"라고 물으면 답을 알 수 없다 — <b>그건 애초에 사서의 일이 아니기 때문이다.</b></p>
+      </div>
+
+      <h3>비유 2 — 옆자리 5명 점수 보고 "제일 높은 점수" 베끼기 <span style="font-weight:400;color:var(--text-dim);font-size:0.82em;">("상위 5 중 최고등급"이 실제로 하는 일)</span></h3>
+      <div class="band warn">
+        <div class="bt">"검색 단독" 방식이 등급을 정하는 계산</div>
+        <p>"검색 단독" 방식은 이렇게 등급을 정한다: <b>① 새 문서와 비슷한 문서 5개를 찾고 → ② 그 5개의 등급 중 제일 높은(심각한) 것을 그대로 베낀다.</b></p>
+        <p>전학 온 학생의 성적을, <b>가까이 앉은 5명 중 제일 잘하는 애의 점수로 매기는 것</b>과 같다. 5명 중 <b>단 한 명이라도</b> 전교 1등이 끼어 있으면, 새 학생도 자동으로 전교 1등이 된다. "제일 높은 걸 고른다"는 규칙이라, <b>비슷한 문서 5개 중 1급비밀(TS)이 단 하나만 껴 있어도 → 새 문서는 무조건 TS</b>로 찍힌다.</p>
+      </div>
+
+      <h4>예를 들어 — 문서 한 건이 어떻게 잘못 찍히나</h4>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>단계</th><th>일어나는 일</th></tr></thead>
+          <tbody>
+            <tr><td class="td-code">업로드</td><td>"A사 반도체 <b>세정 공정</b> 보고서" — 실제 등급은 <b>S2</b>(내부용)</td></tr>
+            <tr><td class="td-code">① 검색</td><td>"반도체·공정·세정" 단어가 겹치는 비슷한 문서 5건을 정확히 찾아옴 ✓ <span class="meta-soft">(검색 자체는 성공)</span></td></tr>
+            <tr><td class="td-code">② 찾아온 5건의 실제 등급</td><td>[ S3 공개카탈로그 · S3 매뉴얼 · S2 내부보고 · S3 스펙시트 · <span class="v-bad">TS 핵심레시피</span> ] — 주제는 같아도 등급은 뒤죽박죽</td></tr>
+            <tr class="row-bad"><td class="td-code">③ "최고등급" 규칙</td><td>5건 중 <span class="v-bad">TS 한 건</span>이 제일 높음 → 이 문서도 <b class="v-bad">TS로 확정</b></td></tr>
+            <tr><td class="td-code">결과</td><td>실제 S2인데 TS로 <b>과탐</b>. 이런 일이 문서 절반에서 일어나 → 전체의 <b>54%가 TS</b>로 찍힘(실제 TS는 7%뿐)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>비유 3 — "한 명도 안 놓치려고 전원을 용의자로" <span style="font-weight:400;color:var(--text-dim);font-size:0.82em;">(미탐 0%가 멋져 보이는 함정)</span></h3>
+      <div class="band bad">
+        <div class="bt">비밀을 안 놓친 게 아니라, 분류를 포기한 것</div>
+        <p>"검색 단독"의 자랑은 <b>"비밀을 놓치는 일(미탐)이 거의 0"</b>이라는 점이다. 멋져 보인다. 그런데 그 0이 만들어지는 방식이 함정이다.</p>
+        <p>공항 경비원이 <b>"테러범을 한 명도 안 놓치겠다"</b>며 <b>지나가는 사람 전원을 테러범으로 붙잡는다</b>고 하자. 놓친 테러범은 0명이 맞다 — 하지만 이건 보안이 아니라 <b>업무 마비</b>다. 진짜 위험인물이 수많은 일반인 사이에 묻혀버린다.</p>
+        <p>"검색 단독"이 딱 이 경비원이다. <b>실제 TS는 7%뿐인데 54%를 TS로 찍어서</b> 미탐 0을 만든다. 미탐을 안 해서 0이 아니라, <b>전부 최고등급으로 밀어버려서</b> 0이다. 결국 "TS" 도장이 흔해져 <b>아무도 그 도장을 믿지 않게 된다(양치기 소년).</b></p>
+      </div>
+
+      <h3>비유 4 — 더 많이 참고할수록 더 틀린다 <span style="font-weight:400;color:var(--text-dim);font-size:0.82em;">(흔한 오해: "5개 말고 10개 보면 낫지 않나")</span></h3>
+      <div class="band bad">
+        <div class="bt">이웃을 늘릴수록 'TS 한 명' 걸릴 확률만 커진다</div>
+        <p>"비슷한 문서를 5개 말고 10개 보면 더 정확하지 않을까?" — 오히려 반대다. 참고하는 이웃을 늘릴수록 <b>그 안에 TS가 한 건이라도 낄 확률만 높아진다.</b> "최고등급을 고른다"는 규칙이라, TS가 한 건만 껴도 결과는 TS. 실제로 5개→10개로 늘렸더니 정확도가 <b>20%→12%로 더 나빠졌다.</b> 즉 <b>"적당한 개수"가 따로 있는 게 아니라</b>, 방법 자체가 잘못이라 어떤 개수를 골라도 어긋난다.</p>
+      </div>
+
+      <div class="callout good">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body"><b>그래서 정답은.</b> 검색엔진의 진짜 강점인 <b>검색</b>은 그대로 살리되(유사 근거·후보 찾기), <b>등급 판단은 "등급의 특징"을 배운 분류기</b>에게 맡긴다. 분류기는 "공개됐나·관리되나"를 학습해, 주제만 보는 사서가 못 넘는 벽을 넘는다. 숫자로 보면 검색 단독 정확도 20% → 분류기 59~65%. 자세한 근거는 다음 장부터 이어진다.</div>
+      </div>
+    </section>
+
+    <!-- 03 -->
+    <section id="s03">
+      <h2><span class="num">03</span> 두 방식 정의</h2>
+      <div class="card-grid col2">
+        <div class="card" style="border-left:4px solid var(--c-bad);border-radius:0;">
+          <div class="card-label">방식 A — 검색 단독</div>
+          <p style="font-size:13.5px;margin:8px 0;">① 업로드 문서를 쿼리로 <b>BM25 검색</b><br>② 골든셋에서 <b>상위 5건</b> 추출<br>③ 5건의 등급 중 <b>가장 높은(심각한) 등급</b> 채택<br>④ 그 등급으로 확정</p>
+          <p class="card-desc">학습·GPU 불필요. 골든셋만 있으면 동작. 단, 분류 성능은 검색 품질이 아니라 <b>"이웃 등급"</b>에 의존.</p>
+        </div>
+        <div class="card" style="border-left:4px solid var(--c-good);border-radius:0;">
+          <div class="card-label">방식 B — 검색 + 분류기</div>
+          <p style="font-size:13.5px;margin:8px 0;">① 학습된 <b>분류기(DeBERTa)</b>가 등급 산출<br>② <b>검색</b>으로 유사 근거·후보 제시<br>③ 룰·합의 게이트로 검수 라우팅<br>④ 등급 확정 + 근거 동봉</p>
+          <p class="card-desc">분류기 학습은 <b>중앙(지재원)에서 1회</b>, 고객사는 추론만(CPU 333ms/건이면 충분). 검색엔진은 검색·근거 담당.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 -->
+    <section id="s04">
+      <h2><span class="num">04</span> 검색은 잘 된다 — 그러나 분류는 다르다</h2>
+      <p class="h2-sub">BM25 검색 자체는 매우 우수하다. 문제는 "검색 ≠ 분류"라는 데 있다.</p>
+
+      <p>BM25로 "비슷한 문서 찾기"는 실측 <b>Recall@5 94%</b>로 탁월하다(아래). 그래서 "이 좋은 검색으로 등급도 매기면 되지 않나"는 자연스러운 발상이다. 하지만 검색이 찾는 것은 <b>주제가 비슷한 문서</b>이고, 등급은 <b>주제가 아니라 비공지성·경제가치·비밀관리성(S·V·M)</b>에서 나온다.</p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>검색 방식</th><th class="td-center">Recall@5</th><th class="td-center">S1 검색</th><th class="td-center">TS 검색</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr class="row-good"><td class="td-code"><b>BM25</b></td><td class="td-center"><b>94%</b></td><td class="td-center">85%</td><td class="td-center">90%</td><td>어휘 정확매칭에 강함</td></tr>
+            <tr><td class="td-code">dense(KURE 임베딩)</td><td class="td-center">55%</td><td class="td-center">25%</td><td class="td-center">55%</td><td>의미 기반, 고유명사 약함</td></tr>
+            <tr><td class="td-code">hybrid(동일가중 RRF)</td><td class="td-center">75%</td><td class="td-center">60%</td><td class="td-center">70%</td><td>약한 dense가 BM25를 깎음</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="band warn">
+        <div class="bt">핵심 통찰 — "등급 ≠ 주제"</div>
+        <p>"반도체 공정" 문서를 검색하면 반도체 관련 이웃을 잘 찾는다(주제 유사). 그런데 그 이웃들은 <b>공개 스펙시트(S3)·내부 레시피(TS)가 뒤섞여</b> 있다. 등급은 "무슨 내용이냐"가 아니라 "공개됐냐·관리되냐"에서 갈리므로, <b>검색이 완벽해도 이웃 등급 투표는 틀린다.</b> 분류기는 등급 판별 특징을 학습해 이 벽을 넘고, 검색·kNN은 못 넘는다.</p>
+      </div>
+    </section>
+
+    <!-- 05 -->
+    <section id="s05">
+      <h2><span class="num">05</span> 결과 수치 — 정확도 · 미탐 · 예측분포</h2>
+      <p class="h2-sub">레퍼런스(골든셋)=공개·합성 프록시 3,754건, 테스트=프록시 라벨 777·109건. 학습누출 0(텍스트해시 검증).</p>
+
+      <h3>① classification_gold (777건 · 실제 TS 비율 7%)</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>방식</th><th class="td-center">정확도</th><th class="td-center">고등급 미탐(FNR)</th><th class="td-center">TS로 찍은 비율</th><th>판정</th></tr></thead>
+          <tbody>
+            <tr class="row-base"><td>무조건 TS (모델·검색 불필요)</td><td class="td-center">7%</td><td class="td-center">0%</td><td class="td-center">100%</td><td>degenerate 기준선</td></tr>
+            <tr class="row-bad"><td><b>A. 검색 단독</b> · 상위5 최고등급</td><td class="td-center cell-bad">20%</td><td class="td-center">2%</td><td class="td-center cell-bad">54%</td><td>= "무조건 TS"와 동급</td></tr>
+            <tr><td>(참고) 검색 kNN 다수결 상위5</td><td class="td-center">38%</td><td class="td-center">22%</td><td class="td-center">30%</td><td>다른 투표도 부족</td></tr>
+            <tr class="row-good"><td><b>B. 검색 + 분류기</b></td><td class="td-center cell-good">59%</td><td class="td-center">5%</td><td class="td-center cell-good">~9% (정상)</td><td>두 축 모두 우위</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>② holdout (109건 · 실제 TS 비율 16%)</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>방식</th><th class="td-center">정확도</th><th class="td-center">고등급 미탐(FNR)</th><th class="td-center">TS로 찍은 비율</th></tr></thead>
+          <tbody>
+            <tr class="row-bad"><td><b>A. 검색 단독</b> · 상위5 최고등급</td><td class="td-center cell-bad">35%</td><td class="td-center">3%</td><td class="td-center cell-bad">51%</td></tr>
+            <tr class="row-good"><td><b>B. 검색 + 분류기</b></td><td class="td-center cell-good">65%</td><td class="td-center">14%</td><td class="td-center cell-good">정상</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>③ 등급별 적중(recall) — 분류기는 S1까지 잡고, 검색 단독은 못 잡는다</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>방식 (777건)</th><th class="td-center">TS</th><th class="td-center">S1</th><th class="td-center">S2</th><th class="td-center">S3</th></tr></thead>
+          <tbody>
+            <tr class="row-good"><td><b>검색 + 분류기</b></td><td class="td-center">96%</td><td class="td-center cell-good">74%</td><td class="td-center">43%</td><td class="td-center">60%</td></tr>
+            <tr class="row-bad"><td>검색 kNN (다수결, 참고)</td><td class="td-center">76%</td><td class="td-center cell-bad">9%</td><td class="td-center">31%</td><td class="td-center">41%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="card-desc">※ 검색 단독 "최고등급" 방식은 문서 대부분을 TS로 밀어 등급별 적중 개념이 무의미해지므로, kNN 다수결을 참고로 병기. <b>S1(고가치 영업비밀) 적중이 9%로 사실상 무검출</b>인 점이 결정적이다.</p>
+    </section>
+
+    <!-- 06 (신규) -->
+    <section id="s5b">
+      <h2><span class="num">06</span> 키워드 룩업으로는 왜 등급을 못 매기나 — 구조적 결함</h2>
+      <p class="h2-sub">위 수치가 "왜 그렇게 될 수밖에 없는가"의 원인. 룰/LLM 키워드로 라벨·검색하고 이웃의 등급을 집계(평균·최고)하는 <b>'검색 룩업 분류'</b>는 6가지 구조적 결함을 가진다. 검색엔진·키워드 추출기를 아무리 똑똑하게 만들어도 남는다.</p>
+
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>제안 구조 = "검색 기반(룩업/kNN) 분류".</b> ① 키워드(룰 또는 LLM)로 문서에 등급 라벨을 붙이고, ② 새 문서가 오면 키워드로 비슷한 검수문서를 찾아, ③ 그 이웃들의 등급을 <b>평균 또는 최고</b>로 집계해 등급을 정한다 — 합리적 직감이다. 그러나 아래 A–F가 구조적으로 막는다.</div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>결함</th><th>무엇이 문제인가</th><th class="td-center">본 문서 실측</th></tr></thead>
+          <tbody>
+            <tr><td><b>A. 의미 ≠ 키워드</b></td><td>같은 비밀이 다른 단어로 쓰이면 못 찾고, 같은 키워드라도 일반 설명까지 끌려온다(표현에 묶임)</td><td class="td-center cell-bad">S1 검색 9%</td></tr>
+            <tr><td><b>B. 집계 병리</b></td><td>최고등급=과탐 / 평균·다수결=미탐 — 어느 쪽도 좋은 동작점이 없다</td><td class="td-center cell-bad">TS 54% / FNR 22%</td></tr>
+            <tr><td><b>C. 비공지성</b></td><td>"이미 공개됐나"는 내용이 아니라 <b>출처</b> 문제 — 키워드로는 공개·비밀이 구분 안 됨</td><td class="td-center">공개문서 85% 과분류*</td></tr>
+            <tr><td><b>D. 일반화 0</b></td><td>룩업은 가진 것 사이 보간만 — 처음 보는 유형은 판정 근거가 없다</td><td class="td-center cell-good">분류기 74% vs 9%</td></tr>
+            <tr><td><b>E. 미보정 과신</b></td><td>약한 키워드 1개가 confidence=1.0 → 자신 있게 오확정(검수 게이트도 통과)</td><td class="td-center cell-bad">TS 5건 무인 미탐*</td></tr>
+            <tr><td><b>F. 순환·누출</b></td><td>틀린 라벨이 다음 이웃이 되어 오류를 전파 → 품질이 갈수록 퇴화</td><td class="td-center">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="card-desc">* C·E는 본 비교 외 골든셋 실증(출처 게이트 미적용 시 공개판례 85% 과분류 / 골든100 룰-폴백에서 TS 5건이 conf=1.0로 무인 미탐). A·B·D는 위 §05 표의 수치.</p>
+
+      <h4>B를 풀어보면 — 집계는 어느 쪽으로 돌려도 망한다</h4>
+      <div class="card-grid col2">
+        <div class="card" style="border-left:4px solid var(--c-bad);border-radius:0;">
+          <div class="card-label">최고등급(max)으로 집계</div>
+          <p class="card-desc" style="margin:6px 0 0;">이웃 하나만 TS여도 전부 TS로 끌어올림 → <span class="v-bad">문서 54%를 TS로 과탐</span>(실제 7%). 미탐 0%는 분류를 포기해 얻은 허수.</p>
+        </div>
+        <div class="card" style="border-left:4px solid var(--c-bad);border-radius:0;">
+          <div class="card-label">평균·다수결로 집계</div>
+          <p class="card-desc" style="margin:6px 0 0;">진짜 TS인데 이웃이 S2·S3 많으면 희석돼 내려감 → <span class="v-bad">FNR 22%</span>(진짜 비밀 놓침). 분포 상세는 다음 장(§07).</p>
+        </div>
+      </div>
+      <p class="card-desc">근본 원인: <b>한 문서의 등급은 그 문서 내용의 속성이지, 겉만 닮은 이웃들의 투표가 아니다.</b> 그래서 집계 규칙을 바꿔도 과탐↔미탐을 오갈 뿐이다.</p>
+
+      <h4>C를 풀어보면 — 같은 글자라도 정반대 등급</h4>
+      <div class="callout">
+        <span class="callout-icon">⚖️</span>
+        <div class="callout-body"><b>예: 영업비밀을 인용한 판례.</b> 그 텍스트는 비밀 본문과 <b>키워드가 완벽히 일치</b>하지만, <b>공개 문서라 S3</b>다. 키워드 룩업은 그 비밀의 등급(TS)을 베껴와 <b>공개 판례를 TS로 오분류</b>한다. 비공지성은 내용이 아니라 <b>출처 메타데이터</b>로만 풀린다(시스템의 source_prior 게이트가 이 축을 담당).</div>
+      </div>
+
+      <h4>"LLM·알고리즘으로 키워드를 똑똑하게 뽑으면 낫지 않나?"</h4>
+      <div class="callout bad">
+        <span class="callout-icon">✕</span>
+        <div class="callout-body"><b>검색은 좋아져도 분류 병목은 그대로다.</b> LLM 키워드 추출은 <b>더 나은 검색기</b>(동의어·개념 확장으로 recall↑)일 뿐, 여전히 문서를 <b>단어 가방으로 환원</b>해 <b>유한한 라벨 풀에 매칭하고 이웃을 집계</b>한다 — A(의미 손실)·B(집계 병리)는 남는다. <b>검색 ≠ 등급 결정.</b> LLM 키워드는 검색을 개선하지 분류를 대체하지 못한다.</div>
+      </div>
+
+      <div class="callout good">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body"><b>그래서 "틀린 도구"가 아니라 "역할을 잘못 맡은" 것이다.</b> 키워드/RAG 룩업은 <b>유사 검수문서를 찾아 근거로 보여주는 일(검색·근거 제시)</b>엔 최적이다. 다만 <b>등급의 최종 결정</b>을 맡기면 A–F로 붕괴한다. 결정은 "등급의 특징"을 배운 <b>분류기</b>가, 검색은 그 근거·후보 보완이 정답이다.</div>
+      </div>
+
+      <h4>분류기 메커니즘 — 키워드 카운트와 무엇이 다른가</h4>
+      <p>분류기는 키워드와 <b>완전히 다른 원리</b>로 작동한다. BERT 계열 <b>인코더 PLM</b>(한국어 <code>kf-deberta-base</code> 파인튜닝)으로, 문서를 토큰으로 쪼갠 뒤 각 단어의 의미를 <b>"주변 문맥 속에서" 계산</b>한다(self-attention).</p>
+      <ul>
+        <li>그래서 "수율"이 <b>유출·경쟁사</b> 근처에 있을 때와 <b>공시·보도자료</b> 근처에 있을 때 <b>모델 내부 표현이 달라진다</b> — 키워드 카운트는 절대 못 하는 일이다(§06-A·B 해소).</li>
+        <li>라벨된 예시(text→등급)로 학습하며, 우리가 명시적으로 안 알려준 <b>패러프레이즈·조합·맥락 패턴까지 통계적으로 학습</b>한다 → <b>처음 보는 표현에도 일반화</b>(§06-D 해소).</li>
+        <li>등급 산식의 <b>곱셈 상호작용</b>(비공지성 S × 자산가치 V × 관리상태 M)을, 단어 합산이 아니라 <b>분포로 학습</b>해 표현한다.</li>
+        <li>문서가 길면 청크별 softmax를 집계하고, 과신을 누르는 <b>temperature 보정</b>까지 거쳐 등급을 낸다.</li>
+      </ul>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>관점</th><th>키워드 (룰엔진)</th><th>분류기 (인코더 PLM)</th></tr></thead>
+          <tbody>
+            <tr><td>보는 것</td><td>글자 그대로 있나(부분문자열·정규식)</td><td><b>문맥 속 의미</b>(self-attention)</td></tr>
+            <tr><td>같은 단어, 다른 맥락</td><td class="cell-bad">구분 못 함</td><td class="cell-good">내부 표현이 달라짐</td></tr>
+            <tr><td>목록에 없는 표현</td><td class="cell-bad">통과 → 미탐</td><td class="cell-good">일반화로 커버</td></tr>
+            <tr><td>등급 결정</td><td>단어 합산 → argmax</td><td><b>S×V×M 상호작용을 분포로 학습</b></td></tr>
+            <tr><td>설명가능성(근거)</td><td class="cell-good">✓ 걸린 단어 스팬 제시</td><td>✕ 단독으론 "왜"를 못 보여줌</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <span class="callout-icon">🧑‍💼</span>
+        <div class="callout-body"><b>비유.</b> 키워드 = <b>금칙어 목록 대조</b>(Ctrl+F). 분류기 = <b>경험 많은 보안담당자가 문서를 통째로 읽고</b> "이건 느낌이 1급이네" 판단. 담당자는 <b>목록에 없는 새 표현도 맥락으로 알아본다.</b></div>
+      </div>
+
+      <h4>왜 분류기가 "필연적으로" 더 맞나 — 수치 이전의 인과</h4>
+      <div class="callout good">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body"><b>두 메커니즘을 나란히 두면 결론은 수치를 보기 전에 정해진다.</b><br>
+        · <b>룩업(검색 단독)</b>은 구조상 <b>새 문서의 등급을 스스로 읽지 않는다</b> — 표면이 닮은 이웃을 찾아 그 <b>이웃의 라벨을 빌려올</b> 뿐이다. 정확도의 천장이 "이웃 라벨이 맞을 확률"에 묶인다. 그런데 등급은 주제(표면)가 아니라 <b>비공지성·관리상태</b>에서 갈리므로, 표면이 닮아도 이웃 등급은 섞여 있다 — <b>검색이 100% 완벽해져도</b> 빌려온 라벨은 어긋나고, 집계를 최고로 돌리면 과탐·평균으로 돌리면 미탐, 그 사이에 좋은 점이 없다.<br>
+        · <b>분류기</b>는 이웃을 빌리지 않고 <b>그 문서 자체를 문맥째 인코딩해</b> 등급 특징을 직접 읽는다(self-attention). 같은 단어라도 맥락에 따라 내부 표현이 달라지고, 목록에 없던 표현도 일반화로 커버한다.<br>
+        <b>그래서 분류기의 우위는 데이터셋의 우연이 아니라 메커니즘의 귀결이다</b> — 빌려온 라벨 vs 직접 읽은 라벨. §05의 수치(검색 단독 20% → 분류기 59~65%)는 이 인과를 <b>확인</b>할 뿐 원인이 아니며, 검색엔진을 ES→PG로 바꾸거나 상위 k를 어떻게 잡아도 이 인과는 그대로다.</div>
+      </div>
+
+      <h4>하이브리드 — 키워드를 버린 게 아니다 (분류기 결정 + 룰 교차검증)</h4>
+      <p>중요한 점: 우리 설계는 "분류기 <b>vs</b> 키워드"가 아니라 <b>둘을 합친 하이브리드</b>다. 룰엔진(키워드)이 항상 같이 돌며 분류기와 교차검증한다. 각자의 강점만 취한다.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>장치</th><th>무엇을 하나</th><th class="td-center">효과</th></tr></thead>
+          <tbody>
+            <tr><td><b>룰 교차검증</b></td><td>알려진 고위험 패턴(M&amp;A·EUV·HBM)을 정밀 포착 + <b>근거 스팬</b> 제시</td><td class="td-center">설명가능성</td></tr>
+            <tr><td><b>분류기</b></td><td>목록에 없는 표현·맥락·조합을 일반화로 커버</td><td class="td-center">미탐↓</td></tr>
+            <tr class="row-good"><td><b>agreement_gate</b></td><td>비공개 등급(TS/S1/S2)은 <b>분류기·룰이 합의</b>해야 자동확정, 불일치면 사람검토</td><td class="td-center cell-good">정밀도 63→81%</td></tr>
+            <tr><td><b>FNR-safe override</b></td><td>룰이 TS/S1을 강하게 감지하면 분류기 예측을 끌어올림</td><td class="td-center">미탐 방지</td></tr>
+            <tr><td>semantic 시드</td><td>시드와 임베딩 <b>코사인 ≥0.75</b> 매칭 → 룰조차 순수 글자매칭 일부 초월</td><td class="td-center">보조(맥락 X)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="card-desc">※ semantic 시드는 "시드 단어와 <b>의미가 가까운가</b>"를 보는 보조일 뿐, 분류기처럼 <b>문서 전체 맥락</b>을 읽는 것은 아니다.</p>
+
+      <div class="callout good">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body"><b>한 줄 정리.</b> 키워드는 <b>"이 단어 있나"</b>(표면·고정 목록), 분류기는 <b>"이 문서가 의미상 몇 급인가"</b>(맥락·조합·일반화)다. 등급 판정은 후자의 문제라 분류기가 의무화됐고(FUN-004/005), 다만 <b>설명가능성과 정밀도</b>를 위해 키워드 룰을 버리지 않고 <b>교차검증 파트너</b>로 같이 쓴다.</div>
+      </div>
+    </section>
+
+    <!-- 07 -->
+    <section id="s06">
+      <h2><span class="num">07</span> 검색 단독(가장 높은 등급)의 함정</h2>
+      <p class="h2-sub">미탐 0%가 멋져 보이지만, 그것이 어떻게 만들어지는지가 함정이다.</p>
+
+      <h4>예측 분포 — 실제 7%인 TS를 54~67%로 찍는다</h4>
+      <div class="card-grid col2">
+        <div class="card" style="border-left:4px solid var(--text-dim);border-radius:0;">
+          <div class="card-label">실제 등급 분포 (777건)</div>
+          <div class="bar"><i class="seg-ts" style="width:7%"></i><i class="seg-ok" style="width:93%"></i></div>
+          <div class="barlbl">TS 7% · 나머지 93%</div>
+        </div>
+        <div class="card" style="border-left:4px solid var(--c-bad);border-radius:0;">
+          <div class="card-label">검색 단독 예측 (상위5 최고등급)</div>
+          <div class="bar"><i class="seg-ts" style="width:54%"></i><i class="seg-ok" style="width:46%"></i></div>
+          <div class="barlbl"><span class="v-bad">TS 54%</span> · 나머지 46% — 9.7배 과탐</div>
+        </div>
+      </div>
+
+      <h4 style="margin-top:28px;">구체적 문제 6가지</h4>
+      <div class="band bad">
+        <div class="bt">1 · BM25를 쓰는 의미가 사라진다</div>
+        <p>FNR·결과가 "무조건 TS" 기준선과 동일하다. 골든셋·검색에 들인 노력이 0이 된다 — <code>return "TS"</code> 한 줄과 같은 출력.</p>
+      </div>
+      <div class="band bad">
+        <div class="bt">2 · 낮은 미탐은 실력이 아니라 과탐 부작용</div>
+        <p>미탐을 안 해서 0이 아니라, <b>전부 최고등급으로 밀어서</b> 0이다. "모든 문서를 1급비밀로 취급"하면 당연히 미탐 0 — 그건 분류가 아니라 <b>분류 포기</b>다.</p>
+      </div>
+      <div class="band bad">
+        <div class="bt">3 · 운영 마비 · 양치기 소년</div>
+        <p>문서 2/3가 TS면, TS 보안처리(접근제한·암호화·감사로그)를 전체의 2/3에 적용 → 비용·업무 폭발. 게다가 진짜 TS가 노이즈에 묻혀 <b>"TS" 태그가 의미를 잃는다.</b> 검수자가 태그를 불신 → 자동화 가치 0.</p>
+      </div>
+      <div class="band bad">
+        <div class="bt">4 · k를 키울수록 더 나빠진다 (근본 불안정)</div>
+        <p>상위 5→10으로 늘리면 정확도가 20%→12%로 더 떨어진다. 이웃을 많이 볼수록 TS 하나가 걸릴 확률↑(top-k에 TS 존재 54%→67%) → 더 많이 escalate. <b>좋은 k가 존재하지 않는다.</b></p>
+      </div>
+      <div class="band bad">
+        <div class="bt">5 · 골든셋 오염 1건에 붕괴</div>
+        <p>TS로 잘못 라벨됐거나 흔한 단어가 많은 골든 문서 <b>하나</b>가, 그 단어를 가진 수백 건을 전부 TS로 끌어올린다. 견고성이 없다.</p>
+      </div>
+      <div class="band bad">
+        <div class="bt">6 · 근본 원인(등급≠주제)은 그대로</div>
+        <p>"가장 높은 등급 선택"은 "이웃 등급이 섞여 있다"는 문제를 가장 보수적 방향으로 뭉갤 뿐이다. 미탐을 과탐으로 바꿨을 뿐, <b>틀린 이웃을 고르는 문제 자체는 안 풀린다.</b></p>
+      </div>
+
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>의도는 옳다.</b> "비밀을 놓치지 말자(미탐 우선)"는 영업비밀에서 100% 옳은 본능이다. 문제는 방법이다. <b>올바른 미탐 최소화 = 분류기(미탐 5~14% + 정확도 59~65%) + 필요한 것만 골라 검수로 올리는 게이트</b>다. 차이는 "<b>무차별</b> escalate(방식 A)" vs "<b>선별</b> escalate(현 게이트)"다.</div>
+      </div>
+    </section>
+
+    <!-- 07 -->
+    <section id="s07">
+      <h2><span class="num">08</span> 장단점 종합 비교</h2>
+
+      <div class="appr-head bad">방식 A · 검색 단독 (BM25 상위5 최고등급)</div>
+      <div class="card-grid col2">
+        <div class="band good" style="margin-top:14px;">
+          <div class="bt" style="color:var(--c-good);">장점</div>
+          <ul>
+            <li>분류기 <b>학습 불필요</b> — 검색만으로 동작</li>
+            <li><b>GPU 불필요</b>(검색은 가벼움), 배포 단순</li>
+            <li>골든셋만 갱신하면 됨(재학습 없음)</li>
+            <li>유사 문서로 <b>설명가능</b></li>
+          </ul>
+        </div>
+        <div class="band bad" style="margin-top:14px;">
+          <div class="bt">단점 (치명적)</div>
+          <ul>
+            <li>정확도 <b>20~35%</b>로 붕괴</li>
+            <li><b>과탐 폭주</b> — 문서 54%를 TS로(실제 7%)</li>
+            <li>낮은 미탐은 "무조건 TS"와 동일한 허수</li>
+            <li><b>S1 사실상 무검출</b>, k 키울수록 악화</li>
+            <li>골든셋 오염 1건에 붕괴, 운영 마비</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="appr-head good">방식 B · 검색 + 분류기</div>
+      <div class="card-grid col2">
+        <div class="band good" style="margin-top:14px;">
+          <div class="bt" style="color:var(--c-good);">장점</div>
+          <ul>
+            <li>정확도 <b>59~65%</b> — 방식 A의 2~3배</li>
+            <li>미탐 낮으면서 <b>정확도 유지</b>(5~14%)</li>
+            <li><b>정상 분포</b> — 과탐 없음</li>
+            <li>S1 등 고등급 판별(적중 58~74%)</li>
+            <li>검색은 근거·후보로 보완, 선별 게이트로 미탐 추가 관리</li>
+          </ul>
+        </div>
+        <div class="band warn" style="margin-top:14px;">
+          <div class="bt">단점 (관리 가능)</div>
+          <ul>
+            <li>분류기 <b>학습 필요</b> — 단, 지재원 중앙 1회. 고객사는 추론만</li>
+            <li>추론 비용 — 단, <b>CPU 333ms/건</b>이면 충분(GPU 선택)</li>
+            <li>등급체계 변경 시 재학습 고려</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 08 -->
+    <section id="s08">
+      <h2><span class="num">09</span> 결론 · 권고</h2>
+      <div class="band good">
+        <div class="bt">권고: 방식 B (검색 + 분류기) 채택</div>
+        <p>① <b>분류기를 1차</b>로 등급을 매긴다(정확도 59~65%, 미탐 5~14%, S1 적중 58~74%).<br>② <b>검색은 보완</b>으로 — "이 골든 예시와 유사" 근거 제시·후보 좁히기. 검색엔진의 강점인 검색(R@5 94%)을 제 자리에 쓴다.<br>③ <b>미탐은 선별 게이트</b>(합의·룰·메타데이터)로 추가로 낮춘다 — 전부가 아니라 불확실한 것만 검수로.</p>
+      </div>
+      <div class="callout bad">
+        <span class="callout-icon">✕</span>
+        <div class="callout-body"><b>방식 A(분류기 제거, 상위5 최고등급)는 권하지 않는다.</b> 가장 강한 검색(BM25 94%)을 줘도 분류 정확도 20%, 문서 54%를 TS로 과탐 — "무조건 TS 도장기"로 퇴행한다. 미탐 0%는 분류를 포기해 얻은 허수다.</div>
+      </div>
+    </section>
+
+    <!-- 09 -->
+    <section id="s09">
+      <h2><span class="num">10</span> 측정 방법 · 한계</h2>
+      <div class="honesty">
+        <div class="honesty-title">측정 조건 (재현 가능)</div>
+        <ul>
+          <li><b>레퍼런스(골든셋)</b>: oss_corpus 3,754건(등급 균형). <b>테스트</b>: classification_gold 777건 · holdout 109건(라벨 실문서).</li>
+          <li><b>학습누출 0</b>: 레퍼런스↔테스트 텍스트해시·200자 prefix 중복 0건 확인(과거 train/gold 텍스트 중복 버그 제거).</li>
+          <li><b>분류기</b>: DeBERTa(v-137066a1), 청크·온도보정·most-severe 집계. <b>검색 단독</b>: BM25(한글 bigram 근사) 상위 k 최고등급/다수결.</li>
+          <li>실행 환경 RTX 5070 Ti. 스크립트: <code>_bench_bm25_knn_classify.py</code>, <code>_bench_bm25_mostsevere.py</code>, <code>_bench_hybrid_recall.py</code>.</li>
+        </ul>
+      </div>
+      <div class="honesty">
+        <div class="honesty-title">한계 · 정직성</div>
+        <ul>
+          <li>BM25는 ES 미가동 환경이라 <b>인프로세스(한글 bigram)로 근사</b>했다. 실제 nori 토크나이저와 미세 차이는 있으나 결론 방향(검색≫분류·과탐 퇴행)은 확고하다.</li>
+          <li>holdout은 109건(고등급 36건)으로 표본이 작아 FNR 신뢰구간이 넓다. classification_gold 777건이 통계적으로 더 견고하다.</li>
+          <li>모든 수치는 본 골든셋·테스트셋 기준이다. 고객사 실데이터 분포에서는 재측정으로 확정해야 한다.</li>
+        </ul>
+      </div>
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>요약.</b> "BM25 조회 후 상위 5 중 가장 높은 등급"은 검색을 분류로 오용한 방식이라 정확도 20%·과탐 54%로 "무조건 TS"와 동급으로 퇴행한다. 검색엔진의 강점은 검색이며, 분류는 분류기가, 검색엔진은 근거·후보 보완이 정답이다.</div>
+      </div>
+    </section>
+
+  </article>
+</div>
+
+<footer>
+  <span>검색 단독 vs 검색 + 분류기 — 등급분류 방식 비교 · 2026-06 · Koipa AI Engine</span>
+  <span>BM25 상위5 최고등급 방식 실측 · 누출 0 · 분류기 우위 확정</span>
+</footer>
+<script>
+const items = document.querySelectorAll('.toc-item[href^="#"]');
+const sections = [...items].map(i => document.querySelector(i.getAttribute('href'))).filter(Boolean);
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      items.forEach(i => i.classList.remove('active'));
+      const link = document.querySelector(`.toc-item[href="#${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>

@@ -1,14 +1,14 @@
 """§4: CachedEmbedding hit/miss 누적 카운터 + prom 메트릭 검증.
 
 운영 진입 시 캐시 적중률 = 임베딩 API 비용 절감 근거. cache_info에 누적값
-노출 + prom Counter 2종(lloydk_embedding_cache_hit_total,
-lloydk_embedding_cache_miss_total)을 부작용으로 자동 갱신.
+노출 + prom Counter 2종(koipa_embedding_cache_hit_total,
+koipa_embedding_cache_miss_total)을 부작용으로 자동 갱신.
 """
 
 from __future__ import annotations
 
-from lloydk.adapters.embedding.base import EmbeddingResult
-from lloydk.adapters.embedding.cache_layer import EmbeddingCache
+from koipa.adapters.embedding.base import EmbeddingResult
+from koipa.adapters.embedding.cache_layer import EmbeddingCache
 
 
 class _StubUnderlying:
@@ -71,7 +71,7 @@ def test_duplicate_in_batch_counts_as_single_miss() -> None:
 
 def test_prom_counters_increment() -> None:
     """prom EMBEDDING_CACHE_HIT_TOTAL{layer=lru} + MISS_TOTAL이 증가."""
-    from lloydk.api import prom_metrics
+    from koipa.api import prom_metrics
 
     def _miss_count() -> float:
         for m in prom_metrics.EMBEDDING_CACHE_MISS_TOTAL.collect():

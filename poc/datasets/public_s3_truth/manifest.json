@@ -1,0 +1,45 @@
+{
+  "built_at": "2026-09-14",
+  "n": 1650,
+  "label_source": "provenance_gate_s3",
+  "rule": "공개 사실이 4종 증거로 검증됨 → 비공지성 결여 → S3",
+  "evidence_required": [
+    "source_reference(URL)",
+    "source_agency",
+    "retrieved_at",
+    "source_sha256"
+  ],
+  "train_pools": [
+    "datasets/gold_real/train_subset.jsonl",
+    "datasets/labeled_p1_v5_clean/train.jsonl",
+    "datasets/labeled_p1_v5_clean/val.jsonl",
+    "datasets/labeled_p1_v5_clean/test.jsonl",
+    "datasets/labeled_oss_v1/train.jsonl",
+    "datasets/labeled_oss_v1/val.jsonl"
+  ],
+  "excluded_suites": [
+    "datasets/patent_proxy/holdout_eval.jsonl",
+    "datasets/patent_proxy/holdout_eval_ablated.jsonl",
+    "datasets/patent_proxy/holdout_eval_clean.jsonl"
+  ],
+  "scanned_s3_rows": 145746,
+  "dropped": {
+    "URL 없음": 133901,
+    "본문 없음·너무 짧음": 83,
+    "제외 목록에 있는 평가면": 3,
+    "본문 중복": 10100,
+    "발행기관 없음": 12
+  },
+  "hosts": {
+    "www.korea.kr": 1650
+  },
+  "claim_ceiling": "SILVER — 상대 비교·회귀 감시용. 성능 주장 불가(EVAL_CRITERIA 제2조)",
+  "known_limitations": [
+    "출처 호스트가 1종이다. 1종이면 이 면은 '공개문서'가 아니라 그 매체의 문체를 잰다 — 대표성 주장 금지.",
+    "발행기관 51종은 다양해 보이나 매체가 같으면 문체가 같다. 다른 매체(공시·판례·학술)를 섞기 전에는 '공개문서 일반' 으로 읽지 말 것.",
+    "정답은 '공개됐다'는 사실이지 '등급이 S3다'라는 사람 판단이 아니다."
+  ],
+  "source_host_count": 1,
+  "source_agency_count": 51,
+  "tool": "scripts/build_public_s3_truth.py"
+}

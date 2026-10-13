@@ -1,0 +1,212 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>데이터 거버넌스 계획 — 골든셋·라벨품질·재현성 | Koipa</title>
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
+  --bg-nav:rgba(255,255,255,.88);
+  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a; --text-faint:#a1a1aa;
+  --border:rgba(0,0,0,.08); --border-mid:rgba(0,0,0,.12); --border-strong:rgba(0,0,0,.18);
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sidebar:220px; --article-max:920px; --container:1360px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:4px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:0;white-space:nowrap;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:48px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;border-radius:0;transition:all .12s;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:0;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-.04em;line-height:1.08;margin:0 0 20px;color:var(--text);}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 36px;max-width:680px;}
+h2{font-size:clamp(19px,2.6vw,24px);font-weight:700;letter-spacing:-.03em;margin:46px 0 12px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:46px 0 22px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{border-radius:0;padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.table-wrap{overflow-x:auto;margin:18px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:0;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.done{background:var(--text);color:var(--bg);}
+.tag.wip{background:#3f3f46;color:#fff;}
+.tag.plan{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.dep{background:#fefce8;color:#92400e;border:1px solid #fbbf24;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:860px){.article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}.toc-aside{display:none;}}
+</style>
+
+</head>
+<body>
+
+<nav class="nav"><div class="nav-inner"><a class="brand" href="#"><span class="brand-mark"><img src="data:image/png;base64,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" alt="Koipa" /></span><span class="brand-name">한국지식재산보호원</span><span class="brand-sep">/</span><span class="brand-sub">데이터 거버넌스 계획</span></a><div class="nav-right"><span class="nav-badge">DATA-GOV</span></div></div></nav>
+
+<div class="article-layout">
+<article>
+
+  <div class="meta-row">
+    <span class="badge">DOC-GOV-01</span>
+    <span class="badge outline">본개발 설계</span>
+    <span class="meta-dot">·</span>
+    <span class="meta-soft">2026-08-02</span>
+  </div>
+  <h1 class="title">데이터 거버넌스 계획</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
+  <p class="lede">KOIPA 영업비밀관리시스템의 데이터 자산·라벨 품질·재현성 관리 계획 — 합성 코퍼스 계층, 라벨 출처와 품질 현황, <strong>locked 평가 진실의 부재를 전제로 한 안전 부트스트랩</strong>, 운영 관리자 확정 루프를 다룬다. 목표는 배포 전 정확도 보증이 아니라 오염을 막고 운영에서 배울 수 있는 토대를 만드는 것이다.</p>
+
+  <div class="callout inset">
+    <div class="callout-label">핵심 메시지</div>
+    <p>현재 정확도 지표는 대부분 <strong>합성·LLM·공개 프록시 라벨</strong>에 기반한다(라벨 순환성). 따라서 본개발의 1순위는 이를 평가 진실로 포장하지 않고, 운영 관리자 확정이 들어오는 경로와 품질 게이트를 깨끗하게 만드는 것이다.</p>
+  </div>
+  <hr/>
+
+  <div class="section-sep" id="s1"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">개요 · 원칙</span></div>
+  <h2>데이터 거버넌스 원칙</h2>
+  <ul>
+    <li><strong>출처 추적</strong> — 모든 라벨은 출처(합성·LLM판정·인간검증)를 기록한다.</li>
+    <li><strong>학습/평가 분리</strong> — 평가 정답지는 학습에 쓰지 않으며, 가능한 한 독립 출처로 구성한다.</li>
+    <li><strong>재현성</strong> — 데이터셋·모델은 버전으로 고정해 결과를 재현한다.</li>
+  </ul>
+
+  <div class="section-sep" id="s2"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">데이터 자산</span></div>
+  <h2>골든셋 계층 · 학습셋</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>자산</th><th>규모</th><th>용도</th></tr></thead>
+    <tbody>
+      <tr><td><strong>gold_real</strong></td><td><strong>777건</strong></td><td><strong>현행 평가정본</strong> · v5_clean(<code>v-fe4b386b</code>) 분류근거 보고 대상 (기계·LLM·공개정의 라벨, human_review=1)</td></tr>
+      <tr><td>golden100 <span class="tag plan">구 후보셋</span></td><td>100건</td><td>구 1차 실증 후보셋(폐기) — 현행 평가정본=gold_real 777건</td></tr>
+      <tr><td>golden500 <span class="tag plan">구 후보셋</span></td><td>500건</td><td>구 확장 평가 후보셋(폐기) — 현행 평가정본=gold_real 777건</td></tr>
+      <tr><td><strong>locked_gold_eval</strong></td><td>0건(현재 정상)</td><td>사람서명 전용 · 운영 확정/제약 완화 시만 증가</td></tr>
+      <tr><td>학습셋(labeled)</td><td>수천 건</td><td>분류기 파인튜닝 — 합성 + LLM판정 + 인간정정 혼합</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="section-sep" id="s3"><span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">라벨 출처 · 품질 현황</span></div>
+  <h2>현재 라벨 구성과 측정 한계</h2>
+  <p>현 학습·평가 라벨은 <strong>대부분 합성 데이터와 LLM 판정</strong>으로 만들어졌고, 사람이 직접 검증한 라벨은 매우 적다. 그 결과 3-tier 평가에서 데이터 출처에 따라 정확도가 크게 갈린다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>평가셋 종류</th><th>F1(예시)</th><th>해석</th></tr></thead>
+    <tbody>
+      <tr><td>합성 데이터</td><td>≈ 1.0</td><td>채점기준에서 생성돼 비현실적으로 분리 — 과대평가</td></tr>
+      <tr><td>LLM 의사정답</td><td>≈ 0.37</td><td>사람 기준에 가까울수록 정확도 급락</td></tr>
+      <tr><td>인간 검증 골드</td><td><strong>미구축</strong></td><td>실제 운영 정확도의 근거가 아직 없음</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="section-sep" id="s4"><span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">라벨 순환성 · 골든셋 구축 (P0)</span></div>
+  <h2>왜 locked 부재를 정직하게 관리해야 하는가</h2>
+  <p><strong>라벨 순환성</strong> — 학습 라벨과 평가 라벨이 모두 모델이 모방할 <strong>동일한 룰 + LLM</strong>에서 파생되면, 모델과 정답지가 같은 맹점을 공유해 "끼리끼리 채점"이 된다. 합성 F1=1.0과 실측 0.37의 격차가 이 순환성의 증거다. 게다가 모든 배포·롤백 임계값이 이 미검증 라벨 기준이므로, 토대가 흔들린다.</p>
+  <div class="callout"><div class="callout-label">본개발 골든셋 구축 계획 (P0)</div><p>① 영업비밀 <strong>도메인 전문가가 직접 라벨링 500건 이상</strong>(희소한 TS·S1 경계 사례 가중) ② 학습에 쓰인 룰·LLM과 <strong>독립된 holdout</strong>으로 구성 ③ 이 골든셋 위에서 <strong>모든 품질 게이트(배포·롤백 임계) 재보정</strong> ④ 2인 검토·검수자 신뢰도 추적으로 라벨 품질 보증. <strong>이것이 없으면 다른 모든 품질 지표가 그림자 측정이다.</strong> <span style="color:var(--text-dim);">(현행 평가정본은 기계·LLM·공개정의 라벨 기반 <strong>gold_real 777건</strong>이며, 본 계획의 "500건+"는 그와 독립된 <strong>사람서명 holdout 신규 구축</strong> 목표치다 — 구 후보셋 golden100/golden500과 별개.)</span></p></div>
+
+  <div class="section-sep" id="s5"><span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">합성 부트스트랩 → 운영 확정 루프</span></div>
+  <h2>운영에서 배우는 검증 루프</h2>
+  <p>프로토타입 수치는 타당성 확인·모델 선정용이다. <strong>실제 운영 정확도는 운영 관리자 확정 라벨이 충분히 쌓인 뒤에야 확인</strong>한다. 현 제약에서는 분류기 가중치가 실데이터로 개선될 경로가 없으므로, 고객사에서는 exact-match 선례·상향 override·검수 라우팅 같은 비모수 메모리부터 안전하게 쌓는다.</p>
+
+  <div class="section-sep" id="s6"><span class="section-sep-num">06</span><span class="section-sep-line"></span><span class="section-sep-title">재현성 · 버전 관리</span></div>
+  <h2>버전 고정</h2>
+  <ul>
+    <li><strong>데이터셋 버전</strong> — 골든셋·학습셋을 버전으로 고정하고 변경 이력을 관리.</li>
+    <li><strong>모델 버전</strong> — 활성 분류기 버전(<code>v-fe4b386b</code>, v5_clean · <code>.env</code> 배포 포인터, 2026-07-29 승격 · gate_p1_candidate 3축 PASS)을 <code>tb_model_versions</code>로 추적, 학습 설정·지표를 MLflow에 기록. 직전 배포본·롤백 타깃은 <code>v-dd3abab9</code>(v4_clean 정제본). (step3/<code>v-f9b5cedb</code>는 정제 전 비교 baseline)</li>
+    <li><strong>인코딩 정합</strong> — 일부 gold 파일의 source 필드 인코딩(모지바케)을 점검·정정.</li>
+  </ul>
+
+  <div class="section-sep" id="s7"><span class="section-sep-num">07</span><span class="section-sep-line"></span><span class="section-sep-title">이번 차수 적용 거버넌스 통제</span></div>
+  <h2>이번 차수 적용된 거버넌스 강화</h2>
+  <p>골든셋·재현성 토대 위에, 데이터 보존·평가 무결성·라벨 품질을 코드/스키마 수준에서 강제하는 통제를 이번 차수에 반영했다. 정책 수치(보존기간·신뢰도 임계·검토자 자격)는 발주처 협의 사항으로 두고, 메커니즘만 선반영한다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>통제</th><th>적용 내용</th><th>거버넌스 효과</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>논리 삭제 · 보존정책</strong><br/><span class="tag done">적용</span></td>
+        <td><code>tb_documents.deleted_at</code> 도입 — 문서 삭제 시 물리 삭제 대신 삭제 시각을 기록(논리 삭제). 청크·감사 행은 보존하고, 일반 조회는 활성행(<code>deleted_at IS NULL</code>)만 노출한다. 감사·복구 경로만 <code>include_deleted</code>로 명시 opt-in.</td>
+        <td>삭제 이력·증빙을 잃지 않으면서 운영 화면에서는 삭제 문서를 숨긴다. 기본값은 <code>NULL</code>이라 기존 데이터·동작 비파괴. 보존기간 만료 후 물리 회수(purge)는 별도 운영 잡이 담당(본 차수 범위 밖).</td>
+      </tr>
+      <tr>
+        <td><strong>평가 데이터 누수 차단</strong><br/><span class="tag done">적용</span></td>
+        <td>보정(corrections) 기반 학습셋 재구축 시, holdout(val/test)의 <code>doc_id</code> 및 정규화 텍스트와 교집합인 보정 문서를 train 추가에서 강제 제외(enforce). 같은 문서가 다른 공백·대소문자로 적혀도 동일 본문으로 잡아 막고, 제외 건수를 로깅한다. 등급별 상한(cap)은 opt-in으로 제공.</td>
+        <td>“파일 불변”만으로는 같은 <code>doc_id</code>가 학습·평가 양쪽에 존재할 수 있어 누수가 가능했던 경로를 차단. 보정이 특정 등급에 몰릴 때의 분포 왜곡도 cap으로 완화. 배포·롤백 게이트가 누출 없는 holdout에서 측정되도록 보장한다.</td>
+      </tr>
+      <tr>
+        <td><strong>검수자 신뢰도 거버넌스</strong><br/><span class="tag done">적용</span></td>
+        <td>검수자 신뢰도를 본인 최신보정 자동동의(self-reference) 대신 <strong>동료 합의(peer corroboration)</strong> 기준으로 산정 — 분류의 최종 등급을 본인 외 검수자도 선택한 표본만 신뢰도 분모로 인정. 이 점수는 고등급 변경 2인검토 정족수 게이트의 신뢰도 입력으로 전파된다.</td>
+        <td>“마지막에 손댄” 검수자의 신뢰도가 무조건 오르던 recency 편향·게이밍을 제거. 신뢰도 임계(<code>high_grade_review_min_reliability</code>)와 검토자 자격은 발주처 협의 사항이며 기본값은 동작 보존(임계 0=비활성)으로 둔다.</td>
+      </tr>
+      <tr>
+        <td><strong>보정 멱등성</strong><br/><span class="tag done">적용</span></td>
+        <td><code>tb_corrections</code>에 (<code>classification_id</code>, <code>corrected_level_id</code>, <code>corrected_by</code>) UNIQUE 제약 추가 — 같은 분류·등급·검수자 조합의 중복 보정 행을 DB 수준에서 차단(최종 방어선).</td>
+        <td>보정 경로의 동시성(race)으로 중복 행이 생겨 능동학습 큐·재학습 임계가 같은 라벨로 중복 가중·오염되는 것을 방지한다.</td>
+      </tr>
+      <tr>
+        <td><strong>자동확정 안전 게이트</strong><br/><span class="tag done">적용</span></td>
+        <td>자동확정·검수 라우팅을 <code>confidence</code> 임계(기본 0.7) 단독이 아니라 다단 게이트로 결정. <code>confidence</code>는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하고 정답/오답 판별력이 낮다(구 후보셋 golden500 AUROC 0.58). 현재 소스 기준 ① <strong>희소근거 게이트</strong>(<code>rule_fallback_min_evidence=0.9</code>)는 룰-폴백 경로 기본 ON으로 단일 약한 키워드만으로 <code>conf=1.0</code>이 되는 자동확정을 차단한다. ② <strong>합의 게이트</strong>(<code>agreement_gate_enabled</code>)는 base 기본 OFF(운영 프로파일 별도)이며, 자동확정은 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용하고 그 외 불일치는 사람 검수로 보낸다.</td>
+        <td>confidence 과신으로 약한 근거가 자동확정되던 경로를 막는다. 측정효과(합성 골든셋·OOD 기준): 희소근거 게이트로 구 후보셋 golden100 무성 TS 미탐 5→0, 합의 게이트로 자동확정 정밀도 63→81%·고등급 TS/S1 미탐 46→8. TS/S1 자동확정분은 표본감사한다. 운영 human_review/locked 확정 전에는 운영 확정 수치가 아니다.</td>
+      </tr>
+    </tbody>
+  </table></div>
+  <div class="callout inset"><div class="callout-label">보정 환류 · 재학습 경계</div><p>위 보정(corrections) 기반 재학습은 <strong>학습 사이트(지재원)</strong>의 활동이다. <strong>고객사는 추론 전용</strong>이라 자체 학습하지 않으며, 고객사 검수교정을 지재원으로 반출할지는 <strong>미확정 결정</strong>이다(<a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인 5</a> A/B/C — <strong>기본 권고: 문서 무반출·집계 진단만</strong>). 또한 모델은 <strong>상시 재학습되지 않는다</strong> — 하드 요건은 <strong>제약 완화 시 별도 학습</strong>(제약 완화 시 실문서 반입)이며, 이후 일상 적응은 룰·키워드·임계·보정·LLM 2차·사람 게이트(비-모델 레버)가 담당하고, 모델 재학습은 <strong>드리프트·이벤트 트리거 시 단발</strong>로 수행한다.</p></div>
+  <div class="callout inset"><div class="callout-label">정책 경계</div><p>위 통제는 <strong>메커니즘</strong>을 코드·스키마에 반영한 것이며, 기본값은 기존 동작을 보존한다. <strong>보존기간·신뢰도 임계·검토자 자격</strong> 등 운영 정책 수치는 발주처 협의로 확정한다.</p></div>
+
+  <div class="section-sep" id="s8"><span class="section-sep-num">08</span><span class="section-sep-line"></span><span class="section-sep-title">본개발 데이터 과제 (P0)</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th class="center">순위</th><th>과제</th><th>근거</th><th class="center">기간</th></tr></thead>
+    <tbody>
+      <tr><td class="center">P0</td><td>관리자 확정 포착·교정 admission gate</td><td>human_review/locked 0, 자동학습 오염 위험</td><td class="center">즉시</td></tr>
+      <tr><td class="center">P0</td><td>라벨 순환성 차단(독립 holdout)</td><td>학습·평가 라벨 동일 출처</td><td class="center">골든셋과 병행</td></tr>
+      <tr><td class="center">P1</td><td>게이트 임계 보수화·운영 표본감사</td><td>임계가 합성/OOD 라벨 기준</td><td class="center">베타 즉시</td></tr>
+      <tr><td class="center">P1</td><td>능동학습 표적 샘플링</td><td>현 트리거는 정정건수 기반(불확실성 샘플링 부재)</td><td class="center">1주</td></tr>
+      <tr><td class="center">P1</td><td>인사·재무 S1 사각지대 라벨 보강 — 임원 보상·자금조달·고객별 매출·원가구조</td><td>구 후보셋 golden500 S1→S2 미탐 7건이 전부 이 유형, 룰·모델 공유 사각지대(둘 다 S2로 합의→게이트 통과). LLM 2차의견도 4/7만 회복 → 재학습으로만 근본 교정</td><td class="center">골든셋과 병행</td></tr>
+    </tbody>
+  </table></div>
+  <div class="footnote">관련: <a href="기술구현_백서_v7.html">기술구현 백서 v7</a> · <a href="테스트_전략_및_이력.html">테스트 전략·이력</a> · <a href="기술구현_백서_부록C_지표용어해설.html">부록C 지표·용어</a> · <a href="보안_설계서.html">보안 설계서</a></div>
+
+</article>
+<aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
+<a href="#s1">01 · 개요·원칙</a><a href="#s2">02 · 데이터 자산</a><a href="#s3">03 · 라벨 출처·품질</a><a href="#s4">04 · 라벨 순환성·골든셋(P0)</a><a href="#s5">05 · 합성→실데이터</a><a href="#s6">06 · 재현성·버전</a><a href="#s7">07 · 적용 거버넌스 통제</a><a href="#s8">08 · 본개발 P0</a>
+</nav></aside>
+</div>
+
+<footer><strong>한국지식재산보호원(Koipa)</strong> · KOIPA 영업비밀관리시스템 · 본개발 설계 문서 · 2026-08-02</footer>
+</body>
+</html>

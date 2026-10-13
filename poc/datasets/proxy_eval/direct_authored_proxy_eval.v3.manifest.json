@@ -1,0 +1,64 @@
+{
+  "change_summary": "Rewrote the two verdict-bearing sections ('4. 공개 여부와 관리 상태', '5. 업무 가치와 영향') from expected_factor_scores instead of from the grade, re-anchored every evidence span, and equalised length with grade-independent notes. Sentences come from scripts/eval_fact_pools.py, which shares no sentence with the training pool (scripts/v6_fact_pools.py) — a shared pool would make the eval measure memorisation of that pool. Section headings, scenario ids, factor profiles and all other narrative are unchanged.",
+  "claim_ceiling": "합성 내부 일관성과 안전 무회귀까지. 실문서 일반화 근거가 아니다(자체 실측: 교차silver→gold_real F1 0.26).",
+  "grade_counts": {
+    "S1": 250,
+    "S2": 250,
+    "S3": 300,
+    "TS": 200
+  },
+  "independence_vs_train": {
+    "lineage_independent": true,
+    "shared_sentence_coverage": 0.0,
+    "shared_sentence_types": 0
+  },
+  "leakage": {
+    "documents": 1000,
+    "grade_token_exposed": 0,
+    "length_by_grade": {
+      "S1": {
+        "max": 2758,
+        "min": 1790,
+        "n": 250,
+        "p50": 2283
+      },
+      "S2": {
+        "max": 2733,
+        "min": 1800,
+        "n": 250,
+        "p50": 2282
+      },
+      "S3": {
+        "max": 2745,
+        "min": 1790,
+        "n": 300,
+        "p50": 2307
+      },
+      "TS": {
+        "max": 2752,
+        "min": 1798,
+        "n": 200,
+        "p50": 2222
+      }
+    },
+    "length_only_1nn": 0.3,
+    "length_only_random": 0.25,
+    "length_theils_u": 0.008,
+    "tell_coverage": 0.063,
+    "tell_sentences": 4
+  },
+  "no_llm_generation": true,
+  "records": 1000,
+  "records_sha256": "683403e0ffbcaf148424d8a40c44c74816fa430404e35d0d68c519e794c01736",
+  "schema": "direct-authored-proxy-evaluation-v3",
+  "source_corpus": "datasets\\proxy_eval\\direct_authored_proxy_eval.v2_2.jsonl",
+  "source_manifest_sha256": "7fd12b81a855cf6825568f955be9bb6299e1eb591a280e2b8488ef74d377381d",
+  "source_records_sha256": "ee7b4ba335f347e6873e5dadee42ef408d06a0f0407cfcc6aa8feeea81c55832",
+  "text_length": {
+    "max": 2758,
+    "mean": 2274.41,
+    "min": 1790
+  },
+  "train_reference": "datasets\\proxy_gold\\direct_authored_catalog_training.v6.jsonl",
+  "training_forbidden": true
+}

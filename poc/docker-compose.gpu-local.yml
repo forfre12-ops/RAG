@@ -1,0 +1,18 @@
+# docker-compose.gpu-local.yml — koipa-jjw 로컬 개발 스택에 GPU 학습 이미지를 얹는 임시 오버레이.
+#
+# docker-compose.gpu-train.yml 을 그대로 안 쓰는 이유: 그 파일은 HF_HOME을
+# /models/hf 로 바꾸는데, 이 jjw 스택은 이미 koipa_hf_cache 볼륨을
+# /home/koipa/.cache/huggingface 에 마운트해 두고 그 안에 kf-deberta-base 캐시까지
+# 받아 놨다(2026-10-10). 경로를 바꾸면 그 캐시를 다시 못 찾는다 — 이미지와 GPU
+# 예약만 얹고 나머지(env_file·volumes)는 기존 layering(docker-compose.yml +
+# .prod.yml + .dual.yml)이 이미 정한 걸 그대로 쓴다.
+services:
+  worker:
+    image: koipa-gpu:cu130
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

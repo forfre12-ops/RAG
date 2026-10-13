@@ -1,0 +1,106 @@
+{
+  "annotations": {"list": []},
+  "title": "Koipa Overview",
+  "uid": "koipa-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-6h", "to": "now"},
+  "tags": ["koipa", "overview"],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "API Up",
+      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4},
+      "targets": [
+        {"expr": "up{job=\"koipa-api\"}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"options": {"0": {"text": "DOWN", "color": "red"}}, "type": "value"},
+            {"options": {"1": {"text": "UP", "color": "green"}}, "type": "value"}
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "p95 latency (s)",
+      "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(koipa_request_duration_seconds_bucket[5m])) by (le))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 3}}
+    },
+    {
+      "type": "stat",
+      "title": "Requests / min",
+      "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
+      "targets": [{"expr": "sum(rate(koipa_requests_total[5m])) * 60", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}}
+    },
+    {
+      "type": "stat",
+      "title": "5xx ratio (%)",
+      "gridPos": {"x": 12, "y": 0, "w": 4, "h": 4},
+      "targets": [
+        {
+          "expr": "100 * sum(rate(koipa_requests_total{status=~\"5..\"}[5m])) / sum(rate(koipa_requests_total[5m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 2}}
+    },
+    {
+      "type": "stat",
+      "title": "Active Learning underclass",
+      "gridPos": {"x": 16, "y": 0, "w": 4, "h": 4},
+      "targets": [{"expr": "koipa_active_learning_pending_underclass", "refId": "A"}],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 5},
+              {"color": "red", "value": 10}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Request rate by route",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "sum(rate(koipa_requests_total[1m])) by (route)", "refId": "A", "legendFormat": "{{route}}"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "p95 latency by route",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(koipa_request_duration_seconds_bucket[5m])) by (le, route))",
+          "refId": "A",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "logs",
+      "title": "Recent API logs",
+      "gridPos": {"x": 0, "y": 12, "w": 24, "h": 8},
+      "targets": [
+        {"expr": "{service=\"api\"}", "refId": "A", "datasource": {"type": "loki", "uid": "loki"}}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+ "doc_id": "MK-0249",
+ "intended_label": "S2",
+ "document_origin": "synthetic",
+ "document_type": "모의문서(생산제조/제품 생산실적 정보, 업무 기록)",
+ "department": "생산제조",
+ "info_type": "제품 생산실적 정보",
+ "doc_format": "업무 기록",
+ "authoring_method": "mock1000_guide40_structure_20261002",
+ "requires_manual_audit": true,
+ "candidate_status": "proposed",
+ "source_reference": "AI 합성(서브에이전트 64명) — guide40 카탈로그(부서·정보유형→등급) 직접 배정",
+ "claim_scope": "검수 전 후보. 전문가 확정 전까지 등급은 잠정값이며 실 비밀정보 아님(전부 가상 내용).",
+ "import_note": "등급명을 작성자에게 알리지 않고 부서·정보유형·심각도 설명만으로 작성시킨 문서(guide40 64건의 구조를 1,001건으로 확장). 상세는 README_읽어주십시오.md 참조.",
+ "review_batch": "expert_review_mock1000_20261002",
+ "review_batch_note": "guide40 구조 확장 모의문서(2026-10-02, 1,001건, 제외 0건). 콘솔에서 review_batch=expert_review_mock1000_20261002 로 필터링."
+}

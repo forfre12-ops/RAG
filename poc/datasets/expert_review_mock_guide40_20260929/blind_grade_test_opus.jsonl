@@ -1,0 +1,64 @@
+{"review_id": "MG-0001", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "재작업 표본조사(60%)·작업표준서 3-7항 개정 논의 등 내부 공정개선 회의이나 허용범위 등 구체 수치는 없고 관련 부서 참석자 한정 공유"}
+{"review_id": "MG-0002", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "high", "insufficient_info": false, "reason": "B사 샘플평가·D사 납품 78% 등 거래처별 실적이 담긴 내부 보고로 영업본부장·경영기획팀에 보고, 공개정보 아님"}
+{"review_id": "MG-0003", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "출입통제·CCTV 정기점검 결과로 결함은 조치 완료·유지보수 계약 범위 내 처리되어 경제적 가치가 없는 시설관리 기록"}
+{"review_id": "MG-0004", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "전사 출근율 96.8%·연차사용률 등 집계 통계뿐으로 개인 식별정보나 경제적 가치 있는 내용 없음"}
+{"review_id": "MG-0005", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "교육 참석률·만족도 결과 보고이며 PS-330 장비 교육도 '시험 대상 제품의 세부 내용은 다루지 않음'이라 명시되어 경제적 가치 없음"}
+{"review_id": "MG-0006", "s": 2, "v": 2, "m": 2, "derived_grade": "TS", "confidence": "high", "insufficient_info": false, "reason": "충전재 24%·접합압력 3.1kN·경화 132도 조합을 '경쟁사가 도달하지 못한 지점'으로 명시한 37회 시험 결과이며 연구소장·대표이사 등 한정 보고, 이 문서 형태로만 존재"}
+{"review_id": "MG-0007", "s": 2, "v": 2, "m": 1, "derived_grade": "TS", "confidence": "medium", "insufficient_info": false, "reason": "표준서에 없는 접합압력 3.3kN 조정·코팅 배합 1:0.26과 투입순서 등 개인 작업일지에만 있던 경험 노하우를 후임에게만 인계, 도면은 반장이 열쇠를 가진 캐비닛에 관리"}
+{"review_id": "MG-0008", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "휴게공간·근무복 논의 결과를 '사내 공지를 통해 별도로 안내'하는 전 직원 대상 정보"}
+{"review_id": "MG-0009", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "구내식당 위탁계약 갱신을 전 직원에게 알리는 안내문으로 단가 등 구체 계약조건 없음"}
+{"review_id": "MG-0010", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "경조사 지원금 기준 변경을 전 직원에게 알리는 복리후생 공지"}
+{"review_id": "MG-0011", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "소방·산업안전 점검 일정과 협조사항을 전 직원에게 안내하는 공지"}
+{"review_id": "MG-0012", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "커넥터 핀 불량률 1.8→3.1%·협력사 부품 0.02mm 편차 등 원인분석 품질 데이터로 관련 부서·협력사 담당자 한정 회의"}
+{"review_id": "MG-0013", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "세정용 알코올·장갑·범용 접착제 등 실험실 소모품 재고 확인으로 '소모품 내역'에 해당"}
+{"review_id": "MG-0014", "s": 1, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "low", "insufficient_info": false, "reason": "부서별 평가등급 조정(최상위 등급 20% 이내 등) 등 인사평가 조정 내용으로 인사팀·부서장 한정이나 영업비밀상 경제적 가치는 제한적"}
+{"review_id": "MG-0015", "s": 0, "v": 1, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "홈페이지·전시회 리플릿 게재용 제품 소개 문안으로 공개를 전제로 한 홍보자료"}
+{"review_id": "MG-0016", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "안건 원안 가결 결과만 담긴 주총 의사록으로 '법정 절차에 따라 작성해 비치'하는 공시성 문서"}
+{"review_id": "MG-0017", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "PS-330 소재 공급사 이원화 검토(해외 후보사·리드타임 3주·시범발주 20%)로 구매·개발 내부 검토이나 단가·배합 수치는 없음"}
+{"review_id": "MG-0018", "s": 2, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "PS-330 개발 착수 품의로 목표사양(30% 축소·-40~150도)·일정이 담긴 신규개발 계획이나 목표는 비공식 정보 기반 잠정값이고 기술 세부는 없음"}
+{"review_id": "MG-0019", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "3라인 검사구간 1.8→2.6m 확장·재작업률 4%→2% 목표 등 설비 재배치 품의로 내부 결재 자료이나 핵심 기술정보는 없음"}
+{"review_id": "MG-0020", "s": 1, "v": 0, "m": 2, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "증빙 누락 3건 외 이상 없음이라는 내부감사 결과로 대표이사 결재 대상이나 경쟁상 경제적 가치가 있는 정보는 없음"}
+{"review_id": "MG-0021", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "라벨 잉크 리본 교체주기 문제로 '제품 자체에는 영향이 없는 포장 표면 문제'라 명시되어 경제적 가치 없음"}
+{"review_id": "MG-0022", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "사무공간 재배치를 전 직원에게 알리는 안내문이며 대표이사 보고 언급도 '특이 소요 없음'"}
+{"review_id": "MG-0023", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "R&D 예산 항목별 집행률(장비 임차 118% 등)과 PS-330 시험 일정 변동이 담긴 연구소 내부 보고이나 금액·기술 세부는 없음"}
+{"review_id": "MG-0024", "s": 2, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "출원 전 온도보상 회로 특허 검토(선행출원 2건 대비 차이·일정)로 공개 전 정보이나 회로 세부는 본문에 없고 '출원 이후 공개될 예정'"}
+{"review_id": "MG-0025", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "F사 입찰 참여 검토로 비공식 입수한 F사 계약만료·물량 규모 정보가 있으나 가격 등 구체 조건은 없음"}
+{"review_id": "MG-0026", "s": 2, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "PS-220 신호처리 회로 산출물의 재사용 범위·기간 단축(3~4주) 검토로 개발부서 내부 자료이나 설계 세부는 없음"}
+{"review_id": "MG-0027", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "재택근무 승인 절차·옛 부서명 정정 등 전 직원이 알아야 할 복무규정 개정 검토"}
+{"review_id": "MG-0028", "s": 1, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "D사 회수 지연에 따른 4분기 자금 경색 가능성·단기 운전자금 검토로 대표이사·재무임원 한정 보고이나 금액 등 구체 수치 없음"}
+{"review_id": "MG-0029", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "10월 1일자 인사발령을 전 직원에게 공지하는 안내문"}
+{"review_id": "MG-0030", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "시험용 소재·범용 부품 발주 건수와 재고 현황 정리로 단가·배합 등 가치 있는 정보는 없음"}
+{"review_id": "MG-0031", "s": 1, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "외부 컨설팅에 의뢰한(비용 투입) 경영진단 결과로 조직·구매 프로세스 지적사항을 담은 경영진 보고, 전문은 경영지원팀 보관"}
+{"review_id": "MG-0032", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "포장재·사무용품·청소용품 등 일반 소모 자재 발주 현황으로 '소모품 내역'에 해당"}
+{"review_id": "MG-0033", "s": 2, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "1차 시제품 리뷰·접합압력 재조정 착수 등 개발 진척을 공유한 팀 내부 회의이나 구체 수치·설계값은 없음"}
+{"review_id": "MG-0034", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "PS-330 초도양산 라인 운영안(전용 대 병행) 비교로 '시나리오 수준·확정 계획 아님'인 내부 생산계획 검토"}
+{"review_id": "MG-0035", "s": 2, "v": 2, "m": 2, "derived_grade": "TS", "confidence": "high", "insufficient_info": false, "reason": "비상장 세라믹 가공업체 지분 인수 협상·실사 경과(외부 회계법인 3주 실사)라는 신규투자 계획으로 이사 한정·대표이사와 법무임원으로 창구 일원화"}
+{"review_id": "MG-0036", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "청소·조경 용역 진행 및 평가 현황으로 경제적 가치 없는 일반 관리 정보"}
+{"review_id": "MG-0037", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "부가세 신고 일정과 증빙 제출을 전 부서에 알리는 안내"}
+{"review_id": "MG-0038", "s": 1, "v": 2, "m": 1, "derived_grade": "S2", "confidence": "high", "insufficient_info": false, "reason": "D사 PS-220A 단가 4,850원(5,200→4,920→4,850)·월 18,000개 등 고객 거래조건이나 거래 상대방도 아는 계약성 정보라 비공지성 1"}
+{"review_id": "MG-0039", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "low", "insufficient_info": false, "reason": "PS-220 주간 지시수량 4,200개·공정 순서·커넥터 핀/기포 확인 지시 등 2라인 작업자 대상 작업지시로 배합 수치 등 핵심값은 없음"}
+{"review_id": "MG-0040", "s": 0, "v": 1, "m": 1, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "시장조사 자료이나 '외부 조사기관의 공개 발표 자료와 전시회 청취 내용 취합, 유료 자료 미사용'이라 명시되어 공개정보 기반"}
+{"review_id": "MG-0041", "s": 1, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "이사회 안건(실적·PS-330 진척·사외이사 후임) 요지만 있고 세부 수치와 후보 정보는 비공개로 유지"}
+{"review_id": "MG-0042", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "현장 인턴 지원 15명·면접 8명 등 채용 진행 현황으로 경제적 가치 없음"}
+{"review_id": "MG-0043", "s": 1, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "외부감사 전 상반기 결산(매출 +8%·영업이익 계획 대비 90%)으로 경영지원팀장 보고용 내부 재무정보"}
+{"review_id": "MG-0044", "s": 0, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "사내 3인·사외 2인 이사회 구성과 일정 안내로 등기상 공개 사항 수준이며 후보 정보는 없음"}
+{"review_id": "MG-0045", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "부문별 실적(영업 계획 대비 94%) 분석으로 내부 경영정보이나 세부 분석은 별도 경영진 회의 자료"}
+{"review_id": "MG-0046", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "PS-410 2차 시험생산 일정·점검항목(사출압력 재조정 등)으로 내부 생산기술 자료이나 설정값은 없음"}
+{"review_id": "MG-0047", "s": 2, "v": 2, "m": 2, "derived_grade": "TS", "confidence": "low", "insufficient_info": true, "reason": "PS-330 전환·차세대 플랫폼·해외 생산거점 등 3개년 경영계획을 대표이사·임원진에 보고; 다만 투자 규모·리스크 대응은 별도 문서라 V(2 대 1) 판단 근거가 부족"}
+{"review_id": "MG-0048", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "업무용 PC·네트워크 정기점검 일정을 전 직원에게 알리는 안내"}
+{"review_id": "MG-0049", "s": 2, "v": 2, "m": 2, "derived_grade": "TS", "confidence": "medium", "insufficient_info": true, "reason": "복합 측정소자 통합·신호분리 알고리즘으로 '경쟁사 대비 2년 이상 격차'라는 실험실 단계 연구결과를 대표이사·부사장에만 보고; 알고리즘·데이터는 연구노트에만 있어 V 확신 제한"}
+{"review_id": "MG-0050", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "프레스 유압 142bar·벨트 마모 12% 등 설비 정기점검 기록으로 제품·공정 핵심정보가 없는 유지보수 정보"}
+{"review_id": "MG-0051", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "low", "insufficient_info": false, "reason": "경력직 지원 23명·1차 면접 6명 등 채용 진행 현황으로 경쟁사 경력자 언급 외 경제적 가치 있는 정보 없음"}
+{"review_id": "MG-0052", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "low", "insufficient_info": false, "reason": "야간조 실적 872개·불량 14건·금형온도 이상 조치 등 하루치 작업일지로 공정 핵심값은 없음"}
+{"review_id": "MG-0053", "s": 1, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "제품계열별 수익성(구형 계열 매출비중 약 8% 등) 분석으로 대표이사 보고 내부자료이나 세부 수치는 별첨"}
+{"review_id": "MG-0054", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "시제품 시험실 출입절차 변경을 전 직원에게 알리는 안내문"}
+{"review_id": "MG-0055", "s": 1, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "임원회의 안건(실적·PS-330·자금·중장기계획) 요지와 결정사항으로 임원 한정이나 구체 수치·기술 세부는 없음"}
+{"review_id": "MG-0056", "s": 2, "v": 2, "m": 1, "derived_grade": "TS", "confidence": "medium", "insufficient_info": false, "reason": "PS-330 1차 시제품 성능평가(정확도 ±1.4% 대 목표 ±1.2%·접합압력 3.1→3.0kN 재조정안·200시간 내구) 등 연구개발 결과 실험데이터"}
+{"review_id": "MG-0057", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "매출채권 회수 92%·월말 지급 집중·일시적 잔고 저하 등 자금 입출금 요약으로 내부 재무정보"}
+{"review_id": "MG-0058", "s": 2, "v": 2, "m": 2, "derived_grade": "TS", "confidence": "low", "insufficient_info": false, "reason": "B사 3% 인하 요청에 2%선 협상 여지·D사 1% 인상 계획 등 거래처별 가격 협상 전략으로 협상 재량은 본부장 승인 하에 관리"}
+{"review_id": "MG-0059", "s": 2, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "PS-220A 원가 구성(소재 42%·가공 31%) 등 보유자만 아는 원가 정보이나 매 분기 같은 방식으로 반복되는 정기 분석"}
+{"review_id": "MG-0060", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "D사 납품 수량(6,000·7,200개)·검수 지적 등 거래처 검수 결과로 상대방도 아는 거래 정보"}
+{"review_id": "MG-0061", "s": 1, "v": 2, "m": 2, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "코팅 배합기술 이전 범위·로열티 방식 등 기술협력 계약 조건으로 핵심기술 관련이나 협력사와 공유되는 계약 정보라 비공지성 1"}
+{"review_id": "MG-0062", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "프레스 5대·사출 4대 등 설비 보유 대수와 연식 정리로 자산 목록 수준"}
+{"review_id": "MG-0063", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "직원 1명의 연차수당 소급 정산 처리 내용으로 개인 관련 정보이나 영업비밀상 경제적 가치는 없음"}
+{"review_id": "MG-0064", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "low", "insufficient_info": false, "reason": "라인별 가동률 87% 등 월간 가동 현황으로 기술·거래 정보가 없는 일상 운영 통계"}

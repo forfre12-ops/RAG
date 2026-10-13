@@ -1,0 +1,64 @@
+{"review_id": "MG-0001", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0002", "s": 2, "v": 2, "m": 1, "derived_grade": "TS", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 업무필요자공개"}
+{"review_id": "MG-0003", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0004", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0005", "s": 2, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 공개/전직원"}
+{"review_id": "MG-0006", "s": 0, "v": 2, "m": 2, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 고가개발투입 승인제한공개"}
+{"review_id": "MG-0007", "s": 1, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "내부업무정보 업무필요자공개"}
+{"review_id": "MG-0008", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0009", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0010", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0011", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0012", "s": 1, "v": 2, "m": 2, "derived_grade": "S2", "confidence": "high", "insufficient_info": false, "reason": "내부업무정보 고가개발투입 승인제한공개"}
+{"review_id": "MG-0013", "s": 0, "v": 1, "m": 2, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 개발/계약비용 승인제한공개"}
+{"review_id": "MG-0014", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "내부업무정보 공개/전직원"}
+{"review_id": "MG-0015", "s": 0, "v": 2, "m": 2, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 고가개발투입 승인제한공개"}
+{"review_id": "MG-0016", "s": 0, "v": 1, "m": 2, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 개발/계약비용 승인제한공개"}
+{"review_id": "MG-0017", "s": 2, "v": 2, "m": 1, "derived_grade": "TS", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 업무필요자공개"}
+{"review_id": "MG-0018", "s": 0, "v": 2, "m": 2, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 고가개발투입 승인제한공개"}
+{"review_id": "MG-0019", "s": 1, "v": 2, "m": 2, "derived_grade": "S2", "confidence": "high", "insufficient_info": false, "reason": "내부업무정보 고가개발투입 승인제한공개"}
+{"review_id": "MG-0020", "s": 1, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "내부업무정보 개발/계약비용 승인제한공개"}
+{"review_id": "MG-0021", "s": 1, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "내부업무정보 개발/계약비용 승인제한공개"}
+{"review_id": "MG-0022", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0023", "s": 2, "v": 0, "m": 1, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 업무필요자공개"}
+{"review_id": "MG-0024", "s": 2, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 공개/전직원"}
+{"review_id": "MG-0025", "s": 0, "v": 2, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 고가개발투입 공개/전직원"}
+{"review_id": "MG-0026", "s": 1, "v": 2, "m": 2, "derived_grade": "S2", "confidence": "high", "insufficient_info": false, "reason": "내부업무정보 고가개발투입 승인제한공개"}
+{"review_id": "MG-0027", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0028", "s": 1, "v": 1, "m": 2, "derived_grade": "S2", "confidence": "high", "insufficient_info": false, "reason": "내부업무정보 개발/계약비용 승인제한공개"}
+{"review_id": "MG-0029", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0030", "s": 2, "v": 2, "m": 2, "derived_grade": "TS", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 승인제한공개"}
+{"review_id": "MG-0031", "s": 1, "v": 1, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "내부업무정보 개발/계약비용 공개/전직원"}
+{"review_id": "MG-0032", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0033", "s": 1, "v": 0, "m": 2, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "내부업무정보 승인제한공개"}
+{"review_id": "MG-0034", "s": 2, "v": 0, "m": 2, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 승인제한공개"}
+{"review_id": "MG-0035", "s": 2, "v": 2, "m": 2, "derived_grade": "TS", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 승인제한공개"}
+{"review_id": "MG-0036", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "내부업무정보 공개/전직원"}
+{"review_id": "MG-0037", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0038", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0039", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0040", "s": 0, "v": 1, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 개발/계약비용 공개/전직원"}
+{"review_id": "MG-0041", "s": 2, "v": 2, "m": 0, "derived_grade": "S1", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 공개/전직원"}
+{"review_id": "MG-0042", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0043", "s": 0, "v": 1, "m": 2, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 개발/계약비용 승인제한공개"}
+{"review_id": "MG-0044", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0045", "s": 2, "v": 2, "m": 0, "derived_grade": "S1", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 공개/전직원"}
+{"review_id": "MG-0046", "s": 2, "v": 2, "m": 2, "derived_grade": "TS", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 승인제한공개"}
+{"review_id": "MG-0047", "s": 2, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 공개/전직원"}
+{"review_id": "MG-0048", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0049", "s": 2, "v": 2, "m": 2, "derived_grade": "TS", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 승인제한공개"}
+{"review_id": "MG-0050", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0051", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0052", "s": 1, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "내부업무정보 공개/전직원"}
+{"review_id": "MG-0053", "s": 2, "v": 2, "m": 0, "derived_grade": "S1", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 공개/전직원"}
+{"review_id": "MG-0054", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0055", "s": 2, "v": 2, "m": 2, "derived_grade": "TS", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 승인제한공개"}
+{"review_id": "MG-0056", "s": 2, "v": 2, "m": 1, "derived_grade": "TS", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 업무필요자공개"}
+{"review_id": "MG-0057", "s": 2, "v": 2, "m": 2, "derived_grade": "TS", "confidence": "high", "insufficient_info": false, "reason": "미공개 신규개발 고가개발투입 승인제한공개"}
+{"review_id": "MG-0058", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0059", "s": 1, "v": 2, "m": 1, "derived_grade": "S2", "confidence": "high", "insufficient_info": false, "reason": "내부업무정보 고가개발투입 업무필요자공개"}
+{"review_id": "MG-0060", "s": 1, "v": 2, "m": 2, "derived_grade": "S2", "confidence": "high", "insufficient_info": false, "reason": "내부업무정보 고가개발투입 승인제한공개"}
+{"review_id": "MG-0061", "s": 1, "v": 2, "m": 2, "derived_grade": "S2", "confidence": "high", "insufficient_info": false, "reason": "내부업무정보 고가개발투입 승인제한공개"}
+{"review_id": "MG-0062", "s": 1, "v": 1, "m": 1, "derived_grade": "S2", "confidence": "medium", "insufficient_info": false, "reason": "내부업무정보 개발/계약비용 업무필요자공개"}
+{"review_id": "MG-0063", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "medium", "insufficient_info": false, "reason": "공개정보 공개/전직원"}
+{"review_id": "MG-0064", "s": 0, "v": 0, "m": 0, "derived_grade": "S3", "confidence": "high", "insufficient_info": false, "reason": "공개정보 공개/전직원"}

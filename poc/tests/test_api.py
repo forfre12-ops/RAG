@@ -6,8 +6,8 @@ pytestmark = pytest.mark.slow
 
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-from lloydk.config import settings
+from koipa.api.app import app
+from koipa.config import settings
 
 
 def test_healthz_ok():
@@ -17,6 +17,7 @@ def test_healthz_ok():
         body = r.json()
         assert body["status"] == "ok"
         assert "uptime_sec" in body
+        assert len(body["build"]["console_admin_html_sha256"]) == 64
 
 
 def test_classify_requires_api_key():
@@ -48,7 +49,6 @@ def test_classify_full_response_shape():
             json={
                 "doc_id": "smoke-ts",
                 "content": "특급기밀 차세대 제품 설계도 핵심 원천기술 M&A 계획",
-                "use_rag": False,
                 "return_evidence": True,
             },
         )

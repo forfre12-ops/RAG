@@ -30,13 +30,13 @@ import pytest
 
 def test_hmac_changes_digest_vs_plain_sha256(monkeypatch):
     """비밀키 설정 시 링크 다이제스트가 키 없는 sha256과 달라야 한다(키 결속 증명)."""
-    import lloydk.services.audit_chain as ac
+    import koipa.services.audit_chain as ac
 
     payload = '{"x":1}'
     prev = "0" * 64
 
     # 키 없음 → 평문 sha256 경로
-    monkeypatch.delenv("LLOYDK_AUDIT_CHAIN_SECRET", raising=False)
+    monkeypatch.delenv("KOIPA_AUDIT_CHAIN_SECRET", raising=False)
     with patch.object(ac, "_chain_secret", return_value=""):
         packed_plain = ac.build_chained_hash(payload, prev)
     _, full_plain = ac.parse_chained_hash(packed_plain)
@@ -53,7 +53,7 @@ def test_hmac_changes_digest_vs_plain_sha256(monkeypatch):
 
 def test_hmac_secret_required_to_reproduce_link():
     """비밀키를 모르면 동일 링크를 재생성할 수 없다 = 재작성 차단의 핵심."""
-    import lloydk.services.audit_chain as ac
+    import koipa.services.audit_chain as ac
 
     payload = '{"action":"relabel","grade":"TS"}'
     prev = "ab" * 32
@@ -73,9 +73,9 @@ def test_hmac_secret_required_to_reproduce_link():
 
 def test_no_secret_falls_back_to_legacy_sha256_nondestructive(monkeypatch):
     """비밀키 미설정 dev: 기존 sha256 동작 유지 — prev16:full32 형식·길이 보존."""
-    import lloydk.services.audit_chain as ac
+    import koipa.services.audit_chain as ac
 
-    monkeypatch.delenv("LLOYDK_AUDIT_CHAIN_SECRET", raising=False)
+    monkeypatch.delenv("KOIPA_AUDIT_CHAIN_SECRET", raising=False)
     with patch.object(ac, "_chain_secret", return_value=""):
         packed = ac.build_chained_hash('{"x":1}', "0" * 64)
         # 동일 입력 결정론 — 레거시 평문 sha256과 정확히 일치
@@ -87,10 +87,10 @@ def test_no_secret_falls_back_to_legacy_sha256_nondestructive(monkeypatch):
 
 
 def test_env_secret_is_picked_up(monkeypatch):
-    """settings에 필드가 없어도 env LLOYDK_AUDIT_CHAIN_SECRET로 키 주입 가능."""
-    import lloydk.services.audit_chain as ac
+    """settings에 필드가 없어도 env KOIPA_AUDIT_CHAIN_SECRET로 키 주입 가능."""
+    import koipa.services.audit_chain as ac
 
-    monkeypatch.setenv("LLOYDK_AUDIT_CHAIN_SECRET", "env-chain-secret")
+    monkeypatch.setenv("KOIPA_AUDIT_CHAIN_SECRET", "env-chain-secret")
     # settings.audit_chain_secret는 미정의 → getattr 폴백 → env 사용
     assert ac._chain_secret() == "env-chain-secret"
 
@@ -124,7 +124,7 @@ class _FakeVaultClient:
 
 
 def _make_vault(data, ttl):
-    from lloydk.services.secrets_manager import VaultSecretsManager
+    from koipa.services.secrets_manager import VaultSecretsManager
 
     sm = VaultSecretsManager(url="http://x", token="t", cache_ttl=ttl)
     fake = _FakeVaultClient(data)
@@ -142,7 +142,7 @@ def test_vault_caches_within_ttl():
 
 def test_vault_refreshes_after_ttl():
     """TTL 만료 후에는 백엔드를 다시 읽어 로테이션된 값을 반영."""
-    import lloydk.services.secrets_manager as sm_mod
+    import koipa.services.secrets_manager as sm_mod
 
     sm, fake = _make_vault({"api_key": "v1"}, ttl=300.0)
     base = [1000.0]
@@ -189,9 +189,9 @@ def test_vault_ttl_zero_disables_cache():
 
 def test_invalidate_secrets_cache_global_noop_on_env(monkeypatch):
     """env 백엔드는 invalidate가 no-op(예외 없이 통과)."""
-    import lloydk.services.secrets_manager as sm_mod
+    import koipa.services.secrets_manager as sm_mod
 
-    monkeypatch.delenv("LLOYDK_SECRETS_BACKEND", raising=False)
+    monkeypatch.delenv("KOIPA_SECRETS_BACKEND", raising=False)
     sm_mod._default = None
     sm_mod.get_secrets_manager()  # EnvSecretsManager
     sm_mod.invalidate_secrets_cache()  # 예외 없어야 함
@@ -204,7 +204,7 @@ def test_invalidate_secrets_cache_global_noop_on_env(monkeypatch):
 
 
 def test_assert_production_auth_config_requires_iss_aud_in_jwt_mode():
-    import lloydk.api._jwt_auth as ja
+    import koipa.api._jwt_auth as ja
 
     with patch.object(ja, "_is_production", return_value=True), \
          patch.object(ja.settings, "auth_mode", "jwt", create=True), \
@@ -217,18 +217,18 @@ def test_assert_production_auth_config_requires_iss_aud_in_jwt_mode():
 
 
 def test_assert_production_auth_config_passes_when_iss_aud_set():
-    import lloydk.api._jwt_auth as ja
+    import koipa.api._jwt_auth as ja
 
     with patch.object(ja, "_is_production", return_value=True), \
          patch.object(ja.settings, "auth_mode", "jwt", create=True), \
          patch.object(ja.settings, "jwt_issuer", "https://idp.example.com", create=True), \
-         patch.object(ja.settings, "jwt_audience", "lloydk-api", create=True):
+         patch.object(ja.settings, "jwt_audience", "koipa-api", create=True):
         ja.assert_production_auth_config()  # 예외 없어야 함
 
 
 def test_assert_production_auth_config_noop_in_dev():
     """dev/test(_is_production=False)는 미설정이어도 통과(비파괴)."""
-    import lloydk.api._jwt_auth as ja
+    import koipa.api._jwt_auth as ja
 
     with patch.object(ja, "_is_production", return_value=False), \
          patch.object(ja.settings, "auth_mode", "jwt", create=True), \
@@ -239,7 +239,7 @@ def test_assert_production_auth_config_noop_in_dev():
 
 def test_verify_jwt_rejects_missing_iss_aud_in_production():
     """운영에서 iss/aud 미설정이면 verify_jwt가 토큰을 거부(런타임 confused-deputy 차단)."""
-    import lloydk.api._jwt_auth as ja
+    import koipa.api._jwt_auth as ja
 
     # 서명 검증 전에 iss/aud 게이트에 도달하도록 _verify_signature를 no-op로.
     import base64
@@ -268,7 +268,7 @@ def test_verify_jwt_dev_skips_iss_aud_nondestructive():
     import json as _json
     import time as _time
 
-    import lloydk.api._jwt_auth as ja
+    import koipa.api._jwt_auth as ja
 
     def _b64(d):
         return base64.urlsafe_b64encode(_json.dumps(d).encode()).rstrip(b"=").decode()
@@ -316,7 +316,7 @@ def test_record_returns_false_and_increments_counter_on_db_error():
     """DB 오류로 audit insert 실패 시 _record가 False 반환 + 카운터 증가."""
     from sqlalchemy.exc import OperationalError
 
-    import lloydk.api.middleware as mw
+    import koipa.api.middleware as mw
 
     req = _make_request({})
 
@@ -324,7 +324,7 @@ def test_record_returns_false_and_increments_counter_on_db_error():
     def _boom(*a, **k):
         raise OperationalError("stmt", {}, Exception("db down"))
 
-    with patch("lloydk.db.session_scope", _boom), \
+    with patch("koipa.db.session_scope", _boom), \
          patch.object(mw, "_inc_audit_failure") as inc, \
          patch.dict(os.environ, {"AUDIT_DISABLED": "0"}):
         ok = mw.AuditMiddleware._record(
@@ -336,7 +336,7 @@ def test_record_returns_false_and_increments_counter_on_db_error():
 
 def test_record_returns_true_when_audit_disabled():
     """AUDIT_DISABLED=1은 의도적 비활성 — 실패가 아니라 True(fail-closed 미발동)."""
-    import lloydk.api.middleware as mw
+    import koipa.api.middleware as mw
 
     req = _make_request({})
     with patch.dict(os.environ, {"AUDIT_DISABLED": "1"}):
@@ -346,23 +346,23 @@ def test_record_returns_true_when_audit_disabled():
 
 
 def test_fail_closed_disabled_by_default():
-    import lloydk.api.middleware as mw
+    import koipa.api.middleware as mw
 
     with patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("LLOYDK_AUDIT_FAIL_CLOSED_HIGH_RISK", None)
+        os.environ.pop("KOIPA_AUDIT_FAIL_CLOSED_HIGH_RISK", None)
         # settings 필드 미정의 → getattr 폴백 False, env 미설정 → False
         assert mw._fail_closed_enabled() is False
 
 
 def test_fail_closed_enabled_via_env():
-    import lloydk.api.middleware as mw
+    import koipa.api.middleware as mw
 
-    with patch.dict(os.environ, {"LLOYDK_AUDIT_FAIL_CLOSED_HIGH_RISK": "1"}):
+    with patch.dict(os.environ, {"KOIPA_AUDIT_FAIL_CLOSED_HIGH_RISK": "1"}):
         assert mw._fail_closed_enabled() is True
 
 
 def test_high_risk_action_classification():
-    import lloydk.api.middleware as mw
+    import koipa.api.middleware as mw
 
     assert mw._is_high_risk(_make_request_for_path("/api/v1/relabel")) is True
     assert mw._is_high_risk(_make_request_for_path("/api/v1/train")) is True
@@ -388,7 +388,7 @@ def test_fail_closed_high_risk_blocks_with_503_via_dispatch():
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
-    import lloydk.api.middleware as mw
+    import koipa.api.middleware as mw
 
     app = FastAPI()
     app.add_middleware(mw.AuditMiddleware)
@@ -414,7 +414,7 @@ def test_fail_closed_off_keeps_serving_on_audit_failure():
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
-    import lloydk.api.middleware as mw
+    import koipa.api.middleware as mw
 
     app = FastAPI()
     app.add_middleware(mw.AuditMiddleware)
@@ -439,7 +439,7 @@ def test_fail_closed_off_keeps_serving_on_audit_failure():
 
 def test_health_storage_local_backend_skipped():
     """설정상 local 백엔드는 의도된 구성 → skipped(ok)."""
-    import lloydk.api.health as h
+    import koipa.api.health as h
 
     with patch.object(h.settings, "storage_backend", "local", create=True):
         res = h._check_storage()
@@ -452,13 +452,13 @@ def test_health_storage_minio_to_local_fallback_is_degraded():
 
     기존 버그: 이 경우 _client 부재로 점검을 건너뛰고 ok로 통과했다.
     """
-    import lloydk.api.health as h
+    import koipa.api.health as h
 
     class _FellBackLocal:
         name = "local"  # _client 속성 없음
 
     with patch.object(h.settings, "storage_backend", "minio", create=True), \
-         patch("lloydk.adapters.storage.build_storage", return_value=_FellBackLocal()):
+         patch("koipa.adapters.storage.build_storage", return_value=_FellBackLocal()):
         res = h._check_storage()
     assert res["ok"] is False
     assert res["status"] == "degraded"
@@ -467,7 +467,7 @@ def test_health_storage_minio_to_local_fallback_is_degraded():
 
 def test_health_storage_minio_ok_when_client_connects():
     """원격 클라이언트가 list_buckets 응답 → ok."""
-    import lloydk.api.health as h
+    import koipa.api.health as h
 
     class _Client:
         def list_buckets(self):
@@ -478,7 +478,7 @@ def test_health_storage_minio_ok_when_client_connects():
         _client = _Client()
 
     with patch.object(h.settings, "storage_backend", "minio", create=True), \
-         patch("lloydk.adapters.storage.build_storage", return_value=_Remote()):
+         patch("koipa.adapters.storage.build_storage", return_value=_Remote()):
         res = h._check_storage()
     assert res["ok"] is True
     assert res["status"] == "ok"
@@ -486,7 +486,7 @@ def test_health_storage_minio_ok_when_client_connects():
 
 def test_health_storage_minio_error_when_client_raises():
     """원격 클라이언트 연결 실패(list_buckets raise) → error(ok=False)."""
-    import lloydk.api.health as h
+    import koipa.api.health as h
 
     class _Client:
         def list_buckets(self):
@@ -497,7 +497,7 @@ def test_health_storage_minio_error_when_client_raises():
         _client = _Client()
 
     with patch.object(h.settings, "storage_backend", "minio", create=True), \
-         patch("lloydk.adapters.storage.build_storage", return_value=_Remote()):
+         patch("koipa.adapters.storage.build_storage", return_value=_Remote()):
         res = h._check_storage()
     assert res["ok"] is False
     assert res["status"] == "error"

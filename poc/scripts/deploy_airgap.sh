@@ -1,0 +1,254 @@
+#!/usr/bin/env bash
+# ============================================================================
+# 폐쇄망(에어갭) 스택 기동 — onprem-local tier
+# ----------------------------------------------------------------------------
+# 오프라인 번들 안에서 실행한다. install.sh(docker load) 이후 전체 스택을 한 번에
+# 기동: docs/INSTALL.md §1·§5~§10 자동화 — 무결성검증 → 이미지 확인 → 인프라 기동
+# → 마이그레이션 → 앱(api·worker·beat) 기동 → 스모크(인수 severity floor).
+#
+#   전제 : Docker + Compose v2, install.sh 로 이미지 적재 완료, 모델 배치 완료(§3)
+#   위치 : 번들 루트(install.sh·verify.sh 옆). 리포에서 실행 시 poc/ 를 루트로 인식.
+#   compose : infra-config/docker-compose.airgap.yml (image 참조·beat·named 볼륨)
+#
+# 사용(번들 루트에서):
+#   bash verify.sh          # (선택) 체크섬
+#   sudo bash install.sh    # docker load + 호스트 deps
+#   cp infra-config/.env.template .env && vi .env   # IMAGE_TAG·POSTGRES_PASSWORD·API_KEY…
+#   bash deploy_airgap.sh
+#
+# 환경변수 override:
+#   ENV_FILE=.env   API_HOST=127.0.0.1   API_PORT=8000   READY_TIMEOUT=240
+#   WITH_MTLS=1     nginx-mtls 프로파일 포함(인증서 ./mtls 사전배치 전제)
+#   WITH_OBS=1      관측성 스택도 기동(observability/…airgap.yml 있으면)
+#   SKIP_VERIFY=1   verify.sh(체크섬) 생략      SKIP_SMOKE=1  스모크 생략
+# ============================================================================
+set -euo pipefail
+
+ENV_FILE="${ENV_FILE:-.env}"
+API_HOST="${API_HOST:-127.0.0.1}"
+API_PORT="${API_PORT:-8000}"
+READY_TIMEOUT="${READY_TIMEOUT:-240}"
+WITH_MTLS="${WITH_MTLS:-0}"
+WITH_OBS="${WITH_OBS:-0}"
+SKIP_VERIFY="${SKIP_VERIFY:-0}"
+SKIP_SMOKE="${SKIP_SMOKE:-0}"
+
+c_bold=$'\033[1m'; c_red=$'\033[31m'; c_dim=$'\033[2m'; c_off=$'\033[0m'
+log()  { printf '\n%s[deploy-airgap] %s%s\n' "$c_bold" "$*" "$c_off"; }
+info() { printf '%s  %s%s\n' "$c_dim" "$*" "$c_off"; }
+die()  { printf '\n%s[deploy-airgap][ERROR] %s%s\n' "$c_red" "$*" "$c_off" >&2; exit 1; }
+
+# ── 위치 탐지: 번들 루트(infra-config/) 우선, 리포(poc/) 폴백 ──
+SELF="$(cd "$(dirname "$0")" && pwd)"
+if   [ -f "$SELF/infra-config/docker-compose.airgap.yml" ]; then
+  ROOT="$SELF";        COMPOSE="infra-config/docker-compose.airgap.yml"; LAYOUT="bundle"
+elif [ -f "$SELF/../docker-compose.airgap.yml" ]; then
+  ROOT="$(cd "$SELF/.." && pwd)"; COMPOSE="docker-compose.airgap.yml";   LAYOUT="repo"
+elif [ -f "$PWD/infra-config/docker-compose.airgap.yml" ]; then
+  ROOT="$PWD";         COMPOSE="infra-config/docker-compose.airgap.yml"; LAYOUT="bundle"
+else
+  die "airgap compose 를 못 찾음. 번들 루트(install.sh 옆)에서 실행하라."
+fi
+cd "$ROOT"
+COMPOSE_DIR="$(cd "$(dirname "$COMPOSE")" && pwd)"
+
+# ── 컨테이너 런타임 판별 ────────────────────────────────────
+# 왜(2026-08-26). 운영 설치 대상이 Rocky Linux 로 정해졌고 설치는 발주처가 수행한다.
+# RHEL 계열 기본 런타임은 podman 이라 docker 를 하드코딩하면 현장에서 스크립트가 통째로
+# 멈춘다 — 그 자리에 우리가 없다. docker 를 우선하되 없으면 podman 으로 진행한다.
+# CRT=런타임 명령 · CRT_COMPOSE=compose 하위명령(문자열, 호출부에서 그대로 전개).
+if command -v docker >/dev/null 2>&1; then
+  CRT=docker
+elif command -v podman >/dev/null 2>&1; then
+  CRT=podman
+else
+  die "컨테이너 런타임 미탑재 — docker 또는 podman 이 필요하다"
+fi
+if $CRT compose version >/dev/null 2>&1; then
+  CRT_COMPOSE="$CRT compose"
+elif [ "$CRT" = podman ] && command -v podman-compose >/dev/null 2>&1; then
+  CRT_COMPOSE="podman-compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  CRT_COMPOSE="docker-compose"
+else
+  die "compose 미탑재 — '$CRT compose'(v2) 또는 podman-compose/docker-compose 가 필요하다"
+fi
+# GPU 오버레이(선택). compose 기본값에는 GPU 예약이 없다 — GPU 없는 호스트에서 기동
+# 자체가 막히던 문제로 base 에서 뺐다. 학습 노드(지재원)에서만 setup.sh 가 넘겨 준다.
+# 값이 있는데 파일이 없으면 조용히 무시하지 않고 중단한다.
+GPU_OVERLAY="${GPU_OVERLAY:-}"
+_gpu_args=""
+if [ -n "$GPU_OVERLAY" ]; then
+  [ -f "$GPU_OVERLAY" ] || die "GPU_OVERLAY=$GPU_OVERLAY 파일이 없다"
+  _gpu_args="-f $GPU_OVERLAY"
+fi
+dc_air() { $CRT_COMPOSE --env-file "$ENV_FILE" -f "$COMPOSE" $_gpu_args "$@"; }
+
+# ── 0. 사전 요건 ────────────────────────────────────────────
+log "0/7  사전 요건 (layout=$LAYOUT · root=$ROOT · runtime=$CRT · compose=$CRT_COMPOSE)"
+
+# .env: 없으면 템플릿 안내 후 중단. env_file: .env 는 compose 파일 기준으로도 해석될 수 있어
+# infra-config/ 에도 동일 .env 를 보장(양쪽 resolution 안전) — CLI --env-file 과 서비스 env_file 불일치 예방.
+if [ ! -f "$ENV_FILE" ]; then
+  tmpl="$COMPOSE_DIR/.env.template"
+  # 비밀값 파일 — 생성 시점부터 소유자 전용.
+  if [ -f "$tmpl" ]; then
+    (umask 077; cp "$tmpl" "$ENV_FILE")
+    chmod 600 "$ENV_FILE" 2>/dev/null || true
+    die "$ENV_FILE 생성함(권한 600) — IMAGE_TAG·POSTGRES_PASSWORD·API_KEY 채운 뒤 재실행."
+  fi
+  die "$ENV_FILE 없음. 'cp infra-config/.env.template $ENV_FILE' 후 실값 입력."
+fi
+if [ "$LAYOUT" = "bundle" ]; then
+  # 서비스 env_file: .env 는 compose 파일 기준(infra-config/)으로 해석될 수 있어 항상 미러(최신화).
+  # cp 대상이 원본과 동일 파일이면 오류 → 무시.
+  # 미러도 원본과 같은 비밀값을 담는다 — 권한을 같이 건다.
+  if cp -f "$ENV_FILE" "$COMPOSE_DIR/.env" 2>/dev/null; then
+    chmod 600 "$COMPOSE_DIR/.env" 2>/dev/null || true
+    info "infra-config/.env 미러(권한 600 · 서비스 env_file 로드 보장)"
+  fi
+fi
+_env_val() { grep -E "^${1}=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"'"'"' '; }
+# 하드닝 프로파일(onprem-local)은 저장암호화를 강제 → ENABLED 가 명시적 off 가 아니면 KEY 도 필수.
+# [2026-08-26 리허설 실측] 종전 목록에 감사체인·서명URL 비밀키가 빠져 있었다. 템플릿에는
+# replace_me_ 로 들어 있는데 검사 대상이 아니라 그대로 통과했고, 마이그레이션까지 다 돈 뒤
+# api 가 startup 에서 죽어 **ready 300초 대기 후에야** 원인을 알게 됐다(RuntimeError:
+# 필수 자격증명 누락: KOIPA_AUDIT_CHAIN_SECRET). 설치자는 현장에 혼자 있다 — 0단계에서
+# 이름을 대고 멈춰야 한다.
+#   KOIPA_AUDIT_CHAIN_SECRET : 없으면 api 가 뜨지 않는다(NFR-SEC-01 감사체인 HMAC).
+#   GOLDEN_HTML_URL_SECRET   : 없으면 골든 검수·서명 화면이 무인증으로 열린다.
+_req_keys="POSTGRES_PASSWORD API_KEY KOIPA_AUDIT_CHAIN_SECRET GOLDEN_HTML_URL_SECRET"
+case "$(printf '%s' "$(_env_val STORAGE_ENCRYPTION_ENABLED || true)" | tr 'A-Z' 'a-z')" in
+  0|false|no|off) : ;;
+  *)              _req_keys="$_req_keys STORAGE_ENCRYPTION_KEY" ;;
+esac
+# [2026-08-26 리허설 실측] 이 스크립트의 사전 검사가 앱의 기동 계약보다 느슨했다.
+# STORAGE_ENCRYPTION_ENABLED=0 이면 "키가 필요 없다"고만 판단하고 통과시켰는데, 하드닝
+# 프로파일의 앱은 그 상태로 뜨지 않는다(RuntimeError: 안전 게이트가 꺼져 있습니다).
+# 그 결과 마이그레이션까지 다 돌고 ready 300초를 기다린 뒤에야 원인을 알게 됐다.
+# 앱과 같은 규칙을 0단계에서 적용한다 — 하드닝 프로파일에서 안전 게이트를 끄려면
+# REQUIRE_SAFETY_GATES=0 으로 의도를 명시해야 한다(앱이 요구하는 것과 동일).
+_falsy() { case "$(printf '%s' "$1" | tr 'A-Z' 'a-z')" in 0|false|no|off) return 0 ;; *) return 1 ;; esac; }
+if ! _falsy "$(_env_val REQUIRE_SAFETY_GATES || echo 1)"; then
+  for _g in STORAGE_ENCRYPTION_ENABLED AGREEMENT_GATE_ENABLED METADATA_FLOOR_ENABLED; do
+    _v="$(_env_val "$_g" || true)"
+    [ -n "$_v" ] && _falsy "$_v" && die "하드닝 프로파일인데 안전 게이트가 꺼져 있다: $_g=$_v
+  폐쇄망 운영은 룰·모델 합의 게이트·메타데이터 상향 floor·원본 at-rest 암호화가 필수다.
+  해당 값을 1 로 켜거나, 의도된 비보안 배포면 REQUIRE_SAFETY_GATES=0 을 $ENV_FILE 에 명시할 것.
+  (이 검사가 없으면 마이그레이션까지 돈 뒤 api 가 startup 에서 죽어 300초 뒤에야 알게 된다)"
+  done
+fi
+for k in $_req_keys; do
+  v="$(_env_val "$k" || true)"
+  { [ -z "$v" ] || printf '%s' "$v" | grep -qiE 'change[_-]?me|replace[_-]?me|placeholder|your[_-]'; } \
+    && die "필수값 미설정/placeholder: $k  ($ENV_FILE 실값 입력)"
+done
+# DEPLOY_PROFILE 하드닝 검증 — lite-* 로 뜨면 온도보정·안전게이트·저장암호화가 OFF 라 고등급 무음 미탐 위험.
+case "$(_env_val DEPLOY_PROFILE || true)" in
+  onprem-local|full-train) : ;;
+  "")  info "DEPLOY_PROFILE 미설정 → compose 가 onprem-local 로 기본 주입(하드닝 유지)" ;;
+  *)   die "DEPLOY_PROFILE='$(_env_val DEPLOY_PROFILE)' 은 폐쇄망 하드닝 프로파일 아님 — onprem-local(또는 full-train)로 설정. lite-* 는 안전게이트·저장암호화 OFF." ;;
+esac
+info "env=$ENV_FILE · profile=$(_env_val DEPLOY_PROFILE || echo 'onprem-local(기본)') · IMAGE_TAG=$(_env_val IMAGE_TAG || echo '기본(1.0.0-rc1)')"
+
+# compose 병합 검증(기동 전 조기 실패) — env 치환·상대경로·문법 오류를 up 전에 잡는다.
+if ! cfgerr="$(dc_air config -q 2>&1)"; then
+  printf '%s\n' "$cfgerr" >&2
+  die "compose 병합 검증 실패 — .env(IMAGE_TAG·POSTGRES_PASSWORD 등)·경로 확인 후 재실행"
+fi
+info "compose 병합 검증 OK"
+
+# ── 1. 무결성 검증 (체크섬) ────────────────────────────────
+if [ "$SKIP_VERIFY" != "1" ] && [ -f "$ROOT/verify.sh" ]; then
+  log "1/7  번들 무결성 검증 (verify.sh)"
+  bash "$ROOT/verify.sh" || die "체크섬 불일치 — 매체 반입 손상. 재반입 필요."
+else
+  log "1/7  무결성 검증 (skip)"
+fi
+
+# ── 2. 이미지 적재 확인 (install.sh 선행) ──────────────────
+log "2/7  적재 이미지 확인"
+_tag="$(_env_val IMAGE_TAG || true)"; _tag="${_tag:-1.0.0-rc1}"
+if ! $CRT image inspect "koipa-api:${_tag}" >/dev/null 2>&1; then
+  die "koipa-api:${_tag} 이미지 없음. 먼저 'sudo bash install.sh' 로 이미지 적재(§2). IMAGE_TAG 도 확인."
+fi
+info "koipa-api:${_tag} 적재됨"
+
+# ── 3. 모델 배치 확인 (§3) ─────────────────────────────────
+log "3/7  모델 배치 확인 (../models)"
+mdir="$COMPOSE_DIR/../models"
+# [fail-closed 2026-08-15] 종전에는 info 로만 알리고 그대로 기동했다. 그 결과 학습 분류기가
+# 없는 번들이 폐쇄망에서 rule-fallback 으로 조용히 떴다 - 등급을 룰이 만들고 무음 미탐이 난다.
+# 번들 빌더도 같은 자리에서 통과시켰다(미동봉을 parity 위반으로 안 봄). 둘 다 막는다.
+# 의도적 rule-fallback 운영이면 ALLOW_RULE_FALLBACK=1 로 명시할 것.
+if [ ! -d "$mdir/classifier-trained" ]; then
+  if [ "${ALLOW_RULE_FALLBACK:-0}" = "1" ]; then
+    info "[주의] models/classifier-trained 부재 - ALLOW_RULE_FALLBACK=1 로 룰 폴백 기동(무음 미탐 위험)."
+  else
+    die "models/classifier-trained 부재 - 룰 폴백으로 뜨면 등급을 룰이 만들고 무음 미탐이 난다. §3 대로 배치하거나 ALLOW_RULE_FALLBACK=1 로 의도를 명시할 것."
+  fi
+fi
+[ -f "$mdir/classifier-trained/temperature.json" ] || info "[주의] temperature.json 부재 → T=1.0 무보정 서빙(과신). CLASSIFIER_TEMPERATURE 대체 또는 재보정 권장."
+[ -d "$mdir/hf" ] || info "[주의] models/hf 부재 → HF_HUB_OFFLINE=1 로 기동 실패 가능(§3)."
+
+# ── 4. 인프라 기동 (postgres·redis) ────────────────────────
+# [2026-09-05] DB 헬시 대기를 엔진 인식으로. 종전에는 `up -d postgres` 후
+# pg_isready 만 기다려, 앱이 다른 DB 를 보게 되면 **엉뚱한 DB 를 확인하고 성공을
+# 보고**했다. db_probe.sh 가 DATABASE_URL 에서 서비스명·프로브를 정한다.
+. "$SELF/db_probe.sh"
+DB_SVC="$(db_service "$(_env_val DATABASE_URL || echo '')")"
+DB_USER="$(_env_val POSTGRES_USER || echo koipa)"
+DB_PW="$(_env_val POSTGRES_PASSWORD || echo '')"
+log "4/7  인프라 기동 + ${DB_SVC} 헬시 대기"
+dc_air up -d "$DB_SVC" redis
+if msg=$(db_wait 60 "$DB_SVC" "$DB_USER" "$DB_USER" dc_air "$DB_PW"); then
+  info "$msg"
+else
+  die "${DB_SVC} 헬시 실패(60s). 'dc_air ps'/'logs ${DB_SVC}' 확인"
+fi
+
+# ── 5. DB 마이그레이션 (19테이블 + 파티션 백필) ────────────
+log "5/7  alembic 마이그레이션 (run --rm api)"
+dc_air run --rm api alembic upgrade head
+
+# ── 6. 애플리케이션 기동 (api·worker 전큐·beat 단일) ───────
+log "6/7  애플리케이션 기동 (api·worker·beat)"
+dc_air up -d api worker beat
+if [ "$WITH_MTLS" = "1" ]; then
+  info "mTLS 프로파일 기동 (인증서 ./mtls 사전배치 전제)"
+  dc_air --profile mtls up -d nginx-mtls
+fi
+if [ "$WITH_OBS" = "1" ]; then
+  obs="$COMPOSE_DIR/../observability/docker-compose.observability.airgap.yml"
+  [ -f "$obs" ] && { info "관측성 스택 기동"; $CRT_COMPOSE --env-file "$ENV_FILE" -f "$obs" up -d; } \
+                 || info "[skip] 관측성 overlay 없음(빌드 시 --skip-observability?)"
+fi
+
+# ── 7. 준비도 + 스모크 ─────────────────────────────────────
+log "7/7  /healthz/ready 대기 (최대 ${READY_TIMEOUT}s)"
+READY_URL="http://${API_HOST}:${API_PORT}/api/v1/healthz/ready"
+ok=0
+for i in $(seq 1 "$READY_TIMEOUT"); do
+  curl -fsS "$READY_URL" >/dev/null 2>&1 && { ok=1; info "ready 200 (${i}s)"; break; }
+  sleep 1
+done
+[ "$ok" = 1 ] || die "ready 미도달(${READY_TIMEOUT}s). 'dc_air logs api' 확인(모델 미배치·HF offline·자격증명)"
+
+if [ "$SKIP_SMOKE" != "1" ] && [ -f "$ROOT/acceptance/run_acceptance.sh" ]; then
+  log "인수 스모크 — 전 포맷 파싱 + severity floor(고등급 미탐=veto)"
+  API_KEY="$(_env_val API_KEY || true)" BASE_URL="http://${API_HOST}:${API_PORT}" \
+    bash "$ROOT/acceptance/run_acceptance.sh" \
+    || die "인수 스모크 FAIL — 파싱실패/고등급 미탐(UNDER!). /healthz/deep 로 원인 확인."
+else
+  log "인수 스모크 (skip 또는 러너 부재)"
+fi
+
+log "완료 ✓  폐쇄망 배포 성공 (onprem-local)"
+cat <<EOF
+${c_dim}
+  상태:   $CRT_COMPOSE --env-file $ENV_FILE -f $COMPOSE ps
+  로그:   $CRT_COMPOSE --env-file $ENV_FILE -f $COMPOSE logs -f api
+  beat 는 단일 인스턴스만(drift·auto-rollback·outbox·파티션 발행기). 누락 시 자동화 정지.
+  worker 는 -Q classify,index,synthesis,learning,celery 전큐 구독(compose 반영).
+${c_off}
+EOF

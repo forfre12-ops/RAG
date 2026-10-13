@@ -14,11 +14,11 @@ import pytest
 pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
 
-from lloydk.adapters.storage import LocalStorage
-from lloydk.api.app import app
-from lloydk.api.documents import _get_ingestion_service
-from lloydk.config import settings
-from lloydk.services.document_ingestion_service import DocumentIngestionService
+from koipa.adapters.storage import LocalStorage
+from koipa.api.app import app
+from koipa.api.documents import _get_ingestion_service
+from koipa.config import settings
+from koipa.services.document_ingestion_service import DocumentIngestionService
 
 
 @pytest.fixture
@@ -68,6 +68,8 @@ class TestDocumentUploadBasic:
         # DB 가용 환경 → persisted=True
         assert isinstance(j["persisted"], bool)
         assert isinstance(j["warnings"], list)
+        # 2026-09-26 에 뺀 항목 — 추출이 잘렸는지(extraction_complete)·처리 쪽수(pages_processed)는 응답에 없다
+        assert "extraction_complete" not in j and "pages_processed" not in j
 
     def test_docx_upload_201(self, client):
         docx = pytest.importorskip("docx")
@@ -96,13 +98,19 @@ class TestDocumentUploadBasic:
 
 
 # ---------------------------------------------------------------------------
-# doc_type / external_ref 메타 전달
+# 등록 때 받는 메타(ICD §3.1~3.3)
 # ---------------------------------------------------------------------------
 class TestDocumentUploadMeta:
-    def test_doc_type_forwarded(self, client):
+    def test_icd_metadata_forwarded(self, client):
         body = b"test metadata forwarding"
-        r = _post(client, "m.txt", body, doc_type="기술보고서", external_ref="EDMS-001")
+        r = _post(client, "m.txt", body, source_type="internal", security_marking="confidential", access_scope="department")
         assert r.status_code == 201, r.text
+
+    def test_removed_form_fields_are_ignored(self, client):
+        """doc_type·external_ref 는 2026-09-26 에 없앴다(저장만 하고 아무도 안 읽었다). 옛 안내서대로 보내도 무시되고 201 이다."""
+        r = _post(client, "m.txt", b"legacy form fields", doc_type="기술보고서", external_ref="EDMS-001")
+        assert r.status_code == 201, r.text
+        assert "doc_type" not in r.json() and "external_ref" not in r.json()
 
     def test_same_content_same_hash(self, client):
         body = b"same content document"
@@ -156,23 +164,30 @@ class TestDocumentUploadValidation:
 
 
 # ---------------------------------------------------------------------------
-# 이미지 OCR 경로
+# 이미지 — OCR 을 하지 않으므로 본문 없이 등록된다
 # ---------------------------------------------------------------------------
-class TestDocumentUploadOcr:
-    def test_image_ocr_upload(self, client):
-        PIL = pytest.importorskip("PIL.Image")
-        ImageDraw = pytest.importorskip("PIL.ImageDraw")
-        pytest.importorskip("pytesseract")
+def _tiny_png() -> bytes:
+    """1x1 흰색 PNG. 이미지 내용은 읽지 않으므로(OCR 안 함) Pillow 없이 만든다."""
+    import struct
+    import zlib
 
-        img = PIL.new("RGB", (600, 80), color="white")
-        ImageDraw.Draw(img).text((10, 20), "Trade Secret ALD process recipe", fill="black")
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        body = buf.getvalue()
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
 
-        r = _post(client, "scan.png", body)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"\x00\xff\xff\xff"))
+        + chunk(b"IEND", b"")
+    )
+
+
+class TestDocumentUploadImage:
+    def test_image_upload_is_registered_without_text(self, client):
+        r = _post(client, "scan.png", _tiny_png())
         assert r.status_code == 201, r.text
         j = r.json()
         assert j["source_format"] == "png"
-        assert j["ocr_used"] is True
-        assert j["char_count"] > 0
+        assert j["char_count"] == 0
+        assert "ocr_used" not in j
+        assert any("unsupported" in w for w in j["warnings"])

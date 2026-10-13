@@ -5,10 +5,10 @@ submit → run_build(in-proc) → run-스코프 후보 파일 출력 + JobStore 
 import json
 import uuid
 
-from lloydk.golden_builder import LabelPair
-from lloydk.schemas.common import Actor
-from lloydk.schemas.golden import GoldenBuildRequest
-from lloydk.services.golden_build_service import GoldenBuildService
+from koipa.golden_builder import LabelPair
+from koipa.schemas.common import Actor
+from koipa.schemas.golden import GoldenBuildRequest
+from koipa.services.golden_build_service import GoldenBuildService
 
 _ACTOR = Actor(user_id="t1", role="admin")
 
@@ -75,7 +75,7 @@ def test_corpus_source_jsonl(tmp_path):
     assert st.gold_count == 1  # "제목\n\ngold 본문" → gold
 
 
-def test_render_review_returns_html_for_completed_job(tmp_path):
+def test_render_signoff_returns_html_for_completed_job(tmp_path):
     req = GoldenBuildRequest(
         source_type="inline",
         docs=[
@@ -87,16 +87,16 @@ def test_render_review_returns_html_for_completed_job(tmp_path):
     )
     svc = GoldenBuildService()
     resp = svc.submit(req, label_fn=_fake_label_fn)
-    html = svc.render_review(resp.golden_job_id)
+    html = svc.render_signoff(resp.golden_job_id)
     assert html is not None
     assert html.startswith("<!doctype html>")
-    assert "d1" in html and "d2" in html        # gold + uncertain 둘 다 포함
-    assert f"job {resp.golden_job_id}" in html   # subtitle
+    assert "d1" in html and "d2" in html        # gold + 합의 미달 둘 다 포함
+    assert f"job {resp.golden_job_id}" in html
 
 
-def test_render_review_unknown_job_is_none():
+def test_render_signoff_unknown_job_is_none():
     svc = GoldenBuildService()
-    assert svc.render_review(uuid.uuid4()) is None
+    assert svc.render_signoff(uuid.uuid4()) is None
 
 
 def test_holdout_leakage_excluded(tmp_path):

@@ -38,6 +38,15 @@
 
 from __future__ import annotations
 
+# 콘솔 출구를 UTF-8 로 고정한다 — cp949 콘솔에서 em dash 하나에 죽던 것을 막는다.
+# 정본은 scripts/_cli_io.py 한 곳이다(같은 코드가 133벌 복사돼 있었다).
+try:  # 스크립트로 직접 실행 - scripts/ 가 sys.path 에 들어온다
+    from _cli_io import force_utf8_stdio  # noqa: E402
+except ImportError:  # 패키지로 import - 릴리스 번들의 import 폐쇄 검사가 이 경로다
+    from scripts._cli_io import force_utf8_stdio  # noqa: E402
+
+force_utf8_stdio()
+
 import argparse
 import json
 import sys
@@ -47,6 +56,8 @@ _HERE = Path(__file__).resolve().parent
 _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
+
+from koipa.dataset_usage import assert_dataset_usage, assert_path_usage
 
 LABELS = ["TS", "S1", "S2", "S3"]
 GRADE_ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
@@ -68,12 +79,14 @@ _EVAL_TYPE_DEFAULT_FILTER: dict[str, list[str] | None] = {
 
 def load_jsonl(path: Path, label_source_filter: list[str] | None = None) -> list[dict]:
     """JSONL 로드. label_source_filter 지정 시 해당 레코드만 반환."""
+    assert_path_usage(path, "model_evaluation")
     rows = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         r = json.loads(line)
+        assert_dataset_usage([r], purpose="model_evaluation")
         if label_source_filter is not None:
             if r.get("label_source") not in label_source_filter:
                 continue
@@ -90,7 +103,8 @@ def build_test_from_synth(synth_dir: Path) -> list[dict]:
 
 
 def evaluate_dryrun(rows: list[dict]) -> dict:
-    from lloydk.modules.m3_labeling import LabelingPipeline
+    assert_dataset_usage(rows, purpose="model_evaluation")
+    from koipa.modules.m3_labeling import LabelingPipeline
 
     pipe = LabelingPipeline()
     y_true: list[str] = []
@@ -174,7 +188,7 @@ def write_report(metrics: dict, mode: str, out: Path) -> str:
             f"# P1 — 분류 모델 평가 리포트 ({mode})",
             "",
             f"- **eval_type**: `{eval_type}`{filter_note} — {eval_note}",
-            f"- **판정**: N/A — 해당 label_source 데이터가 없습니다.",
+            "- **판정**: N/A — 해당 label_source 데이터가 없습니다.",
             "",
             "human_review 데이터를 gold_real/classification_gold.jsonl에 추가한 후 재실행하세요.",
         ]
@@ -250,9 +264,73 @@ def main() -> int:
     ap.add_argument("--epochs", type=int, default=5)
     ap.add_argument("--seed", type=int, default=None,
                     help="학습 시드(모델 init·데이터 셔플). 미지정 시 TrainSpec 기본 42.")
+    ap.add_argument("--deterministic", action="store_true",
+                    help="결정적 학습(TrainingArguments full_determinism) — 시드만으로는 GPU 결과가 갈린다. "
+                         "켜면 같은 시드 두 판의 가중치가 바이트까지 같았다. 대신 느리다: 이 PC(RTX 5070 Ti)에서 "
+                         "단계당 1.1초 대 0.19초 — 약 6배(2026-09-11 실측)")
     ap.add_argument("--train-path", default=None)
+    ap.add_argument(
+        "--train-input-mode",
+        choices=["auto", "documents", "pre_chunked"],
+        default=None,
+        help=(
+            "학습 입력 계약. train_chunks.jsonl은 pre_chunked로 명시(기본 auto도 "
+            "chunk 표식을 fail-closed 검사)"
+        ),
+    )
+    ap.add_argument(
+        "--chunk-expand",
+        action="store_true",
+        help="문서단위 train만 레거시 chunk 확장; pre_chunked 입력과 동시 사용 불가",
+    )
+    ap.add_argument(
+        "--chunk-char-size",
+        type=int,
+        default=None,
+        help=(
+            "확장 조각의 글자 수(0/미지정=max_seq_len*3=1536). "
+            "[2026-09-13 실측] 정본 학습셋에서 한국어는 512토큰 = 약 1,107자라, "
+            "기본 1536자 조각은 창을 넘어 **펼쳐도 42.5%%가 여전히 잘린다**. "
+            "800 이면 초과 조각이 2/4,655(0.0%%)로 사실상 0 이다. "
+            "--chunk-expand 와 함께 쓸 때만 의미가 있다."
+        ),
+    )
+    ap.add_argument(
+        "--mil-windowed-training",
+        action="store_true",
+        help=(
+            "[2026-09-30] chunk_expand(라벨 복제→꼬리조각 누수)의 대안. 문서를 서빙과 같은 "
+            "오버플로 윈도로 나누되 라벨은 문서당 1개 유지 — 윈도별 로짓을 severe-max로 모아 "
+            "문서당 loss 1회만 계산한다. --chunk-expand 와 동시 사용 불가."
+        ),
+    )
+    ap.add_argument(
+        "--mil-max-windows",
+        type=int,
+        default=None,
+        help="MIL 모드에서 문서당 최대 윈도 수(기본 3). --mil-windowed-training 과 함께 쓴다.",
+    )
     ap.add_argument("--val-path", default=None)
     ap.add_argument("--test-path", default=None)
+    ap.add_argument(
+        "--proxy-candidate-mode",
+        action="store_true",
+        help=(
+            "프록시 production 후보 모드: attested train_chunks로 epoch checkpoints만 "
+            "생성하며 test/val-temperature/deployable v-* 산출을 금지"
+        ),
+    )
+    ap.add_argument(
+        "--proxy-training-run-dir",
+        help=(
+            "materialize_proxy_training_set.py의 committed run dir. proxy candidate "
+            "mode에서 train/validation 경로와 SHA를 여기서만 결합"
+        ),
+    )
+    ap.add_argument(
+        "--base-model-revision",
+        help="프록시 후보 모드의 immutable Hugging Face commit(40-hex); 로컬 모델은 생략 가능",
+    )
     ap.add_argument("--batch-size", type=int, default=None)
     ap.add_argument("--base-model", default=None)
     ap.add_argument("--output-dir", default=None)
@@ -263,6 +341,9 @@ def main() -> int:
     ap.add_argument("--no-mlflow", action="store_true",
                     help="MLflow 로깅 비활성화 (서버 없는 환경 또는 속도 우선)")
     ap.add_argument("--no-bf16", action="store_true", help="bf16 비활성화")
+    ap.add_argument("--no-class-weight", action="store_true",
+                    help="빈도 역수 클래스 가중을 끈다(모든 등급 손실 가중 1.0). 기본은 켜짐 — 다수 등급(S3)의 오류 비용이 "
+                         "고등급보다 작아지는 편향이 있다(2026-09-20 실측: S3 재현율 85 퍼센트). 기본 동작은 그대로다.")
     ap.add_argument("--max-seq-len", type=int, default=None,
                     help="최대 시퀀스 길이 (기본 512. 256으로 줄이면 4× 빨라짐)")
     args = ap.parse_args()
@@ -283,12 +364,45 @@ def main() -> int:
         gold_path = _EVAL_TYPE_PATHS[eval_type]
 
     if args.mode == "full":
-        from lloydk.modules.m4_training.trainer import TrainSpec, train_classifier
+        from koipa.modules.m4_training.trainer import TrainSpec, train_classifier
 
         spec_kwargs: dict = {"epochs": args.epochs}
+        if args.proxy_candidate_mode:
+            if not args.proxy_training_run_dir:
+                ap.error("--proxy-candidate-mode requires --proxy-training-run-dir")
+            if (
+                args.train_path
+                or args.val_path
+                or args.test_path
+                or args.train_input_mode
+                or args.chunk_expand
+            ):
+                ap.error(
+                    "proxy candidate mode derives train/validation paths from the attested "
+                    "run and forbids manual train/validation/test/input-mode/chunk paths"
+                )
+            if not args.output_dir:
+                ap.error("proxy candidate mode requires a new --output-dir checkpoint root")
+            proxy_run = Path(args.proxy_training_run_dir)
+            spec_kwargs.update(
+                {
+                    "proxy_candidate_mode": True,
+                    "proxy_training_run_dir": str(proxy_run),
+                    "train_path": str(proxy_run / "train_chunks.jsonl"),
+                    "val_path": str(proxy_run / "validation_documents.jsonl"),
+                    "test_path": None,
+                    "train_input_mode": "pre_chunked",
+                    "chunk_expand": False,
+                    "training_entrypoint_path": str(Path(__file__).resolve()),
+                }
+            )
+        elif args.proxy_training_run_dir:
+            ap.error("--proxy-training-run-dir requires --proxy-candidate-mode")
         for k, v in [("train_path", args.train_path), ("val_path", args.val_path),
                      ("test_path", args.test_path), ("batch_size", args.batch_size),
                      ("base_model", args.base_model), ("output_dir", args.output_dir),
+                     ("train_input_mode", args.train_input_mode),
+                     ("base_model_revision", args.base_model_revision),
                      ("fnr_cost_multiplier", args.fnr_cost_multiplier),
                      ("early_stop_metric", args.early_stop_metric),
                      ("seed", args.seed)]:
@@ -298,8 +412,22 @@ def main() -> int:
             spec_kwargs["use_mlflow"] = False
         if getattr(args, "no_bf16", False):
             spec_kwargs["bf16"] = False
+        if getattr(args, "no_class_weight", False):
+            spec_kwargs["class_weighted"] = False
+        if getattr(args, "deterministic", False):
+            spec_kwargs["deterministic"] = True
         if getattr(args, "max_seq_len", None):
             spec_kwargs["max_seq_len"] = args.max_seq_len
+        if args.chunk_expand:
+            spec_kwargs["chunk_expand"] = True
+        if getattr(args, "chunk_char_size", None):
+            spec_kwargs["chunk_char_size"] = args.chunk_char_size
+        if getattr(args, "mil_windowed_training", False):
+            if args.chunk_expand:
+                ap.error("--mil-windowed-training and --chunk-expand are mutually exclusive")
+            spec_kwargs["mil_windowed_training"] = True
+        if getattr(args, "mil_max_windows", None):
+            spec_kwargs["mil_max_windows"] = args.mil_max_windows
         spec = TrainSpec(**spec_kwargs)
         print(f"[p1] full mode spec: {spec_kwargs}", file=sys.stderr)
         report = train_classifier(spec)

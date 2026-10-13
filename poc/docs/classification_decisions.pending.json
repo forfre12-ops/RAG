@@ -1,0 +1,54 @@
+{
+  "schema_version": "classification-decisions-v1",
+  "status": "pending_owner_decisions",
+  "execution_authorized": false,
+  "note": "Decision collection only. Internal experiment authorization is not customer policy approval. No signatures or final answers are generated here.",
+  "decisions": [
+    {
+      "id": "D01", "topic": "분류 대상과 주 출력의 의미", "status": "pending", "value": null,
+      "owner_role": "발주처 업무 책임자 및 제품 책임자", "owner_id": null, "evidence_ref": null,
+      "required_contents": ["현재 관리등급 재현 또는 필요한 보호 수준 추천", "주 출력과 보조 출력의 구분", "TS/S1/S2/S3 각각의 의미와 적용 문서 범위"]
+    },
+    {
+      "id": "D02", "topic": "적용 정책과 판본", "status": "pending", "value": null,
+      "owner_role": "발주처 및 고객사 정책 책임자", "owner_id": null, "evidence_ref": null,
+      "required_contents": ["원 가이드 또는 승인된 고객사 정책", "정책 ID와 버전 및 시행일", "조직별 적용 범위와 예외 우선순위"]
+    },
+    {
+      "id": "D03", "topic": "S/V/M 판단요소 및 증거", "status": "pending", "value": null,
+      "owner_role": "정책 책임자 및 문서관리 담당자", "owner_id": null, "evidence_ref": null,
+      "required_contents": ["필수 요소와 적용 예외", "본문/맥락/관리시스템 증거의 구분", "사용자의 숫자 입력과 시스템 요소 판정의 구분", "unknown을 0이나 부재로 대체하지 않는 처리"]
+    },
+    {
+      "id": "D04", "topic": "guide/v22/fnr 정책 차이", "status": "pending", "value": null,
+      "owner_role": "정책 승인 권한자", "owner_id": null, "evidence_ref": null,
+      "required_contents": ["적용 산정식 모드", "네 상이 조합의 정답과 이유", "예외 적용 조건", "기본 모드 변경의 별도 승인"],
+      "implementation_comparison_not_answers": [
+        {"s": 1, "v": 2, "m": 2, "guide": "S1", "v22": "S2", "fnr": "S1"},
+        {"s": 2, "v": 1, "m": 2, "guide": "S1", "v22": "S2", "fnr": "S1"},
+        {"s": 2, "v": 2, "m": 0, "guide": "S3", "v22": "S1", "fnr": "S1"},
+        {"s": 2, "v": 2, "m": 1, "guide": "S1", "v22": "TS", "fnr": "S1"}
+      ]
+    },
+    {
+      "id": "D05", "topic": "부족 정보와 충돌 처리", "status": "pending", "value": null,
+      "owner_role": "정책 책임자 및 검수 운영 책임자", "owner_id": null, "evidence_ref": null,
+      "required_contents": ["등급과 검토 상태의 분리", "필수 증거 부재 시 응답", "동일 우선순위 정책 충돌", "검토 담당자와 추가 확인 요청"]
+    },
+    {
+      "id": "D06", "topic": "PMR-002 정답 모집단과 골든셋", "status": "pending", "value": null,
+      "owner_role": "발주처 검수 책임자 및 골든셋 소유자", "owner_id": null, "evidence_ref": null,
+      "required_contents": ["1,000건 이상 골든셋 소유자와 사용 권한", "문서/청크 단위와 표집 모집단", "등급별 분포와 문서 계열", "독립 검수 및 불일치 조정", "블라인드 시험의 접근권한과 학습 제외 명세"]
+    },
+    {
+      "id": "D07", "topic": "재현율과 안전 지표의 분모", "status": "pending", "value": null,
+      "owner_role": "발주처 검수 책임자", "owner_id": null, "evidence_ref": null,
+      "required_contents": ["재현율 90% 목표의 macro/micro/등급별 여부", "HOLD와 무응답의 분모 처리", "TS/S1→S3 및 S2→S3", "S1↔S2와 S3 과분류", "검수율과 사람 최종확정의 별도 집계", "허용 오류와 신뢰구간"]
+    },
+    {
+      "id": "D08", "topic": "학습 비교와 운영 변경 승인 범위", "status": "pending", "value": null,
+      "owner_role": "실험 책임자 및 운영 변경 승인자", "owner_id": null, "evidence_ref": null,
+      "required_contents": ["목적/정책/답안 고정 후 동일 문서 라벨 A/B", "본문 변경 또는 자료 추가는 별도 실험", "모델과 설정 및 코드 지문", "운영 자동 교체 금지", "원격 보관 및 복구 검증 책임"]
+    }
+  ]
+}

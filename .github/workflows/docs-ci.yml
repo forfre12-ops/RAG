@@ -1,0 +1,30 @@
+name: docs-ci
+
+on:
+  pull_request:
+    paths:
+      - 'doc/**'
+      - 'scripts/audit_docs.py'
+      - '.github/workflows/docs-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'doc/**'
+      - 'scripts/audit_docs.py'
+      - '.github/workflows/docs-ci.yml'
+
+jobs:
+  audit-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install audit dependency
+        run: pip install "pyyaml>=6.0"
+
+      - name: Document registry and folder hygiene audit
+        run: python scripts/audit_docs.py

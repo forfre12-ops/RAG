@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>테스트서버 배포 인벤토리 (223) — 폴더·파일·용량 실측 | Koipa</title>
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
+  --bg-nav:rgba(255,255,255,.88);
+  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a; --text-faint:#a1a1aa;
+  --border:rgba(0,0,0,.08); --border-mid:rgba(0,0,0,.12); --border-strong:rgba(0,0,0,.18);
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sidebar:220px; --article-max:920px; --container:968px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:4px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:0;white-space:nowrap;}
+.article-layout{position:relative;max-width:var(--container);margin:0 auto;padding:36px 24px 120px;}
+article{min-width:0;}
+.toc-aside{position:absolute;left:100%;top:36px;width:var(--sidebar);margin-left:36px;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;border-radius:0;transition:all .12s;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:0;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-.04em;line-height:1.08;margin:0 0 20px;color:var(--text);}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 36px;max-width:680px;}
+h2{font-size:clamp(19px,2.6vw,24px);font-weight:700;letter-spacing:-.03em;margin:46px 0 12px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:46px 0 22px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{border-radius:0;padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.table-wrap{overflow-x:auto;margin:18px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:0;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.done{background:var(--text);color:var(--bg);}
+.tag.wip{background:#3f3f46;color:#fff;}
+.tag.plan{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.dep{background:#fefce8;color:#92400e;border:1px solid #fbbf24;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:1480px){.toc-aside{display:none;}}
+@media(max-width:860px){.article-layout{padding:24px 16px 80px;}}
+
+/* ── 인벤토리 문서 보강 (기존 토큰만 사용, 전부 직선형) ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(172px,1fr));gap:12px;margin:22px 0 6px;}
+.stat{border:1px solid var(--border-mid);border-left:3px solid var(--text);background:var(--bg-surface);padding:13px 15px;border-radius:0;}
+.stat-n{display:block;font-family:var(--font-mono);font-size:25px;font-weight:700;letter-spacing:-.035em;line-height:1.15;color:var(--text);font-variant-numeric:tabular-nums;}
+.stat-n span{font-size:13px;font-weight:600;color:var(--text-dim);margin-left:2px;letter-spacing:0;}
+.stat-k{display:block;margin-top:4px;font-size:11.5px;line-height:1.5;color:var(--text-dim);}
+.stat-k code{font-size:11px;}
+td.num,th.num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;}
+td.path{font-family:var(--font-mono);font-size:11.5px;color:var(--text);white-space:nowrap;}
+th.barcell,td.barcell{width:88px;}
+td.barcell{padding-right:14px;vertical-align:middle;}
+.bar{display:block;height:8px;background:var(--bg-strong);border-radius:0;}
+.bar i{display:block;height:100%;background:var(--text);min-width:2px;border-radius:0;}
+tr.sum td{background:var(--bg-surface);border-top:1px solid var(--border-mid);color:var(--text);}
+.footnote code{font-size:11px;}
+@media(max-width:860px){.stats{grid-template-columns:repeat(auto-fit,minmax(142px,1fr));}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">테스트서버 배포 인벤토리 (223)</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">INVENTORY</span></div>
+  </div>
+</nav>
+
+<div class="article-layout">
+<article>
+
+  <div class="meta-row">
+    <span class="badge">DOC-INV-223</span>
+    <span class="badge outline">내부 운영</span>
+    <span class="meta-dot">·</span>
+    <span class="meta-soft">2026-08-25 실측</span>
+  </div>
+
+  <h1 class="title">테스트서버 배포 인벤토리 (223)</h1>
+  <p class="lede">KL 제공 테스트서버 <code>223.130.156.134</code> 에 <strong>실제로 올라가 있는 폴더와 파일</strong>을 SSH 로 접속해 직접 측정한 표. 폴더별 파일 수·용량·용도와, 컨테이너가 어느 경로를 마운트해 실제로 읽고 있는지를 함께 적었다. 모든 수치는 2026-08-25 측정값이며 근거 명령은 문서 끝 「측정 방법」에 남겼다.</p>
+
+  <div class="callout inset">
+    <div class="callout-label">읽는 법</div>
+    <p><span class="tag done">마운트</span> 컨테이너가 실제로 읽는 경로 · <span class="tag plan">보관</span> 서버에 놓여 있을 뿐 실행에 관여 안 함 · <span class="tag dep">정리 후보</span> 실행에 안 쓰이면서 용량을 차지</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span class="stat-n">8.2<span>GB</span></span><span class="stat-k">배포 루트 <code>~/poc</code> · 파일 11,130개</span></div>
+    <div class="stat"><span class="stat-n">201,996<span>줄</span></span><span class="stat-k">파이썬 전체 (소스·테스트·스크립트)</span></div>
+    <div class="stat"><span class="stat-n">8<span>개</span></span><span class="stat-k">기동 중인 컨테이너 · 전부 정상</span></div>
+    <div class="stat"><span class="stat-n">52<span>GB</span></span><span class="stat-k">홈 전체 (배포 8.2 + 실험 런타임 43)</span></div>
+  </div>
+
+  <hr/>
+
+  <!-- ══════════ 01 ══════════ -->
+  <div class="section-sep" id="s1">
+    <span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">서버와 기동 상태</span>
+  </div>
+  <h2>서버 제원</h2>
+  <p>서버 자체의 사양이다. OS 는 문서 인용이 아니라 <code>/etc/os-release</code> 를 직접 읽은 값이다.</p>
+  <div class="table-wrap">
+    <table style="min-width:520px">
+      <thead><tr><th>항목</th><th>측정값</th><th>확인 명령</th></tr></thead>
+      <tbody>
+        <tr><td><strong>호스트명</strong></td><td>klic-kopia-test-server</td><td><code>hostname</code></td></tr>
+        <tr><td><strong>접속 주소</strong></td><td>223.130.156.134:22</td><td>—</td></tr>
+        <tr><td><strong>운영체제</strong></td><td>Ubuntu 22.04.3 LTS (Jammy)</td><td><code>/etc/os-release</code></td></tr>
+        <tr><td><strong>커널</strong></td><td>5.15.0-181-generic</td><td><code>uname -a</code></td></tr>
+        <tr><td><strong>CPU</strong></td><td>8 vCPU</td><td><code>nproc</code></td></tr>
+        <tr><td><strong>메모리</strong></td><td>47 GB</td><td><code>free -g</code></td></tr>
+        <tr><td><strong>GPU</strong></td><td>NVIDIA L4 · 23,034 MiB</td><td><code>nvidia-smi</code></td></tr>
+        <tr><td><strong>디스크</strong></td><td>296 GB 중 123 GB 사용 (44%)</td><td><code>df -h /</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>기동 중인 컨테이너 8개</h2>
+  <p>전부 정상 기동 상태다. 외부로 열린 포트는 API 의 <code>8000</code> 하나뿐이고, 나머지 7개는 도커 내부 네트워크에서만 통신한다.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>컨테이너</th><th>이미지</th><th>역할</th><th>포트</th><th class="center">상태</th></tr></thead>
+      <tbody>
+        <tr><td class="path">koipa-jjw-api-1</td><td><code>koipa-jjw-api</code></td><td>FastAPI 애플리케이션 + 관리 콘솔(<code>/console</code>)</td><td class="path">0.0.0.0:8000</td><td class="center"><span class="tag done">healthy</span></td></tr>
+        <tr><td class="path">koipa-jjw-worker-1</td><td><code>koipa-jjw-worker</code></td><td>Celery 워커 — 문서 파싱·분류·학습 작업 실행</td><td class="path">내부 8000</td><td class="center"><span class="tag done">up</span></td></tr>
+        <tr><td class="path">koipa-jjw-beat-1</td><td><code>koipa-jjw-beat</code></td><td>Celery beat — 야간 배치 등 주기 작업 스케줄러</td><td class="path">내부 8000</td><td class="center"><span class="tag done">up</span></td></tr>
+        <tr><td class="path">koipa-jjw-postgres-1</td><td><code>pgvector/pgvector:pg16</code></td><td>업무 DB + 벡터 검색 · DB 실크기 <strong>447 MB</strong></td><td class="path">내부 5432</td><td class="center"><span class="tag done">healthy</span></td></tr>
+        <tr><td class="path">koipa-jjw-redis-1</td><td><code>redis:7.2-alpine</code></td><td>작업 큐 브로커 · 결과 백엔드</td><td class="path">내부 6379</td><td class="center"><span class="tag done">up 7일</span></td></tr>
+        <tr><td class="path">koipa-jjw-minio-1</td><td><code>minio/minio:latest</code></td><td>객체 스토리지 — 폐쇄망 배포본에서는 미사용 선택 요소</td><td class="path">내부 9000</td><td class="center"><span class="tag done">up 7일</span></td></tr>
+        <tr><td class="path">koipa-jjw-mlflow-1</td><td><code>koipa/mlflow:2.16.2</code></td><td>학습 실험 추적 서버</td><td class="path">내부</td><td class="center"><span class="tag done">up</span></td></tr>
+        <tr><td class="path">koipa-proxy-ollama</td><td><code>ollama/ollama</code></td><td>프록시 골든셋 런타임용 로컬 LLM 서버</td><td class="path">내부 11434</td><td class="center"><span class="tag done">healthy</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>컨테이너가 쓰는 도커 볼륨 5개 — 합계 8.70 GB</h2>
+  <div class="table-wrap">
+    <table style="min-width:620px">
+      <thead><tr><th>볼륨</th><th>담긴 것</th><th class="num">용량</th></tr></thead>
+      <tbody>
+        <tr><td class="path">koipa_hf_cache</td><td>HuggingFace 모델·토크나이저 캐시 (API·워커 공유)</td><td class="num">7.60 GB</td></tr>
+        <tr><td class="path">koipa-jjw_pgdata</td><td>PostgreSQL 데이터 디렉터리</td><td class="num">1.03 GB</td></tr>
+        <tr><td class="path">koipa-jjw_redisdata</td><td>Redis 영속 스냅샷</td><td class="num">49.0 MB</td></tr>
+        <tr><td class="path">koipa-jjw_storagedata</td><td>업로드 문서 저장소 (<code>/app/.storage</code>, 43개 파일)</td><td class="num">19.3 MB</td></tr>
+        <tr><td class="path">koipa-jjw_mlflow_data</td><td>MLflow 메타 저장소</td><td class="num">0.23 MB</td></tr>
+        <tr class="sum"><td><strong>합계</strong></td><td></td><td class="num"><strong>8.70 GB</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════ 02 ══════════ -->
+  <div class="section-sep" id="s2">
+    <span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">배포 루트 ~/poc</span>
+  </div>
+  <h2>폴더 17개 · 파일 11,130개 · 8.2 GB</h2>
+  <p>용량 큰 순서다. 막대는 최대값(<code>artifacts_out</code>) 기준 비율이며, 1% 미만은 최소 두께로 그렸다. 「컨테이너」 열은 <code>docker inspect</code> 의 Mounts 값을 그대로 옮긴 것으로, <strong>소스는 이미지에 구워져 들어가기 때문에 <code>src/</code> 는 마운트되지 않는다.</strong></p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>폴더</th><th>용도</th><th class="num">파일</th><th class="num">용량</th><th class="barcell"></th><th class="center">컨테이너</th></tr></thead>
+      <tbody>
+        <tr><td class="path">artifacts_out/</td><td>학습 산출물 출력 자리 — 체크포인트 2개와 미배포 후보 모델 3개</td><td class="num">43</td><td class="num">6.25 GB</td><td class="barcell"><span class="bar"><i style="width:100%"></i></span></td><td class="center"><span class="tag done">rw 마운트</span></td></tr>
+        <tr><td class="path">artifacts/</td><td>지금 서빙 중인 분류기 모델 1개 (<code>classifier_p1_v5_clean/v-fe4b386b</code>)</td><td class="num">8</td><td class="num">713 MB</td><td class="barcell"><span class="bar"><i style="width:11.1%"></i></span></td><td class="center"><span class="tag done">ro 마운트</span></td></tr>
+        <tr><td class="path">datasets/</td><td>학습·평가·골든 데이터셋 40개 묶음</td><td class="num">6,603</td><td class="num">476 MB</td><td class="barcell"><span class="bar"><i style="width:7.4%"></i></span></td><td class="center"><span class="tag done">rw 마운트</span></td></tr>
+        <tr><td class="path">poc/</td><td><strong>중복 트리</strong> — 배포 래퍼가 만든 한 겹 안쪽 사본. 실행에 안 쓰인다</td><td class="num">1,191</td><td class="num">416 MB</td><td class="barcell"><span class="bar"><i style="width:6.5%"></i></span></td><td class="center"><span class="tag dep">정리 후보</span></td></tr>
+        <tr><td class="path">doc/</td><td>감리·제출 문서 (릴리스본 691개, 결과물 133개)</td><td class="num">847</td><td class="num">227 MB</td><td class="barcell"><span class="bar"><i style="width:3.5%"></i></span></td><td class="center"><span class="tag plan">보관</span></td></tr>
+        <tr><td class="path">.git/</td><td>저장소 이력</td><td class="num">1,215</td><td class="num">116 MB</td><td class="barcell"><span class="bar"><i style="width:1.8%"></i></span></td><td class="center"><span class="tag plan">보관</span></td></tr>
+        <tr><td class="path">src/</td><td>애플리케이션 소스 — <code>koipa</code> 패키지 하나</td><td class="num">231</td><td class="num">5.8 MB</td><td class="barcell"><span class="bar"><i style="width:2px"></i></span></td><td class="center"><span class="tag plan">이미지에 포함</span></td></tr>
+        <tr><td class="path">scripts/</td><td>운영·측정·데이터 가공 스크립트 (파이썬 344개)</td><td class="num">367</td><td class="num">4.9 MB</td><td class="barcell"><span class="bar"><i style="width:2px"></i></span></td><td class="center"><span class="tag done">ro 마운트</span></td></tr>
+        <tr><td class="path">tests/</td><td>테스트 (파이썬 333개 + 콘솔 e2e 26개)</td><td class="num">365</td><td class="num">3.5 MB</td><td class="barcell"><span class="bar"><i style="width:2px"></i></span></td><td class="center"><span class="tag plan">이미지에 포함</span></td></tr>
+        <tr><td class="path">docs/</td><td>운영 런북·측정 기록 마크다운</td><td class="num">58</td><td class="num">1.7 MB</td><td class="barcell"><span class="bar"><i style="width:2px"></i></span></td><td class="center"><span class="tag plan">보관</span></td></tr>
+        <tr><td class="path">reports/</td><td>성능·운영 준비도 측정 결과 (JSON + MD)</td><td class="num">17</td><td class="num">304 KB</td><td class="barcell"><span class="bar"><i style="width:2px"></i></span></td><td class="center"><span class="tag done">ro 마운트</span></td></tr>
+        <tr><td class="path">licenses/</td><td>OSS 라이선스 원문 · SBOM · 서드파티 목록</td><td class="num">5</td><td class="num">192 KB</td><td class="barcell"><span class="bar"><i style="width:2px"></i></span></td><td class="center"><span class="tag plan">보관</span></td></tr>
+        <tr><td class="path">infra/</td><td>인프라 설정 — mlflow · mTLS · 관측 · postgres · systemd</td><td class="num">19</td><td class="num">140 KB</td><td class="barcell"><span class="bar"><i style="width:2px"></i></span></td><td class="center"><span class="tag plan">보관</span></td></tr>
+        <tr><td class="path">alembic/</td><td>DB 스키마 마이그레이션 (versions 포함)</td><td class="num">19</td><td class="num">132 KB</td><td class="barcell"><span class="bar"><i style="width:2px"></i></span></td><td class="center"><span class="tag plan">배포 후 수동 실행</span></td></tr>
+        <tr><td class="path">deploy/</td><td>프록시 골든 런타임 배포 스크립트</td><td class="num">4</td><td class="num">72 KB</td><td class="barcell"><span class="bar"><i style="width:2px"></i></span></td><td class="center"><span class="tag plan">보관</span></td></tr>
+        <tr><td class="path">.github/</td><td>CI 워크플로 2개</td><td class="num">2</td><td class="num">48 KB</td><td class="barcell"><span class="bar"><i style="width:2px"></i></span></td><td class="center"><span class="tag plan">보관</span></td></tr>
+        <tr><td class="path">secrets/</td><td>콘솔 인증 자료 (<code>console_jwt</code>)</td><td class="num">5</td><td class="num">32 KB</td><td class="barcell"><span class="bar"><i style="width:2px"></i></span></td><td class="center"><span class="tag plan">보관</span></td></tr>
+        <tr class="sum"><td><strong>17개 폴더 + 최상위 파일 131개</strong></td><td></td><td class="num"><strong>11,130</strong></td><td class="num"><strong>8.2 GB</strong></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">최상위 파일 131개의 구성</div>
+    <p>이 중 <strong>96개가 <code>.env.jjw.bak_*</code> 환경설정 백업</strong>이다. 나머지는 compose 파일 10개(<code>docker-compose.prod.yml</code>·<code>.dual.yml</code>·<code>.airgap.yml</code> 등), Dockerfile 3개, 그리고 <code>pyproject.toml</code>·<code>uv.lock</code>·<code>Makefile</code>·<code>alembic.ini</code>·<code>README.md</code> 등 빌드·문서 파일이다.</p>
+  </div>
+
+  <!-- ══════════ 03 ══════════ -->
+  <div class="section-sep" id="s3">
+    <span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">소스코드 용량</span>
+  </div>
+  <h2>코드 자체는 14.2 MB — 서버 용량의 0.2%</h2>
+  <p>서버가 8.2 GB 를 쓰는 이유는 코드가 아니라 <strong>모델 가중치와 데이터셋</strong>이다. 코드는 아래가 전부다.</p>
+
+  <div class="stats">
+    <div class="stat"><span class="stat-n">204<span>개</span></span><span class="stat-k">애플리케이션 파이썬 · 55,074줄 · 5.8 MB</span></div>
+    <div class="stat"><span class="stat-n">333<span>개</span></span><span class="stat-k">테스트 파이썬 · 59,042줄 · 3.5 MB</span></div>
+    <div class="stat"><span class="stat-n">344<span>개</span></span><span class="stat-k">운영 스크립트 · 87,880줄 · 4.9 MB</span></div>
+    <div class="stat"><span class="stat-n">13<span>개</span></span><span class="stat-k">콘솔 화면 파일 (HTML·JS·CSS)</span></div>
+  </div>
+
+  <h2>src/koipa — 서브패키지별</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>서브패키지</th><th>담당</th><th class="num">.py</th><th class="num">줄 수</th><th class="num">용량</th></tr></thead>
+      <tbody>
+        <tr><td class="path">modules/</td><td>분류·룰·판정 등 도메인 로직</td><td class="num">51</td><td class="num">13,891</td><td class="num">788 KB</td></tr>
+        <tr><td class="path">(koipa 루트)</td><td>설정, 골든셋·프록시 도구 등 단일 모듈 23개</td><td class="num">23</td><td class="num">11,651</td><td class="num">1.0 MB</td></tr>
+        <tr><td class="path">services/</td><td>서비스 계층 — 문서 처리·학습·검수 흐름</td><td class="num">31</td><td class="num">10,644</td><td class="num">560 KB</td></tr>
+        <tr><td class="path">api/</td><td>FastAPI 라우터 + 관리 콘솔 정적 파일</td><td class="num">25</td><td class="num">5,981</td><td class="num">3.2 MB</td></tr>
+        <tr><td class="path">adapters/</td><td>외부 연동 어댑터 (파서·임베더·LLM·스토리지)</td><td class="num">28</td><td class="num">3,879</td><td class="num">236 KB</td></tr>
+        <tr><td class="path">perf/</td><td>성능 측정 하니스</td><td class="num">8</td><td class="num">2,963</td><td class="num">140 KB</td></tr>
+        <tr><td class="path">repositories/</td><td>DB 접근 계층</td><td class="num">9</td><td class="num">1,573</td><td class="num">80 KB</td></tr>
+        <tr><td class="path">schemas/</td><td>요청·응답 스키마 정의</td><td class="num">14</td><td class="num">1,247</td><td class="num">84 KB</td></tr>
+        <tr><td class="path">rag/</td><td>검색·질의응답 (요건 외 부가 기능)</td><td class="num">6</td><td class="num">1,131</td><td class="num">60 KB</td></tr>
+        <tr><td class="path">workers/</td><td>Celery 작업 정의</td><td class="num">3</td><td class="num">1,085</td><td class="num">64 KB</td></tr>
+        <tr><td class="path">db/</td><td>세션·엔진·모델 베이스</td><td class="num">4</td><td class="num">844</td><td class="num">52 KB</td></tr>
+        <tr><td class="path">obs/</td><td>로깅·관측</td><td class="num">2</td><td class="num">185</td><td class="num">20 KB</td></tr>
+        <tr class="sum"><td><strong>합계</strong></td><td></td><td class="num"><strong>204</strong></td><td class="num"><strong>55,074</strong></td><td class="num"><strong>5.8 MB</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>api/ 가 3.2 MB 인 이유 — 관리 콘솔이 그 안에 있다</h2>
+  <p>콘솔 화면은 <code>src/koipa/api/static/</code> 에 들어 있고, 이미지에 구워져 <code>/console</code> 로 서빙된다.</p>
+  <div class="table-wrap">
+    <table style="min-width:560px">
+      <thead><tr><th>파일</th><th>화면</th><th class="num">용량</th></tr></thead>
+      <tbody>
+        <tr><td class="path">admin.html</td><td>관리·검수 화면 본체</td><td class="num">200 KB</td></tr>
+        <tr><td class="path">samples.js</td><td>시연 샘플 문서 데이터</td><td class="num">112 KB</td></tr>
+        <tr><td class="path">app.js</td><td>콘솔 동작 스크립트</td><td class="num">79 KB</td></tr>
+        <tr><td class="path">styles.css</td><td>콘솔 스타일</td><td class="num">49 KB</td></tr>
+        <tr><td class="path">index.html</td><td>진입 화면</td><td class="num">29 KB</td></tr>
+        <tr><td class="path">그 밖 8개</td><td>오류 문구·검수 사유·SSE·업로드 진행·하이라이트·배포 배지 등</td><td class="num">40 KB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════ 04 ══════════ -->
+  <div class="section-sep" id="s4">
+    <span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">모델과 데이터</span>
+  </div>
+  <h2>용량의 실체 — 배포 루트 8.2 GB 중 7.4 GB</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>경로</th><th>내용</th><th class="num">용량</th></tr></thead>
+      <tbody>
+        <tr><td class="path">artifacts/…/v-fe4b386b</td><td><strong>서빙 중인 분류기</strong> — 가중치·토크나이저·온도 보정값(<code>temperature.json</code>)·평가 리포트 8개 파일</td><td class="num">713 MB</td></tr>
+        <tr><td class="path">artifacts_out/classifier/checkpoint-256</td><td>학습 중간 체크포인트 — 옵티마이저 상태를 포함해 배포 모델의 약 3배</td><td class="num">2.1 GB</td></tr>
+        <tr><td class="path">artifacts_out/classifier/checkpoint-331</td><td>학습 중간 체크포인트</td><td class="num">2.1 GB</td></tr>
+        <tr><td class="path">artifacts_out/classifier/v-24c7c02c</td><td>재학습 후보 모델 (미배포)</td><td class="num">713 MB</td></tr>
+        <tr><td class="path">artifacts_out/classifier/v-60e28954</td><td>재학습 후보 모델 (미배포)</td><td class="num">713 MB</td></tr>
+        <tr><td class="path">artifacts_out/classifier/v-a6e21b73</td><td>재학습 후보 모델 (미배포)</td><td class="num">713 MB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>datasets/ — 폴더 40개 · 파일 6,603개 · 476 MB</h2>
+  <p>큰 것부터 열 개다.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>데이터셋</th><th>성격</th><th class="num">파일</th><th class="num">용량</th></tr></thead>
+      <tbody>
+        <tr><td class="path">v8</td><td>v8 계열 학습셋 본편</td><td class="num">6</td><td class="num">41 MB</td></tr>
+        <tr><td class="path">oss_corpus</td><td>공개 문서 원문 코퍼스</td><td class="num">3,754</td><td class="num">40 MB</td></tr>
+        <tr><td class="path">labeled_p1_retrain_v4_clean</td><td>v4 재학습용 라벨셋</td><td class="num">2</td><td class="num">37 MB</td></tr>
+        <tr><td class="path">v8_r13 · v8_r14</td><td>v8 반복 개정본</td><td class="num">각 5</td><td class="num">각 34 MB</td></tr>
+        <tr><td class="path">labeled_oss_v1</td><td>공개 문서 라벨셋</td><td class="num">3</td><td class="num">34 MB</td></tr>
+        <tr><td class="path">v8_r12</td><td>v8 반복 개정본</td><td class="num">5</td><td class="num">32 MB</td></tr>
+        <tr><td class="path">v8_r11</td><td>v8 반복 개정본</td><td class="num">5</td><td class="num">30 MB</td></tr>
+        <tr><td class="path">proxy_gold</td><td>프록시 골든셋 원문</td><td class="num">2,533</td><td class="num">28 MB</td></tr>
+        <tr><td class="path">gold_real</td><td>실문서 기반 골든셋</td><td class="num">45</td><td class="num">17 MB</td></tr>
+        <tr><td class="path">golden_review</td><td>콘솔 검수 대기 배치</td><td class="num">123</td><td class="num">2.0 MB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════ 05 ══════════ -->
+  <div class="section-sep" id="s5">
+    <span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">배포 루트 바깥</span>
+  </div>
+  <h2>홈 전체 52 GB 중 배포는 8.2 GB 뿐</h2>
+  <p>나머지 43 GB 는 프록시 골든셋 실험 런타임이 차지한다. 배포 산출물이 아니라 실험 자료다.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>경로</th><th>내용</th><th class="num">파일</th><th class="num">용량</th></tr></thead>
+      <tbody>
+        <tr><td class="path">~/proxy_gold_runtime</td><td>프록시 골든셋 실험 런타임 — <code>runs/</code> 23 GB, <code>ollama/</code> 19 GB(LLM 가중치), <code>base-model/</code> 1.4 GB</td><td class="num">404</td><td class="num">43 GB</td></tr>
+        <tr><td class="path">~/poc</td><td>배포 루트 — 위 02 절</td><td class="num">11,130</td><td class="num">8.2 GB</td></tr>
+        <tr><td class="path">~/snapshots</td><td>검수 전 백업 스냅샷 2벌</td><td class="num">12</td><td class="num">948 MB</td></tr>
+        <tr><td class="path">~/.docker</td><td>도커 CLI 설정·플러그인</td><td class="num">542</td><td class="num">2.2 MB</td></tr>
+        <tr><td class="path">~/demo_check</td><td>시연 확인용 문서 원본 (docx·hwpx)</td><td class="num">17</td><td class="num">976 KB</td></tr>
+        <tr><td class="path">~/psh</td><td>운영 점검 작업 폴더</td><td class="num">28</td><td class="num">684 KB</td></tr>
+        <tr><td class="path">~/docker-data</td><td>MinIO 데이터 디렉터리 (root 소유)</td><td class="num">15</td><td class="num">156 KB</td></tr>
+        <tr><td class="path">~/hwp3</td><td>HWP 3.0 파서 시험 자료</td><td class="num">3</td><td class="num">24 KB</td></tr>
+        <tr class="sum"><td><strong>홈 전체</strong></td><td></td><td class="num"></td><td class="num"><strong>52 GB</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>이 밖에 홈 최상위에 배포용 소스 묶음이 파일로 흩어져 있다 — <code>poc_src.tar</code> 12 MB, <code>koipa_src.tar</code> 12 MB, <code>poc_src_backup_*.tgz</code> 4벌(각 4.1 MB).</p>
+
+  <!-- ══════════ 06 ══════════ -->
+  <div class="section-sep" id="s6">
+    <span class="section-sep-num">06</span><span class="section-sep-line"></span><span class="section-sep-title">정리 후보</span>
+  </div>
+  <h2>실행에 안 쓰이면서 용량을 차지하는 것</h2>
+  <p>지우자는 제안이 아니라, 물었을 때 답이 있어야 할 항목이다. <strong>이번 측정에서 삭제한 것은 없다.</strong></p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>항목</th><th>내용</th><th class="num">회수 가능</th></tr></thead>
+      <tbody>
+        <tr><td class="path">도커 이미지 rollback 태그</td><td>이미지 29개 중 실제로 쓰이는 것은 8개. <code>koipa-jjw-{api,worker,beat}</code> 의 <code>rollback-*</code> 태그가 3세대씩 남아 있다(각 3.53 GB). 빌드 캐시는 별도로 6.70 GB</td><td class="num">11.1 GB</td></tr>
+        <tr><td class="path">artifacts_out/…/checkpoint-*</td><td>학습 체크포인트 2개. 옵티마이저 상태까지 들어 있어 배포 모델(713 MB)보다 크다. 재개할 학습이 없으면 남길 이유가 없다</td><td class="num">4.2 GB</td></tr>
+        <tr><td class="path">~/poc/poc</td><td>배포 래퍼가 만든 한 겹 안쪽 중복 트리. <code>datasets</code>·<code>src</code>·<code>tests</code>·<code>scripts</code> 를 통째로 다시 갖고 있고, 컨테이너는 이 경로를 마운트하지 않는다</td><td class="num">416 MB</td></tr>
+        <tr><td class="path">~/poc/doc/releases</td><td>감리 릴리스본 691개. 실행에 안 쓰인다. 다만 지운 적이 있는데 배포 래퍼의 <code>git checkout -- .</code> 이 되살렸다 — 지우려면 래퍼 쪽을 함께 손봐야 한다</td><td class="num">191 MB</td></tr>
+        <tr><td class="path">.env.jjw.bak_*</td><td>환경설정 백업 96벌. 용량은 2.3 KB씩이라 무시할 만하지만, 배포 루트 최상위 파일 131개 중 96개가 이것이라 목록을 읽기 어렵게 만든다</td><td class="num">96개</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout inset">
+    <div class="callout-label">주의 — 배포 버전을 git 으로 판단하면 안 된다</div>
+    <p><code>~/poc</code> 의 git HEAD 는 <code>1eda3d5</code>(8/17)인데, <code>src/koipa/config.py</code> 의 수정 시각은 <strong>8/24 23:12</strong> 이다. 재배포가 git 을 거치지 않고 소스 tar 를 직접 풀어 덮어쓰기 때문이다. 서버에서 <code>git log</code> 로 배포 버전을 읽으면 7일 전 상태를 보게 된다.</p>
+  </div>
+
+  <div class="footnote">
+    <strong>측정 방법</strong> — 2026-08-25, <code>ssh kopia@223.130.156.134</code> 로 접속해 직접 측정했다.<br>
+    폴더 용량 <code>du -sk</code> · 파일 수 <code>find -type f | wc -l</code> — 표기는 1 GB = 1,024 MB 기준으로 환산.<br>
+    컨테이너·이미지·볼륨 <code>docker ps -a</code> · <code>docker images</code> · <code>docker system df -v</code>.<br>
+    마운트 경로 <code>docker inspect --format '{{range .Mounts}}…'</code> — ro/rw 구분은 <code>RW</code> 값 그대로.<br>
+    줄 수 <code>find -name "*.py" -exec cat {} + | wc -l</code> (빈 줄·주석 포함).<br>
+    DB 크기 <code>pg_size_pretty(pg_database_size(current_database()))</code> = 447 MB.<br>
+    서버 제원 <code>/etc/os-release</code> · <code>nproc</code> · <code>free -g</code> · <code>nvidia-smi</code> · <code>df -h /</code>.
+  </div>
+
+</article>
+
+<aside class="toc-aside">
+  <nav class="toc">
+    <div class="toc-title">목차</div>
+    <a href="#s1">01 · 서버와 기동 상태</a>
+    <a href="#s2">02 · 배포 루트 ~/poc</a>
+    <a href="#s3">03 · 소스코드 용량</a>
+    <a href="#s4">04 · 모델과 데이터</a>
+    <a href="#s5">05 · 배포 루트 바깥</a>
+    <a href="#s6">06 · 정리 후보</a>
+  </nav>
+</aside>
+
+</div>
+
+<footer>
+  <strong>KOIPA AI 영업비밀관리시스템</strong> — 테스트서버 배포 인벤토리(223) · 2026-08-25 실측<br>
+  배포 폴더·파일 수·용량·용도 · 근거 명령 병기
+</footer>
+
+<script>
+(function(){
+  const links=document.querySelectorAll('.toc a[href^="#"]');
+  const headings=Array.from(links).map(l=>{const id=l.getAttribute('href').slice(1);return{link:l,el:document.getElementById(id)};}).filter(x=>x.el);
+  function update(){const y=window.scrollY+100;let cur=headings[0];for(const h of headings){if(h.el.getBoundingClientRect().top+window.scrollY<=y)cur=h;}links.forEach(l=>l.classList.remove('active'));if(cur)cur.link.classList.add('active');}
+  window.addEventListener('scroll',update,{passive:true});update();
+})();
+</script>
+
+</body>
+</html>

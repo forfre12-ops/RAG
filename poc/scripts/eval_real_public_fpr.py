@@ -41,10 +41,10 @@ except (AttributeError, ValueError):
     pass
 
 from eval_p1_model_gold import predict_direct  # noqa: E402
-from lloydk.config import settings as _settings  # noqa: E402
+from koipa.config import settings as _settings  # noqa: E402
 
 # 배포 모델 단일 진실원 = .env CLASSIFIER_MODEL_DIR. 버전 문자열 하드코딩이 드리프트 원인이라 제거.
-_DEPLOYED_MODEL = _settings.classifier_model_dir or "artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb"
+_DEPLOYED_MODEL = _settings.classifier_model_dir or "artifacts/classifier_p1_v5_clean/v-fe4b386b"
 
 LABELS = ("TS", "S1", "S2", "S3")
 PREC_SOURCES = {"판례", "판례(1000+)", "판례(2000+)", "판례(3000+)"}
@@ -89,6 +89,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-dir", default=_DEPLOYED_MODEL)
     ap.add_argument("--oss-dir", default="datasets/oss_corpus")
+    ap.add_argument("--extra-dir", action="append", default=[],
+                    help="추가 공개문서 코퍼스 디렉터리(예: datasets/public_eval_negatives). "
+                         "반복 지정 가능. 판례 단일 성격이던 측정 재료를 공시·행정문서로 넓힌다.")
+    ap.add_argument("--extra-sources", default="DART,공공데이터포털",
+                    help="--extra-dir 안에서 채택할 source 값(쉼표 구분)")
     ap.add_argument("--train", default="datasets/labeled_p1_retrain_v4_clean/train.jsonl")
     ap.add_argument("--report", default="reports/p1_real_public_fpr")
     ap.add_argument("--max-docs", type=int, default=600)
@@ -100,13 +105,26 @@ def main() -> int:
     rng = random.Random(args.seed)
     train_keys = _train_keys(Path(args.train))
 
-    files = sorted(Path(args.oss_dir).glob("*.json"))
+    # (디렉터리, 채택할 source 집합) — 판례 코퍼스 + 선택적 추가 공개문서 코퍼스.
+    extra_sources = {s.strip() for s in args.extra_sources.split(",") if s.strip()}
+    scan: list[tuple[Path, set[str]]] = [(Path(args.oss_dir), set(PREC_SOURCES))]
+    for d_ in args.extra_dir:
+        p_ = Path(d_)
+        if not p_.is_dir():
+            print(f"[ERR] --extra-dir 없음: {p_}", file=sys.stderr)
+            return 2
+        scan.append((p_, extra_sources))
+
+    files: list[tuple[Path, set[str]]] = [
+        (f, allowed) for d_, allowed in scan for f in sorted(d_.glob("*.json"))
+        if f.name != "manifest.json"
+    ]
     rng.shuffle(files)
     rows: list[dict] = []
     skipped_contam = 0
-    for f in files:
+    for f, allowed in files:
         d = json.loads(f.read_text(encoding="utf-8"))
-        if d.get("source") not in PREC_SOURCES:  # real published rulings only
+        if d.get("source") not in allowed:  # 정의상 공개인 문서만
             continue
         body = d.get("body") or ""
         if len(body) < args.min_len:
@@ -117,7 +135,8 @@ def main() -> int:
         if nkey in train_keys or bkey in train_keys:
             skipped_contam += 1
             continue
-        rows.append({"text": text, "domain": d.get("domain", ""), "_file": f.name})
+        rows.append({"text": text, "domain": d.get("domain", ""), "_file": f.name,
+                     "_source": d.get("source", "?")})
         if len(rows) >= args.max_docs:
             break
 
@@ -136,6 +155,7 @@ def main() -> int:
     payload = {
         "model_dir": args.model_dir,
         "n_clean_real_docs": len(rows),
+        "by_source": dict(Counter(r["_source"] for r in rows)),
         "skipped_as_contaminated": skipped_contam,
         "predicted_distribution": dict(dist),
         "over_classification_rate": _bootstrap_ci(over_flags, args.n_boot, rng),
@@ -152,12 +172,14 @@ def main() -> int:
     oc = payload["over_classification_rate"]
     hi = payload["escalated_to_high_TS_S1"]
     md = [
-        "# Real Public Rulings — Over-Classification (false-positive) Test",
+        "# Real Public Documents — Over-Classification (false-positive) Test",
         "",
         f"- model: `{args.model_dir}`",
-        f"- material: {len(rows)} genuine published court rulings, NOT in training "
+        f"- material: {len(rows)} genuine public documents, NOT in training "
         f"({skipped_contam} dropped as contaminated)",
-        f"- label is authoritative by definition: published ruling = public = S3",
+        f"- by source: {', '.join(f'{k}={v}' for k, v in sorted(payload['by_source'].items()))}",
+        "- label is authoritative by definition: a published ruling / statutory filing / "
+        "publicly distributed document = public = S3",
         f"- bootstrap: {args.n_boot} resamples (seed {args.seed})",
         "",
         "## Result",

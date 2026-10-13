@@ -13,8 +13,8 @@ from unittest.mock import patch
 
 import pytest
 
-from lloydk.api.middleware import _try_build_chained_hash
-from lloydk.services.audit_chain import ZERO16, parse_chained_hash
+from koipa.api.middleware import _try_build_chained_hash
+from koipa.services.audit_chain import ZERO16, parse_chained_hash
 
 
 @pytest.fixture(autouse=True)
@@ -33,7 +33,7 @@ def test_chain_format_when_db_available():
     fake_prev = "abcdef0123456789" * 4  # 64 hex
     body = b'{"x":1}'
 
-    with patch("lloydk.services.audit_chain.get_last_hash", return_value=fake_prev[:32]):
+    with patch("koipa.services.audit_chain.get_last_hash", return_value=fake_prev[:32]):
         packed = _try_build_chained_hash(body)
 
     assert packed is not None
@@ -47,7 +47,7 @@ def test_falls_back_to_sha256_when_chain_unavailable():
     """audit_chain ImportError 시 단순 sha256(body) 반환."""
     body = b'{"x":1}'
     # get_last_hash가 예외 던지도록 패치 → 폴백 발동
-    with patch("lloydk.services.audit_chain.get_last_hash", side_effect=RuntimeError("db down")):
+    with patch("koipa.services.audit_chain.get_last_hash", side_effect=RuntimeError("db down")):
         packed = _try_build_chained_hash(body)
 
     assert packed is not None
@@ -58,14 +58,14 @@ def test_falls_back_to_sha256_when_chain_unavailable():
 
 def test_empty_body_returns_none_without_chain():
     """body가 비고 chain 실패 시 None (기존 동작 보존)."""
-    with patch("lloydk.services.audit_chain.get_last_hash", side_effect=RuntimeError("db down")):
+    with patch("koipa.services.audit_chain.get_last_hash", side_effect=RuntimeError("db down")):
         packed = _try_build_chained_hash(b"")
     assert packed is None
 
 
 def test_empty_body_with_chain_still_packs():
     """body가 비어도 chain은 계속 진행 (prev 연결성 검증 가치)."""
-    with patch("lloydk.services.audit_chain.get_last_hash", return_value=ZERO16):
+    with patch("koipa.services.audit_chain.get_last_hash", return_value=ZERO16):
         packed = _try_build_chained_hash(b"")
     assert packed is not None
     assert ":" in packed

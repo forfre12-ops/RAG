@@ -1,0 +1,18 @@
+{
+  "schema": "factor-zero-audit-v1",
+  "seed": 20260822,
+  "synthetic_source": "datasets/labeled_v6_factor_grounded/train.jsonl",
+  "real_source": "datasets/v8_real/business_work.jsonl",
+  "n_items": 142,
+  "by_arm": {
+    "A_zero": 104,
+    "A_control": 20,
+    "B_real": 18
+  },
+  "by_factor": {
+    "management": 110,
+    "secrecy": 16,
+    "value": 16
+  },
+  "n_strata": 79
+}

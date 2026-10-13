@@ -42,12 +42,34 @@ def _sha1(text: str) -> str:
 
 
 def _load_jsonl(path: Path) -> list[dict]:
-    return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    """JSONL을 읽는다 — `#`로 시작하는 줄(사람이 손으로 넣은 주석)은 건너뛴다.
+
+    [2026-10-02] 종전엔 `#` 줄을 그대로 json.loads에 넘겨, uncertain_cases.jsonl
+    머리에 있는 주석 14줄(전체 73줄 중) 때문에 --dry-run까지 JSONDecodeError로
+    죽었다. 주석 보존은 _save_jsonl 쪽에서 한다(여기서 버리면 재저장 시 사라진다).
+    """
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return [json.loads(l) for l in lines if l.strip() and not l.lstrip().startswith("#")]
 
 
-def _save_jsonl(path: Path, records: list[dict]) -> None:
+def _leading_comment_lines(path: Path) -> list[str]:
+    """파일 머리의 `#` 주석 줄만 원문 그대로 추출 — 재저장 시 앞에 그대로 되돌린다."""
+    if not path.exists():
+        return []
+    out: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.lstrip().startswith("#"):
+            out.append(line)
+        elif line.strip():
+            break  # 본문(JSON 레코드) 시작 — 주석은 머리에만 있다고 전제
+    return out
+
+
+def _save_jsonl(path: Path, records: list[dict], *, leading_comments: list[str] = ()) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
+        for line in leading_comments:
+            f.write(line + "\n")
         for r in records:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
@@ -114,7 +136,9 @@ def main() -> int:
         return 1
 
     uncertain = _load_jsonl(uncertain_path)
-    print(f"[INFO] uncertain_cases 총 {len(uncertain)}건")
+    uncertain_comments = _leading_comment_lines(uncertain_path)
+    print(f"[INFO] uncertain_cases 총 {len(uncertain)}건"
+          f"{f' (주석 {len(uncertain_comments)}줄 보존)' if uncertain_comments else ''}")
 
     # 기존 gold_real doc_id/hash 수집
     existing_ids: set[str]    = set()
@@ -176,7 +200,7 @@ def main() -> int:
     print(f"[OK] gold_real에 {len(gold_records)}건 추가 (label_source=llm_judge_primary)")
 
     # ── uncertain_cases 갱신 (회수분 제거) ────────────────────────────────────
-    _save_jsonl(uncertain_path, kept_uncertain)
+    _save_jsonl(uncertain_path, kept_uncertain, leading_comments=uncertain_comments)
     print(f"[OK] uncertain_cases → {len(kept_uncertain)}건 (회수분 {len(to_recover)}건 제거)")
 
     # ── 회수 이력 기록 ────────────────────────────────────────────────────────

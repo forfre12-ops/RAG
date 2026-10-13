@@ -1,12 +1,11 @@
-"""[C20·C22] health probe — reranker effective 노출 + 추출기 의존성 가시화.
+"""[C22] health probe — 추출기 의존성 가시화.
 
 DB/모델 불필요(probe는 import-가능성·캐시만 조회) — 빠르게 도는 단위 테스트.
 """
 
 from __future__ import annotations
 
-import lloydk.config as cfg
-from lloydk.api import health
+from koipa.api import health
 
 
 def test_check_extractors_contract() -> None:
@@ -16,15 +15,14 @@ def test_check_extractors_contract() -> None:
     assert isinstance(out["unavailable"], list)
     expected = {
         "hwp_body(rhwp)",
-        "hwp_table(pyhwp/hwp5html)",
+        "hwp_table(unhwp)",
         "xls(xlrd)",
         "xlsx(openpyxl)",
         "docx(python-docx)",
         "pptx(python-pptx)",
         "pdf_text(pdfminer)",
-        "pdf_render(fitz/pdf2image)",
-        "pdf_scan(poppler)",
-        "ocr(tesseract)",
+        "pdf_table(pdfplumber)",
+        "pdf_fallback(fitz)",
         "doc(antiword)",
     }
     assert set(out["probes"].keys()) == expected
@@ -34,52 +32,16 @@ def test_check_extractors_contract() -> None:
     assert set(out["unavailable"]) == {k for k, v in out["probes"].items() if not v["available"]}
 
 
-def test_check_reranker_not_initialized(monkeypatch) -> None:
-    from lloydk.adapters.reranker import _RERANKER_CACHE
+def test_operational_config_states_regulation_reference_mode(monkeypatch) -> None:
+    monkeypatch.setattr(health.settings, "regulation_reference_enabled", True)
+    monkeypatch.setattr(health.settings, "regulation_llm_summary_enabled", False)
+    status = health._operational_config()["regulation_reference"]
+    assert status == {
+        "enabled": True,
+        "summary_enabled": False,
+        "mode": "reference_only",
+        "summary_requires_explicit_request": True,
+    }
 
-    monkeypatch.setattr(cfg.settings, "reranker_provider", "bge", raising=False)
-    saved = dict(_RERANKER_CACHE)
-    _RERANKER_CACHE.clear()
-    try:
-        out = health._check_reranker()
-        assert out["ok"] is True
-        assert out["status"] == "not_initialized"
-        assert out["effective"] is None
-    finally:
-        _RERANKER_CACHE.clear()
-        _RERANKER_CACHE.update(saved)
-
-
-def test_check_reranker_detects_bge_fallback(monkeypatch) -> None:
-    """configured=bge인데 캐시에 NoopReranker → 폴백 가시화(종전 /healthz는 못 봤음)."""
-    from lloydk.adapters.reranker import _RERANKER_CACHE, NoopReranker
-
-    monkeypatch.setattr(cfg.settings, "reranker_provider", "bge", raising=False)
-    saved = dict(_RERANKER_CACHE)
-    _RERANKER_CACHE.clear()
-    _RERANKER_CACHE["bge"] = NoopReranker()  # bge 초기화 실패 → noop 폴백 상태 모사
-    try:
-        out = health._check_reranker()
-        assert out["status"] == "fallback"
-        assert out["fell_back_to_noop"] is True
-        assert out["effective"] == "NoopReranker"
-        assert out["ok"] is True  # 폴백은 서비스-다운 아님(품질 보강 소폭)
-    finally:
-        _RERANKER_CACHE.clear()
-        _RERANKER_CACHE.update(saved)
-
-
-def test_check_reranker_noop_configured_is_ok(monkeypatch) -> None:
-    from lloydk.adapters.reranker import _RERANKER_CACHE, NoopReranker
-
-    monkeypatch.setattr(cfg.settings, "reranker_provider", "noop", raising=False)
-    saved = dict(_RERANKER_CACHE)
-    _RERANKER_CACHE.clear()
-    _RERANKER_CACHE["noop"] = NoopReranker()
-    try:
-        out = health._check_reranker()
-        assert out["status"] == "ok"
-        assert out["fell_back_to_noop"] is False
-    finally:
-        _RERANKER_CACHE.clear()
-        _RERANKER_CACHE.update(saved)
+    monkeypatch.setattr(health.settings, "regulation_llm_summary_enabled", True)
+    assert health._operational_config()["regulation_reference"]["mode"] == "local_summary_on_request"

@@ -8,8 +8,6 @@
 
 from __future__ import annotations
 
-import io
-import json
 import sys
 import uuid
 
@@ -21,9 +19,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.api.app import app
-from lloydk.config import settings
-from lloydk.db import engine
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.db import engine
+from koipa.services import training_service as training_service_module
 
 
 def _pg_ok() -> bool:
@@ -93,15 +92,32 @@ class TestConfirmRouter:
 # ============================================================
 
 class TestTrainingRouter:
-    def test_train_submit_returns_202(self):
+    def test_train_submit_returns_202(self, monkeypatch):
+        # This is a router-contract test.  The actual JSONL shape/volume gate is
+        # exercised with files in test_training_dataset_preflight.py; do not
+        # make this test depend on a deployment-only dataset mount.
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_training_dataset_ready",
+            lambda: {"train": 400, "val": 80, "test": 80},
+        )
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_incremental_training_ready",
+            lambda: {
+                "confirmed_correction_count": 50,
+                "minimum_confirmed_corrections": 50,
+                "initial_model_path": "artifacts/v-active",
+                "initial_model_version": "v-active",
+            },
+        )
         with TestClient(app) as cli:
             r = cli.post(
                 "/api/v1/train",
                 headers=HDR,
                 json={
-                    "training_type": "full",
-                    "base_model": "kf-deberta-base",
-                    "hyperparams": {"lr": 2e-5, "epochs": 5},
+                    "training_type": "incremental",
+                    "base_model": "kakaobank/kf-deberta-base",
                     "actor": ACTOR,
                 },
             )
@@ -109,6 +125,25 @@ class TestTrainingRouter:
             body = r.json()
             assert "train_job_id" in body
             assert body["status_url"].startswith("/api/v1/train/jobs/")
+
+    def test_train_returns_409_when_dataset_is_below_operating_minimum(self, monkeypatch):
+        def reject_small_dataset():
+            raise training_service_module.TrainingDatasetTooSmall("train total=12<400")
+
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_training_dataset_ready",
+            reject_small_dataset,
+        )
+        with TestClient(app) as cli:
+            r = cli.post(
+                "/api/v1/train",
+                headers=HDR,
+                json={"training_type": "incremental", "actor": ACTOR},
+            )
+
+        assert r.status_code == 409, r.text
+        assert "400건 이상" in r.json()["detail"]
 
     def test_train_jobs_list_returns_shape(self):
         with TestClient(app) as cli:
@@ -125,13 +160,28 @@ class TestTrainingRouter:
             assert r.status_code == 404
 
     @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
-    def test_train_submit_then_status_round_trip(self):
+    def test_train_submit_then_status_round_trip(self, monkeypatch):
         """제출 → 상태 폴링 → queued 응답."""
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_training_dataset_ready",
+            lambda: {"train": 400, "val": 80, "test": 80},
+        )
+        monkeypatch.setattr(
+            training_service_module,
+            "ensure_incremental_training_ready",
+            lambda: {
+                "confirmed_correction_count": 50,
+                "minimum_confirmed_corrections": 50,
+                "initial_model_path": "artifacts/v-active",
+                "initial_model_version": "v-active",
+            },
+        )
         with TestClient(app) as cli:
             r1 = cli.post(
                 "/api/v1/train",
                 headers=HDR,
-                json={"training_type": "full", "actor": ACTOR},
+                json={"training_type": "incremental", "actor": ACTOR},
             )
             train_job_id = r1.json()["train_job_id"]
             r2 = cli.get(f"/api/v1/train/jobs/{train_job_id}", headers=HDR)
@@ -144,7 +194,7 @@ class TestTrainingRouter:
 # ============================================================
 
 class TestSynthesisRouter:
-    def test_synth_generate_returns_202(self):
+    def test_synth_generate_never_reports_success_when_runtime_is_unavailable(self):
         with TestClient(app) as cli:
             r = cli.post(
                 "/api/v1/synth/generate",
@@ -157,12 +207,12 @@ class TestSynthesisRouter:
                     "actor": ACTOR,
                 },
             )
-            assert r.status_code == 202
-            body = r.json()
-            assert body["expected_count"] == 10
-            assert body["estimated_cost_usd"] > 0
+            # TestClient에는 실 워커를 붙이지 않는다. 과거처럼 202로 "등록만" 성공을
+            # 말하면 검토 대상 0건 원인을 숨기므로, 운영 준비가 안 된 환경에서는 503이다.
+            assert r.status_code == 503
+            assert "검토 대상" in r.json()["detail"]
 
-    def test_synth_generate_noop_zero_cost(self):
+    def test_synth_generate_rejects_noop_instead_of_creating_test_documents(self):
         with TestClient(app) as cli:
             r = cli.post(
                 "/api/v1/synth/generate",
@@ -174,8 +224,8 @@ class TestSynthesisRouter:
                     "actor": ACTOR,
                 },
             )
-            assert r.status_code == 202
-            assert r.json()["estimated_cost_usd"] == 0.0
+            assert r.status_code == 503
+            assert "noop" in r.json()["detail"]
 
     def test_synth_queue_returns_shape(self):
         with TestClient(app) as cli:
@@ -193,62 +243,6 @@ class TestSynthesisRouter:
                 json={"decision": "approve", "actor": ACTOR},
             )
             assert r.status_code in (404, 503)  # PG 미가용 시 service None → 404
-
-
-# ============================================================
-# /guide/documents
-# ============================================================
-
-class TestGuideRouter:
-    def test_upload_then_list_versions(self):
-        gid = f"guide-{uuid.uuid4().hex[:6]}"
-        with TestClient(app) as cli:
-            r = cli.post(
-                "/api/v1/guide/documents",
-                headers=HDR,
-                data={
-                    "guide_id": gid,
-                    "version": "v1.0",
-                    "effective_date": "2026-06-01",
-                    "change_summary": "initial",
-                    "actor": json.dumps(ACTOR),
-                },
-                files={"file": ("guide.txt", io.BytesIO(b"sample guide content"), "text/plain")},
-            )
-            assert r.status_code == 201, r.text
-            body = r.json()
-            assert body["guide_id"] == gid
-            assert body["version"] == "v1.0"
-            # W5 이후: indexed는 ES 가동·임베딩 모델 가용성에 따라 True/False.
-            # 두 경우 모두 키 존재·타입만 검증 (best-effort 응답 보장).
-            assert isinstance(body["indexed"], bool)
-            assert "embedding_vector_count" in body
-
-            # 목록 조회
-            r2 = cli.get(f"/api/v1/guide/documents/{gid}", headers=HDR)
-            assert r2.status_code == 200
-            vlist = r2.json()
-            assert vlist["guide_id"] == gid
-            assert len(vlist["versions"]) >= 1
-
-    def test_list_unknown_guide_404(self):
-        with TestClient(app) as cli:
-            r = cli.get(f"/api/v1/guide/documents/does-not-exist-{uuid.uuid4().hex[:6]}", headers=HDR)
-            assert r.status_code == 404
-
-    def test_upload_invalid_actor_json_422(self):
-        with TestClient(app) as cli:
-            r = cli.post(
-                "/api/v1/guide/documents",
-                headers=HDR,
-                data={
-                    "guide_id": "g",
-                    "version": "v",
-                    "actor": "{not json",
-                },
-                files={"file": ("g.txt", io.BytesIO(b"x"), "text/plain")},
-            )
-            assert r.status_code == 422
 
 
 # ============================================================
@@ -282,11 +276,13 @@ class TestSchemaAdminRouter:
 # ============================================================
 
 class TestMetricsRouter:
+    @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_latest_no_active_model_404(self):
-        """현재 활성 모델 없음 → 404 (DB 미가용 시에도 동일)."""
+        """현재 활성 모델 없음 → 404. 세팅(활성 모델 비활성화)이 session_scope 를 쓰므로
+        형제 테스트(라인 127·267)와 동일하게 PG 필요 — 무PG 환경 30s 행+ConnectionTimeout 방지."""
         # 공유 DB 오염(타 테스트가 활성화한 모델 잔존) 방지 — 활성 모델 비활성화 후 검증
-        from lloydk.db import session_scope
-        from lloydk.db.models import ModelVersion
+        from koipa.db import session_scope
+        from koipa.db.models import ModelVersion
         with session_scope() as s:
             s.query(ModelVersion).filter_by(is_active=True).update(
                 {"is_active": False}, synchronize_session=False

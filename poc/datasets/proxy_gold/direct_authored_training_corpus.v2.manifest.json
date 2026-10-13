@@ -1,0 +1,17 @@
+{
+  "authoring_method": "codex_direct_authored_training_corpus_v2",
+  "claim_scope": "Proxy training only; not customer-real accuracy evidence or Locked Gold.",
+  "document_shapes": 12,
+  "families": 225,
+  "grade_counts": {
+    "S1": 750,
+    "S2": 750,
+    "S3": 450,
+    "TS": 750
+  },
+  "length_profiles": 3,
+  "records": 2700,
+  "records_sha256": "35efbff32e42332cb5fa7ed1b4266ded3cdfab1e588b11cd92fa02a6c8300445",
+  "schema": "direct-authored-proxy-training-corpus-v2",
+  "training_only": true
+}

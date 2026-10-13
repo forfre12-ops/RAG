@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.modules.m5_inference.pipeline import InferencePipeline
+from koipa.modules.m5_inference.pipeline import InferencePipeline
 
 
 def _load_calibrate_module():
@@ -23,18 +23,18 @@ def _load_calibrate_module():
 @pytest.fixture(autouse=True)
 def _stub_pipeline_db(monkeypatch):
     """InferencePipeline 생성이 PG에 매달리지 않게 DB 의존(get_codes·rule engine)을 스텁."""
-    from lloydk.schemas import common as _common
+    from koipa.schemas import common as _common
 
     monkeypatch.setattr(
         _common.GradeRegistry, "get_codes", lambda *a, **k: ["TS", "S1", "S2", "S3"]
     )
-    from lloydk.modules.m3_labeling import pipeline as _m3
+    from koipa.modules.m3_labeling import pipeline as _m3
 
     monkeypatch.setattr(_m3, "build_rule_engine_from_db", lambda *a, **k: object())
 
 
 def test_temperature_reads_settings(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     pipe = InferencePipeline()
     monkeypatch.setattr(cfg.settings, "classifier_temperature", 1.5, raising=False)
@@ -42,7 +42,7 @@ def test_temperature_reads_settings(monkeypatch):
 
 
 def test_temperature_guards_nonpositive(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     pipe = InferencePipeline()
     monkeypatch.setattr(cfg.settings, "classifier_temperature", 0.0, raising=False)
@@ -129,7 +129,7 @@ def test_calibrate_fails_loud_without_logits(tmp_path, monkeypatch):
 
 
 def test_bundle_calibration_loads_temperature_json(tmp_path, monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(cfg.settings, "classifier_temperature", 1.0, raising=False)
     model_dir = tmp_path / "v-cal"
@@ -149,14 +149,14 @@ def test_uncalibrated_serving_warns_loud(tmp_path, monkeypatch, caplog):
     """동봉 temperature.json 부재 + classifier_temperature=1.0 → 무보정 + loud-warn."""
     import logging
 
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(cfg.settings, "classifier_temperature", 1.0, raising=False)
     model_dir = tmp_path / "v-nocal"
     model_dir.mkdir()  # temperature.json 없음
     pipe = InferencePipeline()
     pipe.model_dir = model_dir
-    with caplog.at_level(logging.WARNING, logger="lloydk.modules.m5_inference.pipeline"):
+    with caplog.at_level(logging.WARNING, logger="koipa.modules.m5_inference.pipeline"):
         src = pipe._apply_bundle_calibration()
     assert src == "uncalibrated"
     assert pipe.calibrated is False
@@ -166,7 +166,7 @@ def test_uncalibrated_serving_warns_loud(tmp_path, monkeypatch, caplog):
 
 def test_env_temperature_counts_as_calibrated(tmp_path, monkeypatch):
     """동봉이 없어도 classifier_temperature(≠1.0) 주입이 있으면 보정으로 간주(경고 없음)."""
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(cfg.settings, "classifier_temperature", 1.5, raising=False)
     model_dir = tmp_path / "v-envcal"
@@ -180,7 +180,7 @@ def test_env_temperature_counts_as_calibrated(tmp_path, monkeypatch):
 
 def test_nonpositive_bundle_temperature_falls_back_uncalibrated(tmp_path, monkeypatch):
     """temperature<=0 동봉은 무시하고 무보정 폴백(주입도 없으면 uncalibrated)."""
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(cfg.settings, "classifier_temperature", 1.0, raising=False)
     model_dir = tmp_path / "v-zero"

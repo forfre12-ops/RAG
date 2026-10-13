@@ -28,7 +28,7 @@ $steps = @(
   @{ n = "[3/6] PoC 5 dryrun";
      c = { & $PY scripts/run_all_pocs.py } },
   @{ n = "[4/6] airgap bundle manifest dry-run";
-     c = { & $PY scripts/build_offline_bundle.py --version 1.0.0-rc1 --dry-run --output dist/lloydk-airgap-bundle } },
+     c = { & $PY scripts/build_offline_bundle.py --version 1.0.0-rc1 --dry-run --output dist/koipa-airgap-bundle } },
   @{ n = "[5/6] OSS license risk (allowlist)";
      c = { & $PY scripts/dump_licenses.py --check --scope=direct } },
   @{ n = "[6/6] synthetic analysis";

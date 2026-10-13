@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lloydk.modules.m6_evaluation.paraphrase_gen import (
+from koipa.modules.m6_evaluation.paraphrase_gen import (
     generate_minimal_pairs,
     is_reverse_eligible,
     make_forward,

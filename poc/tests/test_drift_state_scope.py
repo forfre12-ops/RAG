@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 
-from lloydk.services.drift_monitor import (
+from koipa.services.drift_monitor import (
     _centroid_fingerprint,
     _load_violation_state,
     _save_violation_state,

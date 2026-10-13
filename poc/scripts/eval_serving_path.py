@@ -7,7 +7,7 @@ evaluate_via_serving으로 홀드아웃을 **실서빙 InferencePipeline.run() �
 
 사용:
   python scripts/eval_serving_path.py \
-    --model-dir artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9 \
+    --model-dir artifacts/classifier_p1_v5_clean/v-fe4b386b \
     --gold datasets/gold_real/holdout_eval.jsonl \
     --taus 0,0.35,0.25,0.15 \
     --report reports/serving_path_eval.md
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -26,16 +27,20 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+from koipa.dataset_usage import assert_dataset_usage, assert_path_usage
+
 LABELS = ["TS", "S1", "S2", "S3"]
 
 
 def load_rows(path: Path) -> list[dict]:
+    assert_path_usage(path, "model_evaluation")
     rows = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         r = json.loads(line)
+        assert_dataset_usage([r], purpose="model_evaluation")
         label = r.get("label") or r.get("expected_grade") or r.get("target")
         text = r.get("text") or r.get("body") or ""
         if label in LABELS and text:
@@ -51,12 +56,24 @@ def main() -> int:
     ap.add_argument("--multipliers", default="",
                     help="쉼표구분 rule_high_risk_weight_multiplier 스윕(B1). 주면 τ=None 고정, "
                          "배수별 서빙 FNR 측정(배수마다 파이프라인 재생성=모델 재로드).")
+    ap.add_argument(
+        "--offline-default-registry",
+        action="store_true",
+        help=(
+            "Use built-in TS/S1/S2/S3 registry and skip optional local DB keyword "
+            "loading when the DB is unreachable. Use for immutable proxy-file "
+            "evaluation, not production parity checks."
+        ),
+    )
     ap.add_argument("--report", default="reports/serving_path_eval.md")
     args = ap.parse_args()
 
-    from lloydk.config import settings
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
-    from lloydk.modules.m6_evaluation.serving_eval import evaluate_via_serving
+    if args.offline_default_registry:
+        os.environ.setdefault("TESTING", "1")
+
+    from koipa.config import settings
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
+    from koipa.modules.m6_evaluation.serving_eval import evaluate_via_serving
 
     gold = Path(args.gold)
     if not gold.is_absolute():

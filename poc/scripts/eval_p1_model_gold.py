@@ -13,17 +13,34 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+from koipa.dataset_usage import assert_dataset_usage, assert_path_usage
+
 LABELS = ["TS", "S1", "S2", "S3"]
 GRADE_ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
+PUBLIC_SOURCE_MARKERS = (
+    "court_decision",
+    "판례",
+    "public_disclosure",
+    "공시",
+    "채용공고",
+    "보도자료",
+    "공개특허",
+    "등록특허",
+    "공개공보",
+    "특허공보",
+    "published_patent",
+)
 
 
 def load_jsonl(path: Path, label_sources: set[str] | None = None) -> list[dict]:
+    assert_path_usage(path, "model_evaluation")
     rows: list[dict] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         row = json.loads(line)
+        assert_dataset_usage([row], purpose="model_evaluation")
         label = row.get("label") or row.get("expected_grade")
         if label not in LABELS:
             continue
@@ -74,6 +91,7 @@ def compute_metrics(y_true: list[str], y_pred: list[str]) -> dict:
 
 
 def predict_direct(model_dir: Path, rows: list[dict], batch_size: int = 16) -> list[dict]:
+    assert_dataset_usage(rows, purpose="model_evaluation")
     import torch
     import torch.nn.functional as F
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -98,7 +116,8 @@ def predict_direct(model_dir: Path, rows: list[dict], batch_size: int = 16) -> l
 
 
 def predict_api_like(model_dir: Path, rows: list[dict]) -> list[dict]:
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
+    assert_dataset_usage(rows, purpose="model_evaluation")
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
 
     pipe = InferencePipeline(model_dir=model_dir)
     preds = []
@@ -124,6 +143,38 @@ def predict_api_like(model_dir: Path, rows: list[dict]) -> list[dict]:
     return preds
 
 
+def is_public_source(row: dict) -> bool:
+    src = f"{row.get('source_type', '')} {row.get('source', '')}".lower()
+    return any(marker.lower() in src for marker in PUBLIC_SOURCE_MARKERS)
+
+
+def apply_source_prior_cap(rows: list[dict], preds: list[dict], cap_grade: str) -> tuple[list[dict], int]:
+    if cap_grade == "off":
+        return preds, 0
+    cap_order = GRADE_ORDER[cap_grade]
+    capped: list[dict] = []
+    applied = 0
+    for row, pred in zip(rows, preds):
+        label = pred.get("label")
+        if is_public_source(row) and label in GRADE_ORDER and GRADE_ORDER[label] < cap_order:
+            scores = dict(pred.get("scores") or {})
+            scores[cap_grade] = max(float(scores.get(cap_grade, 0.0)), float(pred.get("confidence", 0.0)))
+            capped.append(
+                {
+                    **pred,
+                    "label": cap_grade,
+                    "confidence": float(scores[cap_grade]),
+                    "scores": scores,
+                    "warnings": list(pred.get("warnings", []))
+                    + [f"source-prior: public source capped at {cap_grade}"],
+                }
+            )
+            applied += 1
+        else:
+            capped.append(pred)
+    return capped, applied
+
+
 def write_report(payload: dict, out: Path) -> None:
     m = payload["metrics"]
     md = [
@@ -131,6 +182,8 @@ def write_report(payload: dict, out: Path) -> None:
         "",
         f"- model_dir: `{payload['model_dir']}`",
         f"- gold: `{payload['gold']}`",
+        f"- source_prior_cap: `{payload.get('source_prior_cap', 'off')}` "
+        f"({payload.get('source_prior_applied', 0)} applied)",
         f"- label_sources: `{','.join(payload['label_sources']) if payload['label_sources'] else 'ALL'}`",
         f"- n: {m['n']}",
         f"- F1 macro: {m['f1_macro']:.3f}",
@@ -190,6 +243,12 @@ def main() -> int:
     ap.add_argument("--tier", choices=["all", "eval", "locked"], default="all",
                     help="평가 tier: all=전체(레거시) / eval=locked_gold_eval(없으면 legal_floor interim) / locked=locked만")
     ap.add_argument("--mode", choices=["direct", "api-like"], default="direct")
+    ap.add_argument(
+        "--source-prior-cap",
+        choices=["off", "S2", "S3"],
+        default="off",
+        help="apply production public-source cap after prediction",
+    )
     ap.add_argument("--report", default="reports/p1_model_gold_eval.md")
     ap.add_argument("--examples", type=int, default=30)
     args = ap.parse_args()
@@ -198,7 +257,7 @@ def main() -> int:
     rows = load_jsonl(Path(args.gold), label_sources or None)
     eval_tier = "all"
     if args.tier in ("eval", "locked"):
-        from lloydk.golden_tiers import eval_records
+        from koipa.golden_tiers import eval_records
         rows, eval_tier = eval_records(rows, allow_floor_fallback=(args.tier == "eval"))
         if not rows:
             print(
@@ -219,6 +278,7 @@ def main() -> int:
         if args.mode == "api-like"
         else predict_direct(Path(args.model_dir), rows)
     )
+    preds, source_prior_applied = apply_source_prior_cap(rows, preds, args.source_prior_cap)
     y_true = [r["label"] for r in rows]
     y_pred = [p["label"] for p in preds]
     errors = [
@@ -237,6 +297,8 @@ def main() -> int:
         "model_dir": args.model_dir,
         "gold": args.gold,
         "mode": args.mode,
+        "source_prior_cap": args.source_prior_cap,
+        "source_prior_applied": source_prior_applied,
         "label_sources": sorted(label_sources),
         "eval_tier": eval_tier,
         "metrics": compute_metrics(y_true, y_pred),

@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from lloydk.modules.m1_synthesis.generator import (
+from koipa.modules.m1_synthesis.generator import (
     GRADE_SITUATION_PROMPTS,
     _fallback_body,
 )

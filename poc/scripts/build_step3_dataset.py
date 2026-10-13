@@ -5,7 +5,9 @@ mundane은 업웨이트(--repeat)로 신호 보강. 일부는 in-distribution �
 출력: datasets/labeled_p1_retrain_v4_step3/train.jsonl
 """
 from __future__ import annotations
-import argparse, json, random
+import argparse
+import json
+import random
 from collections import Counter
 from pathlib import Path
 

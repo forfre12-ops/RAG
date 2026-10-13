@@ -11,8 +11,8 @@
 
 from __future__ import annotations
 
-from lloydk.api import prom_metrics as pm
-from lloydk.services.classify_service import ClassifyService
+from koipa.api import prom_metrics as pm
+from koipa.services.classify_service import ClassifyService
 
 _emit = ClassifyService._emit_gate_visibility_metrics
 

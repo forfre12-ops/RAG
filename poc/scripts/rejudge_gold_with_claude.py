@@ -118,7 +118,7 @@ def main() -> int:
     if args.limit:
         targets = targets[: args.limit]
 
-    from lloydk.modules.m3_labeling.llm_labeler import SYSTEM_PROMPT, _safe_parse_json  # noqa: E402
+    from koipa.modules.m3_labeling.llm_labeler import SYSTEM_PROMPT, _safe_parse_json  # noqa: E402
 
     # 비용 추정 (system + 본문 입력, 출력 ~150tok 가정)
     in_price, out_price = PRICING.get(args.model, (5.0, 25.0))
@@ -158,7 +158,7 @@ def main() -> int:
     except ImportError:
         print("[ERROR] anthropic 패키지 미설치 (pip install anthropic)", file=sys.stderr)
         return 3
-    from lloydk.config import settings  # noqa: PLC0415
+    from koipa.config import settings  # noqa: PLC0415
     key = os.environ.get("ANTHROPIC_API_KEY") or getattr(settings, "anthropic_api_key", None)
     if not key:
         print("[ERROR] ANTHROPIC_API_KEY 미설정 — export/set 후 재실행", file=sys.stderr)

@@ -14,20 +14,20 @@ import uuid
 from pathlib import Path
 
 import pytest
-from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.db import SessionLocal, engine, session_scope
-from lloydk.db.models import (
+from koipa.db import SessionLocal, session_scope
+from koipa.db.models import (
     Chunk,
     Classification,
     ClassificationLevel,
     Correction,
     Document,
 )
-from lloydk.modules.m6_evaluation.corrections_rebuild import (
+from koipa.modules.m6_evaluation.corrections_rebuild import (
     RebuildResult,
     _correction_admissible,
+    build_incremental_train_jsonl,
     build_labeled_rows_from_corrections,
     merge_into_train_jsonl,
     write_labeled_jsonl,
@@ -79,9 +79,76 @@ def test_merge_no_rows_returns_none(tmp_path: Path):
     assert merge_into_train_jsonl(None, RebuildResult(), tmp_path / "x.jsonl") is None
 
 
+def test_incremental_input_is_bounded_replay_plus_confirmed_batch(tmp_path: Path):
+    base = tmp_path / "base.jsonl"
+    base_rows = [
+        {"text": f"base-{label}-{i}", "label": label}
+        for label in ("TS", "S1", "S2", "S3")
+        for i in range(3)
+    ]
+    base.write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in base_rows),
+        encoding="utf-8",
+    )
+    correction_rows = [
+        {"text": f"confirmed-{i}", "label": ("TS", "S1", "S2", "S3")[i % 4]}
+        for i in range(50)
+    ]
+    doc_ids = [f"doc-{i}" for i in range(50)]
+    res = RebuildResult(
+        rows=correction_rows,
+        correction_ids=list(range(1, 51)),
+        doc_ids=doc_ids,
+        corr_ids_by_doc={doc_id: [index + 1] for index, doc_id in enumerate(doc_ids)},
+    )
+
+    built = build_incremental_train_jsonl(
+        base,
+        res,
+        tmp_path / "incremental.jsonl",
+        holdout_paths=[],
+        minimum_correction_rows=50,
+        replay_per_label=1,
+    )
+
+    assert built.reason == "ok"
+    assert built.correction_rows == 50
+    assert built.replay_rows == 4
+    lines = Path(built.path).read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 54
+    assert {json.loads(line)["text"] for line in lines[:4]} <= {
+        row["text"] for row in base_rows
+    }
+    assert {json.loads(line)["text"] for line in lines[4:]} == {
+        row["text"] for row in correction_rows
+    }
+    assert res.incorporated_correction_ids == list(range(1, 51))
+
+
+def test_incremental_input_rejects_batch_below_minimum_after_filtering(tmp_path: Path):
+    base = tmp_path / "base.jsonl"
+    base.write_text(json.dumps({"text": "base", "label": "TS"}) + "\n", encoding="utf-8")
+    res = RebuildResult(
+        rows=[{"text": f"confirmed-{i}", "label": "TS"} for i in range(49)],
+        doc_ids=[f"doc-{i}" for i in range(49)],
+    )
+
+    built = build_incremental_train_jsonl(
+        base,
+        res,
+        tmp_path / "too-small.jsonl",
+        holdout_paths=[],
+    )
+
+    assert built.path is None
+    assert built.correction_rows == 49
+    assert "eligible_corrections=49<minimum=50" == built.reason
+    assert not (tmp_path / "too-small.jsonl").exists()
+
+
 def test_rebuild_db_unavailable_graceful(monkeypatch):
     """session_scope가 SQLAlchemyError를 던지면 빈 결과 + reason."""
-    from lloydk.modules.m6_evaluation import corrections_rebuild as mod
+    from koipa.modules.m6_evaluation import corrections_rebuild as mod
 
     class _Boom:
         def __enter__(self):
@@ -129,13 +196,7 @@ def test_admission_bypass_when_disabled():
 # ── DB-backed ────────────────────────────────────────────────────────────────
 
 
-def _pg_ok() -> bool:
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return True
-    except Exception:  # noqa: BLE001
-        return False
+from _pg_probe import postgres_available
 
 
 def db_backed(obj):
@@ -145,7 +206,7 @@ def db_backed(obj):
 
 @pytest.fixture
 def require_pg():
-    if not _pg_ok():
+    if not postgres_available():
         pytest.skip("Postgres not reachable")
 
 
@@ -212,11 +273,17 @@ class TestRebuildLive:
         db.commit()
         try:
             res = build_labeled_rows_from_corrections()
-            assert res.row_count == 1
-            assert res.rows[0]["label"] == "TS"          # 최신 교정
-            assert "마스터 키" in res.rows[0]["text"]      # 본문은 chunk
+            # 이 함수는 DB 전체의 미소비 교정을 읽는다. 공유 DB 에는 데모·운영 교정이 이미
+            # 들어 있어(실측: reviewer-demo·admin@koipa 5건) 전체 건수로 단정하면 환경에 따라
+            # 깨진다. 이 테스트가 만든 문서의 행만 골라 본다.
+            mine = [
+                row for row, doc_id in zip(res.rows, res.doc_ids) if doc_id == doc.doc_id
+            ]
+            assert len(mine) == 1
+            assert mine[0]["label"] == "TS"          # 최신 교정
+            assert "마스터 키" in mine[0]["text"]      # 본문은 chunk
             # 같은 문서의 unconsumed correction은 전부 소비대상
-            assert set(res.correction_ids) == {c1.correction_id, c2.correction_id}
+            assert {c1.correction_id, c2.correction_id} <= set(res.correction_ids)
         finally:
             with session_scope() as s:
                 s.query(Correction).filter(
@@ -245,10 +312,17 @@ class TestRebuildLive:
         db.commit()
         try:
             res = build_labeled_rows_from_corrections()
-            assert res.row_count == 1
-            assert res.rows[0]["label"] == "S1"
-            assert "프리뷰 본문" in res.rows[0]["text"]
-            assert res.skipped_no_text == 1
+            # 전체 건수 단정 금지 — 공유 DB 의 기존 교정이 함께 잡힌다(위 테스트 주석 참조).
+            mine = [
+                row for row, doc_id in zip(res.rows, res.doc_ids) if doc_id == doc_a.doc_id
+            ]
+            assert len(mine) == 1
+            assert mine[0]["label"] == "S1"
+            assert "프리뷰 본문" in mine[0]["text"]
+            # 문서 B(본문 없음)는 한 건도 나오지 않는다 — skipped_no_text 전역 카운트 대신
+            # 이 테스트가 만든 문서로 확인한다.
+            assert not [d for d in res.doc_ids if d == doc_b.doc_id]
+            assert res.skipped_no_text >= 1
             assert cb.correction_id not in res.correction_ids   # 본문 없는 문서는 미소비
             assert ca.correction_id in res.correction_ids
         finally:

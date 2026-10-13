@@ -8,15 +8,15 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.db import SessionLocal, engine, session_scope
-from lloydk.db.models import (
+from koipa.db import SessionLocal, engine, session_scope
+from koipa.db.models import (
     Classification,
     ClassificationLevel,
     Correction,
     Document,
     ModelVersion,
 )
-from lloydk.modules.m6_evaluation import (
+from koipa.modules.m6_evaluation import (
     build_confusion_matrix,
     compute_metrics_from_arrays,
     compute_metrics_from_db,
@@ -25,7 +25,7 @@ from lloydk.modules.m6_evaluation import (
     render_confusion_matrix_png,
     render_html_report,
 )
-from lloydk.modules.m6_evaluation.active_learning import consume_corrections_for_run
+from koipa.modules.m6_evaluation.active_learning import consume_corrections_for_run
 
 
 def _pg_ok() -> bool:
@@ -293,7 +293,7 @@ class TestActiveLearning:
                 s.query(Classification).filter_by(model_version=version).delete()
 
     def test_consume_marks_corrections(self, db, levels):
-        from lloydk.repositories import TrainingRepo
+        from koipa.repositories import TrainingRepo
 
         version = f"v-cons-{uuid.uuid4().hex[:6]}"
         cls = _seed_classification(db, levels, version, "S3")
@@ -319,14 +319,14 @@ class TestActiveLearning:
             with session_scope() as s:
                 s.query(Correction).filter_by(correction_id=corr.correction_id).delete()
                 s.query(Classification).filter_by(model_version=version).delete()
-                from lloydk.db.models import TrainingRun as _TR  # noqa: PLC0415
+                from koipa.db.models import TrainingRun as _TR  # noqa: PLC0415
                 s.query(_TR).filter_by(run_id=run.run_id).delete()
 
 
 @db_backed
 class TestMetricsServiceLive:
     def test_active_model_with_stored_metrics_returns_them(self, db):
-        from lloydk.services.metrics_service import MetricsService
+        from koipa.services.metrics_service import MetricsService
 
         version = f"v-svc-{uuid.uuid4().hex[:6]}"
         mv = ModelVersion(
@@ -343,7 +343,7 @@ class TestMetricsServiceLive:
         db.add(mv)
         db.flush()
         # 활성화
-        from lloydk.repositories import TrainingRepo
+        from koipa.repositories import TrainingRepo
         TrainingRepo(db).activate_model_version(mv.version_id)
         db.commit()
         try:
@@ -357,7 +357,7 @@ class TestMetricsServiceLive:
                 s.query(ModelVersion).filter_by(version_id=mv.version_id).delete()
 
     def test_confusion_matrix_live_from_classifications(self, db, levels):
-        from lloydk.services.metrics_service import MetricsService
+        from koipa.services.metrics_service import MetricsService
 
         version = f"v-cm-{uuid.uuid4().hex[:6]}"
         mv = ModelVersion(version_label=version, base_model="kf-deberta-base", metrics={})

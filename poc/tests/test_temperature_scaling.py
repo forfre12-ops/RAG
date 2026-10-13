@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import math
 
-from lloydk.modules.m6_evaluation.temperature import (
+from koipa.modules.m6_evaluation.temperature import (
     expected_calibration_error,
     find_best_temperature,
     fit_temperature_report,

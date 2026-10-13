@@ -1,0 +1,42 @@
+{
+  "model_version": "v-fe4b386b",
+  "accuracy": 0.953125,
+  "precision_macro": 0.9566180813858953,
+  "recall_macro": 0.9474218772966458,
+  "f1_macro": 0.9514777079512353,
+  "fnr_overall": 0.046875,
+  "fnr_by_grade": {
+    "TS": 0.1,
+    "S1": 0.021739130434782608,
+    "S2": 0.06896551724137931,
+    "S3": 0.0196078431372549
+  },
+  "fnr_high": 0.0625,
+  "confusion_matrix": [
+    [
+      45,
+      2,
+      0,
+      3
+    ],
+    [
+      0,
+      45,
+      1,
+      0
+    ],
+    [
+      1,
+      0,
+      54,
+      3
+    ],
+    [
+      0,
+      0,
+      2,
+      100
+    ]
+  ],
+  "classification_report": "              precision    recall  f1-score   support\n\n          TS       0.98      0.90      0.94        50\n          S1       0.96      0.98      0.97        46\n          S2       0.95      0.93      0.94        58\n          S3       0.94      0.98      0.96       102\n\n    accuracy                           0.95       256\n   macro avg       0.96      0.95      0.95       256\nweighted avg       0.95      0.95      0.95       256\n"
+}

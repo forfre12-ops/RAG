@@ -1,0 +1,29 @@
+# Git 저장소 뿌리는 rag/이고 Python 프로젝트는 poc/에 있다.
+# 개발 중간 push가 전수 회귀·이미지 3종 빌드로 막히면 작은 UI 변경도 수 분씩 멈춘다.
+# 빠른 계약은 여기서 보고, 전수 회귀는 CI가 최종 배치(GitLab/GitHub push)의 같은 SHA에
+# 대해 수행한다. 사람의 최종 출하 점검은 manual 훅 또는 full_verification_gate.sh로
+# 명시 실행한다. UI/API 배포 직전에는 verify_ui_fast_path.sh + 대상 health/SHA만 쓴다.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (poc/src + poc/tests)
+        entry: python -m ruff check --config poc/pyproject.toml poc/src poc/tests
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: test-fast-contract
+        name: pytest 빠른 계약
+        entry: python -m pytest -q -c poc/pyproject.toml poc/tests/test_hygiene.py poc/tests/test_idempotency.py poc/tests/test_anchor_eval.py poc/tests/test_source_provenance.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: full-verification-gate
+        name: 수동 전수 검증 게이트(pytest 전체·데이터위생·콘솔e2e·도커빌드·인수팩·release-gate)
+        entry: python poc/scripts/run_full_verification_gate.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [manual]
+        verbose: true

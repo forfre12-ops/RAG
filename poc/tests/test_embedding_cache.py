@@ -6,7 +6,7 @@
   3. 다른 텍스트는 underlying이 다시 호출됨
 
 전제:
-- 캐시 모듈은 `lloydk.adapters.embedding.cache` 또는 동등 위치 `EmbeddingCache` 클래스로 제공됨
+- 캐시 모듈은 `koipa.adapters.embedding.cache` 또는 동등 위치 `EmbeddingCache` 클래스로 제공됨
 - 본 PoC 시점 어댑터·구현이 존재하지 않으면 모듈 단위 skip
   (scripts/cache_kure_v1.py는 HF hub 모델 다운로드 스크립트일 뿐 캐시 레이어 아님)
 """
@@ -17,15 +17,15 @@ import importlib
 
 import pytest
 
-from lloydk.adapters.embedding.base import EmbeddingResult
+from koipa.adapters.embedding.base import EmbeddingResult
 
 
 # ---- 캐시 어댑터 후보 모듈 탐색 (없으면 skip) -----------------------------
 
 _CACHE_CANDIDATES = [
-    ("lloydk.adapters.embedding.cache", "EmbeddingCache"),
-    ("lloydk.adapters.embedding.cached", "CachedEmbedding"),
-    ("lloydk.adapters.embedding.cache_layer", "EmbeddingCache"),
+    ("koipa.adapters.embedding.cache", "EmbeddingCache"),
+    ("koipa.adapters.embedding.cached", "CachedEmbedding"),
+    ("koipa.adapters.embedding.cache_layer", "EmbeddingCache"),
 ]
 
 _CacheClass = None
@@ -126,7 +126,7 @@ class TestEmbeddingCache:
         가드. cache_layer._hash_key가 model 인자를 받아 분리하도록 변경된 게
         실제로 적용됐는지 행동으로 검증.
         """
-        from lloydk.adapters.embedding.cache_layer import _hash_key
+        from koipa.adapters.embedding.cache_layer import _hash_key
         text = "한국어 영업비밀 문서"
         k_none = _hash_key(text)
         k_kure = _hash_key(text, "nlpai-lab/KURE-v1")

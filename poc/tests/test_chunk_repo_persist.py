@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import uuid
 
-from lloydk.db.models import Chunk
-from lloydk.modules.m2_preprocess.chunker import Chunk as PreChunk
-from lloydk.repositories.chunk_repo import ChunkRepo, _estimate_token_count
+from koipa.db.models import Chunk
+from koipa.modules.m2_preprocess.chunker import Chunk as PreChunk
+from koipa.repositories.chunk_repo import ChunkRepo, _estimate_token_count
 
 
 class _StubSession:

@@ -11,14 +11,15 @@ import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
 
-import lloydk.services.synthesis_service as ss
-from lloydk.services.synthesis_service import SynthesisService
+import koipa.services.synthesis_service as ss
+from koipa.services.synthesis_service import SynthesisService
 
 
 def _fake_sample(status: str) -> SimpleNamespace:
     return SimpleNamespace(
         sample_id=uuid.uuid4(),
         target_level_id=2,
+        corrected_level_id=None,   # 교정 없음 — queue 응답의 corrected_grade 가 None 이어야 한다
         doc_type="인사",
         llm_provider="anthropic",
         llm_model="claude",
@@ -43,6 +44,9 @@ class _FakeRepo:
 
     def count_by_status(self, status):
         return 1
+
+    def get(self, sample_id):
+        return _fake_sample("pending_review")
 
 
 @contextmanager
@@ -81,3 +85,29 @@ def test_queue_pending_maps_to_pending_review(monkeypatch) -> None:
     resp = SynthesisService().queue(status="pending")
     assert _FakeRepo.last_status == "pending_review"  # API 'pending' → DB 'pending_review'
     assert resp.total == 1
+
+
+def test_queue_keeps_domain_and_document_type_separate(monkeypatch) -> None:
+    _patch(monkeypatch)
+    sample = _fake_sample("pending_review")
+    sample.domain_code = "finance"
+    sample.doc_type = "결산 초안"
+
+    class _DomainRepo(_FakeRepo):
+        def list_by_status(self, status, *, limit=50, offset=0):
+            _FakeRepo.last_status = status
+            return [sample]
+
+    monkeypatch.setattr(ss, "SynthRepo", _DomainRepo)
+    item = SynthesisService().queue(status="pending").items[0]
+    assert item.domain == "finance"
+    assert item.document_type == "결산 초안"
+
+
+def test_document_returns_full_content_for_the_open_document_view(monkeypatch) -> None:
+    """큐 발췌문과 별도로 문서 열기 API가 전체 본문을 가져온다."""
+    _patch(monkeypatch)
+    detail = SynthesisService().document(uuid.uuid4())
+    assert detail is not None
+    assert detail.content == "본문 미리보기"
+    assert detail.preview == "본문 미리보기"

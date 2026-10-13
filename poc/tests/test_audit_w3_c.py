@@ -27,8 +27,8 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.modules.m3_labeling.pipeline import LabelingPipeline
-from lloydk.modules.m3_labeling.rule_engine import LabelRuleEngine
+from koipa.modules.m3_labeling.pipeline import LabelingPipeline
+from koipa.modules.m3_labeling.rule_engine import LabelRuleEngine
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ class TestDatasetLeakGuard:
 # ---------------------------------------------------------------------------
 class TestConfigEnvExplicit:
     def _make_settings(self, env_lines: str, **kwargs):
-        from lloydk.config import Settings
+        from koipa.config import Settings
 
         d = tempfile.mkdtemp()
         envf = os.path.join(d, ".env")
@@ -282,7 +282,7 @@ class TestConfigEnvExplicit:
         return Settings(_env_file=envf, **kwargs)
 
     def test_dotenv_value_treated_as_explicit(self, monkeypatch):
-        from lloydk.config import apply_profile_defaults
+        from koipa.config import apply_profile_defaults
 
         # os.environ에는 없지만 .env에는 POC_MODE=dryrun. full-train은 full을 강제하려 함.
         monkeypatch.delenv("POC_MODE", raising=False)
@@ -293,7 +293,7 @@ class TestConfigEnvExplicit:
         assert src["poc_mode"] == "explicit"
 
     def test_unset_field_still_filled_by_profile(self, monkeypatch):
-        from lloydk.config import apply_profile_defaults
+        from koipa.config import apply_profile_defaults
 
         monkeypatch.delenv("POC_MODE", raising=False)
         monkeypatch.delenv("ENABLE_TRAINING", raising=False)
@@ -305,7 +305,7 @@ class TestConfigEnvExplicit:
 
     def test_os_environ_still_explicit(self, monkeypatch):
         """기존 계약 호환: 진짜 환경변수도 여전히 explicit로 인식."""
-        from lloydk.config import Settings, apply_profile_defaults
+        from koipa.config import Settings, apply_profile_defaults
 
         monkeypatch.setenv("LLM_PROVIDER", "openai")
         s = Settings(deploy_profile="lite-noapi")

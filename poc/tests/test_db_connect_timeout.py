@@ -6,11 +6,11 @@ postgresql 드라이버에 connect_timeout을 주입한다. 본 테스트는 주
 
 from __future__ import annotations
 
-from lloydk.db import session as _sess
+from koipa.db import session as _sess
 
 
 def test_postgres_url_gets_connect_timeout(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(
         cfg.settings, "database_url", "postgresql+psycopg://u:p@h:5432/db", raising=False
@@ -20,14 +20,14 @@ def test_postgres_url_gets_connect_timeout(monkeypatch):
 
 
 def test_non_postgres_url_no_connect_timeout(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(cfg.settings, "database_url", "sqlite:///x.db", raising=False)
     assert _sess._engine_connect_args() == {}
 
 
 def test_zero_timeout_disables(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(
         cfg.settings, "database_url", "postgresql+psycopg://u:p@h/db", raising=False

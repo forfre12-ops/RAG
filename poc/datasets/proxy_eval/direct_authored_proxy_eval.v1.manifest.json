@@ -1,0 +1,13 @@
+{
+  "claim_scope": "Proxy-only evaluation source; not Locked Gold or customer-real accuracy evidence.",
+  "grade_counts": {
+    "S1": 250,
+    "S2": 250,
+    "S3": 300,
+    "TS": 200
+  },
+  "records": 1000,
+  "records_sha256": "aed8297989798cdda808d7b0b578baf84b5df5a6f8e2baa6f4ce12856658513e",
+  "schema": "direct-authored-proxy-evaluation-v1",
+  "training_forbidden": true
+}

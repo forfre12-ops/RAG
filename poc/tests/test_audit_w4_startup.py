@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-import lloydk.api._jwt_auth as _jwt_auth
+import koipa.api._jwt_auth as _jwt_auth
 
 
 def test_assert_production_auth_config_noop_in_test_env():
@@ -24,7 +24,7 @@ def test_lifespan_invokes_production_auth_config(monkeypatch):
     monkeypatch.setattr(_jwt_auth, "assert_production_auth_config", lambda: calls.append(1))
     from fastapi.testclient import TestClient
 
-    from lloydk.api.app import app
+    from koipa.api.app import app
 
     with TestClient(app):  # __enter__ 가 lifespan startup 을 실행
         pass

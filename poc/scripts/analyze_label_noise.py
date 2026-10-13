@@ -14,8 +14,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 # build_review_assist와 동일한 사법 문서 마커 (중복 유지: 독립 실행/CI 단순화)
 RULING_MARKERS = [

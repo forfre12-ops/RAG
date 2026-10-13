@@ -2,8 +2,24 @@
 
 from __future__ import annotations
 
-from lloydk.adapters.llm import NoopProvider
-from lloydk.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
+import pytest
+
+from koipa.adapters.llm import NoopProvider
+from koipa.modules.m1_synthesis import generator as generator_module
+from koipa.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
+
+
+def test_generator_rejects_damaged_static_prompt_before_provider_use(monkeypatch):
+    monkeypatch.setattr(
+        generator_module,
+        "SYSTEM_PROMPT",
+        "\u5f02\u5e38 decoded prompt without Hangul",
+    )
+    with pytest.raises(
+        generator_module.PromptLanguageContractError,
+        match="UTF-8/Hangul integrity gate",
+    ):
+        SyntheticDocGenerator(llm=NoopProvider())
 
 
 def test_generate_one_parses_noop_json():
@@ -48,7 +64,9 @@ def test_noop_v2_no_grade_keyword_leakage():
 
     gen = SyntheticDocGenerator(llm=NoopProvider())
     for grade in ("TS", "S1", "S2", "S3"):
-        doc = gen.generate_one(SynthRequest(target_grade=grade, domain="mixed", count=1))
+        doc = gen.generate_one(
+            SynthRequest(target_grade=grade, domain="mixed", count=1)
+        )
         full = f"{doc.title}\n\n{doc.body}"
         assert doc.parse_error is None, f"noop V2 JSON 파싱 실패 (grade={grade})"
         assert not GRADE_KEYWORD_PATTERN.search(full), (

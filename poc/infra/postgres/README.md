@@ -18,16 +18,16 @@ ES(nori+BM25)를 떼고 Postgres(pgvector dense + `ts_rank`/`pg_bigm` 어휘)로
 docker compose -f docker-compose.pgvector.yml up -d --build
 
 # 1) 스키마 (tb_rag_vectors / tb_rag_aliases + vector/pg_bigm 확장)
-DATABASE_URL=postgresql+psycopg://lloydk:lloydk_dev@localhost:5433/lloydk \
+DATABASE_URL=postgresql+psycopg://koipa:koipa_dev@localhost:5433/koipa \
   alembic upgrade head
 
 # 2) 확장 확인
 docker compose -f docker-compose.pgvector.yml exec postgres-pgvector \
-  psql -U lloydk -d lloydk -c "\dx"   # vector, pg_bigm 보여야 함
+  psql -U koipa -d koipa -c "\dx"   # vector, pg_bigm 보여야 함
 
 # 3) 실 PG 연산자 벤치 (코퍼스 적재 + dense/hybrid/raw-pg_bigm Recall)
 VECTOR_BACKEND=pg \
-DATABASE_URL=postgresql+psycopg://lloydk:lloydk_dev@localhost:5433/lloydk \
+DATABASE_URL=postgresql+psycopg://koipa:koipa_dev@localhost:5433/koipa \
   python scripts/revalidate_pg_lexical.py
 ```
 
@@ -40,7 +40,7 @@ DATABASE_URL=postgresql+psycopg://lloydk:lloydk_dev@localhost:5433/lloydk \
 
 ## 폐쇄망 주의
 - `pg_bigm`은 빌드 타임에 소스 다운로드(인터넷 필요). **빌드는 인터넷 환경에서 1회**,
-  산출 이미지(`lloydk/postgres:16-pgvector-pgbigm`)를 오프라인 번들에 동봉 → 런타임 인터넷 불요.
+  산출 이미지(`koipa/postgres:16-pgvector-pgbigm`)를 오프라인 번들에 동봉 → 런타임 인터넷 불요.
 - 게이트 통과 시 본 이미지를 메인 `docker-compose.yml`의 postgres로 승격하고
   ES 제거(전체 변경 리스트는 PR 설명/의사결정 참조).
 
@@ -48,5 +48,5 @@ DATABASE_URL=postgresql+psycopg://lloydk:lloydk_dev@localhost:5433/lloydk \
 - `Dockerfile.pgvector` — pgvector(베이스 내장) + pg_bigm(소스빌드)
 - `../../docker-compose.pgvector.yml` — 격리 스택(:5433)
 - `../../alembic/versions/a1b2c3d4e5f6_pg_rag_vectorstore.py` — 스키마
-- `../../src/lloydk/adapters/vectorstore/pg_store.py` — PgVectorStore (route ⓑ)
+- `../../src/koipa/adapters/vectorstore/pg_store.py` — PgVectorStore (route ⓑ)
 - `../../scripts/revalidate_pg_lexical.py` — 실 PG 연산자 벤치

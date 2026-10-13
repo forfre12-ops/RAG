@@ -1,8 +1,8 @@
 import pytest
 pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
-from lloydk.api.app import app
-from lloydk.config import settings
+from koipa.api.app import app
+from koipa.config import settings
 
 
 def test_healthz():
@@ -11,9 +11,7 @@ def test_healthz():
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "ok"
-        assert data["operational_config"]["rag"]["embedding_model"] == "nlpai-lab/KURE-v1"
-        assert data["operational_config"]["rag"]["search_mode"] == "hybrid"
-        assert data["operational_config"]["rag"]["chunk_size"] == 1200
+        assert data["operational_config"]["classifier_model_dir"] is not None
         assert "readiness" in data
         assert data["readiness"]["status"] in {"ok", "missing", "error"}
 

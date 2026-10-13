@@ -9,40 +9,32 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.exc import OperationalError
+from _pg_probe import postgres_available
 
-from lloydk.db import SessionLocal, engine
-from lloydk.db.models import (
+from koipa.db import SessionLocal
+from koipa.db.models import (
     ClassificationLevel,
     Correction,
     Document,
 )
-from lloydk.repositories import (
+from koipa.repositories import (
     AuditRepo,
     ClassifyRepo,
     LlmUsageRepo,
     SynthRepo,
     TrainingRepo,
 )
-
-
-def _pg_ok() -> bool:
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return True
-    except OperationalError:
-        return False
-    except Exception:  # noqa: BLE001
-        return False
-
+from koipa.services.audit_chain import parse_chained_hash
 
 pytestmark = pytest.mark.fullstack
 
 
 def _require_pg() -> None:
-    if not _pg_ok():
+    # [2026-10-12] 종전엔 이 파일만의 engine.connect() 직접 호출(타임아웃 없음)이었다 —
+    # 2026-10-11에 7개 파일에서 고친 것과 같은 패턴(_pg_probe 미사용 복붙)이 여기 하나
+    # 더 있었다. postgres_available()은 소켓 1초 타임아웃이 있어 PG가 내려간 채 이름
+    # 해석이 멈추는 함정(localhost IPv6)을 피한다 — 공용 도구로 교체.
+    if not postgres_available():
         pytest.skip("Postgres not reachable - start docker compose up -d postgres")
 
 
@@ -102,15 +94,37 @@ class TestClassifyRepo:
             confidence=0.92,
             alternatives=[{"level_code": "TS", "confidence": 0.05}],
             chunk_count=3,
-            rag_used=True,
-            rag_top_k=5,
         )
         assert cls.classification_id is not None
         assert cls.status == "staging"
+        assert cls.initial_status == "staging"
         assert float(cls.confidence) == pytest.approx(0.92, abs=1e-4)
 
+    def test_initial_status_frozen_after_status_update(self, db, document, levels):
+        """initial_status는 최초 게이트 판정을 동결 — 이후 status 변경(확정/교정)에 안 따라간다.
+
+        회귀 대상: 대시보드 auto_confirmed가 status='staging'만 세면 사람이 확인할수록
+        (staging→confirmed) 분자가 줄어드는 결함이 있었다. initial_status는 그 확인
+        이후에도 최초 판정 그대로 남아야 집계가 정확해진다.
+        """
+        repo = ClassifyRepo(db)
+        cls = repo.create_classification(
+            doc_id=document.doc_id,
+            model_version="v-test",
+            predicted_level_id=levels["S1"],
+            confidence=0.92,
+            alternatives=[],
+            status="staging",
+        )
+        assert cls.initial_status == "staging"
+        repo.update_status(cls.classification_id, "confirmed")
+        db.flush()
+        refetched = repo.get(cls.classification_id)
+        assert refetched.status == "confirmed"
+        assert refetched.initial_status == "staging"
+
     def test_evidence_round_trip_from_spans(self, db, document, levels):
-        from lloydk.schemas.classify import EvidenceSpan
+        from koipa.schemas.classify import EvidenceSpan
 
         repo = ClassifyRepo(db)
         cls = repo.create_classification(
@@ -130,7 +144,7 @@ class TestClassifyRepo:
         assert added == 2
         db.flush()
 
-        from lloydk.db.models import ClassificationEvidence
+        from koipa.db.models import ClassificationEvidence
 
         evs = (
             db.query(ClassificationEvidence)
@@ -138,6 +152,58 @@ class TestClassifyRepo:
             .all()
         )
         assert len(evs) == 2
+
+    def test_evidence_does_not_overflow_real_numeric_column(self, db, document, levels):
+        """2026-10-12 KL 실운영 로그: psycopg.errors.NumericValueOutOfRange로 근거 INSERT가
+        통째로 실패했었다. 지금까지의 테스트는 전부 MagicMock DB라 실제 Postgres의
+        Numeric(4,3) 제약을 통과한 적이 없었다 — 이게 실제 제약에 부딫혀보는 첫 테스트다.
+
+        1) 원래 버그를 그대로 재현하는 값(과거엔 여기서 NumericValueOutOfRange가 났다)이
+           classify_repo.py의 2차 방어(클램프)만으로도 실제 DB에 안전하게 들어가는지.
+        2) m3_labeling/pipeline.py._evidence_contribution()이 애초에 만들어내는 값(극단적인
+           count)도 실제 DB에 그대로 들어가는지 — 클램프가 동작할 필요조차 없어야 한다.
+        """
+        from koipa.modules.m3_labeling.pipeline import _evidence_contribution
+        from koipa.schemas.classify import EvidenceSpan
+
+        repo = ClassifyRepo(db)
+        cls = repo.create_classification(
+            doc_id=document.doc_id,
+            model_version="v",
+            predicted_level_id=levels["TS"],
+            confidence=0.85,
+            alternatives=[],
+        )
+
+        # (1) 수정 전 코드가 그대로 DB에 보냈을 값 — count=2 * weight=9.99.
+        pre_fix_overflow_value = 19.98
+        # (2) 지금 공식이 극단적인 count(=100만 회 매칭)에서 실제로 내놓는 값.
+        extreme_count_value = _evidence_contribution(1_000_000, 9.99)
+        # count가 이 정도로 크면 round(...,3)이 weight와 '정확히 같게' 반올림할 수 있다
+        # (test_evidence_contribution_bound.py에서 이미 증명한 성질) — 그래도 9.999는 못 넘는다.
+        assert extreme_count_value <= 9.99
+
+        spans = [
+            EvidenceSpan(start=0, end=4, text="과거버그재현", weight=pre_fix_overflow_value),
+            EvidenceSpan(start=5, end=9, text="극단count", weight=extreme_count_value),
+        ]
+        added = repo.add_evidence_from_spans(
+            cls.classification_id, spans=spans, default_chunk_id=uuid.uuid4()
+        )
+        db.flush()  # 실제 INSERT가 여기서 나간다 — 터진다면 여기서 OperationalError/DataError
+
+        assert added == 2
+        from koipa.db.models import ClassificationEvidence
+
+        evs = (
+            db.query(ClassificationEvidence)
+            .filter_by(classification_id=cls.classification_id)
+            .order_by(ClassificationEvidence.excerpt_start)
+            .all()
+        )
+        assert len(evs) == 2
+        assert float(evs[0].contribution) == pytest.approx(9.999, abs=1e-3)  # 클램프됨
+        assert float(evs[1].contribution) == pytest.approx(extreme_count_value, abs=1e-3)
 
     def test_correction_direction_underclass(self, db, document, levels):
         """원본 S2(3) → 보정 TS(1): order 감소 = underclass (보안 미탐)."""
@@ -224,7 +290,6 @@ class TestTrainingRepo:
         repo = TrainingRepo(db)
         run = repo.create_run(
             total_samples=500,
-            train_count=350, val_count=75, test_count=75,
             hyperparameters={"lr": 2e-5, "epochs": 5},
             trigger_type="manual",
         )
@@ -235,12 +300,6 @@ class TestTrainingRepo:
         run_refreshed = repo.get_run(run.run_id)
         assert run_refreshed.status == "running"
         assert run_refreshed.started_at is not None
-
-        repo.log_epoch(run.run_id, 1, train_loss=0.5, val_loss=0.6, val_metrics={"f1": 0.7})
-        repo.log_epoch(run.run_id, 2, train_loss=0.3, val_loss=0.4, val_metrics={"f1": 0.85})
-        db.flush()
-        epochs = repo.epochs_for_run(run.run_id)
-        assert [e.epoch for e in epochs] == [1, 2]
 
         repo.mark_completed(run.run_id, final_metrics={"f1_macro": 0.85, "fnr": 0.04}, duration_sec=1234)
         db.flush()
@@ -266,16 +325,6 @@ class TestTrainingRepo:
         assert active is not None
         assert active.version_id == mv.version_id
 
-    def test_register_dataset_rows(self, db, document, levels):
-        repo = TrainingRepo(db)
-        run = repo.create_run(total_samples=1)
-        # 같은 문서를 한 split에만 등록 (UNIQUE(run_id, doc_id))
-        count = repo.register_dataset_rows(
-            run.run_id, [(document.doc_id, "train", levels["S2"])]
-        )
-        assert count == 1
-
-
 # ============================================================
 # SynthRepo
 # ============================================================
@@ -288,13 +337,24 @@ class TestSynthRepo:
             llm_provider="anthropic",
             llm_model="claude-sonnet-4-6",
             generated_content="합성 본문 ...",
+            domain_code="tech",
             doc_type="기술도면",
             quality_score=0.88,
         )
         assert sd.review_status == "pending_review"
+        assert sd.domain_code == "tech"
+        assert sd.doc_type == "기술도면"
 
-        pending = repo.list_pending_review()
-        assert any(s.sample_id == sd.sample_id for s in pending)
+        # list_pending_review 는 limit=50 · created_at 오름차순이다. 공유 DB 에 pending 이
+        # 50건 넘게 쌓이면 **방금 만든 샘플이 가장 뒤라 상위 50건 밖으로 밀려난다**
+        # (실측 2026-08-12: pending 55건 상태에서 이 단언이 깨졌다 — 코드 결함이 아니라
+        # 테스트가 공유 DB 누적을 고려하지 않은 것이다).
+        # 조회 자체가 동작하는지와, 내가 만든 건이 pending 으로 잡히는지를 나눠 본다.
+        assert repo.list_pending_review(), "pending 조회가 비어 있다"
+        mine = repo.list_by_status(
+            "pending_review", limit=repo.count_pending_review() or 1
+        )
+        assert any(s.sample_id == sd.sample_id for s in mine)
 
         reviewed = repo.review(sd.sample_id, approved=True, reviewed_by="qa@test")
         assert reviewed is not None
@@ -340,7 +400,12 @@ class TestAuditRepo:
         )
         db.flush()
         assert a.payload_hash is not None
-        assert len(a.payload_hash) == 64  # SHA-256 hex
+        # Direct repository writes join the append-only audit chain.  The
+        # column stores the compact ``previous-link:current-link`` format,
+        # not a standalone SHA-256 digest.
+        prev, current = parse_chained_hash(a.payload_hash)
+        assert len(prev) == 16
+        assert len(current) == 32
 
     def test_record_with_explicit_hash(self, db):
         repo = AuditRepo(db)

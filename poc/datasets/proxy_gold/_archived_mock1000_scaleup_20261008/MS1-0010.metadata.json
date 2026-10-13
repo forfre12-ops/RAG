@@ -1,0 +1,17 @@
+{
+ "doc_id": "MS1-0010",
+ "intended_label": "S1",
+ "document_origin": "synthetic",
+ "document_type": "모의문서(경영/사업계획 정보, 내부 공지)",
+ "department": "경영",
+ "info_type": "사업계획 정보",
+ "doc_format": "내부 공지",
+ "authoring_method": "claude_subagent_playbook_scaleup_20261007",
+ "requires_manual_audit": true,
+ "candidate_status": "proposed",
+ "source_reference": "AI 합성(Claude 서브에이전트 41개 작업) — guide40 카탈로그(부서·정보유형→등급) 직접 배정 + 외부 생성기(DataGen Studio) 대비 규칙위반(반복금지어·실명호칭·보고서구조 편중) 전수 해소",
+ "claim_scope": "검수 전 후보. 전문가 확정 전까지 등급은 잠정값이며 실 비밀정보 아님(전부 가상 내용). 통계적 지름길 검사(TF-IDF 지름길기준선이 모델보다 11.4%p 앞섬, 2026-10-08) 미해소 — 회귀·규칙준수 시험용으로만 쓸 것.",
+ "import_note": "등급명을 작성자에게 알리지 않고 부서·정보유형·민감도 설명만으로 작성시킨 문서(mock1000과 동일 부서 비중 1,001건). 상세는 README_읽어주십시오.md 참조.",
+ "review_batch": "mock1000_scaleup_20261007",
+ "review_batch_note": "KL장점(구체적 상황설정)+우리규칙(반복금지어·실명금지 등) 결합 모의문서(2026-10-07~08, 1,001건, 제외 0건). 콘솔에서 review_batch=mock1000_scaleup_20261007 로 필터링."
+}

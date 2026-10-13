@@ -12,13 +12,13 @@ import tempfile
 
 import pytest
 
-from lloydk.adapters.llm.base import UsageRecord
-from lloydk.api.prom_metrics import (
+from koipa.adapters.llm.base import UsageRecord
+from koipa.api.prom_metrics import (
     LLM_CALLS_TOTAL,
     LLM_COST_USD_TOTAL,
     LLM_TOKENS_TOTAL,
 )
-from lloydk.services.llm_usage_service import LLMUsageService
+from koipa.services.llm_usage_service import LLMUsageService
 
 pytestmark = pytest.mark.slow
 
@@ -74,7 +74,7 @@ def test_zero_tokens_does_not_emit_token_counter():
 
 def test_record_does_not_raise_when_metrics_unavailable(monkeypatch):
     """Prometheus 카운터가 깨져도 record()는 정상 완료(_emit_metrics 내부 except 흡수)."""
-    import lloydk.api.prom_metrics as pm
+    import koipa.api.prom_metrics as pm
 
     class _Boom:
         def labels(self, *a):

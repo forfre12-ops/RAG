@@ -1,0 +1,1140 @@
+"""Training service — TrainingRun + Celery 트리거 + 상태 폴링.
+
+PoC 흐름:
+1. /train POST → TrainingRun(status='queued') + JobStore에 등록
+2. classify_async와 달리 실 학습은 무거우니, 본 PoC는 즉시 'queued'만 반환
+   (운영에서는 Celery train_classifier_task 발사)
+3. /train/jobs/{id} GET → TrainingRun(DB) + JobStore(메모리) 머지
+4. /train/jobs GET → TrainingRun 최근 목록
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import datetime as dt
+import json
+import logging
+import math
+import uuid
+from pathlib import Path
+from typing import Any, Optional
+
+from sqlalchemy.exc import SQLAlchemyError
+
+from koipa.config import settings
+from koipa.db import session_scope
+from koipa.repositories import TrainingRepo
+from koipa.schemas.training import (
+    ModelMetricsComparison,
+    TrainJobList,
+    TrainJobSummary,
+    TrainRequest,
+    TrainReportResponse,
+    TrainResponse,
+    TrainStatus,
+    TrainingCurvePoint,
+)
+from koipa.services.async_classify_service import _celery_dispatch_available
+from koipa.services.job_store import get_default_store
+
+logger = logging.getLogger(__name__)
+
+
+class TrainingInputRejected(ValueError):
+    """A requested training input failed its pre-enqueue evidence gate."""
+
+
+class TrainingDatasetUnavailable(RuntimeError):
+    """학습 입력이 워커에 준비되지 않았을 때 제출을 막는 운영 오류.
+
+    내부 원인은 로그에만 남긴다. API/콘솔에 호스트 경로나 권한 정보를 그대로
+    노출하면 운영자에게는 도움이 되지만 일반 사용자에게는 조치할 수 없는 정보다.
+    """
+
+    public_message = "학습 데이터가 서버에 준비되지 않았습니다. 관리자에게 문의하세요."
+
+
+class TrainingDatasetTooSmall(TrainingInputRejected):
+    """The formal training dataset is present but not large or balanced enough."""
+
+    public_message = (
+        "정식 학습 데이터가 부족합니다. 학습 데이터는 총 400건 이상 및 "
+        "등급(TS/S1/S2/S3)별 50건 이상, 검증·평가 데이터는 각각 총 80건 이상 및 "
+        "등급별 10건 이상이 필요합니다."
+    )
+
+
+class IncrementalTrainingNotReady(TrainingInputRejected):
+    """The confirmed correction batch cannot safely start an incremental run yet."""
+
+
+_REQUIRED_LABELS = ("TS", "S1", "S2", "S3")
+_MIN_ROWS_BY_SPLIT = {"train": 400, "val": 80, "test": 80}
+_MIN_ROWS_PER_LABEL_BY_SPLIT = {"train": 50, "val": 10, "test": 10}
+# trainer._dataset_split와 같은 run-directory 파일명 규약. API preflight만 옛
+# ``train.jsonl``을 고집하면 worker가 읽을 수 있는 materialized dataset을 두고도
+# 제출을 막거나, 반대로 API/worker가 서로 다른 파일을 검증하게 된다.
+_DATASET_SPLIT_ALIASES = {
+    "train": ("train_chunks.jsonl", "train_documents.jsonl"),
+    "val": ("validation_documents.jsonl",),
+    "test": ("calibration_documents.jsonl",),
+}
+
+
+def _dataset_split_paths(spec_kwargs: dict[str, Any] | None = None) -> dict[str, Path]:
+    """이번 실행이 읽을 train/val/test 경로를 TrainSpec과 같은 규칙으로 계산한다."""
+    supplied = spec_kwargs or {}
+    configured_root = str(settings.training_dataset_dir or "").strip()
+    if configured_root:
+        root = Path(configured_root)
+    else:
+        # 빈 설정도 아래 공통 오류 경로에서 사용자가 이해할 수 있게 처리한다.
+        root = Path("__training_dataset_dir_not_configured__")
+    paths: dict[str, Path] = {}
+    for split in ("train", "val", "test"):
+        supplied_path = supplied.get(f"{split}_path")
+        if supplied_path:
+            paths[split] = Path(str(supplied_path))
+            continue
+        primary = root / f"{split}.jsonl"
+        if primary.is_file():
+            paths[split] = primary
+            continue
+        paths[split] = next(
+            (root / name for name in _DATASET_SPLIT_ALIASES[split] if (root / name).is_file()),
+            primary,
+        )
+    return paths
+
+
+def ensure_training_dataset_ready(
+    spec_kwargs: dict[str, Any] | None = None,
+    *,
+    require_full_train_distribution: bool = True,
+) -> dict[str, int]:
+    """학습 큐 등록 전 데이터셋의 형식·최소량·등급 균형을 보장한다.
+
+    API 컨테이너가 통과해도 워커 마운트가 달라질 수 있으므로 workers.tasks에서도
+    같은 함수를 다시 호출한다. 실패하면 TrainingRun을 만들거나 무거운 모델 import를
+    하기 전에 막는다.
+
+    이 값은 "학습 후보를 만들 최소선"일 뿐, 배포 승인 기준은 아니다. 기준 모델의
+    train은 400건 및 등급별 50건, 검증·평가(val/test)는 각각 80건 및 등급별 10건을
+    요구한다. 증분 배치 자체는 별도 50건 게이트와 제한된 replay로 구성되므로,
+    ``require_full_train_distribution=False``일 때는 비어 있지 않은지만 확인한다.
+    """
+    counts: dict[str, int] = {}
+    label_counts: dict[str, dict[str, int]] = {}
+    problems: list[str] = []
+    for split, path in _dataset_split_paths(spec_kwargs).items():
+        try:
+            rows = 0
+            labels = {label: 0 for label in _REQUIRED_LABELS}
+            unknown_labels: set[str] = set()
+            with path.open(encoding="utf-8") as fh:
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    row = json.loads(line)
+                    label = str(row.get("label") or "").strip()
+                    if label in labels:
+                        labels[label] += 1
+                    else:
+                        unknown_labels.add(label or "(empty)")
+                    rows += 1
+            if rows == 0:
+                problems.append(f"{split}: empty ({path})")
+            else:
+                counts[split] = rows
+                label_counts[split] = labels
+                if unknown_labels:
+                    problems.append(
+                        f"{split}: unknown labels {','.join(sorted(unknown_labels))} ({path})"
+                    )
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            problems.append(f"{split}: {type(exc).__name__} ({path})")
+    if problems:
+        detail = "; ".join(problems)
+        logger.error("training submission blocked: dataset preflight failed: %s", detail)
+        raise TrainingDatasetUnavailable(detail)
+
+    shortages: list[str] = []
+    for split in ("train", "val", "test"):
+        if split == "train" and not require_full_train_distribution:
+            if counts[split] < 1:
+                shortages.append("train total=0<1")
+            continue
+        minimum = _MIN_ROWS_BY_SPLIT[split]
+        if counts[split] < minimum:
+            shortages.append(f"{split} total={counts[split]}<{minimum}")
+        per_label_minimum = _MIN_ROWS_PER_LABEL_BY_SPLIT[split]
+        for label in _REQUIRED_LABELS:
+            actual = label_counts[split][label]
+            if actual < per_label_minimum:
+                shortages.append(f"{split}.{label}={actual}<{per_label_minimum}")
+    if shortages:
+        detail = "; ".join(shortages)
+        logger.warning("training submission blocked: insufficient dataset: %s", detail)
+        raise TrainingDatasetTooSmall(detail)
+    return counts
+
+
+def resolve_active_incremental_model() -> tuple[str, str]:
+    """Return the active classifier checkpoint for a true incremental run.
+
+    The database contains an internal artifact location; it is deliberately
+    returned to the worker only and never copied into an API response or run
+    history.  The worker checks its own volume topology before loading it.
+    """
+    try:
+        with session_scope() as db:
+            active = TrainingRepo(db).get_active()
+            if active is None:
+                raise IncrementalTrainingNotReady(
+                    "증분 학습을 시작할 활성 분류 모델이 없습니다. 초기 기준 모델을 먼저 승인·활성화하세요."
+                )
+            model_uri = str(getattr(active, "model_uri", "") or "").strip()
+            version_label = str(getattr(active, "version_label", "") or "").strip()
+            if not model_uri or not version_label:
+                raise IncrementalTrainingNotReady(
+                    "활성 분류 모델의 학습 산출물을 확인할 수 없습니다. 초기 기준 모델을 다시 배포하세요."
+                )
+            return model_uri, version_label
+    except IncrementalTrainingNotReady:
+        raise
+    except SQLAlchemyError as exc:
+        logger.warning("incremental model lookup failed: %s", exc)
+        raise IncrementalTrainingNotReady(
+            "증분 학습에 사용할 활성 분류 모델을 확인할 수 없습니다. 관리자에게 문의하세요."
+        ) from exc
+
+
+def ensure_incremental_training_ready() -> dict[str, Any]:
+    """Enforce the operator-facing incremental-training admission gate.
+
+    A raw correction count is an early gate.  The worker repeats the gate after
+    reconstructing text and removing evaluation-set overlaps, before it can
+    consume any correction.  This prevents a superficially large but unusable
+    batch from being marked as learned.
+    """
+    from koipa.modules.m6_evaluation.active_learning import (  # noqa: PLC0415
+        DEFAULT_RECOMMENDED,
+        evaluate_retraining_need,
+    )
+
+    status = evaluate_retraining_need(recommended_threshold=DEFAULT_RECOMMENDED)
+    if status.unconsumed_total < DEFAULT_RECOMMENDED:
+        raise IncrementalTrainingNotReady(
+            "증분 학습은 사람이 확정한 미반영 검수 데이터가 "
+            f"{DEFAULT_RECOMMENDED}건 이상일 때만 시작할 수 있습니다 "
+            f"(현재 {status.unconsumed_total}건)."
+        )
+    initial_model_path, initial_model_version = resolve_active_incremental_model()
+    return {
+        "confirmed_correction_count": status.unconsumed_total,
+        "minimum_confirmed_corrections": DEFAULT_RECOMMENDED,
+        "initial_model_path": initial_model_path,
+        "initial_model_version": initial_model_version,
+    }
+
+
+def _advisory_xact_lock(db, _key=None) -> None:
+    """모델 활성 전환 직렬화 — 트랜잭션 단위 잠금(전용 표의 행 잠금, db/locks.py).
+
+    [2026-09-05] 종전에는 pg_advisory_xact_lock 을 쏘고 예외를 흡수했다 — PostgreSQL 이 아닌
+    dialect 에서 **조용히 열려** 두 재학습이 동시에 활성을 다툴 수 있었다. 지금은 dialect 와
+    무관하게 행 잠금을 건다. 못 얻어도 진행한다(모델 등록 자체를 막는 것이 더 큰 사고) — 경고가 남는다.
+
+    _key 는 옛 호출부 호환용이며 쓰이지 않는다(잠금 이름은 db/locks.MODEL_ACTIVATION).
+    """
+    from koipa.db.locks import MODEL_ACTIVATION, advisory_xact_lock  # noqa: PLC0415
+
+    if not advisory_xact_lock(db, MODEL_ACTIVATION):
+        logger.warning(
+            "모델 활성 전환 잠금 미획득 — 직렬화 없이 진행한다. 동시 등록이 있으면 "
+            "활성 모델이 서로 덮어써질 수 있다.",
+        )
+
+
+def _report_metrics(report: Any) -> dict:
+    """TrainReport(dataclass)/dict/객체 → metric dict 정규화 (ModelVersion.metrics 저장용).
+
+    여기서 저장 시각을 평가 시각으로 만들어 넣지 않는다. 과거 report를 나중에 등록해도
+    평가가 그 순간 실행된 것은 아니기 때문이다. 실제 학습 평가는 trainer가 test 예측을
+    끝낸 시점의 ``evaluated_at``을 명시해 넘긴다.
+    """
+    if isinstance(report, dict):
+        return dict(report)
+    if dataclasses.is_dataclass(report) and not isinstance(report, type):
+        return dataclasses.asdict(report)
+    to_dict = getattr(report, "to_dict", None)
+    if callable(to_dict):
+        try:
+            d = to_dict()
+            if isinstance(d, dict):
+                return d
+        except Exception:  # noqa: BLE001
+            pass
+    d = getattr(report, "__dict__", None)
+    return dict(d) if isinstance(d, dict) else {}
+
+
+def _finite_number(value: Any) -> float | None:
+    """사용자/구버전 metric JSON에서 숫자만 안전하게 읽는다."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        out = float(value)
+        return out if math.isfinite(out) else None
+    return None
+
+
+def _stored_learning_curve(metrics: dict[str, Any]) -> list[TrainingCurvePoint]:
+    """저장된 손실 이력을 화면용 계약으로 정규화한다.
+
+    새 학습은 ``learning_curve``를 기록한다. 과거 모델 또는 실험 스크립트는
+    ``loss_history``/HF ``log_history``라는 이름을 쓸 수 있어 읽기 호환만 제공한다.
+    데이터가 없으면 빈 배열을 반환하며, 서비스가 가짜 곡선을 만들지 않는다.
+
+    [2026-10-11] accuracy도 같이 읽는다(KL 요구사항 6절 Epoch별 Accuracy 그래프) — 저장
+    형식은 trainer.py의 정규화 키("accuracy") 또는 HF 원본 키("eval_accuracy") 둘 다 받는다.
+    """
+    source: Any = None
+    for key in ("learning_curve", "loss_history", "log_history"):
+        candidate = metrics.get(key)
+        if isinstance(candidate, list):
+            source = candidate
+            break
+    if source is None:
+        return []
+
+    points: list[TrainingCurvePoint] = []
+    for row in source[:500]:  # 손상된 DB 값이 리포트 응답을 비대하게 만들지 않게 상한
+        if not isinstance(row, dict):
+            continue
+        train_loss = _finite_number(row.get("train_loss", row.get("loss")))
+        eval_loss = _finite_number(row.get("eval_loss", row.get("validation_loss")))
+        accuracy = _finite_number(row.get("accuracy", row.get("eval_accuracy")))
+        if train_loss is None and eval_loss is None and accuracy is None:
+            continue
+        epoch = _finite_number(row.get("epoch"))
+        step_number = _finite_number(row.get("step", row.get("global_step")))
+        points.append(
+            TrainingCurvePoint(
+                epoch=epoch,
+                step=int(step_number) if step_number is not None and step_number >= 0 else None,
+                train_loss=train_loss,
+                eval_loss=eval_loss,
+                accuracy=accuracy,
+            )
+        )
+    return points
+
+
+def _maybe_anchor_report(settings: Any, *, candidate_model_dir: str | None) -> dict | None:
+    """opt-in 시 후보 모델을 외부 사실 앵커 코퍼스로 통과시켜 평가 카드 dict를 반환(게이트 주입용).
+
+    fail-OPEN: 비활성/후보경로 부재/측정 실패는 None(앵커 체크 생략) — 게이트 자체의 fail-secure
+    (degenerate·fnr 회귀·locked-eval)는 그대로 유지된다. 앵커 측정은 CPU 추론 비용이 있으므로
+    기본 비활성. candidate_model_dir = train_classifier_task가 넘긴 후보 산출 경로(output_dir/version).
+    """
+    if not bool(getattr(settings, "deploy_gate_anchor_eval_enabled", False)):
+        return None
+    if not candidate_model_dir:
+        logger.info("anchor gate: 후보 모델 경로 없음 — 앵커 측정 생략")
+        return None
+    from pathlib import Path  # noqa: PLC0415
+    if not Path(candidate_model_dir).exists():
+        logger.warning("anchor gate: 후보 경로 부재(%s) — 앵커 측정 생략", candidate_model_dir)
+        return None
+    try:
+        from koipa.modules.m6_evaluation.anchor_eval import run_anchor_cards  # noqa: PLC0415
+        out = run_anchor_cards(
+            model_dir=str(candidate_model_dir),
+            cap_per_cell_n=int(getattr(settings, "deploy_gate_anchor_cap_per_cell", 200)),
+        )
+        rep = out.get("report")
+        logger.warning(
+            "anchor gate: 후보 앵커 측정 완료 — 평가 %s건, 카드 판정 %s",
+            out.get("evaluated"), (rep or {}).get("counts"),
+        )
+        return rep
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("anchor gate: 앵커 측정 실패(%s) → 앵커 체크 생략(fail-open)", type(exc).__name__)
+        return None
+
+
+def _maybe_metamorphic_report(settings: Any) -> dict | None:
+    """opt-in 시 사전 산출된 메타모픽 회귀 리포트(build_metamorphic_report.to_dict JSON)를 로드.
+
+    fail-OPEN: 경로 미설정/파일 부재/파싱 실패는 None(메타모픽 체크 생략) — 게이트의 fail-secure는
+    유지된다. anchor(후보 라이브 측정)와 달리 메타모픽은 쌍 생성(gen_metamorphic_pairs)이 별도
+    파이프라인이라, 그 산출 JSON을 경로로 받아 소비한다. **후보 모델 대상으로 재생성해야 유효**
+    (stale 리포트는 오판 위험 — 파이프라인이 재학습 eval 단계에서 갱신하는 것을 전제).
+    """
+    path = str(getattr(settings, "deploy_gate_metamorphic_report_path", "") or "").strip()
+    if not path:
+        return None
+    from pathlib import Path  # noqa: PLC0415
+    p = Path(path)
+    if not p.exists():
+        logger.warning("metamorphic gate: 리포트 경로 부재(%s) — 메타모픽 체크 생략(fail-open)", path)
+        return None
+    try:
+        import json  # noqa: PLC0415
+        rep = json.loads(p.read_text(encoding="utf-8"))
+        if not isinstance(rep, dict):
+            logger.warning("metamorphic gate: 리포트가 dict 아님 — 생략")
+            return None
+        # [계약 정합] gen_metamorphic_pairs.py 는 감사 메타(model_dir·admitted…)와 함께 실 리포트를
+        # "report" 키 아래 중첩해 쓴다. 그러나 summarize_metamorphic 은 **최상위** forward 를
+        # 읽으므로, 중첩형을 그대로 넘기면 forward=None → n=0 → measurable=False 로 **조용히 통과**
+        # 하는 fake-pass가 된다. 중첩형이면 내부 report 로 언랩해 게이트가 실제 위반을 보게 한다.
+        inner = rep.get("report")
+        if isinstance(inner, dict) and "forward" in inner:
+            rep = inner
+        fwd = (rep.get("forward") or {})
+        logger.warning(
+            "metamorphic gate: 리포트 로드 — 순방향 위반 %s/%s",
+            fwd.get("violations"), fwd.get("n"),
+        )
+        return rep
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("metamorphic gate: 리포트 로드 실패(%s) → 생략(fail-open)", type(exc).__name__)
+        return None
+
+
+def register_and_gate_model(
+    report: Any,
+    *,
+    training_run_id: uuid.UUID | None = None,
+    training_data_count: int | None = None,
+    model_uri: str | None = None,
+    eval_ready: bool | None = None,
+) -> dict:
+    """재학습 모델을 ModelVersion으로 **등록(C-ver)** 하고 배포 합격선 **게이트** 평가 (A2-②).
+
+    정책(fail-SECURE):
+      - register는 항상 시도한다 — 합격 여부와 무관하게 이력·롤백 대상 보존.
+      - activate(운영 전환)는 **게이트 통과 AND settings.retrain_auto_activate=True** 모두
+        충족할 때만. 기본 retrain_auto_activate=False라 자동배포는 일어나지 않는다(등록만).
+      - baseline = 현재 활성 ModelVersion.metrics. 없으면 최초 배포로 게이트가 처리.
+
+    DB 미가용/오류 → {'registered': False, 'reason': ...} (학습 결과 자체는 호출부가 보존).
+    반환 dict: registered/version_id/activated/gate(decision dict)/reason.
+    """
+    from koipa.config import settings  # noqa: PLC0415
+    from koipa.modules.m6_evaluation.deploy_gate import evaluate_deploy_gate  # noqa: PLC0415
+
+    metrics = _report_metrics(report)
+    version_label = str(metrics.get("model_version") or f"v-{uuid.uuid4().hex[:8]}")
+    base_model = str(metrics.get("base_model") or getattr(settings, "classifier_base_model", "unknown"))
+
+    try:
+        with session_scope() as db:
+            # [A2 동시성 락] 모델 활성 전환을 직렬화 — 두 재학습이 동시에 register/activate하며
+            # is_active 부분 UNIQUE 인덱스를 다투거나 서로의 활성을 덮어쓰는 레이스를 막는다.
+            # 잠금은 트랜잭션 종료(commit/rollback)에 자동 해제된다(db/locks.py · 두 dialect 동일).
+            _advisory_xact_lock(db)
+            repo = TrainingRepo(db)
+            baseline = repo.get_active()
+            baseline_metrics = dict(baseline.metrics) if baseline and baseline.metrics else None
+            baseline_label = baseline.version_label if baseline else None
+
+            # [앵커 연결] 후보를 외부 사실 앵커로 측정해 게이트에 실측 미탐 신호를 주입(opt-in).
+            # 측정 실패는 fail-OPEN(앵커 체크 생략) — 게이트 자체는 fail-secure 유지되고 자동활성은
+            # eval_ready locked 게이트가 별도로 막으므로, 앵커 미측정이 자동배포를 열지 않는다.
+            anchor_report = _maybe_anchor_report(settings, candidate_model_dir=model_uri)
+            metamorphic_report = _maybe_metamorphic_report(settings)
+            # [강제 옵트인] 외부-사실 검사를 *켜둔* 경우에만 리포트 무음 누락을 hard block 으로 승격한다.
+            # 한쪽만 쓰는 운영을 과차단하지 않도록 각 검사의 활성 여부(anchor_enabled·report_path)와 AND.
+            _require_ext = bool(getattr(settings, "deploy_gate_require_external_fact_eval", False))
+            _anchor_on = bool(getattr(settings, "deploy_gate_anchor_eval_enabled", False))
+            _meta_on = bool(str(getattr(settings, "deploy_gate_metamorphic_report_path", "") or "").strip())
+
+            decision = evaluate_deploy_gate(
+                metrics,
+                baseline_metrics,
+                fnr_high_tolerance=float(getattr(settings, "retrain_fnr_high_tolerance", 0.02)),
+                f1_drop_tolerance=float(getattr(settings, "retrain_f1_drop_tolerance", 0.05)),
+                first_deploy_fnr_high_max=getattr(settings, "deploy_gate_first_deploy_fnr_high_max", None),
+                anchor_report=anchor_report,
+                require_anchor=_require_ext and _anchor_on,
+                metamorphic_report=metamorphic_report,
+                metamorphic_forward_ceiling=float(getattr(settings, "deploy_gate_metamorphic_forward_ceiling", 0.0)),
+                metamorphic_min_n=int(getattr(settings, "deploy_gate_metamorphic_min_n", 5)),
+                require_metamorphic=_require_ext and _meta_on,
+                candidate_version=version_label,
+                baseline_version=baseline_label,
+            )
+
+            # 동일 label 재등록 방지(멱등) — 이미 있으면 그 버전 사용.
+            existing = repo.get_by_label(version_label)
+            if existing is not None:
+                mv = existing
+            else:
+                mv = repo.register_model_version(
+                    version_label=version_label,
+                    base_model=base_model,
+                    metrics=metrics,
+                    training_run_id=training_run_id,
+                    model_uri=model_uri,
+                )
+                if training_data_count is not None:
+                    mv.training_data_count = int(training_data_count)
+
+            auto = bool(getattr(settings, "retrain_auto_activate", False))
+            # [죽음의 나선 #4] deploy gate는 합성 test.jsonl에서 fnr를 재 실분포 오염에 맹목이다.
+            # 그래서 자동 활성은 '실(locked) 평가' readiness까지 요구한다 — eval_ready가 명시적
+            # True가 아니면(무실데이터·미확인) 자동 활성을 막는다(등록은 함; 수동 활성은 별도 경로).
+            # deploy_gate_require_locked_eval=False로 끄면 옛 동작(합성 평가만으로 자동 활성).
+            require_locked = bool(getattr(settings, "deploy_gate_require_locked_eval", True))
+            eval_block = require_locked and (eval_ready is not True)
+            activated = False
+            if decision.passed and auto and not eval_block:
+                repo.activate_model_version(mv.version_id)
+                activated = True
+                logger.warning(
+                    "retrain auto-activated: %s (gate passed, locked-eval ready, baseline=%s)",
+                    version_label, baseline_label,
+                )
+            else:
+                logger.info(
+                    "retrain registered (not activated): %s gate_passed=%s auto=%s eval_block=%s",
+                    version_label, decision.passed, auto, eval_block,
+                )
+
+            return {
+                "registered": True,
+                "version_id": str(mv.version_id),
+                "version_label": version_label,
+                "activated": activated,
+                "auto_activate": auto,
+                "eval_block": eval_block,
+                "gate": decision.to_dict(),
+            }
+    except SQLAlchemyError as exc:
+        logger.warning("register_and_gate_model skipped (DB unavailable): %s", exc)
+        return {"registered": False, "reason": f"db_unavailable:{type(exc).__name__}"}
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("register_and_gate_model failed")
+        return {"registered": False, "reason": f"error:{type(exc).__name__}:{exc}"}
+
+
+def activate_model_manually(
+    version_label: str,
+    *,
+    force: bool = False,
+    reason: str = "",
+    actor_id: str | None = None,
+    actor_role: str | None = None,
+) -> dict:
+    """[G1] 등록된 ModelVersion을 사람(admin)이 명시적으로 활성화 — 자동 경로와 별개.
+
+    자동 활성(register_and_gate_model)은 retrain_auto_activate·locked-eval 게이트로 막히지만,
+    수동 활성은 지재원 릴리스의 정상 배포 경로다. 다만 **현재 활성본 대비 deploy gate(고등급
+    미탐 fnr·f1 회귀)** 는 그대로 적용해 회귀 모델을 무심코 활성하는 것을 막고, 게이트 실패 시
+    **force=True(감사됨)** 로만 우회한다. 활성 전환은 advisory lock으로 직렬화(레이스 차단).
+    HTTP 요청 자체는 감사 미들웨어가 기록하므로 여기선 별도 audit write 없이 logger.warning만.
+
+    [배포전 하드닝 P0#①] 하드닝 프로파일(deploy_gate_manual_require_locked_eval=True)에선 회귀
+    gate에 더해 **locked_gold_eval readiness**(사람서명 평가정답)까지 요구한다 — 미검증 모델의
+    무심한 GA 활성을 막고 force=True로만 우회(감사됨). locked readiness는 요구 여부와 무관하게
+    항상 계산해 반환(locked 키)·로그에 노출(가시화).
+
+    반환: {activated, blocked, forced, version_label, version_id, reason, gate, locked, already_active}.
+    DB 미가용/미존재/오류는 예외 대신 activated=False + 명시 reason.
+    """
+    from koipa.config import settings  # noqa: PLC0415
+    from koipa.modules.m6_evaluation.deploy_gate import evaluate_deploy_gate  # noqa: PLC0415
+
+    try:
+        with session_scope() as db:
+            _advisory_xact_lock(db)
+            repo = TrainingRepo(db)
+            target = repo.get_by_label(version_label)
+            if target is None:
+                return {
+                    "activated": False, "blocked": False, "forced": False,
+                    "version_label": version_label, "version_id": None,
+                    "reason": "version_not_found", "gate": None, "locked": None,
+                }
+            baseline = repo.get_active()
+            baseline_metrics = dict(baseline.metrics) if baseline and baseline.metrics else None
+            baseline_label = baseline.version_label if baseline else None
+            already_active = bool(getattr(target, "is_active", False))
+
+            # 메타모픽은 파일 로드(저비용)라 수동 활성 경로에도 회귀 hard-signal 적용(앵커는
+            # CPU 추론 비용으로 수동 경로에선 생략 — 설계 유지). force=True면 아래에서 우회(감사됨).
+            # 수동 경로는 앵커(CPU 추론비용) 생략·메타모픽(파일 로드)만 적용 — 설계 유지. 강제 옵트인도
+            # 메타모픽에만 건다(앵커는 이 경로에서 측정 자체를 안 하므로 강제 대상 아님).
+            _require_ext = bool(getattr(settings, "deploy_gate_require_external_fact_eval", False))
+            _meta_on = bool(str(getattr(settings, "deploy_gate_metamorphic_report_path", "") or "").strip())
+            decision = evaluate_deploy_gate(
+                dict(target.metrics or {}),
+                baseline_metrics,
+                fnr_high_tolerance=float(getattr(settings, "retrain_fnr_high_tolerance", 0.02)),
+                f1_drop_tolerance=float(getattr(settings, "retrain_f1_drop_tolerance", 0.05)),
+                first_deploy_fnr_high_max=getattr(settings, "deploy_gate_first_deploy_fnr_high_max", None),
+                metamorphic_report=_maybe_metamorphic_report(settings),
+                metamorphic_forward_ceiling=float(getattr(settings, "deploy_gate_metamorphic_forward_ceiling", 0.0)),
+                metamorphic_min_n=int(getattr(settings, "deploy_gate_metamorphic_min_n", 5)),
+                require_metamorphic=_require_ext and _meta_on,
+                candidate_version=version_label,
+                baseline_version=baseline_label,
+            )
+
+            # [배포전 하드닝 P0#①] locked_gold_eval readiness — 회귀 gate와 별개의 배포 축.
+            # 항상 계산해 응답/로그에 노출(가시화)하고, 하드닝 프로파일
+            # (deploy_gate_manual_require_locked_eval=True)에선 사람서명 locked 평가가 준비되지
+            # 않으면 hard-block 한다 — 미검증 모델의 무심한 GA 활성 차단. force=True로만 우회(감사됨).
+            # readiness 계산 오류는 fail-closed(막고 force 허용). 기본(lite/dev/pilot)은 요구 안 함.
+            from koipa.modules.m6_evaluation.locked_readiness import (  # noqa: PLC0415
+                locked_eval_readiness,
+            )
+            manual_require_locked = bool(
+                getattr(settings, "deploy_gate_manual_require_locked_eval", False)
+            )
+            try:
+                locked = locked_eval_readiness()
+                locked_ready = bool(locked.get("ready"))
+            except Exception as exc:  # noqa: BLE001
+                locked = {"ready": False, "reason": f"readiness_error:{type(exc).__name__}"}
+                locked_ready = False
+            locked_block = manual_require_locked and not locked_ready
+            # [3축 연결 2026-08-16] gate_p1_candidate.py 의 판정을 활성화 조건에 넣는다.
+            # 종전에는 그 결과가 reports/v5_gate/*.json 에만 남고 **읽는 코드가 0곳**이었다
+            # (실측: grep -rn "gate_verdict|v5_gate" src/ -> 없음). 즉 3축에서 떨어진 모델도
+            # 활성화 API 로 들어갈 수 있었다.
+            #
+            # deploy_gate 와 겹치지 않는다 - 그쪽은 fnr_high·f1_macro 두 지표를 보고,
+            # 3축은 경화 홀드아웃·공개문서 FPR·적대 셋이라는 **다른 판정면**을 본다.
+            #
+            # ⚠ 기본은 fail-open 이다. 리포트가 없으면 막지 않고 사유에만 남긴다 - 3축은
+            #   사람이 손으로 돌리는 절차라 없다고 막으면 기존 수동 활성이 전부 멈춘다.
+            #   강제하려면 axis_gate_required=True 로 옵트인한다.
+            #   다만 **판정이 있고 미통과면 required 와 무관하게 막는다** - 명시적으로
+            #   떨어진 것을 통과시킬 이유는 없다.
+            try:
+                from koipa.modules.m6_evaluation.axis_gate_link import (  # noqa: PLC0415
+                    axis_gate_blocks,
+                )
+                _axis_block, _axis = axis_gate_blocks(
+                    str(getattr(target, "model_uri", "") or version_label),
+                    required=bool(getattr(settings, "axis_gate_required", False)),
+                )
+            except Exception as exc:  # noqa: BLE001
+                # 조회 실패가 활성화를 막지 않게 한다(관측만) - 게이트가 죽어서 운영이 멈추면
+                # 그것이 더 큰 사고다. 대신 사유에 남는다.
+                logger.warning("axis gate lookup failed (ignored): %s", exc)
+                _axis_block, _axis = False, None
+
+            gate_ok = decision.passed and not locked_block and not _axis_block
+
+            # [배포전 하드닝 P0#①-b/c] 하드닝 프로파일에선 force 우회 시 사유(reason)와 **식별된
+            # actor** 를 요구한다 — 미검증 모델을 GA로 강제 활성하려면 '왜'와 '누가'를 남긴다
+            # (force 금지 아님, 감사 강화). actor 없음(api_key 공유키 모드)으로는 강제활성 불가.
+            _reason_text = (reason or "").strip()
+            _actor_text = (actor_id or "").strip()
+            requires_reason = bool(getattr(settings, "manual_activate_force_requires_reason", False))
+            reason_missing = (not gate_ok) and force and requires_reason and not _reason_text
+            actor_missing = (not gate_ok) and force and requires_reason and not _actor_text
+
+            if not gate_ok and (not force or reason_missing or actor_missing):
+                reasons: list[str] = []
+                if not decision.passed:
+                    reasons.append(f"deploy_gate_failed: {decision.reason}")
+                if locked_block:
+                    reasons.append(f"locked_eval_not_ready: {locked.get('reason')}")
+                if _axis_block and _axis is not None:
+                    reasons.append(f"axis_gate_blocked: {_axis.reason}")
+                if reason_missing:
+                    reasons.append("force_reason_required: force 우회에는 사유(reason) 필수")
+                if actor_missing:
+                    reasons.append(
+                        "force_actor_required: force 우회에는 식별된 actor 필수"
+                        "(api_key 공유키 모드 불가 — AUTH_MODE=jwt 사용)"
+                    )
+                if reason_missing or actor_missing:
+                    tail = " — 식별된 actor(jwt)와 reason 으로 force=true 재시도(감사됨)"
+                else:
+                    tail = " — force=true 로만 우회(감사됨)"
+                logger.warning(
+                    "manual activate BLOCKED: %s vs baseline=%s reasons=%s force=%s actor=%s",
+                    version_label, baseline_label, reasons, force, actor_id,
+                )
+                return {
+                    "activated": False, "blocked": True, "forced": False,
+                    "version_label": version_label, "version_id": str(target.version_id),
+                    "reason": " ; ".join(reasons) + tail,
+                    "gate": decision.to_dict(), "locked": locked,
+                    "already_active": already_active,
+                }
+
+            forced = bool(force and not gate_ok)
+            if _axis is not None and not _axis.found:
+                logger.warning(
+                    "manual activate: 3축 게이트 판정 없음 - %s (fail-open 으로 진행)",
+                    _axis.reason,
+                )
+            repo.activate_model_version(target.version_id)
+            logger.warning(
+                "manual activate: version=%s baseline=%s gate_passed=%s locked_ready=%s "
+                "forced=%s reason=%r actor=%s role=%s",
+                version_label, baseline_label, decision.passed, locked_ready, forced,
+                (_reason_text if forced else ""), actor_id, actor_role,
+            )
+            _reason = "activated"
+            if forced:
+                _waived = []
+                if not decision.passed:
+                    _waived.append("deploy gate")
+                if locked_block:
+                    _waived.append("locked-eval")
+                # [P0#①-c] 강제(미검증) GA 활성은 탬퍼-증거 감사 체인에 전용 행으로 남긴다
+                # (누가·왜·무엇을 우회했나) — 활성과 같은 tx(원자적). best-effort: 미들웨어 요청 감사 +
+                # logger.warning 에 더한 명시 기록이라, 체인 write 실패해도 활성은 유지(프로젝트 감사
+                # 관례; hard fail-closed 는 audit_fail_closed_high_risk 소관).
+                try:
+                    from koipa.repositories.audit_repo import AuditRepo  # noqa: PLC0415
+                    from koipa.services.audit_chain import (  # noqa: PLC0415
+                        build_chained_hash_locked,
+                    )
+                    _payload = {
+                        "version_label": version_label, "version_id": str(target.version_id),
+                        "forced": True, "reason": _reason_text, "waived": _waived,
+                        "baseline": baseline_label, "gate_passed": decision.passed,
+                        "locked_ready": locked_ready,
+                    }
+                    _ph = build_chained_hash_locked(db, AuditRepo._hash_payload(_payload))
+                    AuditRepo(db).record(
+                        action="model.activate.forced", actor_id=actor_id,
+                        actor_role=actor_role, target_type="model_version",
+                        target_id=str(target.version_id), payload_hash=_ph, success=True,
+                    )
+                except Exception as _aexc:  # noqa: BLE001
+                    logger.warning("forced-activation audit row skipped: %s", _aexc)
+                _reason = f"activated (FORCED override — {'·'.join(_waived)} 미충족)"
+                if _reason_text:
+                    _reason += f"; 사유={_reason_text}"
+            return {
+                "activated": True, "blocked": False, "forced": forced,
+                "version_label": version_label, "version_id": str(target.version_id),
+                "reason": _reason,
+                "gate": decision.to_dict(), "locked": locked,
+                "already_active": already_active,
+            }
+    except SQLAlchemyError as exc:
+        logger.warning("activate_model_manually skipped (DB unavailable): %s", exc)
+        return {
+            "activated": False, "blocked": False, "forced": False,
+            "version_label": version_label, "version_id": None,
+            "reason": f"db_unavailable:{type(exc).__name__}", "gate": None, "locked": None,
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("activate_model_manually failed")
+        return {
+            "activated": False, "blocked": False, "forced": False,
+            "version_label": version_label, "version_id": None,
+            "reason": f"error:{type(exc).__name__}", "gate": None, "locked": None,
+        }
+
+
+def evaluate_rollback_need(
+    *, min_samples: int | None = None, fnr_high_tolerance: float | None = None
+) -> dict:
+    """활성 모델이 운영에서 미탐 회귀를 보이는지 판정 (C-ver 자동 롤백 고도화).
+
+    등록 시점 baseline(`ModelVersion.metrics.fnr_high`) 대비, **라이브 운영 데이터**
+    (classifications + corrections, `compute_metrics_from_db`)로 측정한 방향성 미탐(고등급)이
+    tolerance를 넘으면 should_rollback=True. 표본이 min_samples 미만이면 판단 보류(무동작).
+
+    순수 판정만 — 실제 롤백은 호출부(auto_rollback_tick)가 settings.auto_rollback_enabled일 때 수행.
+    DB 미가용/활성 모델 없음/baseline·라이브 데이터 부족 → should_rollback=False(안전).
+    """
+    from koipa.config import settings  # noqa: PLC0415
+    from koipa.modules.m6_evaluation.metrics import compute_metrics_from_db  # noqa: PLC0415
+
+    min_samples = int(min_samples if min_samples is not None
+                      else getattr(settings, "rollback_min_samples", 20))
+    tol = float(fnr_high_tolerance if fnr_high_tolerance is not None
+                else getattr(settings, "rollback_fnr_high_tolerance", 0.10))
+    try:
+        with session_scope() as db:
+            active = TrainingRepo(db).get_active()
+            if active is None:
+                return {"should_rollback": False, "reason": "no_active_model"}
+            label = active.version_label
+            base_fnr = (active.metrics or {}).get("fnr_high")
+    except SQLAlchemyError as exc:
+        return {"should_rollback": False, "reason": f"db_unavailable:{type(exc).__name__}"}
+
+    if base_fnr is None:
+        return {"should_rollback": False, "reason": "no_baseline_fnr_high", "active": label}
+
+    live = compute_metrics_from_db(label)
+    if live is None or live.sample_count < min_samples:
+        return {
+            "should_rollback": False, "reason": "insufficient_live_data",
+            "active": label, "samples": (live.sample_count if live else 0), "min_samples": min_samples,
+        }
+
+    by = live.fnr_underclass_by_grade or {}
+    live_fnr = ((by.get("TS", 0.0) + by.get("S1", 0.0)) / 2) if by else live.fnr_underclass_overall
+    regressed = live_fnr > float(base_fnr) + tol
+    return {
+        "should_rollback": bool(regressed),
+        "active": label,
+        "baseline_fnr_high": float(base_fnr),
+        "live_fnr_high": round(float(live_fnr), 4),
+        "tolerance": tol,
+        "samples": live.sample_count,
+        "reason": "live fnr_high regressed beyond tolerance" if regressed else "within tolerance",
+    }
+
+
+def rollback_active_model(reason: str) -> dict:
+    """현재 활성 모델을 직전 활성으로 즉시 복귀 (C-ver 롤백 트리거).
+
+    용도: 새로 활성된 모델이 운영에서 미탐 회귀를 보이거나 잘못 활성됐을 때 한 호출로 복귀.
+    활성 전환과 동일한 advisory lock으로 직렬화. DB 미가용/복귀후보 없음 → rolled_back=False.
+    """
+    try:
+        with session_scope() as db:
+            _advisory_xact_lock(db)
+            repo = TrainingRepo(db)
+            before = repo.get_active()
+            restored = repo.rollback_to_previous(reason=reason)
+            if restored is None:
+                return {
+                    "rolled_back": False,
+                    "reason": "no_previous_version",
+                    "active": before.version_label if before else None,
+                }
+            logger.warning(
+                "model rollback: %s → %s (reason=%s)",
+                before.version_label if before else None, restored.version_label, reason,
+            )
+            return {
+                "rolled_back": True,
+                "from": before.version_label if before else None,
+                "to": restored.version_label,
+                "reason": reason,
+            }
+    except SQLAlchemyError as exc:
+        logger.warning("rollback_active_model skipped (DB unavailable): %s", exc)
+        return {"rolled_back": False, "reason": f"db_unavailable:{type(exc).__name__}"}
+
+
+class TrainingService:
+    def __init__(self):
+        self.jobs = get_default_store()
+
+    def submit(self, req: TrainRequest) -> TrainResponse:
+        """학습 작업 등록. DB에 TrainingRun(queued) 1건 생성."""
+        logger.debug(
+            "training submit enter: type=%s base_model=%s actor=%s",
+            req.training_type, req.base_model, req.actor.user_id,
+        )
+        # 운영 화면은 사람이 확정한 새 검수 데이터를 활성 분류기에 반영하는 증분
+        # 학습만 연다. 전체 재구축은 초기 기준 모델/사고 복구용 내부 절차다.
+        if req.training_type != "incremental":
+            raise TrainingInputRejected(
+                "정식 전체 학습은 초기 기준 모델 재구축 절차에서만 수행합니다. 운영 화면에서는 증분 학습만 제출할 수 있습니다."
+            )
+        # 내부 설정값은 재현성·감사 목적의 TrainSpec에 고정하고, 운영자가 임의 값으로
+        # 후보를 만들어 비교 불가능하게 하는 API 입력은 받지 않는다.
+        if req.hyperparams:
+            raise TrainingInputRejected(
+                "운영 증분 학습의 실행 설정은 검증된 기본값으로 고정되어 있습니다."
+            )
+        if req.include_approved_synthetic:
+            raise TrainingInputRejected(
+                "운영 증분 학습에는 사람이 확정한 검수 데이터만 반영할 수 있습니다."
+            )
+        dataset_counts = ensure_training_dataset_ready()
+        incremental = ensure_incremental_training_ready()
+        # DB 작업 이력에는 artifact filesystem 경로를 저장하지 않는다. 버전/건수만
+        # 남기고, checkpoint 경로는 Celery worker payload에서만 사용한다.
+        run_hyperparameters: dict[str, Any] = {
+            "training_mode": "incremental",
+            "confirmed_correction_count": incremental["confirmed_correction_count"],
+            "minimum_confirmed_corrections": incremental["minimum_confirmed_corrections"],
+            "initial_model_version": incremental["initial_model_version"],
+        }
+        worker_spec_kwargs = dict(run_hyperparameters)
+        # This is deliberately passed to the worker, not merely recorded in
+        # JobStore, so the displayed model and the model actually trained stay
+        # identical.
+        worker_spec_kwargs["base_model"] = req.base_model
+        worker_spec_kwargs["initial_model_path"] = incremental["initial_model_path"]
+        worker_spec_kwargs["initial_model_version"] = incremental["initial_model_version"]
+        synthetic_snapshot: dict | None = None
+        if req.include_approved_synthetic:
+            # 승인 큐는 작업 대기 중에도 바뀔 수 있다. 제출 시점의 검증 통과 행을
+            # JSONL+manifest로 동결하고, 워커는 이 파일만 소비한다.
+            from koipa.config import settings  # noqa: PLC0415
+            from koipa.services.synthesis_service import SynthesisService  # noqa: PLC0415
+
+            try:
+                frozen = SynthesisService().freeze_training_candidate(settings.retrain_dataset_dir)
+            except OSError as exc:
+                raise TrainingInputRejected("승인 모의 문서 스냅샷을 만들 수 없습니다") from exc
+            candidate = frozen.get("candidate")
+            if not frozen.get("ready") or candidate is None:
+                blockers = getattr(candidate, "blockers", []) or []
+                raise TrainingInputRejected(
+                    "승인 모의 문서를 학습에 포함할 수 없습니다"
+                    + (": " + "; ".join(blockers) if blockers else "")
+                )
+            synthetic_snapshot = {
+                "dataset_version": candidate.dataset_version,
+                "included": candidate.included,
+                "approved_total": candidate.approved_total,
+                "rows_sha256": frozen["rows_sha256"],
+                "created_at": frozen["created_at"],
+            }
+            # DB 이력에는 위치 대신 검증 가능한 식별값만 남긴다. 워커에만 로컬
+            # 스냅샷 경로를 전달해 API 응답·작업 목록에서 서버 파일경로가 새지 않는다.
+            run_hyperparameters["approved_synthetic_snapshot"] = synthetic_snapshot
+            worker_spec_kwargs.update({
+                "include_approved_synthetic": True,
+                "approved_synthetic_snapshot_path": frozen["snapshot_path"],
+                "approved_synthetic_dataset_version": candidate.dataset_version,
+                "approved_synthetic_rows_sha256": frozen["rows_sha256"],
+            })
+
+        run_id = self._create_run(req, hyperparameters=run_hyperparameters)
+        # JobStore 등록 (DB 미가용 시에도 응답 가능)
+        self.jobs.create(
+            run_id,
+            payload={
+                "training_type": req.training_type,
+                "base_model": req.base_model,
+                "include_approved_synthetic": req.include_approved_synthetic,
+                "approved_synthetic_snapshot": synthetic_snapshot,
+                "submitted_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+                "actor": req.actor.user_id,
+                "dataset_counts": dataset_counts,
+            },
+        )
+        # 운영(브로커 가용)은 여기서 Celery train_classifier_task.delay() 발사.
+        # 발사해도 worker가 아직 안 돈 시점이라 TrainingRun/Job 상태는 'queued'로 남는다
+        # (status 폴링 정합 보존). 테스트/브로커 미가용/eager는 발사하지 않고 'queued'만
+        # 반환 — PoC는 GPU/데이터셋 미확보라 동기 in-process 학습을 트리거하지 않는다.
+        if _celery_dispatch_available():
+            try:
+                from koipa.workers.tasks import train_classifier_task  # noqa: PLC0415
+
+                # run_id 전달 — 워커가 이 행의 상태를 running→completed/failed 로 갱신하도록
+                # (미전달 시 워커가 별도 run 을 만들어 API 행이 영구 'queued' 고아가 됐다).
+                train_classifier_task.delay(worker_spec_kwargs, run_id=str(run_id))
+                logger.info("training enqueued to celery: train_job_id=%s status=queued", run_id)
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "celery enqueue failed for training — left as queued: train_job_id=%s",
+                    run_id, exc_info=True,
+                )
+        else:
+            logger.info("training submit done: train_job_id=%s status=queued", run_id)
+        return TrainResponse(
+            train_job_id=run_id,
+            status_url=f"/api/v1/train/jobs/{run_id}",
+            websocket_url=None,
+        )
+
+    def status(self, train_job_id: uuid.UUID) -> Optional[TrainStatus]:
+        logger.debug("training status enter: train_job_id=%s", train_job_id)
+        # DB(TrainingRun) 우선, 없으면 JobStore
+        run = self._get_run(train_job_id)
+        if run is not None:
+            # [진행률 배선 2026-08-08] status 만으로는 running 이 내내 0.5 라, 13시간짜리 학습에서
+            # 막대가 멈춘 것처럼 보였다. 트레이너 콜백이 JobStore 에 실제 스텝을 쓰므로 그걸 얹는다.
+            # DB 가 진실원인 것은 그대로다 — status·error 는 DB, 진행 세부는 JobStore(휘발성 TTL).
+            # JobStore 미가용/미기록이면 종전 동작(status 유도값)으로 조용히 되돌아간다.
+            prog = self._live_progress(train_job_id)
+            return TrainStatus(
+                train_job_id=train_job_id,
+                status=run.status,
+                progress=(
+                    prog.get("progress")
+                    if run.status == "running" and prog.get("progress") is not None
+                    else self._progress_from_status(run.status)
+                ),
+                current_epoch=prog.get("current_epoch"),
+                total_epochs=prog.get("total_epochs"),
+                estimated_finish_at=prog.get("estimated_finish_at"),
+                started_at=run.started_at.isoformat() if run.started_at else None,
+                # 학습이 끝나면 워커가 실행 행에 남긴 모델 버전(UUID) — 라벨로 풀어 싣는다. 종전에는 안 실어 항상 null 이었다.
+                model_version=self._version_label(run.model_version),
+                error=run.error_message,
+            )
+        job = self.jobs.get(train_job_id)
+        if job is None:
+            return None
+        return TrainStatus(
+            train_job_id=train_job_id,
+            status=job.get("status", "queued"),
+            progress=0.0,
+        )
+
+    def list_recent(
+        self, limit: int = 20, status_filter: Optional[str] = None, offset: int = 0
+    ) -> TrainJobList:
+        logger.debug(
+            "training list_recent enter: limit=%d offset=%d filter=%s",
+            limit, offset, status_filter,
+        )
+        try:
+            with session_scope() as db:
+                repo = TrainingRepo(db)
+                # status_filter·offset를 DB로 내려 페이지네이션 정합 보장
+                # (이전엔 파이썬 레벨 필터 + total=페이지크기로 부정확).
+                runs = repo.list_recent_runs(
+                    limit=limit, offset=offset, status_filter=status_filter
+                )
+                total = repo.count_runs(status_filter=status_filter)
+                labels = repo.version_labels(r.model_version for r in runs)
+                items = [
+                    TrainJobSummary(
+                        train_job_id=r.run_id,
+                        status=r.status,
+                        started_at=r.started_at.isoformat() if r.started_at else None,
+                        completed_at=r.completed_at.isoformat() if r.completed_at else None,
+                        duration_sec=r.duration_sec,
+                        model_version=labels.get(r.model_version),
+                        trigger_type=r.trigger_type,
+                        # 실패 사유를 목록에 실어 화면이 "왜 실패했는지"를 답할 수 있게 한다.
+                        # 성공 잡의 잔여 메시지까지 노출하지는 않는다.
+                        error=(getattr(r, "error_message", None)
+                               if str(r.status) in ("failed", "error") else None),
+                        approved_synthetic_snapshot=(
+                            (r.hyperparameters or {}).get("approved_synthetic_snapshot")
+                            if isinstance(r.hyperparameters, dict) else None
+                        ),
+                    )
+                    for r in runs
+                ]
+                return TrainJobList(total=total, items=items)
+        except SQLAlchemyError as exc:
+            logger.warning("train list skipped: %s", exc)
+            return TrainJobList(total=0, items=[])
+
+    # [2026-10-09] KL 요청(요구사항 추적표 6절) — 모델 성능 리포트.
+    def report(self, version_label: str) -> Optional[TrainReportResponse]:
+        try:
+            with session_scope() as db:
+                repo = TrainingRepo(db)
+                mv = repo.get_by_label(version_label)
+                if mv is None:
+                    return None
+                m = dict(mv.metrics or {})
+                learning_curve = _stored_learning_curve(m)
+                active = repo.get_active()
+                comparison = None
+                if active is not None and active.version_label != version_label:
+                    am = dict(active.metrics or {})
+
+                    def _delta(key: str) -> Optional[float]:
+                        a, b = m.get(key), am.get(key)
+                        return (a - b) if isinstance(a, (int, float)) and isinstance(b, (int, float)) else None
+
+                    comparison = ModelMetricsComparison(
+                        version_label=active.version_label,
+                        accuracy=am.get("accuracy"),
+                        precision_macro=am.get("precision_macro"),
+                        recall_macro=am.get("recall_macro"),
+                        f1_macro=am.get("f1_macro"),
+                        fnr_overall=am.get("fnr_overall"),
+                        accuracy_delta=_delta("accuracy"),
+                        f1_macro_delta=_delta("f1_macro"),
+                        fnr_overall_delta=_delta("fnr_overall"),
+                    )
+                return TrainReportResponse(
+                    version_label=mv.version_label,
+                    base_model=mv.base_model,
+                    trained_at=mv.trained_at.isoformat() if mv.trained_at else None,
+                    training_data_count=mv.training_data_count,
+                    is_active=bool(mv.is_active),
+                    accuracy=m.get("accuracy"),
+                    precision_macro=m.get("precision_macro"),
+                    recall_macro=m.get("recall_macro"),
+                    f1_macro=m.get("f1_macro"),
+                    fnr_overall=m.get("fnr_overall"),
+                    fnr_by_grade=m.get("fnr_by_grade") or {},
+                    fnr_high=m.get("fnr_high"),
+                    confusion_matrix=m.get("confusion_matrix") or [],
+                    classification_report=m.get("classification_report") or "",
+                    learning_curve=learning_curve,
+                    learning_curve_status="recorded" if learning_curve else "not_recorded",
+                    compared_to_active=comparison,
+                    raw_metrics=m,
+                )
+        except SQLAlchemyError as exc:
+            logger.warning("train report skipped: %s", exc)
+            return None
+
+    # ------------------------------------------------------------
+    # internals
+    # ------------------------------------------------------------
+
+    def _create_run(self, req: TrainRequest, *, hyperparameters: dict | None = None) -> uuid.UUID:
+        try:
+            with session_scope() as db:
+                repo = TrainingRepo(db)
+                run = repo.create_run(
+                    total_samples=0,  # PoC: 데이터셋 미확정
+                    hyperparameters=hyperparameters if hyperparameters is not None else req.hyperparams,
+                    trigger_type=req.training_type,
+                    created_by=req.actor.user_id,
+                )
+                return run.run_id
+        except SQLAlchemyError as exc:
+            logger.warning("training run create skipped (DB unavailable): %s", exc)
+            return uuid.uuid4()
+
+    def _version_label(self, version_id: Optional[uuid.UUID]) -> Optional[str]:
+        """실행 행이 가리키는 모델버전 UUID → 라벨. 못 찾거나 DB 가 안 되면 None(상태 조회를 막지 않는다)."""
+        if version_id is None:
+            return None
+        try:
+            with session_scope() as db:
+                return TrainingRepo(db).version_labels([version_id]).get(version_id)
+        except SQLAlchemyError as exc:
+            logger.warning("model version label lookup failed: version_id=%s err=%s", version_id, exc)
+            return None
+
+    def _get_run(self, run_id: uuid.UUID):
+        try:
+            with session_scope() as db:
+                return TrainingRepo(db).get_run(run_id)
+        except SQLAlchemyError as exc:
+            logger.warning("training run lookup failed: run_id=%s err=%s", run_id, exc)
+            return None
+
+    def _live_progress(self, train_job_id: uuid.UUID) -> dict:
+        """JobStore 에 트레이너 콜백이 남긴 진행 세부를 읽는다. 없으면 빈 dict.
+
+        조회 실패는 삼킨다 — 진행률 때문에 상태조회 자체가 실패하면 안 된다(부가 정보).
+        """
+        try:
+            job = self.jobs.get(train_job_id) or {}
+        except Exception:  # noqa: BLE001
+            return {}
+        out: dict = {}
+        p = job.get("train_progress")
+        if isinstance(p, (int, float)) and 0.0 <= float(p) <= 1.0:
+            out["progress"] = float(p)
+        for k in ("current_epoch", "total_epochs", "estimated_finish_at"):
+            if job.get(k) is not None:
+                out[k] = job[k]
+        return out
+
+    @staticmethod
+    def _progress_from_status(status: str) -> float:
+        return {
+            "queued": 0.0,
+            "running": 0.5,
+            "completed": 1.0,
+            "failed": 0.0,
+        }.get(status, 0.0)

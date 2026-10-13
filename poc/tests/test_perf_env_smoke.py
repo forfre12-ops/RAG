@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 
-from lloydk.perf.env import (
+from koipa.perf.env import (
     EnvSnapshot,
     ServiceStatus,
     capture_env,
@@ -13,7 +13,7 @@ from lloydk.perf.env import (
     _ram_gb,
     _svc_es,
     _svc_minio,
-    _svc_postgres,
+    _svc_db,
     _svc_redis,
 )
 
@@ -21,15 +21,16 @@ from lloydk.perf.env import (
 class TestServiceStatus:
     def test_defaults_unknown(self):
         s = ServiceStatus()
-        assert s.postgres == "UNKNOWN"
-        assert s.elasticsearch == "UNKNOWN"
+        assert s.db == "UNKNOWN"
         assert s.redis == "UNKNOWN"
-        assert s.minio == "UNKNOWN"
+        # [2026-09-05] es·minio 는 재지 않는다 — 쓰지 않는 백엔드라 늘 DOWN 이 찍혀
+        # 환경 보고서가 "무언가 죽어 있다"로 읽혔다. 어느 KPI 도 요구하지 않는다.
+        assert s.elasticsearch == "N/A"
+        assert s.minio == "N/A"
 
     def test_explicit_values(self):
-        s = ServiceStatus(postgres="UP", elasticsearch="DOWN", redis="UP", minio="UP")
-        assert s.postgres == "UP"
-        assert s.elasticsearch == "DOWN"
+        s = ServiceStatus(db="UP", redis="UP")
+        assert s.db == "UP"
 
 
 class TestEnvSnapshot:
@@ -51,7 +52,7 @@ class TestProbeFunctions:
 
     def test_pg_returns_string(self):
         # PG 없으면 "DOWN" 반환 (예외 안 던짐)
-        result = _svc_postgres()
+        result = _svc_db()
         assert result in ("UP", "DOWN")
 
     def test_es_returns_string(self):
@@ -95,19 +96,20 @@ class TestCaptureEnv:
         assert isinstance(env, EnvSnapshot)
         assert env.python
         assert env.platform
-        # probe_services=False면 모든 서비스 UNKNOWN
-        assert env.services.postgres == "UNKNOWN"
-        assert env.services.elasticsearch == "UNKNOWN"
+        # probe_services=False면 재는 서비스는 UNKNOWN (es·minio 는 애초에 안 잰다)
+        assert env.services.db == "UNKNOWN"
+        assert env.services.elasticsearch == "N/A"
 
     @pytest.mark.slow
     def test_with_probe_returns_known(self):
         """probe_services=True 시 UP/DOWN 둘 중 하나로 결정."""
         env = capture_env(probe_services=True, probe_pytest=False)
         # 환경에 따라 UP 또는 DOWN — UNKNOWN 아님
-        assert env.services.postgres in ("UP", "DOWN")
-        assert env.services.elasticsearch in ("UP", "DOWN")
+        assert env.services.db in ("UP", "DOWN")
         assert env.services.redis in ("UP", "DOWN")
-        assert env.services.minio in ("UP", "DOWN")
+        # es·minio 는 재지 않으므로 probe 여부와 무관하게 N/A 다.
+        assert env.services.elasticsearch == "N/A"
+        assert env.services.minio == "N/A"
 
     def test_custom_providers(self):
         """llm_provider/embedding_provider 등 옵션 반영."""
@@ -115,8 +117,6 @@ class TestCaptureEnv:
             probe_services=False,
             llm_provider="anthropic",
             embedding_provider="kure-v1",
-            vector_backend="es",
         )
         assert env.llm_provider == "anthropic"
         assert env.embedding_provider == "kure-v1"
-        assert env.vector_backend == "es"

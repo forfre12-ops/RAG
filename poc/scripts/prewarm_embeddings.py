@@ -40,7 +40,7 @@ def _collect_texts(include_synth: bool, synth_path: Path | None) -> list[str]:
 
     # 1. 시드 키워드 v3 모두
     try:
-        from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS  # noqa: PLC0415
+        from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS  # noqa: PLC0415
 
         for k in KEYWORD_SEEDS:
             kw = k.get("keyword")
@@ -51,7 +51,7 @@ def _collect_texts(include_synth: bool, synth_path: Path | None) -> list[str]:
 
     # 2. S10 RAG 평가셋 본문 (시드 키워드 + 마커 합성)
     try:
-        from lloydk.perf.scenarios import _build_s10_eval_set  # noqa: PLC0415
+        from koipa.perf.scenarios import _build_s10_eval_set  # noqa: PLC0415
 
         for content, _ in _build_s10_eval_set(n_per_grade=25):
             texts.append(content)
@@ -110,8 +110,8 @@ def main() -> int:
 
     # Provider 빌드
     try:
-        from lloydk.adapters.embedding import build_embedder  # noqa: PLC0415
-        from lloydk.adapters.embedding.cache_layer import CachedEmbedding  # noqa: PLC0415
+        from koipa.adapters.embedding import build_embedder  # noqa: PLC0415
+        from koipa.adapters.embedding.cache_layer import CachedEmbedding  # noqa: PLC0415
     except Exception as exc:  # noqa: BLE001
         print(f"  ERROR: embedding adapter import 실패: {exc}")
         return 1

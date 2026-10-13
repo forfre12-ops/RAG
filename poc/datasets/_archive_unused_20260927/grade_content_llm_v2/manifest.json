@@ -1,0 +1,59 @@
+{
+ "built_at": "2026-09-13",
+ "provider": "vllm",
+ "model": "qwen3-30b",
+ "seed": 20260912,
+ "label_source": "rule_from_content_svm (grade_from_svm)",
+ "human_confirmed_count": 0,
+ "use": "내용을 읽어야 풀리는 과제. 사람 확정 정답 아님 · 실문서 일반화 근거 아님.",
+ "split_note": "서버 생성판은 val==test 였다. 2,948건을 다시 겹치지 않게 갈랐다(seed 20260913).",
+ "counts": {
+  "train": 1770,
+  "val": 589,
+  "test": 589
+ },
+ "sha256": {
+  "train": "1667a3e3c9028ef074cdf764b2e05e4f77e23fe3bbb96ff71aa8591a06ca5271",
+  "val": "3f98e2d33dc5921a289ec16a585d7bca88c831c600b7de7a14fc144f5300a12e",
+  "test": "a673c42245e59f2ce1574effcd6f93ef74cbfa6ff22b43f067b41045329c941f"
+ },
+ "shortcut_audit": {
+  "n": 2948,
+  "by_grade": {
+   "S2": 750,
+   "S3": 702,
+   "S1": 748,
+   "TS": 748
+  },
+  "majority_rate": 25.4,
+  "axes": {
+   "document_type": {
+    "rate": 28.1,
+    "null": 28.0,
+    "excess_pp": 0.1
+   },
+   "theme": {
+    "rate": 28.5,
+    "null": 28.3,
+    "excess_pp": 0.2
+   },
+   "length": {
+    "rate": 30.8,
+    "null": 27.9,
+    "excess_pp": 2.8
+   },
+   "phrase": {
+    "rate": 60.2,
+    "null": 37.2,
+    "excess_pp": 23.1
+   }
+  },
+  "median_chars": {
+   "S2": 1068,
+   "S3": 1092,
+   "S1": 1111,
+   "TS": 1105
+  },
+  "median_ratio": 1.04
+ }
+}

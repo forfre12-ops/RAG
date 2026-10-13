@@ -1,0 +1,18 @@
+{
+  "inference_id": "739c4fed-1db8-4e00-b105-d61b3e23a367",
+  "doc_id": "ce3b4e0d-6ceb-452b-acbc-d5d7822a0f73",
+  "label": "S2",
+  "confidence": 0.8804,
+  "confidence_tier": "높음",
+  "scores": {
+    "S2": 0.8804,
+    "TS": 0.02003907598555088,
+    "S1": 0.08763943612575531,
+    "S3": 0.011963642202317715
+  },
+  "model_version": "v-fe4b386b",
+  "status": "needs_review",
+  "confirmed_label": null,
+  "confirmed_by": null,
+  "confirmed_at": null
+}

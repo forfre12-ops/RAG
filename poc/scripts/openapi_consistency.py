@@ -1,7 +1,7 @@
 """B5 — OpenAPI yaml ↔ 실 FastAPI 라우터 정합성 검사.
 
 용도:
-- doc/03_openapi_lloydk_kl.yaml 에 정의된 path/method가 실 app에 모두 구현됐는가
+- doc/03_openapi_koipa_kl.yaml 에 정의된 path/method가 실 app에 모두 구현됐는가
 - 반대로 app에 있지만 yaml에 없는 path (drift) 식별
 - KL 회신 K2 검토 의견 처리 시 빠른 영향 분석
 
@@ -27,15 +27,19 @@ from pathlib import Path
 try:
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
     sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
-except Exception:  # noqa: BLE001
-    pass
+except (AttributeError, OSError):
+    # 일부 테스트/리다이렉션 스트림은 인코딩 재설정을 지원하지 않는다. 이 경우에도
+    # 검사 자체는 수행하되, 진단용 상태를 명시적으로 남긴다.
+    _STDIO_UTF8_ENABLED = False
+else:
+    _STDIO_UTF8_ENABLED = True
 
 HERE = Path(__file__).resolve().parent
 POC_ROOT = HERE.parent
 REPO_ROOT = POC_ROOT.parent
 sys.path.insert(0, str(POC_ROOT / "src"))
 
-DEFAULT_YAML = REPO_ROOT / "doc" / "03_openapi_lloydk_kl.yaml"
+DEFAULT_YAML = REPO_ROOT / "doc" / "03_openapi_koipa_kl.yaml"
 
 
 def _parse_yaml_paths(yaml_path: Path) -> tuple[set[tuple[str, str]], str]:
@@ -43,7 +47,7 @@ def _parse_yaml_paths(yaml_path: Path) -> tuple[set[tuple[str, str]], str]:
 
     spec format:
       servers:
-        - url: http://lloydk-api:8000/api/v1
+        - url: http://koipa-api:8000/api/v1
       paths:
         /classify:
           post:
@@ -128,6 +132,19 @@ _ROUTER_IGNORE_PREFIXES: tuple[str, ...] = (
 _ROUTER_IGNORE_EXACT: set[str] = {
     "/api/v1/metrics-prom",
     "/api/v1/openapi.json",
+    # 내부 운영/관리 라우트 — KL 연동(외부) 계약 명세(03_openapi_koipa_kl.yaml) 범위 밖이며,
+    # 전체 라우트는 부록B API 명세(DEF-2026-39, 48건 전수 문서화)가 다룬다.
+    "/api/v1/admin/demo/purge",   # 데모 데이터 purge — 관리·파괴적, 외부 계약 아님
+    "/api/v1/dashboard/summary",  # 운영 대시보드 집계 — 내부 관측성
+    "/api/v1/rag/search",         # LLM-free 내부 검색 — 외부 KL API 아님
+    # [2026-10-04] 재학습 라우터 3건 — enable_training 뿐 아니라 enable_incremental_retrain
+    # (기본 True인 프로파일 다수, app.py:443)이어도 등록된다. 아래 skip_prefixes(YAML 쪽만 거름)는
+    # 이 3건이 router_only로 잡히는 걸 못 막는다(diff()가 router_norm은 안 거르기 때문) — 애초에
+    # 학습은 KL 7개 인터페이스에 포함된 적이 없어(KL_INFO_DESCRIPTION 참조) 플래그 조합과 무관하게
+    # 항상 범위 밖이다. 여기 넣어 router 수집 단계에서 영구히 제외한다.
+    "/api/v1/train",
+    "/api/v1/train/jobs",
+    "/api/v1/train/jobs/{train_job_id}",
 }
 
 
@@ -153,26 +170,27 @@ def _collect_router_paths() -> tuple[set[tuple[str, str]], set[tuple[str, str]]]
         - training_only_paths: enable_training=True 일 때만 등록되는 경로
     """
     try:
-        from lloydk.api.app import app  # noqa: PLC0415
-        from lloydk.config import settings  # noqa: PLC0415
+        from koipa.api.app import app  # noqa: PLC0415
+        from koipa.config import settings  # noqa: PLC0415
     except Exception as exc:  # noqa: BLE001
-        print(f"  ERROR: lloydk.api.app import 실패: {exc}")
+        print(f"  ERROR: koipa.api.app import 실패: {exc}")
         return set(), set()
 
     training_enabled = getattr(settings, "enable_training", False)
 
     out: set[tuple[str, str]] = set()
-    for route in app.routes:
-        path = getattr(route, "path", None)
-        methods = getattr(route, "methods", None)
-        if not path or not methods:
-            continue
+    # Starlette 신버전은 include_router 결과를 path 없는 래퍼로 감싸 route.path 가 None →
+    # app.routes 순회는 include_router 경로를 전부 놓쳐 43개를 '미구현'으로 오탐한다.
+    # 공개 API app.openapi() 로 경로를 수집한다(test_deploy_profile.py 와 동일 방식, DEF-2026-38).
+    _http_methods = {"GET", "POST", "PUT", "DELETE", "PATCH"}
+    for path, path_item in (app.openapi().get("paths") or {}).items():
         if _is_ignored(path):
             continue
-        for m in methods:
-            if m.upper() in {"HEAD", "OPTIONS"}:
+        for method in path_item:
+            m = method.upper()
+            if m not in _http_methods:
                 continue
-            out.add((m.upper(), path))
+            out.add((m, path))
 
     # training 라우터는 profile 조건부 — YAML에는 있지만 현재 환경에서 미등록일 수 있음
     training_paths: set[tuple[str, str]] = set()
@@ -213,10 +231,27 @@ def diff(
     yaml_norm = {(m, _normalize_path(p)) for m, p in yaml_set}
     router_norm = {(m, _normalize_path(p)) for m, p in router_set}
 
-    # profile-conditional 제외 (예: training 라우터)
+    # [2026-10-02] _ROUTER_IGNORE_EXACT(/dashboard/summary·/admin/demo/purge·/rag/search 등)는
+    # "외부 KL 계약 범위 밖"이라 router_set 수집 단계에서 이미 빠져 있다(_is_ignored, 위 ①에서
+    # router 측만 거름). 그런데 YAML(doc/03_openapi_koipa_kl.yaml)에는 그 경로가 여전히 적혀
+    # 있어서 "YAML에만 있음(미구현)"으로 항상 오탐했다 — 실제로는 라우터에 있는데 비교 대상에서
+    # 한쪽만 뺀 비대칭이 원인이다. YAML 쪽도 같은 기준으로 걸러 대칭을 맞춘다.
+    yaml_norm = {(m, p) for m, p in yaml_norm if not _is_ignored(p)}
+
+    # profile-conditional 제외 (예: training 라우터). [2026-10-09 정정] router_norm 쪽은 그대로
+    # 두면 비대칭이 생긴다 — golden처럼 같은 접두사 아래 **일부 경로는 플래그와 무관하게 항상
+    # 등록**(console_login.py의 로그인·시연 프리필 4경로)되는 경우, yaml 쪽만 걷어내면 그 경로들이
+    # "router에만 있음(스펙 누락)"으로 오탐한다(실제로는 yaml에도 있는데 비교 대상에서 먼저
+    # 빠진 것). training·synth·regulation은 플래그가 꺼지면 해당 경로가 router에 전혀 없으므로
+    # router_norm 쪽도 같이 거르는 것이 영향 없다(뺄 게 없음) — 그래서 대칭으로 바꿔도 기존
+    # 셋은 결과가 그대로다.
     if skip_yaml_prefixes:
         yaml_norm = {
             (m, p) for m, p in yaml_norm
+            if not any(p.startswith(pfx) for pfx in skip_yaml_prefixes)
+        }
+        router_norm = {
+            (m, p) for m, p in router_norm
             if not any(p.startswith(pfx) for pfx in skip_yaml_prefixes)
         }
 
@@ -253,15 +288,55 @@ def main() -> int:
     # training 라우터는 full-train 프로파일 전용 — 현재 프로파일에서 비활성이면
     # YAML의 /train/* 경로를 strict 비교에서 제외 (profile-conditional)
     try:
-        from lloydk.config import settings as _s  # noqa: PLC0415
+        from koipa.config import settings as _s  # noqa: PLC0415
         _training_enabled = getattr(_s, "enable_training", False)
+        _regulation_enabled = getattr(_s, "regulation_reference_enabled", False)
+        _synth_enabled = getattr(_s, "enable_synthetic_generation", False)
+        _golden_enabled = getattr(_s, "enable_golden_review_console", False)
     except Exception:  # noqa: BLE001
         _training_enabled = False
+        _regulation_enabled = False
+        _synth_enabled = False
+        _golden_enabled = False
 
     skip_prefixes: tuple[str, ...] = ()
     if not _training_enabled:
-        skip_prefixes = (f"{server_prefix}/train", "/api/v1/train", "/train")
-        print("  ℹ training 라우터 비활성 (enable_training=False) — /train/* YAML 경로 제외")
+        # training_router에는 /train 뿐 아니라 학습 산출물(ModelVersion)을 다루는
+        # /admin/model/* 운영 경로도 묶여 있다. 고객사 추론 이미지에서는 이 라우터를
+        # 아예 mount하지 않으므로, /train만 제외하면 YAML에만 남은 model 관리 3경로가
+        # 실제 계약 불일치처럼 오탐된다. ENABLE_TRAINING=1 프로파일에서는 제외하지
+        # 않아 세 경로의 구현·명세 정합성은 계속 검증한다.
+        skip_prefixes = (
+            f"{server_prefix}/train", "/api/v1/train", "/train",
+            f"{server_prefix}/admin/model", "/api/v1/admin/model", "/admin/model",
+        )
+        print(
+            "  ℹ training 라우터 비활성 (enable_training=False) — "
+            "/train/* 및 /admin/model/* YAML 경로 제외"
+        )
+    # 규정 참고 표시 라우터도 기능 플래그(regulation_reference_enabled, 기본 꺼짐)일 때만 등록된다 — 꺼진 프로파일에서는 YAML 의 규정 경로 10개를
+    # training 과 같은 방식으로 제외한다. REGULATION_REFERENCE_ENABLED=1 로 돌리면 10개가 모두 라우터와 일치한다(2026-09-26 확인).
+    if not _regulation_enabled:
+        skip_prefixes += (f"{server_prefix}/regulations", f"{server_prefix}/documents/{{doc_id}}/regulation-evidence")
+        print("  ℹ 규정 참고 표시 라우터 비활성 (regulation_reference_enabled=False) — 규정 YAML 경로 제외")
+    # [2026-10-02] synth 라우터도 같은 profile-conditional 패턴이다(app.py: enable_synthetic_
+    # generation=False면 synthesis_api.router 자체가 include_router 안 됨) — training·regulation
+    # 둘만 예외 처리돼 있어서 synth 5경로가 --strict에서 항상 drift로 잡혔다.
+    if not _synth_enabled:
+        skip_prefixes += (f"{server_prefix}/synth",)
+        print("  ℹ 합성문서 라우터 비활성 (enable_synthetic_generation=False) — /synth/* YAML 경로 제외")
+    # [2026-10-09 #9 이미지 분리] golden.py(검수·서명 화면) 라우터도 같은 profile-conditional
+    # 패턴 — enable_golden_review_console=False(경량 프로파일 기본)면 app.py 가 golden_api.router
+    # 를 통째로 include_router 하지 않는다. ⚠ 로그인/세션·시연 프리필 4경로
+    # (login.html·login·session·prefill-login)는
+    # koipa.api.console_login 이 **플래그와 무관하게 항상** 등록하므로, 아래처럼 /golden 전체를
+    # training·synth 와 같은 방식으로 한 번에 제외하면 그 4경로도 이번 실행에서는 비교 대상에서
+    # 빠진다(위 diff() 의 대칭 제외 수정으로 "스펙 누락" 오탐은 막았지만, 그 3경로가 실제로
+    # router·yaml 양쪽에 다 있는지는 이 조합에서 확인되지 않는다는 뜻 — golden_review_console
+    # 이 켜진 실행(지재원)에서는 전부 비교되니 거기서 잡힌다).
+    if not _golden_enabled:
+        skip_prefixes += (f"{server_prefix}/golden", "/api/v1/golden", "/golden")
+        print("  ℹ 골든 검수·서명 라우터 비활성 (enable_golden_review_console=False) — /golden/* YAML 경로 제외(로그인·시연 프리필 4경로 포함, enable_golden_review_console=True 실행에서 별도로 비교됨)")
 
     result = diff(yaml_paths, router_paths, skip_yaml_prefixes=skip_prefixes)
 

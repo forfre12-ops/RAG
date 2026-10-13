@@ -12,10 +12,11 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
 
 import pytest
 
-from lloydk.config import (
+from koipa.config import (
     DEPLOY_PROFILES,
     Settings,
     _PROFILE_DEFAULTS,
@@ -40,6 +41,74 @@ def test_profile_applies_defaults(profile: str, monkeypatch: pytest.MonkeyPatch)
     for field, default in _PROFILE_DEFAULTS[profile].items():
         assert getattr(s, field) == default, f"{profile}.{field}"
         assert sources[field] == "profile"
+
+
+@pytest.mark.parametrize(
+    "profile,expected",
+    [
+        ("lite-noapi", True),
+        ("lite-cloud", True),
+        ("onprem-local", False),
+        ("full-train", False),
+    ],
+)
+def test_demo_console_gated_by_profile(
+    profile: str, expected: bool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """데모 콘솔·파괴적 POST /admin/demo/purge 노출은 하드닝 프로파일서 꺼져야 한다(SEC-2/3).
+
+    demo_console_enabled 가 Settings 에 미선언이던 탓에 admin.py 의 getattr(...,True) 게이트와
+    app.py /demo 마운트가 죽은 no-op(항상 True)였다 — 이제 데모/파일럿(lite-*)만 True, 고객사
+    운영/모델공장(onprem-local·full-train)은 프로파일 default False 로 실제 비활성(마운트·purge 404).
+    """
+    monkeypatch.delenv("ENABLE_TRAINING", raising=False)
+    monkeypatch.delenv("ENABLE_INCREMENTAL_RETRAIN", raising=False)
+    s = Settings(deploy_profile=profile, _env_file=None)
+    apply_profile_defaults(s)
+    assert s.demo_console_enabled is expected, f"{profile}: demo_console_enabled"
+
+
+@pytest.mark.parametrize(
+    "profile,incr_expected,admin_expected",
+    [
+        ("lite-noapi", False, False),     # 순수 추론 — 학습·콘솔 없음
+        ("lite-cloud", False, False),     # 데모(콘솔은 demo_console_enabled 축으로 켜짐)
+        ("onprem-local", False, True),    # 고객사 — 분류·활성학습 신호 수집 + 하드닝 관리 콘솔
+        ("full-train", False, True),      # 지재원 — enable_training 경로 학습 + 관리 콘솔
+    ],
+)
+def test_incremental_retrain_and_admin_console_gated_by_profile(
+    profile: str, incr_expected: bool, admin_expected: bool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """고객사 학습 차단·관리 콘솔 프로파일 default.
+
+    고객사(onprem-local)는 학습·재학습을 열지 않고 분류·활성학습 신호 수집만 한다.
+    지재원은 enable_training 경로로 모델 학습·성능보고를 담당한다.
+    관리 콘솔(serve_admin_console)은 두 프로덕션 노드(onprem-local·full-train) 모두 ON —
+    demo_console_enabled(파괴적 purge)와 분리된 축이라 콘솔만 노출하고 purge 는 계속 OFF.
+    """
+    monkeypatch.delenv("ENABLE_TRAINING", raising=False)
+    monkeypatch.delenv("ENABLE_INCREMENTAL_RETRAIN", raising=False)
+    s = Settings(deploy_profile=profile, _env_file=None)
+    apply_profile_defaults(s)
+    assert s.enable_incremental_retrain is incr_expected, f"{profile}: enable_incremental_retrain"
+    assert s.serve_admin_console is admin_expected, f"{profile}: serve_admin_console"
+    # 안전 불변식: 하드닝 관리 콘솔에도 파괴적 purge는 열지 않는다.
+    if admin_expected:
+        assert s.demo_console_enabled is False, f"{profile}: 하드닝 콘솔에 purge 노출 금지"
+
+
+def test_onprem_profile_enforces_assigned_reviewer_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """고객사 전수 검수는 담당 문서만 보이며, 최초 생성등급·BERT 점수 표시는 별도 UI 계약이다."""
+    monkeypatch.delenv("GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED", raising=False)
+    monkeypatch.delenv("GOLDEN_REVIEW_BLIND_ENFORCED", raising=False)
+    monkeypatch.delenv("ENABLE_TRAINING", raising=False)
+    monkeypatch.delenv("ENABLE_INCREMENTAL_RETRAIN", raising=False)
+    s = Settings(deploy_profile="onprem-local", _env_file=None)
+    apply_profile_defaults(s)
+    assert s.enable_golden_review_console is True
+    assert s.golden_reviewer_assignment_enforced is True
+    assert s.golden_review_blind_enforced is True
 
 
 def test_explicit_env_wins_over_profile(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -71,43 +140,47 @@ def test_empty_profile_is_noop() -> None:
 
 
 @pytest.mark.parametrize(
-    "profile,training_expected",
+    "profile,en_train,en_incr,training_expected",
     [
-        ("lite-noapi", False),
-        ("lite-cloud", False),
-        ("onprem-local", False),
-        ("full-train", True),
+        ("lite-noapi", False, False, False),    # 순수 추론 — 학습 노드 아님
+        ("lite-cloud", False, False, False),
+        ("onprem-local", False, False, False),  # 고객사 — 학습 라우터 미노출
+        ("full-train", True, False, True),      # 지재원 학습 노드 → 라우터 등록
+        ("full-train", True, True, True),       # 둘 다 켜도 등록(OR)
+        ("onprem-local", False, False, False),  # 두 플래그 모두 off → 미등록(음성 대조)
     ],
 )
 def test_training_router_visibility(
-    profile: str, training_expected: bool, monkeypatch: pytest.MonkeyPatch
+    profile: str, en_train: bool, en_incr: bool, training_expected: bool,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """프로파일별 /api/v1/training/* 라우터 등록 여부.
+    """프로파일별 /api/v1/train* 라우터 등록 — full-train 전용 계약.
 
-    app.py가 settings.enable_training을 import-time에 평가하므로
-    settings 모듈 reload + app 모듈 reload 순서로 강제 재로딩.
-
-    teardown 필수 — reload는 monkeypatch가 풀어주지 않으므로 env 정리 후
-    한 번 더 reload하여 settings.poc_mode/enable_training을 원상복구.
-    안 그러면 후속 테스트(test_smoke 등)가 import-time에 production
-    자격증명 차단에 걸림.
+    지재원(full-train)에서만 enable_training으로 학습 라우터가 등록된다. 고객사(onprem-local)와
+    순수 추론 노드에서는 OpenAPI에도 노출되지 않는다.
+    app.py가 두 플래그를 import-time에 평가하므로 settings 모듈 reload + app 모듈 reload 순서로
+    강제 재로딩. teardown 필수 — reload는 monkeypatch가 풀어주지 않으므로 env 정리 후 원상복구.
     """
     monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
     monkeypatch.setenv("DEPLOY_PROFILE", profile)
-    # [Wave3 M-config-env] 모듈 reload 경로의 Settings()는 레포 .env(ENABLE_TRAINING=false,
-    # onprem-local)를 읽는다. explicit 판정이 강화돼 .env의 false가 프로파일을 정당하게
-    # 이긴다(=새 계약). 따라서 ENABLE_TRAINING을 지우면 .env의 false가 남아 full-train도
-    # 학습이 꺼진다. 이 테스트의 본 목적은 'settings.enable_training → train 라우터 등록'
-    # 배선 검증이므로, 기대값을 os.environ에 명시(explicit)해 .env 간섭을 제거한다.
-    monkeypatch.setenv("ENABLE_TRAINING", "true" if training_expected else "false")
+    # [M-config-env] reload 경로의 Settings()는 레포 .env 를 읽고 explicit 판정이 강화돼 .env 값이
+    # 프로파일을 이긴다. 이 테스트는 '두 학습 플래그 → 라우터 등록' OR 계약을 검증하므로 두 플래그를
+    # os.environ 에 명시(explicit)해 프로파일 default·.env 간섭을 제거하고 파라미터대로 강제한다.
+    monkeypatch.setenv("ENABLE_TRAINING", "true" if en_train else "false")
+    monkeypatch.setenv("ENABLE_INCREMENTAL_RETRAIN", "true" if en_incr else "false")
 
-    import lloydk.config as cfg_mod
+    import koipa.config as cfg_mod
+    _orig_settings = cfg_mod.settings  # 원본 settings 객체 — import-bound 모듈(_jwt_auth 등 44개)이 참조
     importlib.reload(cfg_mod)
-    import lloydk.api.app as app_mod
+    import koipa.api.app as app_mod
     importlib.reload(app_mod)
 
     try:
-        paths = {route.path for route in app_mod.app.routes}
+        # [starlette 호환] 신버전은 include_router 결과를 path 없는 `_IncludedRouter` 로 감싸서
+        # app.routes 직접 순회로는 엔드포인트 path 를 얻을 수 없다(구버전 전제 코드가 AttributeError).
+        # 내부 구조 대신 공개 API 인 openapi() 를 쓴다 — prefix 가 적용된 최종 path 를 주고,
+        # "순수 추론 노드에서는 OpenAPI 에도 노출되지 않는다"는 이 테스트의 계약과도 정확히 일치한다.
+        paths = set(app_mod.app.openapi().get("paths", {}))
         # training router의 실제 path는 /api/v1/train, /api/v1/train/jobs 등
         training_paths = {p for p in paths if p.startswith("/api/v1/train")}
 
@@ -116,7 +189,256 @@ def test_training_router_visibility(
         else:
             assert not training_paths, f"{profile}: 학습 라우터가 노출되면 안됨 — {training_paths}"
     finally:
-        # env 원상복구 후 모듈 재reload — 후속 테스트의 settings 오염 차단
+        # env 원상복구 후 원본 settings 객체를 '복원'한다. reload는 새 settings 객체를 만들어
+        # 정체성이 달라지고, import-bound 모듈(_jwt_auth 등 44개)이 stale settings를 참조하게 돼
+        # 후속 테스트(JWT 검증·reranker probe 등)를 결정론적으로 오염시킨다(테스트 순서 의존 red).
+        # 원본 객체를 되돌린 뒤 app만 재빌드해 import-bound 참조와 정합시킨다.
         monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
-        importlib.reload(cfg_mod)
+        cfg_mod.settings = _orig_settings
         importlib.reload(app_mod)
+
+
+@pytest.mark.parametrize(
+    "profile,en_train,en_incr,synth_expected",
+    [
+        ("lite-noapi", False, False, False),    # 순수 추론 — 합성 노드 아님
+        ("lite-cloud", False, False, False),
+        ("onprem-local", False, False, False),  # 고객사 — 합성 미노출
+        ("full-train", True, False, True),      # 지재원 모델공장 → 등록
+    ],
+)
+def test_synthesis_router_visibility(
+    profile: str, en_train: bool, en_incr: bool, synth_expected: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """/api/v1/synth* 등록 계약 — **자기 스위치**(enable_synthetic_generation) 단독.
+
+    학습 라우터(OR 계약)와 다르다. 합성 문서 생성은 지재원 모델공장 전용이라, 고객사 야간
+    증분 재학습 노드(enable_incremental_retrain)에서도 열리면 안 된다.
+
+    [2026-09-06] 조건을 enable_training 에서 떼어냈다. 합성 생성(FUN-003)과 학습은 다른
+    기능인데 한 스위치에 묶여 있어서, **지재원에서 학습을 잠시 꺼도 요건 기능이 화면에서도
+    API 에서도 조용히 사라졌다.** 이 시험이 그 계약을 잠근다 —
+    지재원(full-train) 반드시 열림 · 고객사(onprem-local) 닫힘.
+    스위치를 명시적으로 지워 **프로파일 기본값이 정하게** 한다(conftest 가 시험 편의로
+    켜 두는데, 그 값이 남으면 이 매트릭스가 프로파일이 아니라 conftest 를 재게 된다).
+    """
+    monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
+    monkeypatch.setenv("DEPLOY_PROFILE", profile)
+    monkeypatch.setenv("ENABLE_TRAINING", "true" if en_train else "false")
+    monkeypatch.setenv("ENABLE_INCREMENTAL_RETRAIN", "true" if en_incr else "false")
+    monkeypatch.delenv("ENABLE_SYNTHETIC_GENERATION", raising=False)
+
+    import koipa.config as cfg_mod
+    _orig_settings = cfg_mod.settings
+    importlib.reload(cfg_mod)
+    import koipa.api.app as app_mod
+    importlib.reload(app_mod)
+
+    try:
+        paths = set(app_mod.app.openapi().get("paths", {}))
+        synth_paths = {p for p in paths if p.startswith("/api/v1/synth")}
+        if synth_expected:
+            assert synth_paths, f"{profile}: 합성 라우터가 등록되어야 함"
+        else:
+            assert not synth_paths, f"{profile}: 합성 라우터가 노출되면 안됨 — {synth_paths}"
+    finally:
+        monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+        cfg_mod.settings = _orig_settings
+        importlib.reload(app_mod)
+
+
+# [2026-10-09] koipa.api.console_login 이 항상 등록하는 경로 — golden.py 가 이미지에서
+# 빠져도(고객사) admin.html 의 로그인 자체는 살아 있어야 한다. 정본은 console_login.py.
+_ALWAYS_ON_LOGIN_PATHS = {
+    "/api/v1/golden/candidates/login.html",
+    "/api/v1/golden/candidates/login",
+    "/api/v1/golden/candidates/session",
+    "/api/v1/golden/candidates/prefill-login",
+    # 모든 로그인 방식의 쿠키를 지우는 세션 종료 경로다. 검수 데이터를 열거나 바꾸지 않으므로
+    # 검수 화면이 빠진 고객사/경량 프로파일에서도 남아야 한다.
+    "/api/v1/golden/candidates/logout",
+}
+
+
+@pytest.mark.parametrize(
+    "profile,golden_expected",
+    [
+        ("lite-noapi", False),
+        ("lite-cloud", False),
+        ("onprem-local", True),    # [2026-10-11 고객사 요청] 전수 사람 검수 + AI 참고점수 화면
+        ("full-train", True),
+    ],
+)
+def test_golden_router_visibility(
+    profile: str, golden_expected: bool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """/api/v1/golden* 등록 계약 — **자기 스위치**(enable_golden_review_console) 단독.
+
+    [2026-10-09 정정] 2026-10-07 결정("golden.py 는 플래그로 빼지 않는다 — 모든 프로파일에서
+    등록된다")을 뒤집는다. 그 결정의 전제는 "고객사도 야간 증분 재학습본에 서명하려면 검수·서명
+    화면이 필요하다"였는데, 재확인한 결과 재학습 게이트(locked_eval_readiness,
+    m6_evaluation/locked_readiness.py)가 실제로 요구하는 건 settings.locked_eval_jsonl
+    경로의 파일 하나(읽기 전용)뿐이고 살아있는 화면이 아니다 — 고객사가 필요한 건 "이미 등급
+    확정된 결과로 재학습"이지 골든셋 검수 화면 자체가 아니다(사용자 지적). 그 파일은 지재원이
+    만들어 설치 패키지에 스냅샷으로 실어 보낸다(deploy_manifest.toml [bundle.locked_eval],
+    setup.sh 6-1b단계) — 화면(api/golden.py)은 지재원(full-train)에만 남기고 고객사
+    (onprem-local)에서는 이미지에서도 물리적으로 뺀다(container.customer_exclude). 이후
+    2026-10-11 고객사가 1,000건 전수 사람 검수와 AI 점수 참고표시를 요구해 onprem-local 기본도
+    다시 켰다. 점수는 사람의 최종 결정을 대체하지 않는다.
+    합성 생성(test_synthesis_router_visibility)과 같은 패턴 — 스위치를 명시적으로 지워
+    프로파일 기본값이 정하게 한다.
+
+    [2026-10-09 추가 발견] golden.py 를 실제로 고객사 이미지에서 빼고 띄워보니, admin.html
+    전체의 유일한 로그인 경로(LOGIN_URL)가 golden.py 안의 /golden/candidates/login.html ·
+    /golden/candidates/login · /golden/candidates/session 이었다 — 검수 화면만 끄려다
+    관리 콘솔 전체 로그인을 막는 꼴이었다. 그 셋은 koipa.api.console_login 으로 옮겨
+    **항상** 등록되므로(아래 _ALWAYS_ON_LOGIN_PATHS), golden_expected=False 인 프로파일에서도
+    `/api/v1/golden` 접두사 경로가 그 셋만큼은 남아 있어야 정상이다 — 이 시험은 그 셋을
+    빼고 나머지(검수·후보관리 등 진짜 golden.py 전용)만 본다.
+    """
+    monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
+    monkeypatch.setenv("DEPLOY_PROFILE", profile)
+    monkeypatch.setenv("ENABLE_TRAINING", "false")
+    monkeypatch.setenv("ENABLE_INCREMENTAL_RETRAIN", "false")
+    monkeypatch.delenv("ENABLE_GOLDEN_REVIEW_CONSOLE", raising=False)
+
+    import koipa.config as cfg_mod
+    _orig_settings = cfg_mod.settings
+    importlib.reload(cfg_mod)
+    import koipa.api.app as app_mod
+    importlib.reload(app_mod)
+
+    try:
+        paths = set(app_mod.app.openapi().get("paths", {}))
+        all_golden_paths = {p for p in paths if p.startswith("/api/v1/golden")}
+        assert _ALWAYS_ON_LOGIN_PATHS <= all_golden_paths, (
+            f"{profile}: 로그인 경로는 golden.py 와 무관하게 항상 있어야 함 — "
+            f"없는 것: {_ALWAYS_ON_LOGIN_PATHS - all_golden_paths}"
+        )
+        golden_paths = all_golden_paths - _ALWAYS_ON_LOGIN_PATHS
+        if golden_expected:
+            assert golden_paths, f"{profile}: 골든 검수·서명 라우터가 등록되어야 함"
+        else:
+            assert not golden_paths, f"{profile}: 골든 검수·서명 라우터가 노출되면 안됨 — {golden_paths}"
+    finally:
+        monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+        cfg_mod.settings = _orig_settings
+        importlib.reload(app_mod)
+
+
+def test_admin_console_mounts_without_enabling_purge(monkeypatch: pytest.MonkeyPatch) -> None:
+    """[하드닝 콘솔] serve_admin_console=True + demo_console_enabled=False → /demo 마운트되되
+    파괴적 purge 는 계속 OFF. 관리 UI(검수→재학습→활성화)만 노출하고 데모/물리삭제 표면은 닫는다.
+
+    마운트 축(serve_admin_console)과 purge 축(demo_console_enabled)이 분리됐음을 배선 레벨에서 잠근다.
+    """
+    monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
+    monkeypatch.setenv("DEPLOY_PROFILE", "onprem-local")
+    monkeypatch.setenv("ENABLE_TRAINING", "false")
+    monkeypatch.setenv("ENABLE_INCREMENTAL_RETRAIN", "false")
+    # 두 축을 os.environ 에 명시(explicit)해 .env/프로파일 간섭 제거 — 하드닝 콘솔 조합을 강제.
+    monkeypatch.setenv("SERVE_ADMIN_CONSOLE", "true")
+    monkeypatch.setenv("DEMO_CONSOLE_ENABLED", "false")
+
+    import koipa.config as cfg_mod
+    _orig_settings = cfg_mod.settings
+    importlib.reload(cfg_mod)
+    import koipa.api.app as app_mod
+    importlib.reload(app_mod)
+
+    try:
+        assert cfg_mod.settings.serve_admin_console is True
+        assert cfg_mod.settings.demo_console_enabled is False   # purge 축은 OFF 유지
+        # /demo 정적 마운트가 존재해야 한다(관리 콘솔 서빙).
+        mount_paths = {getattr(r, "path", None) for r in app_mod.app.routes}
+        assert "/demo" in mount_paths, f"관리 콘솔이 마운트돼야 함 — mounts={sorted(p for p in mount_paths if p)}"
+    finally:
+        monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+        cfg_mod.settings = _orig_settings
+        importlib.reload(app_mod)
+
+
+def test_customer_profile_rejects_any_training_override() -> None:
+    """고객사 이미지에 없는 학습 코드를 .env로 되살리려는 시도는 부팅 전에 막는다."""
+    for kwargs in (
+        {"enable_training": True},
+        {"enable_incremental_retrain": True},
+    ):
+        s = Settings(deploy_profile="onprem-local", _env_file=None, **kwargs)
+        with pytest.raises(ValueError, match="classification/active-learning only"):
+            apply_profile_defaults(s)
+
+
+def test_customer_profile_hides_model_lifecycle_routes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """고객사 OpenAPI에는 학습·성능·모델 활성화 경로가 없어야 한다."""
+    monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
+    monkeypatch.setenv("DEPLOY_PROFILE", "onprem-local")
+    monkeypatch.setenv("ENABLE_TRAINING", "false")
+    monkeypatch.setenv("ENABLE_INCREMENTAL_RETRAIN", "false")
+
+    import koipa.config as cfg_mod
+    _orig_settings = cfg_mod.settings
+    importlib.reload(cfg_mod)
+    import koipa.api.app as app_mod
+    importlib.reload(app_mod)
+    try:
+        paths = set(app_mod.app.openapi().get("paths", {}))
+        assert not {p for p in paths if p.startswith("/api/v1/train")}
+        assert {
+            "/api/v1/admin/model/reload",
+            "/api/v1/admin/model/activate",
+            "/api/v1/admin/model/rollback",
+        }.isdisjoint(paths)
+    finally:
+        monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+        cfg_mod.settings = _orig_settings
+        importlib.reload(app_mod)
+
+
+def test_customer_image_removes_jjw_only_modules() -> None:
+    """Dockerfile 정본이 고객사 이미지에서 지재원 전용 파일을 모두 삭제해야 한다."""
+    root = Path(__file__).resolve().parents[1]
+    required = {
+        "src/koipa/api/golden.py",
+        "src/koipa/api/synthesis.py",
+        "src/koipa/api/training.py",
+        "src/koipa/api/_training_report_pdf.py",
+        "src/koipa/modules/m4_training/trainer.py",
+        "src/koipa/services/synthesis_service.py",
+        "src/koipa/services/training_service.py",
+    }
+    for dockerfile in ("Dockerfile.api.customer", "Dockerfile.worker.customer"):
+        text = (root / dockerfile).read_text(encoding="utf-8")
+        missing = {path for path in required if path not in text}
+        assert not missing, f"{dockerfile}: customer image exclusion missing {sorted(missing)}"
+
+
+# ── 프로파일 환경변수 이름 (2026-09-06) ────────────────────────────────────
+#
+# 문서·주석 네 곳이 KOIPA_DEPLOY_PROFILE 이라 적고 있었는데 **그 이름으로는 안 먹는다.**
+# Settings 는 env_prefix 를 쓰지 않으므로 접두사 없는 DEPLOY_PROFILE 이 정본이다.
+# 틀린 이름은 조용히 무시돼 lite-noapi 로 떨어지고, 그러면 학습·합성 라우터가 통째로
+# 사라진다 — 운영자에게 그 이름을 알려주던 오류 메시지도 있었다.
+
+def test_deploy_profile_env_name_is_unprefixed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """DEPLOY_PROFILE 이 정본이고 KOIPA_ 접두사 이름은 안 먹는다 — 실측을 시험으로 고정."""
+    import koipa.config as cfg_mod
+
+    monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
+    monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+    monkeypatch.setenv("KOIPA_DEPLOY_PROFILE", "full-train")
+    _orig = cfg_mod.settings
+    importlib.reload(cfg_mod)
+    try:
+        assert cfg_mod.settings.deploy_profile != "full-train", (
+            "KOIPA_DEPLOY_PROFILE 이 먹기 시작했다면 이름이 두 벌이 된 것이다 — "
+            "문서와 코드가 다시 갈린다. 정본은 DEPLOY_PROFILE 하나다."
+        )
+        monkeypatch.setenv("DEPLOY_PROFILE", "full-train")
+        importlib.reload(cfg_mod)
+        assert cfg_mod.settings.deploy_profile == "full-train"
+    finally:
+        monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+        monkeypatch.delenv("KOIPA_DEPLOY_PROFILE", raising=False)
+        cfg_mod.settings = _orig

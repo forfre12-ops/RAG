@@ -1,0 +1,2279 @@
+"""POST /golden/build + GET /golden/jobs/{id} — 통합 골든셋 빌더 (G3b).
+
+빌드(생성·변경) = admin/kl_backend/system. 상태 조회 = reviewer 포함 broad.
+정본(classification_gold.jsonl)은 직접 변경하지 않고 run-스코프 후보 파일에 쓴다.
+human_review 승격은 별개 경로(import_review_corrections, 지재원 관리자).
+"""
+from __future__ import annotations
+
+import contextlib
+import hashlib
+import hmac
+import re
+from uuid import UUID
+
+from fastapi import (
+    APIRouter, Cookie, Depends, File, Form, Header, HTTPException, Query, Request, Response, UploadFile,
+)
+from fastapi.responses import HTMLResponse
+
+from koipa.api._jwt_auth import require_auth
+from koipa.api._rbac import require_role
+from koipa.api.confirm import bind_authenticated_actor, resolve_actor_user_id
+from koipa.api.console_login import _console_actor_id, _is_console_admin
+from koipa.config import settings
+from koipa.golden_tiers import human_reviewer_rejection_reason
+from koipa.services.job_store import get_default_store
+from koipa.schemas.golden import (
+    GoldenAssignmentRequest,
+    GoldenAssignmentResponse,
+    GoldenExpertReviewPlanRequest,
+    GoldenExpertReviewPlanResponse,
+    GoldenExpertReviewRebalanceRequest,
+    GoldenExpertReviewRebalanceResponse,
+    GoldenReviewPlanRequest,
+    GoldenReviewPlanResponse,
+    GoldenReviewerRosterEntry,
+    GoldenAssignmentStatusResponse,
+    GoldenBuildRequest,
+    GoldenBuildResponse,
+    GoldenBuildStatus,
+    GoldenCorpusSummary,
+    GoldenJobListResponse,
+    GoldenJobSummary,
+    GoldenRegisterRequest,
+    CandidateClassifierScoreResponse,
+    ProxyGoldCandidateDecisionRequest,
+    ProxyGoldCandidateProvenanceRequest,
+    ProxyGoldCandidateProvenanceResponse,
+    ProxyGoldCandidateDecisionResponse,
+    ProxyGoldPromoteRequest,
+    ProxyGoldPromoteResponse,
+    GoldenSignoffRequest,
+    GoldenSignoffPreflightResponse,
+    GoldenSignoffResponse,
+    GoldenCategoryStatsResponse,
+    ReviewExportRequest,
+)
+from koipa.services.golden_build_service import (
+    GoldenBuildService,
+    GoldenSignoffStorageError,
+    display_source_path,
+)
+from koipa.services import golden_reviewer_access as access
+from koipa.services import reviewer_credentials
+from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService, normalize_doc_id
+from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
+from koipa.console_shell import REVIEWER_WORKSPACE_CSS, SHELL_CSS, SHELL_MEDIA_CSS
+from koipa.console_nav import CONSOLE_THEME_CSS, HEADER_CSS, NAV_CSS, header_html, upload_progress_js
+from koipa.console_state import render_console_state_html
+
+# 한국지식재산보호원 심볼 — 폐쇄망이라 외부 이미지를 못 쓰고, 원본 파일도 리포에 없어
+# (있는 것은 Koipa 로고 3종뿐) 제공받은 도안을 보고 벡터로 옮긴 **근사본**이다.
+# 원본 PNG/SVG 가 들어오면 이 상수만 갈아끼우면 두 콘솔에 함께 반영된다.
+# currentColor 를 쓰므로 배경이 밝든 어둡든 부모의 color 만 바꾸면 된다.
+_KOIPA_MARK_SVG = (
+    '<svg viewBox="0 0 40 40" width="30" height="30" role="img" '
+    'aria-label="한국지식재산보호원" fill="currentColor">'
+    '<rect x="2" y="11" width="6" height="18" rx="1"/>'
+    '<rect x="11" y="4" width="6" height="32" rx="1"/>'
+    '<rect x="20" y="15" width="6" height="11" rx="1"/>'
+    '<rect x="29" y="8" width="6" height="24" rx="1"/>'
+    "</svg>"
+)
+
+router = APIRouter(tags=["golden"], dependencies=[Depends(require_auth)])
+
+# 검수·서명 HTML 뷰 전용 라우터(인증 없음). 이 페이지들은 브라우저 window.open/직접 URL 로 여는데
+# 브라우저 네비게이션은 커스텀 헤더(X-API-Key/Bearer)를 못 붙여, require_auth 라우터에 두면 무조건
+# 401 이라 골든 검수 화면 자체가 안 열렸다(signoff.html 은 그 안에서 키를 입력받아 POST 하도록 설계된
+# 닭-달걀 모순). → 별도 무인증 라우터로 분리. 실제 권한 행위인 POST /golden/jobs/{id}/signoff 는 그대로
+# require_role 로 보호되고, 페이지가 입력받은 X-API-Key 를 POST 에 실어 보내므로 보안 불변.
+html_router = APIRouter(tags=["golden"])
+
+
+# ── [#14a] 골든 HTML 서명 URL 토큰 ────────────────────────────────────────────
+# review.html/signoff.html 은 브라우저 네비게이션용 무인증 라우터라 헤더 인증을 못 붙인다.
+# uuid4 job_id 만으로는 URL 만 새면 후보 full-text 가 무인증 노출된다. 비밀키 설정 시 job_id 에
+# 바인딩된 HMAC 토큰(?t=)을 강제해 이를 닫는다(변경성 POST signoff 는 별도 require_role 유지).
+# 비밀키 미설정(dev/test)이면 미강제 — 기존 브라우저 네비게이션·테스트 무변경(backward-compat).
+# [죽은 코드 제거 2026-08-17] 아래 넷은 정의만 있고 호출이 0건이었다 - 라우터도 시험도
+# 참조하지 않았고(git grep 전수), 자기들끼리만 불렀다.
+#   _candidate_manager_html_token / _verify_candidate_manager_html_token  (토큰 헬퍼)
+#   _render_proxy_candidate_manager_html / _render_proxy_gold_console_html (옛 콘솔 렌더러)
+# 살아 있는 렌더러는 _render_specledger_gold_console_html / _render_console_login_html 둘이다
+# (실문서 수집 화면은 2026-08-17 후보 관리의 업로드 모달로 흡수 — D1).
+# ⚠ 지운 렌더러 하나에 협력사 표기(브랜드 문자열)가 남아 있었다. 하이픈이 들어간 철자라
+#   `lloydk` 검색에 안 걸려 2026-08-16 정리 때 놓쳤던 것이다 - 죽은 코드가 흔적을 숨겼다.
+def _golden_url_secret() -> str | None:
+    # 전용 비밀키 설정 시에만 토큰 강제(opt-in) — api_key 로 폴백하지 않는다. 업그레이드 시
+    # 기존 배포의 골든 HTML 북마크를 무단으로 깨지 않고, 운영자가 명시적으로 켜서 닫는다.
+    secret = (getattr(settings, "golden_html_url_secret", "") or "").strip()
+    return secret or None
+
+
+def _mint_html_token(job_id) -> str | None:
+    """job_id 바인딩 HMAC-SHA256 토큰(24 hex). 비밀키 미설정이면 None."""
+    secret = _golden_url_secret()
+    if not secret:
+        return None
+    mac = hmac.new(secret.encode("utf-8"), f"golden:{job_id}".encode("utf-8"), hashlib.sha256)
+    return mac.hexdigest()[:24]
+
+
+def _verify_html_token(job_id, token: str | None) -> bool:
+    """비밀키 설정 시 상수시간 검증(부재/위조 거부); 미설정이면 항상 통과(미강제)."""
+    expected = _mint_html_token(job_id)
+    if expected is None:
+        return True
+    return bool(token) and hmac.compare_digest(expected, token)
+
+
+def _signed_html_urls(job_id) -> tuple[str, str]:
+    """(review_url, signoff_url) — 비밀키 설정 시 ?t= 토큰 포함, 아니면 평문 경로."""
+    base = f"/api/v1/golden/jobs/{job_id}"
+    tok = _mint_html_token(job_id)
+    q = f"?t={tok}" if tok else ""
+    return f"{base}/review.html{q}", f"{base}/signoff.html{q}"
+
+
+
+
+
+
+# ── [2026-09-21] 검수자 접근 통제 — 배정 강제(golden_reviewer_assignment_enforced) · 숨김(golden_review_blind_enforced)
+# 두 손잡이 모두 기본 False = 종전 동작. 강제가 일어나는 자리는 access.resolve_scope /
+# access.enforcement_active 뿐이고, 아래 헬퍼와 각 라우트는 그 결과를 쓰기만 한다(설계 이유는
+# services/golden_reviewer_access.py 머리말).
+#
+# reviewer 가 닿는 라우트와 적용 방식 (관리자·kl_backend·system 은 전부 전체):
+#   GET  /golden/candidates                 배정으로 좁힘 + 숨김이면 자기 결정만으로 다시 센 시야(상태 필터·집계 포함) + grade 필터 거절
+#                                           + doc_id 는 별칭·줄 순서는 별칭 순·query 는 별칭 앞부분에만(2026-09-22)
+#   GET  /golden/candidates/summary         배정으로 좁힌 집계 + 숨김이면 자기 시야로 센 결정 집계 · 등급 분포·품질 제거
+#   GET  /golden/candidates/decisions       배정된 문서의 이벤트만 + 숨김이면 자기 이벤트만(M 입력은 자기가 적은 값으로만) · doc_id 는 별칭
+#   GET  /golden/candidates/session         본인 신원뿐 — 후보 데이터 없음(적용 대상 아님)
+#   GET  /golden/candidates/{doc_id}        배정 밖이면 404 + 숨김 필터 · 숨김이면 {doc_id} 는 별칭만 받는다(실 doc_id 는 404)
+#   GET  /golden/candidates/{doc_id}/classifier-score
+#                                           본문 해시에 묶인 AI 분류 참고 점수만 반환(고객사 전수 사람 검수 보조)
+#   POST /golden/candidates/{doc_id}/decision  배정 밖이면 404 · 숨김이면 approve 거절 · 응답도 자기 시야 · {doc_id} 는 별칭만
+#   GET  /golden/candidates/manage.html     후보 데이터가 인라인으로 박히지 않는 정적 틀(시험이 잠금) + 숨김이면 화면 조정
+#                                           + 관리자 전용 「검수 배정」 패널은 검수자 화면에서 통째로 제거(_strip_assignment_panel — 2026-09-22)
+#   GET  /golden/candidates/login.html      데이터 없음(적용 대상 아님)
+#   GET  /golden/jobs · /golden/jobs/{id} · /golden/summary
+#   GET  /golden/jobs/{id}/review.html · signoff.html · signoff/preflight, POST /golden/jobs/{id}/signoff
+#                                           잡 단위 화면·API 는 잡의 **전체 후보**를 담아 배정으로 걸러낼 수
+#                                           없고 제안 등급이 HTML 에 박힌다 → 손잡이가 켜진 동안 reviewer 에게 403,
+#                                           무인증 HTML 진입로는 401(로그인 요구)
+# 관리자 전용이라 reviewer 는 403 인 라우트: build · builds · jobs/register · candidates/upload ·
+#   candidates/{doc_id}/provenance · candidates/promote · assignments(신규 3개).
+# 별칭 ID(2026-09-22): 숨김이 켜진 동안 검수자 응답의 모든 doc_id 는 별칭(RV-…)이고 경로 {doc_id} 도 별칭만 받는다. 별칭을 못 만들면
+# (솔트 읽기·쓰기 실패 · 풀 안 충돌) 숨김 검수자의 요청은 503 이다. 관리자·kl_backend·system 의 후보 행·상세에는 같은 동안 대응용
+# reviewer_alias 키 하나만 더해진다(그 밖의 응답은 종전과 바이트 단위로 같다).
+def _scope(auth: dict | None) -> access.ReviewerScope:
+    try:
+        return access.resolve_scope(auth)
+    except access.ReviewerAccessError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@contextlib.contextmanager
+def _access_errors():
+    """검수자 접근 계층의 오류(별칭 계층을 쓸 수 없음 = 503)를 HTTP 오류로 옮긴다 — 서비스 계층을 프레임워크에서 떼어 두려고
+    예외를 따로 뒀다. HTTPException 은 그대로 지나간다."""
+    try:
+        yield
+    except access.ReviewerAccessError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+def _resolve_doc_id(scope: access.ReviewerScope, svc: ProxyGoldCandidateService, doc_id: str) -> str:
+    """경로의 {doc_id} → 실 doc_id. 숨김 검수자는 별칭만 받으며, 풀 수 없으면(실 doc_id 를 넣었거나 배정 밖 별칭)
+    **없는 문서와 똑같은** 404 다 — 응답 코드·본문이 같아야 존재 여부와 실 doc_id↔별칭 대응을 못 캔다."""
+    real = scope.resolve_doc_id(svc, doc_id)
+    if real is None:
+        raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+    return real
+
+
+def _require_visible(scope: access.ReviewerScope, svc: ProxyGoldCandidateService, doc_id: str) -> None:
+    """배정 밖 문서는 **없는 문서와 똑같이** 404 로 답한다.
+
+    403 을 주면 "이 doc_id 는 존재하는데 네 것이 아니다"를 알려 주는 셈이다 — 배정 밖 문서의
+    존재 여부(그리고 doc_id 가 등급을 품은 경우 그 문서의 등급)를 추측하는 통로가 된다. 없는
+    문서와 응답 코드·본문이 같으면 배정 안 된 검수자가 알아낼 수 있는 것이 없다.
+    """
+    visible = scope.visible_doc_ids(svc)
+    if visible is not None and doc_id not in visible:
+        raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+
+
+def _deny_restricted_on_jobs(auth: dict | None) -> None:
+    if _scope(auth).restricted:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "job-level golden screens/APIs are closed to reviewers while reviewer "
+                "assignment/blind review is enforced — use the candidate console (manage.html)"
+            ),
+        )
+
+
+def _job_html_guard(
+    request: Request, authorization: str | None, x_api_key: str | None,
+    koipa_access_token: str | None,
+) -> None:
+    """잡 HTML(무인증 진입로) — 손잡이가 켜졌을 때만 로그인을 요구하고 reviewer 를 막는다.
+
+    꺼져 있으면 아무것도 하지 않는다(종전 동작: 서명 URL 토큰만 본다). 켜져 있으면 쿠키·헤더의
+    인증을 **그 자리에서** 해석한다 — 인증 없이 열리는 라우터라 의존성으로는 못 건다.
+    """
+    if not access.enforcement_active():
+        return
+    _deny_restricted_on_jobs(require_auth(request, authorization, x_api_key, koipa_access_token))
+
+
+@router.post(
+    "/golden/build",
+    response_model=GoldenBuildResponse,
+)
+def golden_build(
+    request: Request,
+    req: GoldenBuildRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend", "system")),
+) -> GoldenBuildResponse:
+    # [#13] 감사 신원(created_by 등)을 인증 principal 로 확정(JWT sub 우선; api_key 포털 전파값 유지).
+    bind_authenticated_actor(req.actor, auth)
+    resp = GoldenBuildService().submit(req)
+    # [#14a] 브라우저로 바로 열 수 있는 서명 검수/서명 URL 동봉(비밀키 설정 시 ?t= 토큰).
+    resp.review_url, resp.signoff_url = _signed_html_urls(resp.golden_job_id)
+    return resp
+
+
+@router.get(
+    "/golden/builds",
+    summary="등록할 수 있는 슬레이트 파일 목록 — 화면이 고르게 한다",
+)
+def golden_list_builds(
+    auth: dict = Depends(require_role("admin", "kl_backend", "system")),
+) -> dict:
+    """`POST /golden/jobs/register` 에 넣을 수 있는 파일을 화면에 내려 준다.
+
+    왜(2026-08-20). 등록 칸이 자유 입력이라 서버에 어떤 파일이 있는지 알 방법이
+    없었고, placeholder 가 채워진 값처럼 보여 [등록]을 누르면 "경로를 입력하세요" 가 떴다.
+    고르게 하면 그 함정이 사라진다.
+
+    읽기 전용이고 목록은 datasets/ 하위로 한정된다(register 와 같은 샌드박스).
+    """
+    items = GoldenBuildService().list_registerable_builds()
+    return {"total": len(items), "builds": items}
+
+
+@router.post(
+    "/golden/jobs/register",
+    response_model=GoldenBuildResponse,
+)
+def golden_register_build(
+    req: GoldenRegisterRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend", "system")),
+) -> GoldenBuildResponse:
+    """기존 build_*.jsonl(큐레이트 슬레이트)을 재라벨링 없이 골든 잡으로 등록 → signoff.html 연결.
+
+    /golden/build 와 달리 LLM 재라벨링을 하지 않아 슬레이트 라벨을 보존한다(실서명 스프린트 34건
+    등). 경로는 datasets/ 하위 샌드박스. 반환 job_id 로 GET /golden/jobs/{id}/signoff.html 을 열어
+    검수자가 화면 서명한다.
+    """
+    bind_authenticated_actor(req.actor, auth)  # [#13] 감사 신원 = 인증 principal
+    svc = GoldenBuildService()
+    # 같은 파일이 이미 올라와 있으면 register_build 가 그 잡을 돌려준다(중복 행 방지).
+    # 먼저 조회해 두는 것은 화면에 "새로 열었다/이어서 한다"를 정확히 말하기 위해서다.
+    existing = svc.find_registered_job(req.build_path)
+    job_id = svc.register_build(req.build_path, actor_user_id=req.actor.user_id)
+    if job_id is None:
+        raise HTTPException(
+            status_code=404, detail="build_path 없음 또는 datasets/ 밖(샌드박스 거부)"
+        )
+    review_url, signoff_url = _signed_html_urls(job_id)  # [#14a]
+    return GoldenBuildResponse(
+        golden_job_id=job_id, status_url=f"/golden/jobs/{job_id}",
+        review_url=review_url, signoff_url=signoff_url,
+        reused=(existing is not None and job_id == existing),
+    )
+
+
+@router.get(
+    "/golden/jobs/{job_id}",
+    response_model=GoldenBuildStatus,
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+)
+def golden_job_status(
+    job_id: UUID, auth: dict = Depends(require_auth),
+) -> GoldenBuildStatus:
+    _deny_restricted_on_jobs(auth)
+    st = GoldenBuildService().get_status(job_id)
+    if st is None:
+        raise HTTPException(status_code=404, detail="golden build job not found")
+    # [#14a] 콘솔이 이 값으로 review/signoff HTML 을 연다(인증 경로에서 서명 URL 발급).
+    st.review_url, st.signoff_url = _signed_html_urls(job_id)
+    return st
+
+
+@router.get(
+    "/golden/summary",
+    response_model=GoldenCorpusSummary,
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+    summary="정본 골든셋 구성 집계 (tier·등급·출처·라벨출처)",
+    description=(
+        "골든셋이 지금 어떤 tier(locked_gold_eval·held_review·legal_floor·gold_candidate·"
+        "silver_train)·등급·문서출처로 구성돼 있는지 집계한다. tier 는 저장 컬럼이 아니라 "
+        "label_source/review_status/서명 envelope 에서 파생되므로 golden_tiers 의 tier_of 로 "
+        "유도한다. 읽기 전용 — 정본 변경은 promote_golden_candidates.py 게이트만 담당한다."
+    ),
+)
+def golden_corpus_summary(
+    path: str | None = None, auth: dict = Depends(require_auth),
+) -> GoldenCorpusSummary:
+    """정본 골든셋 구성 집계. path 미지정이면 settings.golden_corpus_jsonl."""
+    # 정본 코퍼스 전체의 등급·tier 분포다 — 배정으로 걸러낼 수 없다. 검수 화면은 안 쓴다(관리 콘솔용).
+    _deny_restricted_on_jobs(auth)
+    target = (path or "").strip() or getattr(
+        settings, "golden_corpus_jsonl", "datasets/gold_real/classification_gold.jsonl"
+    )
+    res = GoldenBuildService().corpus_summary(target)
+    if res is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"골든셋 정본을 찾을 수 없습니다: {target} (datasets/ 하위만 허용)",
+        )
+    return GoldenCorpusSummary(**res)
+
+
+@router.get(
+    "/golden/candidates",
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+    summary="합성 Proxy Gold 후보 목록",
+)
+def proxy_gold_candidate_list(
+    status: str | None = None, grade: str | None = None,
+    origin: str | None = None, query: str | None = None,
+    review_batch: str | None = None,
+    department: str | None = None, info_type: str | None = None, doc_format: str | None = None,
+    boundary_gap_max: float | None = Query(default=None, ge=0, le=1),
+    prediction_mismatch: bool = False,
+    limit: int | None = Query(default=None, ge=1, le=2000),
+    offset: int = Query(default=0, ge=0),
+    auth: dict = Depends(require_auth),
+) -> dict:
+    """관리 후보 목록. 승인도 approved_proxy일 뿐 locked/실문서 골든이 아니다.
+
+    limit·offset — 쪽 나누기. 생략하면 종전처럼 전부 돌려준다(다른 호출자 호환). 콘솔 화면은
+    항상 쪽 단위로 부른다: 후보가 3,598건이 되자 한 응답이 3.6MB 였다. total·summary 는 쪽을
+    넘겨도 같은 값(잘라내기 전 기준)이다.
+
+    review_batch 는 검수 전달본 단위 표식이다. 콘솔 전체가 306건인데 한 회차 검수
+    대상은 그중 일부라, 표식이 없으면 검수자가 어느 문서를 봐야 하는지 알 수 없다.
+    boundary_gap_max 는 BERT 상위 두 등급 점수 차이(0.10 = 10%p) 이하만, prediction_mismatch
+    는 최초 생성 등급과 BERT 최상위 예측이 다른 문서만 남긴다. 둘을 함께 주면 교집합이다.
+    """
+    if status and status not in {"proposed", "under_review", "approved_proxy",
+                                 "grade_fixed_unlocked", "deferred", "discarded", "out_of_scope",
+                                 "unfixed", "training_ready", "excluded"}:
+        raise HTTPException(status_code=422, detail="invalid candidate status")
+    if grade and grade not in {"TS", "S1", "S2", "S3"}:
+        raise HTTPException(status_code=422, detail="invalid grade")
+    scope = _scope(auth)
+    if grade and scope.blind_active:
+        # 이 필터는 제안 등급(proposed_grade)으로도 걸러진다 — 숨김 검수에서 grade=TS 로 목록을
+        # 좁혀 보면 어느 문서가 TS 로 제안됐는지 그대로 읽힌다(응답 필드를 뺐어도 새는 통로).
+        # 조용히 무시하면 호출자가 걸러진 목록으로 오해하므로 거절한다.
+        raise HTTPException(
+            status_code=422, detail="grade filter is not available in blind review")
+    if scope.restricted and (boundary_gap_max is not None or prediction_mismatch):
+        # 경계 문서의 선별은 관리자 검수 우선순위 기능이다. 검수자에게 특정 문서가
+        # "애매하다"는 목록 정보까지 주면 독립 판단의 기준이 바뀔 수 있다.
+        raise HTTPException(
+            status_code=403, detail="classifier boundary filters are available to administrators only")
+    svc = ProxyGoldCandidateService()
+    # 숨김이면 서비스가 행을 별칭 시야로 바꾼 **뒤에** 정렬·검색한다 — 목록 순서는 별칭 순이고(실 doc_id 순이면 줄 위치로 등급이
+    # 읽힌다), query 는 등급 코드를 담을 수 있는 doc_id·title 에 맞추지 않고 별칭 앞부분에만 닿는다(blind_query_match).
+    with _access_errors():
+        return scope.shape_list(svc.list_candidates(
+            status=status, grade=grade, origin=origin, query=query, review_batch=review_batch,
+            department=department, info_type=info_type, doc_format=doc_format,
+            boundary_gap_max=boundary_gap_max, prediction_mismatch=prediction_mismatch,
+            include_classifier_summary=not scope.restricted,
+            visible_doc_ids=scope.visible_doc_ids(svc), view=scope.candidate_view(svc),
+            query_match=scope.query_match(), limit=limit, offset=offset), svc)
+
+
+@router.get(
+    "/golden/candidates/summary",
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+    summary="골든셋 관리 콘솔 집계",
+)
+def proxy_gold_candidate_summary(auth: dict = Depends(require_auth)) -> dict:
+    """후보의 확정·미확정·보류·폐기·출처·등급 분포를 반환한다."""
+    scope = _scope(auth)
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        return scope.shape_summary(svc.summary(
+            visible_doc_ids=scope.visible_doc_ids(svc), view=scope.candidate_view(svc)))
+
+
+@router.get(
+    "/golden/candidates/category-stats",
+    response_model=GoldenCategoryStatsResponse,
+    dependencies=[Depends(require_role("admin", "kl_backend", "system"))],
+    summary="부서×정보유형×등급별 생성 건수(관리자 전용)",
+)
+def proxy_gold_candidate_category_stats(review_batch: str | None = None) -> dict:
+    """admin.html "데이터 생성 현황" — 검수자 배정·블라인드와 무관하게 늘 전체를 본다
+    (admin_only 라우트라 scope 를 거치지 않는다 — _scope 를 안 쓰는 다른 ADMIN_ONLY 라우트와 같다)."""
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        return svc.category_stats(review_batch=review_batch)
+
+
+@router.post(
+    "/golden/candidates/export",
+    dependencies=[Depends(require_role("admin", "kl_backend", "system"))],
+    summary="검수 결과 엑셀 내보내기(관리자 전용)",
+)
+def proxy_gold_candidate_export(body: ReviewExportRequest) -> Response:
+    """선택한 문서(doc_ids) 또는 필터로 좁힌 전체를 .xlsx 로 내린다.
+
+    관리자 전용(ADMIN_ONLY) — 검수자 배정·블라인드를 거치지 않는다(관리자는 원래 전체를
+    본다). "의견"은 별도 입력칸을 새로 만들지 않고 결정에 딸린 사유(reason)를 그대로 쓴다
+    (2026-10-02 사용자 결정 — 등급을 매길 때 이미 사유를 적게 돼 있어 입력은 이미 돼 있다).
+    """
+    import io  # noqa: PLC0415
+
+    from openpyxl import Workbook  # noqa: PLC0415
+
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        rows = svc.export_rows(
+            doc_ids=body.doc_ids, status=body.status, grade=body.grade, origin=body.origin,
+            review_batch=body.review_batch, department=body.department, info_type=body.info_type,
+        )
+
+    headers = ["doc_id", "department", "info_type", "status", "proposed_grade",
+               "final_grade", "reviewer", "reason", "decided_at"]
+    header_labels = ["문서ID", "부서", "정보유형", "상태", "제안등급",
+                      "확정등급", "검수자", "사유/의견", "결정시각"]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "검수결과"
+    ws.append(header_labels)
+    for row in rows:
+        ws.append([row.get(h, "") for h in headers])
+    for i, label in enumerate(header_labels, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = max(12, len(label) + 4)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"golden_review_export_{len(rows)}.xlsx"
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get(
+    "/golden/candidates/decisions",
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+    summary="결정 원장 최근 기록(보류·폐기·번복 포함)",
+)
+def proxy_gold_candidate_decisions(
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    action: str | None = Query(default=None),
+    auth: dict = Depends(require_auth),
+) -> dict:
+    """append-only 결정 원장을 최신순으로 돌려준다. 문서를 열지 않고 감사할 수 있게."""
+    scope = _scope(auth)
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        return svc.recent_decisions(
+            limit=limit, offset=offset, action=action,
+            visible_doc_ids=scope.visible_doc_ids(svc), **scope.event_view(svc))
+
+
+@router.post(
+    "/golden/candidates/upload",
+    status_code=201,
+    summary="골든셋 관리 콘솔 문서 업로드",
+)
+async def proxy_gold_candidate_upload(
+    file: UploadFile = File(...),
+    document_origin: str = Form(default="uploaded_document"),
+    source_reference: str = Form(default=""),
+    authorization_basis: str = Form(default=""),
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> dict:
+    """문서를 미확정 검수 항목으로만 저장한다. 업로드 자체는 골든 승격이 아니다."""
+    actor_id = _console_actor_id(auth)
+    max_bytes = int(getattr(settings, "max_upload_mb", 50)) * 1024 * 1024
+    declared_size = getattr(file, "size", None)
+    if declared_size is not None and declared_size > max_bytes:
+        raise HTTPException(status_code=413, detail="file too large")
+    content = await file.read()
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail="file too large")
+    try:
+        candidate = ProxyGoldCandidateService().create_uploaded_candidate(
+            filename=file.filename or "uploaded_document", content=content,
+            actor_id=actor_id, document_origin=document_origin,
+            source_reference=source_reference, authorization_basis=authorization_basis,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {k: v for k, v in candidate.items() if k != "text"}
+
+
+@router.get(
+    "/golden/candidates/{doc_id}/classifier-score",
+    response_model=CandidateClassifierScoreResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+    summary="검수 후보의 AI 분류 참고 점수",
+)
+def proxy_gold_candidate_classifier_score(doc_id: str, auth: dict = Depends(require_auth)) -> dict:
+    """Return the hash-bound score snapshot for a candidate visible to this caller.
+
+    This is deliberately a read-only score snapshot.  It neither invokes a
+    model during a reviewer request nor changes the human-review decision.
+    """
+    scope = _scope(auth)
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        real_id = _resolve_doc_id(scope, svc, doc_id)
+        _require_visible(scope, svc, real_id)
+        candidate = svc.get_candidate(real_id)
+        if candidate is None:
+            raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+        shaped = scope.shape_candidate(candidate, svc)
+    return {
+        "doc_id": shaped["doc_id"],
+        "classifier_score": shaped["classifier_score"],
+    }
+
+
+@router.get(
+    "/golden/candidates/{doc_id}",
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+    summary="합성 Proxy Gold 후보 상세",
+)
+def proxy_gold_candidate_detail(doc_id: str, auth: dict = Depends(require_auth)) -> dict:
+    scope = _scope(auth)
+    svc = ProxyGoldCandidateService()
+    with _access_errors():
+        real_id = _resolve_doc_id(scope, svc, doc_id)      # 숨김이면 경로는 별칭이다
+        _require_visible(scope, svc, real_id)
+        candidate = svc.get_candidate(real_id)
+        if candidate is None:
+            raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+        return scope.shape_candidate(candidate, svc)
+
+
+@router.post(
+    "/golden/candidates/{doc_id}/provenance",
+    response_model=ProxyGoldCandidateProvenanceResponse,
+    summary="실문서 후보의 출처를 나중에 기록",
+)
+def proxy_gold_candidate_provenance(
+    doc_id: str,
+    req: ProxyGoldCandidateProvenanceRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> ProxyGoldCandidateProvenanceResponse:
+    """이미 올라간 실문서에 원천 위치·사용 권한 근거를 채운다.
+
+    왜 결정 API 가 아닌가. 결정은 action 마다 status 를 정하는 표를 갖고 있어
+    "등급은 그대로 두고 출처만 기록" 을 표현할 수 없다.
+
+    실측 2026-08-17(223): 실문서 74건 중 62건이 출처는 있고 **사용 권한 근거가 없는**
+    상태였는데(적재 스크립트가 top-level 에만 썼다), 그것을 채울 경로가 화면에도 API 에도
+    없었다. 이 엔드포인트가 그 자리다.
+
+    원장에는 event_kind="provenance" 로 남는다 - 결정 이벤트가 아니므로 등급·상태를 안 덮는다.
+    """
+    actor_id = _console_actor_id(auth)
+    try:
+        candidate = ProxyGoldCandidateService().record_provenance(
+            doc_id=doc_id,
+            source_reference=req.source_reference,
+            authorization_basis=req.authorization_basis,
+            reason=req.reason,
+            actor_id=actor_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+    return ProxyGoldCandidateProvenanceResponse(
+        doc_id=doc_id,
+        provenance=candidate.get("provenance") or {},
+        status=candidate["status"],
+        final_grade=candidate.get("final_grade"),
+    )
+
+
+@router.post(
+    "/golden/candidates/{doc_id}/decision",
+    response_model=ProxyGoldCandidateDecisionResponse,
+    summary="합성 Proxy Gold 후보의 관리자 결정 기록",
+)
+def proxy_gold_candidate_decision(
+    doc_id: str,
+    req: ProxyGoldCandidateDecisionRequest,
+    # [2026-09-11] 검수자도 결정을 기록한다 — 등급 결정이 검수자의 일이다. 평가정답 승격(promote)은 관리자만.
+    auth: dict = Depends(require_role("admin", "kl_backend", "reviewer")),
+) -> ProxyGoldCandidateDecisionResponse:
+    """결정을 append-only 원장에 남긴다. 이 엔드포인트는 locked 승격을 수행하지 않는다."""
+    actor_id = _console_actor_id(auth)
+    scope = _scope(auth)
+    svc = ProxyGoldCandidateService()
+    # 배정 밖이면 본문 검증(사유·등급) 결과와 무관하게 없는 문서와 같은 404 — 순서가 뒤바뀌면
+    # 422 사유가 "이 문서는 있다"를 알려 준다. 숨김이면 경로는 별칭이고, 실 doc_id 를 넣어도 같은 404 다.
+    with _access_errors():
+        real_id = _resolve_doc_id(scope, svc, doc_id)
+        _require_visible(scope, svc, real_id)
+    if scope.blind_active and req.action == "approve":
+        # 승인 = '제안 등급 그대로 확정'. 숨김 검수에서는 검수자가 제안을 볼 수 없으니 그 결정은
+        # 볼 수 없는 값을 받아들이는 것이고, 독립 판정이라는 전제를 서버가 스스로 깨게 된다.
+        # 등급을 직접 정하는 change 만 남긴다.
+        raise HTTPException(
+            status_code=403,
+            detail="approve (confirm the proposed grade) is not available in blind review; "
+                   "use action=change with an explicit grade",
+        )
+    try:
+        candidate = svc.decide(
+            doc_id=real_id, action=req.action, grade=req.grade,
+            reason=req.reason, actor_id=actor_id,
+            # 비밀관리성(M) 입력 — 등급 결정과 같은 이벤트에 실린다.
+            security_marking=req.security_marking, access_scope=req.access_scope,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+    # 응답에도 숨김을 적용한다 — 저장된 후보(status·latest_decision·management)에는 다른 검수자의 결정이
+    # 섞여 있고 이벤트에는 proposed_grade·management_before 가 실려 있다. 자기 결정만으로 다시 만든 시야를 돌려준다.
+    with _access_errors():
+        candidate = scope.shape_candidate(candidate, svc)
+    return ProxyGoldCandidateDecisionResponse(
+        doc_id=candidate["doc_id"],           # 숨김이면 별칭, 아니면 종전과 같은 값(경로로 들어온 실 doc_id)
+        status=candidate["status"],
+        final_grade=candidate["final_grade"],
+        latest_decision=candidate["latest_decision"],
+    )
+
+
+@router.post(
+    "/golden/candidates/promote",
+    response_model=ProxyGoldPromoteResponse,
+    summary="콘솔 검수 결정을 사람 서명(locked_gold_eval)으로 승격",
+)
+def proxy_gold_candidate_promote(
+    req: ProxyGoldPromoteRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> ProxyGoldPromoteResponse:
+    """등급을 확정한 콘솔 결정을 평가정답으로 승격한다(원장 투영 · 여러 번 돌려도 같은 결과).
+
+    **서명자는 이 요청을 보낸 사람이 아니다.** 원장에 남은 결정자(actor_id = 포털 JWT sub)가
+    reviewer_id 로 들어간다 — 승격은 결정을 옮기는 행위이지 새로 판단하는 행위가 아니다.
+    머신·플레이스홀더 결정자는 promote_to_locked 가 거부한다.
+
+    이 엔드포인트를 부르는 사람에게도 포털 로그인을 요구한다(_console_actor_id). 공유 API
+    키로 평가정답을 만들 수 있으면 '누가 승격했나'가 남지 않는다.
+    """
+    _console_actor_id(auth)
+    try:
+        out = ProxyGoldCandidateService().promote_decisions_to_locked(
+            publish=req.publish, dry_run=req.dry_run
+        )
+    except GoldenSignoffStorageError as exc:
+        # 저장 실패만 사유를 그대로 내려보낸다 — 폴더 권한·경로처럼 화면 앞의 사람이 바로
+        # 고칠 수 있는 종류다(golden_job_signoff 와 같은 이유).
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return ProxyGoldPromoteResponse(**out)
+
+
+# ── [2026-09-21] 검수자 배정 관리 — 관리자 전용 API (화면: manage.html 의 「검수 배정」 패널, 2026-09-22) ──
+# 배정은 후보 폴더의 append-only 원장(candidate_assignments.jsonl)에 쌓인다. 배정한 관리자는
+# 요청 본문이 아니라 서버가 확정한 포털 JWT sub 다(_console_actor_id — 본문의 자칭을 받지 않는다).
+# 손잡이(golden_reviewer_assignment_enforced)가 꺼져 있으면 배정은 **기록만** 되고 검수자에게는
+# 여전히 전체가 보인다 — 응답의 assignment_enforced 가 그 사실을 알려 준다.
+def _active_reviewer_roster() -> dict[str, GoldenReviewerRosterEntry]:
+    """파일 기반 계정 저장소에서 활성 reviewer만 정규화해 읽는다.
+
+    이 명부는 외부 인사 시스템을 흉내 내지 않는다. 현재 배포본에서 실제로 비밀번호
+    로그인·JWT 발급이 가능한 계정의 최소 권한 근거다. 해시나 비밀번호는 이 경로로
+    절대 반환하지 않는다.
+    """
+    try:
+        accounts = reviewer_credentials.list_accounts()
+    except reviewer_credentials.ReviewerCredentialError as exc:
+        raise HTTPException(status_code=503, detail="검수자 계정 명부를 읽을 수 없습니다") from exc
+
+    roster: dict[str, GoldenReviewerRosterEntry] = {}
+    for account in accounts:
+        roles = [str(role) for role in account.get("roles", ())]
+        if not bool(account.get("active", True)) or "reviewer" not in roles:
+            continue
+        try:
+            reviewer_id = access.norm_id(str(account.get("username") or ""))
+        except ValueError:
+            continue
+        if reviewer_id in roster:
+            raise HTTPException(
+                status_code=503,
+                detail="검수자 계정 명부에 정규화 후 중복된 ID가 있습니다",
+            )
+        roster[reviewer_id] = GoldenReviewerRosterEntry(reviewer_id=reviewer_id, roles=roles)
+    return roster
+
+
+def _require_active_reviewer_accounts(reviewer_ids: list[str]) -> None:
+    """배정 강제 운영에서는 원장 쓰기 전에 로그인 가능한 reviewer인지 확인한다."""
+    if not bool(getattr(settings, "golden_reviewer_assignment_enforced", False)):
+        return
+    roster = _active_reviewer_roster()
+    missing = sorted({access.norm_id(value) for value in reviewer_ids} - set(roster))
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "활성 검수자 계정 명부에 없는 ID입니다: " + ", ".join(missing[:20])
+                + (f" (+{len(missing) - 20} more)" if len(missing) > 20 else "")
+            ),
+        )
+
+
+@router.get(
+    "/golden/reviewers",
+    response_model=list[GoldenReviewerRosterEntry],
+    dependencies=[Depends(require_role("admin", "kl_backend"))],
+    summary="배정 가능한 활성 검수자 계정 목록",
+)
+def golden_reviewer_roster() -> list[GoldenReviewerRosterEntry]:
+    """관리자에게만 활성 reviewer 계정 ID를 제공한다(비밀번호·해시는 미노출)."""
+    return list(_active_reviewer_roster().values())
+
+
+def _apply_assignment(
+    event: str, req: GoldenAssignmentRequest, auth: dict,
+) -> GoldenAssignmentResponse:
+    if event == access.EVENT_ASSIGN:
+        _require_active_reviewer_accounts([req.reviewer_id])
+    actor_id = _console_actor_id(auth)
+    svc = ProxyGoldCandidateService()
+    index = svc.review_batch_index()
+    if req.doc_ids is not None:
+        # 전달본 doc_id(GOLD-…_제목)를 콘솔 doc_id 로 맞춘다 — 이미 콘솔 id 이면 그대로 둔다.
+        ids = list(dict.fromkeys(d if d in index else normalize_doc_id(d) for d in req.doc_ids))
+        if event == access.EVENT_ASSIGN:
+            # 오타 난 id 를 조용히 배정하면 그 검수자에게는 아무것도 안 보이는데 아무도 모른다.
+            # 해제는 이미 사라진 문서를 정리할 수 있어야 하므로 존재를 요구하지 않는다.
+            unknown = [d for d in ids if d not in index]
+            if unknown:
+                raise HTTPException(
+                    status_code=422, detail=f"unknown doc_id: {unknown[:20]}"
+                    + (f" (+{len(unknown) - 20} more)" if len(unknown) > 20 else ""))
+        targets = [("doc_id", d) for d in ids]
+    else:
+        batch = req.review_batch.strip()
+        if event == access.EVENT_ASSIGN and batch not in {b for b in index.values() if b}:
+            raise HTTPException(status_code=422, detail=f"unknown review_batch: {batch}")
+        targets = [("review_batch", batch)]
+    ledger = access.AssignmentLedger(svc.root)
+    try:
+        written, skipped = ledger.apply(
+            event=event, reviewer_id=req.reviewer_id, actor_id=actor_id,
+            targets=targets, reason=req.reason)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return GoldenAssignmentResponse(
+        event=event,
+        reviewer_id=access.norm_id(req.reviewer_id),
+        actor_id=actor_id,
+        applied=[{k: e[k] for k in ("doc_id", "review_batch") if e.get(k)} for e in written],
+        skipped=skipped,
+        events_written=len(written),
+        reviewer_visible_doc_count=len(ledger.visible_doc_ids(req.reviewer_id, index)),
+        assignment_enforced=bool(getattr(settings, "golden_reviewer_assignment_enforced", False)),
+    )
+
+
+@router.post(
+    "/golden/assignments",
+    response_model=GoldenAssignmentResponse,
+    summary="검수자에게 문서 또는 검수 배치를 배정",
+)
+def golden_assignment_add(
+    req: GoldenAssignmentRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> GoldenAssignmentResponse:
+    """doc_ids(문서 목록) 또는 review_batch(배치 단위) 중 하나를 reviewer_id 에게 배정한다.
+
+    이미 배정된 대상은 원장에 다시 적지 않고 skipped 로 돌려준다(멱등).
+    """
+    return _apply_assignment(access.EVENT_ASSIGN, req, auth)
+
+
+@router.post(
+    "/golden/assignments/expert-review-plan",
+    response_model=GoldenExpertReviewPlanResponse,
+    status_code=201,
+    summary="전문가 20명에게 검수 배치 1,000건을 50건씩 원자 배정",
+)
+def golden_expert_review_plan(
+    req: GoldenExpertReviewPlanRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> GoldenExpertReviewPlanResponse:
+    """KL 전문가 검수 회차를 안전하게 개시한다.
+
+    개별/배치 배정 API는 기존 운영과의 호환을 위해 유지한다. 이 엔드포인트는 그보다
+    훨씬 좁다: 배치가 정확히 1,000건이고, 서로 다른 20명에게 정확히 50건씩 독점 배정될
+    때만 성공한다. 배정 강제와 블라인드가 꺼진 상태에서는 원장을 쓰지 않는다. 그렇지
+    않으면 ``20 x 50``이라는 운영 표기가 실제 접근제어와 달라진다.
+    """
+    if not bool(getattr(settings, "golden_reviewer_assignment_enforced", False)):
+        raise HTTPException(
+            status_code=409,
+            detail="expert review plan requires GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1",
+        )
+    if not bool(getattr(settings, "golden_review_blind_enforced", False)):
+        raise HTTPException(
+            status_code=409,
+            detail="expert review plan requires GOLDEN_REVIEW_BLIND_ENFORCED=1",
+        )
+    _require_active_reviewer_accounts(req.reviewer_ids)
+    actor_id = _console_actor_id(auth)
+    svc = ProxyGoldCandidateService()
+    ledger = access.AssignmentLedger(svc.root)
+    try:
+        rows, group_id, already_applied, plan = ledger.apply_exact_expert_review_plan(
+            review_batch=req.review_batch,
+            reviewer_ids=req.reviewer_ids,
+            doc_batches=svc.review_batch_index(),
+            actor_id=actor_id,
+            reason=req.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return GoldenExpertReviewPlanResponse(
+        review_batch=access.norm_id(req.review_batch),
+        reviewer_count=len(plan),
+        documents_per_reviewer=50,
+        total_documents=1000,
+        actor_id=actor_id,
+        events_written=len(rows),
+        assignment_group_id=group_id,
+        already_applied=already_applied,
+        reviewer_document_counts={reviewer: len(doc_ids) for reviewer, doc_ids in plan.items()},
+    )
+
+
+@router.post(
+    "/golden/assignments/expert-review-plan/rebalance",
+    response_model=GoldenExpertReviewRebalanceResponse,
+    status_code=201,
+    summary="미검수 전문가 배치를 25명 x 40건으로 원자 재배정",
+)
+def golden_expert_review_plan_rebalance(
+    req: GoldenExpertReviewRebalanceRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> GoldenExpertReviewRebalanceResponse:
+    """Move an unopened 1,000-document expert-review batch from 20 x 50 to 25 x 40.
+
+    Existing passwords are unrelated to this endpoint and never changed.  The
+    ledger retains every old assignment as an explicit unassign event, while a
+    reviewer decision in the target batch makes this operation fail closed.
+    """
+    if not bool(getattr(settings, "golden_reviewer_assignment_enforced", False)):
+        raise HTTPException(
+            status_code=409,
+            detail="expert review rebalance requires GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1",
+        )
+    if not bool(getattr(settings, "golden_review_blind_enforced", False)):
+        raise HTTPException(
+            status_code=409,
+            detail="expert review rebalance requires GOLDEN_REVIEW_BLIND_ENFORCED=1",
+        )
+    _require_active_reviewer_accounts(req.reviewer_ids)
+    actor_id = _console_actor_id(auth)
+    svc = ProxyGoldCandidateService()
+    ledger = access.AssignmentLedger(svc.root)
+    try:
+        rows, group_id, already_applied, plan = ledger.rebalance_exact_expert_review_plan(
+            review_batch=req.review_batch,
+            reviewer_ids=req.reviewer_ids,
+            doc_batches=svc.review_batch_index(),
+            decision_events=svc.ledger_rows(),
+            actor_id=actor_id,
+            reason=req.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    revoked = sum(1 for row in rows if row["event"] == access.EVENT_UNASSIGN)
+    assigned = sum(1 for row in rows if row["event"] == access.EVENT_ASSIGN)
+    return GoldenExpertReviewRebalanceResponse(
+        review_batch=access.norm_id(req.review_batch),
+        reviewer_count=len(plan),
+        documents_per_reviewer=40,
+        total_documents=1000,
+        actor_id=actor_id,
+        events_written=len(rows),
+        assignment_group_id=group_id,
+        already_applied=already_applied,
+        reviewer_document_counts={reviewer: len(doc_ids) for reviewer, doc_ids in plan.items()},
+        revoked_assignment_events=revoked,
+        assigned_events=assigned,
+    )
+
+
+@router.post(
+    "/golden/assignments/review-plan",
+    response_model=GoldenReviewPlanResponse,
+    status_code=201,
+    summary="검수 배치를 활성 검수자에게 균등 배정",
+)
+def golden_review_plan(
+    req: GoldenReviewPlanRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> GoldenReviewPlanResponse:
+    """현재 배치를 실제 활성 검수자에게 균등·독점 배정한다."""
+    if not bool(getattr(settings, "golden_reviewer_assignment_enforced", False)):
+        raise HTTPException(status_code=409, detail="review plan requires GOLDEN_REVIEWER_ASSIGNMENT_ENFORCED=1")
+    if not bool(getattr(settings, "golden_review_blind_enforced", False)):
+        raise HTTPException(status_code=409, detail="review plan requires GOLDEN_REVIEW_BLIND_ENFORCED=1")
+    _require_active_reviewer_accounts(req.reviewer_ids)
+    actor_id = _console_actor_id(auth)
+    svc = ProxyGoldCandidateService()
+    ledger = access.AssignmentLedger(svc.root)
+    try:
+        rows, group_id, already_applied, plan = ledger.apply_balanced_review_plan(
+            review_batch=req.review_batch,
+            reviewer_ids=req.reviewer_ids,
+            doc_batches=svc.review_batch_index(),
+            actor_id=actor_id,
+            reason=req.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    counts = [len(doc_ids) for doc_ids in plan.values()]
+    return GoldenReviewPlanResponse(
+        review_batch=access.norm_id(req.review_batch),
+        reviewer_count=len(plan),
+        total_documents=sum(counts),
+        min_documents_per_reviewer=min(counts),
+        max_documents_per_reviewer=max(counts),
+        actor_id=actor_id,
+        events_written=len(rows),
+        assignment_group_id=group_id,
+        already_applied=already_applied,
+        reviewer_document_counts={reviewer: len(doc_ids) for reviewer, doc_ids in plan.items()},
+    )
+
+
+@router.post(
+    "/golden/assignments/revoke",
+    response_model=GoldenAssignmentResponse,
+    summary="검수 배정 해제",
+)
+def golden_assignment_revoke(
+    req: GoldenAssignmentRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> GoldenAssignmentResponse:
+    """배정과 **같은 단위**로 해제한다(배치로 배정했으면 배치로 해제).
+
+    원장에서 줄을 지우지 않는다 — 해제도 unassign 이벤트로 덧붙는다.
+    """
+    return _apply_assignment(access.EVENT_UNASSIGN, req, auth)
+
+
+@router.get(
+    "/golden/assignments",
+    response_model=GoldenAssignmentStatusResponse,
+    response_model_exclude_unset=True,      # events 는 include_events=true 일 때만 나간다(종전과 같은 키 집합)
+    summary="검수 배정 현황",
+)
+def golden_assignment_status(
+    reviewer_id: str | None = None,
+    doc_id: str | None = None,
+    review_batch: str | None = None,
+    include_events: bool = False,
+    limit: int = Query(default=100, ge=1, le=1000),
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> dict:
+    """검수자별 배정과 문서 단위 커버리지(어느 검수자에게도 배정되지 않은 문서 수).
+
+    reviewer_id · doc_id(그 문서를 볼 수 있는 검수자) · review_batch(그 배치를 배정받은 검수자)로
+    좁힌다. include_events=true 이면 원장 이벤트를 최신순 limit 건 함께 준다.
+
+    assignments(2026-09-22) 는 지금 유효한 배정을 한 줄씩 편 표다 — 배정 시각·배정한 관리자·사유가 붙는다.
+    enforcement(2026-09-22) 는 두 손잡이의 현재 값이고 `enforced` 와 같은 값이다. 둘 다 같은 지역 변수에서 만들어 어긋날 수 없다.
+    """
+    svc = ProxyGoldCandidateService()
+    ledger = access.AssignmentLedger(svc.root)
+    out = ledger.status(
+        svc.review_batch_index(), reviewer_id=reviewer_id, doc_id=doc_id,
+        review_batch=review_batch, decision_events=svc.ledger_rows())
+    assignment_on = bool(getattr(settings, "golden_reviewer_assignment_enforced", False))
+    blind_on = bool(getattr(settings, "golden_review_blind_enforced", False))
+    out["enforced"] = {"assignment": assignment_on, "blind": blind_on}
+    out["enforcement"] = {"assignment_enforced": assignment_on, "blind_enforced": blind_on}
+    if include_events:
+        out["events"] = list(reversed(ledger.read_events()))[:limit]
+    return out
+
+
+@router.get(
+    "/golden/jobs",
+    response_model=GoldenJobListResponse,
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+)
+def golden_job_list(
+    limit: int = 20, auth: dict = Depends(require_auth),
+) -> GoldenJobListResponse:
+    """최근 골든 잡 목록.
+
+    목록이 없으면 콘솔은 마지막 job_id 를 메모리에만 들고 있어 새로고침 한 번에 검수하던
+    후보로 돌아갈 길이 사라진다(229건을 절반 서명하다 F5 를 누르면 길을 잃는다).
+
+    JobStore 에는 골든 외 잡(분류·학습)도 섞이므로 kind 로 걸러낸다. 정렬은 백엔드에 따라
+    best-effort(Redis 는 SCAN 순서) — 응답 ordering 필드로 그 한계를 명시한다.
+    """
+    _deny_restricted_on_jobs(auth)
+    limit = max(1, min(100, limit))
+    # 필터로 걸러지는 만큼 여유 있게 읽고 자른다(골든 잡이 뒤로 밀려 안 보이는 것 방지).
+    raw = get_default_store().list_recent(limit=limit * 5)
+    svc = GoldenBuildService()
+    jobs: list[GoldenJobSummary] = []
+    for j in raw:
+        if j.get("kind") not in ("golden_build", "golden_register"):
+            continue
+        jid = str(j.get("job_id") or "")
+        if not jid:
+            continue
+        try:
+            uid = UUID(jid)
+            review_url, signoff_url = _signed_html_urls(uid)
+            decided = svc.decided_count(j.get("gold_path"), uid)
+        except ValueError:      # job_id 형식 이상 — 목록에서 제외하지 않고 링크만 생략
+            review_url = signoff_url = None
+            decided = 0
+        jobs.append(GoldenJobSummary(
+            job_id=jid,
+            kind=str(j.get("kind") or ""),
+            status=str(j.get("status") or ""),
+            actor=str(j.get("actor") or ""),
+            submitted_at=j.get("submitted_at"),
+            source_type=j.get("source_type"),
+            gold_count=j.get("gold_count"),
+            uncertain_count=j.get("uncertain_count"),
+            error=j.get("error"),
+            # 어느 파일에서 온 묶음인지 — 없으면 같은 파일을 두 번 등록한 행을 구분할 수 없다.
+            source_path=display_source_path(j.get("gold_path")),
+            review_url=review_url,
+            signoff_url=signoff_url,
+            decided_count=decided,
+        ))
+    jobs, folded = _fold_duplicate_registrations(jobs)
+    return GoldenJobListResponse(jobs=jobs[:limit], folded_duplicates=folded)
+
+
+def _fold_duplicate_registrations(
+    jobs: list[GoldenJobSummary],
+) -> tuple[list[GoldenJobSummary], int]:
+    """같은 원본 파일로 여러 번 등록된 행을 한 행으로 접는다.
+
+    왜(2026-08-25). 등록 쪽에 중복 가드를 넣어 **새로** 생기는 것은 막았지만, 가드 이전에
+    쌓인 행은 저장소에 그대로 남아 화면에서 계속 쌍둥이로 보인다(223 실측: 8행이 실제로는
+    파일 3개). 목록을 저장소 정리에 의존시키지 않는다 — 화면이 스스로 접는다.
+
+    ⚠ **결정이 쌓인 행은 접지 않는다.** 접는 것은 진행분 0 인 빈 쌍둥이뿐이다. 두 행 모두에
+      서명이 남아 있는 경우가 실제로 가능한데(가드 이전 상태), 그때 한쪽을 감추면 그 원장에
+      든 사람 서명이 화면에서 사라진다. 그런 행은 둘 다 남겨 검수자가 보고 판단하게 한다.
+
+    대표 행은 **결정이 많은 쪽**, 같으면 최근 등록순. 접은 수는 감추지 않고 행·응답에 싣는다.
+    """
+    by_source: dict[str, list[GoldenJobSummary]] = {}
+    for j in jobs:
+        # 후보 생성(golden_build)은 잡마다 파일이 따로 생기므로 접을 일이 없다.
+        # 원본 파일을 모르는 행도 근거 없이 묶지 않는다.
+        if j.kind == "golden_register" and j.source_path:
+            by_source.setdefault(j.source_path, []).append(j)
+
+    hidden: set[int] = set()        # 목록에서 뺄 행(id() 로 식별 — job_id 는 중복이 없다)
+    for group in by_source.values():
+        if len(group) == 1:
+            continue
+        decided = [g for g in group if g.decided_count > 0]
+        empties = [g for g in group if g.decided_count == 0]
+        if len(decided) > 1:
+            # 서명이 두 곳에 갈라져 있다 — 그 행들은 감추지 않고 전부 보여준다(사람이 정리할
+            # 일이다). 빈 쌍둥이만 접고, 접었다는 사실은 결정이 가장 많은 행에 적는다.
+            rep = max(decided, key=lambda g: g.decided_count)
+        else:
+            rep = decided[0] if decided else max(
+                empties, key=lambda g: str(g.submitted_at or "")
+            )
+        for g in group:
+            if g is not rep and g.decided_count == 0:
+                hidden.add(id(g))
+        rep.folded_duplicates = sum(1 for g in group if id(g) in hidden)
+
+    kept = [j for j in jobs if id(j) not in hidden]   # 원래 순서 그대로
+    return kept, len(hidden)
+
+
+def _job_gate_html(job_id: UUID) -> HTMLResponse | None:
+    """렌더 전 잡 상태를 확인해 not-found/진행중/실패를 구분한 HTMLResponse 를 돌려주거나,
+    done 이면 None(호출부가 실제 렌더 진행). 진행중·실패·오id 를 같은 404 로 뭉개고 실패 error 를
+    버리던 것 보완 — 검수자가 '기다릴지 재빌드할지'를 화면에서 판단하게 한다.
+    """
+    st = GoldenBuildService().get_status(job_id)
+    if st is None:
+        # 여기는 **검수자가 링크를 눌러 도착하는 자리**다. 원시 JSON 404 를 주면 무슨 일이
+        # 일어났는지 알 수 없다. 실제로 흔한 상황이기도 하다 — JobStore 가 in-memory 면
+        # API 재시작에 잡이 사라지고, Redis 라도 TTL 이 있다. 재등록은 멱등이라 관리자가
+        # 스크립트를 한 번 더 돌리면 끝난다. 그 사실을 화면에서 알려 준다.
+        return HTMLResponse(
+            content=render_console_state_html(
+                title="이 검수 잡을 찾을 수 없습니다",
+                eyebrow="REVIEW JOB UNAVAILABLE",
+                message="링크가 잘못된 것이 아닙니다. API 재시작 또는 보관 기간 만료로 잡 정보가 사라진 경우일 수 있습니다.",
+                detail=(
+                    f"잡 ID: {job_id}\n\n관리자에게 재등록을 요청하세요. 재등록은 멱등이며 같은 후보 파일이면 기존 "
+                    "후보를 재사용하고, 기존 검수 원장을 지우지 않습니다.\n\n"
+                    "관리자 명령: python3 scripts/register_review_signoff_job.py\n"
+                    "재등록 뒤 새 서명 URL(?t= 포함)을 통째로 받으십시오."
+                ),
+                tone="warning",
+            ),
+            status_code=404,
+        )
+    status = getattr(st, "status", None)
+    if status in ("queued", "running", "pending"):
+        return HTMLResponse(
+            content=render_console_state_html(
+                title="골든 빌드를 준비하고 있습니다",
+                eyebrow="REVIEW JOB IN PROGRESS",
+                message="후보 검수 화면은 생성이 완료된 뒤에 열립니다. 잠시 후 이 페이지를 새로고침하세요.",
+                detail=f"잡 ID: {job_id}\n현재 상태: {status}",
+            ),
+            status_code=202,
+        )
+    if status == "failed":
+        err = getattr(st, "error", None) or "(사유 미기록)"
+        return HTMLResponse(
+            content=render_console_state_html(
+                title="골든 빌드가 완료되지 않았습니다",
+                eyebrow="REVIEW JOB FAILED",
+                message="검수 결정을 시작하지 않았습니다. 관리자에게 아래 사유와 잡 ID를 전달해 재빌드 여부를 확인하세요.",
+                detail=f"잡 ID: {job_id}\n실패 사유: {err}",
+                tone="danger",
+            ),
+            status_code=200,
+        )
+    return None
+
+
+# ── [2026-09-22] 관리자 전용 「검수 배정」 패널 ─────────────────────────────────────────────
+# 관리자·kl_backend 가 API 를 직접 부르지 않고 콘솔에서 전문가에게 문서·배치를 배정한다. 새 라우트는 없다 —
+# 기존 POST/GET /golden/assignments · POST /golden/assignments/revoke 와 GET /golden/candidates(available_batches)만 쓴다.
+#
+# ⚠ 검수자에게 이 패널의 마크업·스크립트·관리자 API 주소가 **아예 없어야** 한다(CSS 로 숨기는 것으로는 부족하다 — 검수자가
+#   화면 구조와 관리자 API 주소를 읽는다). 그래서 패널은 네 조각(메뉴 링크 · 스타일 · 본문 · 스크립트)이고 각 조각을 같은 표식으로
+#   감싼다. _as_reviewer_view · _as_blind_reviewer_view 가 _strip_assignment_panel 로 표식째 통째로 걷어낸다. 표식 밖의 관리자
+#   화면은 이 패널이 없던 때와 글자 하나 다르지 않다(패널 조각만 더해졌다).
+# 화면 코드 규칙: 서버가 준 값과 관리자가 입력한 값(검수자 ID 포함 — 임의 문자열)은 textContent·DOM 생성으로만 넣는다(innerHTML 없음).
+# 신원은 서버가 정한다 — 요청 본문에 배정한 관리자 ID 를 싣지 않고, 키·토큰 입력칸도 없다. 신뢰도 수치는 쓰지 않는다.
+_ASSIGN_PANEL_BEGIN = "<!--assign-panel:begin-->"
+_ASSIGN_PANEL_END = "<!--assign-panel:end-->"
+_ASSIGN_PANEL_RE = re.compile(re.escape(_ASSIGN_PANEL_BEGIN) + r".*?" + re.escape(_ASSIGN_PANEL_END), re.S)
+# 표식을 걷은 뒤에도 남아 있으면 안 되는 것 — 남아 있으면 검수자 화면을 내주지 않고 실패한다(fail-closed).
+_ASSIGN_PANEL_LEFTOVERS = ("assign-panel", "golden/assignments", 'id="assignments"', 'id="asn')
+
+
+def _wrap_assign_panel(part: str) -> str:
+    return _ASSIGN_PANEL_BEGIN + part + _ASSIGN_PANEL_END
+
+
+def _strip_assignment_panel(html: str) -> str:
+    """검수자용 화면에서 배정 패널 네 조각을 통째로 제거한다. 걷은 뒤에도 패널 흔적이 남으면 예외 — 화면을 내주지 않는다."""
+    out = _ASSIGN_PANEL_RE.sub("", html)
+    leftover = [t for t in _ASSIGN_PANEL_LEFTOVERS if t in out]
+    if leftover:
+        raise RuntimeError(f"reviewer console still carries the assignment panel: {leftover}")
+    return out
+
+
+_ASSIGN_PANEL_NAV = _wrap_assign_panel('<a href="#assignments"><span>05</span>검수 배정</a>')
+
+_ASSIGN_PANEL_CSS = _wrap_assign_panel(r"""<style>
+#assignments .asnState{display:grid;gap:10px;margin:26px 0 0;padding:16px 18px;border:1px solid var(--line);border-left:4px solid #111;background:#fafaf8}
+#assignments .asnState>div{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;font-size:13px}
+#assignments .asnKey{font-weight:800;min-width:104px}
+#assignments .asnHint{color:#5f666c;font-size:12.5px}
+#assignments .asnOn{background:var(--green);color:#087341}
+#assignments .asnOff{background:#eef1f4;color:#56616b}
+#assignments .asnNote{margin:10px 0 0;padding:9px 12px;border-left:3px solid var(--red);background:#fff8f8;color:#7a1f2b;font-size:13px}
+#assignments .asnNote:empty{display:none}
+#assignments .asnGrid{display:grid;grid-template-columns:minmax(0,1fr);gap:36px;margin-top:30px}
+#assignments h3{font-size:18px;letter-spacing:-.4px;margin:0 0 12px}
+#assignments .asnCount{color:#5f666c;font-size:13px;font-weight:400;letter-spacing:0;margin-left:6px}
+#assignments .asnHead,#assignments .asnRow{grid-template-columns:minmax(110px,1.1fr) 70px minmax(130px,1.5fr) 150px minmax(90px,1fr) 62px;gap:12px}
+#assignments .asnRow{display:grid;align-items:start;padding:12px;border-bottom:1px solid #e8e8e5;font-size:13px}
+#assignments .asnCell{min-width:0;overflow-wrap:anywhere}
+#assignments .asnTime{font:12px ui-monospace,monospace;color:#5f666c}
+#assignments .asnReasonLine{margin-top:3px;font-size:12px;color:#5f666c}
+#assignments .asnScroll{overflow-x:auto}
+#assignments .asnTable{min-width:690px}
+#assignments #asnRows{max-height:440px;overflow-y:auto;border-bottom:1px solid #e8e8e5}
+#assignments .asnForm{max-width:560px}
+#assignments .asnRevoke{padding:5px 10px;font-size:12px}
+#assignments .asnForm label{display:block;margin:14px 0 4px;font-size:12px;color:#5a636b}
+#assignments .asnForm input,#assignments .asnForm select,#assignments .asnForm textarea{display:block;width:100%;border:1px solid var(--line);padding:9px;background:#fff;font:inherit;font-size:13px}
+#assignments .asnForm textarea{height:130px;resize:vertical;font:12px ui-monospace,monospace}
+#assignments .asnForm .asnHint{display:block;margin-top:5px}
+@media(max-width:700px){#assignments .asnRow{grid-template-columns:1fr auto}#assignments .asnTable{min-width:0}}
+</style>""")
+
+_ASSIGN_PANEL_SECTION = _wrap_assign_panel(r"""<section id="assignments" class="section" aria-labelledby="asnTitle"><div class="sectionTop"><div><span class="secNum">05</span><h2 id="asnTitle">검수 배정</h2><p>검수자가 볼 수 있는 문서를 정합니다. 배정과 해제는 누가 언제 했는지와 함께 기록되며 지워지지 않습니다.</p></div><div class="filters"><button id="asnReload" class="btn" type="button">새로고침</button></div></div><div class="asnState"><div><span class="asnKey">배정 강제</span><span id="asnEnfAssign" class="pill asnOff">확인 중</span><span class="asnHint">켜면 검수자는 자신에게 배정된 문서만 봅니다.</span></div><div><span class="asnKey">제안 등급 숨김</span><span id="asnEnfBlind" class="pill asnOff">확인 중</span><span class="asnHint">켜면 검수자 화면에서 제안 등급과 다른 검수자의 결정이 보이지 않습니다.</span></div><div><span class="asnHint">두 항목은 서버 설정값이며 이 화면에서는 바꿀 수 없습니다.</span></div></div><p id="asnEnfNote" class="asnNote" role="status"></p><div class="asnGrid"><div class="asnCol"><h3>현재 배정 <span id="asnCount" class="asnCount"></span></h3><div class="list asnScroll"><div class="asnTable"><div class="rowhead asnHead"><div>검수자 ID</div><div>대상 종류</div><div>대상</div><div>배정일시 (UTC)</div><div>배정한 관리자</div><div></div></div><div id="asnRows"><div class="empty">배정 현황을 불러오는 중…</div></div></div></div><div id="asnTableMsg" class="inlineMsg" role="status" aria-live="polite"></div></div><div class="asnCol asnForm"><h3>새 배정</h3><label for="asnReviewer">검수자 ID</label><input id="asnReviewer" list="asnReviewers" maxlength="128" autocomplete="off" spellcheck="false" placeholder="검수자의 계정 이름"><datalist id="asnReviewers"></datalist><span class="asnHint">검수자가 로그인할 때 쓰는 토큰의 계정 이름과 글자까지 같아야 그 검수자에게 배정됩니다.</span><label for="asnKind">대상 종류</label><select id="asnKind"><option value="review_batch">검수 배치</option><option value="doc_ids">문서 목록</option></select><div id="asnBatchWrap"><label for="asnBatch">검수 배치</label><select id="asnBatch"></select></div><div id="asnDocsWrap" style="display:none"><label for="asnDocs">문서 ID (한 줄에 하나)</label><textarea id="asnDocs" spellcheck="false" disabled placeholder="문서 ID를 한 줄에 하나씩 붙여 넣으십시오"></textarea></div><label for="asnReason">사유 (선택)</label><input id="asnReason" maxlength="1000" autocomplete="off" placeholder="배정 기록에 함께 남습니다"><button id="asnSubmit" class="btn black" type="button" style="width:100%;margin-top:16px">배정</button><div id="asnMsg" class="inlineMsg" role="status" aria-live="polite"></div></div></div></section>""")
+
+_ASSIGN_PANEL_SCRIPT = _wrap_assign_panel(r"""<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id)};
+var ASN='/api/v1/golden/assignments';
+var CAND='/api/v1/golden/candidates';
+var LOGIN_URL='/api/v1/golden/candidates/login.html';
+var BOUNCE_FLAG='koipa_login_bounced';
+var busy=false,tableSeq=0,batchCount=0;
+function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
+function say(id,text,bad){var e=$(id);if(!e)return;e.textContent=text||'';e.className=bad?'inlineMsg error':'inlineMsg'}
+// 서버가 준 값도 관리자가 넣은 값도 문자열이다 — 화면에는 textContent 로만 넣는다(innerHTML 로 이어 붙이지 않는다).
+async function send(method,url,body){
+  var opt={method:method,credentials:'same-origin',headers:{}};
+  if(body!==undefined){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(body)}
+  var r;
+  try{r=await fetch(url,opt)}catch(e){return{net:true,status:0,ok:false,data:null,text:String((e&&e.message)||e)}}
+  var text='';try{text=await r.text()}catch(e){}
+  var data=null;try{data=text?JSON.parse(text):null}catch(e){}
+  return{net:false,status:r.status,ok:r.ok,data:data,text:text}
+}
+// 401 은 다른 콘솔과 같은 방식으로 로그인 화면에 한 번만 보낸다(표식은 이 탭이 닫힐 때까지 남긴다 — 성공 응답으로 지우지 않는다).
+function bounce(){
+  try{
+    if(sessionStorage.getItem(BOUNCE_FLAG)==='1')return false;
+    sessionStorage.setItem(BOUNCE_FLAG,'1');
+  }catch(e){return false}
+  location.href=LOGIN_URL+'?next='+encodeURIComponent(location.pathname+location.search+location.hash);
+  return true;
+}
+function detailOf(r){
+  var d=r.data&&r.data.detail;
+  if(typeof d==='string'&&d)return d;
+  if(Array.isArray(d)&&d.length)return d.map(function(x){return(x&&typeof x==='object'&&x.msg)?String(x.msg):String(x)}).join(' / ');
+  return(r.text||'').slice(0,300);
+}
+function failure(r,lead){
+  if(r.net)return lead+' — 서버에 연결하지 못했습니다. 네트워크를 확인한 뒤 다시 시도하십시오.';
+  if(r.status===401)return bounce()?'로그인 화면으로 이동합니다…':lead+' — 로그인이 만료되었습니다. 로그인 화면에서 다시 들어오십시오.';
+  if(r.status===403)return lead+' — 관리자 권한이 필요합니다. 이 계정으로는 검수 배정을 다룰 수 없습니다.';
+  if(r.status===422)return lead+' — '+detailOf(r);
+  return lead+' — 서버 오류('+r.status+') '+detailOf(r);
+}
+function fmtTime(v){return v?String(v).slice(0,19).replace('T',' '):'–'}
+function setBusy(v){
+  busy=v;$('asnSubmit').disabled=v;
+  Array.prototype.forEach.call(document.querySelectorAll('#asnRows .asnRevoke'),function(b){b.disabled=v});
+}
+function renderEnforcement(en){
+  en=(en&&typeof en==='object')?en:{};
+  function flag(id,v){var n=$(id);if(typeof v==='boolean'){n.textContent=v?'켜짐':'꺼짐';n.className='pill '+(v?'asnOn':'asnOff')}else{n.textContent='확인 못 함';n.className='pill asnOff'}}
+  flag('asnEnfAssign',en.assignment_enforced);flag('asnEnfBlind',en.blind_enforced);
+  $('asnEnfNote').textContent=en.assignment_enforced===false?'배정 강제가 꺼져 있어, 배정해도 검수자 화면에 적용되지 않습니다.':'';
+}
+function renderRows(list){
+  var box=$('asnRows'),dl=$('asnReviewers'),seen=new Set();
+  box.replaceChildren();dl.replaceChildren();
+  $('asnCount').textContent=list.length+'건';
+  if(!list.length){box.append(el('div','empty','현재 배정이 없습니다 — 아래 「새 배정」에서 검수자에게 문서나 배치를 배정하십시오'));return}
+  list.forEach(function(a){
+    if(a.reviewer_id&&!seen.has(a.reviewer_id)){seen.add(a.reviewer_id);var o=document.createElement('option');o.value=a.reviewer_id;dl.append(o)}
+    var row=el('div','asnRow'),tgt=el('div','asnCell');
+    tgt.append(el('div','asnTarget',a.target));
+    if(a.reason)tgt.append(el('div','asnReasonLine','사유: '+a.reason));
+    var act=el('div','asnCell'),b=el('button','btn asnRevoke','해제');
+    b.type='button';b.disabled=busy;
+    b.setAttribute('aria-label','검수자 '+a.reviewer_id+' 의 배정 해제 — '+a.target);
+    b.addEventListener('click',function(){revoke(a)});
+    act.append(b);
+    row.append(el('div','asnCell',a.reviewer_id),el('div','asnCell',a.kind==='review_batch'?'배치':'문서'),tgt,el('div','asnCell asnTime',fmtTime(a.assigned_at)),el('div','asnCell',a.assigned_by||'–'),act);
+    box.append(row);
+  });
+}
+// 돌려주는 값: 실패 문구(성공이면 '') — 표 옆 메시지를 누가 쓸지는 부르는 쪽이 정한다.
+async function loadTable(){
+  var seq=++tableSeq;
+  var r=await send('GET',ASN);
+  if(seq!==tableSeq)return '';                       // 더 나중에 시작한 조회가 있다 — 이 응답은 버린다
+  if(r.status===200&&r.data&&Array.isArray(r.data.assignments)){renderEnforcement(r.data.enforcement);renderRows(r.data.assignments);return ''}
+  var bad=r.status===200?'배정 현황을 불러오지 못했습니다 — 서버 응답의 모양이 이 화면과 맞지 않습니다.':failure(r,'배정 현황을 불러오지 못했습니다');
+  $('asnRows').replaceChildren(el('div','empty','배정 현황을 불러오지 못했습니다 — 「새로고침」을 눌러 다시 시도하십시오'));
+  $('asnCount').textContent='';
+  renderEnforcement(null);                           // 읽지 못한 값을 이전 화면 값으로 남기지 않는다
+  return bad;
+}
+function fillBatches(list){
+  var sel=$('asnBatch');sel.replaceChildren();batchCount=list.length;
+  var head=document.createElement('option');head.value='';head.textContent=list.length?'배치를 선택하십시오':'배치 표식 없음 — 문서 목록으로 배정하십시오';sel.append(head);
+  list.forEach(function(b){var o=document.createElement('option');o.value=b.review_batch;o.textContent=b.review_batch+' · '+b.total+'건';sel.append(o)});
+  syncKind();
+}
+async function loadBatches(){
+  // 배치 이름·건수(available_batches)만 필요하다 — 후보 3,598건을 통째로(3.6MB) 받을 이유가 없다. limit=1 이어도
+  // 배치 목록은 원장 전량 기준으로 온다.
+  var r=await send('GET',CAND+'?limit=1');
+  if(r.status===200&&r.data&&Array.isArray(r.data.available_batches)){fillBatches(r.data.available_batches);return ''}
+  fillBatches([]);
+  return r.status===200?'검수 배치 목록을 불러오지 못했습니다 — 서버 응답의 모양이 이 화면과 맞지 않습니다.':failure(r,'검수 배치 목록을 불러오지 못했습니다');
+}
+function syncKind(){
+  var docs=$('asnKind').value==='doc_ids';
+  $('asnBatchWrap').style.display=docs?'none':'';$('asnBatch').disabled=docs||!batchCount;
+  $('asnDocsWrap').style.display=docs?'':'none';$('asnDocs').disabled=!docs;
+}
+function parseDocs(text){
+  var out=[],seen=new Set();
+  String(text).split(/\r\n|\r|\n/).forEach(function(l){var t=l.trim();if(t&&!seen.has(t)){seen.add(t);out.push(t)}});
+  return out;
+}
+async function reloadAll(){
+  say('asnTableMsg','');say('asnMsg','');
+  var res=await Promise.all([loadTable(),loadBatches()]);
+  if(res[0])say('asnTableMsg',res[0],true);
+  if(res[1])say('asnMsg',res[1],true);
+}
+async function submit(){
+  if(busy)return;
+  say('asnMsg','');
+  var reviewer=$('asnReviewer').value.trim();
+  if(!reviewer){say('asnMsg','검수자 ID를 입력하십시오.',true);$('asnReviewer').focus();return}
+  var body={reviewer_id:reviewer};
+  if($('asnKind').value==='doc_ids'){
+    var ids=parseDocs($('asnDocs').value);
+    if(!ids.length){say('asnMsg','배정할 문서 ID를 한 줄에 하나씩 입력하십시오.',true);$('asnDocs').focus();return}
+    body.doc_ids=ids;
+  }else{
+    var batch=$('asnBatch').value;
+    if(!batch){say('asnMsg','배정할 검수 배치를 선택하십시오.',true);return}
+    body.review_batch=batch;
+  }
+  body.reason=$('asnReason').value.trim();
+  setBusy(true);
+  var r=await send('POST',ASN,body);
+  setBusy(false);
+  if(r.status===200&&r.data){
+    say('asnMsg','새로 배정 '+(r.data.events_written||0)+'건 · 이미 배정돼 건너뜀 '+((r.data.skipped||[]).length)+'건');
+    $('asnDocs').value='';$('asnReason').value='';
+    var bad=await loadTable();
+    if(bad)say('asnTableMsg',bad,true);else say('asnTableMsg','');
+    return;
+  }
+  say('asnMsg',failure(r,'배정하지 못했습니다'),true);
+}
+async function revoke(a){
+  if(busy)return;
+  var body={reviewer_id:a.reviewer_id};
+  if(a.kind==='doc_id')body.doc_ids=[a.target];else body.review_batch=a.target;
+  say('asnTableMsg','');
+  setBusy(true);
+  var r=await send('POST',ASN+'/revoke',body);
+  setBusy(false);
+  if(r.status===200&&r.data){
+    var text=(r.data.events_written||0)>0?('해제했습니다 — '+a.reviewer_id+' · '+a.target):('이미 해제돼 있었습니다 — '+a.reviewer_id+' · '+a.target);
+    var bad=await loadTable();
+    say('asnTableMsg',bad?(text+'. '+bad):text,!!bad);
+    return;
+  }
+  say('asnTableMsg',failure(r,'해제하지 못했습니다'),true);
+}
+$('asnKind').addEventListener('change',syncKind);
+$('asnSubmit').addEventListener('click',submit);
+$('asnReload').addEventListener('click',reloadAll);
+syncKind();
+reloadAll();
+})();
+</script>""")
+
+
+_CANDIDATE_SCORE_CARDS_CSS = r"""<style>
+#detail .sideDetail>.classifier-score,#detail .sideDetail>.initial-grade{margin:16px;margin-bottom:0;padding:17px;background:#fff;border:1px solid var(--border)}
+.initial-grade h4,.classifier-score h4{margin:0 0 7px;color:#0f172a;font-size:15px}
+.initial-grade .initial-grade-value{margin:0;color:#1e3a5f;font-size:22px;font-weight:800}
+.initial-grade .initial-grade-help{margin:8px 0 0;color:var(--text-soft);font-size:12px;line-height:1.5}
+.classifier-score .score-help{margin:0 0 14px;color:var(--text-soft);font-size:12px;line-height:1.5}
+.classifier-score .score-row{display:grid;grid-template-columns:25px minmax(0,1fr) 46px;gap:8px;align-items:center;margin:8px 0;font-size:12px}
+.classifier-score .score-track{height:8px;overflow:hidden;background:#e7edf3}
+.classifier-score .score-fill{height:100%;background:#2563a8}
+.classifier-score .score-value{text-align:right;font-variant-numeric:tabular-nums;color:#334155}
+.classifier-score .score-meta{margin:13px 0 0;color:#64748b;font-size:11px;line-height:1.5;word-break:break-all}
+</style>"""
+
+# 검수자 화면(_REVIEWER_DOCUMENT_WORKBENCH_SCRIPT)의 renderInitialGrade/renderClassifierScore 와
+# 같은 두 카드를 관리자 화면에도 보여준다([2026-10-11] 사용자 지시 — 관리자도 보호원 요청의
+# 최초 생성 등급·BERT 등급별 예측확률을 볼 수 있어야 한다). .reviewer-workspace 래퍼에 의존하지
+# 않도록 두 함수만 떼어 독립 스크립트로 둔다 — 로직은 그대로, 복제는 의도적이다(관리자 화면을
+# 검수자 전용 변환(_as_reviewer_view)에 태우면 배정 패널·등급분포 등 관리자 전용 UI가 사라진다).
+_CANDIDATE_SCORE_CARDS_SCRIPT = r"""<script>
+(function(){
+  const detail=document.getElementById('detail');
+  if(!detail)return;
+  function renderInitialGrade(candidate){
+    const side=detail.querySelector('.sideDetail');
+    if(!side)return;
+    let card=side.querySelector('#initialGrade');
+    if(!card){
+      card=document.createElement('section'); card.id='initialGrade'; card.className='initial-grade';
+      const action=side.querySelector('.action');
+      if(action)side.insertBefore(card,action); else side.append(card);
+    }
+    card.replaceChildren();
+    const heading=document.createElement('h4'); heading.textContent='최초 생성 등급'; card.append(heading);
+    const labels={TS:'특급',S1:'1급',S2:'2급',S3:'3급'};
+    const code=String(candidate&&candidate.proposed_grade||'');
+    const value=document.createElement('p'); value.className='initial-grade-value';
+    value.textContent=labels[code]?(labels[code]+' ('+code+')'):'정보 없음'; card.append(value);
+    const help=document.createElement('p'); help.className='initial-grade-help';
+    help.textContent='모의문서 최초 생성 시 부여된 등급입니다. 최종 등급은 검수자가 원문을 읽고 직접 결정합니다.';
+    card.append(help);
+  }
+  function renderClassifierScore(candidate){
+    const side=detail.querySelector('.sideDetail');
+    if(!side)return;
+    let card=side.querySelector('#classifierScore');
+    if(!card){
+      card=document.createElement('section'); card.id='classifierScore'; card.className='classifier-score';
+      const action=side.querySelector('.action');
+      if(action)side.insertBefore(card,action); else side.append(card);
+    }
+    card.replaceChildren();
+    const heading=document.createElement('h4'); heading.textContent='BERT 등급별 예측 확률'; card.append(heading);
+    const help=document.createElement('p'); help.className='score-help';
+    help.textContent='최종 등급은 검수자가 문서를 읽고 직접 결정합니다.'; card.append(help);
+    const score=candidate&&candidate.classifier_score;
+    if(!score||score.status!=='available'){
+      const unavailable=document.createElement('p'); unavailable.className='score-meta';
+      unavailable.textContent='현재 문서의 점수 스냅샷을 아직 사용할 수 없습니다.'; card.append(unavailable);
+      return;
+    }
+    ['TS','S1','S2','S3'].forEach(function(grade){
+      const value=Number(score.scores&&score.scores[grade]);
+      if(!Number.isFinite(value))return;
+      const row=document.createElement('div'); row.className='score-row';
+      const label=document.createElement('strong'); label.textContent={TS:'특급',S1:'1급',S2:'2급',S3:'3급'}[grade]||grade;
+      const track=document.createElement('div'); track.className='score-track';
+      const fill=document.createElement('div'); fill.className='score-fill';
+      const percent=Math.max(0,Math.min(100,value*100));
+      fill.style.width=percent+'%'; fill.setAttribute('role','progressbar');
+      fill.setAttribute('aria-label',grade+' 점수'); fill.setAttribute('aria-valuemin','0');
+      fill.setAttribute('aria-valuemax','100'); fill.setAttribute('aria-valuenow',String(percent));
+      track.append(fill);
+      const shown=document.createElement('span'); shown.className='score-value'; shown.textContent=percent.toFixed(1)+'%';
+      row.append(label,track,shown); card.append(row);
+    });
+    const meta=document.createElement('p'); meta.className='score-meta';
+    const calibrated=score.calibrated?'보정됨':'보정 미확인';
+    meta.textContent='최상위 점수: '+String(score.predicted_label||'–')+' · '+calibrated
+      +(score.model_version?' · 모델 '+String(score.model_version):'')
+      +(score.scored_at?' · 산출 '+String(score.scored_at):'');
+    card.append(meta);
+  }
+  const originalShow=show;
+  show=async function(id,reload){
+    await originalShow(id,reload);
+    const candidate=selected;
+    if(!candidate)return;
+    renderInitialGrade(candidate);
+    renderClassifierScore(candidate);
+  };
+})();
+</script>"""
+
+_ADMIN_BOUNDARY_FILTER_SCRIPT = r"""<script>
+/* 관리자도 ②③(최초 생성 등급·BERT 등급별 예측확률)을 본다(_CANDIDATE_SCORE_CARDS_SCRIPT) — 관리자 화면 전용은 ④ 경계 문서 선별이다. */
+(function(){
+  const filters=document.querySelector('#candidates .filters');
+  const after=document.getElementById('doc_format');
+  if(!filters||!after||document.getElementById('boundary_gap_max'))return;
+  const gap=document.createElement('select'); gap.id='boundary_gap_max'; gap.setAttribute('aria-label','경계데이터');
+  gap.title='BERT 상위 두 등급 예측확률 차이로 경계 문서를 조회합니다.';
+  gap.append(option('','전체 문서'),option('0.10','경계: 상위 2등급 차이 10%p 이하'));
+  const mismatch=document.createElement('label'); mismatch.id='boundaryMismatch';
+  mismatch.style.cssText='font-size:12px;display:flex;align-items:center;gap:5px;white-space:nowrap';
+  const check=document.createElement('input'); check.id='prediction_mismatch'; check.type='checkbox';
+  mismatch.append(check,document.createTextNode(' 최초생성 ≠ BERT 예측'));
+  after.insertAdjacentElement('afterend',gap); gap.insertAdjacentElement('afterend',mismatch);
+  qurl=function(){
+    let q=new URLSearchParams();
+    ['status','grade','origin','query','review_batch','department','doc_format','boundary_gap_max'].forEach(function(id){
+      let node=$(id),value=node&&String(node.value||'').trim(); if(value)q.set(id,value);
+    });
+    if(check.checked)q.set('prediction_mismatch','true');
+    q.set('limit',PAGE_SIZE);q.set('offset',curPage*PAGE_SIZE);return api+'?'+q;
+  };
+  [gap,check].forEach(function(node){node.addEventListener('change',function(){curPage=0;load(true);});});
+  const originalRenderRows=renderRows;
+  renderRows=function(data){
+    originalRenderRows(data);
+    (data.candidates||[]).forEach(function(candidate,index){
+      const summary=candidate.classifier_score_summary;
+      const row=document.querySelectorAll('#rows .candidate')[index];
+      if(!summary||!row||!row.children[2]||!row.children[2].children[1])return;
+      const label={TS:'특급',S1:'1급',S2:'2급',S3:'3급'}[summary.predicted_label]||summary.predicted_label;
+      const gapPercent=(Number(summary.top_two_gap)*100).toFixed(1);
+      row.children[2].children[1].textContent='BERT '+label+' · 상위 2등급 차이 '+gapPercent+'%p'
+        +(summary.generation_prediction_mismatch?' · 최초생성 불일치':'');
+    });
+  };
+  load(true);
+})();
+</script>"""
+
+
+def _render_specledger_gold_console_html() -> str:
+    """Golden-set console using the same KOIPA console visual system as admin/login."""
+    return r"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>한국지식재산보호원 | 골든셋 등록</title>
+<style>""" + CONSOLE_THEME_CSS + SHELL_CSS + r"""html{scroll-behavior:smooth}.workspace b{margin-left:10px;color:var(--text);font-size:12px;border:1px solid var(--border-strong);padding:9px 14px;border-radius:var(--radius-sm)}.workname{margin-top:18px;font-size:22px;font-weight:850;letter-spacing:-.7px}.workdesc{margin-top:11px;color:var(--text-soft);font-size:14px;max-width:230px}.branch{margin-top:22px;color:var(--text-dim);font:12px var(--font-mono)}.nav{margin-top:36px;border-top:1px solid var(--line);padding-top:26px}.nav a{display:flex;text-decoration:none;color:var(--text-soft);gap:20px;padding:13px 14px;margin:2px -14px;font-size:16px}.nav a span{font:12px var(--font-mono);color:var(--text-dim);padding-top:3px}.nav a.active{background:var(--bg-surface);color:var(--text);font-weight:800;border-left:3px solid var(--text);padding-left:11px}.ledger{margin-top:auto;border-top:1px solid var(--line);padding-top:24px;font-size:12px;color:var(--text-dim)}.ledger b{display:block;color:var(--text-soft);margin:8px 0}.hero h1{font-size:clamp(36px,4.5vw,64px);line-height:1.08;letter-spacing:-.055em;margin:22px 0 20px;font-weight:850}.hero h1 em{font-style:normal;color:var(--text)}.hero p{color:var(--text-soft);font-size:16px;max-width:720px;margin:0}.flow{display:flex;gap:10px;align-items:center;margin-top:28px;color:var(--text-dim);font:12px var(--font-mono)}.flow i{color:var(--text);font-style:normal;font-size:18px}.flow span{border:1px solid var(--line);border-radius:var(--radius-sm);padding:8px 11px;background:#fff}.gate strong{font:800 43px var(--font-mono);letter-spacing:-2px;color:var(--text);display:block;margin:26px 0 8px}.gate p{font-size:13px;color:var(--text-soft)}.btn.red{background:var(--red);border-color:var(--red);color:#fff}.summaryIntro h2{margin:12px 0 5px;font-size:25px;letter-spacing:-1px}.summaryIntro p{margin:0;color:var(--text-soft);font-size:13px}.metric b{font:800 40px var(--font-mono);letter-spacing:-2px;display:block;margin:12px 0 2px}.metric small{color:var(--text-dim)}.section h2{display:inline;font-size:42px;letter-spacing:-2px;margin:0}.sectionTop p{color:var(--text-soft);margin:10px 0 0 48px;font-size:15px}.filters{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.filters input,.filters select{padding:10px;font-size:12px;min-width:110px}.filters input{width:170px}.rowhead,.candidate{display:grid;grid-template-columns:110px minmax(180px,1.2fr) minmax(160px,1.4fr) 130px 86px;gap:16px;align-items:center}.candidate{width:100%;border:0;border-bottom:1px solid var(--border);background:#fff;padding:18px 12px;text-align:left;cursor:pointer;color:inherit}.candidate:hover,.candidate.selected{background:var(--bg-surface)}.candidate.selected{box-shadow:inset 3px 0 0 var(--text)}.docid{font:12px var(--font-mono);color:var(--text-dim)}.doctitle{font-size:17px;font-weight:850;letter-spacing:-.5px}.docsub{font-size:12px;color:var(--text-dim);margin-top:3px}.grade{font:700 15px var(--font-mono)}.origin{font-size:12px;color:var(--text-soft)}.pill.proposed,.pill.review{background:var(--bg-mid);color:var(--text-soft)}.pill.fixed{background:var(--green-soft);color:#087341}.pill.defer{background:var(--amber-soft);color:#92400e}.pill.discard{background:var(--red-soft);color:#b91c1c}.chars{text-align:right;color:var(--text-dim);font:12px var(--font-mono)}.detail{margin-top:38px;display:none;border-top:3px solid var(--text)}.detail.show{display:grid;grid-template-columns:minmax(0,1fr) 315px}.detailMain{padding:31px 34px 38px;border-right:1px solid var(--line)}.detailMain h3{font-size:27px;margin:10px 0 5px;letter-spacing:-1px}.metas{display:flex;gap:7px;flex-wrap:wrap;margin:15px 0}.metas span{font:11px var(--font-mono);background:var(--bg-mid);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 7px;color:var(--text-soft)}.scope{border-left:3px solid var(--text);padding:9px 12px;color:var(--text-soft);background:var(--bg-surface);font-size:13px}
+.viewbar{display:flex;align-items:center;gap:7px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+
+.viewbar .btn.on{background:#111;color:#fff;border-color:#111}
+.viewnote{margin-left:auto;font-size:11.5px;color:#8a9299}
+""" + DOC_CSS + r""".sideDetail{background:#fafaf8;padding:25px}.sideDetail h4{font:800 12px ui-monospace,monospace;color:#8b949b;margin:0 0 14px}.action label{display:block;font-size:12px;color:#6b7378;margin:12px 0 4px}.action select,.action textarea{width:100%;border:1px solid var(--line);padding:9px;background:#fff}.action textarea{height:95px;resize:vertical}.history{border-top:1px solid var(--line);margin-top:24px;padding-top:18px}.event{border-left:3px solid var(--red);background:#fafaf8;padding:9px 12px;margin:9px 0;font-size:12px;border-radius:0 3px 3px 0}.event b{display:block;font-size:12.5px;margin-bottom:4px}.event .when{display:flex;flex-wrap:wrap;column-gap:7px;row-gap:1px;color:#8b949b;margin-top:3px;font:11px ui-monospace,monospace}.event .when .who{color:#5f666c;font-weight:700}.event.change{border-left-color:#2563a8}.event.approve{border-left-color:#1a8a5f}.event.defer{border-left-color:#c47a00}.event.discard,.event.exclude{border-left-color:#c72c40}.event.reopen{border-left-color:#8a9299}.modal{position:fixed;inset:0;background:#111b;display:none;align-items:center;justify-content:center;padding:20px;z-index:200}.modal.show{display:flex}.dialog{background:#fff;border:1px solid #ddd;max-width:540px;width:100%;padding:28px;box-shadow:10px 10px 0 #111}.dialog h3{font-size:25px;margin:0 0 8px}.drop{border:1px dashed #aab0b3;padding:24px;margin:20px 0;background:#fafaf8}.drop input{width:100%}.dialogActions{display:flex;justify-content:flex-end;gap:8px}""" + SHELL_MEDIA_CSS + r"""@media(max-width:1050px){.detail.show{grid-template-columns:1fr}.detailMain{border-right:0}.sideDetail{border-top:1px solid var(--line)}}@media(max-width:700px){.candidate{grid-template-columns:1fr 70px}.candidate .origin,.candidate .chars{display:none}}
+.drop.over{border-color:#111;background:#f4f4f2}
+.inlineMsg{font-size:12px;line-height:1.55;margin-top:8px;color:#087341}.inlineMsg.error{color:#bf2337}.inlineMsg:empty{display:none}.apart{display:inline-block;border:1px solid #cfd3d6;background:#f4f5f6;color:#5f666c;font-size:11px;font-weight:700;padding:2px 6px;margin-left:6px;vertical-align:2px}.apartBox{border-left:3px solid #dededb;padding-left:13px}.rule{border-top:1px solid #eceae7;padding:10px 0}.rule b{display:block;margin-bottom:4px;font-size:12.5px}.rule span{color:#70757a;font-size:12px;line-height:1.5}"""  + HEADER_CSS + NAV_CSS + r"""</style>""" + _ASSIGN_PANEL_CSS + r"""</head><body>""" + header_html("검증문서 후보 관리", "manage", trailing=r"""<div class="topmid"><span class="dot"></span>등급 미확정 <span id="topCount">–</span>건</div>""") + r"""<div class="frame"><aside class="side"><div class="cap">CURRENT WORKSPACE</div><div class="workname">koipa-ai</div><div class="workdesc">Koipa AI Engine for KOIPA Trade-Secret System (PoC)</div><div class="branch">goldset/console-review</div><nav class="nav"><a href="#overview" class="active"><span>01</span>개요</a><a href="#candidates"><span>02</span>골든셋 후보</a><a href="#detail"><span>03</span>문서 상세·결정</a><a href="#ledgerAll"><span>04</span>보류·폐기 이력</a>""" + _ASSIGN_PANEL_NAV + r"""</nav><div class="ledger"><div class="cap">SNAPSHOT LEDGER</div><b id="session">포털 로그인 확인 중</b><div>origin · audit · decision</div></div></aside><main class="main"><section id="overview" class="hero"><div><div class="eyebrow">GOLDEN SET REVIEW CONSOLE</div><h1>검수 가능한<br><em>골든셋</em>을 관리합니다.</h1><p>합성 후보와 실문서를 한 곳에서 검수하고, 등급 확정·보류·폐기를 누가 왜 그렇게 정했는지와 함께 남깁니다. 기록은 덮어쓰지 않고 계속 쌓입니다.</p><div class="flow"><span>문서 수집</span><i>→</i><span>후보·검토</span><i>→</i><span>등급 확정</span><i>→</i><span>이력 보존</span></div></div><aside class="gate"><div class="glabel">등급 확정 진행</div><strong id="readiness">–</strong><div id="readinessNote" style="font-size:11.5px;color:#8d949b;margin:2px 0 6px"></div><p>확정된 후보 수 / 전체 후보 수입니다. 등급을 확정해도 <b>그것만으로 평가 정답지가 되지는 않습니다</b> — 아래 「평가정답으로 승격」을 눌러야 반영됩니다. 승격은 여러 번 눌러도 결과가 같습니다.</p><span class="status">● 후보 단계</span><div class="actions"><button class="btn black" id="openUpload">문서 업로드</button><button class="btn" id="promote">평가정답으로 승격</button><button class="btn" id="refresh">새로고침</button></div><div id="promoteMsg" class="inlineMsg" role="status" aria-live="polite"></div></aside></section><section class="summary" id="kpis"><div class="summaryIntro"><div class="cap">현황 요약</div><h2>골든셋 현황</h2><p>현재 워크스페이스의 검수 상태와 등급 분포입니다.</p></div></section><div id="flash" class="flash" role="status" aria-live="polite"></div><section id="candidates" class="section"><div class="sectionTop"><div><span class="secNum">02</span><h2>골든셋 후보</h2><p>문서를 선택하면 전문과 등급 결정 이력이 열립니다.</p></div><div class="filters"><select id="review_batch" aria-label="검수 배치" title="검수 전달본 단위로 목록을 좁힙니다. 비우면 전체 후보가 보입니다. 목록에 뜨는 배치는 이 서버 원장에 실제로 있는 것뿐입니다(응답의 available_batches)."><option value="">전체 배치</option></select><input id="query" placeholder="문서 ID 또는 제목" aria-label="문서 ID 또는 제목 검색"><select id="status"><option value="">전체 상태</option><option value="proposed">제안</option><option value="under_review">검토중</option><option value="approved_proxy">Proxy 확정</option><option value="grade_fixed_unlocked">등급 확정</option><option value="deferred">보류</option><option value="discarded">폐기</option><option value="out_of_scope">검수 대상 아님</option></select><select id="grade"><option value="">전체 등급</option><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select><select id="origin"><option value="">전체 출처</option><option value="synthetic">합성 후보</option><option value="public_real">공개 실문서</option><option value="organization_real">조직 보유 실문서</option></select><select id="department" aria-label="업무 분야" title="문서가 속한 업무 분야(부서)로 좁힙니다."><option value="">전체 부서</option></select><select id="doc_format" aria-label="문서 유형" title="문서 형식(보고서·이메일·회의 메모 등)으로 좁힙니다."><option value="">전체 문서유형</option></select><button id="filter" class="btn">필터</button></div></div><div class="list"><div class="rowhead"><div>DOCUMENT ID</div><div>DOCUMENT</div><div>GRADE / ORIGIN</div><div>STATUS</div><div>SIZE</div></div><div id="rows"><div class="empty">문서 목록을 불러오는 중입니다.</div></div><div id="pager" style="display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:14px 4px"></div></div></section><section id="detail" class="detail"><div class="detailMain"><div class="eyebrow">DOCUMENT EVIDENCE</div><h3 id="detailTitle">문서 상세</h3><div id="metas" class="metas"></div><div id="scope" class="scope"></div><div class="viewbar"><button class="btn sm" id="viewRendered" aria-pressed="true">읽기 좋게</button><button class="btn sm" id="viewRaw" aria-pressed="false">원문 그대로</button><span class="viewnote">검수 판단은 원문 기준입니다. 읽기 좋게 보기는 서식만 입힌 같은 내용입니다.</span></div><div id="documentRendered" class="docbody md"></div><pre id="document" class="docbody" style="display:none"></pre></div><aside class="sideDetail"><h4>등급 결정</h4><div class="action"><label>결정</label><select id="action"></select><div id="gradeWrap"><label>확정 등급</label><select id="finalGrade"><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select></div><div id="mgmtWrap" style="margin-top:12px;border-top:1px dashed #dededb;padding-top:12px"><h4 style="margin:0 0 6px">비밀관리성 (M)</h4><p style="font-size:12px;color:#70757a;line-height:1.5;margin:0 0 10px">이 두 가지는 <b>본문에 적혀 있지 않습니다.</b> 문서에 찍힌 표기는 원문에서 확인하고, 접근범위는 아는 경우에만 고르십시오. <b>모르면 「확인 안 됨」으로 두십시오</b> — 추측해서 고르면 등급이 바뀝니다.</p><label>보안표시 — 문서에 찍힌 표기</label><select id="secMarking"><option value="">확인 안 됨</option><option value="none">표기 없음</option><option value="confidential">대외비</option><option value="secret">기밀 · 1급 비밀</option><option value="top_secret">극비 · 특급기밀</option></select><label>접근범위 — 누가 열람할 수 있나</label><select id="accScope"><option value="">확인 안 됨</option><option value="approved_only">승인된 자에 한해 공개</option><option value="designated">지정된 접근자만 (NDA·열람 제한)</option><option value="department">특정 부서 · 임직원 일부</option><option value="all_employees">전 임직원 열람 가능</option></select><div id="mgmtState" style="font-size:11.5px;line-height:1.5;margin-top:8px"></div></div><label>사유 / 메모</label><textarea id="reason" placeholder="등급 지정·보류·폐기에는 사유가 필요합니다."></textarea><button id="save" class="btn black" style="width:100%;margin-top:12px">결정 저장</button><div id="saveMsg" class="inlineMsg" role="status" aria-live="polite"></div></div><div id="provBox" class="action apartBox" style="display:none;margin-top:18px;border-top:1px solid #dededb;padding-top:16px"><h4 style="margin:0 0 8px">출처 기록 <span class="apart">등급 결정과 별개</span> <span id="provStatus" style="font-weight:400;color:#70757a;font-size:12.5px"></span></h4><p id="provNote" style="font-size:12px;color:#70757a;line-height:1.5;margin:0 0 10px"><b>등급 결정과는 무관합니다.</b> 채우지 않아도 등급 확정·보류·폐기 모두 됩니다. 나중에 이 문서를 어디서 가져왔는지 답해야 할 때를 위한 기록이니, <b>아는 것만</b> 적으시면 됩니다. 여기에 적어도 등급·상태는 바뀌지 않습니다.</p><label>원천 위치 / 식별 정보<span style="color:#8a9299;font-weight:400;font-size:11.5px;margin-left:4px">(선택)</span></label><input id="provSrc" placeholder="예: 품질관리/운영절차/2026 또는 공개기관 URL"><label>사용 권한 또는 공개 근거<span style="color:#8a9299;font-weight:400;font-size:11.5px;margin-left:4px">(선택)</span></label><input id="provBasis" placeholder="예: 소유부서 검수용 사용 승인 / 공개 라이선스"><label>메모(선택)</label><input id="provReason" placeholder="사후 기록 사유"><div id="provOrigin" style="font-size:11.5px;color:#8d949b;margin-top:6px"></div><button id="provSave" class="btn" style="width:100%;margin-top:10px">출처 저장</button><div id="provMsg" class="inlineMsg" role="status" aria-live="polite"></div></div><div class="history"><h4>결정 이력</h4><div id="history" class="empty">결정 이력이 없습니다.</div></div></aside></section><section id="ledgerAll" class="section"><div class="sectionTop"><div><span class="secNum">04</span><h2>보류 · 폐기 이력</h2><p>문서를 열지 않고 전체 결정 기록을 최신순으로 봅니다. 기록은 덧붙이기만 하며 지워지지 않습니다.</p></div><div class="filters"><select id="ledgerFilter"><option value="">전체 결정</option><option value="defer">보류</option><option value="discard">폐기</option><option value="exclude">검수 대상 아님</option><option value="change">등급 변경</option><option value="approve">승인</option><option value="reopen">재검토</option></select><button id="ledgerReload" class="btn">불러오기</button></div></div><div class="list"><div class="rowhead" style="grid-template-columns:150px 110px 120px minmax(180px,1.6fr) 150px"><div>DOCUMENT ID</div><div>ACTION</div><div>GRADE</div><div>REASON</div><div>WHO / WHEN</div></div><div id="ledgerRows"><div class="empty">결정 기록이 없습니다.</div></div><div id="ledgerPager" style="display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:14px 4px"></div></div></section>""" + _ASSIGN_PANEL_SECTION + r"""</main></div><div id="modal" class="modal"><section class="dialog"><div class="eyebrow">문서 등록</div><h3>문서 업로드</h3><p>업로드 문서는 검토 대기 상태로만 저장됩니다. 자동 골든 승격이나 외부 LLM 전송은 하지 않습니다.</p><div class="drop" id="drop"><input id="file" type="file" accept=".txt,.md,.csv,.pdf,.doc,.docx,.hwp,.hwpx,.xlsx,.xls,.pptx"><p><b id="dropName">여기로 파일을 끌어다 놓거나 위에서 선택하세요</b><br>TXT · PDF · Word · HWP/HWPX · Excel · PPTX<br><span style="color:#8a9299">스캔 이미지는 지원하지 않습니다 — 본문 텍스트가 있는 파일만 등록됩니다.</span></p></div><div class="action"><label>문서 출처</label><select id="upOrigin"><option value="organization_real">조직 보유 실문서 — S2/S3</option><option value="public_real">공개 실문서 — S3 우선</option></select><label>원천 위치 / 식별 정보 <span style="color:#8a9299;font-weight:400">(선택)</span></label><input id="upSource" placeholder="예: 품질관리/운영절차/2026 또는 공개기관 URL" style="width:100%;border:1px solid var(--line);padding:9px"><label>사용 권한 또는 공개 근거 <span style="color:#8a9299;font-weight:400">(선택)</span></label><select id="upBasisSel"><option value="">선택하세요</option><option value="소유부서 검수용 사용 승인">소유부서 검수용 사용 승인</option><option value="기관 공개자료(공개 라이선스)">기관 공개자료(공개 라이선스)</option><option value="공공누리 등 공공저작물 이용허락">공공누리 등 공공저작물 이용허락</option><option value="사내 교육·배포용 승인">사내 교육·배포용 승인</option><option value="__custom__">직접 입력…</option></select><input id="upBasis" placeholder="근거를 직접 적으십시오" style="width:100%;border:1px solid var(--line);padding:9px;display:none;margin-top:6px"><p style="font-size:12px;color:#8a9299;margin:10px 0 0">지금 몰라도 등록됩니다 — 문서 상세의 「출처 기록」에서 나중에 채울 수 있습니다. <b>등급 확정을 막지는 않습니다.</b> 고객사 원문·반출 승인이 없는 문서는 등록하지 마십시오.</p></div><div class="rules" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px"><div class="eyebrow" style="margin-bottom:8px">등록 기준 · 등록 기준</div><div class="rule"><b>S3 · 공개·일반</b><span>공식 공지, 공개 매뉴얼, 일반 안내. 기관·버전·공개 위치를 기록합니다.</span></div><div class="rule"><b>S2 · 조직 내부</b><span>운영 절차, 품질 이력, 교육 자료, 변경·장애 후속조치 등. 소유부서의 검수·사용 근거를 기록합니다.</span></div><div class="rule"><b>제외</b><span>고객사 원문, 반출 승인이 없는 문서, 권한이 불명확한 파일은 등록하지 않습니다.</span></div><div class="rule"><b>다음 단계</b><span>여기 등록은 평가 정답지 승격이 아닙니다. 등급을 잠정 지정하고, 사람 검수 완료 뒤에만 별도 승격 절차를 사용합니다.</span></div></div><div id="upMsg" class="flash" style="display:none;margin:14px 0 0"></div><div class="dialogActions"><button id="cancelUpload" class="btn">취소</button><button id="upload" class="btn black">업로드 및 추출</button></div></section></div><script>""" + upload_progress_js() + r"""</script><script>
+let selected=null,curPage=0,firstLoad=true;const PAGE_SIZE=100;const $=id=>document.getElementById(id);const api='/api/v1/golden/candidates';function msg(v,bad=false){const e=$('flash');e.textContent=v;e.className=bad?'flash error':'flash';const m=$('upMsg'),md=$('modal');if(m){if(md&&md.classList.contains('show')){m.textContent=v;m.className=bad?'flash error':'flash';m.style.display='';}else{m.style.display='none';}}}function note(id,v,bad=false){const e=$(id);if(!e)return;e.textContent=v||'';e.className=bad?'inlineMsg error':'inlineMsg'}function hdr(json=true){let h={};if(json)h['Content-Type']='application/json';return h}function qurl(){let q=new URLSearchParams();['status','grade','origin','query','review_batch','department','doc_format'].forEach(id=>{let v=$(id).value.trim();if(v)q.set(id,v)});q.set('limit',PAGE_SIZE);q.set('offset',curPage*PAGE_SIZE);return api+'?'+q}async function req(url,opt={}){if(window.__GOLDEN_PREVIEW__){const p=window.__GOLDEN_PREVIEW__;if(opt.method)throw new Error('로컬 미리보기는 읽기 전용입니다. 업로드·등급 변경·폐기는 KL 콘솔 배포 후 사용할 수 있습니다.');if(url.endsWith('/session'))return {actor_id:'로컬 미리보기 · 읽기 전용'};const id=url.split('?')[0].slice((api+'/').length);if(id&&p.by_id[id])return p.by_id[id];return p.list}const r=await fetch(url,{...opt,credentials:'same-origin',headers:{...hdr(opt.json!==false),...(opt.headers||{})}});if(!r.ok)throw new Error((await r.text())||r.status);return r.json()}function metric(label,value,hint){let d=document.createElement('div');d.className='metric';d.innerHTML='<div class="mcap"></div><b></b><small></small>';d.children[0].textContent=label;d.children[1].textContent=value;d.children[2].textContent=hint;return d}function renderSummary(s,b){$('kpis').replaceChildren();var byBatch=s.scope==='batch';var scoped=byBatch||(b&&b.total!==s.total);let intro=document.createElement('div');intro.className='summaryIntro';intro.innerHTML='<div class="cap">현황 요약</div><h2>골든셋 현황</h2><p>현재 워크스페이스의 검수 상태와 등급 분포입니다.</p>';$('kpis').append(intro,metric('전체 후보',s.total+'건',(byBatch?'이 검수 배치 기준 · 원장 전량 '+Number(s.ledger_total||0).toLocaleString()+'건 중':'원장 전량(모든 배치)'+(scoped?' · 이 화면 배치 '+b.total+'건':''))+' · 폐기 '+(s.discarded||0)+'건 포함'),metric('등급 확정',s.fixed+'건','Proxy / Unlocked'),metric('미확정',s.unfixed+'건','검토 필요'),metric('보류 · 폐기',(s.deferred+s.discarded)+'건','감사 이력 보존'),metric('검수 대상 아님',(s.out_of_scope||0)+'건','범위 밖 · 되돌릴 수 있음'),metric('실문서',(s.actual_document_intake||0)+'건','출처 기록 대상'),metric('출처 기록',(s.actual_provenance_recorded||0)+'건','미완 '+(s.actual_provenance_partial||0)+'건 · 옛 자리 '+(s.actual_provenance_legacy||0)+'건'));if(s.by_proposed_grade){let gb=document.createElement('div');gb.style.cssText='grid-column:1/-1;border-top:1px solid var(--line);padding:24px 29px 29px';let cap=document.createElement('div');cap.className='cap';cap.textContent='등급별 분포 현황';gb.append(cap);let gr=document.createElement('div');gr.style.cssText='display:grid;grid-template-columns:76px repeat(4,1fr);gap:10px 24px;margin-top:16px;align-items:center;max-width:760px';const GCOLOR={TS:'#c72c40',S1:'#c47a00',S2:'#2563a8',S3:'#1a8a5f'};const hcell=(t,strong)=>{let el=document.createElement('span');el.style.cssText='font-size:12px;color:#8a9299'+(strong?';font-weight:800;color:#5f666c':'');el.textContent=t;return el};gr.append(hcell(''),hcell('특급'),hcell('1급'),hcell('2급'),hcell('3급'));const maxVal=Math.max(1,...['TS','S1','S2','S3'].map(g=>(s.by_proposed_grade||{})[g]||0));const gradeRow=(label,counts)=>{gr.append(hcell(label,true));['TS','S1','S2','S3'].forEach(g=>{let v=(counts||{})[g]||0;let cell=document.createElement('div');let num=document.createElement('b');num.style.cssText='font:800 18px ui-monospace,monospace;letter-spacing:-1px;display:block';num.textContent=v;let bar=document.createElement('div');bar.style.cssText='height:5px;border-radius:2px;margin-top:5px;background:'+GCOLOR[g]+';opacity:.82;width:'+Math.max(v>0?3:0,Math.round(v/maxVal*100))+'%';cell.append(num,bar);gr.append(cell)})};gradeRow('전체',s.by_proposed_grade);gradeRow('미검수',s.by_proposed_grade_unfixed);gradeRow('검수 완료',s.by_final_grade);gb.append(gr);$('kpis').append(gb)}$('readiness').textContent=scoped?(b.terminal+'/'+b.total):(s.fixed+'/'+s.total);$('readinessNote').textContent=scoped?('이 배치 기준 · 남은 '+b.pending+'건'+(b.deferred?' · 보류 '+b.deferred+'건 포함':'')):'전체 후보 기준';$('topCount').textContent=scoped?b.pending:s.unfixed;loadLedger()}function pill(status){let e=document.createElement('span');e.className='pill '+(status==='discarded'?'discard':status==='out_of_scope'?'discard':status==='deferred'?'defer':status.includes('fixed')||status==='approved_proxy'?'fixed':status==='under_review'?'review':'proposed');e.textContent={proposed:'제안',under_review:'검토중',approved_proxy:'Proxy 확정',grade_fixed_unlocked:'등급 확정',deferred:'보류',discarded:'폐기',out_of_scope:'검수 대상 아님'}[status]||status;return e}function renderBatches(list){let sel=$('review_batch');if(!sel)return;let keep=sel.value;sel.replaceChildren();let items=Array.isArray(list)?list:[];sel.append(option('',items.length?'전체 배치':'배치 표식 없음'));items.forEach(b=>sel.append(option(b.review_batch,b.review_batch+' · '+b.total+'건')));sel.disabled=!items.length;if(keep&&items.some(b=>b.review_batch===keep))sel.value=keep;}function renderDepartments(list){let sel=$('department');if(!sel)return;let keep=sel.value;sel.replaceChildren();let items=Array.isArray(list)?list:[];sel.append(option('',items.length?'전체 부서':'부서 표식 없음'));items.forEach(d=>sel.append(option(d.department,d.department+' · '+d.total+'건')));sel.disabled=!items.length;if(keep&&items.some(d=>d.department===keep))sel.value=keep;}function renderDocFormats(list){let sel=$('doc_format');if(!sel)return;let keep=sel.value;sel.replaceChildren();let items=Array.isArray(list)?list:[];sel.append(option('',items.length?'전체 문서유형':'문서유형 표식 없음'));items.forEach(d=>sel.append(option(d.doc_format,d.doc_format+' · '+d.total+'건')));sel.disabled=!items.length;if(keep&&items.some(d=>d.doc_format===keep))sel.value=keep;}function renderRows(data){let box=$('rows');box.replaceChildren();renderSummary(data.summary,data.batch_summary);renderBatches(data.available_batches);renderDepartments(data.available_departments);renderDocFormats(data.available_doc_formats);renderPager(data);if(!data.candidates.length){box.innerHTML='<div class="empty">조건에 맞는 문서가 없습니다.</div>';return}data.candidates.forEach(c=>{let row=document.createElement('button');row.className='candidate'+(selected&&selected.doc_id===c.doc_id?' selected':'');let grade=(c.proposed_grade||'–')+(c.final_grade?' → '+c.final_grade:'');row.innerHTML='<div class="docid"></div><div><div class="doctitle"></div><div class="docsub"></div></div><div><div class="grade"></div><div class="origin"></div></div><div></div><div class="chars"></div>';row.children[0].textContent=c.doc_id;row.children[1].children[0].textContent=c.title;row.children[1].children[1].textContent=({synthetic:'합성 후보',public_real:'공개 실문서',organization_real:'조직 보유 실문서'}[c.document_origin]||c.document_origin);row.children[2].children[0].textContent=grade;row.children[2].children[1].textContent=c.document_origin;row.children[3].append(pill(c.status));row.children[4].textContent=c.characters.toLocaleString();row.onclick=()=>show(c.doc_id);box.append(row)})}function markSelected(){document.querySelectorAll('#rows .candidate').forEach(r=>{const idc=r.children[0]&&r.children[0].textContent;r.classList.toggle('selected',!!selected&&idc===selected.doc_id)})}function renderPager(data){const box=$('pager');if(!box)return;box.replaceChildren();if(!data.limit||data.total<=data.limit)return;const off=data.offset||0,end=off+(data.returned||0),last=Math.ceil(data.total/data.limit);const info=document.createElement('span');info.style.cssText='font-size:12.5px;color:#68727a';info.textContent=(off+1).toLocaleString()+'–'+end.toLocaleString()+' / '+data.total.toLocaleString()+'건 · '+(curPage+1)+' / '+last+' 쪽';const prev=document.createElement('button');prev.className='btn sm';prev.id='pagePrev';prev.textContent='이전';prev.disabled=curPage<=0;prev.onclick=()=>{curPage--;load(true)};const next=document.createElement('button');next.className='btn sm';next.id='pageNext';next.textContent='다음';next.disabled=end>=data.total;next.onclick=()=>{curPage++;load(true)};box.append(info,prev,next)}function option(v,t){let o=document.createElement('option');o.value=v;o.textContent=t;return o}function setActions(c){let a=$('action');a.replaceChildren();if(c.document_origin==='synthetic'&&c.proposed_grade)a.append(option('approve','승인 (제안 등급 그대로 확정)'));a.append(option('change','등급 지정/변경'),option('defer','보류'),option('discard','폐기'),option('exclude','검수 대상 아님'));if(c.status==='deferred'||c.status==='discarded'||c.status==='out_of_scope')a.append(option('reopen','재검토로 되돌림'));toggleGrade()}function toggleGrade(){$('gradeWrap').style.display=$('action').value==='change'?'block':'none';syncMgmt()}
+// [2026-08-24] 사유 누락 안내가 결정 넷을 나열해("등급 지정·보류·폐기·검수 대상 아님에는…")
+// 폐기에도 다른 조건이 걸린 것처럼 읽혔다. 고른 결정 이름만 말한다.
+function actionLabel(){const sel=$('action'),opt=sel&&sel.selectedOptions&&sel.selectedOptions[0];
+return (opt?opt.textContent:'').replace(/\s*\(.*\)$/,'').trim()||'이 결정'}
+// [2026-08-25] 비밀관리성(M)은 등급 결정의 **입력**이다(decide docstring). 등급을 정하지
+// 않는 결정(폐기·검수 대상 아님·재검토)에서는 블록째 감춘다 — 잠긴 칸을 남겨 두면 왜
+// 잠겼는지 설명할 줄이 또 필요해진다. 감춘 값은 save() 가 보내지 않는다(disabled).
+// 「출처 기록」은 결정이 아니라 문서의 속성이라 여기서 건드리지 않는다.
+function syncMgmt(){const w=$('mgmtWrap');if(!w)return;
+const used=['change','approve','defer'].includes($('action').value);
+w.style.display=used?'':'none';$('secMarking').disabled=!used;$('accScope').disabled=!used;}
+function fmtWhen(v){if(!v)return'';const s=String(v).replace('T',' ');const dot=s.indexOf('.');return(dot>0?s.slice(0,dot):s.split('+')[0]).trim()}
+const HISTORY_ACTION_LABELS={change:'등급 변경',approve:'승인',defer:'보류',discard:'폐기',exclude:'검수 대상 아님',reopen:'재검토'};
+const HISTORY_STATUS_LABELS={proposed:'검토 대기',under_review:'검토 대기',deferred:'검토 대기',approved_proxy:'확정됨',grade_fixed_unlocked:'확정됨',discarded:'학습 제외',out_of_scope:'학습 제외'};
+function history(events){let box=$('history');box.replaceChildren();if(!events.length){box.className='empty';box.textContent='결정 이력이 없습니다.';return}box.className='';events.slice().reverse().forEach(e=>{let d=document.createElement('div');d.className='event '+(e.action||'');let a=document.createElement('b');a.textContent=(HISTORY_ACTION_LABELS[e.action]||e.action||'결정')+(e.status?' · '+(HISTORY_STATUS_LABELS[e.status]||e.status):'');let w=document.createElement('div');w.className='when';let t=document.createElement('span');t.textContent=String(e.decided_at||'').replace('T',' ').split('.')[0].split('+')[0].trim();let who=document.createElement('span');who.className='who';who.textContent='담당: '+(e.actor_id||'—');w.append(t,who);let r=document.createElement('div');r.textContent=e.reason||'사유 없음';d.append(a,w,r);box.append(d)})}async function load(showProgress){
+  // [2026-09-24] 목록이 3천 건대로 커지면 응답이 눈에 띄게 걸린다 — 화면이 멈춘 것처럼 보이지
+  // 않게 업로드와 같은 진행 오버레이를 쓴다. showProgress 는 사람이 누른 새로고침·필터·최초
+  // 진입에서만 켠다 — show()·upload() 뒤에 딸려오는 배경 재조회까지 켜면, 방금 저장·업로드
+  // 결과를 보여준 flash 메시지를 오버레이가 곧바로 덮어 버린다(그 메시지가 있는 영역이 가려짐).
+  if(showProgress){window.UploadProgress.start(null,'문서 목록을 불러오고 있습니다');window.UploadProgress.note('후보가 많으면 몇 초 걸릴 수 있습니다.');}
+  try{let session=await req(api+'/session');$('session').textContent='로그인 관리자 · '+session.actor_id;let seeded='';if(firstLoad){firstLoad=false;seeded=session.default_review_batch||'';const sel=$('review_batch');if(seeded&&sel&&!sel.value){sel.append(option(seeded,seeded));sel.value=seeded}else{seeded=''}}let data=await req(qurl());if(seeded&&!(data.available_batches||[]).some(b=>b.review_batch===seeded)){$('review_batch').value='';data=await req(qurl())}if(curPage>0&&data.total>0&&curPage*PAGE_SIZE>=data.total){curPage=Math.max(0,Math.ceil(data.total/PAGE_SIZE)-1);data=await req(qurl())}renderRows(data);const from=data.total?(data.offset||0)+1:0,to=(data.offset||0)+(data.returned||0);msg(data.total+'건'+(data.limit?' 중 '+from+'–'+to+'번째를 불러왔습니다.':'을 불러왔습니다.')+(data.listed_excludes_discarded&&data.summary.discarded?' (폐기 '+data.summary.discarded+'건은 목록에서 뺐습니다 — 상태 필터를 폐기로 두면 보입니다)':''))}catch(e){msg('불러오기 실패: '+e.message,true)}finally{if(showProgress)window.UploadProgress.stop();}}function provLabel(c){if(!c.is_actual_document)return '해당 없음(합성)';
+const p=c.provenance||{};const st=p.status||'';
+if(st==='recorded')return '기록됨';
+if(st==='partial')return '일부 기록됨';
+return '없음'}
+// [E3a-4] 출처 사후 기록. 실측 2026-08-17(223): 실문서 74건 중 62건이 출처는 있는데
+// 사용 권한 근거가 없었고, 화면에 그것을 채울 칸이 없어 영원히 미완이었다.
+function renderProv(c){const box=$('provBox');if(!box)return;
+if(!c.is_actual_document){box.style.display='none';return}
+const p=c.provenance||{};box.style.display='';
+$('provStatus').textContent=provLabel(c);
+$('provSrc').value=p.source_reference||'';
+$('provBasis').value=p.authorization_basis||'';
+$('provReason').value='';
+$('provOrigin').textContent=p.origin?('기록 방식: '+(({legacy_top_level:'초기 일괄 등록분에서 승계',manual:'화면에서 직접 입력',upload:'파일 업로드 때 함께 기록'})[p.origin]||p.origin)):'';
+$('provSave').disabled=(p.status==='recorded');note('provMsg',p.status==='recorded'?'기록 완료 — 더 채울 것이 없습니다.':'');}
+// [2026-08-23] 비밀관리성(M) 표시. 판정은 서버(rule_engine)가 하고 화면은 그 결과만
+// 보여준다 - 여기서 다시 계산하면 판정식이 두 곳에 생긴다.
+function renderMgmt(c){const w=$('mgmtWrap');if(!w)return;const m=c.management||{};
+$('secMarking').value=m.security_marking||'';$('accScope').value=m.access_scope||'';
+const box=$('mgmtState');if(box){box.textContent='';box.hidden=true;}}
+async function saveProv(){try{if(!selected)throw new Error('문서를 먼저 선택하세요.');
+const src=$('provSrc').value.trim(),basis=$('provBasis').value.trim();
+if(!src&&!basis)throw new Error('원천 위치나 사용 권한 근거 중 하나는 적어야 합니다.');
+const r=await req(api+'/'+encodeURIComponent(selected.doc_id)+'/provenance',
+ {method:'POST',body:JSON.stringify({source_reference:src,authorization_basis:basis,reason:$('provReason').value.trim()})});
+msg('출처를 기록했습니다. 등급·상태는 바뀌지 않습니다.');await show(selected.doc_id,true);note('provMsg','출처를 기록했습니다. 등급·상태는 바뀌지 않습니다.')}
+catch(e){msg('출처 기록 실패: '+e.message,true);note('provMsg','출처 기록 실패 — '+e.message,true)}}
+async function show(id,reload){try{let c=await req(api+'/'+encodeURIComponent(id));selected=c;markSelected();$('detailTitle').textContent=c.doc_id+' · '+c.title;$('metas').replaceChildren();[['상태',c.status],['출처',c.document_origin],['제안',c.proposed_grade||'없음'],['확정',c.final_grade||'미확정'],['글자 수',c.characters.toLocaleString()],['SHA-256',c.document_sha256.slice(0,14)+'…'],['출처 기록',provLabel(c)]].forEach(x=>{let m=document.createElement('span');m.textContent=x[0]+': '+x[1];$('metas').append(m)});$('scope').textContent=c.claim_scope;$('document').textContent=c.text;$('documentRendered').innerHTML=mdToHtml(c.text);$('finalGrade').value=c.final_grade||c.proposed_grade||'S3';$('reason').value='';note('saveMsg','');note('provMsg','');setActions(c);renderProv(c);renderMgmt(c);history(c.decision_history||[]);$('detail').classList.add('show');$('detail').scrollIntoView({behavior:'smooth',block:'start'});if(reload)await load()}catch(e){msg('상세 조회 실패: '+e.message,true)}}async function save(){try{if(!selected)throw new Error('문서를 먼저 선택하세요.');const action=$('action').value,reason=$('reason').value.trim();if(['change','defer','discard','exclude'].includes(action)&&!reason)throw new Error('「'+actionLabel()+'」에는 사유가 필요합니다.');let body={action,reason};if(action==='change')body.grade=$('finalGrade').value;const sm=$('secMarking'),asc=$('accScope');if(!sm.disabled&&sm.value)body.security_marking=sm.value;if(!asc.disabled&&asc.value)body.access_scope=asc.value;let out=await req(api+'/'+encodeURIComponent(selected.doc_id)+'/decision',{method:'POST',body:JSON.stringify(body)});msg('저장 완료: '+out.status);await show(selected.doc_id,true);note('saveMsg','저장했습니다 · 상태 '+out.status)}catch(e){let t=e.message||'';msg('저장 실패: '+t,true);note('saveMsg','저장 실패 — '+t,true)}}""" + DOC_RENDER_JS + r"""function setDocView(rendered){
+  $('documentRendered').style.display=rendered?'':'none';
+  $('document').style.display=rendered?'none':'';
+  $('viewRendered').classList.toggle('on',rendered);
+  $('viewRaw').classList.toggle('on',!rendered);
+  $('viewRendered').setAttribute('aria-pressed', rendered?'true':'false');
+  $('viewRaw').setAttribute('aria-pressed', rendered?'false':'true');
+}
+async function upload(){try{let file=$('file').files[0];if(!file)throw new Error('업로드할 파일을 선택하세요.');let src=$('upSource').value.trim();let selv=($('upBasisSel')||{}).value||'';let bas=(selv&&selv!=='__custom__')?selv:$('upBasis').value.trim();/* [2026-08-23] 두 칸의 필수 강제를 뺐다 — 게이트는 등급 확정(decide)과 승격(promote_to_locked)으로 옮겼다. 현관에서 막으니 평가셋이 보호된 게 아니라 등록 자체가 안 됐다(실측 2026-08-17 223: 실문서 74건 중 62건 미완). */let form=new FormData();form.append('file',file);form.append('document_origin',$('upOrigin').value);form.append('source_reference',src);form.append('authorization_basis',bas);let ub=$('upload');if(ub){ub.disabled=true;ub.dataset.label=ub.textContent;ub.textContent='분석 중…';}window.UploadProgress.start(file,'문서를 등록하고 본문을 뽑고 있습니다');msg('문서를 분석하고 있습니다 — '+file.name+' 에서 글자를 뽑는 중입니다. 파일이 크면 몇 초 걸립니다.');let out=await req(api+'/upload',{method:'POST',body:form,json:false});$('modal').classList.remove('show');$('upSource').value='';$('upBasis').value='';if($('upBasisSel')){$('upBasisSel').value='';$('upBasis').style.display='none';}$('file').value='';if($('dropName'))$('dropName').textContent='여기로 파일을 끌어다 놓거나 위에서 선택하세요';msg('업로드 완료: '+out.doc_id+' · 검토 대기 상태입니다.');await load();await show(out.doc_id)}catch(e){msg('업로드 실패: '+e.message,true)}finally{window.UploadProgress.stop();let b=$('upload');if(b){b.disabled=false;b.textContent=b.dataset.label||'업로드 및 추출';}}}
+let ledgerPage=0;const LEDGER_PAGE_SIZE=50;async function loadLedger(){try{let f=$('ledgerFilter').value;let q=new URLSearchParams();q.set('limit',LEDGER_PAGE_SIZE);q.set('offset',ledgerPage*LEDGER_PAGE_SIZE);if(f)q.set('action',f);let out=await req(api+'/decisions?'+q);let ev=out.events;let box=$('ledgerRows');box.replaceChildren();if(!ev.length){box.className='empty';box.textContent='해당하는 결정 기록이 없습니다.';renderLedgerPager(out);return}box.className='';ev.forEach(e=>{let r=document.createElement('div');r.className='candidate';r.style.gridTemplateColumns='150px 110px 120px minmax(180px,1.6fr) 150px';r.style.cursor='pointer';r.onclick=()=>show(e.doc_id);let lbl={approve:'승인',change:'등급 변경',defer:'보류',discard:'폐기',reject:'반려',reopen:'재검토',exclude:'검수 대상 아님'}[e.action]||e.action;r.innerHTML='<div class="docid">'+e.doc_id+'</div><div><span class="pill '+(e.action==='discard'||e.action==='reject'?'discard':e.action==='defer'?'defer':e.action==='reopen'?'proposed':'fixed')+'">'+lbl+'</span></div><div class="grade">'+(e.proposed_grade||'–')+' → '+(e.final_grade||'–')+'</div><div class="docsub" style="margin:0">'+(e.reason||'사유 없음')+'</div><div class="docsub" style="margin:0">'+(e.actor_id||'')+'<br>'+String(e.decided_at||'').slice(0,19).replace('T',' ')+'</div>';box.append(r)});renderLedgerPager(out)}catch(e){msg('결정 이력 조회 실패: '+e.message,true)}}function renderLedgerPager(out){const box=$('ledgerPager');if(!box)return;box.replaceChildren();const total=out.total||0;if(total<=LEDGER_PAGE_SIZE)return;const off=ledgerPage*LEDGER_PAGE_SIZE,end=off+((out.events||[]).length),last=Math.ceil(total/LEDGER_PAGE_SIZE);const info=document.createElement('span');info.style.cssText='font-size:12.5px;color:#68727a';info.textContent=(off+1).toLocaleString()+'–'+end.toLocaleString()+' / '+total.toLocaleString()+'건 · '+(ledgerPage+1)+' / '+last+' 쪽';const prev=document.createElement('button');prev.className='btn sm';prev.textContent='이전';prev.disabled=ledgerPage<=0;prev.onclick=()=>{ledgerPage--;loadLedger()};const next=document.createElement('button');next.className='btn sm';next.textContent='다음';next.disabled=end>=total;next.onclick=()=>{ledgerPage++;loadLedger()};box.append(info,prev,next)}
+$('refresh').onclick=()=>load(true);$('promote').onclick=async()=>{const b=$('promote');b.disabled=true;note('promoteMsg','승격하는 중입니다…');try{const r=await req(api+'/promote',{method:'POST',body:JSON.stringify({publish:true})});let t='승격 '+r.locked+'건 · 누적 평가정답 '+r.locked_total+'건(실문서 '+r.real_locked+'건)';if(r.rejected)t+=' · 서명으로 인정되지 않은 결정 '+r.rejected+'건';if(!r.published)t+=' · 배포 판정에는 아직 반영되지 않았습니다(서버 설정 확인 필요)';note('promoteMsg',t);await load();}catch(e){note('promoteMsg','승격하지 못했습니다. '+(e.message||''),true)}finally{b.disabled=false}};$('filter').onclick=()=>{curPage=0;load(true)};['review_batch','status','grade','origin','department','doc_format'].forEach(id=>{const e=$(id);if(e)e.onchange=()=>{curPage=0;load(true)}});$('query').addEventListener('keydown',e=>{if(e.key==='Enter'){curPage=0;load(true)}});$('action').onchange=toggleGrade;$('provSave').onclick=saveProv;$('save').onclick=save;$('openUpload').onclick=()=>$('modal').classList.add('show');// [2026-08-18] 드롭존을 실제로 배선한다. 종전에는 class="drop" 로 **생긴 것만**
+// 드롭존이고 dragover/drop 처리가 0건이라, 끌어다 놓으면 브라우저가 그 파일로 이동해
+// 검수 화면을 벗어났다.
+(function(){
+  var dz=$('drop'); if(!dz) return;
+  function name(){ var f=$('file').files[0];
+    $('dropName').textContent=f?('선택됨 · '+f.name):'여기로 파일을 끌어다 놓거나 위에서 선택하세요'; }
+  // [2026-08-19] dragleave 는 **자식 요소로 커서가 옮겨갈 때도** 발생한다.
+  // 드롭존 안에 <input>·<p>·<b> 가 있어서, 그 위를 지나갈 때마다 강조가 깜빡였다.
+  // enter/leave 를 세어 0 이 될 때만 강조를 끈다.
+  var over=0;
+  dz.addEventListener('dragenter',function(e){
+    e.preventDefault();e.stopPropagation();over++;dz.classList.add('over');});
+  dz.addEventListener('dragover',function(e){e.preventDefault();e.stopPropagation();});
+  dz.addEventListener('dragleave',function(e){
+    e.preventDefault();e.stopPropagation();
+    if(--over<=0){over=0;dz.classList.remove('over');}});
+  dz.addEventListener('drop',function(e){
+    e.preventDefault();e.stopPropagation();over=0;dz.classList.remove('over');
+    var f=e.dataTransfer&&e.dataTransfer.files; if(!f||!f.length) return;
+    $('file').files=f; name();
+  });
+  $('file').addEventListener('change',name);
+  // 페이지 밖으로 끌어다 놓아 브라우저가 파일을 열어 버리는 것을 막는다.
+  ['dragover','drop'].forEach(function(ev){
+    window.addEventListener(ev,function(e){ if(!dz.contains(e.target)) e.preventDefault(); });
+  });
+})();
+// 권한 근거 — 목록에 없으면 직접 입력.
+(function(){
+  var sel=$('upBasisSel'); if(!sel) return;
+  sel.addEventListener('change',function(){
+    var custom=sel.value==='__custom__';
+    $('upBasis').style.display=custom?'block':'none';
+    if(custom) $('upBasis').focus();
+  });
+})();
+$('cancelUpload').onclick=()=>{const m=$('upMsg');if(m)m.style.display='none';$('modal').classList.remove('show');};$('upload').onclick=upload;$('ledgerReload').onclick=()=>{ledgerPage=0;loadLedger()};$('ledgerFilter').onchange=()=>{ledgerPage=0;loadLedger()};
+$('viewRendered').onclick=()=>setDocView(true);$('viewRaw').onclick=()=>setDocView(false);setDocView(true);
+load(true);
+</script>""" + _ASSIGN_PANEL_SCRIPT + r"""</body></html>"""
+
+
+
+
+# [2026-10-09 #9 이미지 분리] 로그인 화면·토큰/비밀번호 로그인 엔드포인트·세션 조회는
+# koipa.api.console_login 으로 옮겼다 — admin.html 전체의 유일한 로그인 경로였는데, golden.py
+# 를 고객사 이미지에서 빼면 로그인 자체가 막혀서다(console_login.py 머리말 참고). URL 경로는
+# 그대로다 — 이 아래 코드가 쓰는 LOGIN_URL='/api/v1/golden/candidates/login.html' 같은 문자열도
+# 바꿀 필요가 없다.
+# 검수자(reviewer)로 연 후보 관리 화면에서 감추는 관리자 전용 조작 — 업로드 · 출처 기록 · 평가정답 승격.
+# 서버가 이미 403 으로 막는 조작이다(권한은 그대로). 늘 실패할 버튼을 보이지 않게 할 뿐이다.
+# 후보 관리의 원래 상세 영역은 목록 아래에 붙어 있어, 문서 하나를 열 때마다 목록과 본문을
+# 위아래로 오가야 했다. 검수자는 실질적으로 「문서함 / 원문 / 결정」을 동시에 보며 작업하므로,
+# 같은 DOM·같은 API를 세 칸으로 재배치한다. 새 API나 별도 데이터 복제는 만들지 않는다.
+_REVIEWER_DOCUMENT_WORKBENCH_CSS = r"""
+.reviewer-workspace{display:block!important;padding:18px 22px 26px!important;max-width:none!important}
+.reviewer-workspace>.side{display:none!important}
+.reviewer-workspace>.main{padding:0!important;max-width:none!important}
+.reviewer-workspace .hero,.reviewer-workspace .summary,.reviewer-workspace #ledgerAll{display:none!important}
+.reviewer-access-note{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.reviewer-workbench-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:3px 0 19px}
+.reviewer-workbench-head h1{margin:0;font-size:27px;letter-spacing:-1.3px;line-height:1.25}
+.reviewer-workbench-head p{margin:7px 0 0;color:var(--text-soft);font-size:14px}
+.reviewer-workbench-head .head-actions{display:flex;gap:8px;flex-wrap:wrap}
+.reviewer-workbench-flash{margin:0 0 12px!important}
+#reviewer-workbench{display:grid;grid-template-columns:minmax(270px,25%) minmax(0,1fr);height:calc(100vh - 184px);min-height:620px;border:1px solid var(--border);background:#fff;overflow:hidden}
+#reviewer-workbench .reviewer-inbox{min-width:0;min-height:0;border-right:1px solid var(--border);background:#fff;overflow:hidden}
+#reviewer-workbench #candidates{height:100%;min-height:0;display:flex;flex-direction:column;margin:0;border:0;background:#fff}
+#reviewer-workbench #candidates .sectionTop{display:block;margin:0;padding:21px 18px 17px;border-bottom:1px solid var(--border);background:#fff}
+#reviewer-workbench #candidates .secNum{display:none}
+#reviewer-workbench #candidates h2{display:block;margin:0;font-size:16px;letter-spacing:-.45px}
+#reviewer-workbench #candidates .sectionTop p{margin:7px 0 0;font-size:12px;line-height:1.55}
+#reviewer-workbench #candidates .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+#reviewer-workbench #candidates .filters input,#reviewer-workbench #candidates .filters select{box-sizing:border-box;min-width:0;width:100%;padding:9px 10px;background:#fff}
+#reviewer-workbench #candidates #query{grid-column:1/-1}
+#reviewer-workbench #candidates #review_batch,#reviewer-workbench #candidates #grade,#reviewer-workbench #candidates #origin,#reviewer-workbench #candidates #department,#reviewer-workbench #candidates #filter{display:none}
+#reviewer-workbench #candidates .list{flex:1;min-height:0;overflow-y:auto;border:0}
+#reviewer-workbench #candidates .rowhead{display:none}
+#reviewer-workbench #candidates .candidate{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'title status' 'meta meta';gap:5px 8px;padding:14px 16px;border-bottom:1px solid #edf0f2;background:#fff}
+#reviewer-workbench #candidates .candidate:hover,#reviewer-workbench #candidates .candidate.selected{background:#f2f6ff}
+#reviewer-workbench #candidates .candidate.selected{box-shadow:inset 3px 0 0 #2563a8}
+#reviewer-workbench #candidates .candidate>:nth-child(1){grid-area:meta;font-size:11px;color:var(--text-dim)}
+#reviewer-workbench #candidates .candidate>:nth-child(2){grid-area:title;min-width:0}
+#reviewer-workbench #candidates .candidate>:nth-child(3),#reviewer-workbench #candidates .candidate>:nth-child(5){display:none}
+#reviewer-workbench #candidates .candidate>:nth-child(4){grid-area:status;align-self:start}
+#reviewer-workbench #candidates .doctitle{font-size:14px;font-weight:400;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#reviewer-workbench #candidates .docsub{font-size:11px}
+#reviewer-workbench #detail{display:grid!important;grid-column:2;grid-template-columns:minmax(0,1fr) minmax(280px,31%);min-width:0;min-height:0;margin:0;border:0;background:#fff}
+#reviewer-workbench #detail .detailMain{min-width:0;min-height:0;overflow:auto;padding:31px;background:#edf2f7;border-right:1px solid var(--border)}
+#reviewer-workbench .reviewer-document-sheet{box-sizing:border-box;min-height:100%;max-width:760px;margin:0 auto;padding:56px 62px 72px;background:#fff;border:1px solid #d5dde6;box-shadow:0 5px 18px rgba(15,23,42,.08)}
+#reviewer-workbench .reviewer-document-sheet .eyebrow{margin:0 0 18px;color:#64748b}
+#reviewer-workbench .reviewer-document-sheet .document-kicker{font:600 12px/1.4 ui-monospace,monospace;letter-spacing:.08em;color:#64748b}
+#reviewer-workbench .reviewer-document-sheet h3{font-size:30px;line-height:1.32;margin:0 0 17px;word-break:keep-all}
+#reviewer-workbench .reviewer-document-sheet .metas{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+#reviewer-workbench .reviewer-document-sheet .metas span{margin:0;padding:6px 10px;border:1px solid #e1e6eb;border-radius:0;background:#fff;color:#526170;font-size:12px}
+#reviewer-workbench .reviewer-document-sheet .document-facts{white-space:pre-line;margin:33px 0 27px;color:#26384d;font-size:15px;line-height:1.9}
+#reviewer-workbench .reviewer-document-sheet .scope,#reviewer-workbench .reviewer-document-sheet .viewbar{display:none!important}
+#reviewer-workbench .reviewer-document-sheet .docbody{max-width:none;max-height:none!important;overflow:visible!important;padding:0!important;border:0!important;font-size:16px;line-height:1.9;color:#1f2937}
+#reviewer-workbench .reviewer-document-sheet .docbody.md h1,#reviewer-workbench .reviewer-document-sheet .docbody.md h2{letter-spacing:-.55px}
+#reviewer-workbench #detail .sideDetail{min-width:0;min-height:0;overflow:auto;padding:0;background:#fafbfd}
+#reviewer-workbench .reviewer-inspector-head{padding:22px 20px 17px;border-bottom:1px solid var(--border);background:#fff}
+#reviewer-workbench .reviewer-inspector-head h3{margin:0;font-size:16px;letter-spacing:-.35px}
+#reviewer-workbench .reviewer-inspector-head p{margin:7px 0 0;font-size:12px;line-height:1.55;color:var(--text-soft)}
+#reviewer-workbench #detail .sideDetail>.action,#reviewer-workbench #detail .sideDetail>.history,#reviewer-workbench #detail .sideDetail>.classifier-score,#reviewer-workbench #detail .sideDetail>.initial-grade{margin:16px;padding:17px;background:#fff;border:1px solid var(--border)}
+#reviewer-workbench #detail .sideDetail>.history{margin-top:0}
+#reviewer-workbench #detail .sideDetail>.classifier-score,#reviewer-workbench #detail .sideDetail>.initial-grade{margin-bottom:0}
+#reviewer-workbench .initial-grade h4{margin:0 0 7px;color:#0f172a;font-size:15px}
+#reviewer-workbench .initial-grade .initial-grade-value{margin:0;color:#1e3a5f;font-size:22px;font-weight:800}
+#reviewer-workbench .initial-grade .initial-grade-help{margin:8px 0 0;color:var(--text-soft);font-size:12px;line-height:1.5}
+#reviewer-workbench .classifier-score h4{margin:0 0 7px;color:#0f172a;font-size:15px}
+#reviewer-workbench .classifier-score .score-help{margin:0 0 14px;color:var(--text-soft);font-size:12px;line-height:1.5}
+#reviewer-workbench .classifier-score .score-row{display:grid;grid-template-columns:25px minmax(0,1fr) 46px;gap:8px;align-items:center;margin:8px 0;font-size:12px}
+#reviewer-workbench .classifier-score .score-track{height:8px;overflow:hidden;background:#e7edf3}
+#reviewer-workbench .classifier-score .score-fill{height:100%;background:#2563a8}
+#reviewer-workbench .classifier-score .score-value{text-align:right;font-variant-numeric:tabular-nums;color:#334155}
+#reviewer-workbench .classifier-score .score-meta{margin:13px 0 0;color:#64748b;font-size:11px;line-height:1.5;word-break:break-all}
+#reviewer-workbench #detail .sideDetail h4{margin:0 0 12px;color:#334155}
+#reviewer-workbench #detail .sideDetail .reviewer-decision-title{margin:0 0 15px;color:#0f172a;font-size:15px;font-weight:800;letter-spacing:-.25px}
+#reviewer-workbench #detail .sideDetail .action label{margin-top:13px}
+#reviewer-workbench #detail .sideDetail .action select,#reviewer-workbench #detail .sideDetail .action textarea{box-sizing:border-box;font-size:13px}
+@media(max-width:1050px){.reviewer-workspace{padding:14px!important}.reviewer-workbench-head{padding-bottom:14px}#reviewer-workbench{height:auto;min-height:0;grid-template-columns:1fr}#reviewer-workbench .reviewer-inbox{max-height:390px;border-right:0;border-bottom:1px solid var(--border)}#reviewer-workbench #detail{grid-column:1;grid-template-columns:minmax(0,1fr) minmax(275px,34%);min-height:680px}.reviewer-workbench-head h1{font-size:24px}}
+@media(max-width:700px){.reviewer-workspace{padding:12px!important}.reviewer-workbench-head{display:block}.reviewer-workbench-head .head-actions{margin-top:12px}#reviewer-workbench #detail{grid-template-columns:1fr}#reviewer-workbench #detail .detailMain{padding:14px}#reviewer-workbench .reviewer-document-sheet{padding:30px 22px;min-height:0}#reviewer-workbench #detail .sideDetail{border-top:1px solid var(--border)}#reviewer-workbench .reviewer-document-sheet .viewnote{display:block;margin:8px 0 0}}
+"""
+_REVIEWER_DOCUMENT_WORKBENCH_SCRIPT = r"""<script>
+/* 후보 목록과 상세 DOM을 재사용해 문서함 / 원문 / 결정 패널을 한 화면에 둔다. */
+(function(){
+  const root=document.querySelector('.reviewer-workspace');
+  const main=root&&root.querySelector('.main');
+  const candidates=document.getElementById('candidates');
+  const detail=document.getElementById('detail');
+  if(!root||!main||!candidates||!detail||document.getElementById('reviewer-workbench'))return;
+
+  const header=document.createElement('header');
+  header.className='reviewer-workbench-head';
+  const title=document.createElement('div');
+  const h1=document.createElement('h1'); h1.textContent='문서 검토 및 확정';
+  const subtitle=document.createElement('p'); subtitle.textContent='문서함, 원문, 결정 정보를 한 화면에서 확인합니다.';
+  title.append(h1,subtitle);
+  const actions=document.createElement('div'); actions.className='head-actions';
+  const refresh=document.createElement('button'); refresh.type='button'; refresh.className='btn'; refresh.textContent='목록 새로고침';
+  refresh.addEventListener('click',function(){const original=document.getElementById('refresh');if(original)original.click();});
+  actions.append(refresh); header.append(title,actions);
+
+  const bench=document.createElement('section'); bench.id='reviewer-workbench'; bench.setAttribute('aria-label','문서 검토 작업영역');
+  const inbox=document.createElement('aside'); inbox.className='reviewer-inbox'; inbox.setAttribute('aria-label','문서함');
+  const top=candidates.querySelector('.sectionTop');
+  if(top){const h2=top.querySelector('h2');const p=top.querySelector('p');if(h2)h2.textContent='문서함';if(p)p.textContent='배정 문서를 선택해 원문과 결정을 확인합니다.';}
+  inbox.append(candidates);
+
+  const detailMain=detail.querySelector('.detailMain');
+  if(detailMain&&!detailMain.querySelector('.reviewer-document-sheet')){
+    const sheet=document.createElement('article'); sheet.className='reviewer-document-sheet';
+    while(detailMain.firstChild)sheet.append(detailMain.firstChild);
+    detailMain.append(sheet);
+  }
+  /* 원문은 "증거 카드"가 아니라 실제 문서처럼 읽힌다. 원문 데이터는 바꾸지 않고
+     제목과 첫 기본정보 블록만 문서 머리말로 올린다. */
+  function renderInitialGrade(candidate){
+    const side=detail.querySelector('.sideDetail');
+    if(!side)return;
+    let card=side.querySelector('#initialGrade');
+    if(!card){
+      card=document.createElement('section'); card.id='initialGrade'; card.className='initial-grade';
+      const action=side.querySelector('.action');
+      if(action)side.insertBefore(card,action); else side.append(card);
+    }
+    card.replaceChildren();
+    const heading=document.createElement('h4'); heading.textContent='최초 생성 등급'; card.append(heading);
+    const labels={TS:'특급',S1:'1급',S2:'2급',S3:'3급'};
+    const code=String(candidate&&candidate.proposed_grade||'');
+    const value=document.createElement('p'); value.className='initial-grade-value';
+    value.textContent=labels[code]?(labels[code]+' ('+code+')'):'정보 없음'; card.append(value);
+    const help=document.createElement('p'); help.className='initial-grade-help';
+    help.textContent='모의문서 최초 생성 시 부여된 등급입니다. 최종 등급은 검수자가 원문을 읽고 직접 결정합니다.';
+    card.append(help);
+  }
+  function renderClassifierScore(candidate){
+    const side=detail.querySelector('.sideDetail');
+    if(!side)return;
+    let card=side.querySelector('#classifierScore');
+    if(!card){
+      card=document.createElement('section'); card.id='classifierScore'; card.className='classifier-score';
+      const action=side.querySelector('.action');
+      if(action)side.insertBefore(card,action); else side.append(card);
+    }
+    card.replaceChildren();
+    const heading=document.createElement('h4'); heading.textContent='BERT 등급별 예측 확률'; card.append(heading);
+    const help=document.createElement('p'); help.className='score-help';
+    help.textContent='최종 등급은 검수자가 문서를 읽고 직접 결정합니다.'; card.append(help);
+    const score=candidate&&candidate.classifier_score;
+    if(!score||score.status!=='available'){
+      const unavailable=document.createElement('p'); unavailable.className='score-meta';
+      unavailable.textContent='현재 문서의 점수 스냅샷을 아직 사용할 수 없습니다.'; card.append(unavailable);
+      return;
+    }
+    ['TS','S1','S2','S3'].forEach(function(grade){
+      const value=Number(score.scores&&score.scores[grade]);
+      if(!Number.isFinite(value))return;
+      const row=document.createElement('div'); row.className='score-row';
+      const label=document.createElement('strong'); label.textContent={TS:'특급',S1:'1급',S2:'2급',S3:'3급'}[grade]||grade;
+      const track=document.createElement('div'); track.className='score-track';
+      const fill=document.createElement('div'); fill.className='score-fill';
+      const percent=Math.max(0,Math.min(100,value*100));
+      fill.style.width=percent+'%'; fill.setAttribute('role','progressbar');
+      fill.setAttribute('aria-label',grade+' 점수'); fill.setAttribute('aria-valuemin','0');
+      fill.setAttribute('aria-valuemax','100'); fill.setAttribute('aria-valuenow',String(percent));
+      track.append(fill);
+      const shown=document.createElement('span'); shown.className='score-value'; shown.textContent=percent.toFixed(1)+'%';
+      row.append(label,track,shown); card.append(row);
+    });
+    const meta=document.createElement('p'); meta.className='score-meta';
+    const calibrated=score.calibrated?'보정됨':'보정 미확인';
+    meta.textContent='최상위 점수: '+String(score.predicted_label||'–')+' · '+calibrated
+      +(score.model_version?' · 모델 '+String(score.model_version):'')
+      +(score.scored_at?' · 산출 '+String(score.scored_at):'');
+    card.append(meta);
+  }
+  const originalShow=show;
+  show=async function(id,reload){
+    await originalShow(id,reload);
+    const candidate=selected;
+    if(!candidate)return;
+    renderInitialGrade(candidate);
+    renderClassifierScore(candidate);
+    const titleNode=document.getElementById('detailTitle');
+    const tags=document.getElementById('metas');
+    const facts=document.getElementById('documentFacts')||document.createElement('div');
+    facts.id='documentFacts'; facts.className='document-facts';
+    if(!facts.parentNode){
+      const rendered=document.getElementById('documentRendered');
+      if(rendered&&rendered.parentNode)rendered.parentNode.insertBefore(facts,rendered);
+    }
+    if(titleNode)titleNode.textContent=candidate.title||candidate.doc_id;
+    if(tags){
+      tags.replaceChildren();
+      [candidate.department||candidate.info_type||'미분류',candidate.doc_format||'검수/검토 기록',candidate.doc_id]
+        .forEach(function(value){const tag=document.createElement('span');tag.textContent=value;tags.append(tag);});
+    }
+    const source=String(candidate.text||'').replace(/\r\n/g,'\n').trim();
+    const title=String(candidate.title||'').trim();
+    let visible=source;
+    if(title&&visible.startsWith(title))visible=visible.slice(title.length).replace(/^\s+/,'');
+    const blocks=visible.split(/\n\s*\n/);
+    const first=String(blocks[0]||'').trim();
+    const hasFacts=/^(문서번호|수신|참조|작성부서|작성일)\s*[:：]/.test(first);
+    facts.textContent=hasFacts?first:('문서 ID: '+candidate.doc_id);
+    if(hasFacts)blocks.shift();
+    const body=blocks.join('\n\n').trim()||visible||source;
+    const rendered=document.getElementById('documentRendered');
+    if(rendered)rendered.innerHTML=mdToHtml(body);
+    const eyebrow=detail.querySelector('.reviewer-document-sheet .eyebrow');
+    if(eyebrow){eyebrow.className='eyebrow document-kicker';eyebrow.textContent='점검/검토 기록';}
+    // #scope와 .viewbar는 CSS로만 숨긴다. 삭제하면 저장 뒤 원래 show()가
+    // #scope.textContent를 갱신할 때 null 오류가 나 상세 조회 실패로 보인다.
+  };
+  const side=detail.querySelector('.sideDetail');
+  if(side&&!side.querySelector('.reviewer-inspector-head')){
+    const inspector=document.createElement('header'); inspector.className='reviewer-inspector-head';
+    const inspectorTitle=document.createElement('h3'); inspectorTitle.textContent='문서 결정 정보';
+    const inspectorText=document.createElement('p'); inspectorText.textContent='선택 문서의 등록 정보와 결정 이력';
+    inspector.append(inspectorTitle,inspectorText); side.prepend(inspector);
+  }
+  /* 기존 화면의 "등급 결정"은 aside 직속 제목이라 카드 밖에 떠 있었다.
+     검수자가 입력하는 결정 폼의 제목으로 옮겨, 제목·폼·저장 버튼을 한 카드로 유지한다. */
+  const legacyDecisionTitle=side&&Array.from(side.children).find(function(node){
+    return node.tagName==='H4'&&node.textContent.trim()==='등급 결정';
+  });
+  const decisionForm=side&&Array.from(side.children).find(function(node){
+    return node.classList&&node.classList.contains('action');
+  });
+  if(legacyDecisionTitle&&decisionForm&&!decisionForm.querySelector('.reviewer-decision-title')){
+    const decisionTitle=document.createElement('h3'); decisionTitle.className='reviewer-decision-title';
+    decisionTitle.textContent='검수 결정';
+    decisionForm.prepend(decisionTitle); legacyDecisionTitle.remove();
+  }
+  const flash=document.getElementById('flash'); if(flash){flash.classList.add('reviewer-workbench-flash');header.after(flash);}
+  bench.append(inbox,detail);
+  main.prepend(bench); main.prepend(header);
+
+  const detailWasShown=detail.classList.contains('show');
+  const originalRenderRows=renderRows;
+  renderRows=function(data){
+    originalRenderRows(data);
+    if(!detailWasShown&&!detail.classList.contains('show')&&data.candidates&&data.candidates[0])show(data.candidates[0].doc_id);
+  };
+})();
+</script>"""
+_REVIEWER_VIEW_CSS = (
+    "<style>"
+    "#openUpload,#promote,#provBox{display:none!important}"
+    + REVIEWER_WORKSPACE_CSS
+    + _REVIEWER_DOCUMENT_WORKBENCH_CSS
+    + "</style>"
+)
+_REVIEWER_VIEW_NOTE = (
+    '<div class="reviewer-access-note">검수자 권한으로 열었습니다 — 등급 결정과 서명을 할 수 '
+    "있습니다. 문서 업로드 · 출처 기록 · 평가정답 승격은 관리자가 합니다.</div>"
+)
+
+
+def _as_reviewer_view(html: str) -> str:
+    # 배정 패널은 숨기는 것이 아니라 **없앤다** — 관리자 API 주소와 화면 구조가 검수자에게 읽히면 안 된다(위 _ASSIGN_PANEL_* 주석).
+    html = _strip_assignment_panel(html)
+    # [2026-09-27] 관리자 콘솔 메뉴 링크도 검수자 응답에서는 통째로 없앤다 — KL 감리 지적
+    # ("골든셋 검증 페이지에서 관리자 콘솔로 접근이 가능한 상태여서 … 분류기 테스트까지",
+    # 2026-09-11 커밋 0827b0be)의 재발을 막는다. 기본 렌더(admin·kl_backend 가 보는 화면)에는
+    # 그대로 두되(관리자 세션이 관리자 콘솔로 돌아가는 것 자체는 새 권한이 아니다), reviewer
+    # 응답에서만 이 replace 로 제거한다 — 검수자에게는 이 링크가 절대 나가지 않는다.
+    html = html.replace('<a class="cnav-link" href="/console/admin.html">관리자 콘솔</a>', "", 1)
+    # 관리자 화면의 정보 구조를 따르되, 검수자가 자신에게 배정된 작업을 하고 있다는
+    # 사실이 분명해야 한다. 이 치환은 문구·셸 클래스만 바꾸며 API 주소나 제어 코드는 건드리지 않는다.
+    reviewer_labels = (
+        ("한국지식재산보호원 | 골든셋 등록", "한국지식재산보호원 | 검수 문서함"),
+        ("검증문서 후보 관리", "검수 문서함"),
+        ("CURRENT WORKSPACE", "검수 작업공간"),
+        ("koipa-ai", "내 검수 문서함"),
+        ("Koipa AI Engine for KOIPA Trade-Secret System (PoC)", "배정된 문서를 검토하고 등급 결정을 기록합니다."),
+        ("goldset/console-review", "REVIEWER / ASSIGNED ONLY"),
+        ("<span>01</span>개요", "<span>O</span>검수 현황"),
+        ("<span>02</span>골든셋 후보", "<span>D</span>배정 문서"),
+        ("<span>03</span>문서 상세·결정", "<span>R</span>문서 검토·결정"),
+        ("<span>04</span>보류·폐기 이력", "<span>H</span>내 결정 이력"),
+        ("GOLDEN SET REVIEW CONSOLE", "REVIEW WORKSPACE"),
+        ("검수 가능한<br><em>골든셋</em>을 관리합니다.", "배정된 문서를<br><em>검수하고 확정합니다.</em>"),
+        ("합성 후보와 실문서를 한 곳에서 검수하고, 등급 확정·보류·폐기를 누가 왜 그렇게 정했는지와 함께 남깁니다. 기록은 덮어쓰지 않고 계속 쌓입니다.",
+         "배정된 문서의 원문과 근거를 확인한 뒤 등급 결정을 남깁니다. 결정과 사유는 검수 이력에 기록되며, 관리 작업은 별도 권한으로만 수행됩니다."),
+        ("등급 확정 진행", "내 검수 진행"),
+        ("골든셋 현황", "내 검수 현황"),
+        ("현재 워크스페이스의 검수 상태와 등급 분포입니다.", "현재 계정에 보이는 배정 문서의 검수 상태입니다."),
+        ("골든셋 후보", "배정 문서"),
+        ("문서를 선택하면 전문과 등급 결정 이력이 열립니다.", "문서를 선택하면 원문, 검토 기준, 내 결정 이력이 열립니다."),
+        ("SNAPSHOT LEDGER", "검수자 계정"),
+        ("origin · audit · decision", "배정 범위 · 검토 · 결정 이력"),
+    )
+    for old, new in reviewer_labels:
+        html = html.replace(old, new, 1)
+    # 검수자는 내부 상태(제안·proxy 등)가 아니라 업무 상태 세 가지만 본다. 이 값은
+    # 원본 스크립트의 첫 load() 전에 HTML에 들어가므로 최초 조회부터 적용된다.
+    html = html.replace(
+        '<select id="status"><option value="">전체 상태</option><option value="proposed">제안</option><option value="under_review">검토중</option><option value="approved_proxy">Proxy 확정</option><option value="grade_fixed_unlocked">등급 확정</option><option value="deferred">보류</option><option value="discarded">폐기</option><option value="out_of_scope">검수 대상 아님</option></select>',
+        '<select id="status"><option value="unfixed" selected>검토 대기</option><option value="training_ready">확정됨</option><option value="excluded">학습 제외</option><option value="">전체</option></select>',
+        1,
+    )
+    # 상태 코드는 원장·API 호환을 위해 유지한다. 검수 화면에는 업무 의미만 보이고,
+    # 확정은 한 번의 등급 선택으로 끝난다. 실제 모델 학습 실행은 별도 학습 작업의
+    # 데이터셋 동결·검증 경로에서만 일어난다.
+    html = html.replace(
+        "function pill(status){",
+        "function reviewerStatusLabel(status){return {proposed:'검토 대기',under_review:'검토 대기',deferred:'검토 대기',approved_proxy:'확정됨',grade_fixed_unlocked:'확정됨',discarded:'학습 제외',out_of_scope:'학습 제외'}[status]||status}function pill(status){",
+        1,
+    )
+    html = html.replace(
+        "e.textContent={proposed:'제안',under_review:'검토중',approved_proxy:'Proxy 확정',grade_fixed_unlocked:'등급 확정',deferred:'보류',discarded:'폐기',out_of_scope:'검수 대상 아님'}[status]||status;",
+        "e.textContent=reviewerStatusLabel(status);",
+        1,
+    )
+    html = html.replace(
+        "+' · 폐기 '+(s.discarded||0)+'건 포함'),metric('등급 확정',s.fixed+'건','Proxy / Unlocked'),metric('미확정',s.unfixed+'건','검토 필요'),metric('보류 · 폐기',(s.deferred+s.discarded)+'건','감사 이력 보존'),metric('검수 대상 아님',(s.out_of_scope||0)+'건','범위 밖 · 되돌릴 수 있음'),",
+        "),metric('확정됨',s.fixed+'건','등급 결정 완료'),metric('검토 대기',s.unfixed+'건','등급 결정 필요'),metric('학습 제외',(s.discarded+(s.out_of_scope||0))+'건','제외 사유 기록'),",
+        1,
+    )
+    html = html.replace(
+        "let grade=(c.proposed_grade||'–')+(c.final_grade?' → '+c.final_grade:'');",
+        "let grade=c.final_grade?('확정 '+c.final_grade):'등급 미결정';",
+        1,
+    )
+    html = html.replace(
+        "function setActions(c){let a=$('action');a.replaceChildren();if(c.document_origin==='synthetic'&&c.proposed_grade)a.append(option('approve','승인 (제안 등급 그대로 확정)'));a.append(option('change','등급 지정/변경'),option('defer','보류'),option('discard','폐기'),option('exclude','검수 대상 아님'));if(c.status==='deferred'||c.status==='discarded'||c.status==='out_of_scope')a.append(option('reopen','재검토로 되돌림'));toggleGrade()}",
+        "function setActions(c){let a=$('action');a.replaceChildren();a.append(option('change','등급 확정'),option('exclude','학습 제외'));toggleGrade()}",
+        1,
+    )
+    html = html.replace(
+        '<select id="finalGrade"><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select>',
+        '<select id="finalGrade"><option value="">등급을 선택하세요</option><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select>',
+        1,
+    )
+    html = html.replace(
+        "[['상태',c.status],['출처',c.document_origin],['제안',c.proposed_grade||'없음'],['확정',c.final_grade||'미확정'],",
+        "[['상태',reviewerStatusLabel(c.status)],['출처',c.document_origin],['최초 생성 등급',({'TS':'특급','S1':'1급','S2':'2급','S3':'3급'}[c.proposed_grade]||c.proposed_grade||'없음')],['확정',c.final_grade||'미확정'],",
+        1,
+    )
+    html = html.replace(
+        "$('finalGrade').value=c.final_grade||c.proposed_grade||'S3';",
+        "$('finalGrade').value=c.final_grade||'';",
+        1,
+    )
+    html = html.replace(
+        "if(action==='change')body.grade=$('finalGrade').value;",
+        "if(action==='change'){body.grade=$('finalGrade').value;if(!body.grade)throw new Error('확정할 등급을 선택하세요.');}",
+        1,
+    )
+    html = html.replace(
+        "msg('저장 완료: '+out.status);await show(selected.doc_id,true);note('saveMsg','저장했습니다 · 상태 '+out.status)",
+        "msg('저장했습니다 · '+reviewerStatusLabel(out.status));await show(selected.doc_id,true);note('saveMsg','저장했습니다 · '+reviewerStatusLabel(out.status))",
+        1,
+    )
+    html = html.replace("<h2>보류 · 폐기 이력</h2>", "<h2>내 결정 이력</h2>", 1)
+    html = html.replace(
+        '<select id="ledgerFilter"><option value="">전체 결정</option><option value="defer">보류</option><option value="discard">폐기</option><option value="exclude">검수 대상 아님</option><option value="change">등급 변경</option><option value="approve">승인</option><option value="reopen">재검토</option></select>',
+        '<select id="ledgerFilter"><option value="">전체 결정</option></select>',
+        1,
+    )
+    html = html.replace(
+        "let lbl={approve:'승인',change:'등급 변경',defer:'보류',discard:'폐기',reject:'반려',reopen:'재검토',exclude:'검수 대상 아님'}[e.action]||e.action;",
+        "let lbl={approve:'등급 확정',change:'등급 확정',defer:'검토 대기',discard:'학습 제외',reject:'학습 제외',reopen:'검토 대기',exclude:'학습 제외'}[e.action]||e.action;",
+        1,
+    )
+    html = html.replace(
+        "<div class=\"grade\">'+(e.proposed_grade||'–')+' → '+(e.final_grade||'–')+'</div>",
+        "<div class=\"grade\">'+(e.final_grade||'–')+'</div>",
+        1,
+    )
+    reviewer_frame = '<div class="frame reviewer-workspace">'
+    html = html.replace('<div class="frame">', reviewer_frame, 1)
+    html = html.replace('<nav class="nav">', '<nav class="nav" aria-label="검수 작업 메뉴">', 1)
+    html = html.replace("if(s.by_proposed_grade){let gb=document.createElement('div');gb.style.cssText='grid-column:1/-1;border-top:1px solid var(--line);padding:24px 29px 29px';let cap=document.createElement('div');cap.className='cap';cap.textContent='등급별 분포 현황';gb.append(cap);let gr=document.createElement('div');gr.style.cssText='display:grid;grid-template-columns:76px repeat(4,1fr);gap:10px 24px;margin-top:16px;align-items:center;max-width:760px';const GCOLOR={TS:'#c72c40',S1:'#c47a00',S2:'#2563a8',S3:'#1a8a5f'};const hcell=(t,strong)=>{let el=document.createElement('span');el.style.cssText='font-size:12px;color:#8a9299'+(strong?';font-weight:800;color:#5f666c':'');el.textContent=t;return el};gr.append(hcell(''),hcell('특급'),hcell('1급'),hcell('2급'),hcell('3급'));const maxVal=Math.max(1,...['TS','S1','S2','S3'].map(g=>(s.by_proposed_grade||{})[g]||0));const gradeRow=(label,counts)=>{gr.append(hcell(label,true));['TS','S1','S2','S3'].forEach(g=>{let v=(counts||{})[g]||0;let cell=document.createElement('div');let num=document.createElement('b');num.style.cssText='font:800 18px ui-monospace,monospace;letter-spacing:-1px;display:block';num.textContent=v;let bar=document.createElement('div');bar.style.cssText='height:5px;border-radius:2px;margin-top:5px;background:'+GCOLOR[g]+';opacity:.82;width:'+Math.max(v>0?3:0,Math.round(v/maxVal*100))+'%';cell.append(num,bar);gr.append(cell)})};gradeRow('전체',s.by_proposed_grade);gradeRow('미검수',s.by_proposed_grade_unfixed);gradeRow('검수 완료',s.by_final_grade);gb.append(gr);$('kpis').append(gb)}", "", 1)  # [2026-10-09] 등급별 분포 카드 — 관리자 전용, 검수자에게는 보여주지 않는다
+    # 워크벤치 안에서 상세를 열 때는 페이지 전체를 아래로 이동시키지 않는다. 본문 패널의
+    # 스크롤 위치만 바뀌므로 문서함을 잃지 않는다.
+    html = html.replace(
+        "$('detail').scrollIntoView({behavior:'smooth',block:'start'});",
+        "if(!document.getElementById('reviewer-workbench'))$('detail').scrollIntoView({behavior:'smooth',block:'start'});",
+        1,
+    )
+    html = html.replace("</head>", _REVIEWER_VIEW_CSS + "</head>", 1)
+    html = html.replace("</body>", _REVIEWER_DOCUMENT_WORKBENCH_SCRIPT + "</body>", 1)
+    return html.replace(reviewer_frame, _REVIEWER_VIEW_NOTE + reviewer_frame, 1)
+
+
+# ── 숨김 검수(golden_review_blind_enforced) 화면 조정 ────────────────────────────────
+# ⚠ **이것은 화면 정리일 뿐 격리가 아니다.** 다른 검수자의 결정·관리성 입력은 서버가
+#   응답에서 이미 뺐다(golden_reviewer_access.shape_*). 보호원 요청에 따라 최초 생성 등급과
+#   BERT 점수는 검수자에게 의도적으로 표시한다. 앵커가 살아 있는지는 tests/test_golden_blind_review.py 가 지킨다.
+# 문서 ID 는 서버가 내려주는 별칭을 그대로 표시하고 그 별칭으로 상세·결정·이력 이동을 요청한다 — 이 화면 JS 에서 doc_id 를
+# 다루는 자리(목록 행·선택 표시·상세 조회·결정 저장·결정 이력 이동)는 전부 응답에서 받은 값만 쓰므로 고칠 곳이 없다
+# (tests/test_golden_alias_ids.py 가 jsdom 으로 목록→상세→저장을 눌러 요청 주소에 별칭만 나가는지 확인한다).
+# 종전 화면이 제안 등급을 쓰던 자리를 하나씩 걷어 낸다:
+_BLIND_VIEW_CSS = (
+    "<style>"
+    "#quality,a[href=\"#quality\"]{display:none!important}"     # 품질 지표 = 등급별 길이 분포(서버도 뺌)
+    "#grade{display:none!important}"                             # 등급 필터 — 서버가 거절한다
+    "</style>"
+)
+_BLIND_VIEW_NOTE = (
+    '<div class="reviewer-access-note">사람 검수 모드입니다 — 최초 생성 등급과 BERT 예측 확률은 '
+    "참고자료로 표시되며, 다른 검수자의 결정은 표시되지 않습니다. 최종 등급은 검수자가 결정합니다. 문서 ID 는 이 검수를 위해 붙인 별칭(RV-…)입니다.</div>"
+)
+_BLIND_VIEW_PATCHES: tuple[tuple[str, str], ...] = (
+    # '승인 (제안 등급 그대로 확정)' 선택지 — 서버도 approve 를 거절한다
+    ("if(c.document_origin==='synthetic'&&c.proposed_grade)a.append(option('approve','승인 (제안 등급 그대로 확정)'));", ""),
+    # 목록의 등급 칸: 제안 등급 → 내 결정만
+    ("let grade=(c.proposed_grade||'–')+(c.final_grade?' → '+c.final_grade:'');",
+     "let grade=c.final_grade?('내 결정 '+c.final_grade):'–';"),
+    # 일반 검수 화면도 제안 등급 대신 확정 여부만 표시한다. 숨김 검수에서는 미결정
+    # 자리에 등급 유추 단서가 아닌 대시만 남겨야 한다.
+    ("let grade=c.final_grade?('확정 '+c.final_grade):'등급 미결정';",
+     "let grade=c.final_grade?('내 결정 '+c.final_grade):'–';"),
+    # 확정 등급 기본값이 제안 등급(없으면 S3)이었다 — 미리 골라 둔 값 자체가 앵커다
+    ("$('finalGrade').value=c.final_grade||c.proposed_grade||'S3';", "$('finalGrade').value=c.final_grade||'';"),
+    ('<select id="finalGrade"><option>TS</option>',
+     '<select id="finalGrade"><option value="">등급을 선택하세요</option><option>TS</option>'),
+    ("if(action==='change')body.grade=$('finalGrade').value;",
+     "if(action==='change'){if(!$('finalGrade').value)throw new Error('확정할 등급을 선택하세요.');"
+     "body.grade=$('finalGrade').value}"),
+    # 결정 이력 표의 '제안 → 확정' 칸
+    ("(e.proposed_grade||'–')+' → '+(e.final_grade||'–')", "(e.final_grade||'–')"),
+    # 검색 칸 — 숨김에서는 별칭(RV-…) 앞부분으로만 찾는다(제목·실 doc_id 는 등급 코드를 담을 수 있어 검색에서 뺐다)
+    ('placeholder="문서 ID 또는 제목" aria-label="문서 ID 또는 제목 검색"',
+     'placeholder="문서 ID (RV-…) 검색" aria-label="문서 ID 검색"'),
+
+    # [2026-10-09] 등급별 분포 카드(관리자 화면 전용) — by_proposed_grade 문자열이 검수자 화면 JS 에 남으면 안 된다(test_blind_screen_never_mentions_the_proposal).
+    ("if(s.by_proposed_grade){let gb=document.createElement('div');gb.style.cssText='grid-column:1/-1;border-top:1px solid var(--line);padding:24px 29px 29px';let cap=document.createElement('div');cap.className='cap';cap.textContent='등급별 분포 현황';gb.append(cap);let gr=document.createElement('div');gr.style.cssText='display:grid;grid-template-columns:76px repeat(4,1fr);gap:10px 24px;margin-top:16px;align-items:center;max-width:760px';const GCOLOR={TS:'#c72c40',S1:'#c47a00',S2:'#2563a8',S3:'#1a8a5f'};const hcell=(t,strong)=>{let el=document.createElement('span');el.style.cssText='font-size:12px;color:#8a9299'+(strong?';font-weight:800;color:#5f666c':'');el.textContent=t;return el};gr.append(hcell(''),hcell('특급'),hcell('1급'),hcell('2급'),hcell('3급'));const maxVal=Math.max(1,...['TS','S1','S2','S3'].map(g=>(s.by_proposed_grade||{})[g]||0));const gradeRow=(label,counts)=>{gr.append(hcell(label,true));['TS','S1','S2','S3'].forEach(g=>{let v=(counts||{})[g]||0;let cell=document.createElement('div');let num=document.createElement('b');num.style.cssText='font:800 18px ui-monospace,monospace;letter-spacing:-1px;display:block';num.textContent=v;let bar=document.createElement('div');bar.style.cssText='height:5px;border-radius:2px;margin-top:5px;background:'+GCOLOR[g]+';opacity:.82;width:'+Math.max(v>0?3:0,Math.round(v/maxVal*100))+'%';cell.append(num,bar);gr.append(cell)})};gradeRow('전체',s.by_proposed_grade);gradeRow('미검수',s.by_proposed_grade_unfixed);gradeRow('검수 완료',s.by_final_grade);gb.append(gr);$('kpis').append(gb)}", ''),
+)
+
+
+def _as_blind_reviewer_view(html: str) -> str:
+    html = _strip_assignment_panel(html)     # 보통은 _as_reviewer_view 가 먼저 걷었다 — 이 변환만 따로 불려도 패널이 남지 않게 한 번 더
+    for old, new in _BLIND_VIEW_PATCHES:
+        html = html.replace(old, new, 1)
+    html = html.replace("</head>", _BLIND_VIEW_CSS + "</head>", 1)
+    # 검수자 셸은 _as_reviewer_view 에서 frame 에 클래스를 더한다. 독립 검수 안내도
+    # 그 변형을 인식해야 숨김 상태가 화면에서 분명해진다.
+    reviewer_frame = '<div class="frame reviewer-workspace">'
+    if reviewer_frame in html:
+        return html.replace(reviewer_frame, _BLIND_VIEW_NOTE + reviewer_frame, 1)
+    return html.replace('<div class="frame">', _BLIND_VIEW_NOTE + '<div class="frame">', 1)
+
+
+@html_router.get("/golden/candidates/manage.html", response_class=HTMLResponse)
+def proxy_gold_candidate_manager_html(
+    auth: dict = Depends(require_role("admin", "kl_backend", "reviewer")),
+) -> HTMLResponse:
+    """포털 JWT 세션으로만 여는 관리 화면. URL 토큰·API Key 입력을 사용하지 않는다.
+
+    [2026-09-11] 검수자(reviewer) 역할도 연다. 종전에는 admin·kl_backend 만 받아 검수자에게도 관리자
+    토큰을 줘야 했고, 그 토큰의 쿠키(path=/)가 관리자 콘솔 로그인까지 겸했다 — 설계단계 감리의
+    "골든셋 검증 페이지에서 관리자 콘솔로 접근 가능" 지적의 뿌리다. 검수자에게는 관리자 전용 조작을 감춘다.
+    """
+    _console_actor_id(auth)
+    html = _render_specledger_gold_console_html()
+    html = html.replace("제안 등급 숨김", "다른 검수결정 숨김", 1).replace(
+        "켜면 검수자 화면에서 제안 등급과 다른 검수자의 결정이 보이지 않습니다.",
+        "켜면 다른 검수자의 결정은 숨기고, 최초 생성 등급과 BERT 점수는 참고자료로 표시합니다.",
+        1,
+    )
+    if _is_console_admin(auth):
+        html = html.replace("</head>", _CANDIDATE_SCORE_CARDS_CSS + "</head>", 1)
+        html = html.replace(
+            "</body>",
+            _CANDIDATE_SCORE_CARDS_SCRIPT + _ADMIN_BOUNDARY_FILTER_SCRIPT + "</body>",
+            1,
+        )
+    else:
+        html = _as_reviewer_view(html)
+        if _scope(auth).blind_active:       # 숨김 검수 — 서버가 데이터를 뺀 위에 화면도 맞춘다
+            html = _as_blind_reviewer_view(html)
+    return HTMLResponse(content=html)
+
+
+
+
+@html_router.get("/golden/jobs/{job_id}/review.html", response_class=HTMLResponse)
+def golden_job_review_html(
+    request: Request, job_id: UUID, t: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    koipa_access_token: str | None = Cookie(default=None),
+) -> HTMLResponse:
+    """빌드 잡의 후보를 지재원 관리자 검수용 인터랙티브 HTML로 반환(브라우저 직접 접속)."""
+    _job_html_guard(request, authorization, x_api_key, koipa_access_token)   # [2026-09-21] 손잡이 켜졌을 때만
+    # [#14a] 비밀키 설정 시 서명 URL 토큰(?t=)을 강제 — 무인증 full-text 노출 차단.
+    if not _verify_html_token(job_id, t):
+        raise HTTPException(status_code=403, detail="invalid or missing signed-URL token (?t=)")
+    gate = _job_gate_html(job_id)
+    if gate is not None:
+        return gate
+    # [통합 2026-08-18] 검토본과 서명은 **같은 화면**이다. 같은 job 의 같은 후보를 보는데
+    # 화면이 둘이라 검수자가 같은 목록을 두 번 봤다.
+    # ⚠ 이 주소는 없앨 수 없다 — 감리정본 화면설계서 UI-04 이고 build_offline_bundle·
+    #   demo_e2e_golden·register_review_signoff_job·OPERATION.md·사용설명서가 참조한다.
+    #   주소는 남기고 같은 화면을 준다.
+    html = GoldenBuildService().render_signoff(job_id, title="골든셋 검수 · 서명")
+    if html is None:
+        raise HTTPException(status_code=404, detail="golden build review not found (후보 없음)")
+    return HTMLResponse(content=html)
+
+
+@html_router.get("/golden/jobs/{job_id}/signoff.html", response_class=HTMLResponse)
+def golden_job_signoff_html(
+    request: Request, job_id: UUID, t: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+    koipa_access_token: str | None = Cookie(default=None),
+) -> HTMLResponse:
+    """빌드 잡의 gold 후보를 화면 서명용 인터랙티브 HTML로 반환(골든셋 검수·브라우저 직접 접속).
+
+    승인/등급변경/거부 폼 + 제출 버튼이 붙어 있고, 제출 시 POST /golden/jobs/{id}/signoff 로
+    서명을 보낸다(그 POST 는 require_role 로 보호).
+
+    ⚠ review.html 은 **이 화면과 같은 것**이다(2026-08-18 통합). 종전 이 자리에 "review.html
+      (보기 전용)과 달리" 라고 적혀 있었는데, 통합 뒤에도 남아 틀린 서술이 됐다 —
+      test_review_signoff_cross_link.test_both_urls_serve_the_same_screen 이 같음을 잠근다.
+    """
+    _job_html_guard(request, authorization, x_api_key, koipa_access_token)   # [2026-09-21] 손잡이 켜졌을 때만
+    # [#14a] 비밀키 설정 시 서명 URL 토큰(?t=)을 강제 — 무인증 full-text 노출 차단.
+    if not _verify_html_token(job_id, t):
+        raise HTTPException(status_code=403, detail="invalid or missing signed-URL token (?t=)")
+    gate = _job_gate_html(job_id)
+    if gate is not None:
+        return gate
+    html = GoldenBuildService().render_signoff(job_id)
+    if html is None:
+        raise HTTPException(status_code=404, detail="golden build signoff view not found (gold 후보 없음)")
+    return HTMLResponse(content=html)
+
+
+@router.get(
+    "/golden/jobs/{job_id}/signoff/preflight",
+    response_model=GoldenSignoffPreflightResponse,
+    summary="서명 전 점검 — 무엇이 막을지 미리 알려준다",
+)
+def golden_job_signoff_preflight(
+    job_id: UUID,
+    publish: bool = Query(default=False),
+    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
+) -> GoldenSignoffPreflightResponse:
+    """부작용 0. 서명하려는 사람이 그대로 부를 수 있어야 하므로 권한은 POST signoff 와 같다.
+
+    [신원] 검사 대상은 '화면에 미리 채워진 이름' 이 아니라 **실제로 서명할 사람**이다 —
+    2026-08-17 부터 신원은 로그인 쿠키(JWT sub)에서만 온다. 공유 API Key 로 부르면 개별
+    신원이 없어 빈 값이 되고, 그때는 신원 검사를 건너뛴다(POST 시점에 걸린다).
+    """
+    _deny_restricted_on_jobs(auth)
+    reviewer_id, _overridden = resolve_actor_user_id("", auth)
+    out = GoldenBuildService().signoff_preflight(
+        job_id, reviewer_id=reviewer_id or "", publish=publish
+    )
+    if out is None:
+        raise HTTPException(status_code=404, detail="golden build job not found")
+    return GoldenSignoffPreflightResponse(**out)
+
+
+@router.post(
+    "/golden/jobs/{job_id}/signoff",
+    response_model=GoldenSignoffResponse,
+)
+def golden_job_signoff(
+    job_id: UUID,
+    req: GoldenSignoffRequest,
+    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
+) -> GoldenSignoffResponse:
+    """검수 결정(승인/등급변경/거부)을 골든 후보에 적용해 locked_gold_eval 로 승격(골든셋 검수 서명).
+
+    [신원 무결성] reviewer_id 는 인증 신원(jwt sub 우선)으로 확정한다 — 클라 자칭 위조 차단
+    (/confirm 과 동일한 resolve_actor_user_id). 머신/플레이스홀더 reviewer 는 is_human_reviewer
+    로 사전 거부(promote_to_locked 도 재차 거부하나 명시적 403 로 UX 개선). 정본 미변경, 라이브
+    readiness 반영은 publish=True 일 때만(기본 미리보기).
+    """
+    _deny_restricted_on_jobs(auth)
+    reviewer_id, overridden = resolve_actor_user_id(req.actor.user_id, auth)
+    # 사유를 함께 준다 — 거부 조건이 다섯 갈래인데 뒤 둘은 이름이 아니라 **설정** 때문에
+    # 막히는 것이라, 이유가 없으면 이름만 계속 바꿔 보게 된다.
+    reject = human_reviewer_rejection_reason(reviewer_id)
+    if reject:
+        raise HTTPException(
+            status_code=403,
+            detail=f"reviewer_id는 실계정이어야 합니다: {reject}",
+        )
+    # 저장 실패만 사유를 그대로 내려보낸다. 전역 핸들러(app.py)는 J2 정책대로 상세를 지우고
+    # "internal server error" 만 주는데, 이 실패는 화면 앞에 있는 사람이 바로 고칠 수 있는
+    # 종류(폴더 권한·경로 없음)라 원인을 감추면 request_id 를 들고 서버 로그를 찾아가야 한다.
+    # 실측 2026-08-23(223): 후보 폴더가 호스트 계정 소유라 컨테이너가 못 써서 500 이 났고,
+    # 검수자 화면에는 KOIPA_INTERNAL 만 떴다.
+    try:
+        result = GoldenBuildService().apply_signoff(
+            job_id,
+            req.decisions,
+            reviewer_id=reviewer_id,
+            publish=req.publish,
+            dry_run=req.dry_run,
+        )
+    except GoldenSignoffStorageError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(
+            status_code=404, detail="golden build job not found (or no gold candidates)"
+        )
+    return GoldenSignoffResponse(
+        locked=result["locked"],
+        rejected=result["rejected"],
+        locked_by_grade=result["locked_by_grade"],
+        rejected_reasons=result["rejected_reasons"],
+        readiness=result["readiness"],
+        published=result["published"],
+        reviewer_id=reviewer_id,
+        overridden=overridden,
+        publish_note=result.get("publish_note"),
+        dry_run=bool(result.get("dry_run")),
+    )

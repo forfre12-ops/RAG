@@ -1,0 +1,29 @@
+{
+  "synth_id": "ebb5925f-b7c0-47b1-aa11-9ac805096901",
+  "target_grade": "S1",
+  "domain": "tech",
+  "title": "S1 등급 [가상기업A]의 핵심 기술 연구노트",
+  "body": "본 문서는 1급 비밀로 분류된 [가상기업A]의 공정 노하우와 원가 구조 분석 자료입니다. 고객 데이터베이스 연동 방식 및 마케팅 전략 관련 연구 결과가 담겨 있으며, 영업비밀 보호를 위해 접근 권한이 제한됩니다. R&D 팀의 알고리즘 최적화 과정에서 수집된 핵심 데이터 포함.",
+  "document_type": "연구노트",
+  "dept_hint": "R&D",
+  "rationale_tags": [
+    "1급 비밀",
+    "영업비밀",
+    "공정 노하우",
+    "원가 구조",
+    "고객 데이터베이스",
+    "마케팅 전략"
+  ],
+  "llm_provider": "ollama",
+  "pii_violations": [],
+  "parse_error": null,
+  "generated_at": 1780237483,
+  "usage": {
+    "input_tokens": 340,
+    "output_tokens": 609,
+    "cost_usd": 0.0,
+    "latency_ms": 31441
+  },
+  "predicted_grade": "S1",
+  "label_match": true
+}

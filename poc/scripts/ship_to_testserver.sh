@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# ============================================================================
+# ship_to_testserver.sh — 소스+모델을 한 패키지로 묶어 테스트서버로 보내고 설치까지 한 방
+# ----------------------------------------------------------------------------
+# Windows Git Bash 에서 이 한 줄이면 끝: 패키징 → 전송 → 서버 설치(지재원+고객사 이중배포).
+#   bash poc/scripts/ship_to_testserver.sh
+#
+# 대상 서버 기본값 = 현재 kip-ai 테스트서버. 바꾸려면 환경변수로:
+#   TS_HOST=1.2.3.4 TS_PORT=22 TS_USER=aisadm bash poc/scripts/ship_to_testserver.sh
+# 모드:
+#   PACKAGE_ONLY=1 …  패키지만 생성(전송·설치 안 함)
+#   SHIP_ONLY=1    …  전송까지만(서버 설치는 직접)
+# 비밀번호는 scp/ssh 프롬프트에 입력(명령·파일에 안 박음).
+# ============================================================================
+set -euo pipefail
+
+TS_HOST="${TS_HOST:-182.212.163.182}"
+TS_PORT="${TS_PORT:-56320}"
+TS_USER="${TS_USER:-aisadm}"
+PKG="koipa-testserver.tar.gz"        # 소스 + 배포 모델 (서버 설치용)
+SRC_PKG="koipa-poc-src.tar.gz"       # 소스만 (모델 제외 — 소스 검토·감리 제출용)
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+MODEL="poc/artifacts/classifier_p1_v5_clean/v-fe4b386b"   # 배포본 v5 (2026-07-29 3축 PASS). 롤백=v4_clean/v-dd3abab9
+
+b(){ printf '\033[1m%s\033[0m\n' "$*"; }
+[ -f "$MODEL/model.safetensors" ] || { echo "✗ 모델 없음: $ROOT/$MODEL" >&2; exit 1; }
+
+# ── 1) 패키지 생성 (추적 소스 + 모델) ───────────────────────────────────────
+b "[1/3] 패키지 생성 (소스 + 모델)…"
+rm -rf .ship && mkdir -p ".ship/poc"
+# 추적 소스(=커밋본)만. artifacts/ 는 gitignore 라 애초에 안 들어오고, datasets/ 는 들어온다
+# (인수팩·골든셋이 서버에서 필요) → 아래에서 반출 부적합분만 외과적으로 제거한다.
+git archive --format=tar HEAD:poc | tar -x -C ".ship/poc"
+# git archive 는 커밋본만 담는다 → 미커밋 배포 파일은 working tree 에서 보강(누락 방지).
+for f in scripts/deploy_testserver_dual.sh docker-compose.dual.yml scripts/deploy_cloud.sh scripts/deploy_airgap.sh; do
+  [ -f "poc/$f" ] && { mkdir -p ".ship/poc/$(dirname "$f")"; cp -f "poc/$f" ".ship/poc/$f"; }
+done
+# [배포감사] 판례 프록시 원자료는 런타임 미참조(src/ 참조 0)이고 행 단위 출처가 없다
+# → 반출본에서 제외. 출처 기록은 datasets/trade_secret_cases/SOURCE.yaml(리포에 존치).
+rm -rf ".ship/poc/datasets/trade_secret_cases"
+
+# 소스 전용 패키지 — 모델을 얹기 '전'에 만든다. 두 tar 가 같은 스테이징에서 나오므로
+# 소스 내용이 구조적으로 동일하다(과거 두 tar 가 서로·현재 소스와 어긋나던 사고 재발 방지).
+tar czf "$SRC_PKG" -C .ship poc
+b "      → $SRC_PKG ($(du -h "$SRC_PKG" | cut -f1)) · 소스 전용"
+
+mkdir -p ".ship/poc/artifacts/classifier_p1_v5_clean"
+cp -r "$MODEL" ".ship/poc/artifacts/classifier_p1_v5_clean/"   # 모델만 얹기
+tar czf "$PKG" -C .ship poc
+# [#3] 패키징 정합성 게이트 — run 커맨드(deploy_testserver_dual.sh)가 요구하는 파일이 실제
+# tar 에 들어갔는지 전송 전에 확인. 과거 stale tar(피처 커밋 이전 빌드)가 이 두 파일 없이
+# 실려 서버에서 'No such file' 로 죽던 사고 재발 방지 — 누락이면 fail-fast(전송 안 함).
+_need=("poc/scripts/deploy_testserver_dual.sh" "poc/docker-compose.dual.yml")
+_manifest="$(tar tzf "$PKG")"
+_missing=()
+for _f in "${_need[@]}"; do
+  printf '%s\n' "$_manifest" | grep -qx "$_f" || _missing+=("$_f")
+done
+rm -rf .ship
+if [ "${#_missing[@]}" -gt 0 ]; then
+  echo "✗ 패키지 무결성 실패 — tar 에 필수 배포 파일 누락(서버 설치가 반드시 실패):" >&2
+  printf '   - %s\n' "${_missing[@]}" >&2
+  echo "   git ls-files 로 HEAD 포함 여부 / working tree 존재를 확인 후 재실행하세요." >&2
+  exit 1
+fi
+# [배포감사] 모델 세대 게이트 — tar 에 실린 모델이 $MODEL(배포본)과 일치하는지 확인.
+# 과거 stale tar 가 v4(v-dd3abab9)를 싣고 설정만 v5 를 가리켜 아카이브↔설정이 어긋났다.
+_model_leaf="$(basename "$MODEL")"
+printf '%s\n' "$_manifest" | grep -q "artifacts/.*/$_model_leaf/model.safetensors" || {
+  echo "✗ 패키지 무결성 실패 — tar 의 모델이 배포본($_model_leaf)과 불일치." >&2
+  printf '%s\n' "$_manifest" | grep "artifacts/.*/model.safetensors" >&2 || echo "   (모델 없음)" >&2
+  exit 1
+}
+_stale_model="$(printf '%s\n' "$_manifest" | grep "artifacts/.*/model.safetensors" | grep -cv "/$_model_leaf/" || true)"
+[ "$_stale_model" -eq 0 ] || { echo "✗ 패키지에 배포본 외 모델이 섞였다($_stale_model건)." >&2; exit 1; }
+# [배포감사] 반출 부적합 데이터 미포함 확인.
+printf '%s\n' "$_manifest" | grep -q "datasets/trade_secret_cases" && {
+  echo "✗ 패키지 무결성 실패 — 판례 프록시 원자료가 반출본에 포함됐다." >&2; exit 1
+} || true
+b "      → $PKG ($(du -h "$PKG" | cut -f1))"
+[ "${PACKAGE_ONLY:-0}" = "1" ] && { echo "패키지만 생성 완료: $ROOT/$PKG"; exit 0; }
+
+# ── 2) 전송 ─────────────────────────────────────────────────────────────────
+b "[2/3] 전송 → $TS_USER@$TS_HOST:$TS_PORT  (서버 비밀번호 입력)…"
+scp -P "$TS_PORT" "$PKG" "$TS_USER@$TS_HOST:~/"
+if [ "${SHIP_ONLY:-0}" = "1" ]; then
+  echo; b "전송 완료. 이제 서버 터미널에서 아래 한 줄:"
+  echo "  tar xzf ~/$PKG -C ~ && cd ~/poc && bash scripts/deploy_testserver_dual.sh"
+  exit 0
+fi
+
+# ── 3) 원격 설치 (서버에서 압축해제 + 이중배포) ─────────────────────────────
+b "[3/3] 서버에서 설치 시작 (비밀번호 한 번 더 · 10~20분 · 창을 닫지 마세요)…"
+ssh -p "$TS_PORT" "$TS_USER@$TS_HOST" "tar xzf ~/$PKG -C ~ && cd ~/poc && bash scripts/deploy_testserver_dual.sh"
+
+echo; b "✓ 완료 — 지재원 :8000 · 고객사 :8001"
+echo "원격 접속(터널): ssh -p $TS_PORT -L 8000:127.0.0.1:8000 -L 8001:127.0.0.1:8001 $TS_USER@$TS_HOST"
+echo "그 뒤 브라우저: http://localhost:8000  ·  http://localhost:8001"

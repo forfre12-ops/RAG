@@ -1,0 +1,17 @@
+{
+  "artifact_type": "curated_master_comparison_document",
+  "scenario_id": "process-optimization-ts-s2-v2-m2",
+  "instance_profile_id": "alpha",
+  "intended_label": "TS",
+  "document_origin": "synthetic",
+  "authoring_method": "codex_curated_from_catalog_fact_card",
+  "claim_scope": "quality-comparison fixture only; not human-reviewed gold and not customer-real evidence",
+  "fact_sources": [
+    "scenario_catalog.v1.json: shared_context",
+    "scenario_catalog.v1.json: evidence_card",
+    "scenario_catalog.v1.json: disclosure_scope",
+    "scenario_catalog.v1.json: harm_potential",
+    "proxy-fact-ledger-v2"
+  ],
+  "requires_manual_audit": true
+}

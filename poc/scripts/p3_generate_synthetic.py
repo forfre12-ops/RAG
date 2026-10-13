@@ -23,11 +23,11 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.adapters.llm import build_provider  # noqa: E402
-from lloydk.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator  # noqa: E402
-from lloydk.modules.m3_labeling import LabelingPipeline  # noqa: E402
-from lloydk.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: E402
-from lloydk.services.llm_usage_service import LLMUsageService  # noqa: E402
+from koipa.adapters.llm import build_provider  # noqa: E402
+from koipa.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator  # noqa: E402
+from koipa.modules.m3_labeling import LabelingPipeline  # noqa: E402
+from koipa.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: E402
+from koipa.services.llm_usage_service import LLMUsageService  # noqa: E402
 
 GRADES = ["TS", "S1", "S2", "S3"]
 DOMAINS = ["tech", "business", "finance", "hr", "legal", "mixed"]

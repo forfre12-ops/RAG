@@ -1,0 +1,45 @@
+{
+  "n_docs": 43,
+  "class_counts": {
+    "S2": 17,
+    "TS": 3,
+    "S1": 11,
+    "S3": 12
+  },
+  "majority_baseline": 0.3953488372093023,
+  "ngram_classifier": {
+    "real_accuracy_mean": 0.5325581395348837,
+    "real_accuracy_std": 0.05280998862093365,
+    "permutation_mean": 0.31883720930232556,
+    "permutation_std": 0.0832217027691104,
+    "permutation_max": 0.5348837209302325,
+    "percentile_rank_of_real": 0.9866666666666667
+  },
+  "length_only_classifier": {
+    "real_accuracy_mean": 0.33178294573643424,
+    "permutation_mean": 0.24023255813953484,
+    "permutation_max": 0.46511627906976744,
+    "percentile_rank_of_real": 0.9133333333333333
+  },
+  "alias_by_grade": {
+    "S2": {
+      "PS-330": 4,
+      "PS-220": 1
+    },
+    "TS": {
+      "PS-330": 3
+    },
+    "S1": {
+      "PS-220": 4,
+      "PS-330": 5
+    },
+    "S3": {
+      "PS-220": 1,
+      "PS-330": 3
+    }
+  },
+  "n_splits": 3,
+  "n_repeats_real": 30,
+  "n_permutations": 300,
+  "caveat": "표본 43건(등급당 3~17건)으로 검정력이 낮다. 순열분포 최대값 근처거나 그 이상이면 지름길 의심 — 백분위만으로 '안전하다'를 단정하지 말고 아래 방향을 함께 읽을 것."
+}

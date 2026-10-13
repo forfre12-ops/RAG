@@ -1,0 +1,29 @@
+{
+  "synth_id": "3929a0a4-f053-475e-a6f4-600d615efb39",
+  "target_grade": "S3",
+  "domain": "tech",
+  "title": "S3 등급 연구노트: 외부 공지 및 보도자료 활용 방안",
+  "body": "본 연구노트는 [가상기업A]의 기술 개발 방향성을 담은 자료로, 외부 공지 및 보도자료 작성 시 참고할 수 있는 템플릿을 제시합니다. 채용 공고와 회사 소개 내용은 공시 자료와 연계하여 일관된 메시지를 전달해야 하며, 이용약관은 법적 검토 후 공개 여부를 결정해야 합니다. 기술 설계 시 외부 공지와 보도자료 간 정보 유출 방지를 위한 분류 가이드를 적용해야 합니다.",
+  "document_type": "연구노트",
+  "dept_hint": "PR 및 마케팅 부서",
+  "rationale_tags": [
+    "보도자료",
+    "공시",
+    "채용 공고",
+    "회사 소개",
+    "이용약관",
+    "외부 공지"
+  ],
+  "llm_provider": "ollama",
+  "pii_violations": [],
+  "parse_error": null,
+  "generated_at": 1780237544,
+  "usage": {
+    "input_tokens": 336,
+    "output_tokens": 588,
+    "cost_usd": 0.0,
+    "latency_ms": 30225
+  },
+  "predicted_grade": "S3",
+  "label_match": true
+}

@@ -1,8 +1,8 @@
-"""lloydk.hygiene 위생 유틸 단위 테스트 — 정규화·텍스트해시·누출탐지·홀드아웃 분리.
+"""koipa.hygiene 위생 유틸 단위 테스트 — 정규화·텍스트해시·누출탐지·홀드아웃 분리.
 
 정본 정규화 표준(공백 전부 제거 + 대소문자 보존)과 build_p1 분리 알고리즘의 동작을 고정한다.
 """
-from lloydk.hygiene import (
+from koipa.hygiene import (
     find_leaked,
     normalize_text,
     stratified_holdout_split,
@@ -49,7 +49,8 @@ def test_stratified_holdout_split_is_deterministic_and_no_straddle():
     ] + [
         {"text": f"S3 문서 {i}", "label_source": "llm", "label": "S3"} for i in range(10)
     ]
-    sk = lambda r: (r["label_source"], r["label"])
+    def sk(r):
+        return (r["label_source"], r["label"])
     h1 = stratified_holdout_split(rows, frac=0.3, strata_key=sk)
     h2 = stratified_holdout_split(rows, frac=0.3, strata_key=sk)
     assert h1 == h2                      # 결정론적

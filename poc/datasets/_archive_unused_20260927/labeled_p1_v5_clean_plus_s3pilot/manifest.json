@@ -1,0 +1,52 @@
+{
+  "purpose": "v5_clean(현재 배포본 v-fe4b386b의 학습셋) + synth_public_with_numbers_s3_pilot 28건 = golden100 S3 재현율 개선 후보(v5_clean 자체는 변경 없음, 증분만 추가).",
+  "built_from": {
+    "labeled_p1_v5_clean": {
+      "dir": "datasets/labeled_p1_v5_clean",
+      "rows": 2042,
+      "note": "train.jsonl 그대로(무수정) — 현재 배포본의 실제 학습 데이터"
+    },
+    "synth_public_with_numbers_s3_pilot": {
+      "dir": "datasets/synth_public_with_numbers_s3_pilot",
+      "file": "pilot_v2_28docs.jsonl",
+      "rows": 28,
+      "note": "golden100 S3 오분류(공개문서+구체적 수치) 대응 합성 파일럿, 근접중복 0.95문턱 28/28 유효"
+    }
+  },
+  "val_test": {
+    "note": "val.jsonl·test.jsonl은 labeled_p1_v5_clean 것을 무수정 재사용(파일럿 추가분은 train에만 넣음)",
+    "val_rows": 256,
+    "test_rows": 256
+  },
+  "final": {
+    "train_rows": 2070,
+    "grade_distribution_added": {
+      "S3": 28
+    }
+  },
+  "trained_candidates": {
+    "seed42": {
+      "path": "reports/pilot_public_s3_experiment/model_seed42/v-9567c863",
+      "own_test_split": {
+        "accuracy": 0.9609375,
+        "f1_macro": 0.9603608705625968,
+        "fnr_by_grade": {"TS": 0.12, "S1": 0.0, "S2": 0.06896551724137931, "S3": 0.0}
+      },
+      "golden100": {"overall": 0.72, "S3": 0.72, "TS": 0.84, "S1": 0.52, "S2": 0.80},
+      "other_faces_vs_baseline": "hardened42/clean42/holdout109 오차범위 내 동일(부작용 없음)"
+    },
+    "seed43": {
+      "path": "reports/pilot_public_s3_experiment/model_seed43/v-9bcbf05d",
+      "golden100": {"overall": 0.72, "S3": 0.56, "TS": 0.92, "S1": 0.44, "S2": 0.96},
+      "other_faces_vs_baseline": "hardened42/clean42/holdout109 오차범위 내 동일(부작용 없음)"
+    }
+  },
+  "baseline_for_comparison": {
+    "model": "artifacts/classifier_p1_v5_clean/v-fe4b386b",
+    "golden100": {"overall": 0.61, "S3": 0.16, "TS": 0.76, "S1": 0.56, "S2": 0.96}
+  },
+  "status": "⛔⛔REJECTED (2026-09-20) — 배포 취소. golden100을 재구성(등급당 25→50건, datasets/gold/golden100_labeled_v3.jsonl)해 재평가하니 S1 재현율이 두 시드 다 80.0%→28~40.0%로 붕괴(S1의 절반이 S3로 직행 오분류)함이 드러났다. 위 golden100 수치(overall/S3/TS/S1/S2)는 전부 얇은 구 v2(등급당25건) 기준이라 이 결함을 놓쳤던 것 — v2 수치만 보고 배포 판단하지 말 것.",
+  "known_tradeoff": "golden100 S1 재현율이 56.0%→44~52.0%로 소폭 하락(두 시드 다, v2 기준). 84건 확장으로 이 하락을 메우려 시도했으나 TS 재현율이 배포본보다 나빠지는 더 큰 부작용이 발견돼 기각됨. 이후 v3 재평가로 훨씬 심각한 S1 붕괴(80%→28~40%)가 드러나 이 모델 자체를 폐기함 — 상세: datasets/synth_public_with_numbers_s3_pilot/README.md, 메모리 pilot-public-s3-success-plus-expansion-failed-2026-09-19, golden100-v3-rebuild-2026-09-20",
+  "generated": "2026-09-20",
+  "generated_by": "Claude Sonnet 5, 세션 b4af2725-ee90-4704-b834-0138a41218a5 연속"
+}

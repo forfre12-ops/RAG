@@ -1,0 +1,20 @@
+{"doc_id": "MD-0043", "reasons": ["판정자 이견"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-0246", "reasons": ["판정자 이견"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-0319", "reasons": ["길이 이탈"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-0414", "reasons": ["판정자 이견", "길이 이탈", "haiku 작성"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-0416", "reasons": ["판정자 이견"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-0486", "reasons": ["판정자 이견", "haiku 작성"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-0723", "reasons": ["haiku 작성"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-0881", "reasons": ["판정자 이견"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-0920", "reasons": ["판정자 이견"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-1059", "reasons": ["haiku 작성"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-1065", "reasons": ["판정자 이견"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-1179", "reasons": ["길이 이탈", "haiku 작성"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-1316", "reasons": ["판정자 이견"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-1331", "reasons": ["판정자 이견"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-1339", "reasons": ["판정자 이견"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-1341", "reasons": ["haiku 작성"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-1359", "reasons": ["판정자 이견"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-1412", "reasons": ["길이 이탈", "haiku 작성"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-1564", "reasons": ["판정자 이견", "haiku 작성"], "tool": "audit_golden_candidate_pool.py"}
+{"doc_id": "MD-1614", "reasons": ["판정자 이견"], "tool": "audit_golden_candidate_pool.py"}

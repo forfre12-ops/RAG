@@ -1,0 +1,40 @@
+{
+ "built_at": "2026-09-12",
+ "generator_commit_note": "aa8c8222 이후 판(등급 사이 겹치는 문구·문서종류) + 05a2728a(조사)",
+ "batches": [
+  7,
+  8,
+  9
+ ],
+ "per_grade": 100,
+ "bins": 10,
+ "seed": 20260912,
+ "sha256_eval_jsonl": "ec6206361c7261841cad6fce3dba635eb01af33eefc6f4375068842f2fabd769",
+ "label_source": "generator_intended_label",
+ "human_confirmed_count": 0,
+ "use": "모델 A/B 비교 전용. 정확도·실문서 일반화 근거로 쓰지 말 것.",
+ "shortcut_audit": {
+  "n": 400,
+  "by_grade": {
+   "TS": 100,
+   "S1": 100,
+   "S2": 100,
+   "S3": 100
+  },
+  "baseline_rate": 25.0,
+  "length": {
+   "median_chars": {
+    "TS": 2159,
+    "S1": 2159,
+    "S2": 2158,
+    "S3": 2158
+   },
+   "median_ratio": 1.0,
+   "length_only_rate": 26.5,
+   "leak_pp": 1.5
+  },
+  "phrase_single_clue_rate": 39.8,
+  "document_type_rate": 40.8,
+  "document_type_categories": 20
+ }
+}

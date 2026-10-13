@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lloydk.perf.kpis import KPIS, modules_for_kpi, modules_for_scenario
+from koipa.perf.kpis import KPIS, modules_for_kpi, modules_for_scenario
 
 # poc 루트 = 이 파일(tests/)의 부모.
 _POC_ROOT = Path(__file__).resolve().parents[1]

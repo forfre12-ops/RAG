@@ -13,9 +13,9 @@ import pytest
 pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-from lloydk.api.rate_limit import limiter
-from lloydk.config import settings
+from koipa.api.app import app
+from koipa.api.rate_limit import limiter
+from koipa.config import settings
 
 
 HDR = {"X-API-Key": settings.api_key}
@@ -44,7 +44,6 @@ def _classify_payload(doc_id: str = "rl-test") -> dict:
     return {
         "doc_id": doc_id,
         "content": "특급기밀 차세대 제품 설계도",
-        "use_rag": False,
     }
 
 
@@ -75,7 +74,7 @@ def test_rate_limit_exceeds_returns_429(enable_limiter):
         assert last_status == 429, f"expected 429 within 11 calls, last={last_status}"
         assert "retry-after" in {k.lower() for k in r.headers}
         body = r.json()
-        assert body["code"] == "LLOYDK_RATE_LIMIT"
+        assert body["code"] == "KOIPA_RATE_LIMIT"
         assert body["retry_after_sec"] >= 0
 
 
@@ -93,12 +92,13 @@ def test_rate_limit_disabled_env_bypasses(monkeypatch):
             "actor": {"user_id": "rl-bypass", "role": "admin"},
         }
         with TestClient(app) as cli:
-            # 한도(10)보다 많은 12건 호출 — 비활성이므로 모두 202
+        # 한도(10)보다 많은 12건 호출 — limiter가 비활성이면 실제 생성 준비 오류(503)가
+        # 그대로 보이고, 429로 바뀌면 안 된다.
             statuses = []
             for _ in range(12):
                 r = cli.post("/api/v1/synth/generate", headers=HDR, json=payload)
                 statuses.append(r.status_code)
-            assert all(s == 202 for s in statuses), f"unexpected statuses: {statuses}"
+            assert all(s == 503 for s in statuses), f"unexpected statuses: {statuses}"
     finally:
         limiter.enabled = prev_enabled
         limiter.reset()
