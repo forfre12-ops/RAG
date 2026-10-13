@@ -478,7 +478,11 @@ class AsyncClassifyService:
 
     @staticmethod
     def _strip_async_fields(req: ClassifyAsyncRequest) -> ClassifyRequest:
-        """ClassifyAsyncRequest → ClassifyRequest (callback_url 등 제거)."""
-        return ClassifyRequest.model_validate(
-            req.model_dump(exclude={"callback_url", "client_request_id"})
-        )
+        """ClassifyAsyncRequest → ClassifyRequest (callback_url 제거).
+
+        [2026-10-13 정정] client_request_id 는 더 이상 떼지 않는다 — ClassifyRequest 가 이제
+        이 필드를 직접 갖고(classify.py), classify_service.classify() 가 결과(ClassifyOutcome)에
+        그대로 승계한다. 예전엔 여기서 떼어내 job 레벨(ClassifyJobStatus.client_request_id)에만
+        남기고 결과 건별 필드에는 못 실었다.
+        """
+        return ClassifyRequest.model_validate(req.model_dump(exclude={"callback_url"}))

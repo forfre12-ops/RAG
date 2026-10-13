@@ -189,3 +189,53 @@ class TestDocumentsBatchUpload:
                 "classification was not queued" in w
                 for it in j["results"] for w in it["warnings"]
             )
+
+    def test_enqueue_classification_batch_job_results_carry_client_request_id(self, client):
+        """[2026-10-13 결함 수정, KL 리포트] 배치 업로드 응답에는 파일별 client_request_id 가
+        정상 반영됐지만, 분류 작업 결과 조회(GET /classify/jobs/{job_id})에서는 null 로
+        돌아왔다 — 업로드 응답이 아니라 분류 작업 결과 쪽을 확인한다(업로드 응답은
+        test_client_request_ids_matched_by_order 가 이미 커버).
+
+        TESTING 환경은 브로커가 없어 in-process 로 즉시 처리되므로(submit_batch), 업로드
+        응답이 돌아온 시점에 이미 작업이 done 상태다 — 폴링 불필요.
+        """
+        items = [
+            ("a.txt", "핵심 공정 레시피 ALD 증착 조건 대외비".encode("utf-8")),
+            ("b.txt", "일반 공개 보도자료 내용".encode("utf-8")),
+        ]
+        r = client.post(
+            "/api/v1/documents/batch",
+            headers=_hdr(),
+            data={
+                "actor": _actor(),
+                "enqueue_classification": "true",
+                "client_request_ids": ["req-a", "req-b"],
+            },
+            files=_files(items),
+        )
+        assert r.status_code == 201, r.text
+        j = r.json()
+        # 업로드 응답 레벨은 기존에도 정상이었다 — 여기서도 재확인.
+        assert j["results"][0]["client_request_id"] == "req-a"
+        assert j["results"][1]["client_request_id"] == "req-b"
+
+        if j["classification_job_id"] is None:
+            pytest.skip("DB 미가용 — 이 환경에서는 분류 작업이 아예 안 걸린다")
+
+        job = client.get(
+            f"/api/v1/classify/jobs/{j['classification_job_id']}", headers=_hdr(),
+        )
+        assert job.status_code == 200, job.text
+        jr = job.json()
+        assert jr["results"] is not None and len(jr["results"]) == 2
+        by_doc_id = {
+            it["doc_id"]: it["client_request_id"]
+            for it, up in zip(jr["results"], j["results"])
+            if up["doc_id"] is not None
+        }
+        # 업로드 응답의 client_request_id 와 1:1로 맞아야 한다(doc_id 로 교차 확인).
+        upload_crid_by_doc_id = {
+            up["doc_id"]: up["client_request_id"] for up in j["results"] if up["doc_id"] is not None
+        }
+        assert by_doc_id == upload_crid_by_doc_id
+        assert set(upload_crid_by_doc_id.values()) == {"req-a", "req-b"}

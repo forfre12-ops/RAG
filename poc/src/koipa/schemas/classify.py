@@ -42,6 +42,11 @@ class DocumentInput(BaseModel):
 
 class ClassifyRequest(DocumentInput):
     return_evidence: bool = True
+    # [2026-10-13] 호출자가 요청↔결과 매칭에 쓰는 임의 문자열(doc_id 는 내용 해시로 dedupe
+    # 되고 job_id 는 응답을 받은 뒤에야 알 수 있어 둘 다 매칭 키가 못 된다). 서버는 저장·
+    # ClassifyOutcome.client_request_id 로 반환만 하고 의미를 해석하지 않는다. 단건(ClassifyAsyncRequest)·
+    # 배치(ClassifyBatchRequest.documents) 공용.
+    client_request_id: Optional[str] = None
 
 
 class EvidenceSpan(BaseModel):
@@ -185,6 +190,11 @@ class ClassifyOutcome(BaseModel):
     model_version: str
     status: str = "staging"
     warnings: list[str] = []
+    # [2026-10-13] 호출자가 요청에 실어 보낸 값을 그대로 돌려준다(KL 결함 리포트 수정 —
+    # 배치 경로에서는 지금까지 이 필드 자체가 없어 결과에 못 실렸다). 서버는 저장·반환만
+    # 하고 의미를 해석하지 않는다. 단건·배치 공용 — ClassifyRequest.client_request_id 를
+    # classify_service.classify() 가 그대로 승계한다.
+    client_request_id: Optional[str] = None
     # [투명성/시연] 하이브리드 서빙의 각 엔진 원시 판정 — 룰·모델·최종을 대조 표시.
     #   rule_grade: 룰 엔진(시드 키워드 S×V×M) 단독 판정.
     #   model_grade: 학습 분류기(BERT) 단독 판정(override/cap/floor 이전). 모델 미로드 시 None.

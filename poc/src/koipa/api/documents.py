@@ -381,7 +381,9 @@ async def upload_documents_batch(
             )
 
     results: list[DocumentUploadResponse] = []
-    classify_targets: list[str] = []
+    # [2026-10-13] (doc_id, client_request_id) 쌍 — 예전엔 doc_id 만 모아서 분류 작업을
+    # 만들 때 파일별 client_request_id 가 유실됐다(KL 결함 리포트).
+    classify_targets: list[tuple[str, Optional[str]]] = []
     for i, (file, body) in enumerate(zip(files, file_bodies, strict=True)):
         crid = client_request_ids[i] if client_request_ids is not None else None
         filename = file.filename or "unknown"
@@ -415,7 +417,7 @@ async def upload_documents_batch(
         )
         results.append(resp)
         if resp.persisted and resp.doc_id is not None and resp.char_count > 0:
-            classify_targets.append(resp.doc_id)
+            classify_targets.append((resp.doc_id, crid))
 
     classification_job_id: Optional[str] = None
     classification_status: Optional[str] = None
@@ -434,7 +436,10 @@ async def upload_documents_batch(
 
                 job = AsyncClassifyService().submit_batch(
                     ClassifyBatchRequest(
-                        documents=[ClassifyRequest(doc_id=d) for d in classify_targets],
+                        documents=[
+                            ClassifyRequest(doc_id=d, client_request_id=crid)
+                            for d, crid in classify_targets
+                        ],
                         callback_url=callback_url,
                     )
                 )
@@ -442,7 +447,7 @@ async def upload_documents_batch(
                 classification_status = job.status
                 classification_status_url = job.status_url
             except Exception as exc:  # noqa: BLE001
-                targets = set(classify_targets)
+                targets = {d for d, _ in classify_targets}
                 for r in results:
                     if r.doc_id in targets:
                         r.warnings.append(f"classification was not queued: {type(exc).__name__}")

@@ -380,6 +380,7 @@ class ClassifyService:
                     elapsed_ms=0,
                     status="needs_review",
                     warnings=warnings_acc,
+                    client_request_id=req.client_request_id,
                 )
             if req.text_already_preprocessed:
                 cleaned = content
@@ -431,6 +432,7 @@ class ClassifyService:
                         f" reviewer={verified_label.labeler_id or 'system'},"
                         f" level={verified_label.level_code} — inference skipped"
                     ],
+                    client_request_id=req.client_request_id,
                 )
 
             notify("llm")
@@ -750,6 +752,7 @@ class ClassifyService:
                 automation_assessment=automation_assessment,
                 factor_shadow=factor_shadow,
                 policy_shadow=policy_shadow,
+                client_request_id=req.client_request_id,
             )
 
     @staticmethod
